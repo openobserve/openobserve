@@ -22,6 +22,18 @@ defineSlots<OTabSlots>()
 const $attrs = useAttrs()
 const parentDataTest = computed(() => $attrs['data-test'] as string | undefined)
 
+/**
+ * Attrs forwarded to the outer <span> wrapper — everything except data-test.
+ * data-test must only land on the inner <TabsTrigger> (the actual clickable
+ * button) to avoid a strict-mode locator violation in Playwright (two elements
+ * matching the same selector).
+ */
+const spanAttrs = computed(() => {
+   
+  const { 'data-test': _dt, ...rest } = $attrs
+  return rest
+})
+
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY)
 
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name)
@@ -86,7 +98,7 @@ const heightClasses = computed<string>(() => {
     on the button itself never renders. The span wrapper intercepts hover and
     shows the cursor and tooltip even when the inner button is disabled.
   -->
-  <span :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
+  <span v-bind="spanAttrs" :class="disable ? 'tw:cursor-not-allowed' : 'tw:contents'">
     <!--
       TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
       disabled, data-state, click/keyboard activation, and aria-controls linkage.
@@ -103,7 +115,7 @@ const heightClasses = computed<string>(() => {
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
       :class="[baseClasses, stateClasses, heightClasses]"
-      v-bind="$attrs"
+      :data-test="parentDataTest"
     >
       <!--
         If label or icon props are provided, render them (prop-driven mode).

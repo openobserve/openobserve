@@ -96,7 +96,10 @@
               class="tw:flex-1"
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
             />
-            <div class="color-section tw:flex-1">
+            <div
+              class="color-section tw:flex-1"
+              :data-test="`dashboard-addpanel-config-value-mapping-color-section-${index}`"
+            >
               <div
                 v-if="mapping.color !== null"
                 class="tw:items-center tw:flex tw:gap-1"
@@ -121,6 +124,7 @@
                   variant="ghost-primary"
                   size="sm"
                   class="tw:w-full"
+                  :data-test="`dashboard-addpanel-config-value-mapping-set-color-btn-${index}`"
                   @click="setColorByIndex(index)"
                   >{{ t("dashboard.valueMappingSetColor") }}</OButton
                 >

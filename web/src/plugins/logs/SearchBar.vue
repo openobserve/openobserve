@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch
                 :model-value="searchObj.meta.quickMode"
                 size="sm"
-                data-test="logs-search-bar-quick-mode-toggle"
+                data-test="logs-search-bar-quick-mode-switch"
                 @click.stop="handleQuickMode"
               />
             </template>

@@ -115,7 +115,9 @@
             <div
               class="tw:grid tw:grid-cols-2 tw:gap-4 tw:border-t tw:border-[var(--o2-border-color)] tw:pt-2"
             >
-              <div class="tw:space-y-1">
+              <div class="tw:space-y-1"
+                :data-test="`dashboard-query-inspector-start-time-${index}`"
+              >
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Start Time</label
                 >
@@ -130,7 +132,9 @@
                   {{ formatTimestamp(query.startTime) }}
                 </div>
               </div>
-              <div class="tw:space-y-1">
+              <div class="tw:space-y-1"
+                :data-test="`dashboard-query-inspector-end-time-${index}`"
+              >
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >End Time</label
                 >

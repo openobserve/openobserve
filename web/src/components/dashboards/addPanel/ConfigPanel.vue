@@ -447,6 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
           class="tw:mt-2"
           :value-replace-fn="selectPromQlNameOption"
+          data-test="dashboard-config-promql-legend"
         >
           <template v-slot:label>
             <div class="tw:flex tw:items-center all-pointer-events">

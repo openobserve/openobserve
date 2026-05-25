@@ -262,7 +262,8 @@ export async function buildPromQLPanel(page, pm, dashboardName, {
   // Enter PromQL query in Monaco editor
   const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
   await queryEditor.waitFor({ state: "visible", timeout: 10000 });
-  const monacoEditor = queryEditor.getByRole('code');
+  // Monaco renders a div with role="code" — locate via CSS attribute selector (not getByRole)
+  const monacoEditor = queryEditor.locator('[role="code"]');
   await monacoEditor.click({ clickCount: 3 });
   await page.keyboard.press('Backspace');
   // Use insertText (paste-like) to avoid Monaco autocomplete interfering with
@@ -270,7 +271,14 @@ export async function buildPromQLPanel(page, pm, dashboardName, {
   await page.keyboard.insertText(query);
   await page.keyboard.press('Escape'); // dismiss any autocomplete
   // Wait for Monaco debounce to sync editor content to Vue data model
-  await page.waitForTimeout(3000);
+  await page.waitForFunction(
+    (expectedQuery) => {
+      const textarea = document.querySelector('[data-test="dashboard-panel-query-editor"] textarea');
+      return Boolean(textarea && textarea.value.includes(expectedQuery));
+    },
+    query,
+    { timeout: 10000 }
+  );
 
   await pm.dashboardPanelActions.addPanelName(panelName);
   await pm.dashboardPanelActions.applyDashboardBtn();

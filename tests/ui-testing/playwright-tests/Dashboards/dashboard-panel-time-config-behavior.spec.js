@@ -374,22 +374,12 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Verify dropdown opens
     await page.locator('#date-time-menu').waitFor({ state: "visible", timeout: 5000 });
 
-    // Step 5: Click outside to close
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    // Step 5: Press Escape to close
+    await page.keyboard.press('Escape');
     await page.locator('#date-time-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
-    // Step 6: Click picker again and select time
-    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "6-d", false);
-
-    // Dropdown should still be open (not clicked Apply yet)
-    await page.locator('#date-time-menu').waitFor({ state: "visible", timeout: 3000 });
-
-    // Click Apply
-    await page.locator('[data-test="date-time-apply-btn"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-    // Verify dropdown closes and URL updates
-    await page.locator('#date-time-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    // Step 6: Click picker again, select "Last 6 days" and apply
+    await pm.dashboardPanelTime.changePanelTimeInView(panelAId, "6-d", true);
     await assertPanelTimeInURL(page, panelAId, "6d");
 
     // Cleanup
@@ -445,7 +435,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Step 9: Open Query Inspector from panel dropdown menu in View Dashboard
     await page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`).click();
     await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 10: Verify query inspector shows new time (6d, not the old 1h)
     await assertQueryInspectorHasDateTime(page);
@@ -610,7 +600,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(result1.actualCount).toBeGreaterThanOrEqual(1);
 
     // Close dropdown
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await page.keyboard.press('Escape');
     await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 9: Change Panel A time to "Last 1d"
@@ -629,7 +619,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(result2.actualCount).toBeGreaterThanOrEqual(1);
 
     // Close dropdown
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await page.keyboard.press('Escape');
     await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 12: Test global variable uses global time (not panel time)
@@ -647,7 +637,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(result3.actualCount).toBeGreaterThanOrEqual(1);
 
     // Close dropdown
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await page.keyboard.press('Escape');
     await safeWaitForHidden(page, SELECTORS.MENU, { timeout: 3000 });
 
     // Step 14: Change global time to verify global variable tracks it

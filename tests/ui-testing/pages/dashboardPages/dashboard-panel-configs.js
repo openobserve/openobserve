@@ -1,6 +1,8 @@
 //dashboard panel configs page object
 //methods: All configs related to dashboard panels
 
+import { expect } from "@playwright/test";
+
 export default class DashboardPanelConfigs {
   constructor(page) {
     this.page = page;
@@ -36,7 +38,7 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-config-label-rotate"]'
     );
     this.noValueReplacement = page.locator(
-      '[data-test="dashboard-config-no-value-replacement"] input'
+      '[data-test="dashboard-config-no-value-replacement-field"]'
     );
     this.trellisLayout = page.locator('[data-test="dashboard-trellis-chart"]');
     this.queryLimit = page.locator('[data-test="dashboard-config-limit"]');
@@ -87,6 +89,15 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-config-pivot-sticky-row-totals"]'
     );
 
+    // Pagination locators
+    this.paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
+    this.rowsPerPageWrapper = page.locator('[data-test="dashboard-config-rows-per-page"]');
+    this.rowsPerPageField = page.locator('[data-test="dashboard-config-rows-per-page-field"]');
+    this.rowsPerPageInfo = page.locator('[data-test="dashboard-config-rows-per-page-info"]');
+    this.tablePagination = page.locator('[data-test="dashboard-table-pagination"]');
+    this.tableRowsPerPageLabel = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
+    this.tableRowCount = page.locator('[data-test="dashboard-table-row-count"]');
+
     //Metric Text
     this.bgColor = page.locator('[data-test="dashboard-config-color-mode"]');
 
@@ -104,7 +115,7 @@ export default class DashboardPanelConfigs {
     this.overrideTypeSelect = page.locator(
       '[data-test="dashboard-addpanel-config-type-select-0"]'
     );
-    this.sidebarScrollContainer = page.locator('.sidebar-content.scroll');
+    this.sidebarScrollContainer = page.locator('[data-test="panel-sidebar-content"]');
     this.connectNullValuesToggle = page.locator(
       '[data-test="dashboard-config-connect-null-values"]'
     );
@@ -157,6 +168,14 @@ export default class DashboardPanelConfigs {
       '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-close-btn"]'
     );
   }
+  async _clickVirtualOption(dataTestParent, label) {
+    const option = this.page.locator(
+      `[data-test="${dataTestParent}-option"][data-test-label="${label}"]`
+    );
+    await option.waitFor({ state: "visible", timeout: 15000 });
+    await option.click();
+  }
+
   /// Open the config panel
   async openConfigPanel() {
     await this.configBtn.waitFor({ state: "visible" });
@@ -164,30 +183,34 @@ export default class DashboardPanelConfigs {
   }
   // Select legend position
   async legendPosition(position) {
-    await this.legend.waitFor({ state: "visible" });
-    await this.legend.click();
-    await this.page.getByRole("option", { name: position }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-legend-position-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-legend-position", position);
   }
 
   // Select unit
   async selectUnit(unit) {
-    await this.unit.waitFor({ state: "visible" });
-    await this.unit.click();
-    await this.page.getByRole("option", { name: unit, exact: true }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-unit-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    // OSelect has 18+ items; use search to filter before clicking
+    const searchInput = this.page.locator('[data-test="dashboard-config-unit-search"]');
+    await searchInput.waitFor({ state: "visible" });
+    await searchInput.fill(unit);
+    await this._clickVirtualOption("dashboard-config-unit", unit);
   }
 
   //Decimals
   async selectDecimals(decimal) {
     await this.decimals.waitFor({ state: "visible" });
-    await this.decimals.click();
-    await this.decimals.fill(decimal);
+    await this.decimals.locator('[data-test$="-field"]').fill(decimal);
   }
 
   //Query limit
   async selectQueryLimit(limit) {
     await this.queryLimit.waitFor({ state: "visible" });
-    await this.queryLimit.click();
-    await this.queryLimit.fill(limit);
+    await this.queryLimit.locator('[data-test$="-field"]').fill(limit);
   }
 
   //No value replacement
@@ -200,132 +223,130 @@ export default class DashboardPanelConfigs {
   //Axis width
   async selectAxisWidth(width) {
     await this.axisWidth.waitFor({ state: "visible" });
-    await this.axisWidth.click();
-    await this.axisWidth.fill(width);
+    await this.axisWidth.locator('[data-test$="-field"]').fill(width);
   }
   //YAxis Min and Max
   async Y_AxisMin(min) {
     await this.yAxisMin.waitFor({ state: "visible" });
-    await this.yAxisMin.click();
-    await this.yAxisMin.fill(min);
+    await this.yAxisMin.locator('[data-test$="-field"]').fill(min);
   }
   // YAxis Max
   async Y_AxisMax(max) {
     await this.yAxisMax.waitFor({ state: "visible" });
-    await this.yAxisMax.click();
-    await this.yAxisMax.fill(max);
+    await this.yAxisMax.locator('[data-test$="-field"]').fill(max);
   }
 
   // Value position
   async selectValuePosition(position) {
-    await this.valuePosition.waitFor({ state: "visible" });
-    await this.valuePosition.click();
-    await this.page.getByRole("option", { name: position, exact: true }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-label-position-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-label-position", position);
   }
 
   // Value rotate
   async selectValueRotate(rotate) {
     await this.valueRotate.waitFor({ state: "visible" });
-    await this.valueRotate.click();
-    await this.valueRotate.fill(rotate);
+    await this.valueRotate.locator('[data-test$="-field"]').fill(rotate);
   }
 
   //show symbols
   async selectSymbols(symbols) {
-    await this.showSymbols.waitFor({ state: "visible" });
-    await this.showSymbols.click();
-    await this.page.getByRole("option", { name: symbols }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-show_symbol-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-show_symbol", symbols);
   }
   // Line interpolation
   async selectLineInterpolation(interpolation) {
-    await this.lineInterpolation.waitFor({ state: "visible" });
-    await this.lineInterpolation.click();
-    await this.page.getByRole("option", { name: interpolation }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-line_interpolation-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-line_interpolation", interpolation);
   }
 
   // Line thickness
   async selectLineThickness(thickness) {
     await this.lineThickness.waitFor({ state: "visible" });
-    await this.lineThickness.click();
-    await this.lineThickness.fill(thickness);
+    await this.lineThickness.locator('[data-test$="-field"]').fill(thickness);
   }
   //Trellis Layout
   async selectTrellisLayout(layout) {
-    await this.trellisLayout.waitFor({ state: "visible" });
-    await this.trellisLayout.click();
-    await this.page.getByRole("option", { name: layout }).click();
+    const trigger = this.page.locator('[data-test="dashboard-trellis-chart-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    // Trellis is disabled when breakdown field is empty; wait for it to be enabled
+    await expect(trigger).toBeEnabled({ timeout: 15000 });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-trellis-chart", layout);
   }
 
   //GEO Map Configs
 
   //Base Map
-  async selectBaseMap() {
-    await this.baseMap.waitFor({ state: "visible" });
-    await this.baseMap.click();
-    await this.page.getByRole("option", { name: map }).click();
+  async selectBaseMap(map) {
+    const trigger = this.page.locator('[data-test="dashboard-config-basemap-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-basemap", map);
   }
 
   //Lattitude and longitude
   //Lattitude
   async selectLatitude(lat) {
     await this.latitude.waitFor({ state: "visible" });
-    await this.latitude.click();
-    await this.latitude.fill(lat);
+    await this.latitude.locator('[data-test$="-field"]').fill(lat);
   }
   //Longitude
   async selectLongitude(long) {
     await this.longitude.waitFor({ state: "visible" });
-
-    await this.longitude.click();
-    await this.longitude.fill(long);
+    await this.longitude.locator('[data-test$="-field"]').fill(long);
   }
 
   //Zoom
   async selectZoom(zoom) {
     await this.zoom.waitFor({ state: "visible" });
-    await this.zoom.click();
-    await this.zoom.fill(zoom);
+    await this.zoom.locator('[data-test$="-field"]').fill(zoom);
   }
 
   //Symbol size
   async selectSymbolSize(size) {
-    await this.symbolSize.waitFor({ state: "visible" });
-    await this.symbolSize.click();
-    await this.page.getByRole("option", { name: size }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-symbol-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-symbol", size);
   }
 
   //Minimum and maximum size
   async selectMinimumMaximumSize(minimum) {
     await this.minimumSize.waitFor({ state: "visible" });
-    await this.minimumSize.click();
-    await this.minimumSize.fill(minimum);
+    await this.minimumSize.locator('[data-test$="-field"]').fill(minimum);
   }
   //Maximum size
   async selectMaximumSize(maximum) {
     await this.maximumSize.waitFor({ state: "visible" });
-    await this.maximumSize.click();
-    await this.maximumSize.fill(maximum);
+    await this.maximumSize.locator('[data-test$="-field"]').fill(maximum);
   }
 
   //layer type
   async selectLayerType(type) {
-    await this.layerType.waitFor({ state: "visible" });
-    await this.layerType.click();
-    await this.page.getByRole("option", { name: type }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-layer-type-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-layer-type", type);
   }
 
   //weight
   async selectWeight(Weight) {
     await this.weight.waitFor({ state: "visible" });
-    await this.weight.click();
-    await this.weight.fill(Weight);
+    await this.weight.locator('[data-test$="-field"]').fill(Weight);
   }
 
   //Map configs
   async selectMapType(type) {
-    await this.mapType.waitFor({ state: "visible" });
-    await this.mapType.click();
-    await this.page.getByRole("option", { name: type }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-map-type-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-map-type", type);
   }
 
   //table chast configs
@@ -371,7 +392,7 @@ export default class DashboardPanelConfigs {
     // OSelect forwards parent data-test to ListboxItem (`*-option`).
     const columnOptions = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"]');
     if (columnName) {
-      const columnOption = columnOptions.filter({ hasText: columnName }).first();
+      const columnOption = this.page.locator(`[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"][data-test-label="${columnName}"]`);
       await columnOption.waitFor({ state: "visible", timeout: 5000 });
       await columnOption.click();
     } else {
@@ -384,7 +405,7 @@ export default class DashboardPanelConfigs {
     await unitSelect.waitFor({ state: "visible", timeout: 5000 });
     await unitSelect.click();
     const unitOption = this.page
-      .locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0-option"]', { hasText: unitName })
+      .locator(`[data-test="dashboard-addpanel-config-unit-config-select-unit-0-option"][data-test-label="${unitName}"]`)
       .first();
     await unitOption.click();
 
@@ -413,14 +434,15 @@ export default class DashboardPanelConfigs {
 
     const valueInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]');
     await valueInput.waitFor({ state: "visible", timeout: 5000 });
-    await valueInput.fill(value);
+    await valueInput.locator('[data-test$="-field"]').fill(value);
 
     const textInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]');
-    await textInput.fill(text);
+    await textInput.locator('[data-test$="-field"]').fill(text);
 
     if (setColor) {
-      await popup.getByText("Set color").click();
-      await popup.locator('.color-section input').first().waitFor({ state: "visible", timeout: 5000 });
+      const setColorBtn = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-set-color-btn-0"]');
+      await setColorBtn.click();
+      await setColorBtn.waitFor({ state: "hidden", timeout: 5000 });
     }
 
     // ValueMappingPopUp is now an ODialog — Apply is the primary footer button
@@ -458,30 +480,30 @@ export default class DashboardPanelConfigs {
     // Select column
     await this.overrideColumnSelect.waitFor({ state: "visible" });
     await this.overrideColumnSelect.click();
-    const columnOption = this.page.getByRole("option", { name: columnName }).first();
+    const columnOption = this.page.locator(`[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"][data-test-label="${columnName}"]`).first();
     await columnOption.waitFor({ state: "visible" });
     await columnOption.click();
 
     // Select type
     await this.overrideTypeSelect.waitFor({ state: "visible" });
     await this.overrideTypeSelect.click();
-    const typeOption = this.page.getByRole("option", { name: typeName }).first();
+    const typeOption = this.page.locator(`[data-test="dashboard-addpanel-config-type-select-0-option"][data-test-label="${typeName}"]`).first();
     await typeOption.waitFor({ state: "visible" });
     await typeOption.click();
 
     // Optionally enable checkbox corresponding to the selected type
     if (enableTypeCheckbox) {
-      const typeCheckbox = this.page.getByRole("checkbox", { name: typeName });
+      const typeCheckbox = this.page.locator('[data-test="dashboard-addpanel-config-override-unique-value-checkbox-0"]');
       await typeCheckbox.waitFor({ state: "visible" });
       await typeCheckbox.click();
     }
-      const saveBtn = this.page.getByRole('button', { name: 'Save' });
+      const saveBtn = this.page.locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-primary-btn"]');
       await saveBtn.waitFor({ state: "visible", timeout: 5000 });
       await saveBtn.click();
   } 
   // Click-hold on the sidebar and scroll down until the Override button is visible
   async scrollDownSidebarUntilOverrideVisible() {
-    const sidebar = this.page.locator('.sidebar-content');
+    const sidebar = this.sidebarScrollContainer;
     await sidebar.waitFor({ state: "visible" });
 
     // Bring sidebar into view and hover so wheel events target it
@@ -501,10 +523,7 @@ export default class DashboardPanelConfigs {
       await this.page.evaluate((selector) => {
         const el = document.querySelector(selector);
         if (el) el.scrollTop = el.scrollHeight;
-      }, ".sidebar-content");
-
-      // Wait a bit for scroll to complete
-      await this.page.waitForTimeout(500);
+      }, '[data-test="panel-sidebar-content"]');
     }
 
     // Ensure the button is actually visible before proceeding
@@ -522,7 +541,6 @@ export default class DashboardPanelConfigs {
           button.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       });
-      await this.page.waitForTimeout(1000);
     }
 
     // Finally wait for it to be visible
@@ -531,34 +549,30 @@ export default class DashboardPanelConfigs {
   //Metric Text
   //BG color
   async selectBGColor(color) {
-    await this.bgColor.waitFor({ state: "visible" });
-    await this.bgColor.click();
-    await this.page.getByRole("option", { name: color }).click();
+    const trigger = this.page.locator('[data-test="dashboard-config-color-mode-trigger"]');
+    await trigger.waitFor({ state: "visible" });
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-color-mode", color);
   }
 
   //Guage chart configs
   async selectGuageMin(min) {
     await this.gaugeMin.waitFor({ state: "visible" });
-    await this.gaugeMin.click();
-    await this.gaugeMin.fill(min);
+    await this.gaugeMin.locator('[data-test$="-field"]').fill(min);
   }
   //Guage Max
   async selectGuageMax(max) {
     await this.gaugeMax.waitFor({ state: "visible" });
-    await this.gaugeMax.click();
-    await this.gaugeMax.fill(max);
+    await this.gaugeMax.locator('[data-test$="-field"]').fill(max);
   }
 
   // Get connect null values toggle state
   async getConnectNullValuesState() {
     await this.connectNullValuesToggle.waitFor({ state: "visible", timeout: 10000 });
-
-    // Check aria-checked attribute - this is the most reliable indicator
-    let ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-checked");
-    if (ariaChecked === null) {
-      ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-pressed");
-    }
-
+    // OSwitch inner <button> carries data-test="{parentDataTest}-btn" and aria-checked
+    const ariaChecked = await this.connectNullValuesToggle
+      .locator('[data-test$="-btn"]')
+      .getAttribute("aria-checked");
     return ariaChecked === "true";
   }
 
@@ -582,14 +596,13 @@ export default class DashboardPanelConfigs {
    * @param {import('@playwright/test').Locator} targetLocator - Element to scroll to
    */
   async scrollSidebarToElement(targetLocator) {
-    const sidebar = this.page.locator('.sidebar-content');
+    const sidebar = this.sidebarScrollContainer;
     await sidebar.waitFor({ state: "visible" });
     await sidebar.hover();
 
     for (let i = 0; i < 15; i++) {
       if (await targetLocator.isVisible().catch(() => false)) break;
       await this.page.mouse.wheel(0, 300);
-      await this.page.waitForTimeout(200);
     }
 
     if (!(await targetLocator.isVisible().catch(() => false))) {
@@ -600,14 +613,13 @@ export default class DashboardPanelConfigs {
         return el.getAttribute('data-test')
           ? `[data-test="${el.getAttribute('data-test')}"]`
           : null;
-      }).catch(() => null) || '.sidebar-content');
+      }).catch(() => null) || '[data-test="panel-sidebar-content"]');
 
       // Fallback: scroll sidebar to bottom
       await this.page.evaluate(() => {
-        const el = document.querySelector('.sidebar-content');
+        const el = document.querySelector('[data-test="panel-sidebar-content"]');
         if (el) el.scrollTop = el.scrollHeight;
       });
-      await this.page.waitForTimeout(500);
     }
 
     await targetLocator.waitFor({ state: "visible", timeout: 15000 });
@@ -655,21 +667,23 @@ export default class DashboardPanelConfigs {
    * @returns {string} The selected series name
    */
   async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
-    const autoComplete = this.colorBySeriesPopup
-      .locator('[data-test="common-auto-complete"]')
-      .nth(rowIndex);
-    await autoComplete.waitFor({ state: "visible" });
-    await autoComplete.click();
+    // OCombobox input — `dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input`
+    const comboboxInput = this.colorBySeriesPopup.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-input"]`
+    );
+    await comboboxInput.waitFor({ state: "visible", timeout: 10000 });
+    await comboboxInput.click();
 
-    const optionLocators = this.colorBySeriesPopup.locator(
-      '[data-test="common-auto-complete-option"]'
+    // OCombobox uses ComboboxPortal — options are rendered at document root, outside the popup.
+    // Must use page-level locator, not colorBySeriesPopup-scoped locator.
+    const optionLocators = this.page.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-series-select-${rowIndex}-option"]`
     );
     await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });
 
     let targetOption;
 
     if (matchText) {
-      // Find option containing the match text (e.g., "ago" for comparison series)
       const count = await optionLocators.count();
       for (let i = 0; i < count; i++) {
         const text = await optionLocators.nth(i).textContent();
@@ -678,7 +692,6 @@ export default class DashboardPanelConfigs {
           break;
         }
       }
-      // Fallback to last option if no match (comparison series is usually last)
       if (!targetOption && count > 1) {
         targetOption = optionLocators.nth(count - 1);
       } else if (!targetOption) {
@@ -688,7 +701,7 @@ export default class DashboardPanelConfigs {
       targetOption = optionLocators.nth(optionIndex ?? 0);
     }
 
-    const seriesName = await targetOption.textContent();
+    const seriesName = await targetOption.getAttribute("data-test-label");
     await targetOption.click();
 
     return seriesName?.trim() || "";
@@ -701,10 +714,10 @@ export default class DashboardPanelConfigs {
    */
   async setColorForSeriesRow(rowIndex = 0, color = "#5960b2") {
     // Click "Set color" button if the color picker is not yet initialized
-    const setColorBtn = this.colorBySeriesPopup.getByText("Set color");
-    if (await setColorBtn.first().isVisible().catch(() => false)) {
-      await setColorBtn.first().click();
-      await this.page.waitForTimeout(500);
+    const setColorBtn = this.colorBySeriesPopup.locator(`[data-test="dashboard-addpanel-config-color-by-series-set-color-btn-${rowIndex}"]`);
+    if (await setColorBtn.isVisible().catch(() => false)) {
+      await setColorBtn.click();
+      await setColorBtn.waitFor({ state: "hidden", timeout: 5000 });
     }
 
     // Strategy 1: Set color via Vue's reactive data (setupState).
@@ -731,9 +744,9 @@ export default class DashboardPanelConfigs {
         }
 
         // Strategy 2: Native input events fallback (works in prod builds)
-        // Find the color input for the given row and set value via native setter + events
-        const colorInputs = popup.querySelectorAll(".color-section input");
-        const input = colorInputs[rowIndex];
+        // Find the color input scoped to the specific row's color section
+        const colorSection = popup.querySelector(`[data-test="dashboard-addpanel-config-color-by-series-color-section-${rowIndex}"]`);
+        const input = colorSection ? colorSection.querySelector('input') : null;
         if (input) {
           const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
             window.HTMLInputElement.prototype, "value"
@@ -752,8 +765,6 @@ export default class DashboardPanelConfigs {
     if (!result.success) {
       throw new Error(`Failed to set color: ${result.reason}`);
     }
-
-    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -917,16 +928,21 @@ export default class DashboardPanelConfigs {
    * Toggle show row totals for pivot table
    */
   async togglePivotRowTotals() {
-    await this.pivotRowTotals.waitFor({ state: "visible" });
-    await this.pivotRowTotals.click();
+    // Click the inner toggle button directly — the label slot contains an OButton
+    // with @click.stop that would block propagation if the wrapper center lands on it.
+    const innerBtn = this.pivotRowTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**
    * Toggle show column totals for pivot table
    */
   async togglePivotColTotals() {
-    await this.pivotColTotals.waitFor({ state: "visible" });
-    await this.pivotColTotals.click();
+    // Click the inner toggle button directly — same @click.stop concern as row totals.
+    const innerBtn = this.pivotColTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**
@@ -934,8 +950,9 @@ export default class DashboardPanelConfigs {
    * (only visible when row totals is enabled)
    */
   async togglePivotStickyColTotals() {
-    await this.pivotStickyColTotals.waitFor({ state: "visible" });
-    await this.pivotStickyColTotals.click();
+    const innerBtn = this.pivotStickyColTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**
@@ -943,19 +960,96 @@ export default class DashboardPanelConfigs {
    * (only visible when column totals is enabled)
    */
   async togglePivotStickyRowTotals() {
-    await this.pivotStickyRowTotals.waitFor({ state: "visible" });
-    await this.pivotStickyRowTotals.click();
+    const innerBtn = this.pivotStickyRowTotals.locator('[data-test$="-btn"]');
+    await innerBtn.waitFor({ state: "visible" });
+    await innerBtn.click();
   }
 
   /**
-   * Get the checked state of a toggle by data-test selector
-   * @param {import('@playwright/test').Locator} toggleLocator
+   * Get the checked state of an OSwitch toggle.
+   * OSwitch renders aria-checked on the inner <button role="switch">, NOT on the
+   * wrapper div that carries the data-test attribute. Query the inner [data-state]
+   * button to determine the current state.
+   * @param {import('@playwright/test').Locator} toggleLocator - locator for the OSwitch wrapper
    * @returns {Promise<boolean>}
    */
   async getToggleState(toggleLocator) {
     await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
-    const ariaChecked = await toggleLocator.getAttribute("aria-checked");
-    return ariaChecked === "true";
+    // OSwitch inner <button> carries data-test="{parentDataTest}-btn" and data-state="checked|unchecked"
+    const innerBtn = toggleLocator.locator('[data-test$="-btn"]');
+    const dataState = await innerBtn.getAttribute('data-state');
+    return dataState === 'checked';
+  }
+
+  // ========== Pagination Configs ==========
+
+  /**
+   * Toggle the pagination switch in the config panel.
+   */
+  async togglePagination() {
+    await this.paginationToggle.waitFor({ state: "visible" });
+    await this.paginationToggle.click();
+  }
+
+  /**
+   * Returns true if pagination is currently enabled.
+   * @returns {Promise<boolean>}
+   */
+  async isPaginationEnabled() {
+    return this.getToggleState(this.paginationToggle);
+  }
+
+  /**
+   * Set the rows-per-page value.
+   * Targets the inner OInput field (not the wrapper div).
+   * @param {string|number} value
+   */
+  async setRowsPerPage(value) {
+    await this.rowsPerPageWrapper.waitFor({ state: "visible" });
+    await this.rowsPerPageField.click();
+    await this.rowsPerPageField.fill(String(value));
+  }
+
+  /**
+   * Returns the current value in the rows-per-page input.
+   * @returns {Promise<string>}
+   */
+  async getRowsPerPageValue() {
+    return await this.rowsPerPageField.inputValue();
+  }
+
+  /**
+   * Returns true if the transpose toggle inner button is disabled.
+   * @returns {Promise<boolean>}
+   */
+  async isTransposeDisabled() {
+    const innerBtn = this.transpose.locator('[data-test$="-btn"]');
+    return await innerBtn.isDisabled();
+  }
+
+  /**
+   * Returns true if the dynamic columns toggle inner button is disabled.
+   * @returns {Promise<boolean>}
+   */
+  async isDynamicColumnsDisabled() {
+    const innerBtn = this.dynamicColumn.locator('[data-test$="-btn"]');
+    return await innerBtn.isDisabled();
+  }
+
+  /**
+   * Returns true if pivot row totals is currently enabled.
+   * @returns {Promise<boolean>}
+   */
+  async isPivotRowTotalsEnabled() {
+    return this.getToggleState(this.pivotRowTotals);
+  }
+
+  /**
+   * Returns true if pivot column totals is currently enabled.
+   * @returns {Promise<boolean>}
+   */
+  async isPivotColTotalsEnabled() {
+    return this.getToggleState(this.pivotColTotals);
   }
 
 }

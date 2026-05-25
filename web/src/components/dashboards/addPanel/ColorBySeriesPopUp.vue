@@ -55,11 +55,15 @@
                 label="Select Series"
                 label-position="inside"
                 :value-replace-fn="selectColorBySeriesOption"
+                :data-test="`dashboard-addpanel-config-color-by-series-series-select-${index}`"
               />
             </div>
 
             <!-- Color Picker -->
-            <div class="color-section tw:shrink-0">
+            <div
+              class="color-section tw:shrink-0"
+              :data-test="`dashboard-addpanel-config-color-by-series-color-section-${index}`"
+            >
               <div
                 v-if="series.color !== null"
                 class="tw:items-center tw:flex tw:gap-1"
@@ -76,6 +80,7 @@
                   variant="ghost-primary"
                   size="sm"
                   class="tw:w-full"
+                  :data-test="`dashboard-addpanel-config-color-by-series-set-color-btn-${index}`"
                   @click="setColorByIndex(index)"
                   >Set color</OButton
                 >

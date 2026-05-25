@@ -70,9 +70,17 @@ export default class DashboardactionPage {
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
-      
-    // Wait for save to complete
-    // await this.page.waitForLoadState("networkidle");
+    // Wait for either: successful navigation away from add_panel, or a
+    // validation error toast. On success the URL changes; on failure the toast
+    // appears and navigation never happens — without this race the error toast
+    // disappears (5 s) before the URL wait (20 s) gives up.
+    await Promise.race([
+      this.page.waitForURL(
+        (url) => !url.pathname.includes("/add_panel"),
+        { timeout: 20000 }
+      ),
+      this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
+    ]).catch(() => {});
   }
 
   //Apply dashboard button

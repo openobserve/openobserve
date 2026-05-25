@@ -146,6 +146,7 @@ const wrapperClasses = computed(() => [
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
+        :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none',
