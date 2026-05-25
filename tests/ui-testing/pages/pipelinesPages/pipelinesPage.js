@@ -91,7 +91,7 @@ export class PipelinesPage {
         // OInput inner native input — `.fill()` MUST target the `-field`
         // variant per §4 (the wrapper isn't the input).
         this.pipelineSearchInputField = page.locator('[data-test="pipeline-list-search-input-field"]');
-        this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
+        this.deletionSuccessMessage = page.locator('[data-test="o-toast-default"] [data-test="o-toast-message"]').filter({ hasText: 'Pipeline deleted successfully' })
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
         this.sqlQueryInput = page.locator('.monaco-editor').last();
@@ -799,7 +799,7 @@ export class PipelinesPage {
 
     // Method to verify deletion success message
     async verifyPipelineDeleted() {
-        await this.deletionSuccessMessage.click();
+        await this.deletionSuccessMessage.waitFor({ state: 'visible' });
     }
 
     async clickSqlEditor() {
