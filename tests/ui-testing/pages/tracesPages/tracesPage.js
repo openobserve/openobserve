@@ -114,7 +114,7 @@ export class TracesPage {
     // Error States
     this.noStreamSelectedText = '[data-test="logs-search-no-stream-selected-text"]';
     this.resultNotFoundText = '[data-test="logs-search-result-not-found-text"]';
-    this.errorMessage = '[data-test="logs-search-error-message"]';
+    this.errorMessage = '[data-test="traces-search-error-message"]';
 
     // Query Editor
     // The traces SearchBar.vue renders <code-query-editor editor-id="traces-query-editor">
@@ -123,7 +123,7 @@ export class TracesPage {
     this.sqlModeButton = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
     this.queryEditor = '[data-test="query-editor"]';
     this.queryEditorContainer = '[data-test="query-editor"]';
-    this.queryErrorMessage = '[data-test="logs-search-error-message"]';
+    this.queryErrorMessage = '[data-test="traces-search-error-message"]';
 
     // Time Range Selectors
     this.dateTimeRelative15mButton = '[data-test="date-time-relative-15-m-btn"]';
@@ -751,11 +751,10 @@ export class TracesPage {
           return false;
         }
 
-        // Check for error
+        // Check for error — return false so callers can check isErrorMessageVisible()
         const errorElement = this.page.locator(this.errorMessage);
         if (await errorElement.isVisible({ timeout: 1000 })) {
-          const errorText = await errorElement.textContent();
-          throw new Error(`Search failed with error: ${errorText}`);
+          return false;
         }
 
         // If not the last attempt, wait and retry
@@ -763,9 +762,6 @@ export class TracesPage {
           await this.page.waitForTimeout(2000);
         }
       } catch (error) {
-        if (error.message.includes('Search failed')) {
-          throw error;
-        }
         if (attempt === maxAttempts) return false;
       }
     }

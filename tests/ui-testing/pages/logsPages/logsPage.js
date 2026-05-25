@@ -4227,9 +4227,12 @@ export class LogsPage {
     }
 
     /**
-     * Wait for a specific column cell in the first result row to be visible.
-     * Use this for SQL queries that return named columns (e.g. aggregate CTEs)
-     * where the built-in "source" column is not present.
+     * Wait for a specific named column cell in the first result row to be visible.
+     * Only applicable when the user has pinned fields via selectedFields — those
+     * fields are rendered as individual columns with id equal to the field name.
+     * For aggregate CTEs or any query where no fields are pinned, the table shows
+     * a single "source" column (JSON.stringify of the row); use
+     * expectLogTableColumnSourceVisible() + expectInterestingFieldInTable() instead.
      * @param {string} columnName - The column/field name (e.g. 'level', 'kubernetes_pod_name')
      * @param {number} rowIndex - Row index (default 0 = first row)
      */
