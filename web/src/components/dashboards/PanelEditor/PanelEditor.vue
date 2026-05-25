@@ -946,9 +946,9 @@ const afterSlotStyle = computed(() => {
 // After slot inner div class - logs/build uses "tw:flex tw:flex-col", others use "tw:flex tw:flex-col scroll"
 const afterSlotInnerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "tw:flex tw:flex-col tw:w-full";
+    return "tw:flex tw:flex-col tw:flex-1 tw:min-w-0";
   }
-  return "scroll tw:w-full";
+  return "scroll tw:flex-1 tw:min-w-0";
 });
 
 // After slot inner div style
