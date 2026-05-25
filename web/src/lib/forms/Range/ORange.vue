@@ -277,7 +277,7 @@ function onVertUp(e: PointerEvent) {
     :class="
       vertical
         ? 'tw:flex tw:flex-row tw:h-full'
-        : 'tw:flex tw:flex-col tw:gap-1 tw:w-full'
+        : 'tw:flex tw:flex-col tw:gap-1'
     "
   >
     <!-- ── Vertical mode ──────────────────────────────────────────────────── -->
@@ -501,13 +501,17 @@ function onVertUp(e: PointerEvent) {
       />
 
       <!-- Visual thumbs -->
+      <!-- left is clamped so the thumb never overflows the track container at
+           either extreme: min 0px (left edge) and max calc(100% - thumbSize)
+           (right edge). This prevents horizontal scroll in overflow:hidden or
+           overflow-y:auto ancestor containers. -->
       <span
         :class="[
           'tw:absolute tw:rounded-full tw:pointer-events-none tw:shadow-sm tw:border-2 tw:border-slider-thumb-border tw:z-30',
           thumbSize[resolvedSize],
           disabled ? 'tw:bg-slider-disabled-thumb' : 'tw:bg-slider-thumb',
         ]"
-        :style="{ left: `calc(${minPercent}% - ${thumbHalf[resolvedSize]})` }"
+        :style="{ left: `clamp(0px, calc(${minPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))` }"
         aria-hidden="true"
       />
       <span
@@ -516,7 +520,7 @@ function onVertUp(e: PointerEvent) {
           thumbSize[resolvedSize],
           disabled ? 'tw:bg-slider-disabled-thumb' : 'tw:bg-slider-thumb',
         ]"
-        :style="{ left: `calc(${maxPercent}% - ${thumbHalf[resolvedSize]})` }"
+        :style="{ left: `clamp(0px, calc(${maxPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))` }"
         aria-hidden="true"
       />
 

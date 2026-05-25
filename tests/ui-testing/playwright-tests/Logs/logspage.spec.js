@@ -143,9 +143,9 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickRelative6WeeksButton();
     await pm.logsPage.clickShowQueryToggle();
     await pm.logsPage.clickSavedViewsButton();
-    // Use '#' — '@' is explicitly allowed by the regex /^[-A-Za-z0-9 /@/_]+$/
-    // so "e2e@@@@@" would pass validation. '#' is outside the allowed set.
-    await pm.logsPage.fillSavedViewName("e2e#####");
+    // Allowed: alphanumeric, spaces, underscores, hyphens (/^[A-Za-z0-9 _-]+$/)
+    // '@', '#', '/', and other special characters are rejected.
+    await pm.logsPage.fillSavedViewName("e2e@@@@@");
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.clickSavedViewDialogSave();
     // After O2 migration, special-char validation sets savedViewNameError (inline OInput error)

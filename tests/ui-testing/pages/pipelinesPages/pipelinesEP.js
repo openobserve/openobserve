@@ -7,14 +7,14 @@ export class PipelinesEP {
         this.page = page;
 
         this.pipelinesMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        this.functionStreamTab = '[data-test="function-stream-tab"]';
+        this.functionStreamTab = 'button[data-test="function-stream-tab"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
         this.createFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
         this.functionNameInput = '[data-test="add-function-name-input-input"]';
         this.saveFunctionButton = '[data-test="add-function-save-btn"]';
         this.logsSearchField = '[data-test="logs-vrl-function-editor"]';
         this.logsSearchFieldCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
-        this.streamPipelinesTab = '[data-test="stream-pipelines-tab"]';
+        this.streamPipelinesTab = 'button[data-test="stream-pipelines-tab"]';
         this.importPipelineButton = '[data-test="pipeline-list-import-pipeline-btn"]';
         this.importJsonUrlTab = '[data-test="tab-import_json_url"]';
         this.importCancelButton = '[data-test="pipeline-import-cancel-btn"]';

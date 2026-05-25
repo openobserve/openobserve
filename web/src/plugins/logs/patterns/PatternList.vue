@@ -53,11 +53,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></div>
       </div>
 
-      <!-- Patterns List with Virtual Scroll -->
+      <!-- Patterns List: plain render when wrap is on (variable row heights break virtual scroll) -->
+      <template v-if="wrap">
+        <PatternCard
+          v-for="(pattern, index) in patterns"
+          :key="pattern.pattern_id ?? index"
+          :pattern="pattern"
+          :index="index"
+          :wrap="wrap"
+          @click="$emit('open-details', pattern, index)"
+          @include="$emit('add-to-search', pattern, 'include')"
+          @exclude="$emit('add-to-search', pattern, 'exclude')"
+          @create-alert="$emit('create-alert', pattern)"
+        />
+      </template>
+
+      <!-- Patterns List with Virtual Scroll (wrap off) -->
       <OVirtualScroll
+        v-else
         :items="patterns"
         :overscan="5"
         :scroll-target="scrollTarget ?? null"
+        :dynamic-row-height="wrap"
       >
         <template #default="{ item: pattern, index }">
           <PatternCard
@@ -114,6 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- Bottom spacer so the last row isn't flush with the container edge -->
+    <div v-if="patterns?.length > 0" class="tw:h-4" />
+
     <!-- Wildcard hover popover (outside q-virtual-scroll to avoid DOM recycling conflicts) -->
     <WildcardValuePopover
       :visible="!!hoveredToken"
@@ -136,7 +156,7 @@ import useWildcardHover from "./useWildcardHover";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 
-defineProps<{
+const props = defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;

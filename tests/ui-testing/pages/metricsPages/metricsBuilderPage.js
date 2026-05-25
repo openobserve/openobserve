@@ -14,7 +14,7 @@ export class MetricsBuilderPage {
 
         // Metric/Stream Selector (in the sidebar FieldList, not a separate MetricSelector component)
         this.streamSelector = '[data-test="index-dropdown-stream"]';
-        this.fieldSearchInput = '[data-test="index-field-search-input"]';
+        this.fieldSearchInput = '[data-test="o-field-list-search-field"]';
 
         // Label Filter selectors
         this.addLabelFilterButton = '[data-test="promql-add-label-filter"]';
@@ -141,10 +141,11 @@ export class MetricsBuilderPage {
         this.queryEditorEl = page.locator('[data-test="dashboard-panel-query-editor"]').first();
 
         // Table chart (dashboard panel) — TenstackTable header data-tests are
-        // `o2-table-th-{columnId}`; the wrapper has `dashboard-table-renderer-wrapper`.
-        // We accept either the wrapper or the inner table data-test so the locator
-        // works for both metrics PromQL tables and dashboard panel tables.
-        this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"], [data-test="dashboard-table-renderer-wrapper"], [data-test="promql-table-chart"]').first();
+        // `o2-table-th-{columnId}`; the wrapper div carries `dashboard-panel-table`
+        // (moved from TenstackTable component to DOM element in TableRenderer.vue).
+        // We also accept promql-table-chart so the locator works for both metrics
+        // PromQL tables and dashboard panel tables.
+        this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"], [data-test="promql-table-chart"]').first();
         this.tableHeaderCells = page.locator('[data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])');
         this.tableRows = page.locator('[data-test="dashboard-data-row"]');
 
