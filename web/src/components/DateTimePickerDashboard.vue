@@ -72,7 +72,7 @@ export default defineComponent({
     },
     menuAlign: {
       required: false,
-      default: "start",
+      default: "end",
       type: String,
     },
   },
