@@ -2563,11 +2563,26 @@ export class LogsPage {
     }
 
     async clickSearchBarRefreshButton() {
-        return await this.page.locator(this.searchBarRefreshButton).click({ force: true });
+        // Use .first() to avoid strict-mode violations when multiple data-test matches exist.
+        // waitForSearchBarRefreshButton() must be called first to ensure the button is enabled;
+        // OButton.handleClick() guards on props.loading/disabled and will not emit when loading,
+        // making force-click on a loading button a silent no-op.
+        return await this.page.locator(this.searchBarRefreshButton).first().click({ force: true });
     }
 
     async waitForSearchBarRefreshButton() {
-        return await this.page.locator(this.searchBarRefreshButton).waitFor({ state: "visible" });
+        const btn = this.page.locator(this.searchBarRefreshButton).first();
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
+        // OButton renders <button disabled> while loading. Wait for the button to be enabled
+        // before clicking — OButton.handleClick() guards on loading and won't emit if disabled.
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                return el != null && !el.hasAttribute('disabled');
+            },
+            this.searchBarRefreshButton,
+            { timeout: 15000 }
+        );
     }
 
     async clickSQLModeToggle() {

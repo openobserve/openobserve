@@ -141,10 +141,11 @@ export class MetricsBuilderPage {
         this.queryEditorEl = page.locator('[data-test="dashboard-panel-query-editor"]').first();
 
         // Table chart (dashboard panel) — TenstackTable header data-tests are
-        // `o2-table-th-{columnId}`; the wrapper has `dashboard-table-renderer-wrapper`.
-        // We accept either the wrapper or the inner table data-test so the locator
-        // works for both metrics PromQL tables and dashboard panel tables.
-        this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"], [data-test="dashboard-table-renderer-wrapper"], [data-test="promql-table-chart"]').first();
+        // `o2-table-th-{columnId}`; the wrapper div carries `dashboard-panel-table`
+        // (moved from TenstackTable component to DOM element in TableRenderer.vue).
+        // We also accept promql-table-chart so the locator works for both metrics
+        // PromQL tables and dashboard panel tables.
+        this.dashboardPanelTable = page.locator('[data-test="dashboard-panel-table"], [data-test="promql-table-chart"]').first();
         this.tableHeaderCells = page.locator('[data-test^="o2-table-th-"]:not([data-test*="-sort-"]):not([data-test*="-remove-"])');
         this.tableRows = page.locator('[data-test="dashboard-data-row"]');
 
