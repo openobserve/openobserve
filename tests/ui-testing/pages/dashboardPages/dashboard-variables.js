@@ -12,6 +12,12 @@ export default class DashboardVariables {
     this.settingsDrawerCloseBtn = page.locator('[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]');
     // Per-name factory: returns the edit button for a specific variable name
     this.editVariableBtn = (name) => page.locator(`[data-test="dashboard-edit-variable-${name}"]`);
+    // Per-name factories for variable selector dropdown parts
+    this.variableTrigger = (name) => page.locator(`[data-test="variable-selector-${name}-inner-trigger"]`);
+    this.variableSearchInput = (name) => page.locator(`[data-test="variable-selector-${name}-inner-search"]`);
+    this.variableOptionByValue = (name, value) => page.locator(`[data-test="variable-selector-${name}-inner-option"][data-test-value="${value}"]`);
+    this.variablePopover = (name) => page.locator(`[data-test="variable-selector-${name}-inner-popover"]`);
+    this.variableWrapper = (name) => page.locator(`[data-test="variable-selector-${name}-inner"]`);
   }
 
   // Method to add a dashboard variable
@@ -125,6 +131,39 @@ export default class DashboardVariables {
     await this.settingsDrawerCloseBtn.click();
     await this.settingsDrawer.waitFor({ state: 'hidden', timeout: 10000 });
     // }
+  }
+
+  /**
+   * Click the trigger to open a variable's dropdown
+   * @param {string} variableName - Variable name
+   */
+  async clickVariableTrigger(variableName) {
+    const trigger = this.variableTrigger(variableName);
+    await trigger.waitFor({ state: 'visible', timeout: 10000 });
+    await trigger.click();
+    await this.variablePopover(variableName).waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Fill the search input inside an already-open variable dropdown
+   * @param {string} variableName - Variable name
+   * @param {string} term - Search term
+   */
+  async fillVariableSearch(variableName, term) {
+    const searchInput = this.variableSearchInput(variableName);
+    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+    await searchInput.fill(term);
+  }
+
+  /**
+   * Select an option from an open variable dropdown by its exact value
+   * @param {string} variableName - Variable name
+   * @param {string} value - Option value (data-test-value attribute)
+   */
+  async selectVariableOption(variableName, value) {
+    const option = this.variableOptionByValue(variableName, value);
+    await option.waitFor({ state: 'visible', timeout: 10000 });
+    await option.click();
   }
 
   // Dynamic function to fill input by label
