@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <div               
-            v-show="isLoading"
+          <div
+            v-if="isLoading"
             :key="store.state.selectedOrganization?.identifier"
             class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
           >
