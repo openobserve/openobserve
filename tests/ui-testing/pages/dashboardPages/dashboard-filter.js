@@ -207,25 +207,43 @@ export default class DashboardFilter {
   async selectListFilterItems(index, fieldName, values) {
     const idx = String(index);
 
+    // 1. Open the condition popover via the label button
     const labelLocator = this.page.locator(
       `[data-test="dashboard-add-condition-label-${idx}-${fieldName}"]`
     );
     await labelLocator.waitFor({ state: "visible" });
     await labelLocator.click();
 
-    const listTab = this.page.locator(
-      '[data-test="dashboard-add-condition-list-tab"]'
+    // 2. Click the "List" OTab to switch to list mode
+    // OTab has data-test="dashboard-add-condition-list-${conditionIndex}"
+    const listTabTrigger = this.page
+      .locator(`[data-test="dashboard-add-condition-list-${idx}"]`)
+      .last();
+    await listTabTrigger.waitFor({ state: "visible", timeout: 10000 });
+    await listTabTrigger.click();
+
+    // 3. Click the OSelect trigger button to open the list dropdown
+    // OSelect renders its trigger as [data-test="${parent}-trigger"]
+    const listSelect = this.page
+      .locator('[data-test="dashboard-add-condition-list-tab"]')
+      .last();
+    await listSelect.waitFor({ state: "visible", timeout: 5000 });
+    await listSelect.locator('button').first().evaluate((el) => el.click());
+
+    // 4. Wait for the OSelect popover and its options to load
+    const listPopover = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab-popover"]'
     );
-    await listTab.waitFor({ state: "visible" });
-    await listTab.click();
-
-    await this.page
-      .locator('[data-test="dashboard-add-condition-list-item"]')
+    await listPopover.waitFor({ state: "visible", timeout: 10000 });
+    await listPopover
+      .locator('[data-test="dashboard-add-condition-list-tab-option"]')
       .first()
-      .waitFor({ state: "visible" });
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
 
+    // 5. Click each option by its data-test-value
     for (const val of values) {
-      const option = this.page.locator(
+      const option = listPopover.locator(
         `[data-test="dashboard-add-condition-list-tab-option"][data-test-value="${val}"]`
       );
       await option.waitFor({ state: "visible" });

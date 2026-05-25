@@ -19,7 +19,7 @@ export default class DashboardSetting {
     this.dynamicFilter = page.locator(
       '[data-test="dashboard-general-setting-dynamic-filter"]'
     );
-    this.newName = page.locator('[data-test="dashboard-general-setting-name"]');
+    this.newName = page.locator('[data-test="dashboard-general-setting-name-field"]');
     this.saveSettingBtn = page.locator(
       '[data-test="dashboard-general-setting-save-btn"]'
     );

@@ -743,19 +743,22 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     // Perform custom value search in variable dropdown to trigger _values API calls
-    const variableInput = page.locator('[data-test="variable-selector-variablename-inner"]');
-    await variableInput.waitFor({ state: "visible", timeout: 10000 });
-    await variableInput.click();
+    // OSelect trigger opens the dropdown; search input receives typed terms
+    const variableTrigger = page.locator('[data-test="variable-selector-variablename-inner-trigger"]');
+    await variableTrigger.waitFor({ state: "visible", timeout: 10000 });
+    await variableTrigger.click();
+    await page.locator('[data-test="variable-selector-variablename-inner-popover"]').waitFor({ state: "visible", timeout: 5000 });
 
+    const variableSearch = page.locator('[data-test="variable-selector-variablename-inner-search"]');
     // Type partial search terms to trigger multiple _values API calls
     const searchTerms = ["zi", "zio", "ziox"];
     for (const term of searchTerms) {
-      await variableInput.fill(term);
+      await variableSearch.fill(term);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Allow API calls to complete
     }
 
-    // Select the final value
-    const option = page.getByRole("option", { name: "ziox" });
+    // Select the final value using OSelect option convention
+    const option = page.locator('[data-test="variable-selector-variablename-inner-option"][data-test-value="ziox"]');
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
 
