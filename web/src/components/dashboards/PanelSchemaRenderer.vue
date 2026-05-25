@@ -105,21 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ChartRenderer
           v-else
           ref="chartRendererRef"
-          :data="
-            panelSchema.queryType === 'promql' ||
-            (panelData.chartType != 'geomap' &&
-              panelData.chartType != 'table' &&
-              panelData.chartType != 'maps' &&
-              loading)
-              ? panelData
-              : noData == 'No Data'
-                ? {
-                    options: {
-                      backgroundColor: 'transparent',
-                    },
-                  }
-                : panelData
-          "
+          :data="chartRendererData"
           :height="chartPanelHeight"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
@@ -1400,6 +1386,25 @@ export default defineComponent({
       return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
     });
 
+    // Determines what data to pass to ChartRenderer.
+    // noData check is evaluated first so promql panels with no results
+    // also get the transparent background instead of showing a skeleton.
+    const chartRendererData = computed(() => {
+      if (noData.value === "No Data") {
+        return { options: { backgroundColor: "transparent" } };
+      }
+      if (
+        panelSchema.value.queryType === "promql" ||
+        (panelData.value.chartType !== "geomap" &&
+          panelData.value.chartType !== "table" &&
+          panelData.value.chartType !== "maps" &&
+          loading.value)
+      ) {
+        return panelData.value;
+      }
+      return panelData.value;
+    });
+
     // when the error changes, emit the error
     watch(errorDetail, () => {
       //check if there is an error message or not
@@ -1508,6 +1513,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      chartRendererData,
       metadata,
       tableRendererRef,
       tableRendererData,
