@@ -57,16 +57,19 @@ use crate::service::search::datafusion::{
 pub struct FollowerIndexOptimizerRule {
     time_range: (i64, i64),
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    index_fields: HashSet<String>,
 }
 
 impl FollowerIndexOptimizerRule {
     pub fn new(
         time_range: (i64, i64),
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+        index_fields: HashSet<String>,
     ) -> Self {
         Self {
             time_range,
             index_optimizer_mode,
+            index_fields,
         }
     }
 }
@@ -81,8 +84,11 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
             return Ok(plan);
         }
 
-        let mut rewriter =
-            FollowerIndexOptimizer::new(self.time_range, self.index_optimizer_mode.clone());
+        let mut rewriter = FollowerIndexOptimizer::new(
+            self.time_range,
+            self.index_optimizer_mode.clone(),
+            self.index_fields.clone(),
+        );
         let plan = plan.rewrite(&mut rewriter)?.data;
         Ok(plan)
     }
@@ -99,16 +105,19 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
 struct FollowerIndexOptimizer {
     time_range: (i64, i64),
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    index_fields: HashSet<String>,
 }
 
 impl FollowerIndexOptimizer {
     pub fn new(
         time_range: (i64, i64),
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+        index_fields: HashSet<String>,
     ) -> Self {
         Self {
             time_range,
             index_optimizer_mode,
+            index_fields,
         }
     }
 }
@@ -130,6 +139,21 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
             if let Some(index_optimize_mode) = is_simple_select(Arc::clone(&plan)) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+
+            // check if the query is simple topn or simple distinct
+            if config::cluster::LOCAL_NODE.is_single_node() {
+                if let Some(index_optimize_mode) =
+                    is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
+                {
+                    *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                    return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+                } else if let Some(index_optimize_mode) =
+                    is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
+                {
+                    *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                    return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+                }
             }
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
@@ -239,9 +263,8 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
                 let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
                 let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-            } else {
-                return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
             }
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         }
         Ok(Transformed::no(plan))
     }
@@ -394,6 +417,7 @@ mod tests {
             .with_physical_optimizer_rule(Arc::new(FollowerIndexOptimizerRule::new(
                 (0, 0),
                 index_optimizer_mode.clone(),
+                HashSet::new(),
             )))
             .with_default_features()
             .build();
@@ -425,6 +449,7 @@ mod tests {
             .with_physical_optimizer_rule(Arc::new(FollowerIndexOptimizerRule::new(
                 (0, 0),
                 index_optimizer_mode.clone(),
+                HashSet::new(),
             )))
             .with_default_features()
             .build();

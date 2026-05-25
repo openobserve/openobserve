@@ -592,8 +592,11 @@ fn optimizer_physical_plan(
         && index_optimizer_rule_ref.lock().is_none()
         && index_rule.can_optimize()
     {
-        let index_optimizer_rule =
-            FollowerIndexOptimizerRule::new(time_range, index_optimizer_rule_ref.clone());
+        let index_optimizer_rule = FollowerIndexOptimizerRule::new(
+            time_range,
+            index_optimizer_rule_ref.clone(),
+            index_fields.clone(),
+        );
         let _ = index_optimizer_rule.optimize(original_plan, ctx.state().config_options())?;
     }
 
