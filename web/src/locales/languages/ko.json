@@ -397,7 +397,9 @@
     "switchToLogs": "로그로 다시 전환하려면 클릭",
     "patternNoValuesAvailable": "사용할 수 있는 값 없음",
     "selectLogStream": "로그 스트림 선택",
-    "noData": "사용 가능한 데이터 없음"
+    "noData": "사용 가능한 데이터 없음",
+    "functionEditorLabel": "함수 에디터",
+    "transformEditorLabel": "트랜스폼 에디터"
   },
   "menu": {
     "home": "홈",
