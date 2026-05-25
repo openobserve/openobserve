@@ -290,7 +290,7 @@ const plotChart: any = ref({
         roam: false,
         label: {
           show: true,
-          position: "bottom-center",
+          position: "bottom-right",
         },
         draggable: true,
         edgeSymbol: ["arrow"],
@@ -649,7 +649,7 @@ const getPipeline = () => {
       if (!_pipeline) {
         toast({
           message: t("pipeline.pipelineNotFound"),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
         router.replace({
@@ -689,7 +689,7 @@ const getPipeline = () => {
     .catch((error) => {
       toast({
         message: error?.message || t("pipeline.failedToLoadPipeline"),
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
       router.replace({
@@ -750,7 +750,7 @@ const savePipeline = async () => {
 
     toast({
       message: t("pipeline.pipelineNameRequired"),
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 3000,
     });
     return;
@@ -773,7 +773,7 @@ const savePipeline = async () => {
   if (inputNodeIndex === -1) {
     toast({
       message: t("pipeline.sourceNodeRequired"),
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
@@ -783,7 +783,7 @@ const savePipeline = async () => {
   } else if (outputNodeIndex === -1) {
     toast({
       message: t("pipeline.destinationNodeRequired"),
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
@@ -816,7 +816,7 @@ const savePipeline = async () => {
   if (findMissingEdges()) {
     toast({
       message: t("pipeline.connectAllNodes"),
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
@@ -856,7 +856,7 @@ const validatePipeline = () => {
   ) {
     toast({
       message: t("pipeline.enrichmentTablesScheduledOnly"),
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 2000,
     });
     return false;
@@ -879,7 +879,7 @@ const onSubmitPipeline = async () => {
   }
   const dismiss = toast({
     message: t("pipeline.savingPipeline"),
-    position: "bottom-center",
+    position: "bottom-right",
     variant: "loading",
   });
 
@@ -906,7 +906,7 @@ const onSubmitPipeline = async () => {
       });
       toast({
         message: t("pipeline.pipelineUpdated"),
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
       }
@@ -920,7 +920,7 @@ const onSubmitPipeline = async () => {
       });
         toast({
           message: t("pipeline.pipelineSaved"),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
       }
@@ -928,7 +928,7 @@ const onSubmitPipeline = async () => {
         showJsonEditorDialog.value = false;
         toast({
           message: t("pipeline.pipelineUpdated"),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
       }
@@ -942,7 +942,7 @@ const onSubmitPipeline = async () => {
         });
         toast({
           message: t("pipeline.pipelineSaved"),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
       }
@@ -959,7 +959,7 @@ const onSubmitPipeline = async () => {
       ) {
         toast({
           message: t("pipeline.connectAllNodesShort"),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
         if(showJsonEditorDialog.value == true){
@@ -970,7 +970,7 @@ const onSubmitPipeline = async () => {
           toast({
             message:
               error.response?.data?.message || t("pipeline.errorSavingPipeline"),
-            position: "bottom-center",
+            position: "bottom-right",
             timeout: 3000,
           });
           if(showJsonEditorDialog.value == true){

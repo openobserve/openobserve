@@ -152,7 +152,7 @@ export default function useDragAndDrop() {
     ) {
       toast({
         message: "Only 1 source node is allowed",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 2000, 
     });
       return;
@@ -220,7 +220,7 @@ export default function useDragAndDrop() {
     if(connection.sourceHandle === "input" && connection.targetHandle === "input" || connection.sourceHandle === "output" && connection.targetHandle === "output"){
       toast({
         message: "Same type of edges / nodes cannot be connected",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       
     });
@@ -230,7 +230,7 @@ export default function useDragAndDrop() {
     if(isConnectionAlreadyAvailable){
       toast({
         message: "Only one Incoming Edge to the node is allowed",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       
     });
@@ -241,7 +241,7 @@ export default function useDragAndDrop() {
     if(isCycle){
       toast({
         message: "Adding this edge will create a cycle in the pipeline",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       
     });
@@ -407,7 +407,7 @@ export default function useDragAndDrop() {
       if(isCycle){
         toast({
           message: "Adding this edge will create a cycle in the pipeline",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         
       });

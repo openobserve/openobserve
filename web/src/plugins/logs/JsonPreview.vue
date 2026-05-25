@@ -715,7 +715,7 @@ export default {
         toast({
           message:
             err.response?.data?.message || "Failed to get the Original data",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 1500,
         });
       } finally {

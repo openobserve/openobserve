@@ -121,7 +121,7 @@ const saveRole = () => {
       emits("added:role");
       toast({
         message: `Role "${name.value}" Created Successfully!`,
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     })
@@ -129,7 +129,7 @@ const saveRole = () => {
       if(err.response.status != 403){
         toast({
         message: err?.response?.data?.message,
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
       }

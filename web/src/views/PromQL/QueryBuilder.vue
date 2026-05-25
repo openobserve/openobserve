@@ -144,18 +144,14 @@ const clearQuery = () => {
   queryResult.value = null;
   toast({
     variant: "info",
-    message: "Query cleared",
-    position: "top-center",
-  });
+    message: "Query cleared",  });
 };
 
 const testQuery = () => {
   // TODO: Implement actual query execution
   toast({
     variant: "info",
-    message: "Query testing will be implemented soon",
-    position: "top-center",
-  });
+    message: "Query testing will be implemented soon",  });
 
   // Mock result for now
   queryResult.value = JSON.stringify(

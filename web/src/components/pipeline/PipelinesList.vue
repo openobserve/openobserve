@@ -633,7 +633,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         : `${row.name} state paused successfully`;
       toast({
         message: message,
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
       await getPipelines();
@@ -644,7 +644,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
           message:
             error.response?.data?.message ||
             "Error while updating pipeline state",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
       }
@@ -858,7 +858,7 @@ const openDeleteDialog = (pipeline: any) => {
 const savePipeline = (data: any) => {
   const dismiss = toast({
     message: "saving pipeline...",
-    position: "bottom-center",
+    position: "bottom-right",
     variant: "loading",
   });
 
@@ -873,7 +873,7 @@ const savePipeline = (data: any) => {
       showCreatePipeline.value = false;
       toast({
         message: "Pipeline created successfully",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     })
@@ -883,7 +883,7 @@ const savePipeline = (data: any) => {
         toast({
           message:
             error.response?.data?.message || "Error while saving pipeline",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
       }
@@ -893,7 +893,7 @@ const savePipeline = (data: any) => {
 const deletePipeline = async () => {
   const dismiss = toast({
     message: "deleting pipeline...",
-    position: "bottom-center",
+    position: "bottom-right",
     variant: "loading",
   });
   const { pipeline_id } = confirmDialogMeta.value.data;
@@ -906,7 +906,7 @@ const deletePipeline = async () => {
     .then(async () => {
       toast({
         message: "Pipeline deleted successfully",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     })
@@ -915,7 +915,7 @@ const deletePipeline = async () => {
         toast({
           message:
             error.response?.data?.message || "Error while deleting pipeline",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
       }
@@ -1000,7 +1000,7 @@ const exportBulkPipelines = () => {
   selectedPipelineIds.value = [];
   toast({
     message: `${pipelinesToExport.length} pipelines exported successfully`,
-    position: "bottom-center",
+    position: "bottom-right",
     timeout: 3000,
   });
 };

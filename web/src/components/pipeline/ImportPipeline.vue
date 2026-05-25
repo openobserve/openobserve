@@ -657,7 +657,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: e.message || "Invalid JSON format",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -681,7 +681,7 @@ export default defineComponent({
       if (allPipelinesCreated) {
         toast({
           message: "Pipeline(s) imported successfully",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 2000,
         });
 
@@ -718,7 +718,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: "Error importing Pipeline(s) please check the JSON",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 2000,
         });
         return false;

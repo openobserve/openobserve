@@ -523,7 +523,7 @@ const getSessions = () => {
       rows.value = [];
       toast({
         message: err.response?.data?.message || "Error while fetching sessions",
-        position: "bottom-center",
+        position: "bottom-right",
       });
     })
     .finally(() => {
@@ -599,7 +599,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
         message:
           err.response?.data?.message ||
           "Error while fetching session replay data",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 4000,
       });
     })
