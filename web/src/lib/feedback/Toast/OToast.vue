@@ -102,7 +102,10 @@ const screenReaderTitle = computed(() =>
     :open="open"
     :duration="0"
     :class="[
-      'tw:relative tw:pointer-events-auto tw:flex tw:gap-3 tw:items-start tw:w-80 tw:max-w-sm tw:rounded-lg tw:p-4 tw:shadow-toast',
+      'tw:relative tw:pointer-events-auto tw:flex tw:gap-3 tw:items-start tw:rounded-lg tw:p-4 tw:shadow-toast',
+      // Normal toasts keep the original fixed width; only toasts with an action
+      // button grow to fit so the button can sit inline beside short messages.
+      action ? 'tw:w-fit tw:min-w-[20rem] tw:max-w-md' : 'tw:w-80 tw:max-w-sm',
       'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:slide-in-from-bottom-4',
       'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-bottom-4',
       variantClasses[variant ?? 'default'],
@@ -126,7 +129,7 @@ const screenReaderTitle = computed(() =>
     <!-- Icon -->
     <div
       v-if="hasIcon"
-      :class="['tw:mt-0.5 tw:shrink-0', iconColorClasses[variant ?? 'default']]"
+      :class="['tw:shrink-0 tw:flex tw:items-center tw:h-[1.375em] tw:text-sm tw:leading-snug', iconColorClasses[variant ?? 'default']]"
       aria-hidden="true"
     >
       <OIcon name="autorenew" size="sm" v-if="variant === 'loading'"
@@ -153,31 +156,39 @@ const screenReaderTitle = computed(() =>
         {{ title ?? screenReaderTitle }}
       </ToastTitle>
 
-      <!-- Message — always visible -->
-      <ToastDescription
+      <!-- Message + inline action — the action sits beside short messages and
+           wraps below long ones (flex-wrap) -->
+      <div
         :class="[
-          'tw:text-sm tw:leading-snug',
-          title ? 'tw:text-toast-fg-secondary tw:mt-1' : 'tw:text-toast-fg'
+          'tw:flex tw:flex-wrap tw:items-start tw:gap-x-3 tw:gap-y-1.5',
+          title ? 'tw:mt-1' : '',
         ]"
-        data-test="o-toast-message"
       >
-        {{ message }}
-      </ToastDescription>
-
-      <!-- Action button -->
-      <ToastAction
-        v-if="action"
-        :alt-text="action.label"
-        as-child
-      >
-        <button
-          type="button"
-          class="tw:mt-2.5 tw:inline-flex tw:items-center tw:justify-center tw:rounded-md tw:bg-toast-action-text tw:px-3 tw:py-1.5 tw:text-xs tw:font-semibold tw:text-white tw:shadow-sm tw:transition-colors tw:hover:bg-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1 tw:focus-visible:ring-toast-action-text"
-          @click="action.handler"
+        <ToastDescription
+          :class="[
+            'tw:text-sm tw:leading-snug',
+            title ? 'tw:text-toast-fg-secondary' : 'tw:text-toast-fg',
+          ]"
+          data-test="o-toast-message"
         >
-          {{ action.label }}
-        </button>
-      </ToastAction>
+          {{ message }}
+        </ToastDescription>
+
+        <!-- Action button -->
+        <ToastAction
+          v-if="action"
+          :alt-text="action.label"
+          as-child
+        >
+          <button
+            type="button"
+            class="tw:inline-flex tw:items-center tw:justify-center tw:rounded tw:bg-toast-action-text tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:text-white tw:shadow-sm tw:transition-colors tw:hover:bg-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1 tw:focus-visible:ring-toast-action-text"
+            @click="action.handler"
+          >
+            {{ action.label }}
+          </button>
+        </ToastAction>
+      </div>
     </div>
 
     <!-- Dismiss button -->

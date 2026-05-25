@@ -161,12 +161,10 @@ const useLogs = () => {
               variant: "success",
               message: "Job Added Succesfully",
               timeout: 2000,
-              actions: [
-                {
-                  label: "Go To Job Scheduler",
-                  handler: () => routeToSearchSchedule(),
-                },
-              ],
+              action: {
+                label: "Go To Job Scheduler",
+                handler: () => routeToSearchSchedule(),
+              },
             });
           });
       } else {
