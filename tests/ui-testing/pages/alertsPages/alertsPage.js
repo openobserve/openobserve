@@ -1060,8 +1060,8 @@ export class AlertsPage {
         await this.page.waitForTimeout(1000);
 
         // v3 UI validates non-empty name — clear input and submit to trigger validation
-        // OInput renders data-test on outer <div>; the native <input> uses the -field suffix for fill/clear
-        await this.page.locator(this.locators.alertNameInputField).click();
+        // alertNameInput is the OInput wrapper <div>; alertNameInputField is the actual <input>
+        await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).clear();
 
         // Click Save to trigger required-field validation
@@ -1089,8 +1089,7 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // OInput renders data-test on outer <div>; the native <input> uses the -field suffix for fill/clear
-        await this.page.locator(this.locators.alertNameInputField).click();
+        await this.page.locator(this.locators.alertNameInput).click();
         await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
@@ -1189,8 +1188,8 @@ export class AlertsPage {
     }
 
     async verifyFolderSearch(folderName) {
-        await this.page.locator('[data-test="folder-search"]').click();
-        await this.page.locator('[data-test="folder-search"]').fill(folderName);
+        await this.page.locator('[data-test="folder-search-field"]').click();
+        await this.page.locator('[data-test="folder-search-field"]').fill(folderName);
         await expect(this.page.getByText(folderName)).toBeVisible();
         await this.page.getByRole('button', { name: 'Clear' }).click();
         await expect(this.page.locator('button[data-test="dashboard-folder-tab-default"]')).toBeVisible();

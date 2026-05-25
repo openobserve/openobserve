@@ -129,12 +129,13 @@ test.describe("Logs Quickmode testcases", () => {
     // (in quick/FTS mode "oooo" is a valid full-text search term that returns empty results, not an error)
     await pm.logsPage.enableSqlModeIfNeeded();
 
-    // Wait deterministically for the Monaco editor textbox before clicking
+    // Replace the entire editor content with "oooo" (typeQuery does select-all + fill,
+    // ensuring the full SQL query is exactly "oooo" — not appended to an existing valid query
+    // that DataFusion could interpret as a table alias and return results instead of an error).
     await pm.logsPage.waitForQueryEditorTextbox();
-    await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.typeInQueryEditor("oooo");
+    await pm.logsPage.typeQuery("oooo");
 
-    // Wait for the editor to actually contain the typed value before refreshing
+    // Wait for the editor model to reflect the new value before refreshing
     await pm.logsPage.expectQueryEditorContainsText("oooo");
     await pm.logsPage.waitForSearchBarRefreshButton();
     await pm.logsPage.clickSearchBarRefreshButton();

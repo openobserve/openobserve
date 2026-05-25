@@ -253,7 +253,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
     testLogger.info('✓ ServiceNow destination created', { servicenowName });
 
-    await pm.alertDestinationsPage.editServiceNowDestination(servicenowName, instanceUrlUpdated);
+    await pm.alertDestinationsPage.editServiceNowDestination(servicenowName, instanceUrlUpdated, null, password);
     await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
     testLogger.info('✓ ServiceNow destination instance URL updated');
 

@@ -525,8 +525,36 @@ class SchemaPage {
     // the rendered `data-test-value` attribute can lag behind the option's
     // true value when DOM rows are reused on a filter narrow.
     async _pickStreamOption(stream) {
-        await expect(this.logSearchIndexSelectStream).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 }).catch(() => {});
-        await this.logSearchIndexSelectStream.click();
+        // Wait for the trigger to be in a stable closed state before clicking.
+        // Reka popover transitions take ~150-200ms; allow up to 5s for full
+        // settlement (animation + state attribute flip).
+        await expect(this.logSearchIndexSelectStream)
+            .toHaveAttribute('aria-expanded', 'false', { timeout: 5000 })
+            .catch(() => {});
+
+        // Open the popover with retry. Reka PopoverTrigger toggles state on
+        // each click; if the previous _pickStreamOption left the popover open
+        // (multi-mode + Escape race), the first click here would CLOSE it.
+        // Retry the click up to 3 times until we see the popover visible.
+        let popoverOpen = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await this.logSearchIndexSelectStream.click();
+            // Small animation grace — Reka popover slide-in animation needs
+            // ~200ms to attach to DOM (user-approved waitForTimeout for
+            // animation races, AGENT_RULES §10 override).
+            await this.page.waitForTimeout(300);
+            popoverOpen = await this.logSearchStreamPopover
+                .isVisible({ timeout: 3000 })
+                .catch(() => false);
+            if (popoverOpen) break;
+            testLogger.warn(`[_pickStreamOption] popover not visible after click attempt ${attempt}, retrying`);
+            // If trigger toggled the wrong way, press Escape to force-close
+            // and try again on the next iteration.
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.waitForTimeout(200);
+        }
+        // Final hard wait for visibility — if all retries failed this throws
+        // with the original timeout error and CI screenshots capture state.
         await this.logSearchStreamPopover.waitFor({ state: 'visible', timeout: 10000 });
 
         // Defensive clear via Ctrl/Meta+A → Backspace handles reka-ui's
@@ -552,7 +580,11 @@ class SchemaPage {
         // open it again. Without this gate, the next trigger click toggles the
         // still-open popover to closed and the popover-visible wait times out.
         await this.page.keyboard.press('Escape').catch(() => {});
-        await expect(this.logSearchIndexSelectStream).toHaveAttribute('aria-expanded', 'false', { timeout: 5000 }).catch(() => {});
+        // Allow Reka close animation to flush before aria-expanded check.
+        await this.page.waitForTimeout(300);
+        await expect(this.logSearchIndexSelectStream)
+            .toHaveAttribute('aria-expanded', 'false', { timeout: 5000 })
+            .catch(() => {});
     }
 
     // Refresh stream stats and delete

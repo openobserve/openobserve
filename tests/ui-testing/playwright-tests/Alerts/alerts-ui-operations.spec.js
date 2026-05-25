@@ -158,13 +158,16 @@ test.describe("Alerts UI Operations", () => {
     expect(triggerSuccess).toBe(true);
     testLogger.info('Manual alert trigger successful', { alertName });
 
-    // Cleanup: delete the alert and folder
+    // Cleanup: delete the alert then the folder
+    // navigateToFolder puts us inside the folder (alert list view); after deleting
+    // the alert we must navigate back to the alerts root (folder list) before
+    // deleting the folder. dashboardFolder.* uses dashboard-specific locators that
+    // don't exist on the alerts page, so use alertsPage.deleteFolder instead.
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
     await pm.alertsPage.deleteAlertByRow(alertName);
-    await pm.dashboardFolder.searchFolder(folderName);
-    await pm.dashboardFolder.verifyFolderVisible(folderName);
-    await pm.dashboardFolder.deleteFolder(folderName);
+    await pm.commonActions.navigateToAlerts();
+    await pm.alertsPage.deleteFolder(folderName);
 
     testLogger.info('Feature #9484 test completed: Manual Alert Trigger via UI');
   });

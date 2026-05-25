@@ -415,25 +415,12 @@ export class AlertCreationWizard {
         await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
+        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select-trigger"]');
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        // Focus the operator and use keyboard to open the dropdown (more reliable
-        // than clicking when overlays may interfere).
-        await thresholdOperator.focus();
-        await this.page.waitForTimeout(300);
-        await this.page.keyboard.press('Enter');
-        await this.page.waitForTimeout(1000);
-        // Find the ">=" option in the visible popover.
-        const dropdownOption = this.page.locator('[data-test$="-popover"]')
-            .getByText('>=', { exact: true }).first();
-        try {
-            await dropdownOption.click({ timeout: 5000 });
-        } catch {
-            testLogger.warn('popover text not found, trying broader selector');
-            await this.page.locator('[data-test$="-popover"]')
-                .locator('text=">="').first()
-                .click({ timeout: 3000 });
-        }
+        await thresholdOperator.click();
+        await this.page.waitForTimeout(500);
+        await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]')
+            .click({ timeout: 5000 });
         testLogger.info('Set threshold operator: >=');
 
         const thresholdInput = thresholdSection.locator('input[type="number"]').first();
