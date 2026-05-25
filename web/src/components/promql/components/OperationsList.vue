@@ -117,7 +117,7 @@
           variant="ghost-primary"
           size="sm"
           @click="showOperationSelector = true"
-          class="add-operation-btn tw:ml-[0.25rem]"
+          class="add-operation-btn"
           data-test="promql-add-operation"
         >
           <OIcon name="add" size="sm" />
@@ -307,7 +307,7 @@ defineExpose({
 }
 
 .axis-container {
-  margin: 2px 5px;
+  margin: 2px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;

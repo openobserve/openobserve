@@ -264,7 +264,7 @@ const getOperatorHint = (op: string): string => {
 }
 
 .axis-container {
-  margin: 2px 5px;
+  margin: 2px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
