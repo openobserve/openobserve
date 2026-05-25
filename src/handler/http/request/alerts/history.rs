@@ -764,6 +764,228 @@ pub async fn get_alert_history(
     MetaHttpResponse::json(response)
 }
 
+/// Bulk anomaly history query — returns the most recent N hits per anomaly config in one request.
+///
+/// Instead of the caller firing one request per config, this endpoint queries the triggers stream
+/// once for `module = 'anomaly_detection'` and groups the results by config ID.
+///
+/// Response shape:
+/// ```json
+/// { "configs": { "<config_id>": [ { "timestamp": …, "anomaly_count": …, "status": … } ] } }
+/// ```
+#[utoipa::path(
+    get,
+    path = "/{org_id}/anomaly_detection/history",
+    context_path = "/api",
+    tag = "Anomaly Detection",
+    operation_id = "GetAllAnomalyHistory",
+    summary = "Bulk anomaly detection history",
+    description = "Returns recent detection history for all anomaly configs in one request.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("limit" = Option<i64>, Query, description = "Max hits to return per config (default 20, max 100)"),
+        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
+        ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json"),
+        (status = 500, description = "Internal Server Error", content_type = "application/json"),
+    ),
+)]
+#[tracing::instrument(skip_all, fields(org_id = %org_id))]
+pub async fn get_all_anomaly_history(
+    Path(org_id): Path<String>,
+    Query(query): Query<AnomalyBulkHistoryQuery>,
+    Headers(user_email): Headers<UserEmail>,
+    req: axum::http::Request<axum::body::Body>,
+) -> Response {
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
+    let end_time = query.end_time.unwrap_or_else(now_micros);
+    let start_time = query
+        .start_time
+        .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
+
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+
+    // RBAC: determine which config IDs this user may see.
+    // None  → no restriction (root user or RBAC disabled)
+    // Some([]) → no access at all → return empty immediately
+    // Some(ids) → filter to these IDs only
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_config_ids: Option<Vec<String>> = None;
+
+    #[cfg(feature = "enterprise")]
+    let permitted_config_ids = {
+        use crate::common::utils::auth::is_root_user;
+        let user_id = &user_email.user_id;
+        if is_root_user(user_id) {
+            None
+        } else if o2_openfga::config::get_config().enabled {
+            let alert_object_type = o2_openfga::meta::mapping::OFGA_MODELS
+                .get("alerts")
+                .map_or("alerts", |m| m.key);
+            match crate::handler::http::auth::validator::list_objects_for_user(
+                &org_id,
+                user_id,
+                "GET",
+                alert_object_type,
+            )
+            .await
+            {
+                Ok(Some(permitted)) => {
+                    let all_key = format!("{alert_object_type}:_all_{org_id}");
+                    if permitted.contains(&all_key) {
+                        None
+                    } else if permitted.is_empty() {
+                        return MetaHttpResponse::json(serde_json::json!({ "configs": [] }));
+                    } else {
+                        let ids: Vec<String> = permitted
+                            .iter()
+                            .filter(|p| !p.contains("_all_"))
+                            .filter_map(|p| p.split(':').nth(1).map(|s| s.to_string()))
+                            .collect();
+                        Some(ids)
+                    }
+                }
+                Ok(None) => None,
+                Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+            }
+        } else {
+            None
+        }
+    };
+
+    let where_clause = format!(
+        "module = 'anomaly_detection' AND org = '{org_id}' \
+         AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+    );
+
+    let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
+
+    // Fetch more rows than limit*max_configs so we have headroom to fill each config bucket.
+    // We cap at 5000 to avoid oversized responses.
+    let fetch_size = (limit * 200).min(5000);
+    let data_sql = format!(
+        "SELECT _timestamp, key, status, evaluation_took_in_secs, error, success_response \
+         FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
+         ORDER BY _timestamp DESC LIMIT {fetch_size}"
+    );
+
+    let data_req = SearchRequest {
+        query: SearchQuery {
+            sql: data_sql,
+            start_time,
+            end_time,
+            from: 0,
+            size: fetch_size,
+            track_total_hits: false,
+            ..Default::default()
+        },
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        use_cache: false,
+        ..Default::default()
+    };
+
+    let search_result = match SearchService::search(
+        &trace_id,
+        &org_id,
+        StreamType::Logs,
+        Some(user_email.user_id.clone()),
+        &data_req,
+    )
+    .instrument(Span::current())
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("not found") || msg.contains("stream not found") {
+                return MetaHttpResponse::json(serde_json::json!({ "configs": {} }));
+            }
+            log::error!("Failed to fetch bulk anomaly history: {e}");
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to fetch bulk anomaly history: {e}"
+            ));
+        }
+    };
+
+    // Group hits by config ID. The key field format is "alert_name/config_id".
+    let mut grouped: std::collections::HashMap<String, Vec<serde_json::Value>> =
+        std::collections::HashMap::new();
+
+    for hit in search_result.hits {
+        let key = hit.get("key").and_then(|v| v.as_str()).unwrap_or("");
+        // Extract config_id from "name/config_id" (last segment)
+        let config_id = match key.rsplit('/').next() {
+            Some(id) if !id.is_empty() => id.to_string(),
+            _ => continue,
+        };
+
+        // Skip configs the user has no access to
+        if let Some(ref allowed) = permitted_config_ids
+            && !allowed.contains(&config_id)
+        {
+            continue;
+        }
+
+        let bucket = grouped.entry(config_id).or_default();
+        if bucket.len() >= limit as usize {
+            continue;
+        }
+
+        let raw_status = hit
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let anomaly_count = hit
+            .get("success_response")
+            .and_then(|v| v.as_str())
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+            .and_then(|v| v["anomalies_found"].as_i64())
+            .unwrap_or(0);
+
+        let status = match raw_status {
+            "failed" => "failed",
+            "skipped" => "skipped",
+            _ => {
+                if anomaly_count > 0 {
+                    "anomaly"
+                } else {
+                    "normal"
+                }
+            }
+        };
+
+        bucket.push(serde_json::json!({
+            "timestamp": hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+            "anomaly_count": anomaly_count,
+            "status": status,
+            "error": hit.get("error").and_then(|v| v.as_str()),
+            "evaluation_took_in_secs": hit.get("evaluation_took_in_secs").and_then(|v| v.as_f64()),
+        }));
+    }
+
+    // Convert to Vec<{cfg, hits}> shape that the frontend fallback path expects
+    let payload: Vec<serde_json::Value> = grouped
+        .into_iter()
+        .map(|(cfg_id, hits)| serde_json::json!({ "cfg": { "id": cfg_id }, "hits": hits }))
+        .collect();
+
+    MetaHttpResponse::json(serde_json::json!({ "configs": payload }))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnomalyBulkHistoryQuery {
+    pub limit: Option<i64>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

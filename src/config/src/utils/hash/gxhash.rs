@@ -36,17 +36,25 @@ pub fn new_hasher() -> impl Hasher {
 
 impl Sum64 for GxHash {
     fn sum64(&mut self, key: &str) -> u64 {
-        #[cfg(feature = "gxhash")]
-        let n = gxhash::gxhash64(key.as_bytes(), 0);
-        #[cfg(not(feature = "gxhash"))]
-        let n = {
-            use std::hash::{DefaultHasher, Hasher};
-            let mut h = DefaultHasher::new();
-            h.write(key.as_bytes());
-            h.finish()
-        };
-        n
+        sum64_bytes(key.as_bytes())
     }
+}
+
+/// Hash arbitrary bytes — same algorithm as [`GxHash::sum64`] but
+/// without forcing a `&str` round-trip. Used by callers that hold raw
+/// `&[u8]` (e.g. SBBF point checks where the value comes from a
+/// tantivy term dictionary and isn't necessarily valid UTF-8).
+pub fn sum64_bytes(bytes: &[u8]) -> u64 {
+    #[cfg(feature = "gxhash")]
+    let n = gxhash::gxhash64(bytes, 0);
+    #[cfg(not(feature = "gxhash"))]
+    let n = {
+        use std::hash::{DefaultHasher, Hasher};
+        let mut h = DefaultHasher::new();
+        h.write(bytes);
+        h.finish()
+    };
+    n
 }
 
 #[cfg(test)]
