@@ -258,15 +258,18 @@ pub async fn save_enrichment_table_from_url(
     if table_name.trim().is_empty() {
         return MetaHttpResponse::bad_request("Table name cannot be empty");
     }
-    if request_body.url.trim().is_empty() {
-        return MetaHttpResponse::bad_request("URL cannot be empty");
-    }
+    // URL validation: Skip if retry mode (reprocessing existing URLs from DB).
+    // In retry mode the frontend sends an empty URL since the backend already has
+    // the URLs stored — we just need to re-trigger processing. For all other modes
+    // a non-empty, valid URL is required.
+    if !retry {
+        if request_body.url.trim().is_empty() {
+            return MetaHttpResponse::bad_request("URL cannot be empty");
+        }
 
-    // Always validate the URL for SSRF protection, regardless of retry mode.
-    // The retry flag controls job scheduling, not URL sourcing — the body URL
-    // can differ from the original on a retry call, so we cannot skip validation.
-    if let Err(err_msg) = validate_enrichment_url(&request_body.url) {
-        return MetaHttpResponse::bad_request(err_msg);
+        if let Err(err_msg) = validate_enrichment_url(&request_body.url) {
+            return MetaHttpResponse::bad_request(err_msg);
+        }
     }
 
     // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
