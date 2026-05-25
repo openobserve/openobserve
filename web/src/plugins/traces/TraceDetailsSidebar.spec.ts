@@ -475,6 +475,41 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
+    describe("when isEnterprise is true but correlationProps is null (fallback path)", () => {
+      beforeEach(() => {
+        config.isEnterprise = "true";
+        // correlationProps is null — correlation data hasn't been loaded yet
+        wrapper.vm.correlationProps = null;
+        dispatchSpy = vi
+          .spyOn(mockStore, "dispatch")
+          .mockResolvedValue(undefined);
+        pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      });
+
+      it("should fall back to buildQueryDetails and navigateToLogs when correlationProps is null", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        expect(viewLogsBtn.exists()).toBe(true);
+
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
+        expect(mockNavigateToLogs).toHaveBeenCalled();
+      });
+
+      it("should not call navigateToCorrelatedLogs when correlationProps is null", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when isEnterprise is false (non-enterprise branch)", () => {
       beforeEach(() => {
         config.isEnterprise = "false";

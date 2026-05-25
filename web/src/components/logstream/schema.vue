@@ -1045,6 +1045,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-close="false"
   >
     <AssociatedRegexPatterns
+      ref="assocPatternsRef"
       :data="patternAssociationDialog.data"
       :fieldName="patternAssociationDialog.fieldName"
       @closeDialog="patternAssociationDialog.show = false"
@@ -1053,6 +1054,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updateSettings="onSubmit"
       @updateAppliedPattern="handleUpdateAppliedPattern"
     />
+    <template #footer>
+      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="schema-pattern-association-cancel-btn"
+          @click="patternAssociationDialog.show = false"
+        >
+          Cancel
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="schema-pattern-association-update-btn"
+          :disabled="!assocPatternsRef?.isFormDirty"
+          @click="assocPatternsRef?.updateRegexPattern()"
+        >
+          Update Changes
+        </OButton>
+      </div>
+    </template>
   </ODrawer>
 
   <ConfirmDialog

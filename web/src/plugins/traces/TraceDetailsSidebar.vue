@@ -1473,8 +1473,8 @@ export default defineComponent({
     );
 
     const viewSpanLogs = () => {
-      if(config.isEnterprise === 'true'){
-        navigateToCorrelatedLogs(correlationProps.value)
+      if (config.isEnterprise === 'true' && correlationProps.value) {
+        navigateToCorrelatedLogs(correlationProps.value);
       } else {
         const queryDetails = buildQueryDetails(props.span);
         navigateToLogs(queryDetails);
