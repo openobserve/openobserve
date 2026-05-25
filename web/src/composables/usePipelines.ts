@@ -16,7 +16,7 @@ export const usePipelines = () => {
         if(error.response.status != 403){
           toast({
           message: error.response?.data?.message || "Error fetching used streams",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 2000,
         });
         }

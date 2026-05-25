@@ -186,7 +186,7 @@ const deleteUserRole = (role: any) => {
     .then(() => {
       toast({
         message: "Role deleted successfully!",
-        position: "bottom-center",
+        position: "bottom-right",
       });
       setupRoles();
     })
@@ -194,7 +194,7 @@ const deleteUserRole = (role: any) => {
       if (error.response.status != 403) {
         toast({
           message: "Error while deleting role!",
-          position: "bottom-center",
+          position: "bottom-right",
         });
       }
     });
@@ -231,17 +231,17 @@ const bulkDeleteUserRoles = async () => {
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
         message: `Successfully deleted ${successful.length} role(s)`,
-        position: "bottom-center",
+        position: "bottom-right",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
         message: `Deleted ${successful.length} role(s). Failed to delete ${unsuccessful.length} role(s)`,
-        position: "bottom-center",
+        position: "bottom-right",
       });
     } else if (unsuccessful.length > 0) {
       toast({
         message: `Failed to delete ${unsuccessful.length} role(s)`,
-        position: "bottom-center",
+        position: "bottom-right",
       });
     }
 
@@ -252,7 +252,7 @@ const bulkDeleteUserRoles = async () => {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
         message: error.response?.data?.message || error?.message || "Error while deleting roles",
-        position: "bottom-center",
+        position: "bottom-right",
       });
     }
     confirmBulkDelete.value = false;

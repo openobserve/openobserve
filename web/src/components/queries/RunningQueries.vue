@@ -632,7 +632,7 @@ export default defineComponent({
     const getRunningQueries = () => {
       const dismiss = toast({
         message: "Fetching running queries...",
-        position: "bottom-center",
+        position: "bottom-right",
         variant: "loading",
       });
       SearchService.get_running_queries(store.state.zoConfig.meta_org)
@@ -658,7 +658,7 @@ export default defineComponent({
             message:
               error.response?.data?.message ||
               "Failed to fetch running queries",
-            position: "bottom-center",
+            position: "bottom-right",
             timeout: 2500,
           });
         })
@@ -679,14 +679,14 @@ export default defineComponent({
 
           toast({
             message: "Query cancelled",
-            position: "bottom-center",
+            position: "bottom-right",
             timeout: 1500,
           });
         })
         .catch((error: any) => {
           toast({
             message: error.response?.data?.message || "Failed to cancel query",
-            position: "bottom-center",
+            position: "bottom-right",
             timeout: 1500,
           });
         })

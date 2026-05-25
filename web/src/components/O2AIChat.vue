@@ -1970,7 +1970,7 @@ export default defineComponent({
         // Show user notification about successful cancellation
         toast({
           message: "Response generation stopped",
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 2000,
         });
 

@@ -232,7 +232,7 @@ async function importJson({ jsonStr: jsonString }: any) {
   } catch (e: any) {
     toast({
       message: e.message || "Invalid JSON format",
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 2000,
     });
     return;
@@ -264,7 +264,7 @@ async function importJson({ jsonStr: jsonString }: any) {
   if (successCount === totalCount) {
     toast({
       message: `Successfully imported ${successCount} model pricing definition${successCount !== 1 ? "s" : ""}`,
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 2000,
     });
 
@@ -299,7 +299,7 @@ async function processJsonObject(jsonObj: any, index: number) {
   } catch (e: any) {
     toast({
       message: "Error importing model pricing. Please check the JSON format.",
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 2000,
     });
     return false;
@@ -398,7 +398,7 @@ async function createModelPricing(jsonObj: any, index: number) {
     if (error?.response?.status !== 403) {
       toast({
         message: `Failed to import "${jsonObj.name}": ${errorMessage}`,
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 4000,
       });
     }

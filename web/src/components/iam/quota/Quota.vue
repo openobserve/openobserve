@@ -1147,7 +1147,7 @@ export default defineComponent({
               } catch (error) {
                 toast({
                   message: `Error parsing JSON from file ${file.name}`,
-                  position: "bottom-center",
+                  position: "bottom-right",
                   timeout: 2000,
                 });
                 resolve([]);

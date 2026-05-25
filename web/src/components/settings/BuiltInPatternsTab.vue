@@ -352,7 +352,7 @@ export default defineComponent({
               message: t("regex_patterns.patterns_loaded", {
                 count: patterns.value.length,
               }),
-              position: "bottom-center",
+              position: "bottom-right",
               timeout: 2000,
             });
             loading.value = false;
@@ -378,7 +378,7 @@ export default defineComponent({
           message: t("regex_patterns.patterns_loaded", {
             count: patterns.value.length,
           }),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 2000,
         });
       } catch (e: any) {
@@ -388,7 +388,7 @@ export default defineComponent({
           t("regex_patterns.failed_to_load");
         toast({
           message: error.value,
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 4000,
         });
       } finally {
@@ -423,7 +423,7 @@ export default defineComponent({
       if (selected.length === 0) {
         toast({
           message: t("regex_patterns.no_patterns_selected"),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 2000,
         });
         return;

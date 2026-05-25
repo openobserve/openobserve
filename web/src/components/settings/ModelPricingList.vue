@@ -769,7 +769,7 @@ function notifyError(prefix: string, e: any) {
   toast({
     variant: "error",
     message: `${prefix}: ${msg}`,
-    position: "bottom-center",
+    position: "bottom-right",
     timeout: 5000,
   });
 }
@@ -811,7 +811,7 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const message = enabled
       ? t("modelPricing.modelEnabledNotif", { name: displayName })
       : t("modelPricing.modelDisabledNotif", { name: displayName });
-    toast({ variant: "success", message, position: "bottom-center", timeout: 3000 });
+    toast({ variant: "success", message, position: "bottom-right", timeout: 3000 });
   } catch (e: any) {
     notifyError(t("modelPricing.errUpdate"), e);
   }
@@ -839,7 +839,7 @@ function confirmDelete(model: any) {
         toast({
           variant: "success",
           message: t("modelPricing.modelPricingDeleted"),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
         await fetchModels();
@@ -868,7 +868,7 @@ async function refreshBuiltIn() {
     toast({
       variant: "success",
       message: t("modelPricing.builtInRefreshed"),
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 3000,
     });
     await fetchModels();
@@ -887,7 +887,7 @@ function exportSelected() {
     toast({
       variant: "warning",
       message: t("modelPricing.noModelsSelected"),
-      position: "bottom-center",
+      position: "bottom-right",
       timeout: 3000,
     });
     return;
@@ -935,7 +935,7 @@ function confirmDeleteSelected() {
           message: t("modelPricing.deletedModelsNotif", {
             count: successCount,
           }),
-          position: "bottom-center",
+          position: "bottom-right",
           timeout: 3000,
         });
         selectedIds.value = [];

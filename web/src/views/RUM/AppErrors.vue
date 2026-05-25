@@ -398,7 +398,7 @@ const getErrorLogs = () => {
       toast({
         message:
           err.response?.data?.message || "Error while fetching error events",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 4000,
       });
     })

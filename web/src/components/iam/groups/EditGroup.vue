@@ -170,7 +170,7 @@ const getGroupDetails = () => {
       console.log(err);
       toast({
         message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
       router.push({
