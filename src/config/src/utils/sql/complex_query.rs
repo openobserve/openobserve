@@ -16,7 +16,7 @@
 use std::ops::ControlFlow;
 
 use sqlparser::{
-    ast::{Expr, GroupByExpr, Query, SetExpr, Statement, Visit, Visitor},
+    ast::{Expr, GroupByExpr, Query, SetExpr, Statement, TableFactor, Visit, Visitor},
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -64,7 +64,11 @@ impl Visitor for ComplexityVisitor {
                     _ => self.is_complex = true,
                 }
                 // check if has join
-                if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                if select.from.len() > 1
+                    || select.from.iter().any(|from| !from.joins.is_empty())
+                    || (select.from.len() == 1
+                        && !matches!(select.from[0].relation, TableFactor::Table { .. }))
+                {
                     self.is_complex = true;
                 }
                 if select.distinct.is_some() {
