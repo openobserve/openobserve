@@ -1026,7 +1026,7 @@ const pipelinesPanelData = computed(() => {
         barWidth: "50%",
         label: {
           show: true,
-          position: "top-center",
+          position: "top",
           fontSize: 14,
           fontWeight: "bold",
           color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",

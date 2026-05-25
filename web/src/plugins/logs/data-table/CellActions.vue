@@ -1,6 +1,6 @@
 <template>
   <div
-    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] tw:translate-y-1/2 table-cell-actions tw:translate-y-[-50%] tw:h-full! tw:flex! tw:items-center tw:justify-center tw:rounded"
+    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] table-cell-actions tw:translate-y-[-50%] tw:h-full! tw:flex! tw:items-center tw:justify-center tw:rounded"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
@@ -26,7 +26,7 @@
         title="Include Term"
       >
         <OIcon style="height: 8px; width: 8px">
-          <EqualIcon></EqualIcon>
+          <EqualIcon class="tw:size-full" />
         </OIcon>
       </OButton>
     </span>
@@ -41,7 +41,7 @@
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
         <OIcon style="height: 8px; width: 8px">
-          <NotEqualIcon></NotEqualIcon>
+          <NotEqualIcon class="tw:size-full" />
         </OIcon>
       </OButton>
     </span>
