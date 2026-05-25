@@ -4556,39 +4556,39 @@ export class LogsPage {
      *     Absorbs the brief window where one streaming chunk has updated the title
      *     while the underlying hits array is still being mutated by sibling chunks.
      */
-    async expectPaginationTotalAtLeast(minCount, timeout = 30000) {
-        const title = this.page.locator(this.paginationRowCountTitle);
+    async expectPaginationTotalAtLeast(minCount, timeout = 60000) {
+        // SearchResult.vue is rendered in multiple modes (Logs view + Visualize via v-show),
+        // so `[data-test="logs-search-result-title"]` matches more than one element. Scope to
+        // the VISIBLE instance so we never read attributes off the hidden Visualize copy
+        // (whose searchObj is a different store and shows stale/zero values).
+        const title = this.page.locator(`${this.paginationRowCountTitle}:visible`).first();
         await expect(title).toBeVisible({ timeout });
 
-        // Stage 1 — wait until the run-query button is enabled and no longer in
-        // cancel state. The Run and Cancel variants share `data-test="logs-search-bar-refresh-btn"`
-        // but differ on the localized `title` attribute (set to `t("search.cancel")`
-        // while streaming, `t("search.runQuery")` / `t("search.generateQueryTooltip")`
-        // afterward). Playwright matchers operate on the data-test locator directly.
-        const queryBtn = this.page.locator(this.queryButton);
-        await expect(queryBtn).toBeEnabled({ timeout }).catch(() => {
-            testLogger.warn('expectPaginationTotalAtLeast: run-query button never re-enabled, continuing');
-        });
-        await expect(queryBtn).not.toHaveAttribute('title', /cancel/i, { timeout }).catch(() => {
-            testLogger.warn('expectPaginationTotalAtLeast: run-query button still in Cancel state, continuing');
-        });
+        // Stage 1 — wait for the source-side loading signal to flip to "complete".
+        // SearchResult.vue binds :data-search-state="searchObj.loading || searchObj.loadingCounter
+        // ? 'loading' : 'complete'" on this same title element. The attribute is the ATOMIC
+        // truth — it flips only after the streaming partition chain fully resolves AND the
+        // total-counter request completes. This replaces the brittle button-text/title polling
+        // (which has multiple .catch() escape hatches that mask incomplete streaming on slow CI).
+        await expect(title).toHaveAttribute('data-search-state', 'complete', { timeout })
+            .catch(() => {
+                testLogger.warn(
+                    'expectPaginationTotalAtLeast: data-search-state never flipped to "complete", continuing'
+                );
+            });
 
-        // Stage 2 — poll the title's "out of N" text via the data-test locator with
-        // a two-sample stability gate. The title is the rendered projection of
-        // `hits.length`; once two consecutive reads agree (and meet `minCount`),
-        // the chunk-mutation race is over. `textContent()` is invoked on the
-        // data-test-resolved Locator — no element-only or class selectors involved.
-        let lastCount = -1;
+        // Stage 2 — read the hits count directly from the data-hits-count attribute.
+        // SearchResult.vue exposes `searchObj.data.queryResults.hits.length` as
+        // :data-hits-count="...". Polling this attribute is race-free vs. parsing the
+        // localized "out of N" string (which can be "out of 2,000" — comma localized).
+        let lastCount = 0;
         await expect.poll(async () => {
-            const text = (await title.textContent()) || '';
-            const match = text.match(/out of\s+([\d,]+)/);
-            const current = match ? (parseInt(match[1].replace(/,/g, ''), 10) || 0) : 0;
-            const stable = current === lastCount && current >= minCount;
+            const raw = (await title.getAttribute('data-hits-count').catch(() => '0')) ?? '0';
+            const current = Number.parseInt(raw, 10) || 0;
             lastCount = current;
-            // Return the smaller of the two samples until they agree — this prevents
-            // `expect.poll` from succeeding on a single transient over-read.
-            return stable ? current : Math.min(current, minCount - 1);
-        }, { timeout, intervals: [200, 500, 500, 1000] }).toBeGreaterThanOrEqual(minCount);
+            return current;
+        }, { timeout, intervals: [200, 500, 500, 1000, 1000, 2000] }).toBeGreaterThanOrEqual(minCount);
+        testLogger.info(`expectPaginationTotalAtLeast: hits=${lastCount} (>= ${minCount})`);
     }
 
     async waitForDownload() {
@@ -8029,7 +8029,11 @@ export class LogsPage {
      * Expect Builder mode (Auto mode) to be active
      */
     async expectBuilderModeActive(timeout = 15000) {
-        const builderTypeBtn = this.page.locator(this.builderQueryType);
+        // OToggleGroupItem (inheritAttrs:false + v-bind="$attrs" on inner Reka button)
+        // forwards data-test to the inner button — SAME element as data-state. Read the
+        // attribute directly on the data-test locator (NOT a descendant). Scope with
+        // :visible to dodge SearchBar/collapsed-menu duplicates on some routes.
+        const builderTypeBtn = this.page.locator(`${this.builderQueryType}:visible`).first();
         await expect(builderTypeBtn).toBeVisible({ timeout });
         // OToggleGroupItem forwards attrs to the inner Reka UI button via v-bind="$attrs",
         // so data-test and data-state land on the same element — no descendant combinator needed.
@@ -8041,7 +8045,8 @@ export class LogsPage {
      * Expect Custom SQL mode to be active
      */
     async expectCustomModeActive(timeout = 15000) {
-        const customTypeBtn = this.page.locator(this.customQueryType);
+        // Same OToggleGroupItem inner-button pattern as expectBuilderModeActive — see above.
+        const customTypeBtn = this.page.locator(`${this.customQueryType}:visible`).first();
         await expect(customTypeBtn).toBeVisible({ timeout });
         // OToggleGroupItem forwards attrs to the inner Reka UI button via v-bind="$attrs",
         // so data-test and data-state land on the same element — no descendant combinator needed.
@@ -8068,9 +8073,14 @@ export class LogsPage {
      * Click Custom SQL query type toggle
      */
     async clickCustomQueryType() {
-        await this.page.locator(this.customQueryType).click();
-        // Same element carries data-state (attrs forwarded to inner Reka button)
-        await expect(this.page.locator(this.customQueryType)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+        // OToggleGroupItem forwards data-test to the inner Reka button (inheritAttrs:false +
+        // v-bind="$attrs"), so data-test and data-state live on the SAME element. Use the
+        // AND-combinator selector, not the descendant selector (which would look for a child).
+        // Also scope with :visible — the SearchBar mounts twice on some routes (toolbar +
+        // collapsed-menu syntax-guide), so multiple data-test matches exist.
+        const toggle = this.page.locator(`${this.customQueryType}:visible`).first();
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 
@@ -8188,48 +8198,37 @@ export class LogsPage {
     }
 
     /**
-     * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses waitForFunction for reliable DOM detection that survives reactive re-renders.
+     * Verify a chart type is selected.
+     * data-selected is set directly on [data-test="selected-chart-${chartId}-item"] (inner div)
+     * by ChartSelection.vue — always present as "true" or "false".
+     * toHaveAttribute auto-retries, so no manual waitForFunction/polling needed.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
     async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 45000) {
-        // Use waitForFunction to directly check the DOM for the bg-grey class
-        // on the chart selection item. This survives Vue reactive re-renders better
-        // than Playwright's locator.toHaveClass polling.
+        // Uses data-test-selected attribute on <li> in ChartSelection.vue.
+        // Only the currently selected chart has this attribute set to its ID.
+        // Filters by offsetParent to skip elements hidden by v-show (display:none).
         try {
             await this.page.waitForFunction(
                 ({ chartId, shouldBeSelected }) => {
-                    // Find all visible chart selection sections for this chart type
-                    const sections = document.querySelectorAll(
-                        `[data-test="selected-chart-${chartId}-item"]`
+                    const items = document.querySelectorAll(
+                        `[data-test-selected="${chartId}"]`
                     );
-                    for (const section of sections) {
-                        // Skip sections inside display:none containers (e.g. cached Visualize tab)
-                        if (!/** @type {HTMLElement} */ (section).offsetParent) continue;
-                        // Check the parent q-item for the bg-grey selection class
-                        const parent = section.parentElement;
-                        if (!parent) continue;
-                        // Prefer data-selected attribute (added to ChartSelection.vue for clean
-                        // data-test-only selectors). Fall back to legacy bg-grey-3/5 (Quasar) and
-                        // tw:bg-gray-200/400 (Tailwind) classes for older builds.
-                        const dataSelected = parent.getAttribute('data-selected');
-                        if (dataSelected !== null) {
-                            const isSelected = dataSelected === 'true';
-                            if (isSelected === shouldBeSelected) return true;
-                            continue;
+                    let visibleFound = false;
+                    for (const item of items) {
+                        if (/** @type {HTMLElement} */ (item).offsetParent !== null) {
+                            visibleFound = true;
+                            break;
                         }
-                        const cls = parent.className || '';
-                        const hasBgGrey = /\bbg-grey-[35]\b/.test(cls) || /\btw:bg-gray-(?:200|400)\b/.test(cls);
-                        if (hasBgGrey === shouldBeSelected) return true;
                     }
-                    return false;
+                    return visibleFound === shouldBeSelected;
                 },
                 { chartId, shouldBeSelected },
                 { timeout, polling: 'raf' }
             );
             testLogger.info(
-                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
+                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected`
             );
         } catch (error) {
             throw new Error(
@@ -8259,7 +8258,20 @@ export class LogsPage {
      * Expect dashboard panel table to be visible
      */
     async expectDashboardPanelTableVisible() {
-        await expect(this.page.locator(this.dashboardPanelTable)).toBeVisible({ timeout: 30000 });
+        // PanelEditor is rendered in BOTH the Visualize tab (v-show, hidden when not active)
+        // and the Build tab (v-if), so `[data-test="dashboard-panel-table"]` can match more than
+        // one element with `display:none`. Scope to the Build container + :visible so the
+        // assertion sees the actually-rendered table and not a hidden Visualize copy that
+        // would never become visible. Falls back to a global :visible match if the Build
+        // container isn't present (e.g. legacy routes).
+        const inBuild = this.page
+            .locator(`[data-test="logs-build-query-page"] ${this.dashboardPanelTable}:visible`)
+            .first();
+        const inBuildCount = await inBuild.count().catch(() => 0);
+        const panel = inBuildCount > 0
+            ? inBuild
+            : this.page.locator(`${this.dashboardPanelTable}:visible`).first();
+        await expect(panel).toBeVisible({ timeout: 30000 });
         testLogger.info('Dashboard panel table is visible');
     }
 
@@ -8414,19 +8426,15 @@ export class LogsPage {
             return false;
         }
 
-        // Phase 2: Wait for async initializeBuild() to complete.
+        // Phase 2: Wait for async initializeBuild() to render something.
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
-        // The chart-type selection (ChartSelection.vue → data-selected="true" on the <li>)
-        // is set synchronously during initializeBuild() before the chart renderer mounts.
-        // Use waitForFunction to accept EITHER signal — chart/table/no-data visible OR any
-        // chart-type item already marked data-selected="true". This short-circuits Phase 2
-        // when chart-type has been auto-set but the renderer DOM hasn't appeared yet, which
-        // is the common case for Custom-mode CTE/subquery → table chart on CI where the
-        // chart-renderer can lag behind the chart-type selection by several seconds.
+        // Accept EITHER signal:
+        //   - chart/table/no-data renderer present
+        //   - any chart-selection <li> already carries data-test-selected (only set on the
+        //     currently-selected chart — the source-side selection signal).
         try {
             await this.page.waitForFunction(
                 () => {
-                    // Chart/table/no-data renderer present (the original signal)
                     if (
                         document.querySelector('[data-test="chart-renderer"]') ||
                         document.querySelector('[data-test="dashboard-panel-table"]') ||
@@ -8434,15 +8442,10 @@ export class LogsPage {
                     ) {
                         return true;
                     }
-                    // OR any chart-selection item already marked data-selected="true"
-                    // (chart-type auto-selection completed even if renderer is still mounting)
-                    const items = document.querySelectorAll(
-                        '[data-test="dashboard-addpanel-chart-selection-item"]'
+                    // Any chart item with data-test-selected attribute → chart type assigned
+                    return !!document.querySelector(
+                        '[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]'
                     );
-                    for (const item of items) {
-                        if (item.getAttribute('data-selected') === 'true') return true;
-                    }
-                    return false;
                 },
                 undefined,
                 { timeout, polling: 'raf' }
@@ -8613,24 +8616,40 @@ export class LogsPage {
      * @returns {Promise<number>} Number of filter conditions found
      */
     async getFilterConditionCount() {
-        // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
-        const filterItems = this.page.locator(this.filterConditionLabelItems);
-        // Wait for the builder filter parsing to attach at least one condition (deterministic).
-        // initializeBuild() in BuildQueryPage.vue is fully async — parseSQL → parsedQueryToPanelFields →
-        // updateGroupedFields → makeAutoSQLQuery. On slow CI the chain can take 20+ seconds before the
-        // filter rows mount. Some queries genuinely have zero filters — fall through to 0 after the wait.
-        await filterItems.first().waitFor({ state: 'attached', timeout: 30000 }).catch(() => {});
-        // Poll for count stability so we don't read mid-render before all rows mount (multiple AND/OR
-        // conditions render the rows in sequence as the v-for materializes).
-        let count = await filterItems.count();
+        // DashboardFiltersOption.vue exposes the recursive leaf-condition count as
+        // [data-test="dashboard-filter-layout"] data-condition-count="N" — set by a Vue
+        // computed that traverses the filter tree, so the attribute matches the DOM rows
+        // 1:1 and updates atomically with the reactive state. This eliminates the race
+        // where v-for mounts rows sequentially on slow CI.
+        //
+        // IMPORTANT: `data-test="dashboard-filter-layout"` is reused by BOTH the Filters
+        // section (DashboardFiltersOption.vue) AND the JOINs section (DashboardJoinsOption.vue).
+        // The JOIN copy is rendered without `data-condition-count`, so we discriminate via
+        // attribute presence. Also scope inside the Build container — the shared filter
+        // component is mounted in both Build and Visualize tabs (Visualize uses v-show, so
+        // it stays in DOM hidden when Build is active).
+        const layout = this.page
+            .locator('[data-test="logs-build-query-page"] [data-test="dashboard-filter-layout"][data-condition-count]:visible')
+            .first();
+        // If no visible layout exists (e.g., custom-mode path hides it), conditions = 0.
+        const visibleCount = await layout.count().catch(() => 0);
+        if (visibleCount === 0) {
+            testLogger.info('Filter layout not visible (custom-mode path) — 0 conditions');
+            return 0;
+        }
+        // Wait for data-condition-count to settle (attribute is always present once mounted,
+        // but the value updates reactively as conditions are populated by parseSQL chain).
+        let raw = '0';
         await expect.poll(async () => {
-            const next = await filterItems.count();
-            if (next === count && next > 0) return 'stable';
-            count = next;
-            return 'changing';
-        }, { intervals: [200, 200, 200, 500, 500, 1000, 1000], timeout: 5000 }).toBe('stable').catch(() => {});
-        count = await filterItems.count();
-        testLogger.info(`Filter has ${count} condition(s)`);
+            raw = (await layout.getAttribute('data-condition-count').catch(() => '0')) ?? '0';
+            return raw;
+        }, { timeout: 15000, intervals: [100, 100, 200, 200, 500, 500, 1000, 1000] })
+            .not.toBe('0')
+            .catch(() => {
+                // Stable at 0 is a valid outcome — query may genuinely have no filters.
+            });
+        const count = Number.parseInt(raw, 10) || 0;
+        testLogger.info(`Filter has ${count} condition(s) (via data-condition-count)`);
         return count;
     }
 
