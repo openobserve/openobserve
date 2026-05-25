@@ -283,6 +283,10 @@ function onVertUp(e: PointerEvent) {
   dragging = null;
 }
 
+function onVertCancel() {
+  dragging = null;
+}
+
 // ── Horizontal mode pointer handling ─────────────────────────────────────
 // All pointer interactions (track clicks AND native thumb drags) are handled
 // here so we can decouple the smooth visual position from the snapped value
@@ -372,6 +376,12 @@ function onHorizUp(e: PointerEvent) {
   emit("change", next);
   hDragging = null;
 }
+
+function onHorizCancel() {
+  dragVisualMin.value = null;
+  dragVisualMax.value = null;
+  hDragging = null;
+}
 </script>
 
 <template>
@@ -411,6 +421,7 @@ function onHorizUp(e: PointerEvent) {
         @pointerdown="onVertDown"
         @pointermove="onVertMove"
         @pointerup="onVertUp"
+        @pointercancel="onVertCancel"
       >
         <!-- Background track strip -->
         <div
@@ -532,6 +543,7 @@ function onHorizUp(e: PointerEvent) {
       @pointerdown="onHorizDown"
       @pointermove="onHorizMove"
       @pointerup="onHorizUp"
+      @pointercancel="onHorizCancel"
     >
       <!-- Background track -->
       <div
