@@ -213,7 +213,7 @@ watch(
 .wildcard-popover {
   min-width: 14rem;
   max-width: 24rem;
-  background: var(--o2-card-bg, #ffffff);
+  background: var(--o2-card-bg-solid, #ffffff);
   border: 1px solid var(--o2-border, #e5e7eb);
   border-radius: 0.5rem;
   box-shadow:
