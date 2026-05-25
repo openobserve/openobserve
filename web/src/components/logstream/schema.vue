@@ -595,6 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="mini-select"
                             multiple
                             clearable
+                            size="sm"
                             :data-test="`schema-field-${row.name}-index-type-select`"
                             style="width: 190px;"
                             @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
