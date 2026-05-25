@@ -1298,7 +1298,12 @@ DO UPDATE SET
         Ok(id)
     }
 
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<super::MergeJobRecord>> {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";
@@ -1316,23 +1321,28 @@ DO UPDATE SET
             }
             return Err(e.into());
         }
-        // get pending jobs group by stream and order by num desc
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
-        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
+
+        // get pending jobs group by stream and order by num desc
+        let sql = if fast_mode {
+            r#"SELECT stream, id, 0 as num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
+        } else {
             r#"
-SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
-    FROM file_list_jobs
-    WHERE status = $1
-    GROUP BY stream
-    ORDER BY num DESC
-    LIMIT $2;"#,
-        )
-        .bind(super::FileListJobStatus::Pending)
-        .bind(limit)
-        .fetch_all(&mut *tx)
-        .await
+    SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
+        FROM file_list_jobs
+        WHERE status = $1
+        GROUP BY stream
+        ORDER BY num DESC
+        LIMIT $2;"#
+        };
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(sql)
+            .bind(super::FileListJobStatus::Pending)
+            .bind(limit)
+            .fetch_all(&mut *tx)
+            .await
         {
             Ok(v) => v,
             Err(e) => {

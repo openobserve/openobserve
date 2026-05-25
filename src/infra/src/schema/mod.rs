@@ -1075,9 +1075,10 @@ mod tests {
 
     #[test]
     fn test_get_stream_setting_bloom_filter_fields() {
-        // Test with None
+        // Test with None: returns the configured default fields (empty unless
+        // ZO_BLOOM_FILTER_DEFAULT_FIELDS is set)
         let fields = get_stream_setting_bloom_filter_fields(&None);
-        assert!(!fields.is_empty()); // Should have default fields
+        assert_eq!(fields, BLOOM_FILTER_DEFAULT_FIELDS.clone());
 
         // Test with custom bloom filter fields
         let mut settings = StreamSettings::default();

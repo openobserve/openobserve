@@ -90,6 +90,13 @@ const anomaly_detection = {
       `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=${limit}`,
     );
   },
+
+  // Bulk endpoint — returns history for ALL configs in one request
+  getAllHistory: (org_identifier: string, limit: number = 20) => {
+    return http().get(
+      `/api/${org_identifier}/anomaly_detection/history?limit=${limit}`,
+    );
+  },
 };
 
 export default anomaly_detection;
