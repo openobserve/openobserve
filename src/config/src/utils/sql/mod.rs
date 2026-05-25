@@ -28,7 +28,7 @@ pub use explain_query::is_explain_query;
 pub use simple_aggregate_query::is_simple_aggregate_query;
 pub use simple_distinct_query::is_simple_distinct_query;
 pub use timestamp_selected::is_timestamp_selected;
-pub use visitors::{TimestampVisitor, has_wildcard};
+pub use visitors::TimestampVisitor;
 
 pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "min",

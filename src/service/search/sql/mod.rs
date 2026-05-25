@@ -26,10 +26,7 @@ use config::{
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
-    utils::{
-        query_select_utils::replace_o2_custom_patterns,
-        sql::{has_wildcard, is_complex_query_stmt},
-    },
+    utils::{query_select_utils::replace_o2_custom_patterns, sql::is_complex_query_stmt},
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
@@ -258,7 +255,7 @@ impl Sql {
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
-        if !is_complex_query_stmt(&statement) && !has_wildcard(&statement) {
+        if !is_complex_query_stmt(&statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
             if o2_id_is_needed(&used_schemas, &search_event_type) {

@@ -132,11 +132,11 @@ test.describe("CTE Logs Queries testcases", () => {
     testLogger.info('Levels CTE query completed successfully');
   });
 
-  test.skip("should query with Normalized CTE for timeout messages", {
+  test("should query with Normalized CTE for timeout messages", {
     tag: ['@cteLogs', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing Normalized CTE for timeout messages');
-
+    
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
     await pageManager.logsPage.clickQueryEditor();
@@ -145,7 +145,7 @@ test.describe("CTE Logs Queries testcases", () => {
     await pageManager.logsPage.waitForTimeout(500);
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-
+    
     testLogger.info('Normalized CTE query completed successfully');
   });
 
