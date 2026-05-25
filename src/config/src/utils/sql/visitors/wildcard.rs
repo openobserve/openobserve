@@ -18,6 +18,7 @@ use std::ops::ControlFlow;
 use sqlparser::ast::{Query, SelectItem, SetExpr, Statement, Visit, Visitor};
 
 // only check the query like `select * from table`, do not check the union
+// this function only check the simple query that [`super::is_complex_query`] return false
 pub fn has_wildcard(statement: &Statement) -> bool {
     let mut visitor = WildcardVisitor::new();
     let _ = statement.visit(&mut visitor);
@@ -49,5 +50,85 @@ impl Visitor for WildcardVisitor {
             }
         }
         ControlFlow::Continue(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlparser::{dialect::GenericDialect, parser::Parser};
+
+    use super::*;
+
+    fn parse(sql: &str) -> Statement {
+        Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap()
+    }
+
+    #[test]
+    fn wildcard_simple_select_star() {
+        let stmt = parse("SELECT * FROM t");
+        assert!(has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_select_named_columns() {
+        let stmt = parse("SELECT a, b FROM t");
+        assert!(!has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_mixed_projection() {
+        let stmt = parse("SELECT a, * FROM t");
+        assert!(has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_qualified_wildcard_is_not_match() {
+        // SelectItem::QualifiedWildcard is a different variant than
+        // SelectItem::Wildcard and is intentionally not matched.
+        let stmt = parse("SELECT t.* FROM t");
+        assert!(!has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_count_star_is_not_match() {
+        // COUNT(*) is a function call, not a SelectItem::Wildcard projection.
+        let stmt = parse("SELECT COUNT(*) FROM t");
+        assert!(!has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_with_where_clause() {
+        let stmt = parse("SELECT * FROM t WHERE a = 1");
+        assert!(has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_in_subquery() {
+        let stmt = parse("SELECT a FROM (SELECT * FROM t) sub");
+        assert!(has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_in_cte() {
+        let stmt = parse("WITH cte AS (SELECT * FROM t) SELECT a FROM cte");
+        assert!(has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_top_level_union_is_skipped() {
+        // The outer Query body is a SetOperation, not a Select, so the
+        // projection check is skipped per the visitor's contract.
+        let stmt = parse("SELECT * FROM a UNION SELECT b FROM c");
+        assert!(!has_wildcard(&stmt));
+    }
+
+    #[test]
+    fn wildcard_non_query_statement() {
+        let stmt = parse("CREATE TABLE t (a INT)");
+        assert!(!has_wildcard(&stmt));
     }
 }
