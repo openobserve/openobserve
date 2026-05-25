@@ -44,12 +44,14 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
 
     // Switch to average — value input should hide
     await typeSelect.click();
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'visible', timeout: 5000 });
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').click();
     await expect(valueInput).not.toBeVisible();
     testLogger.info("Value input hidden for Average type");
 
     // Switch back to yAxis — value input re-appears, fill it
     await typeSelect.click();
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Y-Axis"]').waitFor({ state: 'visible', timeout: 5000 });
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Y-Axis"]').click();
     await expect(valueInput).toBeVisible();
     await valueInput.locator('[data-test$="-field"]').fill("100");
@@ -91,6 +93,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     const type0 = page.locator('[data-test="dashboard-config-markline-type-0"]');
     await type0.waitFor({ state: 'visible', timeout: 5000 });
     await type0.click();
+    await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').waitFor({ state: 'visible', timeout: 5000 });
     await page.locator('[data-test="dashboard-config-markline-type-0-option"][data-test-label="Average"]').click();
     await page.locator('[data-test="dashboard-config-markline-name-0"]').locator('[data-test$="-field"]').fill("avg");
 
@@ -100,6 +103,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     const type1 = page.locator('[data-test="dashboard-config-markline-type-1"]');
     await type1.waitFor({ state: 'visible', timeout: 5000 });
     await type1.click();
+    await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').waitFor({ state: 'visible', timeout: 5000 });
     await page.locator('[data-test="dashboard-config-markline-type-1-option"][data-test-label="Max"]').click();
     await page.locator('[data-test="dashboard-config-markline-name-1"]').locator('[data-test$="-field"]').fill("max");
 

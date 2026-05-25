@@ -271,35 +271,56 @@ export default class DashboardPanelTime {
    * @param {string} panelId - Panel ID
    * @param {string} timeRange - e.g., "15-m", "1-h", "7-d"
    * @param {boolean} clickApply - Whether to click Apply button (default: true)
+   * @param {number} _attempt - Internal retry counter (do not pass from call sites)
    */
-  async changePanelTimeInView(panelId, timeRange, clickApply = true) {
+  async changePanelTimeInView(panelId, timeRange, clickApply = true, _attempt = 1) {
     // Click the panel time picker button
     await this.clickPanelTimePicker(panelId);
 
     // Wait for the DateTime dialog to open
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
-    // Select the time range within the dialog
-    const timeOptionLocator = this.timeRangeBtn(timeRange);
-    await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
-    // Use evaluate(el.click()) to bypass Playwright's stability check — the ODropdown
-    // open animation can cause "element is not stable" / "element was detached" retries.
-    await timeOptionLocator.evaluate(el => el.click());
-
-    // Wait for the Apply button to be visible and stable before returning.
-    // With auto-apply-dashboard="false" the time button click does NOT emit (only the
-    // Apply button does), so the dropdown should stay open and stable here.
-    const applyBtnLocator = this.dateTimeMenu.locator('[data-test="date-time-apply-btn"]');
-    await applyBtnLocator.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+    // Use page-level locators for both the time option and the Apply button.
+    // ODropdown portals content to document.body; after the time option is clicked,
+    // Vue re-renders the dropdown, briefly detaching #date-time-menu-scoped element
+    // references. Page-level locators re-resolve from the document root each retry
+    // attempt, so they survive the churn. Only one dropdown can be open at a time
+    // (Reka UI unmounts the portal when closed), so page-level locators are safe
+    // and unambiguous — this is exactly how the passing test 4 works.
+    // force: true bypasses stability (the element can be mid-animation due to
+    // background panel re-renders from the initializePanelTimes watch). The element
+    // IS present and visible — it just fails Playwright's stability check in a tight
+    // re-render loop. force fires pointer events immediately once the locator resolves.
+    // page-level locator re-resolves fresh if the element momentarily detaches.
+    const timeOptionLocator = this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).first();
+    await timeOptionLocator.click({ force: true, timeout: 15000 });
 
     if (clickApply) {
-      // Click apply button within the dialog
-      const applyBtn = this.dateTimeMenu.locator('[data-test="date-time-apply-btn"]');
-      await applyBtn.click();
+      const applyBtn = this.page.locator('[data-test="date-time-apply-btn"]').first();
+      await applyBtn.waitFor({ state: "visible", timeout: 5000 });
+
+      const urlBefore = this.page.url();
+      // force: true for the same reason as the time option — continuous background
+      // panel re-renders can keep this button "not stable" in the stability check.
+      await applyBtn.click({ force: true });
 
       // Wait for dialog to close and network to settle
       await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
       await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+      // Detect whether onPanelTimeApply was blocked by the panelsInitializing guard.
+      // The guard is a 500ms timer in RenderDashboardCharts that re-arms whenever
+      // initializePanelTimes() runs (e.g. when currentTimeObj updates from a panel
+      // refresh). Under parallel-test server load this guard can be active when Apply
+      // is clicked, causing onPanelTimeApply to return early without writing the URL.
+      // Detection: if the URL hasn't changed, the apply was a no-op — retry once.
+      const urlAfter = this.page.url();
+      if (urlAfter === urlBefore && _attempt < 2) {
+        // Wait for network to drain fully (lets any in-flight panel refreshes complete
+        // and allows the 500ms panelsInitializing guard to expire).
+        await this.page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+        await this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
+      }
     }
   }
 

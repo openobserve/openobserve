@@ -38,6 +38,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await setupPromQLPanelWithConfig(page, pm, dashboardName);
 
     const stepValueInput = page.locator('[data-test="dashboard-config-step-value"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stepValueInput);
     await expect(stepValueInput).toBeVisible();
 
     // Clear and set step value to 5m
@@ -62,6 +63,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await setupPromQLPanelWithConfig(page, pm, dashboardName);
 
     const legendInfo = page.locator('[data-test="dashboard-config-promql-legend-info"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInfo);
     await expect(legendInfo).toBeVisible();
     testLogger.info("PromQL legend info icon is visible in PromQL mode");
 
@@ -299,12 +301,12 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleColsInput);
     await expect(visibleColsInput).toBeVisible();
 
-    // Click trigger → type to filter → click the filtered option to select it
+    // Open trigger → type the column name → press Enter (creatable select: no stream fields loaded in PromQL mode)
     await page.locator('[data-test="dashboard-config-visible-columns-trigger"]').click();
     const visibleSearchInput = page.locator('[data-test="dashboard-config-visible-columns-search"]');
     await visibleSearchInput.waitFor({ state: "visible" });
     await visibleSearchInput.fill("instance");
-    await page.locator('[data-test="dashboard-config-visible-columns-option"][data-test-label="instance"]').click();
+    await page.keyboard.press("Enter"); // create the typed value
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Visible column 'instance' added");
 
@@ -340,7 +342,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const hiddenSearchInput = page.locator('[data-test="dashboard-config-hidden-columns-search"]');
     await hiddenSearchInput.waitFor({ state: "visible" });
     await hiddenSearchInput.fill("job");
-    await page.locator('[data-test="dashboard-config-hidden-columns-option"][data-test-label="job"]').click();
+    await page.keyboard.press("Enter"); // create the typed value (no stream fields in PromQL mode)
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Hidden column 'job' added");
 
@@ -376,7 +378,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const stickySearchInput = page.locator('[data-test="dashboard-config-sticky-columns-search"]');
     await stickySearchInput.waitFor({ state: "visible" });
     await stickySearchInput.fill("instance");
-    await page.locator('[data-test="dashboard-config-sticky-columns-option"][data-test-label="instance"]').click();
+    await page.keyboard.press("Enter"); // create the typed value (no stream fields in PromQL mode)
     await page.keyboard.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Sticky column 'instance' added");
 
