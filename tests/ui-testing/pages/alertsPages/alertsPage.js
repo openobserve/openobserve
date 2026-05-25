@@ -1175,7 +1175,7 @@ export class AlertsPage {
 
         await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
         await this.page.waitForTimeout(1000);
-        await this.page.locator(this.locators.alertBackButton).click();
+        await this.page.locator(this.locators.cloneCancelButton).click();
         testLogger.info('Clone dialog cancel/back working');
     }
 
