@@ -209,11 +209,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div style="flex-shrink: 0; width: 100%">
-                  <div style="display: flex;">
+                  <div style="display: flex;" class="tw:items-center">
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
                       :options="functionOptions"
+                      label-position="inside"
                       data-test="dashboard-use-saved-vrl-function"
                       labelKey="name"
                       valueKey="function"
