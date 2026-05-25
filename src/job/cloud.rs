@@ -408,6 +408,18 @@ async fn check_external_contract_expiry() {
             log::info!(
                 "[EXT_CONTRACT] External contract expired for org {org_id}, reverting to Free tier"
             );
+
+            // try cancelling subscription of member orgs
+            if let Err(e) =
+                o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(&org_id)
+                    .await
+            {
+                log::error!(
+                    "[EXT_CONTRACT] Failed to delete members of expired billing for org {org_id}: {e}",
+                );
+                continue;
+            }
+
             if let Err(e) =
                 o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(org_id).await
             {
@@ -415,34 +427,6 @@ async fn check_external_contract_expiry() {
                     "[EXT_CONTRACT] Failed to delete expired billing for org {org_id}: {e}"
                 );
             }
-
-            // first try cancelling subscription of member orgs
-            let members =
-                match o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(
-                    &org_id,
-                )
-                .await{
-                    Ok(v)=>v,
-                    Err(e)=>{
-                        log::error!("error listing billing group members of {org_id}, skipping removal : {e}");
-                        continue;
-                    }
-                };
-
-            for member in members {
-                if let Err(e) =
-                    o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(
-                        &member.member_org_id,
-                    )
-                    .await
-                {
-                    log::error!(
-                        "[EXT_CONTRACT] Failed to delete member {} of expired billing for org {org_id}: {e}",
-                        member.member_org_id
-                    );
-                }
-            }
-
             continue;
         }
 
