@@ -4339,6 +4339,15 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
+      // Flush the Monaco editor value synchronously so the search uses what the
+      // user actually typed, not the last debounced emission. Without this, a Run
+      // click within 100ms of typing sends the stale searchObj.data.query value.
+      const currentEditorVal = queryEditorRef.value?.getValue?.();
+      if (typeof currentEditorVal === "string") {
+        searchObj.data.editorValue = currentEditorVal;
+        searchObj.data.query = currentEditorVal;
+      }
+
       if (
         searchObj.meta.logsVisualizeToggle == "visualize" ||
         searchObj.meta.logsVisualizeToggle == "patterns" ||

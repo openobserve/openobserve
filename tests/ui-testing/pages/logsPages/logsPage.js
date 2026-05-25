@@ -7986,9 +7986,9 @@ export class LogsPage {
     async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        const builderStateBtn = this.page.locator(`${this.builderQueryType} [data-state]`);
-        await expect(builderStateBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem forwards attrs to the inner Reka UI button via v-bind="$attrs",
+        // so data-test and data-state land on the same element — no descendant combinator needed.
+        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
 
@@ -7998,9 +7998,9 @@ export class LogsPage {
     async expectCustomModeActive(timeout = 15000) {
         const customTypeBtn = this.page.locator(this.customQueryType);
         await expect(customTypeBtn).toBeVisible({ timeout });
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        const customStateBtn = this.page.locator(`${this.customQueryType} [data-state]`);
-        await expect(customStateBtn).toHaveAttribute('data-state', 'on', { timeout });
+        // OToggleGroupItem forwards attrs to the inner Reka UI button via v-bind="$attrs",
+        // so data-test and data-state land on the same element — no descendant combinator needed.
+        await expect(customTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Custom SQL mode is active');
     }
 
@@ -8024,8 +8024,8 @@ export class LogsPage {
      */
     async clickCustomQueryType() {
         await this.page.locator(this.customQueryType).click();
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        await expect(this.page.locator(`${this.customQueryType} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+        // Same element carries data-state (attrs forwarded to inner Reka button)
+        await expect(this.page.locator(this.customQueryType)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
         testLogger.info('Clicked Custom query type');
     }
 

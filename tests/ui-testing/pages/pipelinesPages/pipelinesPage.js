@@ -193,7 +193,7 @@ export class PipelinesPage {
         this.containsOption = page.getByText("Contains", { exact: true });
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
-        this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
+        this.pipelineSavedMessage = page.locator('[data-test="o-toast-default"] [data-test="o-toast-message"]');
         this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.deletedSuccessfullyText = page.getByText('deleted successfully');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
