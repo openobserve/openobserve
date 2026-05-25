@@ -15,9 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="import-drawer-container">
-    <!-- Content -->
-    <div class="drawer-content tw:p-3">
+  <ODrawer
+    data-test="semantic-field-groups-config-import-drawer"
+    v-model:open="internalOpen"
+    :width="40"
+    title="Import Semantic Groups"
+    sub-title="Upload JSON file to import semantic field groups"
+    secondary-button-label="Cancel"
+    primary-button-label="Apply Changes"
+    :primary-button-disabled="!hasSelectedChanges"
+    :primary-button-loading="isApplying"
+    @click:secondary="handleClose"
+    @click:primary="handleApply"
+    @update:open="handleOpenChange"
+  >
+  <div class="tw:p-3">
       <!-- File Upload -->
       <div class="tw:mb-3">
         <OFile
@@ -221,34 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-
-    <!-- Footer Actions -->
-    <div class="drawer-footer tw:p-3">
-      <OSeparator class="tw:mb-4" />
-      <div class="tw:flex tw:gap-2 tw:justify-end">
-        <div class="col-auto">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="handleClose"
-            data-test="import-drawer-cancel-btn"
-            >Cancel</OButton
-          >
-        </div>
-        <div class="col-auto">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="handleApply"
-            :disabled="!hasSelectedChanges"
-            :loading="isApplying"
-            data-test="import-drawer-apply-btn"
-            >Apply Changes</OButton
-          >
-        </div>
-      </div>
-    </div>
-  </div>
+  </ODrawer>
 
   <!-- Group Details Dialog -->
   <ODialog
@@ -331,7 +316,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -343,7 +329,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+
 
 interface SemanticGroup {
   id: string;
@@ -366,14 +352,29 @@ interface SemanticGroupDiff {
 interface Props {
   currentGroups: SemanticGroup[];
   orgId: string;
+  open?: boolean;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  (e: "close"): void;
+  (e: "update:open", value: boolean): void;
   (e: "apply", groups: SemanticGroup[]): void;
 }>();
+
+const internalOpen = ref(props.open ?? false);
+
+watch(
+  () => props.open,
+  (v) => {
+    if (v !== undefined) internalOpen.value = v;
+  },
+);
+
+function handleOpenChange(v: boolean) {
+  internalOpen.value = v;
+  emit("update:open", v);
+}
 
 
 const jsonFile = ref<File | null>(null);
@@ -534,7 +535,7 @@ const handleApply = () => {
   // Reset and close
   clearFile();
   isApplying.value = false;
-  emit("close");
+  handleOpenChange(false);
 
   toast({
     message: `Applied ${changeCount} changes`,
@@ -545,30 +546,11 @@ const handleApply = () => {
 
 const handleClose = () => {
   clearFile();
-  emit("close");
+  handleOpenChange(false);
 };
 </script>
 
 <style lang="scss" scoped>
-.import-drawer-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.drawer-header {
-  flex-shrink: 0;
-}
-
-.drawer-content {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.drawer-footer {
-  flex-shrink: 0;
-}
-
 .section-header {
   font-size: 14px;
   font-weight: 600;
