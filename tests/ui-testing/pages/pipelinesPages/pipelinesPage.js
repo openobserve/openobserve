@@ -591,8 +591,8 @@ export class PipelinesPage {
      * Clear the pipeline list search input
      */
     async clearPipelineListSearch() {
-        await this.pipelineSearchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await this.pipelineSearchInput.clear();
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.clear();
         await this.page.waitForTimeout(500);
     }
 
