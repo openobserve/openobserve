@@ -233,7 +233,6 @@ const useLogs = () => {
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
             message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-            position: "top-center",
             timeout: 1000,
           });
         }

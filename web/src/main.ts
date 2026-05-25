@@ -179,14 +179,12 @@ function showNewVersionNotification() {
     variant: "error",
     message: i18n.global.t("common.chunkLoadErrorMsg"),
     timeout: 0, // Don't auto-dismiss
-    actions: [
-      {
-        label: i18n.global.t("common.refresh"),
-        handler: () => {
-          window.location.reload();
-        },
+    action: {
+      label: i18n.global.t("common.refresh"),
+      handler: () => {
+        window.location.reload();
       },
-    ],
+    },
     position: "top-center",
   });
 }

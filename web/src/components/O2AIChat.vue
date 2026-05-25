@@ -4452,7 +4452,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
-          position: "top-center",
         });
         return false;
       }
@@ -4462,7 +4461,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Only PNG and JPEG images are supported",
-          position: "top-center",
         });
         return false;
       }
@@ -4655,7 +4653,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: `Failed to read image: ${file.name}`,
-            position: "top-center",
           });
           resolve(false);
         };

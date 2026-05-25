@@ -1812,7 +1812,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Failed to copy content",
-          position: "top-center",
           timeout: 2000,
         });
       }

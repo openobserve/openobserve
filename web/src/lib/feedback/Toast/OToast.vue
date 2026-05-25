@@ -172,7 +172,7 @@ const screenReaderTitle = computed(() =>
       >
         <button
           type="button"
-          class="tw:mt-2 tw:text-sm tw:font-medium tw:text-toast-action-text tw:hover:text-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:underline"
+          class="tw:mt-2.5 tw:inline-flex tw:items-center tw:justify-center tw:rounded-md tw:bg-toast-action-text tw:px-3 tw:py-1.5 tw:text-xs tw:font-semibold tw:text-white tw:shadow-sm tw:transition-colors tw:hover:bg-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1 tw:focus-visible:ring-toast-action-text"
           @click="action.handler"
         >
           {{ action.label }}
