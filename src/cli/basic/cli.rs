@@ -100,11 +100,18 @@ fn create_cli_app() -> Command {
                     arg!("account", 'a', "account", "the account name", false).value_name("account"),
                     arg!("file", 'f', "file", "the parquet file name", true).value_name("file"),
                 ]),
-            Command::new("recover-file-list").about("recover file list from s3")
+            Command::new("recover-file-list").about("recover file list from remote object store")
                 .args([
                     arg!("account", 'a', "account", "the account name", true).value_name("account"),
                     arg!("prefix", 'p', "prefix", "only migrate specified prefix", true).value_name("prefix"),
                     arg!("insert", 'i', "insert", "insert file list into db", false).value_name("insert").action(ArgAction::SetTrue),
+                ]),
+            Command::new("gc-file-list")
+                .about("delete stale stream files from remote storage that are past data retention")
+                .args([
+                    arg!("account", 'a', "account", "override storage account to list/delete, required for file_hash multi-account setups (default: resolve per stream)", false).value_name("account"),
+                    arg!("stream", 's', "stream", "only clean a specific stream, format: org/stream_type/stream_name (default: all streams)", false).value_name("stream"),
+                    arg!("dry-run", 'd', "dry-run", "only print what would be deleted, don't touch storage", false).action(ArgAction::SetTrue),
                 ]),
                 Command::new("node").about("node command").subcommands([
                 Command::new("offline").about("offline node"),
@@ -416,6 +423,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let prefix = command.get_one::<String>("prefix").unwrap();
             let insert = command.get_flag("insert");
             super::load::load_file_list_from_s3(&account, prefix, insert).await?;
+        }
+        "gc-file-list" => {
+            let account = command.get_one::<String>("account").map(|s| s.as_str());
+            let stream = command.get_one::<String>("stream").map(|s| s.as_str());
+            let dry_run = command.get_flag("dry-run");
+            super::gc::run(account, stream, dry_run).await?;
         }
         "node" => {
             let command = command.subcommand();
