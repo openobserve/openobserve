@@ -512,6 +512,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Testing column order persists after re-running the query');
 
     await setupTableChart(page, 'expanded_timeseries');
+    await expect
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 10000 })
+      .toBeGreaterThan(1);
+    await pm.metricsPage.getPromqlTableHeaderText(0);
+    await pm.metricsPage.getPromqlTableHeaderText(1);
 
     // STEP 1: Set custom column order
     testLogger.info('Setting custom column order');
@@ -531,12 +536,14 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // Save the column order
     await pm.dashboardPanelConfigs.saveColumnOrder();
     testLogger.info('Column order saved');
+    const columnOrderPopup = pm.dashboardPanelConfigs.columnOrderDialog;
+    await expect(columnOrderPopup).not.toBeVisible({ timeout: 5000 });
 
     // STEP 2: Verify table shows reordered columns
     // NOTE: Timestamp is always in position 0 (first column)
     // The reordered column should appear in position 1 (second column)
     await expect
-      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 5000 })
+      .poll(async () => await pm.metricsPage.getPromqlTableHeaderText(1), { timeout: 15000 })
       .toBe(expectedColumnName);
 
     const timestampColumn = await pm.metricsPage.getPromqlTableHeaderText(0);

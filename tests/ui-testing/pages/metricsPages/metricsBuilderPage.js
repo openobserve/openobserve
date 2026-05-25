@@ -260,7 +260,7 @@ export class MetricsBuilderPage {
     }
 
     getPanelNameInput() {
-        return this.page.locator('[data-test="dashboard-panel-name"]');
+        return this.page.locator('[data-test="dashboard-panel-name-field"]');
     }
 
     getDashboardApplyBtn() {

@@ -1322,6 +1322,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     }
 
     // 13. Verify operation persisted
+    await expect.poll(async () => await builder.getOperationCount(), { timeout: 10000 })
+      .toBe(1);
     const editOpCount = await builder.getOperationCount();
     testLogger.info(`Panel editor operations: ${editOpCount}`);
     expect(editOpCount).toBe(1);
