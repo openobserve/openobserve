@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondaryButtonLabel="!createNewStream ? t('alerts.cancel') : undefined"
     :neutralButtonLabel="!createNewStream && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
+    data-test="input-node-stream-drawer"
     @click:primary="saveStream"
     @click:secondary="openCancelDialog"
     @click:neutral="openDeleteDialog"

@@ -38,7 +38,9 @@ export class PipelinesPage {
           .getByRole("option", { name: "logs" })
           .locator("div")
           .nth(2);
-        this.saveButton = page.locator('[data-test="input-node-stream-save-btn"]');
+        this.saveButton = page.locator(
+          '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
+        );
         // Error message shown when saving the input/output stream node without
         // selecting a stream. The OSelect on Stream.vue exposes the
         // `:error-message="streamNameError"` via its auto-derived
@@ -71,7 +73,7 @@ export class PipelinesPage {
           '[data-test="input-node-stream-name-select-option"][data-test-value="e2e_automate"]'
         );
         this.inputNodeStreamSaveButton = page.locator(
-          '[data-test="input-node-stream-save-btn"]'
+          '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
         );
         this.destinationNodeRequiredMessage = page.locator(
           '[data-test-message="Destination node is required"]'
@@ -86,7 +88,9 @@ export class PipelinesPage {
        this.previousNodeDropdownSecond = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]:last-child');
         this.createStreamToggle = page.locator('[data-test="create-stream-toggle"]');
         this.saveStreamButton = page.locator('[data-test="save-stream-btn"]');
-        this.inputNodeStreamSaveButton = page.locator('[data-test="input-node-stream-save-btn"]')
+        this.inputNodeStreamSaveButton = page.locator(
+          '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
+        );
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
         // OInput inner native input — `.fill()` MUST target the `-field`
         // variant per §4 (the wrapper isn't the input).
@@ -99,7 +103,7 @@ export class PipelinesPage {
         this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"]');
         this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
-        this.associateFunctionSaveButton = page.locator('[data-test="associate-function-save-btn"]');
+        this.associateFunctionSaveButton = page.locator('[data-test="associate-function-drawer"] [data-test="o-drawer-primary-btn"]');
         this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
         // AddFunction's name field is an OInput — when the form is submitted
         // empty, OInput renders the "Field is required!" message inside the
@@ -153,7 +157,7 @@ export class PipelinesPage {
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
-        this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
+        this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = 'button[data-test="function-enrichment-table-tab"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
@@ -206,8 +210,8 @@ export class PipelinesPage {
         this.toggleOperatorBtn = page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
         this.deleteConditionBtn = page.locator('[data-test="alert-conditions-delete-condition-btn"]');
         this.reorderBtn = page.locator('[data-test="alert-conditions-reorder-btn"]');
-        this.addConditionCancelBtn = page.locator('[data-test="add-condition-cancel-btn"]');
-        this.addConditionDeleteBtn = page.locator('[data-test="add-condition-delete-btn"]');
+        this.addConditionCancelBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-secondary-btn"]');
+        this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
         this.nestedGroups = page.locator('.el-border');
         this.operatorLabels = page.locator('span.tw\\:lowercase');
@@ -657,15 +661,17 @@ export class PipelinesPage {
             `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`
         ).first();
         await optionLocator.waitFor({ state: 'visible', timeout: 15000 });
-        await optionLocator.click({ force: true });
-        // The popover closes on selection — wait for it to detach so the
-        // subsequent Save click isn't intercepted by the listbox.
+        await optionLocator.click();
         await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
     }
 
     async saveInputNodeStream() {
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'detached', timeout: 5000 })
+            .catch(() => {});
+        await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
 
@@ -1345,6 +1351,18 @@ export class PipelinesPage {
     }
 
     async deletePipelineByName(pipelineName) {
+        // Ensure we're on the "all" tab so realtime + scheduled pipelines are
+        // both visible regardless of how the list was previously filtered.
+        const allTab = this.page.locator('[data-test="tab-all"]');
+        if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await allTab.click().catch(() => {});
+            await this.page.waitForTimeout(300);
+        }
+        // Clear any leftover search filter before searching again so the row
+        // can render even if a previous search left the input populated.
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.fill('');
+        await this.page.waitForTimeout(300);
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
         // Click on more options (three-dot menu) then delete

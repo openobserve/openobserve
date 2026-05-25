@@ -137,5 +137,72 @@ class UnflattenedPage {
         console.log('DEBUG: Toggle is already enabled, no action needed');
         return false;
     }
+
+    /**
+     * Open the log detail drawer for the row at index `rowIndex` (0-based, as
+     * rendered by the virtualized table).  Expands the row via its expand
+     * button and then opens the source column to render the JSON detail.
+     */
+    async openLogRowDetail(rowIndex) {
+        const expandBtn = this.page.locator(
+            `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
+        );
+        await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await expandBtn.click();
+        const sourceCell = this.page.locator(`[data-test="log-table-column-${rowIndex}-source"]`);
+        await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
+        await sourceCell.click();
+        // Wait for the detail drawer to be open — deterministic on drawer state.
+        await this.page
+            .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
+            .waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /**
+     * Close the log detail drawer if it is open. Uses Escape as the fallback
+     * when the close button is intercepted by an overlay.
+     */
+    async closeLogDetailDrawerIfOpen() {
+        const detailDialog = this.page.locator(
+            '[data-test="logs-search-result-detail-dialog"][data-state="open"]'
+        );
+        if (await detailDialog.isVisible().catch(() => false)) {
+            await this.closeDialog.click().catch(async () => {
+                await this.page.keyboard.press('Escape');
+            });
+            await detailDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
+    }
+
+    /**
+     * Iterate through the first `maxRows` log rows and return the index of the
+     * first row whose detail contains the `_o2_id` field.  Leaves the detail
+     * drawer OPEN on the matching row so the caller can continue interacting
+     * with the `_o2_id` element.  Returns -1 if no row in the range contains
+     * `_o2_id`.
+     */
+    async findRowWithO2Id(maxRows = 5) {
+        for (let rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+            const expandBtn = this.page.locator(
+                `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
+            );
+            // Stop if the row doesn't exist (table shorter than maxRows).
+            if (!(await expandBtn.isVisible().catch(() => false))) {
+                break;
+            }
+            await this.openLogRowDetail(rowIndex);
+            // Probe for _o2_id with a short timeout — rows that pre-date the
+            // schema change won't have it.
+            const found = await this.o2IdText
+                .waitFor({ state: 'visible', timeout: 3000 })
+                .then(() => true)
+                .catch(() => false);
+            if (found) {
+                return rowIndex;
+            }
+            await this.closeLogDetailDrawerIfOpen();
+        }
+        return -1;
+    }
 }
 export default UnflattenedPage;
