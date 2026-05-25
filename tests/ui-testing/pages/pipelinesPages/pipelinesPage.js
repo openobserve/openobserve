@@ -663,33 +663,9 @@ export class PipelinesPage {
         await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
-        // Defensive: in multi-select / listbox modes the Reka popper wrapper can
-        // remain attached after the named popover detaches, with a virtual list row
-        // (`data-vrow`) intercepting pointer events for the next click (Save).
-        // Loop pressing Escape until any reka-popper-content-wrapper is gone — on
-        // slow CI a single Escape can race with the next reactive render.
-        for (let i = 0; i < 5; i++) {
-            const popperCount = await this.page
-                .locator('[data-reka-popper-content-wrapper]:visible')
-                .count()
-                .catch(() => 0);
-            if (popperCount === 0) break;
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(300);
-        }
     }
 
     async saveInputNodeStream() {
-        for (let i = 0; i < 5; i++) {
-            const popperCount = await this.page
-                .locator('[data-reka-popper-content-wrapper]:visible')
-                .count()
-                .catch(() => 0);
-            if (popperCount === 0) break;
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(300);
-        }
-        await this.inputNodeStreamSaveButton.scrollIntoViewIfNeeded().catch(() => {});
         await this.inputNodeStreamSaveButton.click();
     }
 
