@@ -1280,6 +1280,9 @@ const fieldWidthClass = computed(() => {
       <div class="tw:relative tw:flex tw:items-center">
         <SelectTrigger
           :id="inputId"
+          :data-test="
+            parentDataTest ? `${parentDataTest}-trigger` : undefined
+          "
           :class="[
             'tw:relative tw:flex tw:w-full tw:rounded-md tw:border tw:ps-3',
             'tw:bg-select-bg',

@@ -157,9 +157,9 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(1500);
 
     testLogger.info('Waiting for _o2_id field to appear in log details');
-    // Retry with query refresh if _o2_id not found (data may not be indexed yet)
+    // Retry with query refresh if _o2_id not found (data may not be indexed yet).
     let o2idFound = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 5; attempt++) {
       try {
         await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 15000 });
         testLogger.info(`Successfully found _o2_id field (attempt ${attempt})`);
@@ -168,8 +168,18 @@ test.describe("Unflattened testcases", () => {
         break;
       } catch (error) {
         testLogger.warn(`_o2_id not found on attempt ${attempt}, refreshing search`);
-        // Close the open log detail dialog before refreshing — it intercepts clicks
-        await pageManager.unflattenedPage.closeDialog.click();
+        // Close the open log detail dialog before refreshing — it intercepts
+        // clicks. The drawer carries data-state="open"; close via Escape too as
+        // a fallback when the close button is itself intercepted.
+        const detailDialog = page.locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]');
+        if (await detailDialog.isVisible().catch(() => false)) {
+          await pageManager.unflattenedPage.closeDialog.click().catch(async () => {
+            await page.keyboard.press('Escape');
+          });
+          await detailDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
+        // Give the indexer a chance to catch up between attempts (3s per retry).
+        await page.waitForTimeout(3000);
         await applyQueryButton(page);
         // Re-expand log row
         await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
@@ -180,7 +190,7 @@ test.describe("Unflattened testcases", () => {
       }
     }
     if (!o2idFound) {
-      throw new Error('Failed to find _o2_id field in log details after 3 attempts');
+      throw new Error('Failed to find _o2_id field in log details after 5 attempts');
     }
 
     testLogger.info('Switching to unflattened tab');
@@ -335,6 +345,14 @@ test.describe("Unflattened testcases", () => {
             testLogger.error('Could not retrieve available fields');
           }
           break;
+        }
+        // Close any leftover detail drawer from the previous attempt — it intercepts
+        // pointer events and blocks the table row expand-menu click. The drawer is a
+        // right-side dialog with data-test="logs-search-result-detail-dialog".
+        const detailDialog = page.locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]');
+        if (await detailDialog.isVisible().catch(() => false)) {
+          await page.keyboard.press('Escape');
+          await detailDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         }
         await applyQueryButton(page);
         await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();

@@ -504,15 +504,13 @@ export class MetricsPage {
 
     async enterMetricsQuery(query) {
         // Ensure Custom mode is active so the editor is fully editable
-        const customBtn = this.customQueryTypeButton;
+        const customBtn = this.page.locator(`${this.customQueryTypeSelector || '[data-test="dashboard-custom-query-type"]'}:visible`).first();
         if (await customBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-            const innerBtn = customBtn.locator('[data-state]');
-            const dataState = await innerBtn.getAttribute('data-state').catch(() => '');
+            const dataState = await customBtn.getAttribute('data-state').catch(() => '');
             if (dataState !== 'on') {
                 await customBtn.click();
                 // Wait deterministically for Custom mode to flip data-state to "on"
-                await expect(innerBtn).toHaveAttribute('data-state', 'on', { timeout: 5000 }).catch(() => {});
+                await expect(customBtn).toHaveAttribute('data-state', 'on', { timeout: 5000 }).catch(() => {});
             }
         }
 
@@ -571,10 +569,23 @@ export class MetricsPage {
     }
 
     async waitForMetricsResults() {
-        // Wait for results to load after query execution
-        // networkidle never resolves on OpenObserve (persistent WebSocket/RUM);
-        // keep timeout short so iterative query tests don't exceed the 5-min CI limit
+        // Wait for results to load after query execution.
+        // networkidle never resolves on OpenObserve (persistent WebSocket/RUM)
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await this.page.waitForFunction(
+            () => {
+                const canvases = document.querySelectorAll('[data-test="chart-renderer"] canvas');
+                if (canvases.length > 0) return true;
+                const tableHasRows = document.querySelector('[data-test="promql-table-chart"] tbody tr');
+                if (tableHasRows) return true;
+                // A "no-data" state is also valid completion.
+                const noData = document.querySelector('[data-test="no-data"]');
+                if (noData) return true;
+                return false;
+            },
+            null,
+            { timeout: 15000, polling: 'raf' }
+        ).catch(() => {});
     }
 
     // Query type switching methods
@@ -2303,22 +2314,17 @@ export class MetricsPage {
      * Uses OSelect's `data-test-value` per ruleset §4.
      */
     async selectPromqlTableMode(modeValue) {
-        await this.promqlTableModeSelect.waitFor({ state: 'visible', timeout: 5000 });
-        await this.promqlTableModeSelect.scrollIntoViewIfNeeded();
-        await this.promqlTableModeSelect.click();
+        const trigger = this.page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
+        await trigger.waitFor({ state: 'visible', timeout: 5000 });
+        await trigger.scrollIntoViewIfNeeded();
+        await trigger.click();
         await this.promqlTableModePopover.waitFor({ state: 'visible', timeout: 5000 });
-        const option = this.promqlTableModeOptions.filter({
-            has: this.page.locator(`[data-test-value="${modeValue}"]`),
-        }).first();
-        // Fallback: directly pick the option carrying the data-test-value attr
+        // Pick the option by its data-test-value (per AGENT_RULES §4 OSelectItem stamp).
         const optionByValue = this.page.locator(
             `[data-test="dashboard-config-promql-table-mode-option"][data-test-value="${modeValue}"]`
         );
-        if (await optionByValue.count() > 0) {
-            await optionByValue.click();
-        } else {
-            await option.click();
-        }
+        await optionByValue.first().waitFor({ state: 'visible', timeout: 5000 });
+        await optionByValue.first().click();
         await this.promqlTableModePopover.waitFor({ state: 'hidden', timeout: 5000 });
     }
 
