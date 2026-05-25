@@ -1920,6 +1920,7 @@ export default defineComponent({
             loadingState.value = false;
             isDialogOpen.value = false;
             toast({
+              variant: "success",
               message: "Stream settings updated successfully.",
               timeout: 2000,
             });
@@ -1936,6 +1937,7 @@ export default defineComponent({
         .catch((err: any) => {
           loadingState.value = false;
           toast({
+            variant: "error",
             message: err.response.data.message,
             timeout: 2000,
           });

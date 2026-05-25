@@ -211,6 +211,11 @@ test.describe("SQL Autocomplete — Logs", () => {
             if (hasStream) break;
         }
 
+        // Wait for the DOM widget to appear first (ensures Monaco model is populated),
+        // then read the FULL completion model — the DOM only renders ~10 visible rows
+        // and e2e_automate may sort outside that viewport when many streams exist.
+        await pm.logsPage.getSuggestionLabelsIfVisible(5000);
+        labels = await pm.logsPage.getAllSuggestionLabelsFromMonacoApi();
         testLogger.info(`FROM "partial suggestions: ${labels.slice(0, 8).join(', ')}`);
 
         // Streams should appear (the feature sets contextKeywords when FROM is detected)

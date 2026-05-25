@@ -61,7 +61,7 @@ export class HomePage {
         this.metricsPageIndicator = page.locator('[data-test="metrics-page"]').or(page.locator('[data-test="metrics-apply"]')).first();
         this.tracesPageIndicator = page.locator('[data-test="traces-search-bar-refresh-btn"]').or(page.locator('[data-test="logs-search-bar-refresh-btn"]')).first();
         this.ingestionPageIndicator = page.locator('[data-test="ingestion-page"]').or(page.locator('[data-test="recommended-list-search-input"]')).first();
-        this.settingsPageIndicator = page.locator('[data-test="settings-general-page-title"]').or(page.locator('[data-test="general-settings-tab"]')).first();
+        this.settingsPageIndicator = page.locator('[data-test="settings-general-page-title"]').or(page.locator('button[data-test="general-settings-tab"]')).first();
 
         // ===== ADDITIONAL PAGE INDICATORS =====
         this.rumPageIndicator = page.locator('[data-test="rum-tabs"]').first();
@@ -755,7 +755,7 @@ export class HomePage {
      */
     async navigateToPipelineDestinations() {
         await this.navigateToSettings();
-        const pipelineTab = this.page.locator('[data-test="pipeline-destinations-tab"]');
+        const pipelineTab = this.page.locator('button[data-test="pipeline-destinations-tab"]');
         if (!(await pipelineTab.isVisible({ timeout: 5000 }).catch(() => false))) {
             return false;
         }
