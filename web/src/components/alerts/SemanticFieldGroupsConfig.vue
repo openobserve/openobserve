@@ -129,21 +129,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Import Dialog -->
-    <ODrawer
+    <!-- Import Drawer -->
+    <ImportSemanticGroupsDrawer
       data-test="semantic-field-groups-config-import-drawer"
       v-model:open="showImportDrawer"
-      size="xl"
-      title="Import Semantic Groups"
-      sub-title="Upload JSON file to import semantic field groups"
-    >
-      <ImportSemanticGroupsDrawer
-        :current-groups="localGroups"
-        :org-id="store.state.selectedOrganization.identifier"
-        @apply="handleImportApply"
-        @close="showImportDrawer = false"
-      />
-    </ODrawer>
+      :current-groups="localGroups"
+      :org-id="store.state.selectedOrganization.identifier"
+      @apply="handleImportApply"
+    />
   </div>
 </template>
 
@@ -155,7 +148,6 @@ import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
