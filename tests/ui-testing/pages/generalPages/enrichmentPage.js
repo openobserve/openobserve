@@ -2135,8 +2135,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         for (let i = 0; i < maxAttempts; i++) {
             await this.page.waitForTimeout(pollInterval);
-            await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await this.waitForEnrichmentTablesList();
+            // Dismiss any open form first (after Save the edit form stays open),
+            // then navigate explicitly to guarantee we're on the enrichment list
+            await this.navigateBackFromFormIfNeeded();
+            await this.navigateToEnrichmentTable();
             await this.searchEnrichmentTableInList(tableName);
 
             // Check for warning icon (failed job)
