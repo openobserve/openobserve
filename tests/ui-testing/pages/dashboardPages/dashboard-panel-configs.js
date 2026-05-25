@@ -239,7 +239,7 @@ export default class DashboardPanelConfigs {
   // Value position
   async selectValuePosition(position) {
     const trigger = this.page.locator('[data-test="dashboard-config-label-position-trigger"]');
-    await trigger.waitFor({ state: "visible" });
+    await this.scrollSidebarToElement(trigger);
     await trigger.click();
     await this._clickVirtualOption("dashboard-config-label-position", position);
   }
@@ -253,14 +253,14 @@ export default class DashboardPanelConfigs {
   //show symbols
   async selectSymbols(symbols) {
     const trigger = this.page.locator('[data-test="dashboard-config-show_symbol-trigger"]');
-    await trigger.waitFor({ state: "visible" });
+    await this.scrollSidebarToElement(trigger);
     await trigger.click();
     await this._clickVirtualOption("dashboard-config-show_symbol", symbols);
   }
   // Line interpolation
   async selectLineInterpolation(interpolation) {
     const trigger = this.page.locator('[data-test="dashboard-config-line_interpolation-trigger"]');
-    await trigger.waitFor({ state: "visible" });
+    await this.scrollSidebarToElement(trigger);
     await trigger.click();
     await this._clickVirtualOption("dashboard-config-line_interpolation", interpolation);
   }
@@ -273,7 +273,7 @@ export default class DashboardPanelConfigs {
   //Trellis Layout
   async selectTrellisLayout(layout) {
     const trigger = this.page.locator('[data-test="dashboard-trellis-chart-trigger"]');
-    await trigger.waitFor({ state: "visible" });
+    await this.scrollSidebarToElement(trigger);
     // Trellis is disabled when breakdown field is empty; wait for it to be enabled
     await expect(trigger).toBeEnabled({ timeout: 15000 });
     await trigger.click();
@@ -311,7 +311,7 @@ export default class DashboardPanelConfigs {
   //Symbol size
   async selectSymbolSize(size) {
     const trigger = this.page.locator('[data-test="dashboard-config-symbol-trigger"]');
-    await trigger.waitFor({ state: "visible" });
+    await this.scrollSidebarToElement(trigger);
     await trigger.click();
     await this._clickVirtualOption("dashboard-config-symbol", size);
   }
@@ -330,7 +330,7 @@ export default class DashboardPanelConfigs {
   //layer type
   async selectLayerType(type) {
     const trigger = this.page.locator('[data-test="dashboard-config-layer-type-trigger"]');
-    await trigger.waitFor({ state: "visible" });
+    await this.scrollSidebarToElement(trigger);
     await trigger.click();
     await this._clickVirtualOption("dashboard-config-layer-type", type);
   }
@@ -592,34 +592,28 @@ export default class DashboardPanelConfigs {
   // ========== Time Shift (Compare Against / Multi-Window) ==========
 
   /**
-   * Scroll sidebar until target element is visible
+   * Scroll sidebar until target element is visible and centered in the sidebar viewport.
+   * Centering ensures OSelect popups have enough space to open without being clipped.
    * @param {import('@playwright/test').Locator} targetLocator - Element to scroll to
    */
   async scrollSidebarToElement(targetLocator) {
     const sidebar = this.sidebarScrollContainer;
     await sidebar.waitFor({ state: "visible" });
-    await sidebar.hover();
 
+    // Always use scrollIntoView with block:'center' so the element is in the middle
+    // of the sidebar viewport, not at the edge — critical for OSelect popups.
+    await targetLocator.evaluate(el => {
+      el.scrollIntoView({ behavior: 'instant', block: 'center' });
+    }).catch(() => {
+      // If scrollIntoView fails (element detached), fall back to wheel scroll
+    });
+
+    // Wheel-scroll fallback if element is still not visible
+    const sidebar2 = this.sidebarScrollContainer;
+    await sidebar2.hover();
     for (let i = 0; i < 15; i++) {
       if (await targetLocator.isVisible().catch(() => false)) break;
       await this.page.mouse.wheel(0, 300);
-    }
-
-    if (!(await targetLocator.isVisible().catch(() => false))) {
-      await this.page.evaluate((selector) => {
-        const el = document.querySelector(selector);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, await targetLocator.evaluate(el => {
-        return el.getAttribute('data-test')
-          ? `[data-test="${el.getAttribute('data-test')}"]`
-          : null;
-      }).catch(() => null) || '[data-test="panel-sidebar-content"]');
-
-      // Fallback: scroll sidebar to bottom
-      await this.page.evaluate(() => {
-        const el = document.querySelector('[data-test="panel-sidebar-content"]');
-        if (el) el.scrollTop = el.scrollHeight;
-      });
     }
 
     await targetLocator.waitFor({ state: "visible", timeout: 15000 });
