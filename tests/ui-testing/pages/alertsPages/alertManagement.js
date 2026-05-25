@@ -166,7 +166,7 @@ export class AlertManagement {
 
         await this.page.getByText('Delete', { exact: true }).click();
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.alertDeletedMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertDeletedMessage })).toBeVisible();
         await this.page.waitForTimeout(1000);
     }
 
@@ -268,7 +268,7 @@ export class AlertManagement {
                 await this.page.getByText('Delete').click();
                 await this.page.waitForTimeout(1000);
                 await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
-                await expect(this.page.getByText('Alert deleted')).toBeVisible();
+                await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: 'Alert deleted' })).toBeVisible();
 
                 await this.page.waitForTimeout(3000);
                 attempts++;

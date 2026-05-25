@@ -1187,8 +1187,8 @@ export class AlertsPage {
     }
 
     async verifyFolderSearch(folderName) {
-        await this.page.locator('[data-test="folder-search"]').click();
-        await this.page.locator('[data-test="folder-search"]').fill(folderName);
+        await this.page.locator('[data-test="folder-search-field"]').click();
+        await this.page.locator('[data-test="folder-search-field"]').fill(folderName);
         await expect(this.page.getByText(folderName)).toBeVisible();
         await this.page.getByRole('button', { name: 'Clear' }).click();
         await expect(this.page.locator('button[data-test="dashboard-folder-tab-default"]')).toBeVisible();
