@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSelect
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
+      :labelPosition="labelPosition"
       :options="
         store.state.organizationData.folders.map((item: any) => {
           return { label: item.name, value: item.folderId };
@@ -86,6 +87,10 @@ export default defineComponent({
       validator: (value) => {
         return typeof value === "string" || value === null;
       },
+    },
+    labelPosition: {
+      type: String,
+      default: "outside",
     },
   },
   setup(props, { emit }) {
