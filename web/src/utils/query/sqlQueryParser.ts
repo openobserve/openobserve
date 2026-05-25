@@ -288,16 +288,6 @@ export async function parseSQL(
     // Extract fields, filters, and joins
     const { fields, filters, streamName, joins } = await getFieldsFromQuery(query);
 
-    // If no fields extracted, use custom mode
-    if (!fields || fields.length === 0) {
-      return {
-        ...defaultResult,
-        stream: stream || streamName || "",
-        filters: filters as ParsedFilter,
-        joins: joins || [],
-      };
-    }
-
     // Classify fields into x, y, breakdown
     const xFields: ParsedField[] = [];
     const yFields: ParsedField[] = [];
@@ -316,6 +306,36 @@ export async function parseSQL(
           breakdownFields.push(field);
           break;
       }
+    }
+
+    // Use default histogram/count when there are no meaningful axis fields:
+    // - SELECT * (no fields extracted)
+    // - Bare-field-select (e.g., SELECT method, status FROM logs) where all
+    //   fields are plain columns with no aggregation or time functions
+    if (xFields.length === 0 && yFields.length === 0) {
+      return {
+        stream: stream || streamName || "",
+        streamType,
+        xFields: [
+          {
+            column: "_timestamp",
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+        ],
+        yFields: [
+          {
+            column: "_timestamp",
+            alias: "y_axis_1",
+            aggregationFunction: "count",
+          },
+        ],
+        breakdownFields: [],
+        filters: filters as ParsedFilter,
+        joins: joins || [],
+        customQuery: false,
+        rawQuery: query,
+      };
     }
 
     return {
