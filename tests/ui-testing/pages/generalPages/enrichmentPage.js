@@ -2135,8 +2135,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         for (let i = 0; i < maxAttempts; i++) {
             await this.page.waitForTimeout(pollInterval);
-            await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await this.waitForEnrichmentTablesList();
+            // Navigate explicitly instead of reloading — after save the page
+            // may not be on the enrichment tables list
+            await this.navigateToEnrichmentTable();
             await this.searchEnrichmentTableInList(tableName);
 
             // Check for warning icon (failed job)
