@@ -73,7 +73,7 @@ const filteredOptions = computed<ComboboxOption[]>(() => {
   if (props.searchRegex) {
     const regex = new RegExp(props.searchRegex, "gi");
     const match = regex.exec(val);
-    if (!match) return [];
+    if (!match) return props.items ?? [];
     for (let i = 1; i < match.length; i++) {
       if (match[i] !== undefined) {
         needle = match[i];
