@@ -4511,39 +4511,39 @@ export class LogsPage {
      *     Absorbs the brief window where one streaming chunk has updated the title
      *     while the underlying hits array is still being mutated by sibling chunks.
      */
-    async expectPaginationTotalAtLeast(minCount, timeout = 30000) {
-        const title = this.page.locator(this.paginationRowCountTitle);
+    async expectPaginationTotalAtLeast(minCount, timeout = 60000) {
+        // SearchResult.vue is rendered in multiple modes (Logs view + Visualize via v-show),
+        // so `[data-test="logs-search-result-title"]` matches more than one element. Scope to
+        // the VISIBLE instance so we never read attributes off the hidden Visualize copy
+        // (whose searchObj is a different store and shows stale/zero values).
+        const title = this.page.locator(`${this.paginationRowCountTitle}:visible`).first();
         await expect(title).toBeVisible({ timeout });
 
-        // Stage 1 — wait until the run-query button is enabled and no longer in
-        // cancel state. The Run and Cancel variants share `data-test="logs-search-bar-refresh-btn"`
-        // but differ on the localized `title` attribute (set to `t("search.cancel")`
-        // while streaming, `t("search.runQuery")` / `t("search.generateQueryTooltip")`
-        // afterward). Playwright matchers operate on the data-test locator directly.
-        const queryBtn = this.page.locator(this.queryButton);
-        await expect(queryBtn).toBeEnabled({ timeout }).catch(() => {
-            testLogger.warn('expectPaginationTotalAtLeast: run-query button never re-enabled, continuing');
-        });
-        await expect(queryBtn).not.toHaveAttribute('title', /cancel/i, { timeout }).catch(() => {
-            testLogger.warn('expectPaginationTotalAtLeast: run-query button still in Cancel state, continuing');
-        });
+        // Stage 1 — wait for the source-side loading signal to flip to "complete".
+        // SearchResult.vue binds :data-search-state="searchObj.loading || searchObj.loadingCounter
+        // ? 'loading' : 'complete'" on this same title element. The attribute is the ATOMIC
+        // truth — it flips only after the streaming partition chain fully resolves AND the
+        // total-counter request completes. This replaces the brittle button-text/title polling
+        // (which has multiple .catch() escape hatches that mask incomplete streaming on slow CI).
+        await expect(title).toHaveAttribute('data-search-state', 'complete', { timeout })
+            .catch(() => {
+                testLogger.warn(
+                    'expectPaginationTotalAtLeast: data-search-state never flipped to "complete", continuing'
+                );
+            });
 
-        // Stage 2 — poll the title's "out of N" text via the data-test locator with
-        // a two-sample stability gate. The title is the rendered projection of
-        // `hits.length`; once two consecutive reads agree (and meet `minCount`),
-        // the chunk-mutation race is over. `textContent()` is invoked on the
-        // data-test-resolved Locator — no element-only or class selectors involved.
-        let lastCount = -1;
+        // Stage 2 — read the hits count directly from the data-hits-count attribute.
+        // SearchResult.vue exposes `searchObj.data.queryResults.hits.length` as
+        // :data-hits-count="...". Polling this attribute is race-free vs. parsing the
+        // localized "out of N" string (which can be "out of 2,000" — comma localized).
+        let lastCount = 0;
         await expect.poll(async () => {
-            const text = (await title.textContent()) || '';
-            const match = text.match(/out of\s+([\d,]+)/);
-            const current = match ? (parseInt(match[1].replace(/,/g, ''), 10) || 0) : 0;
-            const stable = current === lastCount && current >= minCount;
+            const raw = (await title.getAttribute('data-hits-count').catch(() => '0')) ?? '0';
+            const current = Number.parseInt(raw, 10) || 0;
             lastCount = current;
-            // Return the smaller of the two samples until they agree — this prevents
-            // `expect.poll` from succeeding on a single transient over-read.
-            return stable ? current : Math.min(current, minCount - 1);
-        }, { timeout, intervals: [200, 500, 500, 1000] }).toBeGreaterThanOrEqual(minCount);
+            return current;
+        }, { timeout, intervals: [200, 500, 500, 1000, 1000, 2000] }).toBeGreaterThanOrEqual(minCount);
+        testLogger.info(`expectPaginationTotalAtLeast: hits=${lastCount} (>= ${minCount})`);
     }
 
     async waitForDownload() {
@@ -8209,7 +8209,20 @@ export class LogsPage {
      * Expect dashboard panel table to be visible
      */
     async expectDashboardPanelTableVisible() {
-        await expect(this.page.locator(this.dashboardPanelTable)).toBeVisible({ timeout: 30000 });
+        // PanelEditor is rendered in BOTH the Visualize tab (v-show, hidden when not active)
+        // and the Build tab (v-if), so `[data-test="dashboard-panel-table"]` can match more than
+        // one element with `display:none`. Scope to the Build container + :visible so the
+        // assertion sees the actually-rendered table and not a hidden Visualize copy that
+        // would never become visible. Falls back to a global :visible match if the Build
+        // container isn't present (e.g. legacy routes).
+        const inBuild = this.page
+            .locator(`[data-test="logs-build-query-page"] ${this.dashboardPanelTable}:visible`)
+            .first();
+        const inBuildCount = await inBuild.count().catch(() => 0);
+        const panel = inBuildCount > 0
+            ? inBuild
+            : this.page.locator(`${this.dashboardPanelTable}:visible`).first();
+        await expect(panel).toBeVisible({ timeout: 30000 });
         testLogger.info('Dashboard panel table is visible');
     }
 

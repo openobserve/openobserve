@@ -41,7 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="tw:w-2/3 tw:text-left tw:pl-4 warning tw:flex tw:items-center" data-test="logs-search-result-title">
+        <div
+          v-else
+          class="tw:w-2/3 tw:text-left tw:pl-4 warning tw:flex tw:items-center"
+          data-test="logs-search-result-title"
+          :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
+          :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
+        >
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
