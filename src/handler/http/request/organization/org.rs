@@ -50,7 +50,7 @@ use crate::{
                 OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
-        utils::auth::{UserEmail, is_root_user},
+        utils::auth::{UserEmail, check_permissions, is_root_user},
     },
     handler::http::extractors::Headers,
     service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
@@ -519,6 +519,21 @@ pub async fn create_org(
         org_type: req.org_type,
         service_account: req.service_account,
     };
+
+    if let Some(oid) = req.make_billed_member_of.as_ref() {
+        if !check_permissions(
+            &oid,
+            &oid,
+            &user_email.user_id,
+            "billing_group",
+            "POST",
+            None,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+    }
 
     let result =
         organization::create_org(&mut org, &user_email.user_id, req.make_billed_member_of).await;
