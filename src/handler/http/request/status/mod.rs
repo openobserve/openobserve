@@ -77,6 +77,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             user::{AuthTokens, AuthTokensExt},
         },
+        utils::auth::{UserEmail, is_root_user},
     },
     service::{
         db,
@@ -436,7 +437,13 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 }
 
 #[get("")]
-pub async fn config_reload() -> Result<HttpResponse, Error> {
+pub async fn config_reload(user_email: UserEmail) -> Result<HttpResponse, Error> {
+    let user_id = user_email.user_id.as_str();
+    if !is_root_user(user_id) {
+        return Ok(MetaHttpResponse::forbidden(
+            "Only root users can reload config",
+        ));
+    }
     if let Err(e) = config::refresh_config() {
         return Ok(
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
@@ -452,8 +459,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
-        // Since this is not a protected route, there is no way to get the user email
-        user_email: "".to_string(),
+        user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
         protocol: Protocol::Http,
