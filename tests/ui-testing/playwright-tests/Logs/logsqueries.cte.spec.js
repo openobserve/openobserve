@@ -140,7 +140,7 @@ test.describe("CTE Logs Queries testcases", () => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
     await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.typeInQueryEditor('WITH Normalized AS (SELECT COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte") SELECT * FROM Normalized WHERE normalized_message LIKE \'%timeout%\'');
+    await pageManager.logsPage.typeInQueryEditor('WITH Normalized AS (SELECT _timestamp, COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte") SELECT * FROM Normalized WHERE normalized_message LIKE \'%timeout%\'');
     // Strategic 500ms wait for CTE query processing - this is functionally necessary
     await pageManager.logsPage.waitForTimeout(500);
     await pageManager.logsPage.clickSearchBarRefreshButton();
