@@ -584,4 +584,94 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         testLogger.info('✓ Data source selection test completed');
     });
+
+    // ============================================================================
+    // CROSS-TYPE NAME COLLISION TESTS
+    // ============================================================================
+
+    test('@P0 @smoke Cross-type collision: file upload rejected when URL enrichment exists with same name', async () => {
+        const tableName = generateTableName('cross_url_first');
+        currentTableName = tableName;
+        testLogger.info(`Test: Cross-type collision URL-first - ${tableName}`);
+
+        // Step 1: Create a URL enrichment
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('URL enrichment created');
+
+        // Step 2: Try to create a file upload with the same name
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('file');
+
+        await enrichmentPage.setFileInput('tests/test-data/protocols.csv');
+        testLogger.info('File selected');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Attempted to save file upload with duplicate name');
+
+        // Step 3: Verify error — should say "already exists as a URL enrichment"
+        await enrichmentPage.verifyDuplicateNameError();
+        testLogger.info('Cross-type collision error verified');
+
+        // Step 4: Navigate back to list
+        await enrichmentPage.navigateBackFromFormIfNeeded();
+
+        // Cleanup
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.clickDeleteButton(tableName);
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        await enrichmentPage.clickDeleteOK();
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table deleted');
+    });
+
+    test('@P0 @smoke Cross-type collision: URL rejected when file upload enrichment exists with same name', async () => {
+        const tableName = generateTableName('cross_file_first');
+        currentTableName = tableName;
+        testLogger.info(`Test: Cross-type collision file-first - ${tableName}`);
+
+        // Step 1: Create a file upload enrichment
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('file');
+
+        await enrichmentPage.setFileInput('tests/test-data/protocols.csv');
+        testLogger.info('File selected');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Save clicked for file upload');
+
+        // Wait for form to close (saved successfully)
+        await enrichmentPage.waitForAddFormToClose(15000);
+        testLogger.info('File upload enrichment created');
+
+        // Step 2: Try to create a URL enrichment with the same name
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('url');
+        await enrichmentPage.fillUrlInput(CSV_URL);
+        testLogger.info('Filled URL form with duplicate name');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Attempted to save URL enrichment with duplicate name');
+
+        // Step 3: Verify error — should say "already exists as a file upload enrichment"
+        await enrichmentPage.verifyDuplicateNameError();
+        testLogger.info('Cross-type collision error verified');
+
+        // Step 4: Navigate back to list
+        await enrichmentPage.navigateBackFromFormIfNeeded();
+
+        // Cleanup
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.clickDeleteButton(tableName);
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        await enrichmentPage.clickDeleteOK();
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table deleted');
+    });
 });
