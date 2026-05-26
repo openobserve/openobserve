@@ -574,6 +574,7 @@ export default defineComponent({
     };
 
     const fieldListRef = ref<HTMLElement | null>(null);
+    const streamSelect = ref<InstanceType<typeof OSelect> | null>(null);
 
     const scrollToTop = () => {
       // Use FieldList's exposed scrollToTop which works with OFieldList/OTable
@@ -668,6 +669,17 @@ export default defineComponent({
     watch(
       () => searchObj.data.stream.filterField,
       () => { pagination.value = { ...pagination.value, page: 1 }; },
+    );
+
+    // Close the stream-select dropdown whenever the Source Details drawer opens
+    // so the open popover does not obscure the drawer in both single and multi-select mode.
+    watch(
+      () => searchObj.meta.showDetailTab,
+      (isOpen) => {
+        if (isOpen) {
+          (streamSelect.value as any)?.close?.();
+        }
+      },
     );
 
     const filterStreamFn = (val: string, update: any) => {
@@ -1893,6 +1905,7 @@ export default defineComponent({
       toggleSchema,
       toggleInterestingFields,
       fieldListRef,
+      streamSelect,
       toggleFieldGroup,
       streamFieldsRows: computed(() => {
         const source = showOnlyInterestingFields.value
