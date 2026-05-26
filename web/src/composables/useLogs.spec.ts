@@ -854,7 +854,6 @@ describe("Use Logs Composable", () => {
 
       expect(toast).toHaveBeenCalledWith({
         message: `Live mode is enabled. Only top ${wrapper.vm.searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-        position: "top-center",
         timeout: 1000,
       });
     });
