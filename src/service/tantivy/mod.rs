@@ -16,63 +16,41 @@
 pub mod puffin;
 pub mod puffin_directory;
 
+// Two build paths for the per-parquet tantivy (.ttv / puffin) index. The
+// orchestrator [`create_tantivy_index`] below picks one based on the
+// `compact.tantivy_parallel_build_workers` config:
+//   - `sequential` — legacy single-threaded `RecordBatchStream` consumer
+//   - `parallel`   — row_group-direct, one worker per parquet row_group
+//
+// Both paths share the schema/tokenizer helpers defined in this file
+// (`build_tantivy_schema_for_index`, `make_index_tokenizer_manager`).
+mod parallel;
+mod sequential;
+
+// Bring the two path entry points into this module's namespace so
+// `create_tantivy_index` below can call them by short name, and so the
+// `tests` submodule reaches them via `super::*` without explicit path
+// qualifiers. The submodules declare the items as `pub(super)`, which makes
+// them visible exactly to this module and its children — broader visibility
+// is unnecessary because `create_tantivy_index` is the only public entry.
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Context;
-use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, LargeStringArray, StringArray, StringViewArray,
-    UInt64Array,
-};
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, INDEX_FIELD_NAME_FOR_ALL, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
+    get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
-        parquet::RecordBatchStream,
+        parquet::get_recordbatch_reader_from_bytes,
         tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
 };
-use futures::TryStreamExt;
 use hashbrown::HashSet;
 use infra::storage;
+use parallel::generate_tantivy_index_parallel_row_groups;
 use puffin_directory::writer::PuffinDirWriter;
-use tokio::task::JoinHandle;
-
-// macro to reduce duplication in array processing
-macro_rules! process_string_array {
-    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
-        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
-            for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
-                    doc.add_text($field, array.value(i));
-                }
-                tokio::task::coop::consume_budget().await;
-            }
-            continue;
-        }
-    };
-}
-
-// macro to reduce duplication in array processing
-macro_rules! process_numeric_array {
-    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
-        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
-            for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
-                    let text = array.value(i).to_string();
-                    doc.add_text($field, &text);
-                }
-                tokio::task::coop::consume_budget().await;
-            }
-            continue;
-        }
-    };
-}
+use sequential::generate_tantivy_index;
 
 pub(crate) async fn create_tantivy_index(
     caller: &str,
@@ -81,23 +59,44 @@ pub(crate) async fn create_tantivy_index(
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
-    reader: RecordBatchStream,
+    buf: Bytes,
 ) -> Result<usize, anyhow::Error> {
     let start = std::time::Instant::now();
     let caller = format!("[{caller}:JOB]");
 
     let dir = PuffinDirWriter::new();
-    let index = generate_tantivy_index(
-        dir.clone(),
-        reader,
-        full_text_search_fields,
-        index_fields,
-        schema,
-    )
-    .await?;
+    let cfg = get_config();
+    let file_format = FileFormat::from_extension(parquet_file_name).unwrap_or_default();
+    let parallel_workers = cfg.compact.tantivy_parallel_build_workers;
+
+    let index = if parallel_workers > 0 && matches!(file_format, FileFormat::Parquet) {
+        log::debug!(
+            "{caller} using row_group-parallel tantivy index build: workers={parallel_workers}"
+        );
+        generate_tantivy_index_parallel_row_groups(
+            dir.clone(),
+            buf,
+            full_text_search_fields,
+            index_fields,
+            schema,
+            parallel_workers,
+        )
+        .await?
+    } else {
+        let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
+        generate_tantivy_index(
+            dir.clone(),
+            reader,
+            full_text_search_fields,
+            index_fields,
+            schema,
+        )
+        .await?
+    };
     if index.is_none() {
         return Ok(0);
     }
+
     // Record the parquet row group size in effect at index build time so the
     // reader can map doc_ids back to row groups even if the constant changes.
     dir.set_property(
@@ -139,22 +138,32 @@ pub(crate) async fn create_tantivy_index(
     Ok(index_size)
 }
 
-/// Create a tantivy index in the given directory for the record batch
-pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
-    tantivy_dir: D,
-    reader: RecordBatchStream,
+/// Builds the tantivy `Schema` shared by both index-build paths.
+///
+/// Returns `None` when there are no fields to index (configured fields don't
+/// intersect with the stream schema). Otherwise returns
+/// `(tantivy_schema, indexed_field_names, fts_field_opt)`:
+/// - `tantivy_schema`: the built schema
+/// - `indexed_field_names`: the set of column names we must populate per row (union of fts fields
+///   and secondary index fields, filtered by data type)
+/// - `fts_field_opt`: the field handle for `INDEX_FIELD_NAME_FOR_ALL`, present when there is at
+///   least one full-text-search field
+fn build_tantivy_schema_for_index(
     full_text_search_fields: &[String],
     index_fields: &[String],
-    schema: Arc<Schema>,
-) -> Result<Option<tantivy::Index>, anyhow::Error> {
+    arrow_schema: &Schema,
+) -> Option<(
+    tantivy::schema::Schema,
+    HashSet<String>,
+    Option<tantivy::schema::Field>,
+)> {
     let mut tantivy_schema_builder = tantivy::schema::SchemaBuilder::new();
-    let schema_fields = schema
+    let schema_fields = arrow_schema
         .fields()
         .iter()
         .map(|f| (f.name(), f))
         .collect::<HashMap<_, _>>();
 
-    // filter out fields that are not in schema & not of type Utf8
     let fts_fields = full_text_search_fields
         .iter()
         .filter(|f| {
@@ -165,21 +174,20 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         })
         .map(String::from)
         .collect::<HashSet<_>>();
-    let index_fields = index_fields
+    let index_fields_filtered = index_fields
         .iter()
         .filter(|f| schema_fields.contains_key(f))
         .map(String::from)
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields
-        .union(&index_fields)
+        .union(&index_fields_filtered)
         .cloned()
         .collect::<HashSet<_>>();
 
     if tantivy_fields.is_empty() {
-        return Ok(None);
+        return None;
     }
 
-    // add fields to tantivy schema
     if !full_text_search_fields.is_empty() {
         let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
@@ -198,138 +206,25 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 .set_fieldnorms(false),
         )
         .set_fast(None);
-    for field in index_fields.iter() {
+    for field in index_fields_filtered.iter() {
         if field == TIMESTAMP_COL_NAME {
             continue;
         }
         tantivy_schema_builder.add_text_field(field, index_opts.clone());
     }
-    // add _timestamp field to tantivy schema
     tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
     let tantivy_schema = tantivy_schema_builder.build();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
+    Some((tantivy_schema, tantivy_fields, fts_field))
+}
 
+/// Creates a `TokenizerManager` matching what the indexer needs (O2 tokenizer
+/// registered). Built fresh per use so it is `Send` and can move into
+/// `spawn_blocking`.
+fn make_index_tokenizer_manager() -> tantivy::tokenizer::TokenizerManager {
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
-    let mut index_writer = tantivy::IndexBuilder::new()
-        .schema(tantivy_schema.clone())
-        .tokenizers(tokenizer_manager)
-        .single_segment_index_writer(tantivy_dir, 50_000_000)
-        .context("failed to create index builder")?;
-
-    // docs per row to be added in the tantivy index
-    log::debug!("start write documents to tantivy index");
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(2);
-    let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
-        let mut total_num_rows = 0;
-        let mut reader = reader;
-        loop {
-            let batch = reader.try_next().await?;
-            let Some(inverted_idx_batch) = batch else {
-                break;
-            };
-            let num_rows = inverted_idx_batch.num_rows();
-            if num_rows == 0 {
-                continue;
-            }
-
-            // update total_num_rows
-            total_num_rows += num_rows;
-
-            // process full text search fields
-            let mut docs = vec![tantivy::doc!(); num_rows];
-            for column_name in tantivy_fields.iter() {
-                // get field
-                let field = match tantivy_schema.get_field(column_name) {
-                    Ok(f) => f,
-                    Err(_) => fts_field.unwrap(),
-                };
-
-                // get column data and convert to strings for indexing
-                if let Some(data) = inverted_idx_batch.column_by_name(column_name) {
-                    // handle string types directly
-                    process_string_array!(data, StringViewArray, docs, field);
-                    process_string_array!(data, StringArray, docs, field);
-                    process_string_array!(data, LargeStringArray, docs, field);
-
-                    // handle numeric and boolean types with to_string conversion
-                    process_numeric_array!(data, Int64Array, docs, field);
-                    process_numeric_array!(data, UInt64Array, docs, field);
-                    process_numeric_array!(data, Float64Array, docs, field);
-                    process_numeric_array!(data, BooleanArray, docs, field);
-
-                    // unsupported type, add empty string
-                    for doc in docs.iter_mut() {
-                        doc.add_text(field, "");
-                        tokio::task::coop::consume_budget().await;
-                    }
-                } else {
-                    // column not found, add empty string
-                    for doc in docs.iter_mut() {
-                        doc.add_text(field, "");
-                        tokio::task::coop::consume_budget().await;
-                    }
-                }
-            }
-
-            // process _timestamp field
-            let column_data = match inverted_idx_batch.column_by_name(TIMESTAMP_COL_NAME) {
-                Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
-                    Some(column_data) => column_data,
-                    None => {
-                        // generate empty array to ensure the tantivy and parquet have same rows
-                        &Int64Array::from(vec![0; num_rows])
-                    }
-                },
-                None => {
-                    // generate empty array to ensure the tantivy and parquet have same rows
-                    &Int64Array::from(vec![0; num_rows])
-                }
-            };
-            let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap(); // unwrap directly since added above
-            const YIELD_THRESHOLD: usize = 100;
-            let mut batch_size = 0;
-            for (i, doc) in docs.iter_mut().enumerate() {
-                doc.add_i64(ts_field, column_data.value(i));
-                batch_size += 1;
-                if batch_size >= YIELD_THRESHOLD {
-                    tokio::task::coop::consume_budget().await;
-                    batch_size = 0;
-                }
-            }
-
-            tx.send(docs).await?;
-        }
-        Ok(total_num_rows)
-    });
-
-    while let Some(docs) = rx.recv().await {
-        for doc in docs {
-            if let Err(e) = index_writer.add_document(doc) {
-                log::error!("generate_tantivy_index: Failed to add document to index: {e}");
-                return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
-            }
-            tokio::task::coop::consume_budget().await;
-        }
-    }
-    let total_num_rows = task.await??;
-    // Create index even with 0 rows since we have valid configured fields in stream schema
-    // (empty index acts as a marker to prevent expensive DataFusion scans)
-    log::debug!(
-        "write documents to tantivy index success (rows: {}, empty_index: {})",
-        total_num_rows,
-        total_num_rows == 0
-    );
-
-    let index = tokio::task::spawn_blocking(move || {
-        index_writer.finalize().map_err(|e| {
-            log::error!("generate_tantivy_index: Failed to finalize the index writer: {e}");
-            anyhow::anyhow!("Failed to finalize the index writer: {}", e)
-        })
-    })
-    .await??;
-
-    Ok(Some(index))
+    tokenizer_manager
 }
 
 #[cfg(test)]
@@ -341,7 +236,10 @@ mod tests {
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
-    use config::{FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
+    use config::{
+        FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, utils::parquet::RecordBatchStream,
+    };
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use tantivy::directory::RamDirectory;
 
     use super::*;
@@ -391,13 +289,12 @@ mod tests {
         RecordBatch::try_new(schema, columns).unwrap()
     }
 
-    // Helper function to create a mock RecordBatchStream
-    async fn create_test_stream(batches: Vec<RecordBatch>) -> RecordBatchStream {
-        // Create a simple parquet file from the batches
+    // Helper: serializes `batches` to an in-memory parquet file and returns
+    // the raw bytes. Shared by both the stream-based and the new
+    // row_group-direct parallel tests.
+    async fn create_test_parquet_bytes(batches: Vec<RecordBatch>) -> bytes::Bytes {
         let schema = batches[0].schema();
         let mut buffer = Vec::new();
-
-        // Use the parquet writer utilities from config
         let file_meta = config::meta::stream::FileMeta {
             min_ts: 1000,
             max_ts: 2000,
@@ -405,7 +302,6 @@ mod tests {
             original_size: 1000,
             ..Default::default()
         };
-
         let mut writer = config::utils::parquet::new_parquet_writer(
             &mut buffer,
             &schema,
@@ -414,14 +310,16 @@ mod tests {
             false,
             None,
         );
-
         for batch in batches {
             writer.write(&batch).await.unwrap();
         }
         writer.close().await.unwrap();
+        bytes::Bytes::from(buffer)
+    }
 
-        // Create stream from the buffer using the new API
-        let bytes = bytes::Bytes::from(buffer);
+    // Helper function to create a mock RecordBatchStream (for legacy-path tests).
+    async fn create_test_stream(batches: Vec<RecordBatch>) -> RecordBatchStream {
+        let bytes = create_test_parquet_bytes(batches).await;
         let (_schema, stream) =
             config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, bytes)
                 .await
@@ -728,7 +626,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_tantivy_index_with_empty_data() {
         let empty_batch = create_test_batch(0, true, true, true);
-        let stream = create_test_stream(vec![empty_batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![empty_batch.clone()]).await;
 
         // Test that create_tantivy_index returns 0 for empty data
         let result = create_tantivy_index(
@@ -738,7 +636,7 @@ mod tests {
             &["content".to_string()],
             &["status".to_string()],
             empty_batch.schema(),
-            stream,
+            buf,
         )
         .await;
 
@@ -749,7 +647,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_tantivy_index_with_no_fields() {
         let batch = create_test_batch(10, true, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
         // Test that create_tantivy_index returns 0 when no fields to index
         let result = create_tantivy_index(
@@ -759,7 +657,7 @@ mod tests {
             &[], // No FTS fields
             &[], // No index fields
             batch.schema(),
-            stream,
+            buf,
         )
         .await;
 
@@ -770,7 +668,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_tantivy_index_with_invalid_parquet_filename() {
         let batch = create_test_batch(10, true, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
         // Test with an invalid parquet filename that won't convert to tantivy filename
         let result = create_tantivy_index(
@@ -780,7 +678,7 @@ mod tests {
             &["content".to_string()],
             &["status".to_string()],
             batch.schema(),
-            stream,
+            buf,
         )
         .await;
 
@@ -881,4 +779,277 @@ mod tests {
     // mocking the storage layer, which is complex for unit tests. The main logic is
     // tested in generate_tantivy_index. Integration tests would be more appropriate
     // for testing the full create_tantivy_index function with actual storage operations.
+
+    // ---- L3 row_group-parallel build path tests ----
+
+    /// Build a record batch where every row has a globally-unique marker token
+    /// in the `marker` column. The marker is what we search to recover the
+    /// doc_id, so we can assert `doc_id == global_row_index`.
+    fn create_marker_batch(start: usize, num_rows: usize) -> RecordBatch {
+        let fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("marker", DataType::Utf8, false),
+        ];
+        let timestamps: Vec<i64> = (0..num_rows).map(|i| (start + i) as i64).collect();
+        let markers: Vec<String> = (0..num_rows)
+            .map(|i| format!("row{:09}", start + i))
+            .collect();
+        let schema = Arc::new(Schema::new(fields));
+        RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(timestamps)),
+                Arc::new(StringArray::from(markers)),
+            ],
+        )
+        .unwrap()
+    }
+
+    /// Writes a parquet file with explicit row_group boundaries. Each inner
+    /// `Vec<RecordBatch>` is concatenated into exactly one row_group via
+    /// `writer.flush()` between groups. Used to exercise the multi-row_group
+    /// parallel path deterministically without writing 100k+ rows.
+    async fn create_test_parquet_bytes_multi_rg(groups: Vec<Vec<RecordBatch>>) -> bytes::Bytes {
+        let schema = groups[0][0].schema();
+        let mut buffer = Vec::new();
+        let file_meta = config::meta::stream::FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: groups.iter().flatten().map(|b| b.num_rows()).sum::<usize>() as i64,
+            original_size: 1000,
+            ..Default::default()
+        };
+        let mut writer = config::utils::parquet::new_parquet_writer(
+            &mut buffer,
+            &schema,
+            &[],
+            &file_meta,
+            false,
+            None,
+        );
+        let num_groups = groups.len();
+        for (i, batches) in groups.into_iter().enumerate() {
+            for batch in batches {
+                writer.write(&batch).await.unwrap();
+            }
+            // flush() closes the in-progress row_group, forcing the next
+            // batch to start a new one. Skip after the last group; close()
+            // handles the tail.
+            if i + 1 < num_groups {
+                writer.flush().await.unwrap();
+            }
+        }
+        writer.close().await.unwrap();
+        bytes::Bytes::from(buffer)
+    }
+
+    /// The core invariant test: with multiple row_groups parsed by
+    /// per-row_group workers (potentially out of order), every marker's
+    /// `doc_id` must equal its original global row index after merge.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_row_group_parallel_preserves_row_order() {
+        // 4 row_groups of varied sizes, total 2137 rows. The middle row_groups
+        // have multiple batches each to exercise the per-row_group batch loop.
+        let rg0 = vec![create_marker_batch(0, 500)];
+        let rg1 = vec![create_marker_batch(500, 300), create_marker_batch(800, 200)];
+        let rg2 = vec![create_marker_batch(1000, 1000)];
+        let rg3 = vec![create_marker_batch(2000, 137)]; // partial tail
+        let total_rows = 500 + 500 + 1000 + 137;
+        let buf = create_test_parquet_bytes_multi_rg(vec![rg0, rg1, rg2, rg3]).await;
+
+        // Verify the parquet really has 4 row_groups (test the test).
+        let metadata_num_rg = {
+            let buf = buf.clone();
+            tokio::task::spawn_blocking(move || {
+                ParquetRecordBatchReaderBuilder::try_new(buf)
+                    .unwrap()
+                    .metadata()
+                    .num_row_groups()
+            })
+            .await
+            .unwrap()
+        };
+        assert_eq!(metadata_num_rg, 4, "test setup must yield 4 row_groups");
+
+        let stream_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("marker", DataType::Utf8, false),
+        ]));
+
+        let index = generate_tantivy_index_parallel_row_groups(
+            RamDirectory::create(),
+            buf,
+            &[],
+            &["marker".to_string()],
+            stream_schema,
+            // workers
+            3, // force out-of-order completion
+        )
+        .await
+        .expect("parallel build must succeed")
+        .expect("parallel build must return Some(index)");
+
+        let segs = index.searchable_segments().unwrap();
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
+
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        let marker_field = index.schema().get_field("marker").unwrap();
+
+        for row in 0..total_rows {
+            let m = format!("row{:09}", row);
+            let q = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(marker_field, &m),
+                tantivy::schema::IndexRecordOption::Basic,
+            );
+            let hits = searcher
+                .search(&q, &tantivy::collector::DocSetCollector)
+                .unwrap();
+            assert_eq!(
+                hits.len(),
+                1,
+                "marker for row {row} must match exactly 1 doc"
+            );
+            let addr = *hits.iter().next().unwrap();
+            assert_eq!(addr.segment_ord, 0);
+            assert_eq!(
+                addr.doc_id as usize, row,
+                "INVARIANT VIOLATION: doc_id != row_index at row {row}"
+            );
+        }
+    }
+
+    /// No-fields case: parallel path must match sequential — return Ok(None).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_row_group_parallel_no_fields_returns_none() {
+        let batch = create_test_batch(10, true, true, true);
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+        let res = generate_tantivy_index_parallel_row_groups(
+            RamDirectory::create(),
+            buf,
+            &[],
+            &[],
+            batch.schema(),
+            2,
+        )
+        .await
+        .unwrap();
+        assert!(res.is_none(), "no fields → no index");
+    }
+
+    /// Empty data + configured fields: still produces a single-segment empty
+    /// marker index (matches legacy behavior).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_row_group_parallel_empty_data_marker() {
+        let empty_batch = create_test_batch(0, true, true, true);
+        let buf = create_test_parquet_bytes(vec![empty_batch.clone()]).await;
+        let res = generate_tantivy_index_parallel_row_groups(
+            RamDirectory::create(),
+            buf,
+            &["content".to_string()],
+            &["status".to_string()],
+            empty_batch.schema(),
+            2,
+        )
+        .await
+        .unwrap();
+        assert!(res.is_some(), "configured fields → empty marker index");
+        let index = res.unwrap();
+        let segs = index.searchable_segments().unwrap();
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].meta().max_doc(), 0);
+    }
+
+    /// Same data through parallel-row_group path and sequential path must
+    /// yield the same `(marker → doc_id)` mapping for every row. Verifies
+    /// behavioural equivalence end-to-end.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_row_group_parallel_matches_sequential() {
+        let rg0 = vec![create_marker_batch(0, 250)];
+        let rg1 = vec![create_marker_batch(250, 250)];
+        let rg2 = vec![create_marker_batch(500, 250)];
+        let total = 750;
+
+        let buf_par =
+            create_test_parquet_bytes_multi_rg(vec![rg0.clone(), rg1.clone(), rg2.clone()]).await;
+        let stream_seq = create_test_stream(vec![
+            create_marker_batch(0, 250),
+            create_marker_batch(250, 250),
+            create_marker_batch(500, 250),
+        ])
+        .await;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("marker", DataType::Utf8, false),
+        ]));
+
+        let par = generate_tantivy_index_parallel_row_groups(
+            RamDirectory::create(),
+            buf_par,
+            &[],
+            &["marker".to_string()],
+            schema.clone(),
+            3,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let seq = generate_tantivy_index(
+            RamDirectory::create(),
+            stream_seq,
+            &[],
+            &["marker".to_string()],
+            schema,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        let par_total: usize = par
+            .searchable_segments()
+            .unwrap()
+            .iter()
+            .map(|s| s.meta().max_doc() as usize)
+            .sum();
+        let seq_total: usize = seq
+            .searchable_segments()
+            .unwrap()
+            .iter()
+            .map(|s| s.meta().max_doc() as usize)
+            .sum();
+        assert_eq!(par_total, total);
+        assert_eq!(seq_total, total);
+
+        let par_reader = par.reader().unwrap();
+        let par_searcher = par_reader.searcher();
+        let par_marker = par.schema().get_field("marker").unwrap();
+        let seq_reader = seq.reader().unwrap();
+        let seq_searcher = seq_reader.searcher();
+        let seq_marker = seq.schema().get_field("marker").unwrap();
+
+        for row in 0..total {
+            let m = format!("row{:09}", row);
+            let q_par = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(par_marker, &m),
+                tantivy::schema::IndexRecordOption::Basic,
+            );
+            let q_seq = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(seq_marker, &m),
+                tantivy::schema::IndexRecordOption::Basic,
+            );
+            let hits_par = par_searcher
+                .search(&q_par, &tantivy::collector::DocSetCollector)
+                .unwrap();
+            let hits_seq = seq_searcher
+                .search(&q_seq, &tantivy::collector::DocSetCollector)
+                .unwrap();
+            assert_eq!(hits_par.len(), 1);
+            assert_eq!(hits_seq.len(), 1);
+            let addr_par = *hits_par.iter().next().unwrap();
+            let addr_seq = *hits_seq.iter().next().unwrap();
+            assert_eq!(addr_par.doc_id as usize, row);
+            assert_eq!(addr_seq.doc_id as usize, row);
+        }
+    }
 }

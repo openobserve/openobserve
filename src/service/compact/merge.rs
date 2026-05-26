@@ -29,7 +29,7 @@ use config::{
     },
     metrics,
     utils::{
-        parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
+        parquet::read_schema_from_bytes,
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
@@ -1011,8 +1011,11 @@ async fn generate_inverted_index(
     latest_schema: Arc<Schema>,
     buf: Bytes,
 ) -> Result<(), anyhow::Error> {
-    let file_format = get_config().common.file_format;
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
+    // `create_tantivy_index` decides internally whether to take the legacy
+    // streaming path or the row_group-parallel path based on
+    // `compact.tantivy_parallel_build_workers`. The latter needs the raw
+    // parquet bytes to dispatch per-row_group workers, so we hand it `buf`
+    // directly instead of pre-opening a RecordBatchStream.
     let index_size = create_tantivy_index(
         "COMPACTOR",
         org_id,
@@ -1020,7 +1023,7 @@ async fn generate_inverted_index(
         full_text_search_fields,
         index_fields,
         latest_schema, // Use stream schema to include all configured fields
-        reader,
+        buf,
     )
     .await
     .map_err(|e| {

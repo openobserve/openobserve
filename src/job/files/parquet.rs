@@ -22,6 +22,11 @@ use std::{
 use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
+// `get_recordbatch_reader_from_bytes` is only consumed by the enterprise-gated
+// `queue_services_from_parquet` below; keep the import behind the same cfg to
+// avoid an unused-import warning in non-enterprise builds.
+#[cfg(feature = "enterprise")]
+use config::utils::parquet::get_recordbatch_reader_from_bytes;
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
@@ -32,9 +37,7 @@ use config::{
     utils::{
         async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
-        parquet::{
-            get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
-        },
+        parquet::{read_metadata_from_file, read_schema_from_file},
         schema_ext::SchemaExt,
     },
 };
@@ -918,9 +921,10 @@ async fn merge_files(
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
-    // generate tantivy inverted index and write to storage
-    let file_format = config::get_config().common.file_format;
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
+    // Generate tantivy inverted index and write to storage. We hand the raw
+    // parquet bytes to `create_tantivy_index`; it decides internally whether
+    // to open a `RecordBatchStream` (legacy path) or dispatch one worker per
+    // row_group in parallel (`compact.tantivy_parallel_build_workers > 0`).
     let index_size = create_tantivy_index(
         "INGESTER",
         &org_id,
@@ -928,7 +932,7 @@ async fn merge_files(
         &full_text_search_fields,
         &index_fields,
         latest_schema.clone(), // Use stream schema to include all configured fields
-        reader,
+        buf,
     )
     .await
     .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {e}"))?;

@@ -1956,6 +1956,12 @@ pub struct Compact {
         help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"
     )]
     pub retention_allowed_hours: String,
+    #[env_config(
+        name = "ZO_COMPACT_TANTIVY_PARALLEL_BUILD_WORKERS",
+        default = 2,
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. 0 disables (single-threaded)"
+    )]
+    pub tantivy_parallel_build_workers: usize,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
