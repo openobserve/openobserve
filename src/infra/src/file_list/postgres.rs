@@ -1473,25 +1473,6 @@ DO UPDATE SET
         Ok(())
     }
 
-    async fn del_jobs(&self, ids: &[i64]) -> Result<()> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let pool = CLIENT.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["delete", "file_list_jobs"])
-            .inc();
-        let sql = format!(
-            "DELETE FROM file_list_jobs WHERE id IN ({});",
-            ids.iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        );
-        sqlx::query(&sql).execute(&pool).await?;
-        Ok(())
-    }
-
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS

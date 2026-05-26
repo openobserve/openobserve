@@ -553,7 +553,6 @@ async fn move_files(
         };
 
         // trigger an incremental merge of the current hour once enough files have piled up
-        // (no-op unless ZO_COMPACT_PENDING_FILES_TRIGGER > 0)
         crate::service::compact::incremental::incr_pending_file(
             &org_id,
             stream_type,

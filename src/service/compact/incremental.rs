@@ -42,6 +42,7 @@
 use std::sync::LazyLock;
 
 use config::{RwAHashMap, get_config, meta::stream::StreamType, utils::time::hour_micros};
+use infra::cluster::get_cached_online_ingester_nodes;
 
 /// key: `org/stream_type/stream` -> (data partition hour in micros, files seen this hour)
 static PENDING_FILES: LazyLock<RwAHashMap<String, (i64, usize)>> = LazyLock::new(Default::default);
@@ -55,10 +56,14 @@ pub async fn incr_pending_file(
     stream_name: &str,
     min_ts: i64,
 ) {
-    let threshold = get_config().compact.pending_files_trigger;
-    if threshold == 0 {
-        return; // feature disabled
-    }
+    let cfg = get_config();
+    let threshold = cfg.compact.max_file_size / cfg.limit.max_file_size_in_memory;
+    let ingester_num = get_cached_online_ingester_nodes()
+        .await
+        .map(|nodes| nodes.len())
+        .unwrap_or(1);
+    // at least 10 files per ingester
+    let threshold = (threshold / ingester_num).max(10);
 
     let hour = min_ts - min_ts % hour_micros(1);
     let key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -79,10 +84,11 @@ pub async fn incr_pending_file(
     };
 
     let Some(hour) = triggered_hour else {
-        return;
+        return; // not triggered
     };
 
     // enqueue the incremental job; deduped at the DB layer by the unique (stream, offsets)
+    // add_job will re-trigger the job if it is already done, so we don't need to check the status
     if let Err(e) = infra::file_list::add_job(org_id, stream_type, stream_name, hour).await {
         log::error!(
             "[COMPACTOR:INCREMENTAL] add_job failed for [{org_id}/{stream_type}/{stream_name}] hour {hour}: {e}"
