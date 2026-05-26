@@ -148,11 +148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-2">
               <OButton
                 variant="ghost"
-                size="icon-xs-sq"
+                size="icon"
                 @click="arrowBackFn"
                 data-test="regex-pattern-import-back-btn"
-              icon-left="chevron-left"
-              />
+              >
+                <OIcon name="arrow-back-ios-new" size="sm" />
+              </OButton>
               <div class="tw:text-xl tw:font-semibold">
                 {{ t("regex_patterns.import_title") }}
               </div>
@@ -214,6 +215,7 @@ import { useRouter } from "vue-router";
 
 import AppTabs from "../common/AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import BaseImport from "../common/BaseImport.vue";
@@ -558,6 +560,7 @@ export default defineComponent({
     BaseImport,
     AppTabs,
     OButton,
+    OIcon,
     OInput,
     BuiltInPatternsTab: defineAsyncComponent(
       () => import("@/components/settings/BuiltInPatternsTab.vue"),
