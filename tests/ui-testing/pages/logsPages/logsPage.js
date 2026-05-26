@@ -2718,7 +2718,8 @@ export class LogsPage {
             await this.page.locator(this.utilitiesMenuButton).click();
             await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
-        return await createSavedViewBtn.click();
+        await this.page.waitForTimeout(200);
+        return await createSavedViewBtn.click({ force: true });
     }
 
     async fillSavedViewName(name) {
@@ -5282,7 +5283,10 @@ export class LogsPage {
             await this.page.locator(this.utilitiesMenuButton).click();
             await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 });
         }
-        await transformEditorMenuItem.click();
+        // Allow dropdown animation to settle before clicking (element resolves but
+        // detaches during the opening transition — same pattern as toggleHistogram).
+        await this.page.waitForTimeout(200);
+        await transformEditorMenuItem.click({ force: true });
         // @select.prevent keeps the menu open — close it so it doesn't overlap the editor
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(500);
@@ -7336,7 +7340,8 @@ export class LogsPage {
             await this.page.locator(this.utilitiesMenuButton).click();
             await listSavedViewsBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
-        await listSavedViewsBtn.click();
+        await this.page.waitForTimeout(200);
+        await listSavedViewsBtn.click({ force: true });
         testLogger.info('Clicked saved views list button via utilities menu');
     }
 
