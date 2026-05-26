@@ -42,7 +42,9 @@ export type ButtonVariant =
   // Webinar banner dismiss — inline text-link style button for the top bar banner
   | "webinar-dismiss"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
-  | "pricing-chip";
+  | "pricing-chip"
+  // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
+  | "outline-primary";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =

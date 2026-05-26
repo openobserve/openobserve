@@ -334,9 +334,10 @@
   --color-inner-loading-overlay: color-mix(in srgb, var(--color-surface-base) 70%, transparent);
   --color-inner-loading-label: var(--color-text-secondary);
 
-  /* Skeleton */
-  --color-skeleton-base: var(--color-grey-200);
-  --color-skeleton-highlight: var(--color-grey-100);
+  /* Skeleton — flat base with a separate translucent shimmer overlay.
+     shimmer uses rgba so it works as a gloss on top of any base colour. */
+  --color-skeleton-base: var(--color-grey-100);
+  --color-skeleton-shimmer: rgba(255, 255, 255, 0.8);
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-primary-600);
@@ -642,6 +643,14 @@
   --color-toggle-item-hover-bg: var(--color-primary-100);
   --color-toggle-item-active-bg: var(--color-surface-base);
   --color-toggle-item-active-text: var(--color-primary-700);
+
+  /* ── Sidebar nav ───────────────────────────────────────────── */
+  --color-nav-icon: var(--color-grey-600);
+  --color-nav-icon-active: var(--color-primary-600);
+  --color-nav-label-hover: var(--color-primary-700);
+  --color-nav-item-hover-bg: var(--color-primary-100);
+  --color-nav-item-active-bg: var(--color-primary-200);
+  --color-nav-item-active-border: var(--color-primary-300);
 }
 
 /* ── Register ALL tokens for Tailwind utility generation ── */
@@ -1113,7 +1122,7 @@
 
   /* Skeleton */
   --color-skeleton-base: var(--color-skeleton-base);
-  --color-skeleton-highlight: var(--color-skeleton-highlight);
+  --color-skeleton-shimmer: var(--color-skeleton-shimmer);
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-progress-bar-default);
@@ -1179,4 +1188,12 @@
   --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
   --color-table-streaming-bar: var(--color-table-streaming-bar);
   --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
+
+  /* Nav */
+  --color-nav-icon: var(--color-nav-icon);
+  --color-nav-icon-active: var(--color-nav-icon-active);
+  --color-nav-label-hover: var(--color-nav-label-hover);
+  --color-nav-item-hover-bg: var(--color-nav-item-hover-bg);
+  --color-nav-item-active-bg: var(--color-nav-item-active-bg);
+  --color-nav-item-active-border: var(--color-nav-item-active-border);
 }

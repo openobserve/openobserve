@@ -21,9 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <header class="o2-app-header tw:shrink-0">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
+        v-if="config.isCloud === 'true'"
         class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
       >
-        <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+        <WebinarBanner variant="header" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
