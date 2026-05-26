@@ -501,6 +501,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         shouldShowCopyButton(cell.getValue())
                       "
                       class="copy-btn tw:mr-1"
+                      data-test="dashboard-table-cell-copy-btn"
+                      :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
@@ -533,6 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Default value with format fn -->
                     <span
                       v-else
+                      data-test="dashboard-table-cell-value"
                       :class="[
                         !props.wrap
                           ? 'tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
@@ -551,6 +554,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         shouldShowCopyButton(cell.getValue())
                       "
                       class="copy-btn tw:ml-1"
+                      data-test="dashboard-table-cell-copy-btn"
+                      :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
@@ -806,6 +811,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             shouldShowCopyButton(cell.getValue())
                           "
                           class="copy-btn tw:mr-1"
+                          data-test="dashboard-table-cell-copy-btn"
+                          :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"
@@ -852,6 +859,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <!-- Default value (dashboard: format fn; logs: renderValue) -->
                         <span
+                          data-test="dashboard-table-cell-value"
                           :style="{
                             width:
                               cell.column.columnDef.id !== 'source' ||
@@ -895,6 +903,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             shouldShowCopyButton(cell.getValue())
                           "
                           class="copy-btn tw:ml-1"
+                          data-test="dashboard-table-cell-copy-btn"
+                          :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"

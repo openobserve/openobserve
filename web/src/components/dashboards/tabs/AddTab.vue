@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-tab-dialog"
+  <ODrawer data-test="dashboard-tab-settings-add-tab-dialog"
     :open="open"
     :width="20"
     :title="editMode ? 'Edit Tab' : 'Add Tab'"
@@ -157,9 +157,7 @@ export default defineComponent({
             emit("refresh", updatedTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab updated successfully", {
-              timeout: 2000,
-            });
+            showPositiveNotification("Tab updated successfully");
           }
           //else new tab
           else {
@@ -174,9 +172,7 @@ export default defineComponent({
             emit("refresh", newTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab added successfully", {
-              timeout: 2000,
-            });
+            showPositiveNotification("Tab added successfully");
           }
           tabData.value = {
             name: "",

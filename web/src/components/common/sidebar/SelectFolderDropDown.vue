@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="tw:flex tw:justify-center tw:items-end">
+    <div class="tw:flex tw:justify-start tw:items-end">
       <!-- select new folder -->
       <OSelect
         v-model="selectedFolder"
@@ -118,8 +118,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
       };
 
       const computedStyle = computed (() => {
-        const baseStyle = props.style ? props.style : 'height: 35px';
-        return `${baseStyle}; margin-top: 23px`;
+        return props.style ? props.style : '';
       });
 
       onActivated(async () => {
