@@ -23,6 +23,9 @@ import {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
+  // Fix timezone to UTC to avoid DST-related duration mismatches in CI
+  test.use({ timezoneId: 'UTC' });
+
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
