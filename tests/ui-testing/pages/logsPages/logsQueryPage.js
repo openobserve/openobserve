@@ -100,22 +100,56 @@ export class LogsQueryPage {
     }
   }
 
+  /** Open the utilities dropdown so the SQL mode menu item becomes visible. Returns true if opened. */
+  async _openUtilitiesMenuForSqlMode() {
+    const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+    const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+    if (!isVisible) {
+      await this.page.locator(this.utilitiesMenuButton).click();
+      await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+      return true;
+    }
+    return false;
+  }
+
   async isSQLModeOn() {
-    return (await this.page.locator(this.sqlModeToggleCheckedBtn).count()) > 0;
+    // Open the dropdown to read the OSwitch inner button's data-state, then close it.
+    const menuOpened = await this._openUtilitiesMenuForSqlMode();
+    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    const state = await stateEl.getAttribute('data-state').catch(() => null);
+    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
+    return state === 'checked';
   }
 
   async ensureSQLMode() {
-    if (!(await this.isSQLModeOn())) {
-      await this.page.locator(this.sqlModeToggle).first().click();
-      await expect.poll(async () => await this.isSQLModeOn(), { timeout: 5000 }).toBe(true);
+    const menuOpened = await this._openUtilitiesMenuForSqlMode();
+    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
+    if (!isOn) {
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+      await expect.poll(async () => {
+        const s = await stateEl.getAttribute('data-state').catch(() => null);
+        return s === 'checked';
+      }, { timeout: 5000 }).toBe(true);
     }
+    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
   }
 
   async ensureFTSMode() {
-    if (await this.isSQLModeOn()) {
-      await this.page.locator(this.sqlModeToggle).first().click();
-      await expect.poll(async () => await this.isSQLModeOn(), { timeout: 5000 }).toBe(false);
+    const menuOpened = await this._openUtilitiesMenuForSqlMode();
+    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
+    if (isOn) {
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+      await expect.poll(async () => {
+        const s = await stateEl.getAttribute('data-state').catch(() => null);
+        return s === 'unchecked';
+      }, { timeout: 5000 }).toBe(true);
     }
+    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
   }
 
   async _isAutoQueryEnabled() {
