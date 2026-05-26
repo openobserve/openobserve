@@ -349,7 +349,7 @@ describe("AppGroups Component", () => {
       );
       expect(mockToast).toHaveBeenCalledWith({
         message: "Group deleted successfully!",
-        position: "bottom-center",
+        position: "bottom-right",
       });
     });
 
@@ -365,7 +365,7 @@ describe("AppGroups Component", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: "Error while deleting group!",
-        position: "bottom-center",
+        position: "bottom-right",
       });
     });
 
