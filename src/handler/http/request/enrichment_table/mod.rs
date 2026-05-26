@@ -85,8 +85,11 @@ pub async fn save_enrichment_table(
 
         let stream_name = format_stream_name(table_name.trim().to_string());
         let key = format!("{org_id}/{}/{}", StreamType::EnrichmentTables, stream_name);
+        // Note: get_url_jobs_for_table uses the raw table_name (as stored in the
+        // URL jobs DB), while the ENRICHMENT_TABLES cache key uses the formatted
+        // stream_name. They can differ when names contain uppercase/special chars.
         if ENRICHMENT_TABLES.contains_key(&key)
-            && let Ok(jobs) = get_url_jobs_for_table(&org_id, &stream_name).await
+            && let Ok(jobs) = get_url_jobs_for_table(&org_id, table_name.trim()).await
             && !jobs.is_empty()
         {
             return MetaHttpResponse::bad_request(format!(
