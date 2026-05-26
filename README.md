@@ -121,7 +121,7 @@ Enrich, redact, reduce, or normalize data on ingest. Stream processing for logs-
 ## Getting Started
 
 ### OpenObserve Cloud (Fastest Way)
-Get started in minutes without managing infrastructure. Free tier includes up to 200 GB/day ingestion.
+Get started in minutes without managing infrastructure. Free tier includes up to 50 GB/day ingestion.
 [Get Started Free →](https://cloud.openobserve.ai/)
 
 ### 🐳 Docker:
@@ -310,8 +310,8 @@ For organizations requiring enterprise-grade features and support, we offer an E
 - Training and onboarding programs
 
 **Pricing:**
-- **Free tier**: Up to 200 GB/day of ingestion (roughly 6 TB/month), including full commercial use
-- *Registration required at 100 GB/day*
+- **Free tier**: Up to 50 GB/day of ingestion (roughly 1.5 TB/month), including full commercial use
+- *Registration required at 50 GB/day*
 - Volume discounts and multi-year contracts available
 - [View complete feature comparison →](https://openobserve.ai/downloads/)
 

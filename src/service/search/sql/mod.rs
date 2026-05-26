@@ -26,7 +26,7 @@ use config::{
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
-    utils::query_select_utils::replace_o2_custom_patterns,
+    utils::{query_select_utils::replace_o2_custom_patterns, sql::is_complex_query_stmt},
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
@@ -50,7 +50,6 @@ use crate::service::search::sql::{
         histogram_interval::{HistogramIntervalVisitor, validate_and_adjust_histogram_interval},
         match_all::MatchVisitor,
         partition_column::PartitionColumnVisitor,
-        utils::is_complex_query,
     },
 };
 
@@ -256,7 +255,7 @@ impl Sql {
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
-        if !is_complex_query(&mut statement) {
+        if !is_complex_query_stmt(&statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
             if o2_id_is_needed(&used_schemas, &search_event_type) {
@@ -269,7 +268,7 @@ impl Sql {
         // 13. replace the Utf8 to Utf8View type
         let final_schemas = finalize_schemas(&used_schemas);
 
-        let is_complex = is_complex_query(&mut statement);
+        let is_complex = is_complex_query_stmt(&statement);
 
         Ok(Sql {
             sql: statement.to_string(),
