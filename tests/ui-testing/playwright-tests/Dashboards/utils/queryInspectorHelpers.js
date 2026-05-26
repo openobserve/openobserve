@@ -241,6 +241,44 @@ export function assertDateTimesAreSame(dateTime1, dateTime2) {
   testLogger.info('Date times are the same');
 }
 
+/**
+ * Set the application timezone to UTC via localStorage.
+ * Returns the original timezone so it can be restored in afterEach.
+ * IMPORTANT: Call restoreTimezone() in afterEach to avoid affecting other tests.
+ * @param {Object} page - Playwright page object
+ * @returns {Promise<string>} - The original timezone value to restore later
+ */
+export async function setTimezoneToUTC(page) {
+  testLogger.info('Setting application timezone to UTC');
+
+  const originalTimezone = await page.evaluate(() => localStorage.getItem('timezone') || '');
+  testLogger.info('Original timezone saved', { originalTimezone });
+
+  await page.evaluate(() => localStorage.setItem('timezone', 'UTC'));
+  await page.reload({ waitUntil: 'networkidle' });
+
+  testLogger.info('Timezone set to UTC');
+  return originalTimezone;
+}
+
+/**
+ * Restore the application timezone to its original value.
+ * Call this in afterEach to avoid affecting other tests.
+ * @param {Object} page - Playwright page object
+ * @param {string} originalTimezone - The timezone to restore
+ */
+export async function restoreTimezone(page, originalTimezone) {
+  testLogger.info('Restoring timezone', { originalTimezone });
+
+  if (originalTimezone) {
+    await page.evaluate((tz) => localStorage.setItem('timezone', tz), originalTimezone);
+  } else {
+    await page.evaluate(() => localStorage.removeItem('timezone'));
+  }
+
+  testLogger.info('Timezone restored');
+}
+
 export default {
   openQueryInspector,
   closeQueryInspector,
@@ -251,4 +289,6 @@ export default {
   calculateTimeRangeDuration,
   assertDateTimesAreDifferent,
   assertDateTimesAreSame,
+  setTimezoneToUTC,
+  restoreTimezone,
 };

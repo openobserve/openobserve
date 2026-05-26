@@ -26,6 +26,8 @@ import {
   assertQueryInspectorHasDateTime,
   assertQueryInspectorTimeRange,
   closeQueryInspector,
+  setTimezoneToUTC,
+  restoreTimezone,
 } from "./utils/queryInspectorHelpers.js";
 import {
   monitorVariableAPICalls,
@@ -42,9 +44,16 @@ const {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior", () => {
+  let originalTimezone = '';
+
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
+    originalTimezone = await setTimezoneToUTC(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await restoreTimezone(page, originalTimezone);
   });
 
   test("1-should configure panel time toggle and +Set flow end-to-end", async ({ page }) => {

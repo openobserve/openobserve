@@ -18,14 +18,23 @@ import {
   getQueryInspectorDateTime,
   verifyQueryInspectorDateTime,
   assertDateTimesAreSame,
+  setTimezoneToUTC,
+  restoreTimezone,
 } from "./utils/queryInspectorHelpers.js";
 
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
+  let originalTimezone = '';
+
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
+    originalTimezone = await setTimezoneToUTC(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await restoreTimezone(page, originalTimezone);
   });
 
   test("18-should always use global time for chart rendering in Add Panel mode", async ({ page }) => {
