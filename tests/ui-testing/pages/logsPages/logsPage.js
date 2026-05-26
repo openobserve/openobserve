@@ -2854,7 +2854,7 @@ export class LogsPage {
     }
 
     async clickSavedViewByTitle(title) {
-        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${title}"]`).first();
+        const element = this.page.locator(`[data-test="logs-search-bar-apply-${title}-saved-view-btn"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
@@ -3334,7 +3334,7 @@ export class LogsPage {
     }
 
     async clickSavedViewByLabel(label) {
-        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${label}"]`).first();
+        const element = this.page.locator(`[data-test="logs-search-bar-apply-${label}-saved-view-btn"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click({ force: true });
     }
