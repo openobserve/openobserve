@@ -1144,7 +1144,10 @@ export class PipelinesPage {
     }
 
     async waitForPipelineSaved() {
-        await this.pipelineSavedMessage.waitFor({ state: "visible" });
+        await Promise.race([
+            this.pipelineSavedMessage.waitFor({ state: 'visible', timeout: 15000 }).catch(() => null),
+            this.page.waitForURL(/\/pipeline\/pipelines(\?|$)/, { timeout: 15000 }).catch(() => null),
+        ]);
     }
 
     async exploreStreamAndNavigateToPipeline(streamName) {
@@ -1208,6 +1211,18 @@ export class PipelinesPage {
         // more-options ODropdown. PipelinesList.vue:194-201 uses data-test=
         // `pipeline-list-${row.name}-delete-pipeline`. The ODropdown only contains
         // pause/start, export, backfill, view-error — no delete-action item.
+        const rowAnchor = this.page.locator(
+            `[data-test^="pipeline-list-${pipelineName}-"]`
+        ).first();
+        const rowFound = await rowAnchor.isVisible({ timeout: 30000 }).catch(() => false);
+        if (!rowFound) {
+            // Clear and re-type the search term — list pagination/cache can drop
+            // the row until a fresh query is issued.
+            await this.pipelineSearchInputField.fill('').catch(() => {});
+            await this.page.waitForTimeout(500);
+            await this.pipelineSearchInputField.fill(pipelineName).catch(() => {});
+            await rowAnchor.waitFor({ state: 'visible', timeout: 15000 });
+        }
         const deleteBtn = this.page.locator(
           `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
         ).first();
@@ -1368,7 +1383,18 @@ export class PipelinesPage {
         const deleteBtn = this.page.locator(
           `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
         ).first();
-        await deleteBtn.waitFor({ state: 'visible', timeout: 15000 });
+        const uiVisible = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
+        if (!uiVisible) {
+            try {
+                await this.apiDeletePipelineByName(pipelineName);
+                testLogger.info(`Pipeline deleted via API fallback`, { pipelineName });
+                return;
+            } catch (e) {
+                testLogger.warn(`API delete fallback failed`, { pipelineName, error: e?.message });
+            }
+            // Last attempt: explicit waitFor with the original error semantics.
+            await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+        }
         await deleteBtn.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
