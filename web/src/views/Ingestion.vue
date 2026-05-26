@@ -282,25 +282,38 @@ export default defineComponent({
     const globalSearchQuery = ref("");
 
     // Token selector — pick which ingestion token the curl examples use
-    const selectedTokenName = ref("default");
+    const selectedTokenName = ref("");
     const tokenOptions = computed(() => {
       const tokens = store.state.organizationData.orgTokens || [];
       const enabled = tokens.filter((t: any) => t.enabled);
       if (enabled.length === 0) {
-        return [{ label: "default", value: "default" }];
+        return [];
       }
       return enabled.map((t: any) => ({
         label: t.name,
         value: t.name,
       }));
     });
+    watch(
+      tokenOptions,
+      (opts) => {
+        if (opts.length > 0 && !opts.find((o) => o.value === selectedTokenName.value)) {
+          selectedTokenName.value = opts[0].value;
+          const tokens = store.state.organizationData.orgTokens || [];
+          const token = tokens.find((t: any) => t.name === opts[0].value);
+          if (token?.token) {
+            store.dispatch("setOrganizationPasscode", token.token);
+          }
+        }
+      },
+      { immediate: true },
+    );
     const onTokenSelected = (name: string) => {
       const tokens = store.state.organizationData.orgTokens || [];
       const token = tokens.find((t: any) => t.name === name);
       if (token?.token) {
         store.dispatch("setOrganizationPasscode", token.token);
       }
-      // Fallback: if tokens haven't loaded yet, keep passcode from getOrganizationPasscode()
     };
 
     const activeTab = ref("recommended");
@@ -334,7 +347,6 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (store.state.selectedOrganization.identifier != undefined) {
-        getOrganizationPasscode();
         fetchOrgTokens();
         if (!store.state.organizationData.rumToken.rum_token) {
           getRUMToken();

@@ -40,14 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div class="full-width tw:flex tw:justify-end">
-            <q-btn
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t('ingestion.createTokenBtn')"
+            <OButton
+              variant="primary"
+              size="sm-action"
               data-test="add-ingestion-token"
               @click="showCreateForm = true"
-            />
+            >
+              {{ t('ingestion.createTokenBtn') }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -126,24 +126,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #body-cell-actions="props">
                 <q-td :props="props" side>
-                  <q-btn
-                    v-if="props.row.enabled"
-                    :label="t('common.disable')"
-                    class="o2-primary-button tw:h-[28px]"
-                    no-caps
-                    size="sm"
-                    :disable="loading"
-                    @click="toggleEnabled(props.row.name, false)"
-                  />
-                  <q-btn
-                    v-else
-                    :label="t('common.enable')"
-                    class="o2-primary-button tw:h-[28px]"
-                    no-caps
-                    size="sm"
-                    :disable="loading"
-                    @click="toggleEnabled(props.row.name, true)"
-                  />
+                  <OButton
+                    :data-test="`ingestion-token-${props.row.name}-toggle`"
+                    class="material-symbols-outlined"
+                    :variant="props.row.enabled ? 'ghost-destructive' : 'ghost'"
+                    size="icon-circle-sm"
+                    :title="props.row.enabled ? t('common.disable') : t('common.enable')"
+                    :disabled="loading"
+                    @click.stop="toggleEnabled(props.row.name, !props.row.enabled)"
+                  >
+                    <q-icon :name="props.row.enabled ? outlinedPause : outlinedPlayArrow" />
+                  </OButton>
                 </q-td>
               </template>
             </q-table>
@@ -154,70 +147,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Create token dialog -->
     <q-dialog v-model="showCreateForm" persistent>
-      <q-card
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        style="width: 480px; max-width: 90vw"
-      >
+      <q-card style="min-width: 440px; max-width: 90vw; border-radius: 12px;">
         <q-card-section class="row items-center q-pb-none">
           <span class="text-h6">{{ t("ingestion.createTokenTitle") }}</span>
           <q-space />
-          <q-btn flat round dense icon="close" @click="showCreateForm = false" />
+          <q-btn flat round dense icon="close" v-close-popup />
         </q-card-section>
         <q-card-section>
           <q-input
             v-model="newTokenName"
-            :label="t('ingestion.tokenNameLabel')"
-            :dark="store.state.theme === 'dark'"
-            outlined
+            :label="t('ingestion.tokenNameLabel') + ' *'"
             dense
+            borderless
+            hide-bottom-space
             autofocus
-            :rules="[(val: string) => !!val.trim() || 'Name is required']"
-            class="q-mb-sm"
             maxlength="256"
           />
           <q-input
             v-model="newTokenDescription"
             :label="t('ingestion.tokenDescriptionLabel')"
-            :dark="store.state.theme === 'dark'"
-            outlined
             dense
-            class="q-mb-sm"
+            borderless
+            hide-bottom-space
+            class="q-mt-sm"
           />
         </q-card-section>
-        <q-card-actions align="right">
-          <q-btn
-            flat
-            no-caps
-            :label="t('common.cancel')"
+        <q-card-actions align="right" class="q-pa-md tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="showCreateForm = false"
-          />
-          <q-btn
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            class="o2-primary-button text-bold"
-            flat
-            no-caps
-            :disable="!newTokenName.trim() || loading"
-            :label="t('common.create')"
+          >
+            {{ t('common.cancel') }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="!newTokenName.trim() || loading"
             @click="createToken"
-          />
+          >
+            {{ t('common.create') }}
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
 
     <!-- Revealed token dialog -->
     <q-dialog v-model="showRevealedDialog" persistent>
-      <q-card
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        style="width: 520px; max-width: 90vw"
-      >
+      <q-card style="min-width: 460px; max-width: 90vw; border-radius: 12px;">
         <q-card-section class="row items-center q-pb-none">
           <span class="text-h6">{{ t("ingestion.newTokenRevealed") }}</span>
           <q-space />
-          <q-btn flat round dense icon="close" @click="showRevealedDialog = false" />
+          <q-btn flat round dense icon="close" v-close-popup />
         </q-card-section>
         <q-card-section>
           <div
@@ -231,20 +212,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ revealedToken?.token }}</code>
           </div>
         </q-card-section>
-        <q-card-actions align="right">
-          <q-btn
-            flat
-            no-caps
+        <q-card-actions align="right" class="q-pa-md tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
             icon="content_copy"
-            :label="t('ingestion.copyTokenBtn')"
             @click="copyToken(revealedToken?.token || '')"
-          />
-          <q-btn
-            flat
-            no-caps
-            :label="t('common.close')"
+          >
+            {{ t('ingestion.copyTokenBtn') }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
             @click="showRevealedDialog = false"
-          />
+          >
+            {{ t('common.close') }}
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -256,6 +239,8 @@ import { ref, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, copyToClipboard, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
+import { outlinedPause, outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
 import organizationsService from "@/services/organizations";
 
 interface Token {
@@ -270,6 +255,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
+  components: { OButton },
   setup() {
     const store = useStore();
     const $q = useQuasar();
@@ -317,7 +303,7 @@ export default defineComponent({
         align: "center",
         sortable: false,
         classes: "actions-column",
-        style: "width: 120px;",
+        style: "width: 80px;",
       },
     ];
 
@@ -438,6 +424,8 @@ export default defineComponent({
       newTokenName,
       newTokenDescription,
       revealedToken,
+      outlinedPause,
+      outlinedPlayArrow,
       fetchTokens,
       createToken,
       toggleEnabled,
