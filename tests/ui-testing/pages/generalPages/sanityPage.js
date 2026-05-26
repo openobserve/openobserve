@@ -272,6 +272,27 @@ export class SanityPage {
     }
 
     // ================================================================
+    // SQL Mode helpers
+    // ================================================================
+
+    /**
+     * Open the utilities ("More") dropdown, click the SQL mode ODropdownItem to toggle it,
+     * then close the dropdown.
+     * Uses [data-test="logs-search-bar-menu-sql-mode-btn"] — NOT the legacy syntax-guide element.
+     */
+    async _clickSqlModeToggle() {
+        const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+        const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isVisible) {
+            await this.utilitiesMenuButton.click();
+            await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await sqlModeMenuItem.click();
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(100);
+    }
+
+    // ================================================================
     // Query Limit Methods
     // ================================================================
     async displayLimitedResults() {
@@ -279,7 +300,7 @@ export class SanityPage {
         await this.refreshButton.click();
         await initialSearchPromise;
 
-        await this.sqlModeToggleButton.click();
+        await this._clickSqlModeToggle();
 
         await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
 
@@ -835,7 +856,7 @@ export class SanityPage {
         await this.clickHistogramToggle();
 
         // Enable SQL mode
-        await this.sqlModeToggleButton.click();
+        await this._clickSqlModeToggle();
 
         // Click run query button
         const sqlSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
@@ -901,13 +922,11 @@ export class SanityPage {
         }
 
         // Enable SQL mode with error handling
-        await expect(this.sqlModeToggleButton).toBeVisible({ timeout: 15000 });
-
         try {
-            await this.sqlModeToggleButton.click({ timeout: 10000 });
+            await this._clickSqlModeToggle();
         } catch (error) {
             console.warn('SQL mode switch failed, retrying:', error.message);
-            await this.sqlModeToggleButton.click({ timeout: 10000 });
+            await this._clickSqlModeToggle();
         }
 
         // Click refresh button with waits
@@ -983,13 +1002,11 @@ export class SanityPage {
         }
 
         // Enable SQL mode with error handling
-        await expect(this.sqlModeToggleButton).toBeVisible({ timeout: 15000 });
-
         try {
-            await this.sqlModeToggleButton.click({ timeout: 10000 });
+            await this._clickSqlModeToggle();
         } catch (error) {
             console.warn('SQL mode switch click failed, retrying:', error.message);
-            await this.sqlModeToggleButton.click({ timeout: 10000 });
+            await this._clickSqlModeToggle();
         }
 
         // Wait for query editor to be ready, then drive content via MonacoEditorHelper.

@@ -577,17 +577,33 @@ class LanguagePage {
     for (const subPage of subPages) {
       try {
         if (subPage.action === 'toggleSqlMode') {
-          // Special action: toggle SQL mode
-          if (await this.sqlModeToggle.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await this.sqlModeToggle.click();
-            // Wait for the SQL editor surface (Monaco) to mount before scraping.
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-            const texts = await this._extractAllVisibleText();
-            results.push({
-              name: subPage.name,
-              analysis: this._analyzeTranslation(texts, langCode),
-            });
-            await this.sqlModeToggle.click();
+          // Special action: toggle SQL mode.
+          // Use [data-test="logs-search-bar-menu-sql-mode-btn"] (the ODropdownItem) — the legacy
+          // data-test="logs-search-bar-sql-mode-toggle-btn" is on an unrelated syntax-guide component.
+          const utilitiesBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+          const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+          const utilitiesBtnVisible = await utilitiesBtn.isVisible({ timeout: 2000 }).catch(() => false);
+          if (utilitiesBtnVisible) {
+            await utilitiesBtn.click();
+            const menuItemVisible = await sqlModeMenuItem.isVisible({ timeout: 3000 }).catch(() => false);
+            if (menuItemVisible) {
+              await sqlModeMenuItem.click();
+              await this.page.keyboard.press('Escape');
+              // Wait for the SQL editor surface (Monaco) to mount before scraping.
+              await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+              const texts = await this._extractAllVisibleText();
+              results.push({
+                name: subPage.name,
+                analysis: this._analyzeTranslation(texts, langCode),
+              });
+              // Toggle back: reopen the menu and click again
+              await utilitiesBtn.click();
+              await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+              await sqlModeMenuItem.click();
+              await this.page.keyboard.press('Escape');
+            } else {
+              await this.page.keyboard.press('Escape');
+            }
           }
         } else if (subPage.path) {
           // Navigate to sub-page URL
