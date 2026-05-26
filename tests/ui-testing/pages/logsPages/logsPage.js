@@ -2709,12 +2709,16 @@ export class LogsPage {
     }
 
     async clickSaveViewButton() {
-        // Close any open dialogs/menus first (e.g., saved views dropdown).
-        // Press Escape to dismiss without relying on a body click + arbitrary wait.
+        // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
+        // Close any open menus/dialogs first, then open the menu and click the item.
         await this.page.keyboard.press('Escape').catch(() => {});
-        const saveBtn = this.page.locator('[data-test="logs-search-saved-views-btn"]');
-        await saveBtn.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-        return await saveBtn.click();
+        const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
+        const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        return await createSavedViewBtn.click();
     }
 
     async fillSavedViewName(name) {
@@ -7321,34 +7325,28 @@ export class LogsPage {
     }
 
     /**
-     * Click the utilities menu button to show saved views
-     * This opens the utilities menu (replaces old dropdown arrow)
+     * Open the saved views list dialog via the utilities ("More") menu.
+     * Post-menu-migration: list saved views moved from standalone dropdown to
+     * the utilities menu as logs-search-bar-menu-list-saved-views-btn.
      */
     async clickSavedViewsDropdownArrow() {
-        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
-        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
-        await dropdownArrow.click();
-        await this.page.waitForTimeout(500);
-        testLogger.info('Clicked saved views dropdown arrow');
+        const listSavedViewsBtn = this.page.locator('[data-test="logs-search-bar-menu-list-saved-views-btn"]');
+        const isVisible = await listSavedViewsBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await listSavedViewsBtn.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await listSavedViewsBtn.click();
+        testLogger.info('Clicked saved views list button via utilities menu');
     }
 
     /**
-     * Expand the saved views dropdown and wait for search input
-     * Tries arrow click first, then main button if search input doesn't appear
+     * Expand the saved views dropdown and wait for search input.
      */
     async expandSavedViewsDropdown() {
-        try {
-            await this.clickSavedViewsDropdownArrow();
-            const searchInput = this.page.locator(this.savedViewSearchInput);
-            await searchInput.waitFor({ state: 'visible', timeout: 5000 });
-            return;
-        } catch (e) {
-            testLogger.debug('Arrow click did not show search input, retrying');
-        }
-
-        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
-        await dropdownArrow.click();
-        await this.page.waitForTimeout(500);
+        await this.clickSavedViewsDropdownArrow();
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
