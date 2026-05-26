@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :items="patterns"
         :overscan="5"
         :scroll-target="scrollTarget ?? null"
-        :dynamic-row-height="wrap"
+        :dynamic-row-height="true"
       >
         <template #default="{ item: pattern, index }">
           <PatternCard
