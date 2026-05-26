@@ -15,7 +15,7 @@
 
 use std::ops::ControlFlow;
 
-use config::TIMESTAMP_COL_NAME;
+use config::{TIMESTAMP_COL_NAME, utils::sql::is_complex_query_stmt};
 use infra::errors::Error;
 use sqlparser::{
     ast::{Expr, Ident, OrderByExpr, OrderByKind, Query, VisitMut, VisitorMut},
@@ -23,15 +23,13 @@ use sqlparser::{
     parser::Parser,
 };
 
-use crate::service::search::sql::visitor::utils::is_complex_query;
-
 /// check if the sql is complex query, if not, add ordering term by timestamp
 pub fn check_or_add_order_by_timestamp(sql: &str, is_asc: bool) -> infra::errors::Result<String> {
     let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
         .map_err(|e| Error::Message(e.to_string()))?
         .pop()
         .unwrap();
-    if is_complex_query(&mut statement) {
+    if is_complex_query_stmt(&statement) {
         return Ok(sql.to_string());
     }
     let mut visitor = AddOrderingTermVisitor::new(TIMESTAMP_COL_NAME.to_string(), is_asc);

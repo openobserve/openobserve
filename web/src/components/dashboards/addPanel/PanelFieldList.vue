@@ -58,8 +58,9 @@
               #icon-left
             >
               <OIcon
-                size="xs"
+                size="sm"
                 :name="metricsIconMapping[selectedMetricTypeIcon || '']"
+                class="tw:mb-0.5"
               />
             </template>
           </OSelect>

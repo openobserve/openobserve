@@ -12,20 +12,20 @@
 
       <OButton
         :label="t('common.copyToClipboard')"
-        size="sm-action"
+        size="xs"
         variant="outline"
         class="tw:mb-[0.375rem] tw:mr-2"
         @click="copyLogToClipboard"
-      ><OIcon name="content-copy" size="sm" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+      ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
-        size="sm-action"
+        size="xs"
         variant="outline"
-        class="log-preview-btn tw:mr-2"
+        class="tw:mb-[0.375rem] tw:mr-2"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <OIcon name="link" size="sm" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <OIcon name="link" size="xs" class="tw:mr-1" />{{ t('search.viewRelated') }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div

@@ -1068,6 +1068,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <!-- Stream contribution chart (single-value only) -->
+          <div class="tw:px-5 tw:py-4 tw:flex tw:flex-col tw:h-full">
           <template
             v-if="
               !(insightData as any).isCardLevel &&
@@ -1077,11 +1078,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-3 tw:shrink-0">
               <div
                 class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:text-gray-400'
-                    : 'tw:text-gray-400'
-                "
+                style="color: var(--color-text-primary)"
               >
                 Stream Sources
               </div>
@@ -1283,6 +1280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
+          </div>
         </ODrawer>
       </div>
 

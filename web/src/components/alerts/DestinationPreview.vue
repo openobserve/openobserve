@@ -16,11 +16,9 @@ limitations under the License.
 <template>
   <ODialog
     v-model:open="isOpen"
-    :width="55"
+    size="md"
     :title="`${t('alerts.destinationPreview')} - ${getDestinationTypeName(type)}`"
     data-test="destination-preview-dialog"
-    primary-button-label="Close"
-    @click:primary="isOpen = false"
   >
 
     <div data-test="destination-preview-card" class="preview-card">
@@ -242,7 +240,10 @@ limitations under the License.
             </div>
           </div>
         </div>
-      <div class="tw:flex tw:justify-center tw:pt-3">
+    </div>
+
+    <template #footer>
+      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:w-full">
         <OButton
           data-test="preview-copy-button"
           variant="outline"
@@ -252,8 +253,15 @@ limitations under the License.
         >
           Copy Template
         </OButton>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="isOpen = false"
+        >
+          Close
+        </OButton>
       </div>
-    </div>
+    </template>
   </ODialog>
 </template>
 
@@ -317,8 +325,7 @@ const copyTemplate = () => {
 
 <style lang="scss" scoped>
 .preview-card {
-  width: 700px;
-  max-width: 90vw;
+  width: 100%;
 }
 
 .preview-container {

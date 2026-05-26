@@ -3,8 +3,8 @@
     <OSeparator />
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
-    <div class="tw:py-[0.25rem]">
-      <div style="display: flex; flex-direction: row" class="tw:pl-3">
+    <div>
+      <div style="display: flex; flex-direction: row; align-items: center" class="tw:pl-2">
         <div class="layout-name">{{ t("panel.options") }}</div>
         <span class="layout-separator">:</span>
         <div class="axis-container">
@@ -220,10 +220,8 @@ export default defineComponent({
 <style lang="scss" scoped>
 .layout-name {
   white-space: nowrap;
-  min-width: 80px;
-  font-size: 12px;
-  line-height: 24px;
-  font-weight: 600;
+  min-width: 86px;
+  font-size: 14px;
   display: flex;
   align-items: center;
 }
@@ -236,13 +234,11 @@ export default defineComponent({
 }
 
 .axis-container {
-  flex: 1;
-  width: 100%;
+  margin: 2px 5px;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
+  gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .option-field-wrapper {
@@ -250,6 +246,7 @@ export default defineComponent({
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  margin-left: 10px;
 }
 
 .field-label {

@@ -595,6 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="mini-select"
                             multiple
                             clearable
+                            size="sm"
                             :data-test="`schema-field-${row.name}-index-type-select`"
                             style="width: 190px;"
                             @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
@@ -635,186 +636,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Configuration tab -->
                 <div v-if="activeMainTab == 'configuration'">
-                  <div
-                    class="tw:w-full tw:h-[calc(100vh-307px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4"
-                  >
+                  <div class="tw:w-full tw:h-full tw:overflow-y-auto tw:p-4 tw:flex tw:flex-col tw:gap-4">
                     <!-- Configuration Settings Card -->
-                    <div
-                      :class="[
-                        'tw:rounded-lg tw:p-2 tw:border tw:shadow-sm tw:flex tw:flex-col tw:justify-evenly',
-                        store.state.theme === 'dark'
-                          ? 'dark:tw:bg-[#181A1B] dark:tw:border-gray-700'
-                          : 'tw:border-gray-200',
-                      ]"
-                    >
-                      <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1">
-                        <!-- Data Retention -->
-                        <div v-if="showDataRetention" class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Data Retention (days)
-                          </label>
-                          <OInput
-                            data-test="stream-details-data-retention-input"
-                            v-model="dataRetentionDays"
-                            type="number"
-                            min="1"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            v-if="
-                              dataRetentionDays > 0 && dataRetentionDays != ''
-                            "
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Global retention is
-                            {{ store.state.zoConfig.data_retention_days }} days
-                          </small>
-                          <!-- Error Message -->
-                          <div class="tw:text-red-500 tw:text-sm">
-                            <span
-                              v-if="
-                                dataRetentionDays <= 0 ||
-                                dataRetentionDays == ''
-                              "
-                            >
-                              Retention period must be at least 1 day
-                            </span>
-                          </div>
-                        </div>
+                    <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:divide-y tw:divide-[var(--o2-border-color)]">
 
-                        <!-- Max Query Range -->
-                        <div class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Max Query Range (hours)
-                          </label>
-                          <OInput
-                            data-test="stream-details-max-query-range-input"
-                            v-model="maxQueryRange"
-                            type="number"
-                            min="0"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Maximum time range allowed for queries. Set 0 for
-                            unlimited range.
-                          </small>
-                        </div>
+                      <!-- Data Retention -->
+                      <div v-if="showDataRetention" class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
+                        <label class="tw:text-[13px] tw:font-[500] tw:text-[var(--o2-text-label)]">
+                          Data Retention (days)
+                        </label>
+                        <OInput
+                          data-test="stream-details-data-retention-input"
+                          v-model="dataRetentionDays"
+                          type="number"
+                          min="1"
+                          class="tw:max-w-[220px]"
+                          @update:model-value="markFormDirty"
+                        />
+                        <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
+                          Global retention is {{ store.state.zoConfig.data_retention_days }} days
+                        </small>
+                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="tw:text-[var(--o2-status-error-text)]">
+                          Retention period must be at least 1 day
+                        </small>
+                      </div>
 
-                        <!-- Flatten Level -->
-                        <div class="setting-group">
-                          <label
-                            :class="[
-                              'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            {{ t("logStream.flattenLevel") }}
-                          </label>
-                          <OInput
-                            data-test="stream-details-flatten-level-input"
-                            v-model="flattenLevel"
-                            type="number"
-                            min="0"
-                            @update:model-value="markFormDirty"
-                          />
-                          <small
-                            :class="[
-                              'tw:block tw:text-xs tw:mt-1 tw:italic',
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-400'
-                                : 'tw:text-gray-500',
-                            ]"
-                          >
-                            Global is
-                            {{ store.state.zoConfig.ingest_flatten_level || 3 }}
-                          </small>
-                        </div>
+                      <!-- Max Query Range -->
+                      <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
+                        <label class="tw:text-[13px] tw:font-[500] tw:text-[var(--o2-text-label)]">
+                          Max Query Range (hours)
+                        </label>
+                        <OInput
+                          data-test="stream-details-max-query-range-input"
+                          v-model="maxQueryRange"
+                          type="number"
+                          min="0"
+                          class="tw:max-w-[220px]"
+                          @update:model-value="markFormDirty"
+                        />
+                        <small>Maximum time range allowed for queries. Set 0 for unlimited range.</small>
+                      </div>
 
-                        <!-- Toggles -->
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600'
-                              : 'tw:border-gray-200',
-                          ]"
-                        >
-                          <span
-                            :class="[
-                              store.state.theme === 'dark'
-                                ? 'tw:text-gray-200'
-                                : 'tw:text-gray-700',
-                            ]"
-                          >
-                            Use Stream Stats for Partitioning
-                          </span>
-                          <OSwitch
-                            data-test="log-stream-use_approx-toggle-btn"
-                            v-model="approxPartition"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
+                      <!-- Flatten Level -->
+                      <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
+                        <label class="tw:text-[13px] tw:font-[500] tw:text-[var(--o2-text-label)]">
+                          {{ t("logStream.flattenLevel") }}
+                        </label>
+                        <OInput
+                          data-test="stream-details-flatten-level-input"
+                          v-model="flattenLevel"
+                          type="number"
+                          min="0"
+                          class="tw:max-w-[220px]"
+                          @update:model-value="markFormDirty"
+                        />
+                        <small>Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}</small>
+                      </div>
 
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600 tw:text-gray-200'
-                              : 'tw:border-gray-200 tw:text-gray-700',
-                          ]"
-                        >
-                          <span>Store Original Data</span>
-                          <OSwitch
-                            v-if="showStoreOriginalDataToggle"
-                            data-test="log-stream-store-original-data-toggle-btn"
-                            v-model="storeOriginalData"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
+                      <!-- Toggles -->
+                      <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                        <span>Use Stream Stats for Partitioning</span>
+                        <OSwitch
+                          data-test="log-stream-use_approx-toggle-btn"
+                          v-model="approxPartition"
+                          @update:model-value="formDirtyFlag = true"
+                        />
+                      </div>
 
-                        <div
-                          :class="[
-                            'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                            store.state.theme === 'dark'
-                              ? 'tw:border-gray-600 tw:text-gray-200'
-                              : 'tw:border-gray-200 tw:text-gray-700',
-                          ]"
-                        >
-                          <span>Enable Distinct Values</span>
-                          <OSwitch
-                            data-test="log-stream-enabled-distinct-values-toggle-btn"
-                            v-model="enableDistinctFields"
-                            @update:model-value="formDirtyFlag = true"
-                          />
-                        </div>
+                      <div v-if="showStoreOriginalDataToggle" class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                        <span>Store Original Data</span>
+                        <OSwitch
+                          data-test="log-stream-store-original-data-toggle-btn"
+                          v-model="storeOriginalData"
+                          @update:model-value="formDirtyFlag = true"
+                        />
+                      </div>
+
+                      <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                        <span>Enable Distinct Values</span>
+                        <OSwitch
+                          data-test="log-stream-enabled-distinct-values-toggle-btn"
+                          v-model="enableDistinctFields"
+                          @update:model-value="formDirtyFlag = true"
+                        />
                       </div>
                     </div>
                   </div>
@@ -913,14 +817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- floating footer for the table -->
-                <div
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'dark-theme-floating-buttons'
-                      : 'light-theme-floating-buttons'
-                  "
-                  class="floating-buttons tw:px-2 tw:py-1"
-                >
+                <div class="floating-buttons tw:px-2 tw:py-1">
                   <!-- LLM Evaluation tab footer -->
                   <div
                     v-if="activeMainTab === 'llmEvaluation'"
@@ -1045,6 +942,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-close="false"
   >
     <AssociatedRegexPatterns
+      ref="assocPatternsRef"
       :data="patternAssociationDialog.data"
       :fieldName="patternAssociationDialog.fieldName"
       @closeDialog="patternAssociationDialog.show = false"
@@ -1053,6 +951,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updateSettings="onSubmit"
       @updateAppliedPattern="handleUpdateAppliedPattern"
     />
+    <template #footer>
+      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="schema-pattern-association-cancel-btn"
+          @click="patternAssociationDialog.show = false"
+        >
+          Cancel
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="schema-pattern-association-update-btn"
+          :disabled="!assocPatternsRef?.isFormDirty"
+          @click="assocPatternsRef?.updateRegexPattern()"
+        >
+          Update Changes
+        </OButton>
+      </div>
+    </template>
   </ODrawer>
 
   <ConfirmDialog

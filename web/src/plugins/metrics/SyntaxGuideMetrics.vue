@@ -173,7 +173,7 @@ export default defineComponent({
   text-transform: capitalize;
   padding: 5px 5px;
   height: 30px;
-  font-weight: bold;
+  font-weight: 600;
   border: 1px solid rgba(89, 96, 178, 0.3);
 }
 

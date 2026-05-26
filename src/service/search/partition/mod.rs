@@ -16,6 +16,7 @@
 pub(crate) mod aggregate;
 pub(crate) mod cpu_cores;
 pub(crate) mod settings;
+pub(crate) mod sql_context;
 pub(crate) mod stream_files;
 
 use std::cmp::max;

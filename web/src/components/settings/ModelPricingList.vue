@@ -45,9 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-sm"
+            class="tw:-ml-1"
             data-test="model-pricing-info-btn"
           >
-            <OIcon name="info-outline" size="xs" />
+            <OIcon name="info-outline" size="sm" />
             <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
           </OButton>
         </div>
@@ -280,36 +281,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 @click.stop="toggleEnabled(row, !row.enabled)"
                 data-test="model-pricing-toggle-btn"
-              >
-                <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
-              </OButton>
+                :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              />
               <OButton
                 variant="ghost"
                 size="icon-sm"
                 :title="t('modelPricing.actionEdit')"
                 @click.stop="openEditor(row)"
                 data-test="model-pricing-edit-btn"
-              >
-                <OIcon name="edit" size="xs" />
-              </OButton>
+                icon-left="edit"
+              />
               <OButton
                 variant="ghost-destructive"
                 size="icon-sm"
                 :title="t('modelPricing.actionDelete')"
                 @click.stop="confirmDelete(row)"
                 data-test="model-pricing-delete-btn"
-              >
-                <OIcon name="delete" size="sm" />
-              </OButton>
+                icon-left="delete"
+              />
               <OButton
                 variant="ghost"
                 size="icon-sm"
                 :title="t('modelPricing.actionDuplicate')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-duplicate-btn"
-              >
-                <OIcon name="content-copy" size="xs" />
-              </OButton>
+                icon-left="content-copy"
+              />
             </template>
             <template v-else>
               <OButton
@@ -318,9 +315,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionClone')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-clone-btn"
-              >
-                <OIcon name="content-copy" size="xs" />
-              </OButton>
+                icon-left="content-copy"
+              />
             </template>
           </div>
         </template>

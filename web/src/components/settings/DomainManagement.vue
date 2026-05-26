@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             clearable
             :loading="loadingFunctions"
+            @update:model-value="userTouched = true"
           >
             <template #empty>
               <span>{{ t('settings.noVrlFunctionsFound') }}</span>
@@ -374,6 +375,7 @@ const saving = ref(false);
 // Claim parser function state
 const claimParserFunction = ref("");
 const originalClaimParserFunction = ref(""); // Track original value to detect changes
+const userTouched = ref(false); // Only true after user explicitly interacts with the select
 const functionOptions = ref<string[]>([]);
 const allFunctions = ref<string[]>([]);
 const loadingFunctions = ref(false);
@@ -384,9 +386,12 @@ const loadingErrors = ref(false);
 
 const emit = defineEmits(["cancel", "saved"]);
 
-// Computed property to check if claim parser function value has changed
+// Computed property to check if claim parser function value has changed.
+// Requires explicit user interaction (userTouched) so the pre-loaded stored value
+// does not enable the Save button on first render — matching main branch q-select hide-selected behaviour.
 const hasClaimParserChanged = computed(() => {
-  return claimParserFunction.value !== originalClaimParserFunction.value;
+  if (!userTouched.value) return false;
+  return (claimParserFunction.value || "") !== originalClaimParserFunction.value;
 });
 
 onMounted(() => {
@@ -432,10 +437,13 @@ const loadDomainSettings = async () => {
       domains.splice(0, domains.length, ...loadedDomains);
     }
 
-    // Load claim parser function from organization settings
+    // Track the saved value for change detection without pre-populating the OSelect model.
+    // This matches main branch's q-select hide-selected visual behaviour: the field appears
+    // empty on first load; the user must explicitly select a value before saving.
     const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
-    claimParserFunction.value = storedFunction;
-    originalClaimParserFunction.value = storedFunction; // Store original for change detection
+    claimParserFunction.value = ""; // Always start visually empty
+    userTouched.value = false;      // Reset so save button is disabled until user acts
+    originalClaimParserFunction.value = storedFunction;
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
@@ -620,13 +628,13 @@ const loadFunctions = async () => {
     loadingFunctions.value = true;
     const response = await jstransform.list(1, 10000, "name", false, "", store.state.zoConfig.meta_org);
 
+    // Populate options. The model value (claimParserFunction) is intentionally NOT set here
+    // so the trigger remains visually empty until the user makes an explicit selection.
+    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
+    originalClaimParserFunction.value = storedFunction;
+
     allFunctions.value = response.data.list.map((fn: any) => fn.name);
     functionOptions.value = allFunctions.value;
-
-    // Set the current value from store if it exists
-    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
-    claimParserFunction.value = storedFunction;
-    originalClaimParserFunction.value = storedFunction; // Store original for change detection
   } catch (e: any) {
     console.error("Error loading functions:", e);
   } finally {
@@ -669,8 +677,9 @@ const saveClaimParserFunction = async () => {
     };
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    // Update original value after successful save
+    // Update original value after successful save and reset interaction flag
     originalClaimParserFunction.value = claimParserFunction.value || "";
+    userTouched.value = false;
 
     toast({
       variant: "success",

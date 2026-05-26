@@ -80,7 +80,7 @@
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
-              @click="removeLink(link)"
+              @click="removeLink(idx)"
               :data-test="`cross-link-delete-${idx}`"
             />
           </div>
@@ -176,8 +176,8 @@ export default defineComponent({
       showAddDialog.value = true;
     }
 
-    function removeLink(link: CrossLink) {
-      const updated = props.modelValue.filter((l) => l.name !== link.name);
+    function removeLink(idx: number) {
+      const updated = props.modelValue.filter((_, i) => i !== idx);
       emit("update:modelValue", updated);
       emit("change");
     }

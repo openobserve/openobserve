@@ -142,7 +142,7 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.setQueryEditorValue('WITH Normalized AS (SELECT COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte") SELECT * FROM Normalized WHERE normalized_message LIKE \'%timeout%\'');
+    await pageManager.logsPage.setQueryEditorValue('WITH Normalized AS (SELECT _timestamp, COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte") SELECT * FROM Normalized WHERE normalized_message LIKE \'%timeout%\'');
     // Deterministic wait — confirms Monaco model reflects the new query before Run.
     await pageManager.logsPage.waitForQueryEditorValue('Normalized');
     await applyQueryButton(pageManager);

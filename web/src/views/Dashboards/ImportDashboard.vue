@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <select-folder-dropdown
                         @folder-selected="selectedFolder = $event"
                         :activeFolderId="selectedFolder.value"
+                        label-position="inside"
                       />
                     </div>
                   </div>
@@ -143,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <select-folder-dropdown
                         @folder-selected="selectedFolder = $event"
                         :activeFolderId="selectedFolder.value"
+                        label-position="inside"
                       />
                     </div>
                     <div v-if="filesImportResults.length" class="tw:py-2" data-test="dashboard-import-file-results">
