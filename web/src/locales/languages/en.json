@@ -395,6 +395,7 @@
     "selectStreamBeforeScheduling": "Please select a stream before scheduling a job",
     "functionSelectionNotSupportedVisualization": "Function selection is not supported for timechart",
     "toggleFunctionEditor": "Toggle Function Editor",
+    "functionEditorLabel": "Function Editor",
     "functionLabel": "Function",
     "actionLabel": "Action",
     "transformLabel": "Transform",
