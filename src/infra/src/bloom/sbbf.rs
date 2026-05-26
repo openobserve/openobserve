@@ -18,10 +18,11 @@
 //! The Parquet bloom-filter crate ships an `Sbbf` type whose only public
 //! check path requires materializing the full bitset in memory. For a
 //! single-point check that the spec only needs **32 bytes** for, that
-//! pulls in megabytes of bitmap per query (see DESIGN.md §6). We therefore
-//! re-implement the spec — it's small and stable — so the reader can do
-//! a **single-block range GET** and check 8 bits without ever loading the
-//! rest of the bitmap.
+//! pulls in megabytes of bitmap per query. We therefore re-implement the
+//! spec — it's small and stable — so a point check runs over **just one
+//! 32-byte block** ([`check_block`]) without ever loading the rest of the
+//! bitmap. (In the transposed `.bf` layout the reader range-reads one row
+//! of blocks per group and then runs this 32-byte check per file.)
 //!
 //! Self-consistent: writer and reader use the same `SALT` constants,
 //! the same `gxhash64(seed=0)` from `config::utils::hash`, the same

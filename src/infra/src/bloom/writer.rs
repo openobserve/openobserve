@@ -23,7 +23,7 @@
 //! block 1, … — the blocks a query needs (one per file) form a single
 //! contiguous row at `bi`. The search side then reads **one contiguous
 //! range of `M × 32` bytes per group** instead of one tiny range per
-//! file. See DESIGN.md §6.
+//! file.
 //!
 //! ```text
 //! body for a field with M files, B blocks each:
@@ -35,7 +35,10 @@
 
 use std::io::Write;
 
-use super::{ALGO_SBBF_GXHASH, MAGIC, VERSION, sbbf::Sbbf};
+use super::{
+    ALGO_SBBF_GXHASH, MAGIC, VERSION,
+    sbbf::{BLOCK_BYTES, Sbbf},
+};
 
 /// Default false-positive probability for new SBBFs.
 const DEFAULT_FPP: f64 = 0.01;
@@ -270,8 +273,6 @@ impl BloomWriter {
         Ok(out)
     }
 }
-
-use super::sbbf::BLOCK_BYTES;
 
 #[cfg(test)]
 mod tests {

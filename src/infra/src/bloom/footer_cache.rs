@@ -15,20 +15,20 @@
 
 //! Cross-query cache for `.bf` suffix bytes.
 //!
-//! The pruner's partial-read fetch path issues a `GetRange::Suffix(N)`
-//! to grab the footer plus the tail of body from object storage. The
-//! footer payload of a `.bf` is small (a few KB), and `.bf` files are
-//! append-only by construction (path includes a microsecond
-//! `bloom_ver`, never overwritten), so the cached bytes are valid for
-//! the lifetime of the file.
+//! The pruner issues a `GetRange::Suffix(N)` to grab the footer (plus a
+//! little trailing body) from object storage. The footer payload is small
+//! (a few KB), and a `.bf` is **write-once**: its path embeds a microsecond
+//! `bloom_ver` and is never overwritten (a rebuild produces a new path; an
+//! orphaned `.bf` is deleted, not mutated). So a cached suffix stays valid
+//! for the lifetime of the file.
 //!
-//! On a cache hit the prune step skips the suffix `GET` entirely and
-//! goes straight to fetching the body byte ranges the query needs.
+//! On a cache hit the prune step skips the suffix `GET` entirely and parses
+//! the footer straight from the cached bytes.
 //!
-//! This cache only stores the **suffix probe** bytes (footer + tail of
-//! body). The full `.bf` body is left to the regular `file_data` cache
-//! ladder, which the pruner backfills asynchronously via
-//! `file_downloader::queue_download` after a cache miss.
+//! This cache only stores the **suffix probe** bytes. The body block-rows a
+//! query needs are fetched on demand through the regular `file_data` cache
+//! ladder (`memory → disk → remote`) via batched range reads — there is no
+//! separate async whole-`.bf` backfill.
 
 use std::sync::LazyLock;
 
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_put_get_round_trip() {
         let c = BloomFooterCache::new(1024 * 1024);
-        let path = "files/o/bloom/logs/s/2026/05/08/14/123456.bf".to_string();
+        let path = "files/o/bloom/s_logs/2026/05/08/14/123456.bf".to_string();
         let body = Bytes::from_static(b"footer-bytes-here");
         c.put(path.clone(), 100_000, body.clone());
 

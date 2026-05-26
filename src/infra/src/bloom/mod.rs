@@ -15,10 +15,12 @@
 
 //! `.bf` file format and helpers.
 //!
-//! A `.bf` is a flat object-store blob containing many per-(file, field)
-//! Split-Block Bloom Filters (SBBF — same byte layout as Parquet's per-column
-//! bloom). One `.bf` covers a single hour bucket of a stream and is named
-//! after the microsecond timestamp at which it was built; see
+//! A `.bf` is a flat object-store blob holding one Split-Block Bloom Filter
+//! (SBBF — Parquet's block bit-layout, but our own hash and framing) per
+//! (file, field). A single hour bucket of a stream is covered by **one or
+//! more** `.bf` files: when a bucket holds many files they're sub-grouped
+//! into chunks (to cap build-time memory), and each chunk is written as its
+//! own `.bf` named by its `bloom_ver` (`base_ts + chunk_idx`). See
 //! `bloom::path` for the naming scheme.
 //!
 //! Layout (**transposed / block-major** — POC for O(groups) read cost):
@@ -61,7 +63,7 @@
 //! turning prune IO from O(files) into O(groups). This is the form that
 //! can beat tantivy on S3 for fully-random high-cardinality fields,
 //! where tantivy's sparse-index range pruning can't reject and it must
-//! touch every file. See DESIGN.md §6.
+//! touch every file.
 
 pub mod footer_cache;
 pub mod path;
