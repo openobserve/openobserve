@@ -290,9 +290,9 @@ describe("SemanticFieldGroupsConfig - import drawer", () => {
     expect((w.vm as any).showImportDrawer).toBe(false);
   });
 
-  it("renders ImportSemanticGroupsDrawer inside ODrawer", async () => {
+  it("renders ImportSemanticGroupsDrawer for import flow", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="import-drawer-stub"]').exists()).toBe(true);
+    expect(w.findComponent({ name: "ImportSemanticGroupsDrawer" }).exists()).toBe(true);
   });
 
   it("closes drawer when child ImportSemanticGroupsDrawer emits update:open=false", async () => {
