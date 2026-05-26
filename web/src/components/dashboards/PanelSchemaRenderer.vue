@@ -197,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-circle"
           @click="$emit('show-legends')"
           icon-left="format-list-bulleted"
+          data-test="dashboard-show-legends-btn"
         >
           <OTooltip content="Show Legends" side="top" align="end" />
         </OButton>

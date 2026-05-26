@@ -73,7 +73,11 @@ export default class DashboardLegendsCopy {
    */
   async getLegendCount() {
     await this.waitForPopupVisible();
-    const items = this.page.locator('[data-test^="dashboard-legend-item-"]');
+    // Use :not() to exclude dashboard-legend-item-text which also starts with
+    // "dashboard-legend-item-" and would otherwise double-count each item.
+    // Use .first() to scope to a single popup instance (PanelEditor can render
+    // multiple popup DOM nodes simultaneously).
+    const items = this.legendsPopup.first().locator('[data-test^="dashboard-legend-item-"]:not([data-test="dashboard-legend-item-text"])');
     const count = await items.count();
     testLogger.info(`Found ${count} legend items`);
     return count;
@@ -229,11 +233,11 @@ export default class DashboardLegendsCopy {
   async isTableCellCopied(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
     const copyBtn = cell.locator('[data-test="dashboard-table-cell-copy-btn"]');
-    // Hover to reveal the copy button, then check icon state via data-icon attribute
+    // Hover to reveal the copy button, then check data-copied attribute
     await cell.hover({ force: true });
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
-    const iconAttr = await copyBtn.locator('[data-test="dashboard-table-cell-copy-icon"]').first().getAttribute('data-icon');
-    return iconAttr === 'check';
+    const copiedAttr = await copyBtn.getAttribute('data-copied');
+    return copiedAttr === 'true';
   }
 
   /**

@@ -19,7 +19,7 @@ export default class DashboardSetting {
     this.dynamicFilter = page.locator(
       '[data-test="dashboard-general-setting-dynamic-filter"]'
     );
-    this.newName = page.locator('[data-test="dashboard-general-setting-name"]');
+    this.newName = page.locator('[data-test="dashboard-general-setting-name-field"]');
     this.saveSettingBtn = page.locator(
       '[data-test="dashboard-general-setting-save-btn"]'
     );
@@ -142,7 +142,15 @@ export default class DashboardSetting {
   async addTabSetting(tabnewName) {
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
+    // TabsSettings loads dashboard data async on mount; wait for the first
+    // draggable row (the default tab) to appear before clicking "Add Tab",
+    // otherwise dashboardId is still undefined and the API call fails.
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-draggable-row"]')
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 });
     await this.addtab.click();
+    await this.tabName.waitFor({ state: "visible", timeout: 10000 });
     await this.tabName.fill(tabnewName);
   }
 
