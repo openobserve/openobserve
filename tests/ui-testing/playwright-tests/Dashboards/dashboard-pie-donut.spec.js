@@ -357,7 +357,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.dashboardPanelActions.savePanel();
     await reopenPanelConfig(page, pm);
 
-    await expect(page.locator('[data-test="dashboard-config-description"]')).toHaveValue("Test pie chart description");
+    await expect(page.locator('[data-test="dashboard-config-description-field"]')).toHaveValue("Test pie chart description");
     testLogger.info("Description persisted after save and reopen");
 
     await pm.dashboardPanelActions.savePanel();
