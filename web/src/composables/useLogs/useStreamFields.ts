@@ -149,7 +149,11 @@ export const useStreamFields = () => {
       searchObj.data.errorMsg = "";
       searchObj.data.errorDetail = "";
       searchObj.data.countErrorMsg = "";
-      searchObj.data.stream.selectedStreamFields = [];
+      // Do NOT clear selectedStreamFields here — clearing it before the async
+      // work completes causes the field list to briefly render empty, which
+      // resets the scroll container's scrollTop to 0 and loses the user's
+      // scroll position. Instead we compute the new list locally and assign it
+      // atomically at the end (see assignments below).
       searchObj.data.stream.interestingFieldList = [];
       const schemaFields: any = [];
       const commonSchemaFields: any = [];
