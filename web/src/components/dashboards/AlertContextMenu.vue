@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'hovered': hoveredItem === 'above' }"
         data-test="alert-context-menu-above"
       >
-        <OIcon name="arrow-upward" size="xs" class="tw:mr-2" />
+        <OIcon name="arrow-upward" size="sm" class="tw:mr-2" />
         <span>Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'hovered': hoveredItem === 'below' }"
         data-test="alert-context-menu-below"
       >
-        <OIcon name="arrow-downward" size="xs" class="tw:mr-2" />
+        <OIcon name="arrow-downward" size="sm" class="tw:mr-2" />
         <span>Create Alert with threshold below {{ formattedValue }}</span>
       </div>
     </div>
