@@ -2145,7 +2145,7 @@ is restored to disallow `@` (or another mechanism rejects this input).
 
 ### Verified at policy level
 
-- §2: all selectors are data-test (`logs-search-bar-utilities-menu-btn`, `search-download-submenu-trigger`, `search-download-csv-btn`, `search-download-json-btn`, `logs-search-result-title`, `logs-search-bar-refresh-btn`). The diagnostic `__vueParentComponent` walk used to confirm the root cause was probe-only and is **not** in the shipped code — the final wait helper only reads the title's `out of N` text via `textContent()` on the data-test-resolved Locator.
+- §2: all selectors are data-test (`logs-search-bar-more-options-btn`, `search-download-submenu-trigger`, `search-download-csv-btn`, `search-download-json-btn`, `logs-search-result-title`, `logs-search-bar-refresh-btn`). The diagnostic `__vueParentComponent` walk used to confirm the root cause was probe-only and is **not** in the shipped code — the final wait helper only reads the title's `out of N` text via `textContent()` on the data-test-resolved Locator.
 - §3: `setupSQLMode()` in the spec calls only PO methods; no inline `page.locator(...)`. `runQueryAndWaitForResults` was an existing PO method (lines 2428-2479) — only its caller in `setupSQLMode` changed.
 - §7a: classified as functional behaviour characteristic (in-memory hits buffer is paginated under streaming mode). No dev-server time-range widening, no inline `test.skip`, no CORS-bypass API workaround.
 - §9a: no comments, JSDoc blocks, section banners, or `testLogger.*` calls removed. Spec comments added explain *why* `runQueryAndWaitForResults` replaces `clickRefreshButton` (Cancel-state preservation).

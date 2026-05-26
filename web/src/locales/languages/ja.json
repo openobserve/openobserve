@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "使用可能な値はありません",
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
-    "functionEditorLabel": "関数エディター",
-    "transformEditorLabel": "トランスフォームエディター"
+    "functionEditorLabel": "関数エディター"
   },
   "menu": {
     "home": "ホーム",
@@ -1617,7 +1616,8 @@
     "axisLabelTruncateTooltipText": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。",
     "axisLabelTooltipNotePrefix": "注記:",
     "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。",
-    "allFolders": "すべてのフォルダー"
+    "allFolders": "すべてのフォルダー",
+    "selectFile": "[ファイルを選択]"
   },
   "panel": {
     "header": "パネル",

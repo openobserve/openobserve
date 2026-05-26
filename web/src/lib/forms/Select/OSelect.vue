@@ -56,6 +56,8 @@ type NormalizedOption = {
   iconComponent?: any;
   /** Secondary description text shown below the label in the dropdown item. */
   subLabel?: string;
+  /** When true, renders subLabel on the same line as the label (name – url style). */
+  subLabelInline?: boolean;
   /** Array of CSS color strings used to render a gradient swatch below the label. */
   colorPalette?: string[];
 };
@@ -168,6 +170,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   // when the icon isn't a string in the OIcon registry.
   const rawIconComponent = option["iconComponent"];
   const rawSubLabel = option["subLabel"];
+  const rawSubLabelInline = option["subLabelInline"];
   const rawColorPalette = option["colorPalette"];
   return {
     label:
@@ -180,6 +183,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
     icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
     iconComponent: rawIconComponent ?? undefined,
     subLabel: typeof rawSubLabel === "string" ? rawSubLabel : undefined,
+    subLabelInline: rawSubLabelInline === true,
     colorPalette: Array.isArray(rawColorPalette)
       ? (rawColorPalette as string[])
       : undefined,
@@ -606,7 +610,10 @@ const virtualizer = useVirtualizer(
       const opt = filteredOptions.value[index];
       if (!opt) return 28;
       const hasSubLabel = !!opt.subLabel;
+      const isInline = !!opt.subLabelInline;
       const hasPalette = !!(opt.colorPalette?.length);
+      // Inline subLabel renders on the same line — single-row height.
+      if (hasSubLabel && isInline) return 28;
       // py-2(16) + label(20) + gap(4) + 2-line subLabel(34) + gap(4) + gradient(6) = 84px
       if (hasPalette && hasSubLabel) return 84;
       // py-2(16) + label(20) + gap(4) + gradient(6) = 46px  — no subLabel
@@ -1185,8 +1192,8 @@ const fieldWidthClass = computed(() => {
                           'tw:text-select-item-text tw:rounded-sm',
                           'tw:cursor-pointer tw:select-none tw:outline-none',
                           'tw:transition-colors tw:duration-100',
-                          // Use flex-col for rich items (subLabel / colorPalette), row otherwise
-                          filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length
+                          // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
+                          (filteredOptions[vRow.index].subLabel && !filteredOptions[vRow.index].subLabelInline) || filteredOptions[vRow.index].colorPalette?.length
                             ? 'tw:flex-col tw:items-start tw:py-2'
                             : 'tw:flex-row tw:items-center',
                           // highlightedIndex-based highlight — works with virtualised items.
@@ -1235,11 +1242,20 @@ const fieldWidthClass = computed(() => {
                           </span>
                         </template>
 
+                        <!-- Inline subLabel: name – url on a single row -->
+                        <template
+                          v-if="filteredOptions[vRow.index].subLabel && filteredOptions[vRow.index].subLabelInline"
+                        >
+                          <span class="tw:font-medium tw:shrink-0">{{ filteredOptions[vRow.index].label }}</span>
+                          <span class="tw:text-select-placeholder tw:shrink-0 tw:mx-1">–</span>
+                          <span class="tw:text-text-secondary tw:truncate tw:text-xs">{{ filteredOptions[vRow.index].subLabel }}</span>
+                        </template>
+
                         <!-- Rich item: label + optional subLabel + optional color palette swatch.
                              Wrapped in a single div so ListboxItem's gap-2 does not
                              add unexpected space between each child and overflow the fixed height. -->
                         <template
-                          v-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length"
+                          v-else-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length"
                         >
                           <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full tw:overflow-hidden">
                             <span class="tw:truncate tw:w-full tw:leading-snug tw:font-medium">{{

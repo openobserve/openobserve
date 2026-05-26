@@ -78,6 +78,8 @@ export default class DashboardLegendsCopy {
     // Use .first() to scope to a single popup instance (PanelEditor can render
     // multiple popup DOM nodes simultaneously).
     const items = this.legendsPopup.first().locator('[data-test^="dashboard-legend-item-"]:not([data-test="dashboard-legend-item-text"])');
+    // Items are populated asynchronously after the popup opens
+    await items.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
     const count = await items.count();
     testLogger.info(`Found ${count} legend items`);
     return count;

@@ -286,7 +286,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import {
   computed,
-  defineAsyncComponent,
   defineComponent,
   onActivated,
   onMounted,
@@ -331,10 +330,7 @@ import {
   panelCsvRegistry,
 } from "@/utils/panelDownloadRegistry";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-
-const ViewPanel = defineAsyncComponent(() => {
-  return import("@/components/dashboards/viewPanel/ViewPanel.vue");
-});
+import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -406,9 +402,7 @@ export default defineComponent({
     VariablesValueSelector,
     ViewPanel,
     TabList,
-    ODialog: defineAsyncComponent(
-      () => import("@/lib/overlay/Dialog/ODialog.vue"),
-    ),
+    ODialog,
   },
   setup(props: any, { emit }) {
     const { t } = useI18n();

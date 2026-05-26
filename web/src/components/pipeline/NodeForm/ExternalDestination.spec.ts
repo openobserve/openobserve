@@ -78,13 +78,43 @@ const sampleDestinations = [
   { name: "dest2", url: "http://dest2.example.com", destination_type_name: "splunk" },
 ];
 
-// ODrawer stub — renders slot content and the title prop so inner elements
-// and title text are accessible in tests.
+// ODrawer stub — renders slot content, title, and action buttons so tests can
+// interact with save/cancel/delete controls.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "width", "persistent"],
-  emits: ["update:open"],
-  template: '<div class="o-drawer-stub"><div class="o-drawer-title">{{ title }}</div><slot /></div>',
+  props: [
+    "open",
+    "size",
+    "showClose",
+    "title",
+    "width",
+    "persistent",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div class="o-drawer-stub">
+      <div class="o-drawer-title">{{ title }}</div>
+      <slot />
+      <button
+        v-if="secondaryButtonLabel"
+        data-test="add-destination-cancel-btn"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+      <button
+        v-if="primaryButtonLabel"
+        data-test="add-destination-save-btn"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        v-if="neutralButtonLabel"
+        data-test="add-destination-delete-btn"
+        @click="$emit('click:neutral')"
+      >{{ neutralButtonLabel }}</button>
+    </div>
+  `,
 };
 
 // --------------------------------------------------------------------------
@@ -298,15 +328,15 @@ describe("ExternalDestination.vue", () => {
       await flushPromises();
     });
 
-    it("3.1 returns formatted objects with label, value, url", () => {
+    it("3.1 returns formatted objects with label, value, subLabel", () => {
       wrapper.vm.destinations = [
         { name: "dest1", url: "http://dest1.com" },
         { name: "dest2", url: "http://dest2.com" },
       ];
       const formatted = wrapper.vm.getFormattedDestinations;
       expect(formatted).toEqual([
-        { label: "dest1", value: "dest1", url: "http://dest1.com" },
-        { label: "dest2", value: "dest2", url: "http://dest2.com" },
+        { label: "dest1", value: "dest1", subLabel: "http://dest1.com", subLabelInline: true },
+        { label: "dest2", value: "dest2", subLabel: "http://dest2.com", subLabelInline: true },
       ]);
     });
 
@@ -323,22 +353,22 @@ describe("ExternalDestination.vue", () => {
         },
       ];
       const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].url.endsWith("...")).toBe(true);
-      expect(formatted[0].url.length).toBeLessThanOrEqual(73); // 70 chars + "..."
+      expect(formatted[0].subLabel.endsWith("...")).toBe(true);
+      expect(formatted[0].subLabel.length).toBeLessThanOrEqual(73); // 70 chars + "..."
     });
 
     it("3.4 does not truncate URLs of exactly 70 characters", () => {
       const url70 = "a".repeat(70);
       wrapper.vm.destinations = [{ name: "exact", url: url70 }];
       const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].url).toBe(url70);
-      expect(formatted[0].url.endsWith("...")).toBe(false);
+      expect(formatted[0].subLabel).toBe(url70);
+      expect(formatted[0].subLabel.endsWith("...")).toBe(false);
     });
 
     it("3.5 does not truncate URLs shorter than 70 characters", () => {
       wrapper.vm.destinations = [{ name: "short", url: "http://short.io" }];
       const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].url).toBe("http://short.io");
+      expect(formatted[0].subLabel).toBe("http://short.io");
     });
 
     it("3.6 handles a large list of destinations", () => {

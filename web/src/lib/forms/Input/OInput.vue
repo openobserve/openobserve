@@ -46,6 +46,15 @@ const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 const debounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 
 function handleBlur(event: FocusEvent) {
+  // Flush any pending debounced emit immediately on blur so that tabbing away
+  // or clicking Apply right after typing does not lose the typed value.
+  if (debounceTimer.value) {
+    clearTimeout(debounceTimer.value);
+    debounceTimer.value = null;
+    const target = event.target as HTMLInputElement | HTMLTextAreaElement;
+    const normalized = normalizeByModifiers(target.value);
+    emit("update:modelValue", normalized);
+  }
   emit("blur", event);
 }
 

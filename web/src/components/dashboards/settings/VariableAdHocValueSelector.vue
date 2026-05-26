@@ -26,6 +26,7 @@
         :debounce="1000"
         style="width: 125px"
         data-test="dashboard-variable-adhoc-value-selector"
+        @update:model-value="emitValue()"
       />
       <OButton
         variant="ghost"

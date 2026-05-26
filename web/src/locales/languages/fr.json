@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Aucune valeur disponible",
     "selectLogStream": "Sélectionnez le flux de journaux",
     "noData": "Aucune donnée disponible",
-    "functionEditorLabel": "Éditeur de fonctions",
-    "transformEditorLabel": "Éditeur de transformation"
+    "functionEditorLabel": "Éditeur de fonctions"
   },
   "menu": {
     "home": "Accueil",
@@ -1600,7 +1599,8 @@
     "axisLabelTruncateTooltipText": "Tronquez les étiquettes de l'axe X à la largeur spécifiée (en pixels).",
     "axisLabelTooltipNotePrefix": "Remarque :",
     "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
-    "allFolders": "Tous les dossiers"
+    "allFolders": "Tous les dossiers",
+    "selectFile": "Sélectionnez un fichier"
   },
   "panel": {
     "header": "Panneau",

@@ -168,9 +168,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
             <OButton
               variant="outline"
-             size="xs"
-                  class="tw:h-full tw:text-[0.75rem]!"
-:title="t('traces.viewLogs')"
+              size="xs"
+              class="tw:h-full tw:text-[0.75rem]!"
+              :title="(config.isEnterprise === 'true' && correlationLoading) ? t('correlation.loadingCorrelation') : t('traces.viewLogs')"
+              :disabled="config.isEnterprise === 'true' && correlationLoading"
+              :loading="config.isEnterprise === 'true' && correlationLoading"
               @click.stop="viewSpanLogs"
               data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
             >
@@ -1761,11 +1763,8 @@ export default defineComponent({
         correlationProps.value = null;
         correlationError.value = null;
 
-        // If we're already on a correlation tab, reload the data for the new span
-        if (
-          activeTab.value === "correlated-logs" ||
-          activeTab.value === "correlated-metrics"
-        ) {
+        // Load correlation proactively so View Logs button has data
+        if (props.serviceStreamsEnabled) {
           loadCorrelation();
         }
       },

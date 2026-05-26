@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="tw:p-0 float-left tw:mr-1 function-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
-    <div class="tw:flex tw:items-center tw:px-1">
+    <div v-if="!hideToggle" class="tw:flex tw:items-center tw:px-1">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
@@ -103,9 +103,12 @@ import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   functionOptions: { name: string; function: string }[];
-}>();
+  hideToggle?: boolean;
+}>(), {
+  hideToggle: false,
+});
 
 const emit = defineEmits(["select:function", "save:function"]);
 

@@ -309,8 +309,10 @@ export default defineComponent({
     const routeToSettingsTab: Record<string, string> = {
       general:               "general",
       organization:          "organization",
+      organizationSettings:  "organization",
       nodes:                 "nodes",
       queryManagement:       "queryManagement",
+      query_management:      "queryManagement",
       domainManagement:      "domain_management",
       alertDestinations:     "alert_destinations",
       pipelineDestinations:  "pipeline_destinations",
@@ -351,7 +353,7 @@ export default defineComponent({
         }
       }
       else if (router.currentRoute.value.name === "nodes") {
-        if(!isMetaOrg.value || config.isEnterprise === "false") {
+        if(store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false")) {
           settingsTab.value = "general";
           router.push({
             path: "/settings/general",
@@ -363,7 +365,7 @@ export default defineComponent({
 
       }
       else if (router.currentRoute.value.name === "license") {
-        if(!isMetaOrg.value || config.isEnterprise === "false") {
+        if(store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false")) {
           settingsTab.value = "general";
           router.push({
             path: "/settings/general",
@@ -403,7 +405,7 @@ export default defineComponent({
       }
     }
     const regexIcon = computed(()=>{
-      return getImageURL(store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+      return getImageURL(store.state.theme === 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
     })
 
     return {

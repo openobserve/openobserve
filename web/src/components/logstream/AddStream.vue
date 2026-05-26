@@ -21,8 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="lg"
     :title="t('logStream.add')"
-    persistent
+    :secondary-button-label="t('logStream.cancel')"
+    :primary-button-label="t('common.save')"
     @update:open="emits('update:open', $event)"
+    @click:secondary="emits('update:open', false)"
+    @click:primary="submitForm"
   >
     <div class="tw:p-4 tw:w-full">
       <OForm :default-values="streamInputsDefault" @submit="submitForm">
@@ -72,25 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add="addField"
           @remove="removeField"
         />
-
-        <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="add-stream-cancel-btn"
-            @click="emits('update:open', false)"
-          >
-            {{ t('logStream.cancel') }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            data-test="add-stream-save-btn"
-          >
-            {{ t('common.save') }}
-          </OButton>
-        </div>
       </OForm>
     </div>
   </ODrawer>

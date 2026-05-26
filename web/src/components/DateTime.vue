@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <OSeparator />
+        <div class="date-time-tab-panels-wrapper">
         <OTabPanels v-model="selectedType" animated>
           <OTabPanel v-if="!disableRelative" name="relative" class="tw:p-0">
             <div class="date-time-table tw:relative tw:flex tw:flex-col">
@@ -219,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OTabPanel>
         </OTabPanels>
+        </div>
         <div v-if="!hideRelativeTimezone" class="tw:pr-3">
           <OSelect
             data-test="datetime-timezone-select"
@@ -1165,6 +1167,11 @@ export default defineComponent({
   &:hover {
     background: var(--o2-hover-accent) !important;
   }
+}
+
+.date-time-tab-panels-wrapper {
+  max-height: 21.875rem;
+  overflow-y: auto;
 }
 
 .date-time-dialog {

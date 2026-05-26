@@ -79,16 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab == 'import_json_url'"
                 class="editor-container-url card-container tw:py-1"
               >
-                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full tw:items-center">
+                <div class="tw:mx-2 my-2">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:mt-2 tw:w-full tw:items-center">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
-                      class="tw:pr-2"
                     >
                       <OInput
                         data-test="dashboard-import-url-control"
                         v-model="url"
+                        label="URL"
                         :placeholder="t('dashboard.addURL')"
                       />
                     </div>
@@ -101,7 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <select-folder-dropdown
                         @folder-selected="selectedFolder = $event"
                         :activeFolderId="selectedFolder.value"
-                        label-position="inside"
                       />
                     </div>
                   </div>
@@ -109,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-url-editor"
                     ref="queryEditorFileRef"
                     editor-id="dashboards-query-editor-file"
-                    class="monaco-editor tw:mx-2 tw:mt-2"
+                    class="monaco-editor tw:my-4"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -120,16 +119,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab == 'import_json_file'"
                 class="dashboard-import-json-container card-container tw:py-1"
               >
-                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:w-full tw:items-center">
+                <div class="tw:mx-2 tw:my-2">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:w-full tw:items-center">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
-                      class="tw:pr-2"
                     >
                       <OFile
                         data-test="dashboard-import-file-control"
                         v-model="jsonFiles"
+                        :label="t('dashboard.selectFile')"
                         :placeholder="t('dashboard.dropFileMsg')"
                         accept=".json"
                         multiple
@@ -144,7 +143,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <select-folder-dropdown
                         @folder-selected="selectedFolder = $event"
                         :activeFolderId="selectedFolder.value"
-                        label-position="inside"
                       />
                     </div>
                     <div v-if="filesImportResults.length" class="tw:py-2" data-test="dashboard-import-file-results">
@@ -167,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-json-file-editor"
                     ref="queryEditorJsonRef"
                     editor-id="dashboards-query-editor-json"
-                    class="monaco-editor tw:mx-2 tw:mt-2"
+                    class="monaco-editor tw:my-4"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -867,14 +865,14 @@ export default defineComponent({
 }
 .editor-container-url {
   :deep(.monaco-editor) {
-    height: calc(100vh - 310px) !important;
+    height: calc(100vh - 302px) !important;
     overflow: hidden;
     resize: none;
   }
 }
 .dashboard-import-json-container {
   :deep(.monaco-editor) {
-    height: calc(100vh - 310px) !important;
+    height: calc(100vh - 302px) !important;
     overflow: hidden;
     resize: none;
   }

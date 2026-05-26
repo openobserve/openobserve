@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Nessun valore disponibile",
     "selectLogStream": "Seleziona lo stream dei log",
     "noData": "Nessun dato disponibile",
-    "functionEditorLabel": "Editor di funzioni",
-    "transformEditorLabel": "Editor di trasformazione"
+    "functionEditorLabel": "Editor di funzioni"
   },
   "menu": {
     "home": "Home",
@@ -1598,7 +1597,8 @@
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
     "configSectionBackground": "Sfondo",
-    "allFolders": "Tutte le cartelle"
+    "allFolders": "Tutte le cartelle",
+    "selectFile": "Seleziona file"
   },
   "panel": {
     "header": "Pannello",
