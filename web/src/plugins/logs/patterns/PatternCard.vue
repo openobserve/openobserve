@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative"
+    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative tw:py-1"
     :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:pl-3" :class="wrap ? '' : 'tw:overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:w-full"
+        class="pattern-template-text tw:w-full"
         :class="[
           store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
           wrap
-            ? 'tw:flex-wrap tw:break-all'
-            : 'tw:flex-nowrap tw:overflow-hidden',
+            ? 'pattern-template-text--wrap tw:break-all'
+            : 'tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
       >
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="tw:text-red-500 text-weight-bold tw:text-[0.625rem] tw:cursor-help"
+        class="tw:text-badge-error-ol-text text-weight-bold tw:text-[0.7rem] tw:cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
