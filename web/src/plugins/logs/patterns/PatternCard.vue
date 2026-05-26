@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
           wrap
-            ? 'pattern-template-text--wrap tw:break-all'
+            ? 'tw:break-all'
             : 'tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
