@@ -107,6 +107,8 @@ export class LogsPage {
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
         this.savedViewsListDialogEl = '[data-test="saved-views-list-dialog"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
+        this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
+        this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
@@ -2639,7 +2641,7 @@ export class LogsPage {
      * Returns true if the dropdown was opened; false if it was already open.
      */
     async _openUtilitiesMenuForSqlMode() {
-        const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+        const sqlModeMenuItem = this.page.locator(this.menuSqlModeBtn);
         const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
         if (!isVisible) {
             await this.page.locator(this.utilitiesMenuButton).click();
@@ -2652,15 +2654,16 @@ export class LogsPage {
     /** Press Escape to close the utilities dropdown after a SQL mode check/toggle. */
     async _closeUtilitiesMenuAfterSqlToggle() {
         await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(100);
+        await this.page.locator(this.menuSqlModeBtn).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     async clickSQLModeToggle() {
         // SQL mode lives in the utilities ("More") dropdown.
-        // Click [data-test="logs-search-bar-menu-sql-mode-btn"] (ODropdownItem) — @select.prevent
-        // toggles sqlMode without closing the dropdown.
+        // Click menuSqlModeBtn (ODropdownItem) — @select.prevent toggles sqlMode without closing.
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+        const sqlModeBtn = this.page.locator(this.menuSqlModeBtn);
+        await expect(sqlModeBtn).toBeVisible({ timeout: 5000 });
+        await sqlModeBtn.click({ force: true });
         if (menuOpened) {
             await this._closeUtilitiesMenuAfterSqlToggle();
         }
@@ -4171,20 +4174,15 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
-        // The save button is now a standalone button (not in dropdown)
-        // Try FunctionSelector button first, then TransformSelector button
-        try {
-            // Try FunctionSelector save button (when actions are disabled)
-            await this.page.locator('[data-test="logs-search-bar-save-function-btn"]').click({ timeout: 3000 });
-        } catch (error) {
-            try {
-                // Try TransformSelector save button (when actions are enabled)
-                await this.page.locator(this.logsSearchBarSaveTransformBtn).click({ timeout: 3000 });
-            } catch (transformError) {
-                // Fallback: Try the save function button directly
-                await this.page.locator('[data-test="logs-search-bar-save-function-btn"], [data-test="logs-search-bar-save-transform-btn"]').first().click();
-            }
+        // In the new UI, the transform editor (FunctionSelector/TransformSelector) is hidden by
+        // default. The save button only renders when the editor is visible. Ensure it's open first.
+        const saveBtn = this.page.locator('[data-test="logs-search-bar-save-function-btn"], [data-test="logs-search-bar-save-transform-btn"]');
+        const isBtnVisible = await saveBtn.first().isVisible({ timeout: 1000 }).catch(() => false);
+        if (!isBtnVisible) {
+            await this.toggleVrlEditor();
         }
+        await saveBtn.first().waitFor({ state: 'visible', timeout: 5000 });
+        await saveBtn.first().click();
     }
 
     async clickSavedFunctionNameInput() {
@@ -4313,8 +4311,8 @@ export class LogsPage {
     }
 
     async clickHistogramToggleDiv() {
-        // Histogram toggle is now directly in the toolbar (moved out of utilities menu)
-        return await this.page.locator(this.histogramToggle).click();
+        // Histogram toggle lives in the utilities ("More") menu — delegate to toggleHistogram().
+        await this.toggleHistogram();
     }
 
     async expectQueryEditorContainsExpectedQuery(expectedQuery) {
@@ -6705,7 +6703,7 @@ export class LogsPage {
      */
     async isSqlModeEnabled() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         const state = await stateEl.getAttribute('data-state').catch(() => null);
         if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
@@ -6718,11 +6716,11 @@ export class LogsPage {
      */
     async enableSqlModeIfDisabled() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         const state = await stateEl.getAttribute('data-state').catch(() => null);
         if (state !== 'checked') {
-            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            await this.page.locator(this.menuSqlModeBtn).click();
             await expect.poll(async () => {
                 const s = await stateEl.getAttribute('data-state').catch(() => null);
                 return s === 'checked';
@@ -7060,7 +7058,7 @@ export class LogsPage {
      */
     async clickSQLModeSwitch() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+        await this.page.locator(this.menuSqlModeBtn).click();
         if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
     }
 
@@ -7071,7 +7069,7 @@ export class LogsPage {
      */
     async getSQLModeState() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         const state = await stateEl.getAttribute('data-state').catch(() => null);
         if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
@@ -7562,11 +7560,11 @@ export class LogsPage {
      */
     async enableSqlModeIfNeeded() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (!isOn) {
-            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            await this.page.locator(this.menuSqlModeBtn).click();
             // Dropdown stays open (ODropdownItem has @select.prevent) — poll the inner button directly
             await expect.poll(async () => {
                 const s = await stateEl.getAttribute('data-state').catch(() => null);
@@ -7585,11 +7583,11 @@ export class LogsPage {
      */
     async disableSqlModeIfNeeded() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (isOn) {
-            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            await this.page.locator(this.menuSqlModeBtn).click();
             await expect.poll(async () => {
                 const s = await stateEl.getAttribute('data-state').catch(() => null);
                 return s === 'unchecked';

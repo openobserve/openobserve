@@ -128,7 +128,10 @@ export class LogsQueryPage {
     const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
     await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     const state = await stateEl.getAttribute('data-state').catch(() => null);
-    if (menuOpened) { await this.page.keyboard.press('Escape'); }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
     return state === 'checked';
   }
 
@@ -144,7 +147,10 @@ export class LogsQueryPage {
         return s === 'checked';
       }, { timeout: 5000 }).toBe(true);
     }
-    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
   }
 
   async ensureFTSMode() {
@@ -159,7 +165,10 @@ export class LogsQueryPage {
         return s === 'unchecked';
       }, { timeout: 5000 }).toBe(true);
     }
-    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
   }
 
   async _isAutoQueryEnabled() {
