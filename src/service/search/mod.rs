@@ -58,7 +58,7 @@ use crate::{
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
-            cpu_cores::estimated_secs, settings::calculate_partition_settings,
+            cpu_cores::estimated_secs, generate_partitions, settings::calculate_partition_settings,
             sql_context::PartitionSqlContext, stream_files::collect_stream_files,
         },
     },
@@ -677,18 +677,7 @@ pub async fn search_partition(
         stream_files.max_query_range,
     );
 
-    let generator = partition::PartitionGenerator::new(
-        partition_settings.min_step,
-        cfg.limit.search_mini_partition_duration_secs,
-        ctx.sql.histogram_interval.is_some(),
-    );
-    resp.partitions = generator.generate_partitions(
-        req.start_time,
-        req.end_time,
-        partition_settings.step,
-        ctx.sql_order_by,
-        ctx.is_complex_query,
-    );
+    resp.partitions = generate_partitions(&ctx, &partition_settings);
     Ok(resp)
 }
 
