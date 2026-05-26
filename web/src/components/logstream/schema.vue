@@ -1499,7 +1499,7 @@ export default defineComponent({
         streamResponse.settings.extended_retention_days.forEach(
           (field, index) => {
             redBtnRows.value.push({
-              index: index,
+              index: String(index),
               original_start: field.start,
               original_end: field.end,
               start: convertUnixToQuasarFormat(field.start),
