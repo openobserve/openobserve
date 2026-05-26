@@ -734,7 +734,7 @@ watch(
       !props.wrap
         ? "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
         : "",
-      props.wrap ? "tw:break-words" : "",
+      props.wrap ? "tw:break-all" : "",
     ];
   },
   {
