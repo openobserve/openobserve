@@ -379,6 +379,37 @@ pub async fn get_opts(
     })
 }
 
+pub async fn get_size(account: &str, file: &str) -> object_store::Result<usize> {
+    get_size_opts(account, file, true).await
+}
+
+pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_store::Result<usize> {
+    let cfg = config::get_config();
+    // get from memory cache
+    if cfg.memory_cache.enabled
+        && let Some(v) = memory::get_size(file).await
+    {
+        return Ok(v);
+    }
+    // get from disk cache
+    if cfg.disk_cache.enabled
+        && let Some(v) = disk::get_size(file).await
+    {
+        return Ok(v);
+    }
+
+    // get from storage
+    if remote {
+        let meta = crate::storage::head(account, file).await?;
+        return Ok(meta.size as usize);
+    }
+
+    Err(object_store::Error::NotFound {
+        path: file.to_string(),
+        source: Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, file)),
+    })
+}
+
 /// Batched range read across the cache ladder.
 ///
 /// `memory → disk → remote storage`, returning one `Bytes` per input
@@ -417,38 +448,6 @@ pub async fn get_ranges_opts(
         source: Box::new(std::io::Error::other(file)),
     })
 }
-
-pub async fn get_size(account: &str, file: &str) -> object_store::Result<usize> {
-    get_size_opts(account, file, true).await
-}
-
-pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_store::Result<usize> {
-    let cfg = config::get_config();
-    // get from memory cache
-    if cfg.memory_cache.enabled
-        && let Some(v) = memory::get_size(file).await
-    {
-        return Ok(v);
-    }
-    // get from disk cache
-    if cfg.disk_cache.enabled
-        && let Some(v) = disk::get_size(file).await
-    {
-        return Ok(v);
-    }
-
-    // get from storage
-    if remote {
-        let meta = crate::storage::head(account, file).await?;
-        return Ok(meta.size as usize);
-    }
-
-    Err(object_store::Error::NotFound {
-        path: file.to_string(),
-        source: Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, file)),
-    })
-}
-
 /// get the file time from the file name
 ///
 /// metrics_cache:

@@ -538,6 +538,12 @@ pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
     files.get(file, range).await
 }
 
+#[inline]
+pub async fn get_size(file: &str) -> Option<usize> {
+    let files = get_file_reader(file)?;
+    files.get_size(file).await
+}
+
 /// Batched range read against the disk cache: one `File::open` followed
 /// by N `pread`s, all inside one `block_in_place`. Returns one `Bytes`
 /// per input range, in input order. This is the hot path for the search
@@ -600,12 +606,6 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
         out.push(bytes);
     }
     Ok(out)
-}
-
-#[inline]
-pub async fn get_size(file: &str) -> Option<usize> {
-    let files = get_file_reader(file)?;
-    files.get_size(file).await
 }
 
 #[inline]

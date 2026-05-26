@@ -289,6 +289,16 @@ pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
     files.get(file, range).await
 }
 
+#[inline]
+pub async fn get_size(file: &str) -> Option<usize> {
+    if !get_config().memory_cache.enabled {
+        return None;
+    }
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
+    files.get_size(file).await
+}
+
 /// Slice the cached in-memory `Bytes` once for each requested range.
 /// Returns `None` if the file isn't in the memory cache or any range is
 /// out of bounds — callers should fall through to disk / remote.
@@ -309,16 +319,6 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> Option<Vec<Bytes>>
         out.push(data.slice(r.start as usize..r.end as usize));
     }
     Some(out)
-}
-
-#[inline]
-pub async fn get_size(file: &str) -> Option<usize> {
-    if !get_config().memory_cache.enabled {
-        return None;
-    }
-    let idx = get_bucket_idx(file);
-    let files = FILES[idx].read().await;
-    files.get_size(file).await
 }
 
 #[inline]
