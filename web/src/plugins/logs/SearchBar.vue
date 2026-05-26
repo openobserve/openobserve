@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.showPatternsLabel") }}
           </OToggleGroupItem>
         </OToggleGroup>
-
+        <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
         <OButton
           data-test="logs-search-bar-reset-filters-btn"
           class="tw:ms-1"
@@ -83,9 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="restart-alt" size="sm" />
           <OTooltip :content="t('search.resetFilters')" />
         </OButton>
-        
         <!-- this is the button group responsible for showing all the utilities -->
-        <ODropdown side="bottom" align="start" @update:open="(open) => { if (!open) { showDownloadSubmenu = false; showFunctionsSubmenu = false; functionSearchTerm = ''; } }">
+        <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
@@ -145,104 +144,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.quickModeLabel") }}
           </ODropdownItem>
 
-          <!-- VRL / Transform Editor Toggle -->
-          <ODropdownItem @select.prevent>
+          <!-- Function/Transform Editor Toggle -->
+          <ODropdownItem
+            data-test="logs-search-bar-menu-transform-editor-toggle-btn"
+            @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
+          >
             <template #icon-left>
               <OSwitch
-                data-test="logs-search-bar-show-query-toggle-btn"
                 v-model="searchObj.meta.showTransformEditor"
                 size="md"
                 @click.stop
               />
             </template>
-            {{ isActionsEnabled ? t('search.transformEditorLabel') : t('search.functionEditorLabel') }}
+            {{ t('search.functionEditorLabel') }}
           </ODropdownItem>
-
-          <!-- Functions/Transforms — only visible when editor is toggled on -->
-          <template v-if="searchObj.meta.showTransformEditor">
-            <ODropdownSeparator />
-            <!-- Functions/Transforms submenu (hover to open) -->
-            <div
-              data-test="logs-search-bar-function-dropdown"
-              class="search-download-item tw:gap-2!"
-              @mouseenter="showFunctionsSubmenu = true"
-              @mouseleave="showFunctionsSubmenu = false"
-            >
-              <OIcon size="sm" name="code" />
-              <span class="search-download-item-label">
-                {{ isActionsEnabled && searchObj.data.transformType === 'action' ? t('search.actionLabel') : t('search.functionLabel') }}
-              </span>
-              <OIcon size="sm" name="chevron-right" />
-
-              <!-- Submenu -->
-              <div
-                v-if="showFunctionsSubmenu"
-                class="search-download-submenu"
-                data-test="logs-search-saved-function-list"
-              >
-                <!-- Transform type selector (only when isActionsEnabled) -->
-                <div
-                  v-if="isActionsEnabled"
-                  data-test="logs-search-bar-transform-type-select"
-                  class="logs-transform-type o2-input"
-                >
-                  <OSelect
-                    v-model="searchObj.data.transformType"
-                    :options="[{ label: 'Function', value: 'function' }, { label: 'Action', value: 'action' }]"
-                    :label="t('search.transformType')"
-                    clearable
-                    @update:model-value="updateEditorWidth"
-                  />
-                </div>
-
-                <!-- Search input -->
-                <OInput
-                  v-model="functionSearchTerm"
-                  clearable
-                  :debounce="300"
-                  :placeholder="t('search.searchSavedFunction')"
-                  data-test="function-search-input"
-                >
-                  <template #icon-left>
-                    <OIcon name="search" size="sm" />
-                  </template>
-                </OInput>
-
-                <!-- Items list -->
-                <div
-                  v-if="filteredFunctionMenuOptions.length"
-                  class="tw:max-h-72 tw:overflow-y-auto"
-                >
-                  <button
-                    v-for="item in filteredFunctionMenuOptions"
-                    :key="item.name"
-                    type="button"
-                    :data-test="`logs-search-saved-${isActionsEnabled ? 'transform' : 'function'}-item-${item.name}`"
-                    class="search-download-submenu-item"
-                    @click="selectFunctionMenuItem(item)"
-                  >
-                    <span class="tw:flex-1">{{ item.name }}</span>
-                  </button>
-                </div>
-                <div v-else class="tw:px-3 tw:py-2">
-                  <span class="tw:text-sm">{{ t('search.savedFunctionNotFound') }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Save button -->
-            <ODropdownItem
-              :data-test="isActionsEnabled ? 'logs-search-bar-save-transform-btn' : 'logs-search-bar-save-function-btn'"
-              :disabled="isActionsEnabled && searchObj.data.transformType !== 'function'"
-              @select="fnSavedFunctionDialog"
-            >
-              <template #icon-left>
-                <OIcon name="save" size="sm" />
-              </template>
-              {{ t('search.saveFunctionLabel') }}
-            </ODropdownItem>
-
-          </template>
 
           <ODropdownSeparator />
 
@@ -278,22 +193,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('search.syntaxGuideLabel')"
             />
           </ODropdownItem>
+        </ODropdown>
+      </div>
 
-          <ODropdownSeparator />
+      <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
+        <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
+          <transform-selector
+            v-if="isActionsEnabled"
+            :function-options="functionOptions"
+            :hide-toggle="true"
+            @select:function="populateFunctionImplementation"
+            @save:function="fnSavedFunctionDialog"
+          />
+          <function-selector
+            v-else
+            :function-options="functionOptions"
+            :hide-toggle="true"
+            @select:function="populateFunctionImplementation"
+            @save:function="fnSavedFunctionDialog"
+          />
+        </template>
+        <ODropdown
+          side="bottom"
+          align="start"
+          @update:open="(open) => { if (!open) showDownloadSubmenu = false; }"
+        >
+          <template #trigger>
+            <OButton
+              data-test="logs-search-bar-more-options-btn"
+              class="download-logs-btn tw:order-4"
+              variant="outline"
+              size="icon-toolbar"
+            >
+              <OIcon name="menu" size="sm" />
+              <OTooltip style="width: 110px" :content="t('search.moreActions')" />
+            </OButton>
+          </template>
 
           <!-- Share Link -->
-          <div  data-test="logs-search-bar-menu-share-link-btn">
+          <div v-if="shouldMoveShareToMenu" class="tw:p-2" data-test="logs-search-bar-menu-share-link-btn">
             <share-button
               :url="shareURL"
-              variant="ghost"
-              size="sm"
+              variant="outline"
+              size="sm-action"
               :show-label="true"
               class="tw:w-full"
-              buttonClass="tw:justify-start! tw:h-8!"
             />
           </div>
 
-          <ODropdownSeparator />
+          <ODropdownSeparator v-if="shouldMoveShareToMenu" />
 
           <ODropdownItem
             data-test="search-history-item-btn"
@@ -429,9 +377,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span data-test="search-inspect-label">Search Inspect</span>
           </ODropdownItem>
         </ODropdown>
-      </div>
-
-      <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
+        <share-button
+          v-if="!shouldMoveShareToMenu"
+          data-test="logs-search-bar-share-link-btn"
+          :url="shareURL"
+          variant="outline"
+          size="icon-toolbar"
+          class="tw:order-3"
+        />
         <div class="tw:mr-1 tw:order-1">
           <date-time
             ref="dateTimeRef"
@@ -1653,6 +1606,8 @@ import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
+import TransformSelector from "./TransformSelector.vue";
+import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
@@ -1766,6 +1721,8 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
+    TransformSelector,
+    FunctionSelector,
     CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
@@ -2091,6 +2048,8 @@ export default defineComponent({
       windowWidth.value = window.innerWidth;
     };
 
+    // Responsive breakpoint: share button moves into overflow menu at narrow widths
+    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
@@ -3923,49 +3882,6 @@ export default defineComponent({
         !searchObj.data.stream.selectedStream?.length ||
         !searchObj.data.queryResults?.hits?.length,
     );
-
-    // Hover-triggered submenu state for "Functions/Transforms" in the utilities dropdown.
-    const showFunctionsSubmenu = ref(false);
-    const functionSearchTerm = ref("");
-
-    const filteredFunctionMenuOptions = computed(() => {
-      const term = functionSearchTerm.value;
-      if (isActionsEnabled.value) {
-        if (searchObj.data.transformType === "function") {
-          if (!term) return functionOptions.value;
-          return functionOptions.value.filter((item: any) =>
-            item.name.toLowerCase().includes(term.toLowerCase()),
-          );
-        }
-        if (searchObj.data.transformType === "action") {
-          if (!term) return searchObj.data.actions;
-          return searchObj.data.actions.filter((item: any) =>
-            item.name.toLowerCase().includes(term.toLowerCase()),
-          );
-        }
-        return [];
-      }
-      if (!term) return functionOptions.value;
-      return functionOptions.value.filter((item: any) =>
-        item.name.toLowerCase().includes(term.toLowerCase()),
-      );
-    });
-
-    const selectFunctionMenuItem = (item: any) => {
-      showFunctionsSubmenu.value = false;
-      if (
-        isActionsEnabled.value &&
-        searchObj.data.transformType === "action"
-      ) {
-        searchObj.data.selectedTransform = { ...item, type: "action" };
-        toast({
-          message: `${item?.name} action applied successfully`,
-          timeout: 3000,
-        });
-        return;
-      }
-      populateFunctionImplementation(item, true);
-    };
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
       { label: "JSON", value: "json" },
@@ -4359,11 +4275,11 @@ export default defineComponent({
       return {
         backgroundColor:
           searchObj.data.transformType === "function" && isFocused.value
-            ? "var(--o2-card-bg-solid)"
+            ? "var(--o2-card-bg)"
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
-            ? "0.375rem solid var(--o2-card-bg-solid)"
+            ? "0.375rem solid var(--o2-card-bg)"
             : "none",
         // Conditional width when focused (expand-on-focus active)
         width: isFocused.value
@@ -4628,10 +4544,6 @@ export default defineComponent({
       confirmCallback,
       showDownloadSubmenu,
       isDownloadDisabled,
-      showFunctionsSubmenu,
-      functionSearchTerm,
-      filteredFunctionMenuOptions,
-      selectFunctionMenuItem,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
@@ -4789,6 +4701,7 @@ export default defineComponent({
       isNaturalLanguageDetected,
       isGeneratingSQL,
       vrlEditorNlpMode,
+      shouldMoveShareToMenu,
       toggleLiveMode,
     };
   },
@@ -5146,7 +5059,7 @@ export default defineComponent({
   top: 0;
   margin-right: 0.25rem;
   min-width: 10rem;
-  background-color: var(--o2-card-bg-solid);
+  background-color: var(--o2-card-bg);
   border: 0.063rem solid var(--o2-border-color);
   border-radius: 0.375rem;
   box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
@@ -5154,7 +5067,7 @@ export default defineComponent({
   z-index: 9999;
 
   body.body--dark & {
-    background-color: var(--o2-card-bg-solid);
+    background-color: var(--o2-card-bg);
     border-color: var(--o2-border-color);
     box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
   }

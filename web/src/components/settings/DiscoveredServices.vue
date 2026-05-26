@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filter-mode="client"
             :default-columns="false"
             :show-global-filter="false"
-            expansion="multiple"
+            expansion="multi"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
             :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky services-table"

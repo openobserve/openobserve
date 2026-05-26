@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
-    "functionEditorLabel": "Functie-editor",
-    "transformEditorLabel": "Editor transformeren"
+    "functionEditorLabel": "Functie-editor"
   },
   "menu": {
     "home": "Home",
@@ -1598,7 +1597,8 @@
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
     "configSectionBackground": "Achtergrond",
-    "allFolders": "Alle mappen"
+    "allFolders": "Alle mappen",
+    "selectFile": "Bestand selecteren"
   },
   "panel": {
     "header": "Paneel",

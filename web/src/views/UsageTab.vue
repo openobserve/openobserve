@@ -14,14 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="usage-tab" :class="{ 'usage-tab--ai': store.state.isAiChatEnabled }">
+  <div class="usage-tab tw:h-full">
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem]"
-      :class="
-        store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 2.5rem)]' : 'tw:h-full'
-      "
+      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:py-[0.625rem] tw:overflow-y-auto"
     >
       <!-- Banners -->
       <div class="banners-wrapper">
@@ -1428,11 +1425,6 @@ watch(orgId, (newVal, oldVal) => {
   }
 }
 
-.usage-tab--ai .charts-main-container {
-  grid-template-columns: 1fr !important;
-  grid-template-rows: auto auto auto !important;
-}
-
 .functions-dashboards-column {
   display: flex;
   flex-direction: column;
@@ -1445,14 +1437,6 @@ watch(orgId, (newVal, oldVal) => {
 
   @media (max-width: 768px) {
     flex-direction: column;
-  }
-}
-
-.usage-tab--ai .functions-dashboards-column {
-  flex-direction: row !important;
-
-  @media (max-width: 768px) {
-    flex-direction: column !important;
   }
 }
 

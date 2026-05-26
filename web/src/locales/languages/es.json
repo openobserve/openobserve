@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "No hay valores disponibles",
     "selectLogStream": "Seleccione la secuencia de registros",
     "noData": "No hay datos disponibles",
-    "functionEditorLabel": "Editor de funciones",
-    "transformEditorLabel": "Editor de transformaciones"
+    "functionEditorLabel": "Editor de funciones"
   },
   "menu": {
     "home": "Inicio",
@@ -1600,7 +1599,8 @@
     "axisLabelTruncateTooltipText": "Trunque las etiquetas del eje x al ancho especificado (en píxeles).",
     "axisLabelTooltipNotePrefix": "Nota:",
     "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales.",
-    "allFolders": "Todas las carpetas"
+    "allFolders": "Todas las carpetas",
+    "selectFile": "Seleccione un archivo"
   },
   "panel": {
     "header": "Panel",

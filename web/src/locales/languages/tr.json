@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Mevcut değer yok",
     "selectLogStream": "Günlükler akışını seçin",
     "noData": "Veri yok",
-    "functionEditorLabel": "İşlev Düzenleyicisi",
-    "transformEditorLabel": "Dönüştür Düzenleyicisi"
+    "functionEditorLabel": "İşlev Düzenleyicisi"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -1598,7 +1597,8 @@
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
     "configSectionBackground": "Arkaplan",
-    "allFolders": "Tüm Klasörler"
+    "allFolders": "Tüm Klasörler",
+    "selectFile": "Dosya Seç"
   },
   "panel": {
     "header": "Panel",

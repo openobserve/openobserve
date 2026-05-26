@@ -20,8 +20,8 @@ async selectStreamDropDown() {
 // Search Job Scheduler Dropdown updated with new locator for more options at the top right of the page 
 
 async searchSchedulerDropdown() {
-  await this.page.waitForSelector('[data-test="logs-search-bar-utilities-menu-btn"]');
-  await this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
+  await this.page.waitForSelector('[data-test="logs-search-bar-more-options-btn"]');
+  await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
 }
 
 async searchSchedulerCreate() {
@@ -57,7 +57,7 @@ async validateAddJob(jobId) {
   await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Job Added Succesfully', { timeout: 15000 });
 
   // Navigate to the scheduler list
-  await this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
+  await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 

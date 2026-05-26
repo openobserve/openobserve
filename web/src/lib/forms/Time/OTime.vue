@@ -264,15 +264,7 @@ const fieldClasses = computed(() => [
           :disabled="disabled || undefined"
           aria-label="Open time picker"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            class="tw:size-4"
-          >
-            <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 12a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11Z" />
-            <path d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z" />
-          </svg>
+          <OIcon name="schedule" size="sm" />
         </PopoverTrigger>
 
         <input
