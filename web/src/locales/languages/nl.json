@@ -397,9 +397,7 @@
     "switchToLogs": "klik om terug te schakelen naar de logboeken",
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
     "selectLogStream": "Stream van logboeken selecteren",
-    "noData": "Geen gegevens beschikbaar",
-    "functionEditorLabel": "Functie-editor",
-    "transformEditorLabel": "Editor transformeren"
+    "noData": "Geen gegevens beschikbaar"
   },
   "menu": {
     "home": "Home",

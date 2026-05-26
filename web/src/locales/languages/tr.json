@@ -397,9 +397,7 @@
     "switchToLogs": "Günlüklere geri dönmek için tıklayın",
     "patternNoValuesAvailable": "Mevcut değer yok",
     "selectLogStream": "Günlükler akışını seçin",
-    "noData": "Veri yok",
-    "functionEditorLabel": "İşlev Düzenleyicisi",
-    "transformEditorLabel": "Dönüştür Düzenleyicisi"
+    "noData": "Veri yok"
   },
   "menu": {
     "home": "Ana Sayfa",
