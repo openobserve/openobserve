@@ -328,7 +328,13 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::zo_config)
             .service(status::logout)
-            .service(web::scope("/reload").service(status::config_reload)),
+            .service(
+                web::scope("/reload")
+                    .wrap(HttpAuthentication::with_fn(
+                        super::auth::validator::oo_validator,
+                    ))
+                    .service(status::config_reload),
+            ),
     );
 }
 
@@ -344,7 +350,13 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .service(status::refresh_token_with_dex)
             .service(status::logout)
             .service(users::service_accounts::exchange_token)
-            .service(web::scope("/reload").service(status::config_reload)),
+            .service(
+                web::scope("/reload")
+                    .wrap(HttpAuthentication::with_fn(
+                        super::auth::validator::oo_validator,
+                    ))
+                    .service(status::config_reload),
+            ),
     );
 }
 
