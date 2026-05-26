@@ -1312,6 +1312,7 @@ import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
   timestampToTimezoneDate,
+  queryIndexSplit,
 } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
@@ -1342,6 +1343,12 @@ import { onBeforeUnmount } from "vue";
 import { debounce } from "lodash-es";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
+import {
+  getFieldFromExpression,
+  hasFieldCondition,
+  removeFieldCondition,
+  replaceExistingFieldCondition,
+} from "@/plugins/logs/filterUtils";
 
 const UnifiedQueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -2258,18 +2265,121 @@ watch(
   },
 );
 
+const SQL_FILTER_TERMINATING_CLAUSES = [
+  "group by",
+  "having",
+  "order by",
+  "limit",
+];
+
+const getFirstSqlTerminatingClause = (sql: string): string | null => {
+  const lowerSql = sql.toLowerCase();
+  let firstClause: string | null = null;
+  let firstIndex = Infinity;
+
+  SQL_FILTER_TERMINATING_CLAUSES.forEach((clause) => {
+    const index = lowerSql.indexOf(clause);
+    if (index !== -1 && index < firstIndex) {
+      firstIndex = index;
+      firstClause = sql.slice(index, index + clause.length);
+    }
+  });
+
+  return firstClause;
+};
+
+const normalizeFilterValue = (filter: string) => {
+  const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+
+  if (!isFilterValueNull) return filter;
+
+  return filter
+    .replace(/=|!=/, (match) => (match === "=" ? " is " : " is not "))
+    .replace(/'null'/, "null");
+};
+
+const insertSqlFilter = (sql: string, filterValue: string) => {
+  const filter = normalizeFilterValue(filterValue);
+  const query = sql.trimEnd().replace(/;$/, "").trimEnd();
+
+  if (!query) return filter;
+
+  if (/\bwhere\b/i.test(query)) {
+    const fieldName = getFieldFromExpression(filter);
+
+    if (fieldName && hasFieldCondition(query, fieldName)) {
+      return replaceExistingFieldCondition(query, fieldName, filter);
+    }
+
+    const firstClause = getFirstSqlTerminatingClause(query);
+    if (firstClause) {
+      const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
+      return `${beforeClause.trim()} AND ${filter} ${firstClause}${afterClause}`;
+    }
+
+    return `${query} AND ${filter}`;
+  }
+
+  const firstClause = getFirstSqlTerminatingClause(query);
+  if (firstClause) {
+    const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
+    return `${beforeClause.trim()} where ${filter} ${firstClause}${afterClause}`;
+  }
+
+  return `${query} where ${filter}`;
+};
+
+const removeSqlFieldFilter = (sql: string, fieldName: string) => {
+  const whereMatch = sql.match(/\bwhere\b/i);
+
+  if (whereMatch?.index == null) return sql;
+
+  const whereIndex = whereMatch.index;
+  const beforeWhere = sql.slice(0, whereIndex).trimEnd();
+  const afterWhereStart = whereIndex + whereMatch[0].length;
+  const afterWhere = sql.slice(afterWhereStart);
+  const firstClause = getFirstSqlTerminatingClause(afterWhere);
+
+  let whereClause = afterWhere;
+  let trailingClause = "";
+
+  if (firstClause) {
+    const [beforeClause, afterClause] = queryIndexSplit(afterWhere, firstClause);
+    whereClause = beforeClause;
+    trailingClause = `${firstClause}${afterClause}`;
+  }
+
+  const nextWhereClause = removeFieldCondition(whereClause, fieldName).trim();
+  const nextSql = nextWhereClause
+    ? `${beforeWhere} WHERE ${nextWhereClause}`
+    : beforeWhere;
+
+  return trailingClause.trim()
+    ? `${nextSql} ${trailingClause.trim()}`
+    : nextSql;
+};
+
 const handleSidebarEvent = (event: string, value: any) => {
   if (pipelineEditorRef.value) {
     const currentQuery: string = pipelineEditorRef.value.getValue() ?? "";
 
+    if (event === "remove-field") {
+      const newQuery =
+        tab.value === "sql"
+          ? removeSqlFieldFilter(currentQuery, value)
+          : removeFieldCondition(currentQuery, value);
+      pipelineEditorRef.value.setValue(newQuery);
+      updateQueryValue(newQuery);
+      cursorPosition.value = newQuery.length - 1;
+      return;
+    }
+
     // For include/exclude expressions in SQL mode, append with WHERE / AND so the
     // resulting query stays syntactically valid.
     if (tab.value === "sql" && !value.endsWith("=''")) {
-      const trimmed = currentQuery.trimEnd().replace(/;$/, "").trimEnd();
-      const hasWhere = /\bwhere\b/i.test(trimmed);
-      const connector = trimmed ? (hasWhere ? " AND " : " WHERE ") : "";
-      const newQuery = trimmed + connector + value;
+      const newQuery = insertSqlFilter(currentQuery, value);
       pipelineEditorRef.value.setValue(newQuery);
+      updateQueryValue(newQuery);
       cursorPosition.value = newQuery.length - 1;
       return;
     }
@@ -2297,6 +2407,7 @@ const handleSidebarEvent = (event: string, value: any) => {
 
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
+    updateQueryValue(newQuery);
   } else {
     console.log("Could not find editor instance");
   }
