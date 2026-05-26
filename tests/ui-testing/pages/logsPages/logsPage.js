@@ -1521,10 +1521,12 @@ export class LogsPage {
 
     // Histogram methods
     async toggleHistogram() {
-        // await this.page.locator(this.utilitiesMenuButton).click();
-        // await this.page.waitForTimeout(200);
-        // await this.page.locator(this.histogramToggle).click();
-        await this.page.locator(this.histogramToggle).click();
+        // Histogram toggle is now inside the utilities ("More") menu.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
+        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        await histogramMenuItem.click();
     }
 
     async toggleHistogramAndExecute() {
@@ -1553,9 +1555,14 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
-        // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-        // OSwitch wrapper carries data-test, inner button carries data-state="checked|unchecked".
-        await expect(this.page.locator(this.histogramToggleUncheckedBtn)).toBeVisible({ timeout: 5000 });
+        // Histogram is now inside the utilities menu — open the menu and check the switch is unchecked.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
+        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
+        await expect(switchEl).toBeVisible({ timeout: 5000 });
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     // Error handling methods
@@ -2660,7 +2667,16 @@ export class LogsPage {
     }
 
     async clickShowQueryToggle() {
-        return await this.page.locator(this.showQueryToggle).click({ force: true });
+        // Transform editor toggle moved to the utilities ("More") menu.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const toggleItem = this.page.locator(this.menuTransformEditorToggleBtn);
+        await toggleItem.waitFor({ state: 'visible', timeout: 5000 });
+        await toggleItem.click();
+        // @select.prevent keeps the dropdown open after the click — close it explicitly.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await toggleItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        testLogger.info('Clicked show-query toggle via utilities menu');
     }
 
     async clickFieldListCollapseButton() {
@@ -2715,15 +2731,31 @@ export class LogsPage {
 
     async clickSaveViewButton() {
         // Create saved view is now via the utilities ("More") dropdown menu.
-        // Close any open dialogs/menus first (Escape closes both dropdowns and ODialogs).
-        // Wait for the saved-views-list dialog overlay to clear before clicking the utilities button.
+        // Close the saved-views-list dialog explicitly if it's open — Escape can be intercepted
+        // by a focused OInput inside the dialog and may not reach the dialog dismiss handler.
+        const listDialog = this.page.locator(this.savedViewsListDialogEl);
+        const isDialogOpen = await listDialog.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isDialogOpen) {
+            const closeBtn = this.page.locator('[data-test="saved-views-list-dialog"] [data-test="o-dialog-close-btn"]');
+            await closeBtn.click({ timeout: 5000 }).catch(() => {
+                // Fallback to Escape if close button is not reachable
+                return this.page.keyboard.press('Escape');
+            });
+            await listDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        }
         await this.page.keyboard.press('Escape').catch(() => {});
-        await this.page.locator(this.savedViewsListDialogEl).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        // Wait for any dialog backdrop/overlay (the fixed inset overlay with data-state="open") to
+        // disappear — its 200ms fade-out animation intercepts pointer events until it's gone.
+        await this.page.waitForFunction(
+            () => !document.querySelector('[data-state="open"][aria-hidden="true"]'),
+            { timeout: 5000 }
+        ).catch(() => {});
         const createMenuItem = this.page.locator(this.menuCreateSavedViewBtn);
         await createMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         await this.page.locator(this.utilitiesMenuButton).click();
         await createMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        await createMenuItem.click();
+        // force:true bypasses pointer-event interception from sibling portals (e.g. FunctionSelector popper)
+        await createMenuItem.click({ force: true });
         await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
     }
 
@@ -3645,9 +3677,18 @@ export class LogsPage {
     }
 
     async toggleVrlEditor() {
-        // OSwitch renders the wrapper with data-test and the click handler on the wrapper;
-        // the inner `div` suffix from the Quasar era no longer matches. Use the wrapper.
-        return await this.page.locator(this.vrlToggleButton).first().click();
+        // Transform editor toggle is inside the utilities ("More") menu.
+        // Ensure it is ON (idempotent) — only enable if the function dropdown is not already visible.
+        const functionDropdown = this.page.locator('[data-test="logs-search-bar-function-dropdown"]');
+        const isVisible = await functionDropdown.isVisible({ timeout: 2000 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.locator(this.utilitiesMenuButton).click();
+            const toggleItem = this.page.locator(this.menuTransformEditorToggleBtn);
+            await toggleItem.waitFor({ state: 'visible', timeout: 5000 });
+            await toggleItem.click();
+            await functionDropdown.waitFor({ state: 'visible', timeout: 10000 });
+        }
     }
 
     async clickVrlEditor() {
@@ -3787,25 +3828,13 @@ export class LogsPage {
     }
 
     async clickVrlToggle() {
-        // Check both toggle button selectors to understand which one exists
-        const showQueryToggle = this.page.locator(this.vrlToggleButton);
-        const vrlToggle = this.page.locator(this.vrlToggleBtn);
-
-        const showQueryCount = await showQueryToggle.count();
-        const vrlCount = await vrlToggle.count();
-
-        testLogger.info(`Found ${showQueryCount} elements for show-query-toggle, ${vrlCount} elements for vrl-toggle`);
-
-        // Use the VRL toggle button instead of show-query toggle
-        if (vrlCount > 0) {
-            await vrlToggle.first().click();
-            testLogger.info('Clicked VRL toggle button (logs-search-bar-vrl-toggle-btn)');
-        } else if (showQueryCount > 0) {
-            await showQueryToggle.first().click();
-            testLogger.info('Clicked show-query toggle button (logs-search-bar-show-query-toggle-btn)');
-        } else {
-            throw new Error('No VRL toggle button found');
-        }
+        // Transform editor toggle is inside the utilities ("More") menu — toggle it.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const toggleItem = this.page.locator(this.menuTransformEditorToggleBtn);
+        await toggleItem.waitFor({ state: 'visible', timeout: 5000 });
+        await toggleItem.click();
+        testLogger.info('Clicked VRL toggle via utilities menu');
 
         // Deterministic wait — let the VRL/results panel transition settle. The reactive
         // state change is observable via the VRL editor's presence or absence.
@@ -5182,7 +5211,9 @@ export class LogsPage {
         const isOn = state === 'checked';
 
         if (desiredState !== isOn) {
-            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch"]').click();
+            // Click the inner OSwitch <button> (data-state="checked|unchecked") — the outer wrapper
+            // is a <div> that Playwright treats as non-interactive and times out on.
+            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]').click();
             // Wait for OSwitch data-state to flip to the desired value
             const expectedState = desiredState ? 'checked' : 'unchecked';
             await this.page.waitForFunction(
@@ -5199,17 +5230,22 @@ export class LogsPage {
     }
 
     async ensureHistogramToggleState(desiredState) {
+        // Histogram is now inside the utilities ("More") menu.
+        await this.page.keyboard.press('Escape').catch(() => {});
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const histogramToggle = this.page.locator(this.histogramToggle);
-        const isEnabled = await histogramToggle.getAttribute('aria-pressed');
+        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
+        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state]`).first();
+        await switchEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const state = await switchEl.getAttribute('data-state').catch(() => null);
+        const isOn = state === 'checked';
 
-        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
-            await histogramToggle.click();
-            await this.page.waitForTimeout(500);
+        if (desiredState !== isOn) {
+            await histogramMenuItem.click();
+            await this.page.keyboard.press('Escape').catch(() => {});
             return true; // State was changed
         }
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        await this.page.keyboard.press('Escape').catch(() => {});
         return false; // State was already correct
     }
 
@@ -6333,11 +6369,12 @@ export class LogsPage {
      * Wait for SQL mode to be active after switching
      */
     async waitForSQLModeActive() {
-        // Deterministic signal: OSwitch's inner button has data-state="checked" once v-model flips to true.
-        // Wait on the visible checked state directly — avoids strict-mode collisions with any
-        // OTooltip grace-area spans that may also carry data-state attributes inside the wrapper.
-        await this.page.locator(this.sqlModeToggleCheckedBtn).first()
-            .waitFor({ state: 'visible', timeout: 10000 });
+        // SQL mode switch is inside the utilities menu. Use getSQLModeState() poll to confirm
+        // the OSwitch inner button reaches data-state="checked" without leaving the menu open.
+        await expect.poll(
+            () => this.getSQLModeState(),
+            { timeout: 10000 }
+        ).toBe('checked');
         testLogger.info('SQL mode switch stabilized');
     }
 

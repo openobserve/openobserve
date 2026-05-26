@@ -1775,6 +1775,7 @@ export default defineComponent({
     },
     handleDeleteSavedView(item: any) {
       this.savedViewDropdownModel = false;
+      this.savedViewsListDialog = false;
       this.deleteViewID = item.view_id;
       this.confirmDelete = true;
     },
@@ -1787,6 +1788,7 @@ export default defineComponent({
         return;
       }
       this.savedViewDropdownModel = false;
+      this.savedViewsListDialog = false;
       this.updateViewObj = item;
       this.confirmUpdate = true;
     },
