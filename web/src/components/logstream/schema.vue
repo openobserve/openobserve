@@ -642,7 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
-                        <label class="tw:text-[13px] tw:font-[500] tw:text-[var(--o2-text-label)]">
+                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -663,7 +663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Max Query Range -->
                       <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
-                        <label class="tw:text-[13px] tw:font-[500] tw:text-[var(--o2-text-label)]">
+                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -679,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Flatten Level -->
                       <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
-                        <label class="tw:text-[13px] tw:font-[500] tw:text-[var(--o2-text-label)]">
+                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput
