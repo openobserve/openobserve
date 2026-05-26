@@ -4,7 +4,7 @@ import { computed } from "vue";
 
 const props = withDefaults(defineProps<SkeletonProps>(), {
   type: "rect",
-  animation: "pulse",
+  animation: "wave",
 });
 
 const shapeClasses: Record<NonNullable<SkeletonProps["type"]>, string> = {
@@ -38,22 +38,40 @@ const classes = computed(() => [
 
 <style scoped>
 /*
-  Wave animation is not built into Tailwind — define it here via CSS.
-  Uses background-position trick: a highlight gradient shifts left→right.
+  translateX shimmer — fundamentally more natural than background-position.
+
+  Why this feels better:
+  • The base is a flat solid colour (tw:bg-skeleton-base). No moving gradient.
+  • A ::after overlay physically slides across with translateX. This is
+    GPU-composited (no layout cost) and maps 1:1 to visual motion.
+  • ease-in-out on translateX mimics how light actually reflects off a surface —
+    it eases in and out naturally. (ease-in-out was wrong for background-position
+    but is correct here.)
+  • The shimmer beam is a 105° tilted gradient — a slight diagonal makes it
+    read as a gloss catch, not a mechanical wipe.
 */
 .tw\:skeleton-wave {
-  background: linear-gradient(
-    90deg,
-    var(--color-skeleton-base) 25%,
-    var(--color-skeleton-highlight) 50%,
-    var(--color-skeleton-base) 75%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-wave 1.4s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
 }
 
-@keyframes skeleton-wave {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+.tw\:skeleton-wave::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent        0%,
+    transparent       30%,
+    var(--color-skeleton-shimmer, rgba(255, 255, 255, 0.8)) 50%,
+    transparent       70%,
+    transparent      100%
+  );
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 </style>

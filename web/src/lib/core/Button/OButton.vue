@@ -199,6 +199,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:enabled:hover:text-[#1e40af]",
     "tw:disabled:opacity-60",
   ].join(" "),
+  // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
+  // Use for edition/tier badges that must stand out without being a heavy CTA.
+  "outline-primary": [
+    "tw:bg-button-ghost-primary-active-bg tw:text-button-ghost-primary-text tw:border tw:border-button-outline-hover-border",
+    "tw:enabled:hover:bg-button-ghost-primary-active-bg tw:enabled:hover:border-button-outline-hover-border",
+    "tw:enabled:active:bg-button-ghost-primary-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-primary-focus-ring",
+    "tw:disabled:opacity-50",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "tw:bg-transparent tw:text-inherit tw:border tw:border-border-default",
