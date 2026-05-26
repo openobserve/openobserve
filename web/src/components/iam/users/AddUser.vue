@@ -58,6 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('user.password') + ' *'"
               class="showLabelOnTop"
               data-test="user-password-field"
+              :error="!!passwordError"
+              :error-message="passwordError"
+              @update:model-value="passwordError = ''"
             >
               <template #icon-right>
                 <OIcon
@@ -318,6 +321,7 @@ export default defineComponent({
     const filterdOption = ref([...props.customRoles]);
     const emailError = ref('');
     const roleError = ref('');
+    const passwordError = ref('');
 
     watch(
       () => props.customRoles,
@@ -424,6 +428,7 @@ export default defineComponent({
       filterdOption,
       emailError,
       roleError,
+      passwordError,
       invalidateLoginData,
       config,
       filterFn(val: any, update: any) {
@@ -474,11 +479,11 @@ export default defineComponent({
 
       if (!this.existingUser && !this.beingUpdated) {
         if (!this.formData.password) {
-          toast({ message: 'Password is required.', timeout: 3000 });
+          this.passwordError = 'Password is required.';
           return;
         }
         if (this.formData.password.length < pwdMinLen) {
-          toast({ message: 'Password must be at least 8 characters long.', timeout: 3000 });
+          this.passwordError = 'Password must be at least 8 characters long.';
           return;
         }
       }
