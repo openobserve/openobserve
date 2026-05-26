@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('CreateAlert')"
           >
             <template #icon-left
-              ><OIcon name="report-problem" size="sm"
+              ><OIcon name="shield-alert-outline" size="sm"
             /></template>
             {{ t("panel.createAlert") }}
           </ODropdownItem>
