@@ -427,16 +427,18 @@ watch(internalOpen, (open) => {
         <!-- ── Content (default slot) ───────────────────────── -->
         <!-- min-h-0 is required in some browsers for flex children to overflow correctly -->
         <!-- overflow-x-hidden prevents horizontal scrollbar when content is wider than dialog -->
-        <!-- No flex-1: panel height = content height (capped at max-h), footer flows below body -->
+        <!-- full-size: flex-1 so the body fills the remaining viewport height; content manages its own scroll -->
+        <!-- non-full: no flex-1 — panel height = content height (capped at max-h), footer flows below body -->
         <div
           ref="bodyRef"
           :class="[
-            'tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
-            'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
+            'tw:min-h-0 tw:overflow-x-hidden',
+            isFullSize ? 'tw:flex-1 tw:overflow-hidden tw:p-0' : 'tw:overflow-y-auto',
+            !isFullSize && 'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
             'tw:text-dialog-content-text',
-            canScrollUp && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollUp && canScrollDown && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollUp && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollUp && canScrollDown && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
           @focusin="handleBodyFocusIn"
         >
