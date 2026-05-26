@@ -631,7 +631,7 @@ function getPaletteGradient(colors: string[]): string {
   return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
-// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
+// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density; raised to h-9 (36px) to match OButton sm.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-6 tw:text-sm",
   md: "tw:h-8 tw:text-sm",
