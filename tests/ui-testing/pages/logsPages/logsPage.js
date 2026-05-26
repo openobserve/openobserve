@@ -102,6 +102,7 @@ export class LogsPage {
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+        this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
