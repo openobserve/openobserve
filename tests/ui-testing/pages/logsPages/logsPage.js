@@ -5322,7 +5322,9 @@ export class LogsPage {
             await this.page.locator(this.utilitiesMenuButton).click();
             await menuItem.waitFor({ state: 'visible', timeout: 5000 });
         }
-        await menuItem.click();
+        // ODropdown portal can transiently detach items during initial render — force: true
+        // bypasses actionability checks, matching the clickSQLModeToggle pattern.
+        await menuItem.click({ force: true });
         // Close the dropdown (ODropdownItem @select.prevent keeps it open)
         await this.page.keyboard.press('Escape');
         // Wait for the VRL function editor container to appear
@@ -7559,7 +7561,8 @@ export class LogsPage {
         await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (!isOn) {
-            await this.page.locator(this.menuSqlModeBtn).click();
+            // force: true bypasses actionability checks — ODropdown portal transiently detaches items on render
+            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
             // Dropdown stays open (ODropdownItem has @select.prevent) — poll the inner button directly
             await expect.poll(async () => {
                 const s = await stateEl.getAttribute('data-state').catch(() => null);
