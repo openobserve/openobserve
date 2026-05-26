@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:w-full"
           >
             <!-- Name Field for Create Mode -->
-            <div v-if="!destination" class="tw:w-full tw:pb-3">
+            <div v-if="!destination" class="tw:w-1/2 tw:pb-3">
               <OInput
                 data-test="add-destination-name-input"
                 v-model="formData.name"
