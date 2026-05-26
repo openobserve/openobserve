@@ -145,7 +145,6 @@ pub async fn merge_parquet_files_with_downsampling(
 async fn write_downsampled_parquet(
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     schema: &Arc<datafusion::arrow::datatypes::Schema>,
-    bloom_filter_fields: &[String],
     metadata: &FileMeta,
     cfg: &config::Config,
 ) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>)> {
@@ -154,8 +153,7 @@ async fn write_downsampled_parquet(
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size);
     let mut file_meta = FileMeta::default();
-    let mut writer =
-        new_parquet_writer(&mut buf, schema, bloom_filter_fields, metadata, false, None);
+    let mut writer = new_parquet_writer(&mut buf, schema, metadata, false, None);
     let mut last_min_ts = 0;
 
     while let Some(batch_result) = rx.recv().await {
@@ -177,8 +175,7 @@ async fn write_downsampled_parquet(
             // reset for next file
             buf.clear();
             file_meta = FileMeta::default();
-            writer =
-                new_parquet_writer(&mut buf, schema, bloom_filter_fields, metadata, false, None);
+            writer = new_parquet_writer(&mut buf, schema, metadata, false, None);
         }
 
         // Update metadata for current batch

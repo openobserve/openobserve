@@ -42,8 +42,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     runtime::DATAFUSION_RUNTIME,
     schema::{
-        SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
-        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
+        SchemaCache, get_partition_time_level, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_created_at,
     },
     storage,
 };
@@ -783,7 +783,6 @@ pub async fn merge_files(
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values, storage_type) =
@@ -872,9 +871,6 @@ pub async fn merge_files(
 
     let merge_result = {
         let stream_name = stream_name.to_string();
-        // Clone for the spawn — we still need bloom_filter_fields below to
-        // drive the per-file `.bf` build path after the merge completes.
-        let bloom_fields_for_merge = bloom_filter_fields.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
@@ -882,7 +878,6 @@ pub async fn merge_files(
                     &stream_name,
                     schema,
                     tables,
-                    &bloom_fields_for_merge,
                     new_file_meta,
                     false,
                 )

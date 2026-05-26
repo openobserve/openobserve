@@ -42,7 +42,6 @@ use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
-    _bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
     write_metadata: bool,
     compression: Option<&str>,
@@ -76,26 +75,6 @@ pub fn new_parquet_writer<'a>(
             ),
         ]));
     }
-
-    // Bloom filter stored by row_group, set NDV to reduce the memory usage.
-    // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
-    // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
-    // let mut bf_ndv = min(metadata.records as u64, PARQUET_MAX_ROW_GROUP_SIZE as u64);
-    // if bf_ndv > 1000 {
-    //     bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
-    // }
-    // if cfg.common.bloom_filter_enabled {
-    //     let mut fields = bloom_filter_fields.to_vec();
-    //     fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
-    //     fields.sort();
-    //     fields.dedup();
-    //     for field in fields {
-    //         writer_props = writer_props
-    //             .set_column_bloom_filter_enabled(field.as_str().into(), true)
-    //             .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
-    //             .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
-    //     }
-    // }
     let writer_props = writer_props.build();
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
@@ -103,12 +82,10 @@ pub fn new_parquet_writer<'a>(
 pub async fn write_recordbatch_to_parquet(
     schema: Arc<Schema>,
     record_batches: &[RecordBatch],
-    bloom_filter_fields: &[String],
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer =
-        new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true, None);
+    let mut writer = new_parquet_writer(&mut buf, &schema, metadata, true, None);
     for batch in record_batches {
         writer.write(batch).await?;
     }
@@ -458,14 +435,10 @@ mod tests {
         };
 
         // Write to parquet
-        let data = write_recordbatch_to_parquet(
-            schema.clone(),
-            std::slice::from_ref(&batch),
-            &["name".to_string()],
-            &metadata,
-        )
-        .await
-        .unwrap();
+        let data =
+            write_recordbatch_to_parquet(schema.clone(), std::slice::from_ref(&batch), &metadata)
+                .await
+                .unwrap();
 
         // Read back
         let (read_schema, read_batches) =
@@ -494,7 +467,7 @@ mod tests {
         };
 
         // Write to parquet
-        let data = write_recordbatch_to_parquet(schema, &[batch], &["name".to_string()], &metadata)
+        let data = write_recordbatch_to_parquet(schema, &[batch], &metadata)
             .await
             .unwrap();
 
@@ -571,44 +544,5 @@ mod tests {
         let (min_ts, max_ts) = parse_time_range_from_filename(old_format);
         assert_eq!(min_ts, 1000);
         assert_eq!(max_ts, 2000);
-    }
-
-    /// Verifies that the parquet writer no longer emits per-column bloom filters.
-    /// The replacement is the higher-level `.bf` files maintained by the compactor.
-    #[tokio::test]
-    async fn test_parquet_writer_does_not_emit_column_bloom_filters() {
-        let (schema, batch) = create_test_batch();
-        let metadata = FileMeta {
-            min_ts: 0,
-            max_ts: 0,
-            records: batch.num_rows() as i64,
-            original_size: 1,
-            compressed_size: 1,
-            index_size: 0,
-            flattened: false,
-            bloom_ver: 0,
-        };
-        // Even when bloom_filter_fields requests bloom on a column, the writer
-        // should ignore it now.
-        let bloom_fields = vec!["id".to_string(), "name".to_string()];
-        let buf = write_recordbatch_to_parquet(schema.clone(), &[batch], &bloom_fields, &metadata)
-            .await
-            .expect("write parquet");
-
-        // Read metadata back from the buffer: every row group / column must
-        // report no bloom filter offset.
-        let bytes = bytes::Bytes::from(buf);
-        let reader = parquet::file::serialized_reader::SerializedFileReader::new(bytes)
-            .expect("parse parquet");
-        let md = parquet::file::reader::FileReader::metadata(&reader);
-        for rg in md.row_groups() {
-            for col in rg.columns() {
-                assert!(
-                    col.bloom_filter_offset().is_none(),
-                    "column {} unexpectedly has bloom filter offset",
-                    col.column_descr().name()
-                );
-            }
-        }
     }
 }

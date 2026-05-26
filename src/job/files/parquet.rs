@@ -40,10 +40,7 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::{
-    schema::{
-        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields,
-    },
+    schema::{SchemaCache, get_stream_setting_fts_fields, get_stream_setting_index_fields},
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
@@ -717,7 +714,6 @@ async fn merge_files(
 
     // get latest version of schema
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values) =
@@ -778,7 +774,6 @@ async fn merge_files(
         &stream_name,
         schema,
         tables,
-        &bloom_filter_fields,
         new_file_meta,
         true,
     )

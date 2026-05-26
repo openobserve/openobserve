@@ -154,7 +154,6 @@ pub async fn build_for_bucket(
 
     let base_ver = now_micros();
     let mut wrote_any = false;
-    let mut total_covered = 0usize;
     let chunk_total = new_files.len().div_ceil(max_files_per_bf);
 
     for (chunk_idx, chunk) in new_files.chunks(max_files_per_bf).enumerate() {
@@ -229,7 +228,6 @@ pub async fn build_for_bucket(
         config::metrics::BLOOM_FILE_BUILT_TOTAL
             .with_label_values(&[org_id, stream_type.as_str()])
             .inc();
-        total_covered += contributing_ids.len();
         wrote_any = true;
         log::debug!(
             "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {bf_path} (chunk {}/{chunk_total}, num_blocks={num_blocks}) covering {} file(s)",
