@@ -5320,18 +5320,13 @@ export class LogsPage {
         const isMenuItemVisible = await menuItem.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {
             await this.page.locator(this.utilitiesMenuButton).click();
-            await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+            await menuItem.waitFor({ state: 'visible', timeout: 5000 });
         }
-        // Allow dropdown animation to settle before clicking (element resolves but
-        // detaches during the opening transition — same pattern as toggleHistogram).
-        await this.page.waitForTimeout(200);
-        await transformEditorMenuItem.click({ force: true });
-        // @select.prevent keeps the menu open — close it so it doesn't overlap the editor
+        await menuItem.click();
+        // Close the dropdown (ODropdownItem @select.prevent keeps it open)
         await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(500);
-        // Wait for the VRL function editor container to appear (Firefox needs this)
-        await this.page.waitForTimeout(2000);
-        await this.page.locator('[data-test="logs-vrl-function-editor"]').first().waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for the VRL function editor container to appear
+        await this.page.locator(this.fnEditor).first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async clickMonacoEditor() {
@@ -7374,9 +7369,8 @@ export class LogsPage {
     }
 
     /**
-     * Open the saved views list dialog via the utilities ("More") menu.
-     * Post-menu-migration: list saved views moved from standalone dropdown to
-     * the utilities menu as logs-search-bar-menu-list-saved-views-btn.
+     * Click the utilities menu button to show saved views
+     * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
         // Saved views list is now opened via the utilities ("More") dropdown menu.
@@ -7392,7 +7386,8 @@ export class LogsPage {
     }
 
     /**
-     * Expand the saved views dropdown and wait for search input.
+     * Expand the saved views dropdown and wait for search input
+     * Tries arrow click first, then main button if search input doesn't appear
      */
     async expandSavedViewsDropdown() {
         await this.clickSavedViewsDropdownArrow();
