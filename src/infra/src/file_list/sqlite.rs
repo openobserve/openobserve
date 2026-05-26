@@ -359,6 +359,27 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         Ok(())
     }
 
+    async fn bloom_ver_referenced(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+        bloom_ver: i64,
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let pool = CLIENT_RO.clone();
+        let found: Option<(i64,)> = sqlx::query_as(
+            r#"SELECT 1 FROM file_list WHERE stream = $1 AND date = $2 AND bloom_ver = $3 LIMIT 1;"#,
+        )
+        .bind(stream_key)
+        .bind(date)
+        .bind(bloom_ver)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(found.is_some())
+    }
+
     async fn list(&self) -> Result<Vec<FileKey>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(

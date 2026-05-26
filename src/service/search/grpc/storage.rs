@@ -119,26 +119,29 @@ pub async fn search(
                     .into_iter()
                     .collect();
             if !bloom_fields.is_empty() {
-                let preds = super::super::bloom_predicate::extract(
+                let bloom_start = std::time::Instant::now();
+                let before = files.len();
+                // The pruner pulls the bloom-decidable predicates out of the
+                // IndexCondition itself; if none are decidable it returns the
+                // input untouched (no `.bf` is touched).
+                files = super::super::bloom_pruner::prune(
+                    files,
                     index_condition.as_ref().unwrap(),
                     &bloom_fields,
-                );
-                if !preds.is_empty() {
-                    let bloom_start = std::time::Instant::now();
-                    let before = files.len();
-                    files = super::super::bloom_pruner::prune(
-                        files,
-                        &preds,
-                        trace_id,
-                        org_id,
-                        *stream_type,
-                        stream_name,
-                    )
-                    .await;
-                    let elapsed = bloom_start.elapsed();
+                    trace_id,
+                    org_id,
+                    *stream_type,
+                    stream_name,
+                )
+                .await;
+                let elapsed = bloom_start.elapsed();
+                let after = files.len();
+                // Only surface metrics/logs when pruning actually removed
+                // files — an all-kept or no-decidable-predicate pass is a fast
+                // no-op we don't want to spam.
+                if after < before {
                     log::info!(
-                        "[trace_id {trace_id}] search->storage: bloom prune {before} -> {} in {} ms",
-                        files.len(),
+                        "[trace_id {trace_id}] search->storage: bloom prune {before} -> {after} in {} ms",
                         elapsed.as_millis()
                     );
                     config::metrics::BLOOM_PRUNE_DURATION
@@ -147,11 +150,11 @@ pub async fn search(
                     if before > 0 {
                         config::metrics::BLOOM_PRUNE_KEEP_RATIO
                             .with_label_values(&[org_id.as_str(), stream_type.as_str()])
-                            .observe(files.len() as f64 / before as f64);
+                            .observe(after as f64 / before as f64);
                     }
-                    if files.is_empty() {
-                        return Ok((vec![], ScanStats::default(), HashSet::new()));
-                    }
+                }
+                if files.is_empty() {
+                    return Ok((vec![], ScanStats::default(), HashSet::new()));
                 }
             }
         }

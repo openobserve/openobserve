@@ -15,8 +15,9 @@
 
 //! Search-side bloom prune layer — transposed (block-major) read.
 //!
-//! Given a candidate `Vec<FileKey>` and the bloom-prunable predicates
-//! extracted by [`super::bloom_predicate`], this module:
+//! Given a candidate `Vec<FileKey>` and the query's tantivy `IndexCondition`,
+//! this module pulls the bloom-decidable predicates out of it
+//! ([`collect_decidable`]) and then:
 //!
 //! 1. Splits files into "has bloom" (`bloom_ver != 0`) and "no bloom" (`bloom_ver == 0`). The
 //!    latter pass through untouched.
@@ -33,14 +34,66 @@
 //! Any failure (fetch, parse, schema mismatch) **falls back to "keep
 //! all"** for the affected group — bloom is performance, not correctness.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::stream::{FileKey, StreamType};
 use futures::stream::{self, StreamExt};
 use infra::bloom::{BLOOM_FOOTER_CACHE, BloomReader, path::bloom_path, sbbf::BLOCK_BYTES};
 use object_store::{GetOptions, GetRange};
 
-use super::bloom_predicate::BloomPredicate;
+use super::index::{Condition, IndexCondition};
+
+/// One bloom-decidable predicate: a field plus the candidate values to test.
+/// Passes if **any** candidate's bloom check returns "maybe" (OR within a
+/// predicate; predicates are AND'd across).
+struct Predicate {
+    field: String,
+    values: Vec<String>,
+}
+
+/// Pull the bloom-decidable predicates out of a top-level `IndexCondition`.
+///
+/// Only **positive equality / IN** on a bloom-indexed field is useful: a
+/// bloom can prove a value is definitely *absent* from a file, never that
+/// it's present. Everything else is ignored — those conditions don't
+/// participate in pruning and the file passes the bloom step untouched:
+///
+/// - `NotEqual` / `Not`: a bloom can't refute "not X".
+/// - `StrMatch` / `Regex` / `MatchAll` / `FuzzyMatchAll`: tokenized; the bloom is keyed by the
+///   exact term.
+/// - `Or`: a single OR would need every branch bloom-prunable, and OR-joining branch results
+///   weakens the filter.
+/// - nested `And`: not recursed into (top-level conditions are already AND'd).
+/// - empty `In` / negated `In`: nothing to test / can't refute.
+///
+/// `bloom_indexed_fields` is the stream's `bloom_filter_fields ∩ index_fields`
+/// — passing an unrelated field would just waste IO on guaranteed misses.
+fn collect_decidable(
+    cond: &IndexCondition,
+    bloom_indexed_fields: &HashSet<String>,
+) -> Vec<Predicate> {
+    let mut out: Vec<Predicate> = Vec::new();
+    for c in &cond.conditions {
+        match c {
+            Condition::Equal(field, value) if bloom_indexed_fields.contains(field) => {
+                out.push(Predicate {
+                    field: field.clone(),
+                    values: vec![value.clone()],
+                });
+            }
+            Condition::In(field, values, false)
+                if bloom_indexed_fields.contains(field) && !values.is_empty() =>
+            {
+                out.push(Predicate {
+                    field: field.clone(),
+                    values: values.clone(),
+                });
+            }
+            _ => {}
+        }
+    }
+    out
+}
 
 /// Bytes pulled from the tail of a `.bf` on footer-cache miss. Big
 /// enough to cover the footer payload for hour buckets up to ~150 indexed
@@ -59,21 +112,26 @@ fn bloom_prefetch_concurrency() -> usize {
     config::get_config().limit.query_thread_num.max(1)
 }
 
-/// Prune `files` against `predicates`, returning the surviving subset.
-/// Files with `bloom_ver == 0` are always kept (no bloom info).
+/// Prune `files` against the bloom-decidable parts of `index_condition`,
+/// returning the surviving subset. Files with `bloom_ver == 0` are always
+/// kept (no bloom info). If no condition is bloom-decidable, `files` is
+/// returned unchanged without touching any `.bf`.
 ///
 /// `trace_id` is threaded through purely for logging.
 pub async fn prune(
     files: Vec<FileKey>,
-    predicates: &[BloomPredicate],
+    index_condition: &IndexCondition,
+    bloom_indexed_fields: &HashSet<String>,
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Vec<FileKey> {
+    let predicates = collect_decidable(index_condition, bloom_indexed_fields);
     if predicates.is_empty() {
         return files;
     }
+    let predicates = predicates.as_slice();
 
     // 1. Split files by whether they have a bloom_ver assigned.
     let total_input = files.len();
@@ -291,7 +349,7 @@ async fn run_group(
     account: &str,
     path: &str,
     file_idxs: &[usize],
-    predicates: &[BloomPredicate],
+    predicates: &[Predicate],
     with_bloom: &[FileKey],
 ) -> GroupResult {
     // Step 1: footer (cache → suffix GET on miss). `.bf` is immutable so the
@@ -416,8 +474,90 @@ mod tests {
         k
     }
 
+    fn fields(names: &[&str]) -> HashSet<String> {
+        names.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn cond(conditions: Vec<Condition>) -> IndexCondition {
+        let mut c = IndexCondition::new();
+        for x in conditions {
+            c.add_condition(x);
+        }
+        c
+    }
+
+    // ---- collect_decidable dispatch ----
+
+    #[test]
+    fn test_collect_equal_on_indexed_field() {
+        let c = cond(vec![Condition::Equal("trace_id".into(), "abc".into())]);
+        let p = collect_decidable(&c, &fields(&["trace_id"]));
+        assert_eq!(p.len(), 1);
+        assert_eq!(p[0].field, "trace_id");
+        assert_eq!(p[0].values, vec!["abc".to_string()]);
+    }
+
+    #[test]
+    fn test_collect_skips_non_indexed_field() {
+        let c = cond(vec![Condition::Equal("body".into(), "abc".into())]);
+        assert!(collect_decidable(&c, &fields(&["trace_id"])).is_empty());
+    }
+
+    #[test]
+    fn test_collect_positive_in() {
+        let c = cond(vec![Condition::In(
+            "trace_id".into(),
+            vec!["a".into(), "b".into()],
+            false,
+        )]);
+        let p = collect_decidable(&c, &fields(&["trace_id"]));
+        assert_eq!(p.len(), 1);
+        assert_eq!(p[0].values, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn test_collect_skips_empty_and_negated_in() {
+        let empty = cond(vec![Condition::In("trace_id".into(), vec![], false)]);
+        assert!(collect_decidable(&empty, &fields(&["trace_id"])).is_empty());
+        let negated = cond(vec![Condition::In(
+            "trace_id".into(),
+            vec!["a".into()],
+            true,
+        )]);
+        assert!(collect_decidable(&negated, &fields(&["trace_id"])).is_empty());
+    }
+
+    #[test]
+    fn test_collect_skips_negation_regex_strmatch_or() {
+        let c = cond(vec![
+            Condition::NotEqual("trace_id".into(), "abc".into()),
+            Condition::Regex("trace_id".into(), "^abc.*".into()),
+            Condition::StrMatch("trace_id".into(), "abc".into(), true),
+            Condition::Or(
+                Box::new(Condition::Equal("trace_id".into(), "a".into())),
+                Box::new(Condition::Equal("trace_id".into(), "b".into())),
+            ),
+        ]);
+        assert!(collect_decidable(&c, &fields(&["trace_id"])).is_empty());
+    }
+
+    #[test]
+    fn test_collect_multiple_top_level_ands() {
+        // Top-level AND: each prunable predicate is picked; non-prunable ones
+        // (here the NotEqual) are ignored.
+        let c = cond(vec![
+            Condition::Equal("trace_id".into(), "x".into()),
+            Condition::NotEqual("body".into(), "noise".into()),
+            Condition::Equal("user_id".into(), "u-1".into()),
+        ]);
+        let p = collect_decidable(&c, &fields(&["trace_id", "user_id"]));
+        assert_eq!(p.len(), 2);
+        assert!(p.iter().any(|x| x.field == "trace_id"));
+        assert!(p.iter().any(|x| x.field == "user_id"));
+    }
+
     /// End-to-end: writer produces a `.bf`, reader's single-block API resolves
-    /// the same membership the predicate logic expects.
+    /// the same membership the prune logic expects.
     #[test]
     fn test_writer_reader_predicate_contract() {
         let id_a: u64 = 101;
@@ -442,7 +582,7 @@ mod tests {
             BloomReader::check_block_with_hash(block, h)
         };
 
-        let pred = BloomPredicate {
+        let pred = Predicate {
             field: "trace_id".into(),
             values: vec!["present-A".into()],
         };
@@ -461,7 +601,7 @@ mod tests {
         );
 
         // IN list with one present + one absent → still kept (OR within)
-        let pred_in = BloomPredicate {
+        let pred_in = Predicate {
             field: "trace_id".into(),
             values: vec!["present-A".into(), "absent-X".into()],
         };
@@ -473,11 +613,11 @@ mod tests {
         );
 
         // AND across predicates: any all-miss drops
-        let pred_other = BloomPredicate {
+        let pred_other = Predicate {
             field: "trace_id".into(),
             values: vec!["absent-Z".into()],
         };
-        let preds = [pred.clone(), pred_other];
+        let preds = [pred, pred_other];
         let kept = preds
             .iter()
             .all(|p| p.values.iter().any(|v| check(&p.field, id_a, v.as_bytes())));
@@ -490,31 +630,46 @@ mod tests {
             fk("files/o/logs/s/2026/05/08/14/a.parquet", 0),
             fk("files/o/logs/s/2026/05/08/14/b.parquet", 0),
         ];
-        let preds = vec![BloomPredicate {
-            field: "trace_id".into(),
-            values: vec!["x".into()],
-        }];
-        let kept = prune(files.clone(), &preds, "tid", "o", StreamType::Logs, "s").await;
+        let c = cond(vec![Condition::Equal("trace_id".into(), "x".into())]);
+        let kept = prune(
+            files.clone(),
+            &c,
+            &fields(&["trace_id"]),
+            "tid",
+            "o",
+            StreamType::Logs,
+            "s",
+        )
+        .await;
         assert_eq!(kept.len(), files.len());
     }
 
     #[tokio::test]
-    async fn test_no_predicates_keeps_everything() {
+    async fn test_no_decidable_predicate_keeps_everything() {
         let files = vec![fk("files/o/logs/s/2026/05/08/14/a.parquet", 123)];
-        let kept = prune(files.clone(), &[], "tid", "o", StreamType::Logs, "s").await;
+        // A NotEqual is not bloom-decidable → prune returns input untouched.
+        let c = cond(vec![Condition::NotEqual("trace_id".into(), "x".into())]);
+        let kept = prune(
+            files.clone(),
+            &c,
+            &fields(&["trace_id"]),
+            "tid",
+            "o",
+            StreamType::Logs,
+            "s",
+        )
+        .await;
         assert_eq!(kept.len(), 1);
     }
 
     #[tokio::test]
     async fn test_missing_bf_keeps_all_files_in_group() {
         let files = vec![fk("files/o/logs/missing/2026/05/08/14/a.parquet", 9_999)];
-        let preds = vec![BloomPredicate {
-            field: "trace_id".into(),
-            values: vec!["x".into()],
-        }];
+        let c = cond(vec![Condition::Equal("trace_id".into(), "x".into())]);
         let kept = prune(
             files.clone(),
-            &preds,
+            &c,
+            &fields(&["trace_id"]),
             "tid",
             "o",
             StreamType::Logs,
@@ -527,11 +682,17 @@ mod tests {
     #[tokio::test]
     async fn test_unparseable_key_kept() {
         let files = vec![fk("not-a-files-path", 1234)];
-        let preds = vec![BloomPredicate {
-            field: "trace_id".into(),
-            values: vec!["x".into()],
-        }];
-        let kept = prune(files, &preds, "tid", "o", StreamType::Logs, "s").await;
+        let c = cond(vec![Condition::Equal("trace_id".into(), "x".into())]);
+        let kept = prune(
+            files,
+            &c,
+            &fields(&["trace_id"]),
+            "tid",
+            "o",
+            StreamType::Logs,
+            "s",
+        )
+        .await;
         assert_eq!(kept.len(), 1);
     }
 }

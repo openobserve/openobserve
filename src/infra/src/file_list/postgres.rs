@@ -436,6 +436,34 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         Ok(())
     }
 
+    async fn bloom_ver_referenced(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+        bloom_ver: i64,
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["bloom_ver_referenced", "file_list"])
+            .inc();
+        // Index note: filters on (stream, date, bloom_ver). The existing
+        // (stream, date) index narrows it to one hour bucket (a few hundred
+        // rows at most), so the residual bloom_ver scan is cheap and LIMIT 1
+        // stops at the first hit — no dedicated composite index needed.
+        let found: Option<(i32,)> = sqlx::query_as(
+            r#"SELECT 1 FROM file_list WHERE stream = $1 AND date = $2 AND bloom_ver = $3 LIMIT 1;"#,
+        )
+        .bind(stream_key)
+        .bind(date)
+        .bind(bloom_ver)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(found.is_some())
+    }
+
     async fn list(&self) -> Result<Vec<FileKey>> {
         return Ok(vec![]); // disallow list all data
     }

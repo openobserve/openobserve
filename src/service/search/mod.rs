@@ -64,7 +64,6 @@ use crate::{
     },
 };
 
-pub(crate) mod bloom_predicate;
 pub(crate) mod bloom_pruner;
 pub(crate) mod cache;
 #[cfg(feature = "enterprise")]

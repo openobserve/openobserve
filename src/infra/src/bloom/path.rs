@@ -16,20 +16,22 @@
 //! `.bf` object-store path layout.
 //!
 //! ```text
-//! files/{org}/bloom/{stream_type}/{stream}/{date}/{hour}/{bloom_ver}.bf
+//! files/{org}/bloom/{stream}_{stream_type}/{date}/{bloom_ver}.bf
 //! ```
 //!
 //! `bloom_ver` is the microsecond build timestamp the compactor stamps on
 //! every parquet file in the bucket via `file_list.bloom_ver`. Files share
 //! a `.bf` exactly when they share a `bloom_ver`.
+//!
+//! The `{stream}_{stream_type}` segment mirrors the dump-path convention
+//! so a whole `(stream, date)` subtree drops in one prefix at retention.
 
 use config::meta::stream::StreamType;
 
 /// Build the `.bf` object-store key for a given hour-bucket.
 ///
 /// `date` is expected in the same `YYYY/MM/DD/HH` format used elsewhere in
-/// `file_list.date` — we split on `/` and use the first three components as
-/// the date dir and the fourth as the hour. Anything after is ignored.
+/// `file_list.date`.
 pub fn bloom_path(
     org: &str,
     stream_type: StreamType,
@@ -42,13 +44,13 @@ pub fn bloom_path(
     // in release would produce a path that 404s on read and confuses
     // diagnostics.
     assert!(bloom_ver > 0, "bloom_ver=0 means no .bf — caller bug");
-    format!("files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf")
+    format!("files/{org}/bloom/{stream}_{stream_type}/{date}/{bloom_ver}.bf")
 }
 
 /// Directory prefix for all `.bf` files in a single (stream, date/hour)
 /// bucket. Useful for listing / GC of orphaned versions.
 pub fn bloom_dir(org: &str, stream_type: StreamType, stream: &str, date: &str) -> String {
-    format!("files/{org}/bloom/{stream_type}/{stream}/{date}/")
+    format!("files/{org}/bloom/{stream}_{stream_type}/{date}/")
 }
 
 #[cfg(test)]
@@ -68,14 +70,14 @@ mod tests {
         );
         assert_eq!(
             p,
-            "files/default/bloom/logs/nginx/2026/05/08/14/1715169600000000.bf"
+            "files/default/bloom/nginx_logs/2026/05/08/14/1715169600000000.bf"
         );
     }
 
     #[test]
     fn test_bloom_dir_format() {
         let d = bloom_dir("acme", StreamType::Traces, "frontend", "2026/05/08/14");
-        assert_eq!(d, "files/acme/bloom/traces/frontend/2026/05/08/14/");
+        assert_eq!(d, "files/acme/bloom/frontend_traces/2026/05/08/14/");
     }
 
     #[test]

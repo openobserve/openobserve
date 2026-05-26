@@ -73,6 +73,18 @@ pub trait FileList: Sync + Send + 'static {
     /// post-merge bloom builder (see `service::compact::bloom_build`).
     /// Empty `ids` is a no-op.
     async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
+    /// Is `bloom_ver` still referenced by at least one live file_list row in
+    /// this `(stream, date)` bucket? Used by the post-merge orphan cleanup to
+    /// decide whether a `.bf` can be retired. `stream` is the combined
+    /// `{org}/{stream_type}/{stream}` key; `date` is the `YYYY/MM/DD/HH` value.
+    async fn bloom_ver_referenced(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+        bloom_ver: i64,
+    ) -> Result<bool>;
     async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
@@ -295,6 +307,19 @@ pub async fn update_bloom_ver(ids: &[i64], bloom_ver: i64) -> Result<()> {
         return Ok(());
     }
     CLIENT.update_bloom_ver(ids, bloom_ver).await
+}
+
+#[inline]
+pub async fn bloom_ver_referenced(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date: &str,
+    bloom_ver: i64,
+) -> Result<bool> {
+    CLIENT
+        .bloom_ver_referenced(org_id, stream_type, stream_name, date, bloom_ver)
+        .await
 }
 
 #[inline]
