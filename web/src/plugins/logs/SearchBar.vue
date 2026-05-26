@@ -1361,6 +1361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         class="tw:flex tw:flex-1 tw:min-w-0"
                         :title="value"
+                        :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
                         @click.stop="
                           applySavedView(row);
                           savedViewsListDialog = false;

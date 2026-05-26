@@ -103,6 +103,10 @@ export class LogsPage {
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
+        this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
+        this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
+        this.savedViewsListDialogEl = '[data-test="saved-views-list-dialog"]';
+        this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
@@ -2710,17 +2714,17 @@ export class LogsPage {
     }
 
     async clickSaveViewButton() {
-        // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
-        // Close any open menus/dialogs first, then open the menu and click the item.
+        // Create saved view is now via the utilities ("More") dropdown menu.
+        // Close any open dialogs/menus first (Escape closes both dropdowns and ODialogs).
+        // Wait for the saved-views-list dialog overlay to clear before clicking the utilities button.
         await this.page.keyboard.press('Escape').catch(() => {});
-        const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
-        const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
-            await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
-        }
-        await this.page.waitForTimeout(200);
-        return await createSavedViewBtn.click({ force: true });
+        await this.page.locator(this.savedViewsListDialogEl).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        const createMenuItem = this.page.locator(this.menuCreateSavedViewBtn);
+        await createMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await createMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        await createMenuItem.click();
+        await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async fillSavedViewName(name) {
@@ -2873,13 +2877,13 @@ export class LogsPage {
     }
 
     async clickSavedViewByText(text) {
-        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${text}"]`).first();
+        const element = this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.locator(`[data-test="logs-search-saved-view-item-${text}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(`[data-test="logs-search-bar-dialog-saved-view-row-${text}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -5275,12 +5279,12 @@ export class LogsPage {
     }
 
     async toggleQueryModeEditor() {
-        // Post-menu-migration: the function/transform editor toggle moved into the
-        // utilities ("More") dropdown as logs-search-bar-menu-transform-editor-toggle-btn.
-        // Open the dropdown if needed, click the toggle item, then close the menu.
-        const transformEditorMenuItem = this.page.locator('[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]');
-        const isVisible = await transformEditorMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
+        // The function/transform editor toggle lives in the utilities ("More") dropdown.
+        // Mirror the clickSQLModeToggle / _openUtilitiesMenuForSqlMode pattern:
+        // check visibility first so we don't close-reopen a dropdown that's already open.
+        const menuItem = this.page.locator(this.menuTransformEditorToggleBtn);
+        const isMenuItemVisible = await menuItem.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isMenuItemVisible) {
             await this.page.locator(this.utilitiesMenuButton).click();
             await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 });
         }
@@ -7165,11 +7169,16 @@ export class LogsPage {
         if (isToolbarVisible) {
             await toolbarToggle.click();
         } else {
-            await this.page.locator(this.utilitiesMenuButton).click();
-            await this.page.waitForTimeout(200);
-            await this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]').click();
+            // Mirror the clickSQLModeToggle pattern: check visibility first so a
+            // second consecutive call (dropdown still open from first) just clicks.
+            const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
+            const isMenuItemVisible = await histogramMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+            if (!isMenuItemVisible) {
+                await this.page.locator(this.utilitiesMenuButton).click();
+                await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+            }
+            await histogramMenuItem.click();
         }
-        await this.page.waitForTimeout(500);
         testLogger.info('Histogram toggled');
     }
 
@@ -7335,15 +7344,16 @@ export class LogsPage {
      * the utilities menu as logs-search-bar-menu-list-saved-views-btn.
      */
     async clickSavedViewsDropdownArrow() {
-        const listSavedViewsBtn = this.page.locator('[data-test="logs-search-bar-menu-list-saved-views-btn"]');
-        const isVisible = await listSavedViewsBtn.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
-            await listSavedViewsBtn.waitFor({ state: 'visible', timeout: 5000 });
-        }
-        await this.page.waitForTimeout(200);
-        await listSavedViewsBtn.click({ force: true });
-        testLogger.info('Clicked saved views list button via utilities menu');
+        // Saved views list is now opened via the utilities ("More") dropdown menu.
+        // Ensure any previously open dropdown is closed before opening fresh.
+        const listMenuItem = this.page.locator(this.menuListSavedViewsBtn);
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await listMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await listMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        await listMenuItem.click();
+        await this.page.locator(this.savedViewsListDialogEl).waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Clicked saved views dropdown arrow');
     }
 
     /**
@@ -7352,7 +7362,7 @@ export class LogsPage {
     async expandSavedViewsDropdown() {
         await this.clickSavedViewsDropdownArrow();
         const searchInput = this.page.locator(this.savedViewSearchInput);
-        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
+        await searchInput.waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
