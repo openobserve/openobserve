@@ -397,7 +397,8 @@
     "switchToLogs": "clique para voltar para Logs",
     "patternNoValuesAvailable": "Não há valores disponíveis",
     "selectLogStream": "Selecione o fluxo de registros",
-    "noData": "Não há dados disponíveis"
+    "noData": "Não há dados disponíveis",
+    "functionEditorLabel": "Editor de funções"
   },
   "menu": {
     "home": "Início",

@@ -397,7 +397,8 @@
     "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
     "patternNoValuesAvailable": "Keine Werte verfügbar",
     "selectLogStream": "Logs-Stream auswählen",
-    "noData": "Keine Daten verfügbar"
+    "noData": "Keine Daten verfügbar",
+    "functionEditorLabel": "Funktionseditor"
   },
   "menu": {
     "home": "Startseite",
