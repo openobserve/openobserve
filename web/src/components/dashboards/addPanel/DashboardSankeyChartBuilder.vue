@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButtonGroup>
         <div
           class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          data-test="dashboard-sankey-source-empty-hint"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex

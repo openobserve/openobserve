@@ -1332,7 +1332,7 @@ export class LogsPage {
     }
 
     async executeQueryWithKeyboardShortcutWithSQLMode() {
-        await this.page.locator(this.sqlModeToggle).first().click();
+        await this.enableSqlModeIfNeeded();
         await this.page.locator(this.queryEditor).click();
         await this.page.keyboard.type("SELECT * FROM 'e2e_automate' LIMIT 10");
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
@@ -1463,7 +1463,7 @@ export class LogsPage {
 
     // SQL Mode methods
     async enableSQLMode() {
-        await this.page.locator(this.sqlModeToggle).first().click();
+        await this.enableSqlModeIfNeeded();
     }
 
     // Quick Mode methods (now inside the utilities hamburger menu)
@@ -2097,12 +2097,9 @@ export class LogsPage {
         await this.clearAndFillQueryEditor(query);
         await this.page.waitForTimeout(2000);
 
-        // OSwitch: check data-state on the inner button; click the wrapper to toggle
-        const isSqlEnabled = await this.isSqlModeEnabled();
-        if (!isSqlEnabled) {
-            await this.page.locator(this.sqlModeToggle).first().click();
-            await this.page.waitForTimeout(1000);
-        }
+        // Enable SQL mode (opens the utilities dropdown, toggles if needed, then closes it)
+        await this.enableSqlModeIfNeeded();
+        await this.page.waitForTimeout(1000);
 
         await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
         
@@ -2618,13 +2615,43 @@ export class LogsPage {
         );
     }
 
+    /**
+     * Open the utilities ("More") dropdown so the SQL mode toggle becomes visible.
+     * Returns true if the dropdown was opened by this call; false if toggle was already visible.
+     * Always pair with _closeUtilitiesMenuAfterSqlToggle() when the caller opened the menu.
+     */
+    /**
+     * Open the utilities ("More") dropdown so the SQL mode menu item becomes visible.
+     * Uses [data-test="logs-search-bar-menu-sql-mode-btn"] (the ODropdownItem) — NOT the
+     * syntax-guide which incorrectly carries the legacy data-test.
+     * Returns true if the dropdown was opened; false if it was already open.
+     */
+    async _openUtilitiesMenuForSqlMode() {
+        const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+        const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        }
+        return false;
+    }
+
+    /** Press Escape to close the utilities dropdown after a SQL mode check/toggle. */
+    async _closeUtilitiesMenuAfterSqlToggle() {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(100);
+    }
+
     async clickSQLModeToggle() {
-        // SearchBar.vue:97 / 501 emits an OSwitch with data-test="logs-search-bar-sql-mode-toggle-btn"
-        // (either on the toolbar or inside the utilities menu depending on viewport).
-        // Click the wrapper directly — OSwitch handles toggle on the wrapper click.
-        const toggle = this.page.locator(this.sqlModeToggle).first();
-        await toggle.waitFor({ state: 'visible', timeout: 10000 });
-        return await toggle.click({ force: true });
+        // SQL mode lives in the utilities ("More") dropdown.
+        // Click [data-test="logs-search-bar-menu-sql-mode-btn"] (ODropdownItem) — @select.prevent
+        // toggles sqlMode without closing the dropdown.
+        const menuOpened = await this._openUtilitiesMenuForSqlMode();
+        await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+        if (menuOpened) {
+            await this._closeUtilitiesMenuAfterSqlToggle();
+        }
     }
 
     async clickShowQueryToggle() {
@@ -6613,33 +6640,39 @@ export class LogsPage {
     }
 
     /**
-     * Check if SQL mode is currently enabled
+     * Check if SQL mode is currently enabled.
+     * Opens the utilities dropdown, reads the OSwitch inner button's data-state, then closes it.
      * @returns {Promise<boolean>} True if SQL mode is enabled
      */
     async isSqlModeEnabled() {
-        // OSwitch wrapper carries the consumer data-test; inner button has data-state="checked|unchecked"
-        const stateBtn = this.page.locator(this.sqlModeToggleStateBtn).first();
-        await stateBtn.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
-        const state = await stateBtn.getAttribute('data-state');
+        const menuOpened = await this._openUtilitiesMenuForSqlMode();
+        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const state = await stateEl.getAttribute('data-state').catch(() => null);
+        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
         return state === 'checked';
     }
 
     /**
      * Enable SQL mode if currently disabled; no-op if already enabled.
-     * Clicks the OSwitch wrapper data-test which toggles the underlying switch button.
+     * Opens the utilities menu to access the toggle, then closes it.
      */
     async enableSqlModeIfDisabled() {
-        const enabled = await this.isSqlModeEnabled();
-        if (!enabled) {
-            await this.page.locator(this.sqlModeToggle).first().click();
-            // Wait for the checked state element to appear deterministically
-            await expect(
-                this.page.locator(`[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]`).first()
-            ).toBeVisible({ timeout: 5000 });
+        const menuOpened = await this._openUtilitiesMenuForSqlMode();
+        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const state = await stateEl.getAttribute('data-state').catch(() => null);
+        if (state !== 'checked') {
+            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            await expect.poll(async () => {
+                const s = await stateEl.getAttribute('data-state').catch(() => null);
+                return s === 'checked';
+            }, { timeout: 5000 }).toBe(true);
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
         }
+        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
     }
 
     /**
@@ -6963,22 +6996,27 @@ export class LogsPage {
     }
 
     /**
-     * Click the SQL Mode switch by role
+     * Click the SQL Mode switch.
+     * Opens the utilities dropdown first since the toggle lives inside it.
      */
     async clickSQLModeSwitch() {
-        const sqlModeToggle = this.page.locator(this.sqlModeToggleBtn);
-        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
-        await sqlModeToggle.click();
+        const menuOpened = await this._openUtilitiesMenuForSqlMode();
+        await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
     }
 
     /**
-     * Get SQL mode aria-checked state
-     * @returns {Promise<string|null>} The aria-checked value
+     * Get SQL mode data-state value ("checked" | "unchecked").
+     * Opens the utilities dropdown to read the OSwitch inner button state, then closes it.
+     * @returns {Promise<string|null>}
      */
     async getSQLModeState() {
-        const stateBtn = this.page.locator(this.sqlModeToggleInnerBtn).first();
-        await stateBtn.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
-        return await stateBtn.getAttribute('data-state');
+        const menuOpened = await this._openUtilitiesMenuForSqlMode();
+        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const state = await stateEl.getAttribute('data-state').catch(() => null);
+        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        return state;
     }
 
     /**
@@ -7459,40 +7497,48 @@ export class LogsPage {
     }
 
     /**
-     * Enable SQL mode if not already enabled
-     * Combines getSQLModeState() check with clickSQLModeSwitch()
+     * Enable SQL mode if not already enabled.
+     * Opens the utilities ("More") dropdown, reads + toggles the OSwitch, then closes it.
      */
     async enableSqlModeIfNeeded() {
-        // Use .first() to dodge strict-mode violations when SearchBar duplicates this data-test
-        // (toolbar OSwitch + collapsed-menu syntax-guide may co-exist in the DOM).
-        const sqlModeToggle = this.page.locator(this.sqlModeToggle).first();
-        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
-        const isOn = await this.isSqlModeOn();
+        const menuOpened = await this._openUtilitiesMenuForSqlMode();
+        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (!isOn) {
-            await sqlModeToggle.click();
-            // Wait for the toggle to actually switch ON (inner <button role="switch"> exposes data-state)
-            await expect.poll(async () => this.isSqlModeOn(), { timeout: 10000 }).toBe(true);
+            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            // Dropdown stays open (ODropdownItem has @select.prevent) — poll the inner button directly
+            await expect.poll(async () => {
+                const s = await stateEl.getAttribute('data-state').catch(() => null);
+                return s === 'checked';
+            }, { timeout: 10000 }).toBe(true);
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
         }
+        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
     }
 
     /**
-     * Disable SQL mode if currently enabled
-     * Combines getSQLModeState() check with clickSQLModeSwitch()
+     * Disable SQL mode if currently enabled.
+     * Opens the utilities ("More") dropdown, reads + toggles the OSwitch, then closes it.
      */
     async disableSqlModeIfNeeded() {
-        const sqlModeToggle = this.page.locator(this.sqlModeToggle).first();
-        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
-        const isOn = await this.isSqlModeOn();
+        const menuOpened = await this._openUtilitiesMenuForSqlMode();
+        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (isOn) {
-            await sqlModeToggle.click();
-            await expect.poll(async () => this.isSqlModeOn(), { timeout: 10000 }).toBe(false);
+            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            await expect.poll(async () => {
+                const s = await stateEl.getAttribute('data-state').catch(() => null);
+                return s === 'unchecked';
+            }, { timeout: 10000 }).toBe(true);
             testLogger.info('SQL mode disabled');
         } else {
             testLogger.info('SQL mode already disabled');
         }
+        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
     }
 
     /**
@@ -8283,26 +8329,8 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if SQL mode is ON
      */
     async isSqlModeOn() {
-        // OSwitch wrapper carries data-test; inner <button role="switch"> exposes data-state="checked|unchecked".
-        // The wrapper may exist twice (toolbar OSwitch + collapsed-menu syntax-guide which forwards the
-        // same data-test). Scope to the visible OSwitch wrapper and read its inner data-state via evaluate
-        // so we never match the syntax-guide root.
-        const state = await this.page.evaluate((selector) => {
-            const wrappers = Array.from(document.querySelectorAll(selector));
-            for (const w of wrappers) {
-                // Prefer the visible wrapper (toolbar OSwitch is always in layout flow)
-                if (!/** @type {HTMLElement} */ (w).offsetParent) continue;
-                const inner = w.querySelector('[data-state]');
-                if (inner) return inner.getAttribute('data-state');
-            }
-            // Fallback: first wrapper that contains a [data-state] (works even when offsetParent is null in some layouts)
-            for (const w of wrappers) {
-                const inner = w.querySelector('[data-state]');
-                if (inner) return inner.getAttribute('data-state');
-            }
-            return null;
-        }, this.sqlModeToggle);
-        return state === 'checked';
+        // Opens the utilities dropdown to read the SQL mode OSwitch state, then closes it.
+        return await this.isSqlModeEnabled();
     }
 
     /**
@@ -8312,7 +8340,8 @@ export class LogsPage {
         const isSqlEnabled = await this.isSqlModeEnabled();
 
         if (isSqlEnabled) {
-            await this.page.locator(this.sqlModeToggleBtn).first().click();
+            // Turn off SQL mode so we can test auto-enable on Build tab switch
+            await this.disableSqlModeIfNeeded();
             await this.page.waitForTimeout(500);
         }
 
