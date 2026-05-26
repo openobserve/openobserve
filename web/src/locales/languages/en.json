@@ -3587,6 +3587,7 @@
     "correlatedLogs": "Logs",
     "correlatedMetrics": "Metrics",
     "correlatedTraces": "Traces",
+    "loadingCorrelation": "Loading correlation data...",
     "clickToLoadLogs": "Click to load correlated logs",
     "clickToLoadMetrics": "Click to load correlated metrics",
     "clickToLoadTraces": "Click to load correlated traces",
