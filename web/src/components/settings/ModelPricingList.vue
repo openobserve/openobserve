@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-match_pattern="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
             <code
-              class="tw:text-xs pattern-code o2-table-cell-content"
+              class="tw:text-xs pattern-code"
               :class="{ 'shadowed-pattern': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
@@ -584,29 +584,30 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colModel"),
     accessorKey: "name",
     sortable: true,
-    meta: { align: "left" , autoWidth: true },
+    minSize: 180,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "match_pattern",
     header: t("modelPricing.colMatchPattern"),
     accessorKey: "match_pattern",
-    size: 280,
-    meta: { align: "left" },
+    minSize: 200,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "pricing",
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
-    meta: { align: "left" },
-    size: 300,
+    minSize: 200,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "actions",
     header: t("modelPricing.colActions"),
     isAction: true,
     pinned: "right",
-    size: 200,
-    minSize: 180,
+    size: 168,
+    minSize: 44,
     meta: { align: "center", actionCount: 4 },
   },
 ];

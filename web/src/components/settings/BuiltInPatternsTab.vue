@@ -103,29 +103,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-              <span class="tw:text-sm tw:font-bold">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:gap-1">
+              <span class="tw:text-sm tw:font-semibold">
                 {{ pattern.name }}
               </span>
-              <span class="tw:block tw:text-xs tw:text-muted-foreground tw:line-clamp-2">
-                <div class="tw:mb-1">
-                  <OBadge
-                    v-for="tag in pattern.tags.slice(0, 3)"
-                    :key="tag"
-                    size="sm"
-                    variant="primary"
-                  >
-                    {{ tag }}
-                  </OBadge>
-                  <OBadge v-if="pattern.tags.length > 3" size="sm">
-                    +{{ pattern.tags.length - 3 }}
-                  </OBadge>
-                </div>
-                <div class="pattern-preview">
-                  {{ pattern.pattern.substring(0, 100)
-                  }}{{ pattern.pattern.length > 100 ? "..." : "" }}
-                </div>
-              </span>
+              <div class="tw:flex tw:flex-wrap tw:gap-1">
+                <OBadge
+                  v-for="tag in pattern.tags.slice(0, 3)"
+                  :key="tag"
+                  size="sm"
+                  variant="primary"
+                >
+                  {{ tag }}
+                </OBadge>
+                <OBadge v-if="pattern.tags.length > 3" size="sm">
+                  +{{ pattern.tags.length - 3 }}
+                </OBadge>
+              </div>
+              <div class="pattern-preview tw:line-clamp-1">
+                {{ pattern.pattern.substring(0, 100)
+                }}{{ pattern.pattern.length > 100 ? "..." : "" }}
+              </div>
             </div>
 
             <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
@@ -477,8 +475,7 @@ export default defineComponent({
 
 .filters-bar {
   flex-shrink: 0;
-  background: var(--q-color-background);
-  border-bottom: 1px solid var(--q-color-separator);
+  border-bottom: 1px solid var(--o2-border-color);
 }
 
 .patterns-list {
@@ -495,8 +492,8 @@ export default defineComponent({
 
 .pattern-preview {
   font-family: monospace;
-  font-size: 0.85em;
-  color: var(--q-color-text-caption);
+  font-size: 0.75rem;
+  color: var(--o2-text-secondary);
   word-break: break-all;
 }
 </style>

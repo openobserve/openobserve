@@ -214,7 +214,10 @@ function handleClick() {
       class="tw:flex tw:items-center tw:gap-1 tw:min-w-0"
       :style="{ paddingLeft: `${treeIndentPx}px` }"
     >
-      <span class="o2-table-tree-chevron-slot">
+      <span
+        v-if="treeMeta?.hasChildren || (treeMeta && treeMeta.parentId !== null)"
+        class="o2-table-tree-chevron-slot"
+      >
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
@@ -229,7 +232,7 @@ function handleClick() {
           />
         </button>
         <span
-          v-else-if="treeMeta && treeMeta.parentId !== null"
+          v-else
           class="o2-table-tree-endpoint"
           aria-hidden="true"
         />

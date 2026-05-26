@@ -1029,13 +1029,15 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
+      if (store.state.theme === "dark") {
+        return getImageURL("images/common/ai_icon_dark.svg");
+      }
+
       if (isHovered.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
-      return store.state.theme === "dark"
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
+      return getImageURL("images/common/ai_icon_gradient.svg");
     });
     //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
     //this will be called from the get started component whenever users clicks on the submit button
