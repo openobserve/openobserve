@@ -172,17 +172,7 @@ const wrapperClasses = computed(() => [
           class="tw:flex tw:items-center tw:ps-3 tw:text-datepicker-icon tw:shrink-0 tw:outline-none tw:cursor-pointer tw:disabled:cursor-not-allowed"
           aria-label="Open calendar"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            class="tw:size-4"
-            aria-hidden="true"
-          >
-            <path
-              d="M4 1.5a.5.5 0 0 1 .5.5V3h7V2a.5.5 0 0 1 1 0v1h.5A1.5 1.5 0 0 1 14.5 4.5v9A1.5 1.5 0 0 1 13 15H3a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 3 3h.5V2a.5.5 0 0 1 .5-.5Zm-1.5 4v8a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5v-8h-11Z"
-            />
-          </svg>
+          <OIcon name="calendar-month" size="sm" aria-hidden="true" />
         </DatePickerTrigger>
 
         <!-- Segmented date field -->
@@ -201,7 +191,7 @@ const wrapperClasses = computed(() => [
                 :class="[
                   'tw:text-datepicker-text',
                   seg.part !== 'literal'
-                    ? 'tw:rounded-sm tw:px-px tw:outline-none tw:tabular-nums tw:data-placeholder:text-datepicker-placeholder tw:focus:bg-datepicker-segment-focus-bg tw:focus:text-datepicker-segment-focus-text'
+                    ? 'tw:rounded-sm tw:px-px tw:outline-none tw:tabular-nums tw:data-placeholder:text-datepicker-placeholder tw:focus:bg-datepicker-segment-focus-bg tw:focus:text-datepicker-segment-focus-text tw:focus:data-placeholder:text-datepicker-segment-focus-text'
                     : 'tw:select-none tw:text-datepicker-placeholder',
                 ]"
               >{{ seg.value }}</DatePickerInput>
