@@ -21,8 +21,10 @@ defineEmits<{
     @click.stop="$emit('toggle')"
   >
     <OIcon
-      :name="expanded ? 'expand-less' : 'expand-more'"
+      name="chevron-right"
       size="sm"
+      class="tw:transition-transform tw:duration-200"
+      :class="expanded ? 'tw:rotate-90' : 'tw:rotate-0'"
     />
   </button>
 </template>

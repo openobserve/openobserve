@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="check-icon"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
-                <OIcon name="check-circle" size="md" />
+                <OIcon name="check" size="xs" />
               </div>
             </div>
           </div>
@@ -1356,8 +1356,18 @@ defineExpose({
 
   .check-icon {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 0.375rem;
+    right: 0.375rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--o2-positive);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
   }
 }
 
