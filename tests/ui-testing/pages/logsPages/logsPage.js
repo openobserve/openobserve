@@ -2856,7 +2856,8 @@ export class LogsPage {
     async clickSavedViewByTitle(title) {
         const element = this.page.locator(`[data-test="logs-search-bar-apply-${title}-saved-view-btn"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
-        return await element.click();
+        // force: true — ODropdown portal transiently detaches items during initial render
+        return await element.click({ force: true });
     }
 
     async clickDeleteButton() {
@@ -2868,7 +2869,10 @@ export class LogsPage {
     }
 
     async clickConfirmButton() {
-        return await this.page.locator(this.confirmButton).click();
+        const btn = this.page.locator(this.confirmButton);
+        await btn.waitFor({ state: 'visible', timeout: 5000 });
+        // force: true — dialog portal can transiently detach during initial render
+        return await btn.click({ force: true });
     }
 
     async clickStreamsMenuItem() {
@@ -2945,30 +2949,24 @@ export class LogsPage {
         const backdrop = this.page.locator('[data-test="o-dialog-close-btn"]');
         const isBackdropVisible = await backdrop.isVisible().catch(() => false);
         if (isBackdropVisible) {
-            await backdrop.click();
-            await this.waitForTimeout(500);
+            // force: true — ODropdown portal transiently detaches items during initial render
+            await backdrop.click({ force: true });
+            await backdrop.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         }
 
-        // Wait for the saved views area to be stable after navigation
-        await this.waitForTimeout(2000);
-
-        // Ensure saved views panel is expanded and wait for stability
+        // Ensure saved views panel is expanded
         await this.clickSavedViewsExpand();
-        await this.waitForTimeout(1000);
 
-        // Wait for the search input to be stable and ready
-        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
-        await this.waitForTimeout(500);
+        // Wait for the search input to be visible and ready
+        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'visible', timeout: 5000 });
 
         // Click and fill the search input with better error handling
         await this.page.locator(this.savedViewSearchInput).click({ force: true });
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
-        await this.waitForTimeout(1500);
 
         // Wait for and click the delete button
         await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(deleteButtonSelector).click({ force: true });
-        await this.waitForTimeout(500);
     }
 
     async clickResetFiltersButton() {
@@ -5211,7 +5209,8 @@ export class LogsPage {
         if (desiredState !== isOn) {
             // Click the inner OSwitch <button> (data-state="checked|unchecked") — the outer wrapper
             // is a <div> that Playwright treats as non-interactive and times out on.
-            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]').click();
+            // force: true — ODropdown portal transiently detaches items during initial render
+            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]').click({ force: true });
             // Wait for OSwitch data-state to flip to the desired value
             const expectedState = desiredState ? 'checked' : 'unchecked';
             await this.page.waitForFunction(
@@ -5239,7 +5238,8 @@ export class LogsPage {
         const isOn = state === 'checked';
 
         if (desiredState !== isOn) {
-            await histogramMenuItem.click();
+            // force: true — ODropdown portal transiently detaches items during initial render
+            await histogramMenuItem.click({ force: true });
             await this.page.keyboard.press('Escape').catch(() => {});
             return true; // State was changed
         }
@@ -7209,7 +7209,8 @@ export class LogsPage {
                 await this.page.locator(this.utilitiesMenuButton).click();
                 await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
             }
-            await histogramMenuItem.click();
+            // force: true — ODropdown portal transiently detaches items during initial render
+            await histogramMenuItem.click({ force: true });
         }
         testLogger.info('Histogram toggled');
     }
@@ -7341,11 +7342,12 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickSavedViewByName(name) {
-        // Target the per-row data-test on the saved-view list row (SearchBar.vue):
-        // `logs-search-saved-view-item-${row.view_name}` — §2-compliant, no text-matching.
-        const savedView = this.page.locator(`[data-test="logs-search-saved-view-item-${name}"]`).first();
+        // SearchBar.vue uses data-test="logs-search-bar-apply-${value}-saved-view-btn" for the apply button.
+        // The previously used `logs-search-saved-view-item-${name}` does not exist in the DOM.
+        const savedView = this.page.locator(`[data-test="logs-search-bar-apply-${name}-saved-view-btn"]`).first();
         await savedView.waitFor({ state: 'visible', timeout: 10000 });
-        await savedView.click();
+        // force: true — ODropdown portal transiently detaches items during initial render
+        await savedView.click({ force: true });
         testLogger.info(`Clicked saved view: ${name}`);
     }
 
@@ -7380,9 +7382,21 @@ export class LogsPage {
         const listMenuItem = this.page.locator(this.menuListSavedViewsBtn);
         await this.page.keyboard.press('Escape').catch(() => {});
         await listMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await listMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        await listMenuItem.click();
+        // After navigation the Vue component may need an extra render cycle before its
+        // click handler responds. Retry the open sequence up to 3 times: force-click the
+        // trigger, wait up to 5 s for the menu item to appear, then reset and try again.
+        let opened = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+            opened = await listMenuItem.waitFor({ state: 'visible', timeout: 5000 })
+                .then(() => true).catch(() => false);
+            if (opened) break;
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await listMenuItem.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
+        }
+        if (!opened) throw new Error('Could not open saved views menu after 3 attempts');
+        // force: true — ODropdown portal transiently detaches items during initial render
+        await listMenuItem.click({ force: true });
         await this.page.locator(this.savedViewsListDialogEl).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Clicked saved views dropdown arrow');
     }

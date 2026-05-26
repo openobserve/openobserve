@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon-left>
               <OSwitch
+                data-test="logs-search-bar-show-query-toggle-btn"
                 v-model="searchObj.meta.showTransformEditor"
                 size="md"
                 @click.stop
