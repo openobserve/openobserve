@@ -65,7 +65,7 @@ limitations under the License.
 
     <!-- MS Teams Fields -->
     <template v-if="destinationType === 'msteams'">
-      <div class="tw:w-full tw:py-1">
+      <div class="tw:w-1/2 tw:py-1">
         <OInput
           v-model="credentials.webhookUrl"
           data-test="msteams-webhook-url-input"
@@ -108,7 +108,7 @@ limitations under the License.
 
     <!-- ServiceNow Fields -->
     <template v-if="destinationType === 'servicenow'">
-      <div class="tw:w-full tw:py-1">
+      <div class="tw:w-1/2 tw:py-1">
         <OInput
           v-model="credentials.instanceUrl"
           data-test="servicenow-instance-url-input"
@@ -142,7 +142,7 @@ limitations under the License.
           :error-message="fieldErrors.password"
         />
       </div>
-      <div class="tw:w-full tw:py-1">
+      <div class="tw:w-1/2 tw:py-1">
         <OInput
           v-model="credentials.assignmentGroup"
           data-test="servicenow-assignment-group-input"
@@ -155,7 +155,7 @@ limitations under the License.
 
     <!-- Email Fields -->
     <template v-if="destinationType === 'email'">
-      <div class="tw:w-full tw:py-1">
+      <div class="tw:w-1/2 tw:py-1">
         <OInput
           v-model="credentials.recipients"
           data-test="email-recipients-input"
