@@ -23,6 +23,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>-</span>
           <span> {{ new Date(endTime/1000).toDateString() }} </span>
         </div>
+        <div v-if="billingMembers.length > 0" class="tw:min-w-[240px]">
+          <q-select
+            v-model="selectedMember"
+            :options="memberOptions"
+            :label="t('billing.organizationGroup.usageMemberLabel')"
+            class="showLabelOnTop"
+            stack-label
+            borderless
+            dense
+            bg-color="input-bg"
+            color="input-border"
+            emit-value
+            map-options
+            data-test="usage-member-select"
+          />
+        </div>
       </div>
       <div>
         <div v-if="Object.keys(usageData).length === 0" >
@@ -245,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useQuasar, date } from "quasar";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
+  import config from "@/aws-exports";
   import { convertBillingData } from "@/utils/billing/convertBillingData";
 import router from "@/router";
 import { useRouter } from "vue-router";
@@ -287,7 +304,28 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         ai_credits: "0.00"
       });
       let chartData: any = ref({});
+      const selectedMember = ref("");
+      const billingMembers = ref<string[]>([]);
+      const memberOptions = computed(() => [
+        { label: t("billing.organizationGroup.usageAllMembers"), value: "" },
+        ...billingMembers.value.map((m) => ({ label: m, value: m })),
+      ]);
+      const fetchBillingMembers = () => {
+        if (config.isCloud !== "true") return;
+        BillingService.list_billing_group_members(
+          store.state.selectedOrganization.identifier
+        )
+          .then((res: any) => {
+            billingMembers.value = (res.data ?? []).map(
+              (m: any) => m.member_org_id
+            );
+          })
+          .catch(() => {
+            billingMembers.value = [];
+          });
+      };
       onMounted(async () => {
+        fetchBillingMembers();
         selectUsageDate();
       });
       const usageDate: any = computed(() => {
@@ -300,6 +338,9 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       watch(usageDataType, (val) => {
         getUsage();
       })
+      watch(selectedMember, () => {
+        getUsage();
+      })
       const getUsage = () => {
         const dismiss = $q.notify({
           spinner: true,
@@ -308,8 +349,9 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         dataLoading.value = true;
         BillingService.get_data_usage(
           store.state.selectedOrganization.identifier,
-          usageDate.value,  
-          usageDataType.value
+          usageDate.value,
+          usageDataType.value,
+          selectedMember.value || undefined
         )
           .then((res) => {
             dataLoading.value = false;
@@ -954,6 +996,9 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         remotePipelineIcon,
         dataRetentionIcon,
         aiIcon,
+        selectedMember,
+        billingMembers,
+        memberOptions,
       };
     },
   });
