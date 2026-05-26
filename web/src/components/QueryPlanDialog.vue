@@ -705,6 +705,22 @@ export default defineComponent({
   border-radius: 0.5rem;
   overflow: hidden;
 
+  // Make OTabPanels and OTabPanel fill the remaining surface height
+  :deep(.o-tab-panels) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.o-tab-panel) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   &__header {
     padding: 0.625rem 1rem;
     border-bottom: 1px solid var(--o2-border-color);
@@ -726,7 +742,7 @@ export default defineComponent({
 }
 
 .plan-scroll-area {
-  max-height: calc(100vh - 250px);
+  flex: 1;
   overflow-y: auto;
   padding: 0.75rem 1rem;
 }

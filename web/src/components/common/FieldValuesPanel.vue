@@ -118,6 +118,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ fieldValues?.errMsg || "No values found" }}
       </div>
 
+      <!-- Selected values with no count data available (synthetic fallback) -->
+      <div
+        v-if="displayValues.length > 0 && (displayValues[0] as any)?.synthetic && !fieldValues?.isLoading"
+        class="tw:pl-3 tw:pb-1 tw:text-xs tw:text-o2-text-secondary tw:italic"
+        data-test="field-values-panel-no-count-msg"
+      >
+        No data in range — values from active filter
+      </div>
+
       <!-- Field values list -->
       <ul
         class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none"
@@ -155,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ value.label ?? value.key }}
               </div>
               <div
+                v-if="value.count != null"
                 :title="String(value.count)"
                 class="tw:truncate tw:text-right tw:pr-0 tw:text-3!"
                 style="display: contents"
@@ -281,6 +291,10 @@ watch(
 );
 
 // Show interim locally-filtered cache while the API responds to a search term.
+// When the API returns no values but there are selected values (e.g. after page
+// refresh where the filter exists in the URL but the time range yields no data),
+// synthesise the selected values as items so the user can see and deselect them
+// instead of seeing a contradictory "N selected / No values found" state.
 const displayValues = computed(() => {
   if (
     props.fieldValues?.isLoading &&
@@ -292,7 +306,17 @@ const displayValues = computed(() => {
       String(v.key).toLowerCase().includes(term),
     );
   }
-  return props.fieldValues?.values || [];
+
+  const apiValues = props.fieldValues?.values || [];
+  if (apiValues.length > 0) return apiValues;
+
+  // No API values — fall back to synthetic entries for each selected value so
+  // they remain visible and removable (count: null signals no data available).
+  if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
+    return selectedValues.value.map((v) => ({ key: v, count: null as unknown as number, synthetic: true }));
+  }
+
+  return [];
 });
 
 // Show search box whenever there are values to search.
