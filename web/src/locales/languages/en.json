@@ -1584,6 +1584,7 @@
     "selectDashboard": "Select Dashboard",
     "importDashboard": "Import Dashboard",
     "dropFileMsg": "Drop your file here ",
+    "selectFile": "Select File",
     "importURL": "Import Dashboard from URL",
     "addURL": "Add your url",
     "importJson": "Import Dashboard from JSON",
