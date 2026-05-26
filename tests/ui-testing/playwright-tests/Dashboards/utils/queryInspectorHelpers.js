@@ -120,7 +120,7 @@ export function calculateTimeRangeDuration(startTime, endTime) {
  * @param {number} queryIndex - Query index (default: 0)
  * @param {number} tolerancePercent - Tolerance percentage (default: 10%)
  */
-export async function assertQueryInspectorTimeRange(page, expectedRange, queryIndex = 0, tolerancePercent = 15) {
+export async function assertQueryInspectorTimeRange(page, expectedRange, queryIndex = 0, tolerancePercent = 10) {
   testLogger.info('Asserting query inspector time range', { expectedRange, queryIndex });
 
   const dateTime = await getQueryInspectorDateTime(page, queryIndex);

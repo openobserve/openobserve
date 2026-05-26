@@ -42,9 +42,6 @@ const {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior", () => {
-  // Fix timezone to UTC to avoid DST-related duration mismatches in CI
-  test.use({ timezoneId: 'UTC' });
-
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
@@ -426,7 +423,6 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Step 2: Click panel picker, select "Last 6 days"
     await pm.dashboardPanelTime.clickPanelTimePicker(panelId);
     await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
-    await page.waitForTimeout(500); // Wait for time picker to update selection
 
     // Step 3: Verify panel data does NOT refresh yet
     await assertPanelDataNotRefreshed(page, 2000);
@@ -434,11 +430,8 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Step 4: Verify URL has NOT updated yet
     expect(page.url()).toBe(initialURL);
 
-    // Step 5: Click Apply button and wait for the query to fire
-    await Promise.all([
-      page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200, { timeout: 10000 }).catch(() => {}),
-      page.locator('[data-test="date-time-apply-btn"]').click(),
-    ]);
+    // Step 5: Click Apply button
+    await page.locator('[data-test="date-time-apply-btn"]').click();
 
     // Step 6: Verify API call fires immediately
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});

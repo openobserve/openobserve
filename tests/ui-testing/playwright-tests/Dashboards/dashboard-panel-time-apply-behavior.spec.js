@@ -23,9 +23,6 @@ import {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
-  // Fix timezone to UTC to avoid DST-related duration mismatches in CI
-  test.use({ timezoneId: 'UTC' });
-
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
@@ -94,7 +91,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
 
     // Step 9: Change global time again to verify Apply works multiple times
     await pm.dashboardPanelTime.changeGlobalTime('1-w');
-    await page.waitForTimeout(2000); // Buffer for data processing (longer for week range)
+    await page.waitForTimeout(1000); // Buffer for data processing
 
     // Verify time updated to ~1 week
     await verifyQueryInspectorDateTime(page, { expectedRange: "1w" });
