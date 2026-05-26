@@ -301,9 +301,9 @@ export default class LogsVisualise {
     );
     await runBtn.waitFor({ state: "visible" });
     await runBtn.click();
-    await runBtn.waitFor({ state: "visible" });
-    // Optional: small buffer to ensure UI is stable
-    await this.page.waitForTimeout(300);
+    // Wait for query to start (cancel btn appears) then complete (cancel btn disappears)
+    await cancelBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    await cancelBtn.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {});
   }
 
   // Helper function to check for dashboard errors

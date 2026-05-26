@@ -263,7 +263,7 @@ test.describe("VRL visualization support testcases", () => {
     );
 
     // Verify success
-    const successMessage = page.getByText("Panel added to dashboard");
+    const successMessage = page.locator('[data-test="o-toast-message"]').filter({ hasText: "Panel added to dashboard" });
     await expect(successMessage).toBeVisible({ timeout: 10000 });
 
     // Verify table chart is displayed on dashboard
