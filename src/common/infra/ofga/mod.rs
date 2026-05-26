@@ -74,6 +74,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_incidents_migration = false;
     let mut need_model_pricing_migration = false;
     let mut need_billing_group_migration = false;
+    let mut need_anomaly_detection_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -256,6 +257,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_30 = version_compare::Version::from("0.0.30").unwrap();
                 let v0_0_31 = version_compare::Version::from("0.0.31").unwrap();
                 let v0_0_33 = version_compare::Version::from("0.0.33").unwrap();
+                let v0_0_34 = version_compare::Version::from("0.0.34").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -322,6 +324,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     need_incidents_migration = true;
                 }
                 if existing_model_version < v0_0_33 {
+                    log::info!("[OFGA:Local] anomaly detection permissions migration needed");
+                    need_anomaly_detection_migration = true;
+                }
+
+                if existing_model_version < v0_0_34 {
                     log::info!("[OFGA:Local] billing group migration needed");
                     need_billing_group_migration = true;
                 }
@@ -480,6 +487,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         Err(e) => {
                             log::error!(
                                 "[OFGA:Local] Error migrating report folders to openfga: {e}"
+                            );
+                        }
+                    }
+                }
+                if need_anomaly_detection_migration {
+                    match migrations::migrate_anomaly_detection().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[OFGA:Local] Error migrating anomaly detection to openfga: {e}"
                             );
                         }
                     }
