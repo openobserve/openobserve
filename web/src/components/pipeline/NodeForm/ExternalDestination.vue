@@ -134,6 +134,7 @@ const getFormattedDestinations = computed(() => {
       label: destination.name,
       value: destination.name,
       subLabel: truncatedUrl,
+      subLabelInline: true,
     };
   });
 });
