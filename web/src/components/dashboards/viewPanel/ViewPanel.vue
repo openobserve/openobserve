@@ -27,11 +27,6 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          @update:modelValue="
-            (newValue: any) => {
-              histogramInterval = newValue.value;
-            }
-          "
           class="viewpanel-icons"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
