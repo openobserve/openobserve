@@ -317,6 +317,10 @@ impl TopKHeap {
 }
 
 /// Wrapper around a JSON hit that implements `Ord` across all ORDER BY columns.
+///
+/// Direction-aware so that `Reverse<HeapHit>` always evicts the "current worst":
+/// - DESC col: ascending cmp → `Reverse` = min-heap → evicts smallest → keeps k largest
+/// - ASC  col: descending cmp → `Reverse` = min-heap → evicts largest → keeps k smallest
 struct HeapHit {
     hit: Value,
     cols: Vec<(String, bool, bool)>,
@@ -344,6 +348,7 @@ impl Ord for HeapHit {
             } else {
                 compare_string_values(&self.hit, &other.hit, col)
             };
+            // Flip direction for ASC so Reverse<HeapHit> evicts the largest (keeps k smallest).
             let ord = if *is_desc { ord } else { ord.reverse() };
             if ord != Ordering::Equal {
                 return ord;
