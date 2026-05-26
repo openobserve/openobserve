@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Mevcut değer yok",
     "selectLogStream": "Günlükler akışını seçin",
     "noData": "Veri yok",
-    "functionEditorLabel": "İşlev Düzenleyicisi",
-    "transformEditorLabel": "Dönüştür Düzenleyicisi"
+    "functionEditorLabel": "İşlev Düzenleyicisi"
   },
   "menu": {
     "home": "Ana Sayfa",

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="tw:flex tw:items-center">
-      <div class="tw:flex tw:items-center">
+      <div v-if="!hideToggle" class="tw:flex tw:items-center">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.showTransformEditor"
@@ -147,9 +147,12 @@ import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   functionOptions: { name: string; function: string }[];
-}>();
+  hideToggle?: boolean;
+}>(), {
+  hideToggle: false,
+});
 
 const emit = defineEmits(["select:function", "save:function"]);
 

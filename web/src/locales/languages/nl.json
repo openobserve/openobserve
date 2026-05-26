@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
-    "functionEditorLabel": "Functie-editor",
-    "transformEditorLabel": "Editor transformeren"
+    "functionEditorLabel": "Functie-editor"
   },
   "menu": {
     "home": "Home",

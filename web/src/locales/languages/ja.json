@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "使用可能な値はありません",
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
-    "functionEditorLabel": "関数エディター",
-    "transformEditorLabel": "トランスフォームエディター"
+    "functionEditorLabel": "関数エディター"
   },
   "menu": {
     "home": "ホーム",

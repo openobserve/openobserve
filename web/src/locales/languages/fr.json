@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Aucune valeur disponible",
     "selectLogStream": "Sélectionnez le flux de journaux",
     "noData": "Aucune donnée disponible",
-    "functionEditorLabel": "Éditeur de fonctions",
-    "transformEditorLabel": "Éditeur de transformation"
+    "functionEditorLabel": "Éditeur de fonctions"
   },
   "menu": {
     "home": "Accueil",

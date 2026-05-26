@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "No hay valores disponibles",
     "selectLogStream": "Seleccione la secuencia de registros",
     "noData": "No hay datos disponibles",
-    "functionEditorLabel": "Editor de funciones",
-    "transformEditorLabel": "Editor de transformaciones"
+    "functionEditorLabel": "Editor de funciones"
   },
   "menu": {
     "home": "Inicio",

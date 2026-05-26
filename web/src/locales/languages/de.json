@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Keine Werte verfügbar",
     "selectLogStream": "Logs-Stream auswählen",
     "noData": "Keine Daten verfügbar",
-    "functionEditorLabel": "Funktionseditor",
-    "transformEditorLabel": "Transformations-Editor"
+    "functionEditorLabel": "Funktionseditor"
   },
   "menu": {
     "home": "Startseite",

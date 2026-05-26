@@ -188,7 +188,7 @@ export class LogsPage {
         this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
-        this.moreOptionsBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
+        this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
         this.downloadSubmenu = '[data-test="search-download-submenu"]';
@@ -9205,7 +9205,7 @@ export class LogsPage {
      * Open the "More Options" menu on the logs search bar.
      */
     async openMoreOptionsMenu() {
-        const menuBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+        const menuBtn = this.page.locator('[data-test="logs-search-bar-more-options-btn"]');
         await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
         await menuBtn.click();
         await this.page.waitForTimeout(500);
