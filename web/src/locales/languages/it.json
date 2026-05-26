@@ -1598,7 +1598,8 @@
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
     "configSectionBackground": "Sfondo",
-    "allFolders": "Tutte le cartelle"
+    "allFolders": "Tutte le cartelle",
+    "selectFile": "Seleziona file"
   },
   "panel": {
     "header": "Pannello",

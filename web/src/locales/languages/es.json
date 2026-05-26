@@ -1600,7 +1600,8 @@
     "axisLabelTruncateTooltipText": "Trunque las etiquetas del eje x al ancho especificado (en píxeles).",
     "axisLabelTooltipNotePrefix": "Nota:",
     "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales.",
-    "allFolders": "Todas las carpetas"
+    "allFolders": "Todas las carpetas",
+    "selectFile": "Seleccione un archivo"
   },
   "panel": {
     "header": "Panel",

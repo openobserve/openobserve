@@ -42,8 +42,8 @@ const effectiveError = computed(
 const hasError = computed(() => !!effectiveError.value);
 
 const heightClasses: Record<NonNullable<FileProps["size"]>, string> = {
-  sm: "tw:min-h-8 tw:text-xs",
-  md: "tw:min-h-10 tw:text-sm",
+  sm: "tw:h-6 tw:text-xs",
+  md: "tw:h-8 tw:text-sm",
 };
 
 function emitFiles(fileList: FileList | File[] | null) {
@@ -153,7 +153,7 @@ function formatSize(bytes: number) {
 }
 
 const wrapperClasses = computed(() => [
-  "tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full tw:rounded-md tw:border tw:px-3 tw:py-2 tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
+  "tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full tw:rounded-md tw:border tw:px-3 tw:py-1 tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
   "tw:ring-offset-1 tw:ring-offset-surface-base",
   heightClasses[props.size ?? "md"],
   isDragging.value
@@ -173,7 +173,7 @@ const wrapperClasses = computed(() => [
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-file-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1"
     >
       <slot name="label">{{ label }}</slot>
       <OIcon
