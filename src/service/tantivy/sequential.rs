@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Legacy single-threaded tantivy index builder.
+//! Single-segment, stream-order tantivy index builder.
 //!
 //! Consumes a [`RecordBatchStream`] sequentially and feeds documents to a
 //! single [`SingleSegmentIndexWriter`] in stream order. This is what runs when
@@ -21,64 +21,38 @@
 //! fallback for non-parquet inputs (e.g. Vortex) where row_group dispatch is
 //! not applicable.
 //!
+//! Pipeline:
+//!   async producer (stream pull)  ──mpsc(RecordBatch, cap=2)──▶  blocking worker
+//!                                                                (convert + add_doc)
+//!
+//! The blocking worker owns the `SingleSegmentIndexWriter` and runs all of the
+//! per-row CPU work — batch→docs conversion and `add_document` encoding — on a
+//! `spawn_blocking` thread. This is the same shape `parallel.rs` uses; the only
+//! reason there is one worker here instead of N is that the legacy path must
+//! preserve global row order for non-parquet inputs.
+//!
 //! See [`super::parallel`] for the row_group-parallel path enabled by the
 //! `workers > 0` config.
 
 use std::sync::Arc;
 
 use anyhow::Context;
-use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, LargeStringArray, StringArray, StringViewArray,
-    UInt64Array,
-};
+use arrow::array::RecordBatch;
 use arrow_schema::Schema;
-use config::{TIMESTAMP_COL_NAME, utils::parquet::RecordBatchStream};
+use config::utils::parquet::RecordBatchStream;
 use futures::TryStreamExt;
 use tokio::task::JoinHandle;
 
-use super::{build_tantivy_schema_for_index, make_index_tokenizer_manager};
-
-// macro to reduce duplication in array processing
-macro_rules! process_string_array {
-    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
-        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
-            for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
-                    doc.add_text($field, array.value(i));
-                }
-                tokio::task::coop::consume_budget().await;
-            }
-            continue;
-        }
-    };
-}
-
-// macro to reduce duplication in array processing
-macro_rules! process_numeric_array {
-    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
-        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
-            for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
-                    let text = array.value(i).to_string();
-                    doc.add_text($field, &text);
-                }
-                tokio::task::coop::consume_budget().await;
-            }
-            continue;
-        }
-    };
-}
+use super::{
+    build_tantivy_schema_for_index, convert_batch_to_docs_sync, make_index_tokenizer_manager,
+};
 
 /// Create a tantivy index in the given directory for the record batch stream.
 ///
-/// This is the legacy path: a single producer task pulls `RecordBatch`es from
-/// `reader`, converts them to `TantivyDocument`s on the runtime thread, and
-/// pushes them through a small mpsc channel to a single `SingleSegmentIndexWriter`
-/// that processes them in arrival order.
+/// Single producer task pulls `RecordBatch`es from `reader` and forwards them
+/// over a small bounded channel to one `spawn_blocking` writer worker that
+/// converts each batch into `TantivyDocument`s and feeds them to a
+/// `SingleSegmentIndexWriter` in arrival order.
 pub(super) async fn generate_tantivy_index<D: tantivy::Directory>(
     tantivy_dir: D,
     reader: RecordBatchStream,
@@ -93,108 +67,70 @@ pub(super) async fn generate_tantivy_index<D: tantivy::Directory>(
     };
 
     let tokenizer_manager = make_index_tokenizer_manager();
-    let mut index_writer = tantivy::IndexBuilder::new()
+    let index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema.clone())
         .tokenizers(tokenizer_manager)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
-    // docs per row to be added in the tantivy index
     log::debug!("start write documents to tantivy index");
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(2);
-    let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
-        let mut total_num_rows = 0;
+
+    // Cap=2 gives one batch in flight for the worker plus one queued, which is
+    // enough to overlap stream I/O with indexing CPU without piling up memory.
+    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+
+    // Async producer: pulls batches off the (possibly I/O-bound) stream and
+    // forwards them. send().await applies backpressure when the worker falls
+    // behind. The producer holds the only `tx`; dropping it on completion is
+    // what signals end-of-stream to the worker.
+    let producer: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
+        let mut total_num_rows = 0usize;
         let mut reader = reader;
-        loop {
-            let batch = reader.try_next().await?;
-            let Some(inverted_idx_batch) = batch else {
-                break;
-            };
-            let num_rows = inverted_idx_batch.num_rows();
+        while let Some(batch) = reader.try_next().await? {
+            let num_rows = batch.num_rows();
             if num_rows == 0 {
                 continue;
             }
-
-            // update total_num_rows
             total_num_rows += num_rows;
-
-            // process full text search fields
-            let mut docs = vec![tantivy::doc!(); num_rows];
-            for column_name in tantivy_fields.iter() {
-                // get field
-                let field = match tantivy_schema.get_field(column_name) {
-                    Ok(f) => f,
-                    Err(_) => fts_field.unwrap(),
-                };
-
-                // get column data and convert to strings for indexing
-                if let Some(data) = inverted_idx_batch.column_by_name(column_name) {
-                    // handle string types directly
-                    process_string_array!(data, StringViewArray, docs, field);
-                    process_string_array!(data, StringArray, docs, field);
-                    process_string_array!(data, LargeStringArray, docs, field);
-
-                    // handle numeric and boolean types with to_string conversion
-                    process_numeric_array!(data, Int64Array, docs, field);
-                    process_numeric_array!(data, UInt64Array, docs, field);
-                    process_numeric_array!(data, Float64Array, docs, field);
-                    process_numeric_array!(data, BooleanArray, docs, field);
-
-                    // unsupported type, add empty string
-                    for doc in docs.iter_mut() {
-                        doc.add_text(field, "");
-                        tokio::task::coop::consume_budget().await;
-                    }
-                } else {
-                    // column not found, add empty string
-                    for doc in docs.iter_mut() {
-                        doc.add_text(field, "");
-                        tokio::task::coop::consume_budget().await;
-                    }
-                }
+            if tx.send(batch).await.is_err() {
+                // Worker exited (likely an error on its side); stop reading.
+                break;
             }
-
-            // process _timestamp field
-            let column_data = match inverted_idx_batch.column_by_name(TIMESTAMP_COL_NAME) {
-                Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
-                    Some(column_data) => column_data,
-                    None => {
-                        // generate empty array to ensure the tantivy and parquet have same rows
-                        &Int64Array::from(vec![0; num_rows])
-                    }
-                },
-                None => {
-                    // generate empty array to ensure the tantivy and parquet have same rows
-                    &Int64Array::from(vec![0; num_rows])
-                }
-            };
-            let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap(); // unwrap directly since added above
-            const YIELD_THRESHOLD: usize = 100;
-            let mut batch_size = 0;
-            for (i, doc) in docs.iter_mut().enumerate() {
-                doc.add_i64(ts_field, column_data.value(i));
-                batch_size += 1;
-                if batch_size >= YIELD_THRESHOLD {
-                    tokio::task::coop::consume_budget().await;
-                    batch_size = 0;
-                }
-            }
-
-            tx.send(docs).await?;
         }
         Ok(total_num_rows)
     });
 
-    while let Some(docs) = rx.recv().await {
-        for doc in docs {
-            if let Err(e) = index_writer.add_document(doc) {
-                log::error!("generate_tantivy_index: Failed to add document to index: {e}");
-                return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
+    // Blocking writer worker: owns the SingleSegmentIndexWriter and runs all
+    // per-row CPU work off the runtime. Eliminates both the per-row
+    // consume_budget.await overhead of the previous implementation and the
+    // tail-latency hit from doing tantivy's synchronous add_document on a
+    // runtime thread.
+    let mut rx = rx;
+    let schema_for_worker = tantivy_schema.clone();
+    let writer_task: JoinHandle<Result<_, anyhow::Error>> =
+        tokio::task::spawn_blocking(move || {
+            let mut writer = index_writer;
+            while let Some(batch) = rx.blocking_recv() {
+                let docs = convert_batch_to_docs_sync(
+                    &batch,
+                    &schema_for_worker,
+                    &tantivy_fields,
+                    fts_field,
+                );
+                for doc in docs {
+                    writer
+                        .add_document(doc)
+                        .map_err(|e| anyhow::anyhow!("Failed to add document to index: {}", e))?;
+                }
             }
-            tokio::task::coop::consume_budget().await;
-        }
-    }
-    let total_num_rows = task.await??;
+            Ok(writer)
+        });
+
+    // Producer finishes first (drains the stream and drops tx); the worker
+    // then sees the channel close and exits.
+    let total_num_rows = producer.await??;
+    let index_writer = writer_task.await??;
+
     // Create index even with 0 rows since we have valid configured fields in stream schema
     // (empty index acts as a marker to prevent expensive DataFusion scans)
     log::debug!(

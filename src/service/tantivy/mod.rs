@@ -35,6 +35,10 @@ mod sequential;
 // is unnecessary because `create_tantivy_index` is the only public entry.
 use std::{collections::HashMap, sync::Arc};
 
+use arrow::array::{
+    Array, BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
+    StringViewArray, UInt64Array,
+};
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
@@ -225,6 +229,98 @@ fn make_index_tokenizer_manager() -> tantivy::tokenizer::TokenizerManager {
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     tokenizer_manager
+}
+
+macro_rules! process_string_array_sync {
+    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
+        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
+            for (i, doc) in $docs.iter_mut().enumerate() {
+                if array.is_null(i) {
+                    doc.add_text($field, "");
+                } else {
+                    doc.add_text($field, array.value(i));
+                }
+            }
+            continue;
+        }
+    };
+}
+
+macro_rules! process_numeric_array_sync {
+    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
+        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
+            for (i, doc) in $docs.iter_mut().enumerate() {
+                if array.is_null(i) {
+                    doc.add_text($field, "");
+                } else {
+                    let text = array.value(i).to_string();
+                    doc.add_text($field, &text);
+                }
+            }
+            continue;
+        }
+    };
+}
+
+/// Synchronously converts one `RecordBatch` into a `Vec<TantivyDocument>` ready
+/// to be added to a `SingleSegmentIndexWriter`. Preserves row order and the
+/// per-field semantics expected by both build paths. Callers run this inside
+/// `spawn_blocking` so the per-row CPU work stays off the async runtime.
+pub(super) fn convert_batch_to_docs_sync(
+    batch: &RecordBatch,
+    tantivy_schema: &tantivy::schema::Schema,
+    tantivy_fields: &HashSet<String>,
+    fts_field: Option<tantivy::schema::Field>,
+) -> Vec<tantivy::TantivyDocument> {
+    let num_rows = batch.num_rows();
+    let mut docs = vec![tantivy::doc!(); num_rows];
+
+    for column_name in tantivy_fields.iter() {
+        let field = match tantivy_schema.get_field(column_name) {
+            Ok(f) => f,
+            Err(_) => fts_field.expect("fts field must exist when index field is missing"),
+        };
+
+        if let Some(data) = batch.column_by_name(column_name) {
+            process_string_array_sync!(data, StringViewArray, docs, field);
+            process_string_array_sync!(data, StringArray, docs, field);
+            process_string_array_sync!(data, LargeStringArray, docs, field);
+            process_numeric_array_sync!(data, Int64Array, docs, field);
+            process_numeric_array_sync!(data, UInt64Array, docs, field);
+            process_numeric_array_sync!(data, Float64Array, docs, field);
+            process_numeric_array_sync!(data, BooleanArray, docs, field);
+            for doc in docs.iter_mut() {
+                doc.add_text(field, "");
+            }
+        } else {
+            for doc in docs.iter_mut() {
+                doc.add_text(field, "");
+            }
+        }
+    }
+
+    // _timestamp field — default to zeros when missing or the wrong type, so
+    // the tantivy doc count always matches the parquet row count.
+    let owned_default;
+    let column_data: &Int64Array = match batch.column_by_name(TIMESTAMP_COL_NAME) {
+        Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
+            Some(ts) => ts,
+            None => {
+                owned_default = Int64Array::from(vec![0; num_rows]);
+                &owned_default
+            }
+        },
+        None => {
+            owned_default = Int64Array::from(vec![0; num_rows]);
+            &owned_default
+        }
+    };
+    let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap();
+    for (i, doc) in docs.iter_mut().enumerate() {
+        doc.add_i64(ts_field, column_data.value(i));
+    }
+
+    docs
 }
 
 #[cfg(test)]

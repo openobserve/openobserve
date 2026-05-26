@@ -32,55 +32,16 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use arrow::array::{
-    Array, BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
-    StringViewArray, UInt64Array,
-};
 use arrow_schema::Schema;
 use bytes::Bytes;
-use config::TIMESTAMP_COL_NAME;
 use hashbrown::HashSet;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tantivy::directory::MmapDirectory;
 use tokio::task::JoinHandle;
 
-use super::{build_tantivy_schema_for_index, make_index_tokenizer_manager};
-
-// --- Sync (non-async) variants of the column-iteration macros ---
-// These run inside `tokio::task::spawn_blocking`, where `.await` is illegal.
-// The conversion semantics are otherwise identical to the async macros in the
-// sequential module, so the resulting tantivy docs are byte-for-byte
-// equivalent between the two paths.
-macro_rules! process_string_array_sync {
-    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
-        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
-            for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
-                    doc.add_text($field, array.value(i));
-                }
-            }
-            continue;
-        }
-    };
-}
-
-macro_rules! process_numeric_array_sync {
-    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
-        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
-            for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
-                    let text = array.value(i).to_string();
-                    doc.add_text($field, &text);
-                }
-            }
-            continue;
-        }
-    };
-}
+use super::{
+    build_tantivy_schema_for_index, convert_batch_to_docs_sync, make_index_tokenizer_manager,
+};
 
 /// Row-group-direct parallel tantivy index builder.
 ///
@@ -133,13 +94,8 @@ pub(super) async fn generate_tantivy_index_parallel_row_groups<
         })
         .await??
     };
-
-    // Empty parquet → still emit a single-segment empty marker (matches legacy
-    // behavior, so the consumer sees "indexed, no hits" rather than "no index").
     if num_row_groups == 0 {
-        return Ok(Some(
-            build_empty_marker_index(tantivy_dir, tantivy_schema).await?,
-        ));
+        return Ok(None);
     }
 
     let workers = workers.max(1).min(num_row_groups);
@@ -224,7 +180,7 @@ fn build_row_group_segment_sync(
         .build()
         .with_context(|| format!("worker {rg_idx}: build row_group reader"))?;
 
-    // The `TempDir` handle is owned by the directory, so 
+    // The `TempDir` handle is owned by the directory, so
     // when the directory (and the merged `Index` referencing it)
     // is dropped, the tempdir is cleaned up automatically.
     let dir = MmapDirectory::create_from_tempdir()
@@ -257,85 +213,4 @@ fn build_row_group_segment_sync(
         .with_context(|| format!("worker {rg_idx}: finalize"))?;
 
     Ok((rg_idx, index, rg_rows))
-}
-
-/// Synchronously converts one `RecordBatch` into a `Vec<TantivyDocument>` ready
-/// to be added to a `SingleSegmentIndexWriter`. Preserves row order and the
-/// per-field semantics of the async batch converter in [`super::sequential`].
-fn convert_batch_to_docs_sync(
-    batch: &RecordBatch,
-    tantivy_schema: &tantivy::schema::Schema,
-    tantivy_fields: &HashSet<String>,
-    fts_field: Option<tantivy::schema::Field>,
-) -> Vec<tantivy::TantivyDocument> {
-    let num_rows = batch.num_rows();
-    let mut docs = vec![tantivy::doc!(); num_rows];
-
-    for column_name in tantivy_fields.iter() {
-        let field = match tantivy_schema.get_field(column_name) {
-            Ok(f) => f,
-            Err(_) => fts_field.expect("fts field must exist when index field is missing"),
-        };
-
-        if let Some(data) = batch.column_by_name(column_name) {
-            process_string_array_sync!(data, StringViewArray, docs, field);
-            process_string_array_sync!(data, StringArray, docs, field);
-            process_string_array_sync!(data, LargeStringArray, docs, field);
-            process_numeric_array_sync!(data, Int64Array, docs, field);
-            process_numeric_array_sync!(data, UInt64Array, docs, field);
-            process_numeric_array_sync!(data, Float64Array, docs, field);
-            process_numeric_array_sync!(data, BooleanArray, docs, field);
-            for doc in docs.iter_mut() {
-                doc.add_text(field, "");
-            }
-        } else {
-            for doc in docs.iter_mut() {
-                doc.add_text(field, "");
-            }
-        }
-    }
-
-    // _timestamp field — handled the same way as the async path.
-    let owned_default;
-    let column_data: &Int64Array = match batch.column_by_name(TIMESTAMP_COL_NAME) {
-        Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
-            Some(ts) => ts,
-            None => {
-                owned_default = Int64Array::from(vec![0; num_rows]);
-                &owned_default
-            }
-        },
-        None => {
-            owned_default = Int64Array::from(vec![0; num_rows]);
-            &owned_default
-        }
-    };
-    let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap();
-    for (i, doc) in docs.iter_mut().enumerate() {
-        doc.add_i64(ts_field, column_data.value(i));
-    }
-
-    docs
-}
-
-/// Builds an empty single-segment index in the given puffin directory. Used as
-/// a marker when the source parquet has zero rows but configured index fields,
-/// so downstream consumers can distinguish "indexed, no hits" from "no index".
-async fn build_empty_marker_index<D: tantivy::Directory + Send + Sync + 'static>(
-    tantivy_dir: D,
-    tantivy_schema: tantivy::schema::Schema,
-) -> Result<tantivy::Index, anyhow::Error> {
-    let tokenizer_manager = make_index_tokenizer_manager();
-    let writer = tantivy::IndexBuilder::new()
-        .schema(tantivy_schema)
-        .tokenizers(tokenizer_manager)
-        .single_segment_index_writer::<tantivy::TantivyDocument>(tantivy_dir, 5_000_000)
-        .context("failed to create empty index writer")?;
-    let idx = tokio::task::spawn_blocking(move || {
-        writer
-            .finalize()
-            .map_err(|e| anyhow::anyhow!("Failed to finalize empty index: {e}"))
-    })
-    .await??;
-    Ok(idx)
 }
