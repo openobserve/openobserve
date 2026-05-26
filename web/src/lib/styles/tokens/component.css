@@ -608,6 +608,30 @@
   --color-note-highlight:        var(--color-note-highlight-light);
   --color-note-emphasis:         var(--color-grey-600);
   --color-note-code:             var(--color-note-code-light);
+
+  /* ── OText typography color tokens ──────────────────────── */
+  /* One color token per variant. Font size and weight are baked into        */
+  /* OText.vue as Tailwind utilities. To retheme a variant, change one line. */
+  --color-typography-page-title:  var(--color-text-primary);
+  --color-typography-section:     var(--color-text-secondary);
+  --color-typography-panel-title: var(--color-text-primary);
+  --color-typography-body:        var(--color-text-primary);
+  --color-typography-label:       var(--color-text-primary);
+  --color-typography-meta:        var(--color-text-secondary);
+  --color-typography-mono:        var(--color-text-primary);
+
+  /* ── OCode (inline + block monospace display) ────────────── */
+  /* Inline chip */
+  --color-code-text:              var(--color-text-primary);
+  --color-code-bg:                var(--color-surface-subtle);
+  --color-code-border:            var(--color-border-default);
+  /* Block pre/code */
+  --color-code-block-text:        var(--color-text-primary);
+  --color-code-block-bg:          var(--color-surface-panel);
+  /* Copy button (shared by inline + block) */
+  --color-code-copy-icon:         var(--color-text-secondary);
+  --color-code-copy-hover-icon:   var(--color-text-primary);
+  --color-code-copy-hover-bg:     var(--color-surface-subtle-hover);
 }
 
 
@@ -1116,6 +1140,25 @@
   --color-pagination-nav-text: var(--color-pagination-nav-text);
   --color-pagination-nav-hover-bg: var(--color-pagination-nav-hover-bg);
   --color-pagination-nav-disabled-text: var(--color-pagination-nav-disabled-text);
+
+  /* OText typography */
+  --color-typography-page-title:  var(--color-typography-page-title);
+  --color-typography-section:     var(--color-typography-section);
+  --color-typography-panel-title: var(--color-typography-panel-title);
+  --color-typography-body:        var(--color-typography-body);
+  --color-typography-label:       var(--color-typography-label);
+  --color-typography-meta:        var(--color-typography-meta);
+  --color-typography-mono:        var(--color-typography-mono);
+
+  /* OCode */
+  --color-code-text:              var(--color-code-text);
+  --color-code-bg:                var(--color-code-bg);
+  --color-code-border:            var(--color-code-border);
+  --color-code-block-text:        var(--color-code-block-text);
+  --color-code-block-bg:          var(--color-code-block-bg);
+  --color-code-copy-icon:         var(--color-code-copy-icon);
+  --color-code-copy-hover-icon:   var(--color-code-copy-hover-icon);
+  --color-code-copy-hover-bg:     var(--color-code-copy-hover-bg);
 
   /* OTable */
   --color-table-header-bg: var(--color-table-header-bg);
