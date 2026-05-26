@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DeletePanel')"
           >
             <template #icon-left
-              ><OIcon name="delete-outline" size="sm"
+              ><OIcon name="delete-outline" size="sm" class="tw:text-current!"
             /></template>
             {{ t("panel.deletePanel") }}
           </ODropdownItem>
