@@ -5269,10 +5269,19 @@ export class LogsPage {
     }
 
     async toggleQueryModeEditor() {
-        // Post-OSwitch-migration: the toggle is a `<button data-state>` inside
-        // the wrapper data-test. Click the inner [data-state] button (see
-        // sqlModeToggleStateBtn for the canonical pattern).
-        await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] [data-state]').first().click();
+        // Post-menu-migration: the function/transform editor toggle moved into the
+        // utilities ("More") dropdown as logs-search-bar-menu-transform-editor-toggle-btn.
+        // Open the dropdown if needed, click the toggle item, then close the menu.
+        const transformEditorMenuItem = this.page.locator('[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]');
+        const isVisible = await transformEditorMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await transformEditorMenuItem.click();
+        // @select.prevent keeps the menu open — close it so it doesn't overlap the editor
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
         // Wait for the VRL function editor container to appear (Firefox needs this)
         await this.page.waitForTimeout(2000);
         await this.page.locator('[data-test="logs-vrl-function-editor"]').first().waitFor({ state: 'visible', timeout: 15000 });

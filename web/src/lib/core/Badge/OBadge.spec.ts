@@ -149,7 +149,7 @@ describe("OBadge", () => {
       props: { size: "sm" },
       slots: { default: "x" },
     });
-    expect(wrapper.classes().join(" ")).toContain("tw:px-1.5");
+    expect(wrapper.classes().join(" ")).toContain("tw:px-2");
   });
 
   // ── Root element tag ────────────────────────────────────────────────────

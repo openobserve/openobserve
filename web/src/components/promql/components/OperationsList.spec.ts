@@ -116,7 +116,8 @@ describe("OperationsList", () => {
   describe("Component Rendering", () => {
     it("should render operations list container", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".tw\\:py-\\[0\\.25rem\\]").exists()).toBe(true);
+      // Outer tw:py-[0.25rem] wrapper removed in commit 3e7c9baf6a; check the inner row instead
+      expect(wrapper.find(".tw\\:pl-2").exists()).toBe(true);
     });
 
     it("should display layout name", () => {

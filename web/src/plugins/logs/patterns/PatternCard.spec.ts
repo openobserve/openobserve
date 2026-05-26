@@ -252,10 +252,10 @@ describe("PatternCard", () => {
       expect(template.classes()).not.toContain("tw:flex-wrap");
     });
 
-    it("should apply tw:flex-wrap and tw:break-all class on template when wrap is true", async () => {
+    it("should apply tw:break-all class on template when wrap is true", async () => {
       await wrapper.setProps({ wrap: true });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("tw:flex-wrap");
+      // tw:flex-wrap removed in commit eb9f1f80f2; flex layout moves to the false branch
       expect(template.classes()).toContain("tw:break-all");
       expect(template.classes()).not.toContain("tw:flex-nowrap");
     });
