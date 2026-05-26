@@ -244,7 +244,7 @@ class="tw:mr-1" />
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw:table-row'
-                : 'tw:flex',
+                : 'tw:flex tw:break-all',
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
