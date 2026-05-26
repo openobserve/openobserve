@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DeletePanel')"
           >
             <template #icon-left
-              ><OIcon name="delete-outline" size="sm" class="tw:text-current!"
+              ><OIcon name="delete-outline" size="sm"
             /></template>
             {{ t("panel.deletePanel") }}
           </ODropdownItem>
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('CreateAlert')"
           >
             <template #icon-left
-              ><OIcon name="shield-alert-outline" size="sm"
+              ><OIcon name="report-problem" size="sm"
             /></template>
             {{ t("panel.createAlert") }}
           </ODropdownItem>
