@@ -613,7 +613,7 @@ describe("logsUtils", () => {
       utils.showCancelSearchNotification();
       expect(mockToast).toHaveBeenCalledWith({
         message: "Running query cancelled successfully",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 4000,
       });
     });
