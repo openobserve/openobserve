@@ -181,6 +181,7 @@ import ListIcon from "~icons/material-symbols/list";
 import NumbersIcon from "~icons/material-symbols/123";
 import PaidIcon from "~icons/material-symbols/paid-outline-rounded";
 import AutorenewIcon from "~icons/material-symbols/autorenew";
+import ProgressActivityIcon from "~icons/material-symbols/progress-activity";
 import CardGiftcardIcon from "~icons/material-symbols/redeem";
 import CircleIcon from "~icons/material-symbols/circle-outline";
 import CloudDoneIcon from "~icons/material-symbols/cloud-done-outline";
@@ -513,6 +514,7 @@ export const iconRegistry = {
   "123": NumbersIcon,
   "paid": PaidIcon,
   "autorenew": AutorenewIcon,
+  "progress-activity": ProgressActivityIcon,
   "card-giftcard": CardGiftcardIcon,
   "check-circle-outline": CheckCircleOutline,
   "circle": CircleIcon,

@@ -77,15 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
       <template #empty>
+        <div v-if="variableItem.isLoading" class="tw:flex tw:justify-center tw:items-center tw:py-3">
+          <OSpinner size="sm" />
+        </div>
         <div
-          v-if="currentSearchTerm && !isSearchTermExistingOption"
+          v-else-if="currentSearchTerm && !isSearchTermExistingOption"
           class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
           <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
         </div>
-        <div v-else class="tw:italic tw:text-gray-500 tw:px-3 tw:py-2" data-test="variable-query-value-selector-no-data">
+        <div v-else class="tw:italic tw:text-gray-500 tw:flex tw:justify-center tw:items-center tw:py-3" data-test="variable-query-value-selector-no-data">
           No Data Found
         </div>
       </template>
@@ -107,10 +110,11 @@ import {
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  components: { OSeparator, OSelect, OCheckbox },
+  components: { OSeparator, OSelect, OCheckbox, OSpinner },
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
@@ -335,10 +339,8 @@ export default defineComponent({
         } else {
           return selectedValue.value;
         }
-      } else if (!props.variableItem.isLoading) {
-        return "(No Data Found)";
       } else {
-        return "";
+        return "(No Data Found)";
       }
     });
 
