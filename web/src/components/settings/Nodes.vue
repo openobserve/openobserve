@@ -636,6 +636,7 @@ export default defineComponent({
           id: "memory",
           header: t("nodes.memory"),
           accessorKey: "percentage_memory_usage",
+          sortable: true,
           size: 200,
           meta: { align: "left" },
         },

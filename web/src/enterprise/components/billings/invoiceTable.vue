@@ -26,9 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     filter-mode="client"
     :default-columns="false"
     :show-global-filter="false"
-    :style="invoiceHistory.length > 0
-      ? 'width: 100%; height: calc(100vh - 150px); overflow-y: auto;'
-      : 'width: 100%'"
+    class="tw:h-full tw:w-full"
   >
     <template #empty>
       <NoData />

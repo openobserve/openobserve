@@ -397,7 +397,9 @@
     "switchToLogs": "点击切换回日志",
     "patternNoValuesAvailable": "没有可用值",
     "selectLogStream": "选择日志流",
-    "noData": "无可用数据"
+    "noData": "无可用数据",
+    "functionEditorLabel": "函数编辑器",
+    "transformEditorLabel": "变换编辑器"
   },
   "menu": {
     "home": "主页",

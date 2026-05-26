@@ -188,7 +188,7 @@ export class LogsPage {
         this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
-        this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+        this.moreOptionsBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
         this.downloadSubmenu = '[data-test="search-download-submenu"]';
@@ -9205,7 +9205,7 @@ export class LogsPage {
      * Open the "More Options" menu on the logs search bar.
      */
     async openMoreOptionsMenu() {
-        const menuBtn = this.page.locator('[data-test="logs-search-bar-more-options-btn"]');
+        const menuBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
         await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
         await menuBtn.click();
         await this.page.waitForTimeout(500);
@@ -9439,6 +9439,12 @@ export class LogsPage {
         const monacoHelper = this.getMonacoEditorHelper();
         const container = this.getQueryEditorContainer();
         await monacoHelper.setContent(container, content);
+        // Wait slightly longer than the 500ms debounce in CodeQueryEditor so that
+        // getSuggestions() fires with the final query before Ctrl+Space opens the
+        // widget.  Without this, provideCompletionItems reads stale effectiveKeywords
+        // from the previous getSuggestions call (e.g. FROM context stream names instead
+        // of WHERE context field names).
+        await this.page.waitForTimeout(600);
         await monacoHelper.triggerSuggestions();
     }
 
@@ -9590,6 +9596,40 @@ export class LogsPage {
             }
         }, { timeout }).catch(() => {
             testLogger.warn('streamKeywords hydration not observed — autocomplete may still work via cached state');
+        });
+    }
+
+    /**
+     * Wait for the field keyword list to be populated inside the SQL autocomplete
+     * composable. This is the deterministic gate for WHERE-clause field suggestions:
+     * the stream schema API populates searchObj.data.stream.selectedStreamFields,
+     * which triggers the Vue watcher that calls updateFieldKeywords(). Without this
+     * wait, Ctrl+Space may fire before field names are in autoCompleteKeywords and
+     * the suggestion widget will show only functions + SQL keywords instead of fields.
+     * @param {number} timeout
+     */
+    async waitForFieldKeywordsHydration(timeout = 8000) {
+        await this.page.waitForFunction(() => {
+            try {
+                const w = /** @type {any} */ (window);
+                // Primary: selectedStreamFields in the Vuex/composable searchObj
+                const fields = w.searchObj?.data?.stream?.selectedStreamFields;
+                if (Array.isArray(fields) && fields.length > 0) return true;
+                // Fallback: check Pinia stores for the same data
+                const stores = w.__pinia_stores__;
+                if (stores) {
+                    for (const key of Object.keys(stores)) {
+                        const s = stores[key]?.();
+                        const f = s?.data?.stream?.selectedStreamFields;
+                        if (Array.isArray(f) && f.length > 0) return true;
+                    }
+                }
+                return false;
+            } catch {
+                return false;
+            }
+        }, { timeout }).catch(() => {
+            testLogger.warn('field keywords hydration not observed — field suggestions may be absent');
         });
     }
 

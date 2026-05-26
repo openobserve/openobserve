@@ -1,6 +1,6 @@
 <template>
-  <div class="label-filter-editor tw:py-[0.25rem]">
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
+  <div class="label-filter-editor">
+    <div style="display: flex; flex-direction: row" class="tw:pl-2">
       <div class="layout-name">{{ t("panel.labelFilters") }}</div>
       <span class="layout-separator">:</span>
       <div class="axis-container scroll tw:flex">
@@ -96,10 +96,9 @@
           variant="ghost-primary"
           size="sm"
           @click="addLabel"
-          class="add-filter-btn"
           data-test="promql-add-label-filter"
         >
-          <OIcon name="add" size="xs" />
+          <OIcon name="add" size="sm" />
           <OTooltip content="Add label filter" side="top" />
         </OButton>
       </div>
@@ -265,7 +264,7 @@ const getOperatorHint = (op: string): string => {
 }
 
 .axis-container {
-  margin: 5px;
+  margin: 2px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -275,10 +274,6 @@ const getOperatorHint = (op: string): string => {
 .label-filter-item {
   display: flex;
   align-items: center;
-}
-
-.add-filter-btn {
-  margin-left: 4px;
 }
 
 .label-filter-editor-dropdown {

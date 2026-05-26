@@ -1245,7 +1245,7 @@ const fieldWidthClass = computed(() => {
                           <OIcon
                             v-else-if="filteredOptions[vRow.index].icon"
                             :name="filteredOptions[vRow.index].icon"
-                            size="xs"
+                            size="sm"
                             class="tw:shrink-0"
                           />
                           <span class="tw:truncate">{{

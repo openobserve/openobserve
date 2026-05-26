@@ -1,6 +1,5 @@
 <template>
-  <div class="tw:py-[0.25rem]">
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
+    <div style="display: flex; flex-direction: row" class="tw:pl-2">
       <div class="layout-name">{{ t("panel.operations") }}</div>
       <span class="layout-separator">:</span>
       <div class="axis-container scroll tw:flex">
@@ -118,10 +117,10 @@
           variant="ghost-primary"
           size="sm"
           @click="showOperationSelector = true"
-          class="add-operation-btn tw:ml-[0.25rem]"
+          class="add-operation-btn"
           data-test="promql-add-operation"
         >
-          <OIcon name="add" size="xs" />
+          <OIcon name="add" size="sm" />
           <OTooltip content="Add operation" side="top" />
         </OButton>
       </div>
@@ -171,7 +170,6 @@
         </div>
       </div>
     </ODialog>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -309,7 +307,7 @@ defineExpose({
 }
 
 .axis-container {
-  margin: 5px;
+  margin: 2px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
