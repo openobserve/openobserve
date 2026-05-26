@@ -1365,47 +1365,48 @@ export class PipelinesPage {
     }
 
     async deletePipelineByName(pipelineName) {
-        // Wait for the pipeline-list API to respond at least once after we
-        // landed on this page — otherwise the table's data is empty when our
-        // search filter is applied, and the row never matches no matter how
-        // long we wait. PipelinesList.vue fetches GET /api/{org}/pipelines on
-        // mount and populates `pipelines.value` from the response.
-        await this.page.waitForResponse(
-            (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
-            { timeout: 15000 }
-        ).catch(() => {
-            testLogger.warn('deletePipelineByName: pipelines API response not observed within 15s');
-        });
-
-        // Ensure we're on the "all" tab so realtime + scheduled pipelines are
-        // both visible regardless of how the list was previously filtered.
-        const allTab = this.page.locator('[data-test="tab-all"]');
-        if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await allTab.click().catch(() => {});
-            await this.page.waitForTimeout(300);
-        }
-        // Wait for the pipeline-list table to render at least one row so we
-        // know the data has loaded. Without this, searching against an empty
-        // table filters to nothing and the search itself can't surface our row.
-        const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
-        await anyRow.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-
-        // Clear any leftover search filter before searching again so the row
-        // can render even if a previous search left the input populated.
-        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
-        await this.pipelineSearchInputField.fill('');
-        await this.page.waitForTimeout(300);
-        await this.searchPipeline(pipelineName);
-        await this.page.waitForTimeout(1000);
-
-        // The delete icon button lives DIRECTLY in the row, NOT inside the
-        // more-options ODropdown. PipelinesList.vue:194-201 uses data-test=
-        // `pipeline-list-${row.name}-delete-pipeline`. The ODropdown contains
-        // pause/start, export, backfill, view-error — no delete-action item.
         const deleteBtn = this.page.locator(
           `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
         ).first();
-        await deleteBtn.waitFor({ state: 'visible', timeout: 30000 });
+        let deleteVisible = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const apiPromise = this.page.waitForResponse(
+                (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                { timeout: 20000 }
+            ).catch(() => null);
+
+            if (attempt > 1) {
+                testLogger.info(`deletePipelineByName: pipeline row not visible, reloading list (attempt ${attempt}/3)`);
+                await this.page.reload().catch(() => {});
+            }
+            await apiPromise;
+
+            // Ensure we're on the "all" tab so realtime + scheduled pipelines
+            // are both visible regardless of any previous tab selection.
+            const allTab = this.page.locator('[data-test="tab-all"]');
+            if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await allTab.click().catch(() => {});
+                await this.page.waitForTimeout(300);
+            }
+
+            // Wait for at least one pipeline row so we know the table rendered
+            // its data — search against an empty table never surfaces our row.
+            const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
+            await anyRow.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+
+            // Clear and re-fill the search filter.
+            await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+            await this.pipelineSearchInputField.fill('');
+            await this.page.waitForTimeout(300);
+            await this.searchPipeline(pipelineName);
+            await this.page.waitForTimeout(1000);
+
+            deleteVisible = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
+            if (deleteVisible) break;
+        }
+        if (!deleteVisible) {
+            await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+        }
         await deleteBtn.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
