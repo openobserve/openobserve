@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               class="tw:flex tw:items-start tw:gap-4 tw:px-2"
-              style="padding-top: 12px"
+              style="padding-top: 0.75rem"
             >
               <div data-test="add-report-name-input" class="o2-input">
                 <OInput
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   help-text="Characters like :, ?, /, #, and spaces are not allowed."
                   @update:model-value="nameError = ''"
                   tabindex="0"
-                  style="width: 330px"
+                  style="width: 20.625rem"
                 >
                 </OInput>
               </div>
@@ -85,12 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="add-report-folder-select"
                 class="o2-input"
-                style="width: 250px; padding-top: 2px"
+                style="width: 15.625rem"
               >
                 <SelectFolderDropdown
                   :activeFolderId="selectedReportFolderId"
                   type="reports"
-                  :style="'height: 34px;top:28px'"
                   :disableDropdown="isEditingReport"
                   @folder-selected="
                     (f: any) => (selectedReportFolderId = f.value)
@@ -237,6 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :default-relative-time="dashboard.timerange.period"
                         data-test="add-report-timerange-dropdown"
+                        menu-align="start"
                         @on:date-change="updateDateTime"
                       />
                     </div>
