@@ -9793,5 +9793,4 @@ export class LogsPage {
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
     }
-
 }
