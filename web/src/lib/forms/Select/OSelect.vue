@@ -11,6 +11,7 @@ import type {
 import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import {
   ListboxFilter,
   ListboxItem,
@@ -290,22 +291,21 @@ const listboxModeEnabled = computed(
 
 const selectedValues = computed<SelectPrimitiveValue[]>(() => {
   if (Array.isArray(props.modelValue)) return props.modelValue;
-  // Treat null/undefined/'' as "no selection" — otherwise the clear (X)
-  // button appears even when nothing is selected.
-  if (
-    props.modelValue === undefined ||
-    props.modelValue === null ||
-    props.modelValue === ""
-  ) {
+  if (props.modelValue === undefined || props.modelValue === "") {
     return [];
+  }
+  if (props.modelValue === null) {
+    // null is a valid selection when a null-valued option exists (e.g. "Auto", "None", "Default")
+    const hasNullOption = normalizedOptions.value.some(
+      (opt) => !opt.header && opt.value === null,
+    );
+    return hasNullOption ? [null] : [];
   }
   return [props.modelValue];
 });
 
 const hasSelection = computed(() =>
-  selectedValues.value.some(
-    (v) => v !== undefined && v !== null && v !== "",
-  ),
+  selectedValues.value.some((v) => v !== undefined),
 );
 
 const selectedLabels = computed(() => {
@@ -995,7 +995,9 @@ const fieldWidthClass = computed(() => {
               </svg>
             </button>
 
+            <OSpinner v-if="loading" size="xs" />
             <span
+              v-else
               aria-hidden="true"
               :class="[
                 'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
@@ -1407,7 +1409,9 @@ const fieldWidthClass = computed(() => {
             </svg>
           </button>
 
+          <OSpinner v-if="loading" size="xs" />
           <span
+            v-else
             aria-hidden="true"
             :class="[
               'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
