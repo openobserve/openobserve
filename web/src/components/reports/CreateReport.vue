@@ -1296,8 +1296,8 @@ const saveReport = async () => {
     const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
     const year = now.getFullYear();
 
-    // Combine them in the DD-MM-YYYY format
-    scheduling.value.date = `${day}-${month}-${year}`;
+    // Combine them in the YYYY-MM-DD format (ISO 8601, for ODate compatibility)
+    scheduling.value.date = `${year}-${month}-${day}`;
 
     // Get the hours and minutes, ensuring they are formatted with two digits
     const hours = String(now.getHours()).padStart(2, "0");
@@ -1312,8 +1312,13 @@ const saveReport = async () => {
     scheduling.value.timezone = timezone.value;
   }
 
+  // scheduling.value.date is always YYYY-MM-DD (ISO 8601),
+  // but convertDateToTimestamp expects DD-MM-YYYY
+  const [y, m, d] = scheduling.value.date.split("-");
+  const dateForConversion = `${d}-${m}-${y}`;
+
   const convertedDateTime = convertDateToTimestamp(
-    scheduling.value.date,
+    dateForConversion,
     scheduling.value.time,
     scheduling.value.timezone,
   );
@@ -1338,6 +1343,7 @@ const saveReport = async () => {
   } else {
     reportPayload.frequency.type = frequency.value.type;
     reportPayload.frequency.interval = 1;
+    formData.value.frequency.interval = 1;
   }
 
   reportPayload.timezone = scheduling.value.timezone;
@@ -1508,6 +1514,8 @@ const validateReportData = async (): Promise<boolean> => {
     return false;
   }
 
+  console.log(JSON.parse(JSON.stringify(formData.value)));
+
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
     if (formData.value.frequency.type === "custom") {
       if (!frequency.value.custom.interval) {
@@ -1667,8 +1675,8 @@ const setupEditingReport = async (report: any) => {
     zone: reportTimezone,
   });
 
-  // Combine them in the DD-MM-YYYY format
-  scheduling.value.date = dateInReportTz.toFormat("dd-MM-yyyy");
+  // Combine them in the YYYY-MM-DD format (ISO 8601, for ODate compatibility)
+  scheduling.value.date = dateInReportTz.toFormat("yyyy-MM-dd");
 
   // Combine them in the HH:MM format
   scheduling.value.time = dateInReportTz.toFormat("HH:mm");
