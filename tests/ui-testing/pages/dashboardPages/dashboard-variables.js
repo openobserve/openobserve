@@ -463,3 +463,4 @@ export default class DashboardVariables {
     }
   }
 }
+
