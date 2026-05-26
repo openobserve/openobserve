@@ -1598,7 +1598,8 @@
     "configSectionComparison": "비교",
     "configSectionMarkLines": "마크 라인",
     "configSectionBackground": "백그라운드",
-    "allFolders": "모든 폴더"
+    "allFolders": "모든 폴더",
+    "selectFile": "파일 선택"
   },
   "panel": {
     "header": "패널",

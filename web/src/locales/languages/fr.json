@@ -1600,7 +1600,8 @@
     "axisLabelTruncateTooltipText": "Tronquez les étiquettes de l'axe X à la largeur spécifiée (en pixels).",
     "axisLabelTooltipNotePrefix": "Remarque :",
     "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
-    "allFolders": "Tous les dossiers"
+    "allFolders": "Tous les dossiers",
+    "selectFile": "Sélectionnez un fichier"
   },
   "panel": {
     "header": "Panneau",

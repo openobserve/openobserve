@@ -1600,7 +1600,8 @@
     "axisLabelTruncateTooltipText": "Trunque os rótulos do eixo x na largura especificada (em pixels).",
     "axisLabelTooltipNotePrefix": "Nota:",
     "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
-    "allFolders": "Todas as pastas"
+    "allFolders": "Todas as pastas",
+    "selectFile": "Selecionar arquivo"
   },
   "panel": {
     "header": "Painel",

@@ -1600,7 +1600,8 @@
     "axisLabelTruncateTooltipText": "Kürzt die Beschriftungen der X-Achse auf die angegebene Breite (in Pixeln).",
     "axisLabelTooltipNotePrefix": "Hinweis:",
     "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
-    "allFolders": "Alle Ordner"
+    "allFolders": "Alle Ordner",
+    "selectFile": "Wählen Sie Datei"
   },
   "panel": {
     "header": "Panel",
