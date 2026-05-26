@@ -42,7 +42,7 @@ use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
-    bloom_filter_fields: &'a [String],
+    _bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
     write_metadata: bool,
     compression: Option<&str>,
@@ -76,10 +76,26 @@ pub fn new_parquet_writer<'a>(
             ),
         ]));
     }
-    // Parquet's per-column bloom filter writing is replaced by the higher-level
-    // `.bf` files maintained by the compactor (see project_bloom_filter_above_tantivy).
-    // The `bloom_filter_fields` argument is kept for API stability but unused here.
-    let _ = bloom_filter_fields;
+
+    // Bloom filter stored by row_group, set NDV to reduce the memory usage.
+    // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
+    // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
+    // let mut bf_ndv = min(metadata.records as u64, PARQUET_MAX_ROW_GROUP_SIZE as u64);
+    // if bf_ndv > 1000 {
+    //     bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
+    // }
+    // if cfg.common.bloom_filter_enabled {
+    //     let mut fields = bloom_filter_fields.to_vec();
+    //     fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+    //     fields.sort();
+    //     fields.dedup();
+    //     for field in fields {
+    //         writer_props = writer_props
+    //             .set_column_bloom_filter_enabled(field.as_str().into(), true)
+    //             .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
+    //             .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
+    //     }
+    // }
     let writer_props = writer_props.build();
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }

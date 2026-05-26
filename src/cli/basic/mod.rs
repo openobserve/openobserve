@@ -15,7 +15,9 @@
 
 mod bloom;
 pub mod cli;
+mod gc;
 mod http;
 mod load;
 mod query_optimiser;
+mod stream;
 mod test;

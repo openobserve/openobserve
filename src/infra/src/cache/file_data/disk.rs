@@ -608,6 +608,70 @@ pub async fn get_size(file: &str) -> Option<usize> {
     files.get_size(file).await
 }
 
+/// Batched range read against the disk cache: one `File::open` followed
+/// by N `pread`s, all inside one `block_in_place`. Returns one `Bytes`
+/// per input range, in input order. This is the hot path for the search
+/// side's `.bf` block fetches — without it each range turns into a
+/// separate `File::open` and async task spawn, which dominates wall
+/// clock for queries touching many buckets.
+///
+/// Returns `Err(NotFound)` when the file isn't in the disk cache; the
+/// caller falls back to remote storage.
+#[cfg(unix)]
+pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Result<Vec<Bytes>> {
+    use std::os::unix::fs::FileExt;
+
+    let Some(files) = get_file_reader(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(files.get_file_path(file));
+    let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
+    let file_label = file.to_string();
+
+    tokio::task::block_in_place(move || -> object_store::Result<Vec<Bytes>> {
+        let f = std::fs::File::open(&path).map_err(|e| object_store::Error::NotFound {
+            path: file_label.clone(),
+            source: Box::new(e),
+        })?;
+        let mut out = Vec::with_capacity(ranges_owned.len());
+        for r in &ranges_owned {
+            if r.start > r.end {
+                return Err(crate::storage::Error::BadRange(file_label.clone()).into());
+            }
+            let len = (r.end - r.start) as usize;
+            let mut buf = vec![0u8; len];
+            f.read_exact_at(&mut buf, r.start)
+                .map_err(|e| object_store::Error::Generic {
+                    store: "DiskCache",
+                    source: Box::new(e),
+                })?;
+            out.push(Bytes::from(buf));
+        }
+        Ok(out)
+    })
+}
+
+#[cfg(not(unix))]
+pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Result<Vec<Bytes>> {
+    // Non-unix fallback: serial `get` calls. Still reuses the same on-disk file
+    // entry but pays per-range open overhead. Acceptable — the hot path is unix.
+    let mut out = Vec::with_capacity(ranges.len());
+    for r in ranges {
+        let bytes =
+            get(file, Some(r.clone()))
+                .await
+                .ok_or_else(|| object_store::Error::NotFound {
+                    path: file.to_string(),
+                    source: Box::new(std::io::Error::other("file not found")),
+                })?;
+        out.push(bytes);
+    }
+    Ok(out)
+}
+
 #[inline]
 pub fn get_file_path(file: &str) -> Option<String> {
     let files = get_file_reader(file)?;

@@ -163,6 +163,8 @@ impl ObjectStoreExt for CacheFS {
         if let Ok(v) = file_data::get_ranges_opts(account, &path, ranges, false).await {
             return Ok(v);
         }
+
+        // default to storage
         storage::get_ranges(account, &path, ranges).await
     }
 
@@ -177,7 +179,7 @@ impl ObjectStoreExt for CacheFS {
                 version: None,
             });
         }
-        // default
+        // default to storage
         storage::head(account, &path).await
     }
 
@@ -395,7 +397,7 @@ mod tests {
         assert!(matches!(result.unwrap_err(), Error::Generic { .. }));
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_fs_get_ranges() {
         let cache_fs = CacheFS {};
         let location = Path::from("test/file.txt");

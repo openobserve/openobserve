@@ -147,7 +147,10 @@ impl ObjectStore for Local {
         // metrics — use the actual returned range size, not the full file
         // size. For range / suffix GETs `result.meta.size` is the total file
         // length, which would over-count bytes by ~the file size each call.
-        let data_len = result.range.end - result.range.start;
+        let mut data_len = result.range.end - result.range.start;
+        if data_len == 0 {
+            data_len = result.meta.size;
+        }
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES

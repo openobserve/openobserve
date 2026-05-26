@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-};
+use std::{collections::HashSet, fmt::Display};
 
 use config::{
     TIMESTAMP_COL_NAME,
@@ -27,7 +24,7 @@ use tantivy::{
     Searcher,
     aggregation::{
         AggregationCollector, Key,
-        agg_req::{Aggregation, AggregationVariants},
+        agg_req::{Aggregation, AggregationVariants, Aggregations},
         agg_result::{AggregationResult, BucketEntries, BucketResult},
         bucket::{
             CustomOrder, HistogramAggregation, HistogramBounds, Order, OrderTarget,
@@ -186,7 +183,7 @@ impl TantivyResult {
                 keyed: false,
                 is_normalized_to_ns: false,
             }),
-            sub_aggregation: HashMap::from([(
+            sub_aggregation: Aggregations::from_iter(vec![(
                 "breakdown".to_string(),
                 Aggregation {
                     agg: AggregationVariants::Terms(TermsAggregation {
@@ -197,12 +194,14 @@ impl TantivyResult {
                         min_doc_count: Some(1),
                         show_term_doc_count_error: Some(false),
                         segment_size: None,
+                        include: None,
+                        exclude: None,
                     }),
-                    sub_aggregation: HashMap::new(),
+                    sub_aggregation: Default::default(),
                 },
             )]),
         };
-        let aggregations = HashMap::from([("histogram".to_string(), histogram_agg)]);
+        let aggregations = Aggregations::from_iter(vec![("histogram".to_string(), histogram_agg)]);
         let collector = AggregationCollector::from_aggs(aggregations, Default::default());
 
         let mut res = searcher.search(&query, &collector)?;
@@ -266,10 +265,12 @@ impl TantivyResult {
                 min_doc_count: Some(1),
                 show_term_doc_count_error: Some(false),
                 segment_size: Some(limit),
+                include: None,
+                exclude: None,
             }),
-            sub_aggregation: HashMap::new(),
+            sub_aggregation: Default::default(),
         };
-        let aggregations = HashMap::from([("termagg".to_string(), aggregation)]);
+        let aggregations = Aggregations::from_iter(vec![("termagg".to_string(), aggregation)]);
         let collector = AggregationCollector::from_aggs(aggregations, Default::default());
 
         let mut res = searcher.search(&query, &collector)?;
