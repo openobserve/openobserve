@@ -1204,19 +1204,15 @@ export class PipelinesPage {
         // Verify pipeline creation and cleanup
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
-        // Click on more options (three-dot menu) then delete
-        const moreOptionsButton = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-more-options"]`
-        );
-        await moreOptionsButton.waitFor({ state: "visible" });
-        await moreOptionsButton.click();
-        await this.page.waitForTimeout(500);
-        // Click delete option in the menu — PipelinesList row uses ODropdown with
-        // data-test on each row's delete action.
-        await this.page
-            .locator(`[data-test="pipeline-list-${pipelineName}-delete-action"]`)
-            .first()
-            .click();
+        // The delete icon button is rendered DIRECTLY in the row, NOT inside the
+        // more-options ODropdown. PipelinesList.vue:194-201 uses data-test=
+        // `pipeline-list-${row.name}-delete-pipeline`. The ODropdown only contains
+        // pause/start, export, backfill, view-error — no delete-action item.
+        const deleteBtn = this.page.locator(
+          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        ).first();
+        await deleteBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await deleteBtn.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -1365,19 +1361,15 @@ export class PipelinesPage {
         await this.page.waitForTimeout(300);
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
-        // Click on more options (three-dot menu) then delete
-        const moreOptionsButton = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-more-options"]`
-        );
-        await moreOptionsButton.waitFor({ state: "visible" });
-        await moreOptionsButton.click();
-        await this.page.waitForTimeout(500);
-        // Click delete option in the menu — PipelinesList row uses ODropdown with
-        // data-test on each row's delete action.
-        await this.page
-            .locator(`[data-test="pipeline-list-${pipelineName}-delete-action"]`)
-            .first()
-            .click();
+        // The delete icon button lives DIRECTLY in the row, NOT inside the
+        // more-options ODropdown. PipelinesList.vue:194-201 uses data-test=
+        // `pipeline-list-${row.name}-delete-pipeline`. The ODropdown contains
+        // pause/start, export, backfill, view-error — no delete-action item.
+        const deleteBtn = this.page.locator(
+          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        ).first();
+        await deleteBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await deleteBtn.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
