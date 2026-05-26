@@ -34,6 +34,7 @@ pub mod functions;
 pub mod github;
 pub mod grpc;
 pub mod ingestion;
+pub mod ingestion_tokens;
 pub mod kv;
 pub mod logs;
 pub mod metadata;

@@ -422,6 +422,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("organizations cache failed");
     db::org_users::cache().await.expect("org user cache failed");
+    db::org_ingestion_tokens::cache()
+        .await
+        .expect("org ingestion tokens cache failed");
 
     db::organization::org_settings_cache()
         .await
@@ -430,6 +433,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // watch org users
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
+    tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::organization::watch());
 
     #[cfg(feature = "cloud")]

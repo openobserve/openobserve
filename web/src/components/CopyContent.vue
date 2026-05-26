@@ -68,7 +68,7 @@ export default defineComponent({
       email.value = store.state.userInfo.email;
       passcode.value = store.state.organizationData.organizationPasscode;
       basicPasscode.value = b64EncodeStandard(
-        `${store.state.userInfo.email}:${store.state.organizationData.organizationPasscode}`
+        `${email.value}:${store.state.organizationData.organizationPasscode}`
       );
       if (isMask) {
         return data

@@ -10,6 +10,7 @@ pub mod alerts;
 pub mod anomaly_detection_config;
 pub mod anomaly_detection_models;
 pub mod backfill_jobs;
+pub mod org_ingestion_tokens;
 pub mod cipher_keys;
 pub mod compactor_manual_jobs;
 pub mod dashboards;
