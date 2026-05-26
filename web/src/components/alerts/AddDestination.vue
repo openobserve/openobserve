@@ -1324,22 +1324,6 @@ const filterActions = (val: string, update: any) => {
     .destination-type-label {
       color: white;
     }
-
-    &::after {
-      content: "✓";
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: bold;
-    }
   }
 }
 

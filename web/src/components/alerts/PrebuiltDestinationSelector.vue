@@ -51,14 +51,14 @@ limitations under the License. -->
           <p data-test="destination-type-description" class="card-description">
             {{ type.description }}
           </p>
+        </div>
 
-          <!-- Selection Indicator -->
-          <div
-            v-if="selectedType === type.id"
-            class="check-icon"
-          >
-            <OIcon name="check-circle" size="md" />
-          </div>
+        <!-- Selection Indicator -->
+        <div
+          v-if="selectedType === type.id"
+          class="check-icon"
+        >
+          <OIcon name="check" size="xs" />
         </div>
       </div>
 
@@ -80,12 +80,14 @@ limitations under the License. -->
           <p data-test="destination-type-description" class="card-description">
             {{ t('alerts.customDestinationDescription') }}
           </p>
-          <div
-            v-if="selectedType === 'custom'"
-            class="check-icon"
-          >
-            <OIcon name="check-circle" size="md" />
-          </div>
+        </div>
+
+        <!-- Selection Indicator -->
+        <div
+          v-if="selectedType === 'custom'"
+          class="check-icon"
+        >
+          <OIcon name="check" size="xs" />
         </div>
       </div>
     </div>
@@ -239,8 +241,17 @@ function getIconName(icon: string): string {
       position: absolute;
       top: 0.375rem;
       right: 0.375rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--o2-positive);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
     }
   }
 }
-
 </style>
