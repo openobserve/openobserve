@@ -34,12 +34,15 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
     const orgId = process.env["ORGNAME"];
     const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3"];
     const headers = getHeaders();
-    
+
     for(const streamName of streamNames) {
       const url = getIngestionUrl(orgId, streamName);
       const response = await sendRequest(page, url, logsdata, headers);
       testLogger.debug('API response received', { response });
     }
+    await pageManager.apiCleanup.cleanupPipelines(streamNames).catch((err) => {
+      testLogger.warn('Pipeline cleanup before test failed (continuing)', { error: err?.message });
+    });
   });
 
   test.afterEach(async () => {
