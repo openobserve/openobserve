@@ -250,6 +250,7 @@ import StopIcon from "~icons/material-symbols/stop-outline";
 import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
 import SwapVertIcon from "~icons/material-symbols/swap-vert";
 import SyncIcon from "~icons/material-symbols/sync-outline";
+import SyncDisabledIcon from "~icons/material-symbols/sync-disabled";
 import SyncProblemIcon from "~icons/material-symbols/sync-problem-outline";
 import TableViewIcon from "~icons/material-symbols/table-view-outline";
 import TagIcon from "~icons/material-symbols/tag";
@@ -584,6 +585,7 @@ export const iconRegistry = {
   "swap-horiz": SwapHorizIcon,
   "swap-vert": SwapVertIcon,
   "sync": SyncIcon,
+  "sync-disabled": SyncDisabledIcon,
   "sync-problem": SyncProblemIcon,
   "table-view": TableViewIcon,
   "tag": TagIcon,

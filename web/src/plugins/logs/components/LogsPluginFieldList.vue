@@ -18,7 +18,7 @@
     <!-- Group header -->
     <template #group-header="{ row, groupName }">
       <div
-        class="field-group-header tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+        class="field-group-header tw:h-full tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
         @click="$emit('toggle-group', row.group)"
       >
         <div class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:gap-1">

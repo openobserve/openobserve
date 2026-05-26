@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #trigger>
       <OFieldRow
-        :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
+        <OTooltip :content="field.name" side="right" />
         <span class="field-type-container">
           <OIcon
             class="field-expand-icon"
@@ -134,6 +134,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   field: any;

@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <OFieldRow
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
-    :title="field.name"
     :data-test="`logs-field-list-item-${field.name}`"
     class="tw:pl-[1.5rem]"
   >
+    <OTooltip :content="field.name" side="right" />
     <OFieldLabel :field="field" :show-type-icon="false" />
     <OIcon
       :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
@@ -78,6 +78,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   field: any;
