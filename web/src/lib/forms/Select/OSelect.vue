@@ -208,6 +208,11 @@ const searchTerm = ref("");
 const popoverOpen = ref(false);
 const filterDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 
+// Set of Reka string keys that were selected when the popover last opened.
+// Frozen for the lifetime of one open session so items don't re-order mid-interaction.
+// Cleared when the popover opens with nothing selected.
+const pinnedSelected = ref<Set<string>>(new Set());
+
 const inputEnabled = computed(() => props.searchable);
 
 const filteredOptions = computed(() => {
@@ -227,7 +232,24 @@ const filteredOptions = computed(() => {
     });
   }
 
-  if (!term) return options;
+  if (!term) {
+    // In multi-select mode, float previously-selected items to the top so users
+    // can immediately see and manage their current choices on re-open.
+    // Only applies when there is a non-empty pin set and no headers in the list
+    // (headers imply grouped options where reordering would break visual grouping).
+    if (
+      props.multiple &&
+      pinnedSelected.value.size > 0 &&
+      !options.some((o) => o.header)
+    ) {
+      const pinned = pinnedSelected.value;
+      const top = options.filter((o) => pinned.has(toRekaString(o.value)));
+      const rest = options.filter((o) => !pinned.has(toRekaString(o.value)));
+      return [...top, ...rest];
+    }
+    return options;
+  }
+
   // Keep headers visible if any of their following non-header items match
   const result: NormalizedOption[] = [];
   for (let i = 0; i < options.length; i++) {
@@ -317,9 +339,15 @@ watch(searchTerm, (value) => {
 
 // Clear the search term whenever the popover closes so re-opening the
 // dropdown always shows the full unfiltered option list.
+// In multi-select mode, also snapshot the current selection so selected items
+// can be floated to the top on the next open.
 watch(popoverOpen, (open) => {
   if (!open) {
     searchTerm.value = "";
+  } else if (props.multiple) {
+    pinnedSelected.value = new Set(
+      selectedValues.value.map((v) => toRekaString(v)),
+    );
   }
 });
 
