@@ -346,7 +346,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
 
     await setupPiePanelWithConfig(page, pm, dashboardName, "Pie Description");
 
-    const descriptionInput = page.locator('[data-test="dashboard-config-description"]');
+    const descriptionInput = page.locator('[data-test="dashboard-config-description-field"]');
     await expect(descriptionInput).toBeVisible();
     await descriptionInput.fill("Test pie chart description");
     testLogger.info("Description set");
@@ -429,10 +429,11 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     // 2. Save panel to access legend on dashboard view
     await pm.dashboardPanelActions.savePanel();
 
-    // 3. Verify legend popup — hover over chart area to reveal legend button
-    const chartArea = page.locator('[data-test="chart-renderer"]').first();
-    await chartArea.waitFor({ state: "visible", timeout: 10000 });
-    await chartArea.hover();
+    // 3. Wait for chart to render in dashboard view then reveal legend button
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    const panelBar = page.locator('[data-test="dashboard-panel-bar"]').first();
+    await panelBar.waitFor({ state: "visible", timeout: 10000 });
+    await panelBar.hover();
 
     const legendBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
     await legendBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});

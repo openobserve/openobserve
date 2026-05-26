@@ -187,7 +187,7 @@ test.describe("Sankey chart testcases", () => {
 
       // Verify hint text reappears (empty state)
       await expect(
-        sourceLayout.locator(".text-caption")
+        sourceLayout.locator('[data-test="dashboard-sankey-source-empty-hint"]')
       ).toBeVisible({ timeout: 10000 });
 
       testLogger.info("Source field removal verified");
@@ -222,21 +222,14 @@ test.describe("Sankey chart testcases", () => {
       await pm.chartTypeSelector.searchAndAddField("source", "source");
 
       // Search for another field and verify +S button is disabled
-      const searchInput = page.locator(
-        '[data-test="index-field-search-input"]'
-      );
+      const searchInput = page.locator('[data-test="o-field-list-search-field"]');
       await searchInput.click();
       await searchInput.fill("target");
 
-      const fieldItem = page
-        .locator(
-          '[data-test^="field-list-item-"][data-test$="-target"]'
-        )
-        .first();
+      const fieldItem = page.locator('[data-test="o-field-list-row-target"]').first();
       await fieldItem.waitFor({ state: "visible", timeout: 5000 });
-      const sourceBtn = fieldItem.locator(
-        '[data-test="dashboard-add-source-data"]'
-      );
+      await fieldItem.hover();
+      const sourceBtn = fieldItem.locator('[data-test="dashboard-add-source-data"]');
 
       await expect(sourceBtn).toBeDisabled({ timeout: 5000 });
 
@@ -281,7 +274,7 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Wait for field list to populate from query result
-      await page.locator('[data-test="index-field-search-input"]').waitFor({ state: "visible", timeout: 10000 });
+      await page.locator('[data-test="o-field-list-search-field"]').waitFor({ state: "visible", timeout: 10000 });
 
       // Assign fields from custom query result to Sankey axes
       await pm.chartTypeSelector.searchAndAddField("source", "source");
@@ -349,15 +342,13 @@ test.describe("Sankey chart testcases", () => {
       // Add source as a filter field
       // Sankey mode renders two button groups per field: standard (+X +Y +B +F) and sankey (+S +T +V +F).
       // Scope to the sankey group by finding +F that's a sibling of the +S button.
-      const searchInput = page.locator('[data-test="index-field-search-input"]');
+      const searchInput = page.locator('[data-test="o-field-list-search-field"]');
       await searchInput.click();
       await searchInput.fill("source");
-      const fieldItem = page
-        .locator('[data-test^="field-list-item-"][data-test$="-source"]')
-        .first();
-      // Target the Sankey button group (contains +S) and find +F within it
-      const sankeyGroup = fieldItem.locator('.field_icons:has([data-test="dashboard-add-source-data"])');
-      const filterBtn = sankeyGroup.locator('[data-test="dashboard-add-filter-data"]');
+      const fieldItem = page.locator('[data-test="o-field-list-row-source"]').first();
+      await fieldItem.waitFor({ state: "visible", timeout: 5000 });
+      await fieldItem.hover();
+      const filterBtn = fieldItem.locator('[data-test="dashboard-add-filter-data"]');
       await filterBtn.waitFor({ state: "visible", timeout: 5000 });
       await filterBtn.click();
       await searchInput.fill("");

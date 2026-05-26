@@ -36,14 +36,23 @@ const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubern
 
 // Helper function to enable VRL editor with deterministic wait
 async function enableVrlEditor(page) {
-  const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-  await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
+  // VRL toggle lives inside the utilities menu dropdown
+  const utilitiesBtn = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+  await utilitiesBtn.waitFor({ state: "visible", timeout: 10000 });
+  await utilitiesBtn.click();
 
-  const isChecked = await vrlToggle.getAttribute("aria-checked");
+  const vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+  await vrlToggleBtn.waitFor({ state: "visible", timeout: 10000 });
 
-  if (isChecked === "false") {
-    await vrlToggle.click();
-    await page.waitForTimeout(1000);
+  const dataState = await vrlToggleBtn.getAttribute("data-state");
+
+  if (dataState === "unchecked") {
+    await vrlToggleBtn.click();
+    await page.keyboard.press("Escape");
+    const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+    await vrlEditor.first().waitFor({ state: "visible", timeout: 10000 });
+  } else {
+    await page.keyboard.press("Escape");
   }
 }
 
@@ -73,20 +82,8 @@ test.describe("VRL visualization support testcases", () => {
     // Open visualization tab
     await pm.logsVisualise.openVisualiseTabWithVrl();
 
-    // Verify VRL toggle button is visible in the toolbar
-    const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-    await expect(vrlToggle).toBeVisible();
-
-    // Check if toggle is already on (aria-checked="true")
-    const isChecked = await vrlToggle.getAttribute("aria-checked");
-
-    if (isChecked === "false") {
-      // Click VRL toggle to show editor
-      await vrlToggle.click();
-      // Wait for VRL editor to appear
-      const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
-      await vrlEditor.first().waitFor({ state: "visible", timeout: 10000 });
-    }
+    // Enable VRL editor via the utilities dropdown
+    await enableVrlEditor(page);
 
     // Verify VRL editor is visible
     const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
