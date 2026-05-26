@@ -57,13 +57,13 @@ pub async fn incr_pending_file(
     min_ts: i64,
 ) {
     let cfg = get_config();
-    let threshold = cfg.compact.max_file_size / cfg.limit.max_file_size_in_memory;
     let ingester_num = get_cached_online_ingester_nodes()
         .await
         .map(|nodes| nodes.len())
         .unwrap_or(1);
-    // at least 10 files per ingester
-    let threshold = (threshold / ingester_num).max(10);
+    // must wait for at least 3 times of needed files
+    let threshold =
+        (cfg.compact.max_file_size / cfg.limit.max_file_size_in_memory / ingester_num).max(1) * 3;
 
     let hour = min_ts - min_ts % hour_micros(1);
     let key = format!("{org_id}/{stream_type}/{stream_name}");
