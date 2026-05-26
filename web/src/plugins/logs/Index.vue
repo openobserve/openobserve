@@ -337,6 +337,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
+              :isSqlMode="searchObj.meta.sqlMode"
+              :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
               class="tw:pb-[0.75rem]! tw:pr-[0.625rem]"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
