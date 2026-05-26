@@ -509,7 +509,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.decimals =
-                typeof value == 'number' && value >= 0 ? value : 2)
+                typeof value == 'number' && value >= 0 ? value : null)
+          "
+          @blur="
+            () => {
+              if (dashboardPanelData.data.config.decimals == null)
+                dashboardPanelData.data.config.decimals = 2
+            }
           "
           :label="t('dashboard.decimals')"
           data-test="dashboard-config-decimals"
@@ -534,8 +540,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (value: any) =>
               (dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].config.limit = value ? value : 0)
+              ].config.limit = typeof value === 'number' ? value : null)
           "
+          @blur="() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit == null && (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit = 0)"
           placeholder="0"
           :label="t('dashboard.queryLimit')"
           data-test="dashboard-config-limit"
@@ -766,7 +773,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.label_option.rotate =
-                value !== '' ? value : 0)
+                typeof value === 'number' ? value : null)
+          "
+          @blur="
+            () => {
+              if (dashboardPanelData.data.config.label_option.rotate == null)
+                dashboardPanelData.data.config.label_option.rotate = 0
+            }
           "
           data-test="dashboard-config-label-rotate"
         />
@@ -785,8 +798,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="
               (value: any) =>
                 (dashboardPanelData.data.config.axis_label_rotate =
-                  value !== '' ? value : 0)
+                  typeof value === 'number' ? value : null)
             "
+            @blur="() => dashboardPanelData.data.config.axis_label_rotate == null && (dashboardPanelData.data.config.axis_label_rotate = 0)"
             data-test="dashboard-config-axis-label-rotate"
           >
             <template #tooltip>
@@ -881,7 +895,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.line_thickness =
-                typeof value == 'number' && value >= 0 ? value : 1.5)
+                typeof value == 'number' && value >= 0 ? value : null)
+          "
+          @blur="
+            () => {
+              if (dashboardPanelData.data.config.line_thickness == null)
+                dashboardPanelData.data.config.line_thickness = 1.5
+            }
           "
           :label="t('dashboard.lineThickness')"
           :placeholder="t('dashboard.lineThicknessDefault')"
@@ -1362,7 +1382,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (value: any) =>
               (dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].config.min = value ? value : 0)
+              ].config.min = typeof value === 'number' ? value : null)
+          "
+          @blur="
+            () => {
+              if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.min == null)
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.min = 0
+            }
           "
           data-test="dashboard-config-gauge-min"
         />
@@ -1380,7 +1406,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (value: any) =>
               (dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].config.max = value ? value : 100)
+              ].config.max = typeof value === 'number' ? value : null)
+          "
+          @blur="
+            () => {
+              if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.max == null)
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.max = 100
+            }
           "
           data-test="dashboard-config-gauge-max"
         />
