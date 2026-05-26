@@ -397,7 +397,9 @@
     "switchToLogs": "haga clic para volver a Registros",
     "patternNoValuesAvailable": "No hay valores disponibles",
     "selectLogStream": "Seleccione la secuencia de registros",
-    "noData": "No hay datos disponibles"
+    "noData": "No hay datos disponibles",
+    "functionEditorLabel": "Editor de funciones",
+    "transformEditorLabel": "Editor de transformaciones"
   },
   "menu": {
     "home": "Inicio",

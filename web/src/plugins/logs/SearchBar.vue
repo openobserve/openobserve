@@ -72,313 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.showPatternsLabel") }}
           </OToggleGroupItem>
         </OToggleGroup>
-        <div
-          v-if="!shouldMoveSqlToggleToMenu"
-          class="toolbar-toggle-container element-box-shadow"
-        >
-          <OSwitch
-            data-test="logs-search-bar-show-histogram-toggle-btn"
-            v-model="searchObj.meta.showHistogram"
-            size="lg"
-          >
-            <template #label>
-              <OIcon name="bar-chart" size="xs" />
-              <OTooltip :content="t('search.showHistogramLabel')" />
-            </template>
-          </OSwitch>
-        </div>
-        <div
-          v-if="!shouldMoveSqlToggleToMenu"
-          class="toolbar-toggle-container element-box-shadow"
-        >
-          <OSwitch
-            data-test="logs-search-bar-sql-mode-toggle-btn"
-            v-model="searchObj.meta.sqlMode"
-            :disabled="isSqlModeDisabled"
-            size="lg"
-          >
-            <template #label>
-              <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
-              <OTooltip
-                :content="
-                  isSqlModeDisabled
-                    ? t('search.sqlModeDisabledForVisualization')
-                    : t('search.sqlModeLabel')
-                "
-              />
-            </template>
-          </OSwitch>
-        </div>
-        <OButtonGroup
-          v-if="!shouldMoveSavedViewToMenu"
-          class="tw:ml-1 tw:p-0 element-box-shadow tw:border tw:border-button-outline-border"
-        >
-          <!-- Save current view -->
-          <OButton
-            data-test="logs-search-saved-views-btn"
-            variant="ghost"
-            size="icon-toolbar"
-            @click="fnSavedView"
-          >
-            <OIcon name="save" size="sm" />
-            <OTooltip :content="t('search.savedViewsLabel')" />
-          </OButton>
-          <!-- List saved views dropdown -->
-          <ODropdown
-            :open="savedViewDropdownModel"
-            @update:open="
-              (v) => {
-                savedViewDropdownModel = v;
-                if (v) loadSavedView();
-              }
-            "
-            side="bottom"
-            align="start"
-          >
-            <template #trigger>
-              <OButton
-                data-test="logs-search-saved-views-expand-btn"
-                variant="ghost"
-                size="icon-toolbar"
-              >
-                <OIcon name="saved-search" size="sm" />
-                <OIcon name="arrow-drop-down" size="sm" class="tw:-ms-1" />
-                <OTooltip :content="t('search.listSavedViews')" />
-              </OButton>
-            </template>
-            <div
-              :style="
-                localSavedViews.length > 0
-                  ? 'width: 500px; max-height: 400px; overflow-y: auto; overflow-x: auto'
-                  : 'width: 250px; max-height: 400px; overflow-y: auto; overflow-x: auto'
-              "
-            >
-              <div data-test="logs-search-saved-view-list">
-                <div class="tw:flex tw:p-0">
-                  <div
-                    class="tw:flex tw:flex-col"
-                    :style="
-                      localSavedViews.length > 0
-                        ? 'width: 60%; border-right: 1px solid lightgray; min-width: 0'
-                        : 'width: 100%; min-width: 0'
-                    "
-                  >
-                    <div class="tw:box-border tw:w-full tw:px-2">
-                      <OInput
-                        data-test="log-search-saved-view-field-search-input"
-                        v-model="searchObj.data.savedViewFilterFields"
-                        clearable
-                        :debounce="1"
-                        class="tw:w-full tw:my-2"
-                        :placeholder="t('search.searchSavedView')"
-                      >
-                        <template #icon-left>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                      </OInput>
-                    </div>
-                    <div
-                      v-if="searchObj.loadingSavedView == true"
-                      class="tw:w-full float-left tw:p-1"
-                    >
-                      <div class="tw:text-sm tw:font-medium text-weight-bold float-left">
-                        <OSpinner size="xs" />
-                        {{ t("confirmDialog.loading") }}
-                      </div>
-                    </div>
-                    <div
-                      v-else
-                      data-test="log-search-saved-view-list-fields-table"
-                      class="tw:max-h-[20rem] tw:overflow-y-auto tw:overflow-x-hidden"
-                    >
-                      <div
-                        v-if="paginatedSavedViews.length === 0"
-                        class="tw:pl-2 tw:pt-2"
-                      >
-                        <span class="tw:text-sm">{{
-                          t("search.savedViewsNotFound")
-                        }}</span>
-                      </div>
-                      <div
-                        v-for="row in paginatedSavedViews"
-                        :key="row.view_id"
-                        class="tw:grid tw:grid-cols-[minmax(0,1fr)_auto_auto_auto] tw:items-center tw:gap-0.5 tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
-                        :data-test="`logs-search-saved-view-item-${row.view_name}`"
-                      >
-                        <div
-                          class="tw:truncate tw:text-sm tw:min-w-0"
-                          :title="row.view_name"
-                          @click.stop="applySavedView(row)"
-                        >
-                          {{ row.view_name }}
-                        </div>
-                        <OButton
-                          :data-test="`logs-search-bar-favorite-${row.view_name}-saved-view-btn`"
-                          :title="t('common.favourite')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                          @click.stop="
-                            handleFavoriteSavedView(
-                              row,
-                              favoriteViews.includes(row.view_id),
-                            )
-                          "
-                        >
-                          <OIcon
-                            :name="
-                              favoriteViews.includes(row.view_id)
-                                ? 'favorite'
-                                : 'favorite-border'
-                            "
-                            size="xs"
-                          />
-                        </OButton>
-                        <OButton
-                          :data-test="`logs-search-bar-update-${row.view_name}-saved-view-btn`"
-                          :title="t('common.edit')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                          @click.stop="handleUpdateSavedView(row)"
-                        >
-                          <OIcon name="edit" size="xs" />
-                        </OButton>
-                        <OButton
-                          :data-test="`logs-search-bar-delete-${row.view_name}-saved-view-btn`"
-                          :title="t('common.delete')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                          @click.stop="handleDeleteSavedView(row)"
-                        >
-                          <OIcon name="delete" size="xs" />
-                        </OButton>
-                      </div>
-                    </div>
-                    <div
-                      v-if="savedViewTotalPages > 1"
-                      class="tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1 tw:border-t tw:border-[var(--color-border-default)]"
-                    >
-                      <span class="tw:text-xs tw:text-[var(--o2-text-caption)]">
-                        {{ (savedViewPage - 1) * savedViewPageSize + 1 }}–{{ Math.min(savedViewPage * savedViewPageSize, filteredSavedViews.length) }} / {{ filteredSavedViews.length }}
-                      </span>
-                      <div class="tw:flex tw:gap-0.5">
-                        <OButton
-                          size="icon"
-                          variant="ghost"
-                          :disabled="savedViewPage <= 1"
-                          @click.stop="savedViewPage = 1"
-                        >
-                          <OIcon name="first-page" size="xs" />
-                        </OButton>
-                        <OButton
-                          size="icon"
-                          variant="ghost"
-                          :disabled="savedViewPage <= 1"
-                          @click.stop="savedViewPage--"
-                        >
-                          <OIcon name="chevron-left" size="xs" />
-                        </OButton>
-                        <OButton
-                          size="icon"
-                          variant="ghost"
-                          :disabled="savedViewPage >= savedViewTotalPages"
-                          @click.stop="savedViewPage++"
-                        >
-                          <OIcon name="chevron-right" size="xs" />
-                        </OButton>
-                        <OButton
-                          size="icon"
-                          variant="ghost"
-                          :disabled="savedViewPage >= savedViewTotalPages"
-                          @click.stop="savedViewPage = savedViewTotalPages"
-                        >
-                          <OIcon name="last-page" size="xs" />
-                        </OButton>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div
-                    class="tw:flex tw:flex-col tw:w-[40%] tw:p-0 tw:ml-0 tw:justify-start tw:self-start"
-                    v-if="localSavedViews.length > 0"
-                  >
-                    <div class="tw:p-0">
-                      <div class="tw:p-2 tw:font-bold favorite-label">
-                        {{ t("search.favoriteViews") }}
-                      </div>
-                    </div>
-                    <OSeparator class="tw:mx-4" />
-                    <div
-                      data-test="log-search-saved-view-favorite-list-fields-table"
-                      class="tw:max-h-[20rem] tw:overflow-y-auto tw:overflow-x-hidden"
-                    >
-                      <div
-                        v-for="row in localSavedViews"
-                        :key="row.view_id"
-                        class="tw:grid tw:grid-cols-[minmax(0,1fr)_auto_auto_auto] tw:items-center tw:gap-0.5 tw:px-2 tw:py-0.5 saved-view-item tw:hover:bg-[var(--o2-hover-accent)] tw:cursor-pointer"
-                      >
-                        <div
-                          class="tw:truncate tw:text-sm tw:min-w-0"
-                          :title="row.view_name"
-                          @click.stop="applySavedView(row)"
-                        >
-                          {{ row.view_name }}
-                        </div>
-                        <OButton
-                          :data-test="`logs-search-bar-favorite-${row.view_name}-saved-view-btn`"
-                          :title="t('common.favourite')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                          @click.stop="
-                            handleFavoriteSavedView(
-                              row,
-                              favoriteViews.includes(row.view_id),
-                            )
-                          "
-                        >
-                          <OIcon
-                            :name="
-                              favoriteViews.includes(row.view_id)
-                                ? 'favorite'
-                                : 'favorite-border'
-                            "
-                            size="xs"
-                          />
-                        </OButton>
-                        <OButton
-                          :data-test="`logs-search-bar-update-${row.view_name}-favorite-saved-view-btn`"
-                          :title="t('common.edit')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                          @click.stop="handleUpdateSavedView(row)"
-                        >
-                          <OIcon name="edit" size="xs" />
-                        </OButton>
-                        <OButton
-                          :data-test="`logs-search-bar-delete-${row.view_name}-favorite-saved-view-btn`"
-                          :title="t('common.delete')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                          @click.stop="handleDeleteSavedView(row)"
-                        >
-                          <OIcon name="delete" size="xs" />
-                        </OButton>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </ODropdown>
-        </OButtonGroup>
-        <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
         <OButton
-          v-if="!shouldMoveSavedViewToMenu"
           data-test="logs-search-bar-reset-filters-btn"
           class="tw:ms-1"
           size="icon-toolbar"
@@ -388,8 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="restart-alt" size="sm" />
           <OTooltip :content="t('search.resetFilters')" />
         </OButton>
+        
         <!-- this is the button group responsible for showing all the utilities -->
-        <ODropdown side="bottom" align="start">
+        <ODropdown side="bottom" align="start" @update:open="(open) => { if (!open) { showDownloadSubmenu = false; showFunctionsSubmenu = false; functionSearchTerm = ''; } }">
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
@@ -404,14 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Histogram Toggle -->
           <ODropdownItem
-            v-if="shouldMoveSqlToggleToMenu"
             data-test="logs-search-bar-menu-histogram-btn"
             @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <template #icon-left>
               <OSwitch
                 v-model="searchObj.meta.showHistogram"
-                size="sm"
+                size="md"
                 @click.stop
               />
             </template>
@@ -420,7 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SQL Mode Toggle -->
           <ODropdownItem
-            v-if="shouldMoveSqlToggleToMenu"
             data-test="logs-search-bar-menu-sql-mode-btn"
             @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
@@ -428,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch
                 v-model="searchObj.meta.sqlMode"
                 :disabled="isSqlModeDisabled"
-                size="sm"
+                size="md"
                 @click.stop
               />
             </template>
@@ -443,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left>
               <OSwitch
                 :model-value="searchObj.meta.quickMode"
-                size="sm"
+                size="md"
                 data-test="logs-search-bar-quick-mode-switch"
                 @click.stop="handleQuickMode"
               />
@@ -451,11 +145,109 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.quickModeLabel") }}
           </ODropdownItem>
 
+          <!-- VRL / Transform Editor Toggle -->
+          <ODropdownItem @select.prevent>
+            <template #icon-left>
+              <OSwitch
+                data-test="logs-search-bar-show-query-toggle-btn"
+                v-model="searchObj.meta.showTransformEditor"
+                size="md"
+                @click.stop
+              />
+            </template>
+            {{ isActionsEnabled ? t('search.transformEditorLabel') : t('search.functionEditorLabel') }}
+          </ODropdownItem>
+
+          <!-- Functions/Transforms — only visible when editor is toggled on -->
+          <template v-if="searchObj.meta.showTransformEditor">
+            <ODropdownSeparator />
+            <!-- Functions/Transforms submenu (hover to open) -->
+            <div
+              data-test="logs-search-bar-function-dropdown"
+              class="search-download-item tw:gap-2!"
+              @mouseenter="showFunctionsSubmenu = true"
+              @mouseleave="showFunctionsSubmenu = false"
+            >
+              <OIcon size="sm" name="code" />
+              <span class="search-download-item-label">
+                {{ isActionsEnabled && searchObj.data.transformType === 'action' ? t('search.actionLabel') : t('search.functionLabel') }}
+              </span>
+              <OIcon size="sm" name="chevron-right" />
+
+              <!-- Submenu -->
+              <div
+                v-if="showFunctionsSubmenu"
+                class="search-download-submenu"
+                data-test="logs-search-saved-function-list"
+              >
+                <!-- Transform type selector (only when isActionsEnabled) -->
+                <div
+                  v-if="isActionsEnabled"
+                  data-test="logs-search-bar-transform-type-select"
+                  class="logs-transform-type o2-input"
+                >
+                  <OSelect
+                    v-model="searchObj.data.transformType"
+                    :options="[{ label: 'Function', value: 'function' }, { label: 'Action', value: 'action' }]"
+                    :label="t('search.transformType')"
+                    clearable
+                    @update:model-value="updateEditorWidth"
+                  />
+                </div>
+
+                <!-- Search input -->
+                <OInput
+                  v-model="functionSearchTerm"
+                  clearable
+                  :debounce="300"
+                  :placeholder="t('search.searchSavedFunction')"
+                  data-test="function-search-input"
+                >
+                  <template #icon-left>
+                    <OIcon name="search" size="sm" />
+                  </template>
+                </OInput>
+
+                <!-- Items list -->
+                <div
+                  v-if="filteredFunctionMenuOptions.length"
+                  class="tw:max-h-72 tw:overflow-y-auto"
+                >
+                  <button
+                    v-for="item in filteredFunctionMenuOptions"
+                    :key="item.name"
+                    type="button"
+                    :data-test="`logs-search-saved-${isActionsEnabled ? 'transform' : 'function'}-item-${item.name}`"
+                    class="search-download-submenu-item"
+                    @click="selectFunctionMenuItem(item)"
+                  >
+                    <span class="tw:flex-1">{{ item.name }}</span>
+                  </button>
+                </div>
+                <div v-else class="tw:px-3 tw:py-2">
+                  <span class="tw:text-sm">{{ t('search.savedFunctionNotFound') }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Save button -->
+            <ODropdownItem
+              :data-test="isActionsEnabled ? 'logs-search-bar-save-transform-btn' : 'logs-search-bar-save-function-btn'"
+              :disabled="isActionsEnabled && searchObj.data.transformType !== 'function'"
+              @select="fnSavedFunctionDialog"
+            >
+              <template #icon-left>
+                <OIcon name="save" size="sm" />
+              </template>
+              {{ t('search.saveFunctionLabel') }}
+            </ODropdownItem>
+
+          </template>
+
           <ODropdownSeparator />
 
           <!-- === SAVED VIEWS GROUP === -->
           <ODropdownItem
-            v-if="shouldMoveSavedViewToMenu"
             data-test="logs-search-bar-menu-list-saved-views-btn"
             @select="openSavedViewsList"
           >
@@ -466,7 +258,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdownItem>
 
           <ODropdownItem
-            v-if="shouldMoveSavedViewToMenu"
             data-test="logs-search-bar-menu-create-saved-view-btn"
             @select="fnSavedView"
           >
@@ -476,21 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.createSavedView") }}
           </ODropdownItem>
 
-          <ODropdownSeparator v-if="shouldMoveSavedViewToMenu" />
-
-          <!-- Reset Filters -->
-          <ODropdownItem
-            v-if="shouldMoveSavedViewToMenu"
-            data-test="logs-search-bar-menu-reset-filters-btn"
-            @select="resetFilters"
-          >
-            <template #icon-left>
-              <OIcon name="restart-alt" size="sm" />
-            </template>
-            {{ t("search.resetFilters") }}
-          </ODropdownItem>
-
-          <ODropdownSeparator v-if="shouldMoveSavedViewToMenu" />
+          <ODropdownSeparator />
 
           <!-- Syntax Guide -->
           <ODropdownItem @select.prevent>
@@ -501,51 +278,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('search.syntaxGuideLabel')"
             />
           </ODropdownItem>
-        </ODropdown>
-      </div>
 
-      <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
-        <transform-selector
-          v-if="isActionsEnabled && !shouldMoveShareToMenu"
-          :function-options="functionOptions"
-          @select:function="populateFunctionImplementation"
-          @save:function="fnSavedFunctionDialog"
-        />
-        <function-selector
-          v-else-if="!isActionsEnabled && !shouldMoveShareToMenu"
-          :function-options="functionOptions"
-          @select:function="populateFunctionImplementation"
-          @save:function="fnSavedFunctionDialog"
-        />
-        <ODropdown
-          side="bottom"
-          align="start"
-          @update:open="(open) => { if (!open) showDownloadSubmenu = false; }"
-        >
-          <template #trigger>
-            <OButton
-              data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn tw:order-4"
-              variant="outline"
-              size="icon-toolbar"
-            >
-              <OIcon name="menu" size="sm" />
-              <OTooltip style="width: 110px" :content="t('search.moreActions')" />
-            </OButton>
-          </template>
+          <ODropdownSeparator />
 
           <!-- Share Link -->
-          <div v-if="shouldMoveShareToMenu" class="tw:p-2" data-test="logs-search-bar-menu-share-link-btn">
+          <div  data-test="logs-search-bar-menu-share-link-btn">
             <share-button
               :url="shareURL"
-              variant="outline"
-              size="sm-action"
+              variant="ghost"
+              size="sm"
               :show-label="true"
               class="tw:w-full"
+              buttonClass="tw:justify-start! tw:h-8!"
             />
           </div>
 
-          <ODropdownSeparator v-if="shouldMoveShareToMenu" />
+          <ODropdownSeparator />
 
           <ODropdownItem
             data-test="search-history-item-btn"
@@ -681,14 +429,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span data-test="search-inspect-label">Search Inspect</span>
           </ODropdownItem>
         </ODropdown>
-        <share-button
-          v-if="!shouldMoveShareToMenu"
-          data-test="logs-search-bar-share-link-btn"
-          :url="shareURL"
-          variant="outline"
-          size="icon-toolbar"
-          class="tw:order-3"
-        />
+      </div>
+
+      <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
         <div class="tw:mr-1 tw:order-1">
           <date-time
             ref="dateTimeRef"
@@ -1910,8 +1653,6 @@ import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
-import TransformSelector from "./TransformSelector.vue";
-import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
@@ -2025,8 +1766,6 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
-    TransformSelector,
-    FunctionSelector,
     CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
@@ -2352,13 +2091,6 @@ export default defineComponent({
       windowWidth.value = window.innerWidth;
     };
 
-    // Responsive breakpoints: progressively move items into menus
-    // <= 1440px: saved views + reset ? left hamburger menu
-    // <= 1280px: also histogram + SQL toggles ? left hamburger menu
-    // <= 1024px: also share + transform selector ? right overflow menu
-    const shouldMoveSavedViewToMenu = computed(() => windowWidth.value <= 1440);
-    const shouldMoveSqlToggleToMenu = computed(() => windowWidth.value <= 1280);
-    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
@@ -4191,6 +3923,49 @@ export default defineComponent({
         !searchObj.data.stream.selectedStream?.length ||
         !searchObj.data.queryResults?.hits?.length,
     );
+
+    // Hover-triggered submenu state for "Functions/Transforms" in the utilities dropdown.
+    const showFunctionsSubmenu = ref(false);
+    const functionSearchTerm = ref("");
+
+    const filteredFunctionMenuOptions = computed(() => {
+      const term = functionSearchTerm.value;
+      if (isActionsEnabled.value) {
+        if (searchObj.data.transformType === "function") {
+          if (!term) return functionOptions.value;
+          return functionOptions.value.filter((item: any) =>
+            item.name.toLowerCase().includes(term.toLowerCase()),
+          );
+        }
+        if (searchObj.data.transformType === "action") {
+          if (!term) return searchObj.data.actions;
+          return searchObj.data.actions.filter((item: any) =>
+            item.name.toLowerCase().includes(term.toLowerCase()),
+          );
+        }
+        return [];
+      }
+      if (!term) return functionOptions.value;
+      return functionOptions.value.filter((item: any) =>
+        item.name.toLowerCase().includes(term.toLowerCase()),
+      );
+    });
+
+    const selectFunctionMenuItem = (item: any) => {
+      showFunctionsSubmenu.value = false;
+      if (
+        isActionsEnabled.value &&
+        searchObj.data.transformType === "action"
+      ) {
+        searchObj.data.selectedTransform = { ...item, type: "action" };
+        toast({
+          message: `${item?.name} action applied successfully`,
+          timeout: 3000,
+        });
+        return;
+      }
+      populateFunctionImplementation(item, true);
+    };
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
       { label: "JSON", value: "json" },
@@ -4584,11 +4359,11 @@ export default defineComponent({
       return {
         backgroundColor:
           searchObj.data.transformType === "function" && isFocused.value
-            ? "var(--o2-card-bg)"
+            ? "var(--o2-card-bg-solid)"
             : "",
         borderBottom:
           searchObj.data.transformType === "function" && isFocused.value
-            ? "0.375rem solid var(--o2-card-bg)"
+            ? "0.375rem solid var(--o2-card-bg-solid)"
             : "none",
         // Conditional width when focused (expand-on-focus active)
         width: isFocused.value
@@ -4853,6 +4628,10 @@ export default defineComponent({
       confirmCallback,
       showDownloadSubmenu,
       isDownloadDisabled,
+      showFunctionsSubmenu,
+      functionSearchTerm,
+      filteredFunctionMenuOptions,
+      selectFunctionMenuItem,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
@@ -5010,9 +4789,6 @@ export default defineComponent({
       isNaturalLanguageDetected,
       isGeneratingSQL,
       vrlEditorNlpMode,
-      shouldMoveSavedViewToMenu,
-      shouldMoveSqlToggleToMenu,
-      shouldMoveShareToMenu,
       toggleLiveMode,
     };
   },
@@ -5370,7 +5146,7 @@ export default defineComponent({
   top: 0;
   margin-right: 0.25rem;
   min-width: 10rem;
-  background-color: var(--o2-card-bg);
+  background-color: var(--o2-card-bg-solid);
   border: 0.063rem solid var(--o2-border-color);
   border-radius: 0.375rem;
   box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
@@ -5378,7 +5154,7 @@ export default defineComponent({
   z-index: 9999;
 
   body.body--dark & {
-    background-color: var(--o2-card-bg);
+    background-color: var(--o2-card-bg-solid);
     border-color: var(--o2-border-color);
     box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
   }
