@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <OSelect
       ref="selectRef"
-      style="min-width: 150px"
+      style="min-width: 9.375rem"
       :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #trigger>
         <span
-          class="tw:flex-1 tw:text-start tw:truncate"
+          class="tw:flex-1 tw:text-start tw:truncate tw:text-xs tw:leading-4"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
         >{{ displayValue }}</span>
       </template>
@@ -254,7 +254,8 @@ export default defineComponent({
         }
         // Remove custom value suffix if present
         val = val.filter(
-          (v) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)),
+          (v: any) =>
+            !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)),
         );
       }
       selectedValue.value = val;
@@ -429,7 +430,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .o2-custom-select-dashboard {
-  max-width: 600px;
+  max-width: 37.5rem;
 }
 
 :deep(.q-field__native) {

@@ -891,14 +891,17 @@ const fieldWidthClass = computed(() => {
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               triggerEndPadding,
               labelPosition === 'inside' && label
-                ? 'tw:items-end tw:h-10'
+                ? [
+                    'tw:items-end tw:pb-0.5 tw:text-sm',
+                    heightClasses[size ?? 'md'],
+                  ]
                 : ['tw:items-center', heightClasses[size ?? 'md']],
             ]"
           >
             <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+              class="tw:absolute tw:top-0.5 tw:start-3 tw:text-[0.625rem] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
               >{{ label }}</span
             >
 
@@ -918,11 +921,11 @@ const fieldWidthClass = computed(() => {
                   <slot
                     v-for="(labelText, idx) in visibleSelectedLabels"
                     name="chip"
-                    :label="labelText"
+                    :label="String(labelText ?? '')"
                     :value="selectedValues[idx]"
                   >
                     <span
-                      :key="labelText"
+                      :key="`${idx}-${String(labelText ?? '')}`"
                       class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
                     >
                       {{ labelText }}
@@ -940,7 +943,10 @@ const fieldWidthClass = computed(() => {
               <span
                 v-else
                 :class="[
-                  'tw:flex-1 tw:text-start tw:truncate',
+                  'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+                  labelPosition === 'inside' && label
+                    ? 'tw:text-xs tw:leading-4'
+                    : '',
                   disabled
                     ? 'tw:text-select-disabled-text'
                     : hasSelection
@@ -1339,21 +1345,27 @@ const fieldWidthClass = computed(() => {
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             triggerEndPadding,
             labelPosition === 'inside' && label
-              ? 'tw:items-end tw:h-10 tw:pb-1.5'
+              ? [
+                  'tw:items-end tw:pb-0.5 tw:text-sm',
+                  heightClasses[size ?? 'md'],
+                ]
               : ['tw:items-center', heightClasses[size ?? 'md']],
           ]"
         >
           <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+            class="tw:absolute tw:top-0.5 tw:start-3 tw:text-[0.625rem] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
             >{{ label }}</span
           >
 
           <SelectValue
             :placeholder="placeholder"
             :class="[
-              'tw:flex-1 tw:text-start tw:truncate',
+              'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+              labelPosition === 'inside' && label
+                ? 'tw:text-xs tw:leading-4'
+                : '',
               disabled
                 ? 'tw:text-select-disabled-text'
                 : hasSelection
