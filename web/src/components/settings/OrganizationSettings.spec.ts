@@ -453,7 +453,7 @@ describe("OrganizationSettings", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: "Organization settings updated successfully",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     });
@@ -469,7 +469,7 @@ describe("OrganizationSettings", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: errorMessage,
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     });
@@ -482,7 +482,7 @@ describe("OrganizationSettings", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: "Error saving organization settings",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     });
@@ -495,7 +495,7 @@ describe("OrganizationSettings", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: "Error saving organization settings",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     });
@@ -693,7 +693,7 @@ describe("OrganizationSettings", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: "Network timeout",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     });
@@ -743,7 +743,7 @@ describe("OrganizationSettings", () => {
       
       expect(mockToast).toHaveBeenCalledWith({
         message: "Organization settings updated successfully",
-        position: "bottom-center",
+        position: "bottom-right",
         timeout: 3000,
       });
     });

@@ -253,7 +253,7 @@ describe("CrossLinkManager Component", () => {
   describe("removeLink", () => {
     it("should emit update:modelValue without the removed link", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      wrapper.vm.removeLink(sampleLinks[0]);
+      wrapper.vm.removeLink(0);
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0][0]).toEqual([

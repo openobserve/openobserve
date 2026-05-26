@@ -501,12 +501,13 @@ describe('SettingsIndex.vue', () => {
       expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_light.svg');
     });
 
-    it('should return light icon when on regexPatterns route even with dark theme', () => {
+    it('should return dark icon when on regexPatterns route with dark theme', () => {
+      // Route no longer affects icon — ORouteTab handles active styling (commit 73b5288a20)
       wrapper = createWrapper();
       mockStore.state.theme = 'dark';
       mockRouter.currentRoute.value.name = 'regexPatterns';
 
-      expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_light.svg');
+      expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_dark.svg');
     });
 
     it('should react to theme changes', async () => {
@@ -523,24 +524,19 @@ describe('SettingsIndex.vue', () => {
       expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_dark.svg');
     });
 
-    it('should react to route changes', async () => {
-      // Test the logic by directly setting different route values and checking icon
+    it('should not change icon based on route (route no longer affects icon)', async () => {
+      // Route check removed in commit 73b5288a20 — icon depends only on theme
       wrapper = createWrapper();
-      
-      // Test case 1: Dark theme + non-regexPatterns route = dark icon
       wrapper.vm.store.state.theme = 'dark';
       mockRouter.currentRoute.value.name = 'settings';
-      wrapper.vm.router.currentRoute.value.name = 'settings';
-      
-      // Re-create the wrapper to trigger the computed property with new router state
+
       wrapper.unmount();
       mockRouter.currentRoute.value.name = 'regexPatterns';
       wrapper = createWrapper();
       wrapper.vm.store.state.theme = 'dark';
-      
-      // When route is regexPatterns, should show light icon even with dark theme
+
       const iconOnRegexRoute = wrapper.vm.regexIcon;
-      expect(iconOnRegexRoute).toBe('mocked-images/regex_pattern/regex_icon_light.svg');
+      expect(iconOnRegexRoute).toBe('mocked-images/regex_pattern/regex_icon_dark.svg');
     });
   });
 

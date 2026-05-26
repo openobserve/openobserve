@@ -330,18 +330,16 @@ describe("SelectFolderDropDown.vue", () => {
   // ─── Computed style ───────────────────────────────────────────────────────────
 
   describe("computedStyle", () => {
-    it("appends margin-top: 23px to the base style", () => {
+    it("returns the provided style as-is", () => {
       wrapper = createWrapper({ style: "height: 40px" });
       const style = (wrapper.vm as any).computedStyle;
       expect(style).toContain("height: 40px");
-      expect(style).toContain("margin-top: 23px");
     });
 
-    it("uses default 'height: 35px' when no style prop is provided", () => {
+    it("returns empty string when no style prop is provided", () => {
       wrapper = createWrapper();
       const style = (wrapper.vm as any).computedStyle;
-      expect(style).toContain("height: 35px");
-      expect(style).toContain("margin-top: 23px");
+      expect(style).toBe("");
     });
   });
 

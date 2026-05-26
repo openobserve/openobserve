@@ -71,8 +71,8 @@ async function mountComp(props: Record<string, any> = {}) {
         ImportSemanticGroupsDrawer: {
           name: "ImportSemanticGroupsDrawer",
           template: '<div data-test="import-drawer-stub"></div>',
-          props: ["currentGroups", "orgId"],
-          emits: ["apply", "close"],
+          props: ["currentGroups", "orgId", "open"],
+          emits: ["apply", "update:open"],
         },
       },
     },
@@ -105,9 +105,9 @@ describe("SemanticFieldGroupsConfig - rendering", () => {
     expect(w.find('[data-test="semantic-group-category-select"]').exists()).toBe(true);
   });
 
-  it("renders the ODrawer container for import flow", async () => {
+  it("renders the ImportSemanticGroupsDrawer for import flow", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
+    expect(w.findComponent({ name: "ImportSemanticGroupsDrawer" }).exists()).toBe(true);
   });
 });
 
@@ -267,40 +267,40 @@ describe("SemanticFieldGroupsConfig - import drawer", () => {
     expect((w.vm as any).showImportDrawer).toBe(true);
   });
 
-  it("ODrawer reflects open=true after navigateToImport", async () => {
+  it("ImportSemanticGroupsDrawer receives open=true after navigateToImport", async () => {
     const w = await mountComp();
     (w.vm as any).navigateToImport();
     await flushPromises();
-    const drawer = w.find('[data-test-stub="o-drawer"]');
-    expect(drawer.attributes("data-open")).toBe("true");
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    expect(importDrawer.props("open")).toBe(true);
   });
 
-  it("ODrawer is closed by default", async () => {
+  it("ImportSemanticGroupsDrawer is closed by default", async () => {
     const w = await mountComp();
-    const drawer = w.find('[data-test-stub="o-drawer"]');
-    expect(drawer.attributes("data-open")).toBe("false");
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    expect(importDrawer.props("open")).toBe(false);
   });
 
-  it("closes drawer when ODrawer emits update:open=false", async () => {
+  it("closes drawer when ImportSemanticGroupsDrawer emits update:open=false", async () => {
     const w = await mountComp();
     (w.vm as any).showImportDrawer = true;
     await flushPromises();
-    const drawer = w.findComponent(ODrawerStub);
-    await drawer.vm.$emit("update:open", false);
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    await importDrawer.vm.$emit("update:open", false);
     expect((w.vm as any).showImportDrawer).toBe(false);
   });
 
-  it("renders ImportSemanticGroupsDrawer inside ODrawer", async () => {
+  it("renders ImportSemanticGroupsDrawer for import flow", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="import-drawer-stub"]').exists()).toBe(true);
+    expect(w.findComponent({ name: "ImportSemanticGroupsDrawer" }).exists()).toBe(true);
   });
 
-  it("closes drawer when child ImportSemanticGroupsDrawer emits close", async () => {
+  it("closes drawer when child ImportSemanticGroupsDrawer emits update:open=false", async () => {
     const w = await mountComp();
     (w.vm as any).showImportDrawer = true;
     await flushPromises();
     const importChild = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
-    await importChild.vm.$emit("close");
+    await importChild.vm.$emit("update:open", false);
     expect((w.vm as any).showImportDrawer).toBe(false);
   });
 

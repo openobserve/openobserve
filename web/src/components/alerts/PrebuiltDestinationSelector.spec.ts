@@ -228,7 +228,7 @@ describe("PrebuiltDestinationSelector", () => {
 
       expect(checkIcon.exists()).toBe(true);
       const qIcon = checkIcon.findComponent({ name: "OIcon" });
-      expect(qIcon.props("name")).toBe("check-circle");
+      expect(qIcon.props("name")).toBe("check");
     });
 
     it("should not show check icon on unselected cards", () => {
@@ -350,7 +350,7 @@ describe("PrebuiltDestinationSelector", () => {
       const customCard = findCardByType(wrapper, "custom");
       const checkIcon = customCard
         .findAllComponents({ name: "OIcon" })
-        .find((icon) => icon.props("name") === "check-circle");
+        .find((icon) => icon.props("name") === "check");
 
       expect(checkIcon).toBeDefined();
       // OIcon no longer has a `color` prop — color comes from the `.check-icon` parent class

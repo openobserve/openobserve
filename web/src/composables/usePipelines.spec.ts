@@ -141,7 +141,7 @@ describe('usePipelines', () => {
     expect(result).toEqual([]);
     expect(toast).toHaveBeenCalledWith({
       message: 'Internal Server Error',
-      position: 'bottom-center',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -163,7 +163,7 @@ describe('usePipelines', () => {
     expect(result).toEqual([]);
     expect(toast).toHaveBeenCalledWith({
       message: 'Error fetching used streams',
-      position: 'bottom-center',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -184,7 +184,7 @@ describe('usePipelines', () => {
     expect(result).toEqual([]);
     expect(toast).toHaveBeenCalledWith({
       message: 'Error fetching used streams',
-      position: 'bottom-center',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -324,7 +324,7 @@ describe('usePipelines', () => {
     expect(toast).toHaveBeenCalledTimes(1);
     expect(toast).toHaveBeenCalledWith({
       message: 'Bad Request Error',
-      position: 'bottom-center',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -543,7 +543,7 @@ describe('usePipelines', () => {
     expect(result).toEqual([]);
     expect(toast).toHaveBeenCalledWith({
       message: 'Validation failed',
-      position: 'bottom-center',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
