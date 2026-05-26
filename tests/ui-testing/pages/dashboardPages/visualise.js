@@ -22,7 +22,7 @@ export default class LogsVisualise {
     this.newDashboardBtn = page.locator(
       '[data-test="dashboard-dashboard-new-add"]'
     );
-    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
+    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name-field"]');
     // Inner "New dashboard" ODrawer's Save action — the legacy
     // `dashboard-add-submit` button was removed when AddDashboard.vue was
     // migrated to ODrawer (SelectDashboardDropdown now hosts the form and
@@ -31,7 +31,7 @@ export default class LogsVisualise {
       '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
     );
     this.panelTitleInput = page.locator(
-      '[data-test="metrics-new-dashboard-panel-title"]'
+      '[data-test="metrics-new-dashboard-panel-title-field"]'
     );
     // Outer "Add to Dashboard" ODrawer's Add action — the legacy
     // `metrics-schema-update-settings-button` was removed when AddToDashboard.vue
