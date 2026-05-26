@@ -38,7 +38,11 @@ use std::collections::{HashMap, HashSet};
 
 use config::meta::stream::{FileKey, StreamType};
 use futures::stream::{self, StreamExt};
-use infra::bloom::{BLOOM_FOOTER_CACHE, BloomReader, path::bloom_path, sbbf::BLOCK_BYTES};
+use infra::bloom::{
+    BLOOM_FOOTER_CACHE, BloomReader,
+    path::bloom_path,
+    sbbf::{BLOCK_BYTES, check_block_with_mask, mask_from_hash},
+};
 use object_store::{GetOptions, GetRange};
 
 use super::index::{Condition, IndexCondition};
@@ -370,7 +374,10 @@ async fn run_group(
         pred_idx: usize,
         value_idx: usize,
         range: std::ops::Range<u64>,
-        hash: u64,
+        /// SBBF bit-mask for this value, computed once and reused for every
+        /// file's block in the row (the mask depends only on the hash, which
+        /// is identical across all files in the group).
+        mask: [u32; 8],
     }
     let mut rows: Vec<RowPlan> = Vec::new();
     for (pi, pred) in predicates.iter().enumerate() {
@@ -380,7 +387,7 @@ async fn run_group(
                     pred_idx: pi,
                     value_idx: vi,
                     range,
-                    hash,
+                    mask: mask_from_hash(hash),
                 });
             }
             // field absent in this .bf → no row → those (file, pred) pairs
@@ -436,7 +443,7 @@ async fn run_group(
                 continue;
             }
             let block: &[u8; BLOCK_BYTES] = row_bytes[off..off + BLOCK_BYTES].try_into().unwrap();
-            let hit = BloomReader::check_block_with_hash(block, r.hash);
+            let hit = check_block_with_mask(block, &r.mask);
             outcomes.push((file_idx, r.pred_idx, r.value_idx, hit));
         }
     }
@@ -446,19 +453,61 @@ async fn run_group(
 
 /// Footer suffix retrieval: footer cache → suffix-range GET on miss.
 /// Returns (total_size, suffix_bytes) in both branches.
+///
+/// Two-step read: the first probe pulls a fixed tail
+/// (`BLOOM_SUFFIX_PROBE_BYTES`), which covers the whole footer for the common
+/// case (few fields / a few hundred files). When the footer is bigger than
+/// the probe — many bloom fields, or a large `max_files_per_bf` — we re-read
+/// exactly `footer_len + 8` from the tail so a big `.bf` still prunes instead
+/// of silently falling back to keep-all.
 async fn get_footer_suffix(account: &str, path: &str) -> Result<(u64, bytes::Bytes), FetchError> {
     if let Some((total, suffix)) = BLOOM_FOOTER_CACHE.get(path) {
         return Ok((total, suffix));
     }
+
+    let (total, suffix) = fetch_suffix(account, path, BLOOM_SUFFIX_PROBE_BYTES).await?;
+    let suffix = match footer_shortfall(&suffix, total) {
+        Some(needed) => fetch_suffix(account, path, needed).await?.1,
+        None => suffix,
+    };
+
+    BLOOM_FOOTER_CACHE.put(path.to_string(), total, suffix.clone());
+    Ok((total, suffix))
+}
+
+/// One `Suffix(n)` GET. Returns (total_file_size, suffix_bytes).
+async fn fetch_suffix(
+    account: &str,
+    path: &str,
+    n: u64,
+) -> Result<(u64, bytes::Bytes), FetchError> {
     let opts = GetOptions {
-        range: Some(GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)),
+        range: Some(GetRange::Suffix(n)),
         ..Default::default()
     };
     let res = infra::cache::storage::get_opts(account, &path.into(), opts).await?;
     let total = res.meta.size;
     let suffix = res.bytes().await?;
-    BLOOM_FOOTER_CACHE.put(path.to_string(), total, suffix.clone());
     Ok((total, suffix))
+}
+
+/// If the footer doesn't fully fit in `suffix`, return how many trailing
+/// bytes to re-read (`footer_len + footer_len_field + magic`). The last 8
+/// bytes of any `.bf` are `footer_len(4) + MAGIC(4)`, and the probe always
+/// includes them, so we can read `footer_len` here. Returns `None` when the
+/// footer already fits, the suffix is too short to hold the trailer, or
+/// `footer_len` is implausible (corrupt) — let `parse_suffix` reject those.
+fn footer_shortfall(suffix: &[u8], total: u64) -> Option<u64> {
+    let n = suffix.len();
+    if n < 8 {
+        return None;
+    }
+    let footer_len = u32::from_le_bytes(suffix[n - 8..n - 4].try_into().ok()?) as u64;
+    let needed = footer_len + 8;
+    if needed <= n as u64 || needed > total {
+        return None;
+    }
+    Some(needed)
 }
 
 #[cfg(test)]
@@ -694,5 +743,48 @@ mod tests {
         )
         .await;
         assert_eq!(kept.len(), 1);
+    }
+
+    #[test]
+    fn test_footer_shortfall() {
+        let total = 10_000u64;
+        let mut s = vec![0u8; 64]; // last 8 bytes = footer_len(4) + magic(4)
+        // footer fits within the 64-byte suffix (needed = 40 + 8 = 48 <= 64)
+        s[56..60].copy_from_slice(&40u32.to_le_bytes());
+        assert_eq!(footer_shortfall(&s, total), None);
+        // footer bigger than the suffix → re-read footer_len + 8
+        s[56..60].copy_from_slice(&5000u32.to_le_bytes());
+        assert_eq!(footer_shortfall(&s, total), Some(5008));
+        // implausible footer_len (> total) → None, let parse reject it
+        s[56..60].copy_from_slice(&20_000u32.to_le_bytes());
+        assert_eq!(footer_shortfall(&s, total), None);
+        // too short to even hold the trailer → None
+        assert_eq!(footer_shortfall(&[0u8; 4], total), None);
+    }
+
+    /// A `.bf` whose footer exceeds a small probe must still parse once we
+    /// re-read exactly `footer_shortfall` bytes from the tail — the two-step
+    /// read that keeps large `.bf`s prunable instead of falling back.
+    #[test]
+    fn test_large_footer_two_step_parse() {
+        // 300 files in one field → footer ≈ 3.6 KB, well over a 256 B probe.
+        let mut bb = BloomBuilder::new();
+        for fid in 0..300u64 {
+            let i = bb.begin_with_blocks(fid, "trace_id", 4);
+            bb.insert(i, format!("v-{fid}").as_bytes());
+        }
+        let blob = BloomWriter::serialize(bb.finish()).unwrap();
+        let total = blob.len() as u64;
+
+        // Small probe that does NOT cover the whole footer.
+        let probe = 256.min(blob.len());
+        let small = &blob[blob.len() - probe..];
+        let needed = footer_shortfall(small, total).expect("footer exceeds the small probe");
+
+        // Re-read exactly `needed` trailing bytes and parse — must succeed.
+        let big = &blob[blob.len() - needed as usize..];
+        let r = BloomReader::parse_suffix(big, total).expect("parse with precise footer suffix");
+        assert!(r.column_index("trace_id", 0).is_some());
+        assert!(r.column_index("trace_id", 299).is_some());
     }
 }

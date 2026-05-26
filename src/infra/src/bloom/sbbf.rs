@@ -71,8 +71,13 @@ pub fn block_index(hash: u64, num_blocks: u32) -> u32 {
 
 /// 8 single-bit masks computed from the lower 32 bits of `hash`. These are
 /// the bits to set/check inside the chosen block — one per word.
+///
+/// The mask depends only on the hash, so in the transposed layout — where a
+/// value maps to the same block index across every file in a group — it can
+/// be computed **once per row** and reused for all files' blocks via
+/// [`check_block_with_mask`], instead of recomputing it per file.
 #[inline]
-fn mask_from_hash(hash: u64) -> [u32; 8] {
+pub fn mask_from_hash(hash: u64) -> [u32; 8] {
     let key = hash as u32;
     let mut out = [0u32; 8];
     for i in 0..8 {
@@ -93,22 +98,35 @@ fn block_from_bytes(bytes: &[u8; BLOCK_BYTES]) -> [u32; 8] {
     out
 }
 
+/// Single-block point check against a **precomputed mask**.
+///
+/// Reads each 32-bit word straight out of the 32-byte block and tests it
+/// against the corresponding mask word — no intermediate `[u32; 8]` array.
+/// Use this when checking many files' blocks for the same value: compute the
+/// mask once with [`mask_from_hash`] and pass it here per block.
+#[inline]
+pub fn check_block_with_mask(block_bytes: &[u8; BLOCK_BYTES], mask: &[u32; 8]) -> bool {
+    for (i, m) in mask.iter().enumerate() {
+        let off = i * 4;
+        let word = u32::from_le_bytes(block_bytes[off..off + 4].try_into().unwrap());
+        if word & m != *m {
+            return false;
+        }
+    }
+    true
+}
+
 /// Single-block point check used by the search side.
 ///
 /// Given just the **32 bytes of the chosen block** plus the original hash,
 /// returns true iff the block has every required bit set. The caller is
 /// responsible for fetching the block (e.g. via a range read on the `.bf`
 /// body) and supplying the same `hash` that was used to pick the block.
+/// For checking many files against one value, prefer computing the mask once
+/// via [`mask_from_hash`] + [`check_block_with_mask`].
 #[inline]
 pub fn check_block(block_bytes: &[u8; BLOCK_BYTES], hash: u64) -> bool {
-    let block = block_from_bytes(block_bytes);
-    let mask = mask_from_hash(hash);
-    for i in 0..8 {
-        if block[i] & mask[i] != mask[i] {
-            return false;
-        }
-    }
-    true
+    check_block_with_mask(block_bytes, &mask_from_hash(hash))
 }
 
 /// Sizing helper. Returns the number of 32-byte SBBF blocks required to

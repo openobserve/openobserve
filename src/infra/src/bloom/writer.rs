@@ -185,7 +185,26 @@ impl BloomWriter {
             return Err(WriteError::TooManyFields(field_order.len()));
         }
 
-        let mut out = Vec::with_capacity(1024);
+        // Pre-size `out` to the exact final length. A chunk's body can be
+        // hundreds of MB at high cardinality (M files × num_blocks × 32), and
+        // letting `Vec` grow by doubling would transiently push the peak even
+        // higher (up to ~2× the final body) and churn through reallocs.
+        //
+        //   head:   MAGIC(4) + VERSION(1)
+        //   body:   Σ every bloom's bytes (each written exactly once)
+        //   footer: field_count(4)
+        //           + per field: name_len(2) + name + algo(1) + num_blocks(4)
+        //                        + file_count(4) + body_offset(8) + 12×files
+        //   tail:   footer_len(4) + MAGIC(4)
+        let body_total: usize = by_field.values().flatten().map(|b| b.bytes.len()).sum();
+        let footer_total: usize = 4
+            + field_order
+                .iter()
+                .map(|f| 2 + f.len() + 1 + 4 + 4 + 8 + by_field.get(f).map_or(0, Vec::len) * (8 + 4))
+                .sum::<usize>();
+        let total = 4 + 1 + body_total + footer_total + 4 + 4;
+
+        let mut out = Vec::with_capacity(total);
         out.extend_from_slice(MAGIC);
         out.push(VERSION);
 
