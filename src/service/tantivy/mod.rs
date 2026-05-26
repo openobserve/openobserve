@@ -22,8 +22,9 @@ pub mod puffin_directory;
 //   - `sequential` — legacy single-threaded `RecordBatchStream` consumer
 //   - `parallel`   — row_group-direct, one worker per parquet row_group
 //
-// Both paths share the schema/tokenizer helpers defined in this file
-// (`build_tantivy_schema_for_index`, `make_index_tokenizer_manager`).
+// The orchestrator builds the tantivy schema once via
+// [`build_tantivy_schema_for_index`] and hands the resulting
+// [`TantivyIndexSchema`] to whichever path it chose.
 mod parallel;
 mod sequential;
 
@@ -46,21 +47,18 @@ use config::{
     get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
-        parquet::get_recordbatch_reader_from_bytes,
-        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
+        tantivy::tokenizer::O2_TOKENIZER,
     },
 };
 use hashbrown::HashSet;
 use infra::storage;
-use parallel::generate_tantivy_index_parallel_row_groups;
 use puffin_directory::writer::PuffinDirWriter;
-use sequential::generate_tantivy_index;
 
 pub(crate) async fn create_tantivy_index(
     caller: &str,
     org_id: &str,
     parquet_file_name: &str,
-    full_text_search_fields: &[String],
+    fts_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
     buf: Bytes,
@@ -73,29 +71,15 @@ pub(crate) async fn create_tantivy_index(
     let file_format = FileFormat::from_extension(parquet_file_name).unwrap_or_default();
     let parallel_workers = cfg.compact.tantivy_parallel_build_workers;
 
+    let Some(index_schema) = build_tantivy_schema_for_index(fts_fields, index_fields, &schema)
+    else {
+        return Ok(0);
+    };
+
     let index = if parallel_workers > 0 && matches!(file_format, FileFormat::Parquet) {
-        log::debug!(
-            "{caller} using row_group-parallel tantivy index build: workers={parallel_workers}"
-        );
-        generate_tantivy_index_parallel_row_groups(
-            dir.clone(),
-            buf,
-            full_text_search_fields,
-            index_fields,
-            schema,
-            parallel_workers,
-        )
-        .await?
+        parallel::build_index(dir.clone(), buf, index_schema, parallel_workers).await?
     } else {
-        let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
-        generate_tantivy_index(
-            dir.clone(),
-            reader,
-            full_text_search_fields,
-            index_fields,
-            schema,
-        )
-        .await?
+        sequential::build_index(dir.clone(), file_format, buf, index_schema).await?
     };
     if index.is_none() {
         return Ok(0);
@@ -142,25 +126,31 @@ pub(crate) async fn create_tantivy_index(
     Ok(index_size)
 }
 
+/// Bundle of the tantivy schema and the per-row metadata both build paths need.
+///
+/// Built once by [`build_tantivy_schema_for_index`] and shared by the
+/// sequential and parallel builders so they don't each rebuild the schema.
+#[derive(Clone)]
+pub(super) struct TantivyIndexSchema {
+    /// The built tantivy schema.
+    pub(super) schema: tantivy::schema::Schema,
+    /// Set of column names we must populate per row — union of fts fields and
+    /// secondary index fields, filtered by data type.
+    pub(super) fields: HashSet<String>,
+    /// Field handle for `INDEX_FIELD_NAME_FOR_ALL`, present when there is at
+    /// least one full-text-search field.
+    pub(super) fts_field: Option<tantivy::schema::Field>,
+}
+
 /// Builds the tantivy `Schema` shared by both index-build paths.
 ///
 /// Returns `None` when there are no fields to index (configured fields don't
-/// intersect with the stream schema). Otherwise returns
-/// `(tantivy_schema, indexed_field_names, fts_field_opt)`:
-/// - `tantivy_schema`: the built schema
-/// - `indexed_field_names`: the set of column names we must populate per row (union of fts fields
-///   and secondary index fields, filtered by data type)
-/// - `fts_field_opt`: the field handle for `INDEX_FIELD_NAME_FOR_ALL`, present when there is at
-///   least one full-text-search field
+/// intersect with the stream schema).
 fn build_tantivy_schema_for_index(
     full_text_search_fields: &[String],
     index_fields: &[String],
     arrow_schema: &Schema,
-) -> Option<(
-    tantivy::schema::Schema,
-    HashSet<String>,
-    Option<tantivy::schema::Field>,
-)> {
+) -> Option<TantivyIndexSchema> {
     let mut tantivy_schema_builder = tantivy::schema::SchemaBuilder::new();
     let schema_fields = arrow_schema
         .fields()
@@ -219,16 +209,11 @@ fn build_tantivy_schema_for_index(
     tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
     let tantivy_schema = tantivy_schema_builder.build();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
-    Some((tantivy_schema, tantivy_fields, fts_field))
-}
-
-/// Creates a `TokenizerManager` matching what the indexer needs (O2 tokenizer
-/// registered). Built fresh per use so it is `Send` and can move into
-/// `spawn_blocking`.
-fn make_index_tokenizer_manager() -> tantivy::tokenizer::TokenizerManager {
-    let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
-    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
-    tokenizer_manager
+    Some(TantivyIndexSchema {
+        schema: tantivy_schema,
+        fields: tantivy_fields,
+        fts_field,
+    })
 }
 
 macro_rules! process_string_array_sync {
@@ -268,10 +253,12 @@ macro_rules! process_numeric_array_sync {
 /// `spawn_blocking` so the per-row CPU work stays off the async runtime.
 pub(super) fn convert_batch_to_docs_sync(
     batch: &RecordBatch,
-    tantivy_schema: &tantivy::schema::Schema,
-    tantivy_fields: &HashSet<String>,
-    fts_field: Option<tantivy::schema::Field>,
+    index_schema: &TantivyIndexSchema,
 ) -> Vec<tantivy::TantivyDocument> {
+    let tantivy_schema = &index_schema.schema;
+    let tantivy_fields = &index_schema.fields;
+    let fts_field = index_schema.fts_field;
+
     let num_rows = batch.num_rows();
     let mut docs = vec![tantivy::doc!(); num_rows];
 
@@ -332,9 +319,7 @@ mod tests {
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
-    use config::{
-        FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, utils::parquet::RecordBatchStream,
-    };
+    use config::{FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use tantivy::directory::RamDirectory;
 
@@ -413,28 +398,31 @@ mod tests {
         bytes::Bytes::from(buffer)
     }
 
-    // Helper function to create a mock RecordBatchStream (for legacy-path tests).
-    async fn create_test_stream(batches: Vec<RecordBatch>) -> RecordBatchStream {
-        let bytes = create_test_parquet_bytes(batches).await;
-        let (_schema, stream) =
-            config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, bytes)
-                .await
-                .unwrap();
-        stream
+/// Test helper: build the per-index schema struct or panic on `None`.
+    fn make_index_schema(
+        fts: &[String],
+        index: &[String],
+        arrow_schema: &Schema,
+    ) -> TantivyIndexSchema {
+        build_tantivy_schema_for_index(fts, index, arrow_schema)
+            .expect("schema helper returned None")
     }
 
     #[tokio::test]
     async fn test_generate_tantivy_index_empty_data() {
         let dir = RamDirectory::create();
         let empty_batch = create_test_batch(0, true, true, true);
-        let stream = create_test_stream(vec![empty_batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![empty_batch.clone()]).await;
 
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &["content".to_string()],
-            &["status".to_string()],
-            empty_batch.schema(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["status".to_string()],
+                &empty_batch.schema(),
+            ),
         )
         .await;
 
@@ -444,33 +432,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_tantivy_index_no_fields() {
-        let dir = RamDirectory::create();
+    async fn test_build_tantivy_schema_no_fields() {
         let batch = create_test_batch(10, true, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
-
-        let result = generate_tantivy_index(
-            dir,
-            stream,
-            &[], // No full-text search fields
-            &[], // No index fields
-            batch.schema(),
-        )
-        .await;
-
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_none()); // Should return None when no fields to index
+        // No fields to index → helper returns None and the orchestrator short-circuits.
+        assert!(build_tantivy_schema_for_index(&[], &[], &batch.schema()).is_none());
     }
 
     #[tokio::test]
     async fn test_generate_tantivy_index_with_fts_fields() {
         let dir = RamDirectory::create();
         let batch = create_test_batch(10, true, true, false);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
-        let result =
-            generate_tantivy_index(dir, stream, &["content".to_string()], &[], batch.schema())
-                .await;
+        let result = sequential::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(&["content".to_string()], &[], &batch.schema()),
+        )
+        .await;
 
         assert!(result.is_ok());
         let index = result.unwrap();
@@ -487,10 +467,15 @@ mod tests {
     async fn test_generate_tantivy_index_with_index_fields() {
         let dir = RamDirectory::create();
         let batch = create_test_batch(10, true, false, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
-        let result =
-            generate_tantivy_index(dir, stream, &[], &["status".to_string()], batch.schema()).await;
+        let result = sequential::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(&[], &["status".to_string()], &batch.schema()),
+        )
+        .await;
 
         assert!(result.is_ok());
         let index = result.unwrap();
@@ -507,14 +492,17 @@ mod tests {
     async fn test_generate_tantivy_index_with_both_field_types() {
         let dir = RamDirectory::create();
         let batch = create_test_batch(10, true, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &["content".to_string()],
-            &["status".to_string()],
-            batch.schema(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["status".to_string()],
+                &batch.schema(),
+            ),
         )
         .await;
 
@@ -531,44 +519,37 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_tantivy_index_missing_fields_in_schema() {
-        let dir = RamDirectory::create();
+    async fn test_build_tantivy_schema_missing_fields_in_schema() {
         let batch = create_test_batch(10, true, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
-
-        // Request fields that don't exist in the schema at all
-        let result = generate_tantivy_index(
-            dir,
-            stream,
+        // Configured fields don't exist in the stream schema → helper returns None
+        // and the orchestrator returns 0 without creating an index.
+        let result = build_tantivy_schema_for_index(
             &["nonexistent_field".to_string()],
             &["another_nonexistent_field".to_string()],
-            batch.schema(),
-        )
-        .await;
-
-        assert!(result.is_ok());
-        let index = result.unwrap();
-        // Should NOT create index when configured fields don't exist in stream schema
-        // (this indicates a configuration error, not just missing data)
-        assert!(index.is_none());
+            &batch.schema(),
+        );
+        assert!(result.is_none());
     }
 
     #[tokio::test]
     async fn test_generate_tantivy_index_mixed_existing_and_missing_fields() {
         let dir = RamDirectory::create();
         let batch = create_test_batch(10, true, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
         // Mix of existing and non-existing fields
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &["content".to_string(), "nonexistent_field".to_string()],
-            &[
-                "status".to_string(),
-                "another_nonexistent_field".to_string(),
-            ],
-            batch.schema(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string(), "nonexistent_field".to_string()],
+                &[
+                    "status".to_string(),
+                    "another_nonexistent_field".to_string(),
+                ],
+                &batch.schema(),
+            ),
         )
         .await;
 
@@ -589,14 +570,17 @@ mod tests {
         let dir = RamDirectory::create();
         let batch1 = create_test_batch(5, true, true, true);
         let batch2 = create_test_batch(5, true, true, true);
-        let stream = create_test_stream(vec![batch1.clone(), batch2.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch1.clone(), batch2.clone()]).await;
 
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &["content".to_string()],
-            &["status".to_string()],
-            batch1.schema(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["status".to_string()],
+                &batch1.schema(),
+            ),
         )
         .await;
 
@@ -616,14 +600,17 @@ mod tests {
     async fn test_generate_tantivy_index_without_timestamp() {
         let dir = RamDirectory::create();
         let batch = create_test_batch(10, false, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &["content".to_string()],
-            &["status".to_string()],
-            batch.schema(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["status".to_string()],
+                &batch.schema(),
+            ),
         )
         .await;
 
@@ -661,15 +648,18 @@ mod tests {
         .unwrap();
 
         let dir = RamDirectory::create();
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
         // Try to index the non-string field
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &["content".to_string()],
-            &["number_field".to_string()], // This field is not Utf8
-            batch.schema(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["number_field".to_string()], // This field is not Utf8
+                &batch.schema(),
+            ),
         )
         .await;
 
@@ -689,15 +679,18 @@ mod tests {
     async fn test_generate_tantivy_index_timestamp_field_handling() {
         let dir = RamDirectory::create();
         let batch = create_test_batch(10, true, true, true);
-        let stream = create_test_stream(vec![batch.clone()]).await;
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
         // Try to index the timestamp field as a regular index field
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &["content".to_string()],
-            &[TIMESTAMP_COL_NAME.to_string()], // This should be ignored
-            batch.schema(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &[TIMESTAMP_COL_NAME.to_string()], // This should be ignored
+                &batch.schema(),
+            ),
         )
         .await;
 
@@ -826,19 +819,22 @@ mod tests {
         ];
         let stream_schema = Arc::new(Schema::new(stream_fields));
 
-        let stream = create_test_stream(vec![parquet_batch]).await;
+        let buf = create_test_parquet_bytes(vec![parquet_batch]).await;
 
         // Generate index with stream schema (all configured fields)
-        let result = generate_tantivy_index(
+        let result = sequential::build_index(
             dir,
-            stream,
-            &[], // No FTS fields
-            &[
-                "continent".to_string(),
-                "name".to_string(),
-                "flag_url".to_string(),
-            ],
-            stream_schema.clone(), // Pass stream schema, not parquet schema
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &[], // No FTS fields
+                &[
+                    "continent".to_string(),
+                    "name".to_string(),
+                    "flag_url".to_string(),
+                ],
+                &stream_schema, // Pass stream schema, not parquet schema
+            ),
         )
         .await;
 
@@ -873,7 +869,7 @@ mod tests {
 
     // Note: Full testing of create_tantivy_index with storage operations would require
     // mocking the storage layer, which is complex for unit tests. The main logic is
-    // tested in generate_tantivy_index. Integration tests would be more appropriate
+    // tested in sequential::build_index. Integration tests would be more appropriate
     // for testing the full create_tantivy_index function with actual storage operations.
 
     // ---- L3 row_group-parallel build path tests ----
@@ -972,12 +968,10 @@ mod tests {
             Field::new("marker", DataType::Utf8, false),
         ]));
 
-        let index = generate_tantivy_index_parallel_row_groups(
+        let index = parallel::build_index(
             RamDirectory::create(),
             buf,
-            &[],
-            &["marker".to_string()],
-            stream_schema,
+            make_index_schema(&[], &["marker".to_string()], &stream_schema),
             // workers
             3, // force out-of-order completion
         )
@@ -1016,22 +1010,12 @@ mod tests {
         }
     }
 
-    /// No-fields case: parallel path must match sequential — return Ok(None).
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_row_group_parallel_no_fields_returns_none() {
+    /// No-fields case: the schema helper returns None so the orchestrator
+    /// never invokes the parallel path. We assert that directly.
+    #[tokio::test]
+    async fn test_build_tantivy_schema_no_fields_parallel() {
         let batch = create_test_batch(10, true, true, true);
-        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
-        let res = generate_tantivy_index_parallel_row_groups(
-            RamDirectory::create(),
-            buf,
-            &[],
-            &[],
-            batch.schema(),
-            2,
-        )
-        .await
-        .unwrap();
-        assert!(res.is_none(), "no fields → no index");
+        assert!(build_tantivy_schema_for_index(&[], &[], &batch.schema()).is_none());
     }
 
     /// Empty data + configured fields: still produces a single-segment empty
@@ -1040,12 +1024,14 @@ mod tests {
     async fn test_row_group_parallel_empty_data_marker() {
         let empty_batch = create_test_batch(0, true, true, true);
         let buf = create_test_parquet_bytes(vec![empty_batch.clone()]).await;
-        let res = generate_tantivy_index_parallel_row_groups(
+        let res = parallel::build_index(
             RamDirectory::create(),
             buf,
-            &["content".to_string()],
-            &["status".to_string()],
-            empty_batch.schema(),
+            make_index_schema(
+                &["content".to_string()],
+                &["status".to_string()],
+                &empty_batch.schema(),
+            ),
             2,
         )
         .await
@@ -1069,7 +1055,7 @@ mod tests {
 
         let buf_par =
             create_test_parquet_bytes_multi_rg(vec![rg0.clone(), rg1.clone(), rg2.clone()]).await;
-        let stream_seq = create_test_stream(vec![
+        let buf_seq = create_test_parquet_bytes(vec![
             create_marker_batch(0, 250),
             create_marker_batch(250, 250),
             create_marker_batch(500, 250),
@@ -1080,23 +1066,20 @@ mod tests {
             Field::new("marker", DataType::Utf8, false),
         ]));
 
-        let par = generate_tantivy_index_parallel_row_groups(
+        let par = parallel::build_index(
             RamDirectory::create(),
             buf_par,
-            &[],
-            &["marker".to_string()],
-            schema.clone(),
+            make_index_schema(&[], &["marker".to_string()], &schema),
             3,
         )
         .await
         .unwrap()
         .unwrap();
-        let seq = generate_tantivy_index(
+        let seq = sequential::build_index(
             RamDirectory::create(),
-            stream_seq,
-            &[],
-            &["marker".to_string()],
-            schema,
+            FileFormat::Parquet,
+            buf_seq,
+            make_index_schema(&[], &["marker".to_string()], &schema),
         )
         .await
         .unwrap()

@@ -34,41 +34,39 @@
 //! See [`super::parallel`] for the row_group-parallel path enabled by the
 //! `workers > 0` config.
 
-use std::sync::Arc;
-
 use anyhow::Context;
 use arrow::array::RecordBatch;
-use arrow_schema::Schema;
-use config::utils::parquet::RecordBatchStream;
+use bytes::Bytes;
+use config::{
+    FileFormat,
+    utils::{
+        parquet::get_recordbatch_reader_from_bytes,
+        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
+    },
+};
 use futures::TryStreamExt;
 use tokio::task::JoinHandle;
 
-use super::{
-    build_tantivy_schema_for_index, convert_batch_to_docs_sync, make_index_tokenizer_manager,
-};
+use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
 
-/// Create a tantivy index in the given directory for the record batch stream.
+/// Create a tantivy index in the given directory for the input file bytes.
 ///
-/// Single producer task pulls `RecordBatch`es from `reader` and forwards them
-/// over a small bounded channel to one `spawn_blocking` writer worker that
-/// converts each batch into `TantivyDocument`s and feeds them to a
-/// `SingleSegmentIndexWriter` in arrival order.
-pub(super) async fn generate_tantivy_index<D: tantivy::Directory>(
+/// Opens a `RecordBatchStream` over `buf` and a single producer task pulls
+/// batches off it, forwarding them over a small bounded channel to one
+/// `spawn_blocking` writer worker that converts each batch into
+/// `TantivyDocument`s and feeds them to a `SingleSegmentIndexWriter` in
+/// arrival order.
+pub(super) async fn build_index<D: tantivy::Directory>(
     tantivy_dir: D,
-    reader: RecordBatchStream,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-    schema: Arc<Schema>,
+    file_format: FileFormat,
+    buf: Bytes,
+    index_schema: TantivyIndexSchema,
 ) -> Result<Option<tantivy::Index>, anyhow::Error> {
-    let Some((tantivy_schema, tantivy_fields, fts_field)) =
-        build_tantivy_schema_for_index(full_text_search_fields, index_fields, &schema)
-    else {
-        return Ok(None);
-    };
-
-    let tokenizer_manager = make_index_tokenizer_manager();
+    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
+    let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
+    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let index_writer = tantivy::IndexBuilder::new()
-        .schema(tantivy_schema.clone())
+        .schema(index_schema.schema.clone())
         .tokenizers(tokenizer_manager)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
@@ -106,17 +104,11 @@ pub(super) async fn generate_tantivy_index<D: tantivy::Directory>(
     // tail-latency hit from doing tantivy's synchronous add_document on a
     // runtime thread.
     let mut rx = rx;
-    let schema_for_worker = tantivy_schema.clone();
     let writer_task: JoinHandle<Result<_, anyhow::Error>> =
         tokio::task::spawn_blocking(move || {
             let mut writer = index_writer;
             while let Some(batch) = rx.blocking_recv() {
-                let docs = convert_batch_to_docs_sync(
-                    &batch,
-                    &schema_for_worker,
-                    &tantivy_fields,
-                    fts_field,
-                );
+                let docs = convert_batch_to_docs_sync(&batch, &index_schema);
                 for doc in docs {
                     writer
                         .add_document(doc)
@@ -141,7 +133,7 @@ pub(super) async fn generate_tantivy_index<D: tantivy::Directory>(
 
     let index = tokio::task::spawn_blocking(move || {
         index_writer.finalize().map_err(|e| {
-            log::error!("generate_tantivy_index: Failed to finalize the index writer: {e}");
+            log::error!("sequential::build_index: Failed to finalize the index writer: {e}");
             anyhow::anyhow!("Failed to finalize the index writer: {}", e)
         })
     })

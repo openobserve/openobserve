@@ -32,16 +32,13 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use arrow_schema::Schema;
 use bytes::Bytes;
-use hashbrown::HashSet;
+use config::utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tantivy::directory::MmapDirectory;
 use tokio::task::JoinHandle;
 
-use super::{
-    build_tantivy_schema_for_index, convert_batch_to_docs_sync, make_index_tokenizer_manager,
-};
+use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
 
 /// Row-group-direct parallel tantivy index builder.
 ///
@@ -68,22 +65,12 @@ use super::{
 /// ```
 ///
 /// `Bytes` is reference-counted, so handing one clone per worker is cheap.
-pub(super) async fn generate_tantivy_index_parallel_row_groups<
-    D: tantivy::Directory + Send + Sync + 'static,
->(
+pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
     tantivy_dir: D,
     buf: Bytes,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-    schema: Arc<Schema>,
+    index_schema: TantivyIndexSchema,
     workers: usize,
 ) -> Result<Option<tantivy::Index>, anyhow::Error> {
-    let Some((tantivy_schema, tantivy_fields, fts_field)) =
-        build_tantivy_schema_for_index(full_text_search_fields, index_fields, &schema)
-    else {
-        return Ok(None);
-    };
-
     // Parse parquet metadata once on a blocking thread (footer decode is sync I/O).
     let num_row_groups = {
         let buf = buf.clone();
@@ -110,12 +97,10 @@ pub(super) async fn generate_tantivy_index_parallel_row_groups<
     for rg_idx in 0..num_row_groups {
         let permit = semaphore.clone().acquire_owned().await?;
         let buf_c = buf.clone();
-        let schema_c = tantivy_schema.clone();
-        let tantivy_fields_c = tantivy_fields.clone();
-        let fts_field_c = fts_field;
+        let index_schema_c = index_schema.clone();
         tasks.push(tokio::task::spawn_blocking(move || {
             let _permit = permit;
-            build_row_group_segment_sync(rg_idx, buf_c, schema_c, tantivy_fields_c, fts_field_c)
+            build_row_group_segment_sync(rg_idx, buf_c, index_schema_c)
         }));
     }
 
@@ -129,7 +114,7 @@ pub(super) async fn generate_tantivy_index_parallel_row_groups<
     let indices: Vec<tantivy::Index> = indexed.into_iter().map(|(_, i, _)| i).collect();
 
     log::info!(
-        "generate_tantivy_index_parallel_row_groups: built {num_row_groups} row_groups, total_rows={total_num_rows}, workers={workers}, elapsed={:?} ms",
+        "parallel::build_index: built {num_row_groups} row_groups, total_rows={total_num_rows}, workers={workers}, elapsed={:?} ms",
         start.elapsed().as_millis()
     );
 
@@ -143,7 +128,7 @@ pub(super) async fn generate_tantivy_index_parallel_row_groups<
     .await??;
 
     log::info!(
-        "generate_tantivy_index_parallel_row_groups: merged row_group indices into single tantivy index, elapsed={:?} ms",
+        "parallel::build_index: merged row_group indices into single tantivy index, elapsed={:?} ms",
         start.elapsed().as_millis()
     );
 
@@ -169,9 +154,7 @@ pub(super) async fn generate_tantivy_index_parallel_row_groups<
 fn build_row_group_segment_sync(
     rg_idx: usize,
     buf: Bytes,
-    schema: tantivy::schema::Schema,
-    tantivy_fields: HashSet<String>,
-    fts_field: Option<tantivy::schema::Field>,
+    index_schema: TantivyIndexSchema,
 ) -> Result<(usize, tantivy::Index, usize), anyhow::Error> {
     let builder = ParquetRecordBatchReaderBuilder::try_new(buf)
         .with_context(|| format!("worker {rg_idx}: open parquet"))?;
@@ -185,9 +168,10 @@ fn build_row_group_segment_sync(
     // is dropped, the tempdir is cleaned up automatically.
     let dir = MmapDirectory::create_from_tempdir()
         .with_context(|| format!("worker {rg_idx}: create tempdir-backed mmap directory"))?;
-    let tokenizer_manager = make_index_tokenizer_manager();
+    let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
+    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let mut writer = tantivy::IndexBuilder::new()
-        .schema(schema.clone())
+        .schema(index_schema.schema.clone())
         .tokenizers(tokenizer_manager)
         .single_segment_index_writer::<tantivy::TantivyDocument>(dir, 50_000_000)
         .with_context(|| format!("worker {rg_idx}: create index writer"))?;
@@ -200,7 +184,7 @@ fn build_row_group_segment_sync(
             continue;
         }
         rg_rows += batch.num_rows();
-        let docs = convert_batch_to_docs_sync(&batch, &schema, &tantivy_fields, fts_field);
+        let docs = convert_batch_to_docs_sync(&batch, &index_schema);
         for doc in docs {
             writer
                 .add_document(doc)
