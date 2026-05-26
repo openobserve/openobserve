@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="pattern-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+            class="pattern-item tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3"
             :data-test="`pattern-item-${index}`"
           >
             <div class="tw:flex tw:items-center tw:shrink-0">
@@ -103,20 +103,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:gap-1">
-              <span class="tw:text-sm tw:font-semibold">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:gap-1.5">
+              <span class="tw:text-sm tw:font-semibold tw:leading-snug">
                 {{ pattern.name }}
               </span>
               <div class="tw:flex tw:flex-wrap tw:gap-1">
                 <OBadge
                   v-for="tag in pattern.tags.slice(0, 3)"
                   :key="tag"
-                  size="sm"
-                  variant="primary"
+                  size="md"
+                  variant="primary-soft"
+                  class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
                 >
                   {{ tag }}
                 </OBadge>
-                <OBadge v-if="pattern.tags.length > 3" size="sm">
+                <OBadge v-if="pattern.tags.length > 3" size="md" variant="default-soft" class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current">
                   +{{ pattern.tags.length - 3 }}
                 </OBadge>
               </div>
@@ -133,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="previewPattern(pattern)"
                 :data-test="`pattern-preview-${index}`"
               >
-                <OIcon name="more-vert" size="xs" />
+                <OIcon name="visibility" size="sm" />
                 <OTooltip :content="t('regex_patterns.preview')" side="top" />
               </OButton>
             </div>
@@ -185,13 +186,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="tw:mb-3">
           <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.tags') }}</div>
-          <OBadge
-            v-for="tag in previewedPattern?.tags"
-            :key="tag"
-            variant="primary"
-          >
-            {{ tag }}
-          </OBadge>
+          <div class="tw:flex tw:flex-wrap tw:gap-2">
+            <OBadge
+              v-for="tag in previewedPattern?.tags"
+              :key="tag"
+              size="md"
+              variant="primary-soft"
+              class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
+            >
+              {{ tag }}
+            </OBadge>
+          </div>
         </div>
 
         <div class="tw:mb-3">
@@ -485,14 +490,17 @@ export default defineComponent({
 }
 
 .pattern-item {
+  transition: background-color 0.15s ease;
+
   &:hover {
-    background-color: rgba(0, 0, 0, 0.02);
+    background-color: var(--o2-hover-accent);
   }
 }
 
 .pattern-preview {
   font-family: monospace;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--o2-text-secondary);
   word-break: break-all;
 }

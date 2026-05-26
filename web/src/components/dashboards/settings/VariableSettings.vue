@@ -106,13 +106,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="item-scope">
                 <div class="scope-info">
                   <OBadge
-                    variant="primary"
+                    variant="primary-soft"
+                    class="tw:ring-1 tw:ring-inset tw:ring-current"
                     v-if="getScopeType(variable) === 'global'"
                   >
                     Global
                   </OBadge>
                   <OBadge
-                    variant="primary-soft"
+                    variant="primary-outline"
                     v-else-if="getScopeType(variable) === 'tabs'"
                   >
                     {{ variable.tabs?.length || 0 }} Tabs

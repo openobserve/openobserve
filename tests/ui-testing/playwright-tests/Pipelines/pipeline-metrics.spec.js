@@ -597,12 +597,20 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     let toggleSwitch = await pageManager.pipelinesPage.openPipelineRowMenuAndGetToggle(pipelineName);
     await toggleSwitch.click();
     await page.waitForTimeout(1000);
-    testLogger.info('Pipeline toggle clicked');
+    testLogger.info('Pipeline paused');
 
-    // Re-open the menu and toggle back (dropdown closes after the first click)
+    // Second toggle: resume → ResumePipelineDialog opens asking "from now" vs
+    // "from where paused". Click the primary button to confirm resume; without
+    // this, the dialog stays open and blocks subsequent UI clicks (cleanup).
     toggleSwitch = await pageManager.pipelinesPage.openPipelineRowMenuAndGetToggle(pipelineName);
     await toggleSwitch.click();
-    await page.waitForTimeout(1000);
+    const resumeDialog = page.locator('[data-test="resume-pipeline-dialog"]');
+    if (await resumeDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const resumePrimaryBtn = resumeDialog.locator('[data-test="o-dialog-primary-btn"]');
+      await resumePrimaryBtn.click();
+      await page.waitForTimeout(500);
+      testLogger.info('Resume dialog confirmed');
+    }
     testLogger.info('Pipeline toggled back');
 
     // Cleanup using helper

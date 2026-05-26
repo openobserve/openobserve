@@ -509,18 +509,22 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
 
     // The pause/start control is an ODropdownItem inside the per-row
     // more-options menu (PipelinesList.vue:212). Open the menu, click toggle,
-    // then re-open to toggle back. Dropdown items only exist in DOM while the
-    // menu is open.
     try {
       let toggleSwitch = await pipelinePage.openPipelineRowMenuAndGetToggle(pipelineName);
       await toggleSwitch.click();
       await page.waitForTimeout(500);
-      testLogger.info('Pipeline toggle clicked');
+      testLogger.info('Pipeline paused');
 
-      // Re-open menu and toggle back
+      // Second toggle: resumes the pipeline → ResumePipelineDialog opens
       toggleSwitch = await pipelinePage.openPipelineRowMenuAndGetToggle(pipelineName);
       await toggleSwitch.click();
-      await page.waitForTimeout(500);
+      const resumeDialog = page.locator('[data-test="resume-pipeline-dialog"]');
+      if (await resumeDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const resumePrimaryBtn = resumeDialog.locator('[data-test="o-dialog-primary-btn"]');
+        await resumePrimaryBtn.click();
+        await page.waitForTimeout(500);
+        testLogger.info('Resume dialog confirmed');
+      }
       testLogger.info('Pipeline toggle functionality verified');
     } catch (e) {
       testLogger.info('Toggle control not reachable via more-options menu', { error: e?.message });

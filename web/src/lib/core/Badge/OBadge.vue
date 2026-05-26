@@ -105,7 +105,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
 // ── Size class map ────────────────────────────────────────────────────────
 const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
-  sm: "tw:px-1.5 tw:py-0.5 tw:text-[11px] tw:gap-1",
+  sm: "tw:px-2 tw:py-[3px] tw:text-[11px] tw:gap-1",
   md: "tw:px-2.5 tw:py-1 tw:text-xs tw:gap-1.5",
 };
 
@@ -117,7 +117,7 @@ const trailingSizeClasses = computed(() =>
 // ── Root element classes ──────────────────────────────────────────────────
 const classes = computed(() => [
   // Base — layout + typography + shape
-  "tw:inline-flex tw:items-center tw:whitespace-nowrap tw:rounded-full",
+  "tw:inline-flex tw:items-center tw:whitespace-nowrap tw:rounded-md",
   "tw:font-medium tw:leading-none",
   "tw:transition-colors tw:duration-150",
   // Variant + size
