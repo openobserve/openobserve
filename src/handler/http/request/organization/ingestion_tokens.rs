@@ -100,14 +100,17 @@ pub async fn create_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    if !is_root_user(user_id) {
-        match users::get_user(Some(&org_id), user_id).await {
-            Some(initiator)
-                if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
-            _ => {
-                return MetaHttpResponse::forbidden(
-                    "Admin or Root role required to create ingestion tokens",
-                );
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !is_root_user(user_id) {
+            match users::get_user(Some(&org_id), user_id).await {
+                Some(initiator)
+                    if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
+                _ => {
+                    return MetaHttpResponse::forbidden(
+                        "Admin or Root role required to create ingestion tokens",
+                    );
+                }
             }
         }
     }
@@ -155,14 +158,17 @@ pub async fn enable_disable_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    if !is_root_user(user_id) {
-        match users::get_user(Some(&org_id), user_id).await {
-            Some(initiator)
-                if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
-            _ => {
-                return MetaHttpResponse::forbidden(
-                    "Admin or Root role required to manage ingestion tokens",
-                );
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !is_root_user(user_id) {
+            match users::get_user(Some(&org_id), user_id).await {
+                Some(initiator)
+                    if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
+                _ => {
+                    return MetaHttpResponse::forbidden(
+                        "Admin or Root role required to manage ingestion tokens",
+                    );
+                }
             }
         }
     }
