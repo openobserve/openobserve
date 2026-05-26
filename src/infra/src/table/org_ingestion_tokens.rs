@@ -18,8 +18,10 @@ use sea_orm::{
     QuerySelect, Set, entity::prelude::*,
 };
 
-use super::entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model};
-use super::get_lock;
+use super::{
+    entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model},
+    get_lock,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{self, DbError, Error},
@@ -208,11 +210,7 @@ pub async fn count_by_org(org_id: &str) -> Result<u64, errors::Error> {
 }
 
 /// Enable or disable a token by org_id and name.
-pub async fn set_enabled(
-    org_id: &str,
-    name: &str,
-    enabled: bool,
-) -> Result<(), errors::Error> {
+pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

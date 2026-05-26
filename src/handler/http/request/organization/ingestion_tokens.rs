@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{
-    Json,
-    extract::Path,
-    response::Response,
-};
+use axum::{Json, extract::Path, response::Response};
 use config::meta::user::UserRole;
 use serde_json::json;
 
@@ -62,9 +58,7 @@ use crate::{
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn list_ingestion_tokens(
-    Path(org_id): Path<String>,
-) -> Response {
+pub async fn list_ingestion_tokens(Path(org_id): Path<String>) -> Response {
     match ingestion_tokens::list_tokens(&org_id).await {
         Ok(tokens) => MetaHttpResponse::json(OrgIngestionTokenListResponse { data: tokens }),
         Err(e) => MetaHttpResponse::internal_error(e),

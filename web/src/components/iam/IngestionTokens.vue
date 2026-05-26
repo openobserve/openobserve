@@ -102,17 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ props.row.token }}
                   </code>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    size="sm"
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
                     icon="content_copy"
                     class="q-ml-sm"
+                    :title="t('ingestion.copyTokenBtn')"
                     @click="copyToken(props.row.token)"
-                  >
-                    <q-tooltip>{{ t("ingestion.copyTokenBtn") }}</q-tooltip>
-                  </q-btn>
+                  />
                 </q-td>
               </template>
 
@@ -151,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <span class="text-h6">{{ t("ingestion.createTokenTitle") }}</span>
           <q-space />
-          <q-btn flat round dense icon="close" v-close-popup />
+          <OButton variant="ghost" size="icon-circle-sm" icon="close" @click="showCreateForm = false" />
         </q-card-section>
         <q-card-section>
           <q-input
@@ -198,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <span class="text-h6">{{ t("ingestion.newTokenRevealed") }}</span>
           <q-space />
-          <q-btn flat round dense icon="close" v-close-popup />
+          <OButton variant="ghost" size="icon-circle-sm" icon="close" @click="showRevealedDialog = false" />
         </q-card-section>
         <q-card-section>
           <div

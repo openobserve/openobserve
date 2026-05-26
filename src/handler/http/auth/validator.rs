@@ -256,9 +256,7 @@ pub async fn validate_credentials(
             if let Some(r) = ORG_INGESTION_TOKENS.get(&cache_key) {
                 let token_name = r.value().clone();
                 let is_ingestion_path = path_columns.len() == 1
-                    || INGESTION_EP
-                        .iter()
-                        .any(|ep| path_columns.contains(ep));
+                    || INGESTION_EP.iter().any(|ep| path_columns.contains(ep));
 
                 if !is_ingestion_path {
                     return Ok(TokenValidationResponse {
@@ -284,23 +282,23 @@ pub async fn validate_credentials(
             }
 
             // Cache miss — do DB lookup. find_enabled_token filters by enabled=true.
-            match crate::service::db::org_ingestion_tokens::find_enabled_token(org_id, user_password).await {
+            match crate::service::db::org_ingestion_tokens::find_enabled_token(
+                org_id,
+                user_password,
+            )
+            .await
+            {
                 Ok(Some(token_record)) => {
                     // Populate cache for future fast lookups
                     ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
 
                     let is_ingestion_path = path_columns.len() == 1
-                        || INGESTION_EP
-                            .iter()
-                            .any(|ep| path_columns.contains(ep));
+                        || INGESTION_EP.iter().any(|ep| path_columns.contains(ep));
 
                     if !is_ingestion_path {
                         return Ok(TokenValidationResponse {
                             is_valid: false,
-                            user_email: format!(
-                                "ingestion:{}@{}",
-                                token_record.name, org_id
-                            ),
+                            user_email: format!("ingestion:{}@{}", token_record.name, org_id),
                             is_internal_user: false,
                             user_role: None,
                             user_name: token_record.name.clone(),
@@ -311,10 +309,7 @@ pub async fn validate_credentials(
 
                     return Ok(TokenValidationResponse {
                         is_valid: true,
-                        user_email: format!(
-                            "ingestion:{}@{}",
-                            token_record.name, org_id
-                        ),
+                        user_email: format!("ingestion:{}@{}", token_record.name, org_id),
                         is_internal_user: true,
                         user_role: None,
                         user_name: token_record.name.clone(),

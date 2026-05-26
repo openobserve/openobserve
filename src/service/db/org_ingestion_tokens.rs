@@ -69,11 +69,7 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
 }
 
 /// Enable or disable a named token and notify the cluster.
-pub async fn set_enabled(
-    org_id: &str,
-    name: &str,
-    enabled: bool,
-) -> Result<(), anyhow::Error> {
+pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), anyhow::Error> {
     let existing = org_ingestion_tokens::get_by_name(org_id, name)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
@@ -114,9 +110,7 @@ pub async fn get_by_name(
 }
 
 /// List all tokens for an org.
-pub async fn list_by_org(
-    org_id: &str,
-) -> Result<Vec<OrgIngestionTokenListRecord>, anyhow::Error> {
+pub async fn list_by_org(org_id: &str) -> Result<Vec<OrgIngestionTokenListRecord>, anyhow::Error> {
     org_ingestion_tokens::list_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))

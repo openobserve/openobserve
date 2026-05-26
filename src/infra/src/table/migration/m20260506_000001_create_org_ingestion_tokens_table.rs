@@ -28,15 +28,9 @@ impl MigrationTrait for Migration {
         manager
             .create_table(create_org_ingestion_tokens_table_statement())
             .await?;
-        manager
-            .create_index(create_org_id_idx_stmnt())
-            .await?;
-        manager
-            .create_index(create_token_idx_stmnt())
-            .await?;
-        manager
-            .create_index(create_org_name_uq_stmnt())
-            .await?;
+        manager.create_index(create_org_id_idx_stmnt()).await?;
+        manager.create_index(create_token_idx_stmnt()).await?;
+        manager.create_index(create_org_name_uq_stmnt()).await?;
         Ok(())
     }
 
@@ -66,11 +60,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
         manager
-            .drop_table(
-                Table::drop()
-                    .table(OrgIngestionTokens::Table)
-                    .to_owned(),
-            )
+            .drop_table(Table::drop().table(OrgIngestionTokens::Table).to_owned())
             .await?;
         Ok(())
     }

@@ -55,8 +55,7 @@ use crate::{
     },
     service::{
         db::{self, org_users},
-        ingestion_tokens,
-        self_reporting,
+        ingestion_tokens, self_reporting,
         stream::get_streams,
         users::add_admin_to_org,
     },
@@ -301,6 +300,17 @@ async fn update_passcode_inner(
     if is_rum_update {
         org_users::update_rum_token(local_org_id, user_id, &rum_token).await?;
     } else {
+        // If a "default" org ingestion token exists, rotate it instead of the user token
+        if db::org_ingestion_tokens::get_by_name(local_org_id, "default")
+            .await
+            .is_ok_and(|r| r.is_some())
+        {
+            let new_token = db::org_ingestion_tokens::rotate_token(local_org_id, "default").await?;
+            return Ok(IngestionTokensContainer::Passcode(IngestionPasscode {
+                user: db_user.email,
+                passcode: new_token,
+            }));
+        }
         org_users::update_token(local_org_id, user_id, &token).await?;
     }
 
@@ -607,8 +617,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
             })
             .await;
             // Create default org-level ingestion token for auto-provisioned orgs
-            if let Err(e) =
-                ingestion_tokens::create_default_token(&org.identifier, "system").await
+            if let Err(e) = ingestion_tokens::create_default_token(&org.identifier, "system").await
             {
                 log::error!(
                     "Failed to create default ingestion token for org '{}': {e}",
@@ -645,8 +654,7 @@ pub async fn check_and_create_org_without_ofga(
     match db::organization::save_org(org).await {
         Ok(_) => {
             // Create default org-level ingestion token for auto-provisioned orgs
-            if let Err(e) =
-                ingestion_tokens::create_default_token(&org.identifier, "system").await
+            if let Err(e) = ingestion_tokens::create_default_token(&org.identifier, "system").await
             {
                 log::error!(
                     "Failed to create default ingestion token for org '{}': {e}",

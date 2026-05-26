@@ -16,8 +16,7 @@
 use config::ider;
 use infra::table::org_ingestion_tokens;
 
-use crate::common::meta::organization::OrgIngestionToken;
-use crate::service::db;
+use crate::{common::meta::organization::OrgIngestionToken, service::db};
 
 /// Create the default ingestion token for a newly created org.
 pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), anyhow::Error> {
@@ -69,7 +68,9 @@ pub async fn create_token(
         return Err(anyhow::anyhow!("Token name cannot be empty"));
     }
     if name.len() > 256 {
-        return Err(anyhow::anyhow!("Token name must be 256 characters or fewer"));
+        return Err(anyhow::anyhow!(
+            "Token name must be 256 characters or fewer"
+        ));
     }
     if !name
         .chars()
@@ -173,48 +174,58 @@ mod tests {
     #[test]
     fn test_validate_name_allows_alphanumeric() {
         let name = "prod-pipeline_01";
-        assert!(name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            name.chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 
     #[test]
     fn test_validate_name_allows_single_char() {
         let name = "a";
-        assert!(name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            name.chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 
     #[test]
     fn test_validate_name_rejects_special_chars() {
         let name = "bad name!";
-        assert!(!name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            !name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 
     #[test]
     fn test_validate_name_rejects_slash() {
         let name = "path/token";
-        assert!(!name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            !name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 
     #[test]
     fn test_validate_name_rejects_dot() {
         let name = "token.name";
-        assert!(!name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            !name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 
     #[test]
     fn test_validate_name_rejects_at_sign() {
         let name = "token@org";
-        assert!(!name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            !name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 }
