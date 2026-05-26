@@ -258,6 +258,7 @@ const classes = computed<string[]>(() => [
   props.block
     ? "tw:flex tw:w-full tw:items-center tw:justify-center"
     : "tw:inline-flex tw:items-center tw:justify-center",
+  "tw:relative",
   "tw:whitespace-nowrap",
   "tw:font-medium tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150",
   "tw:outline-none",
@@ -288,12 +289,27 @@ function handleClick(event: MouseEvent): void {
     v-bind="$attrs"
     @click="handleClick"
   >
-    <slot name="icon-left">
-      <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
-    </slot>
-    <slot />
-    <slot name="icon-right">
-      <OIcon v-if="iconRight" :name="iconRight" size="sm" />
-    </slot>
+    <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
+    <span
+      v-if="loading"
+      class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center tw:pointer-events-none"
+      aria-hidden="true"
+    >
+      <OIcon name="progress-activity" size="sm" class="tw:animate-spin" />
+    </span>
+
+    <!-- Original content — invisible (not hidden) when loading to preserve button dimensions -->
+    <span
+      :class="loading ? 'tw:invisible tw:inline-flex tw:items-center' : 'tw:contents'"
+      :style="loading ? { gap: 'inherit' } : undefined"
+    >
+      <slot name="icon-left">
+        <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
+      </slot>
+      <slot />
+      <slot name="icon-right">
+        <OIcon v-if="iconRight" :name="iconRight" size="sm" />
+      </slot>
+    </span>
   </Primitive>
 </template>
