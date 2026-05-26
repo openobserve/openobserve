@@ -309,10 +309,27 @@ code {
     box-shadow 0.3s ease;
 }
 
+html.dark .ai-hover-btn,
+body.body--dark .ai-hover-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.5) 0%,
+    rgba(236, 72, 153, 0.5) 100%
+  ) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+}
+
 .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
 }
+
+html.dark .ai-hover-btn:hover,
+body.body--dark .ai-hover-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+}
+
 
 .ai-btn-active {
   background: linear-gradient(
@@ -326,12 +343,122 @@ code {
   }
 }
 
+html.dark .ai-btn-active,
+body.body--dark .ai-btn-active {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.5) 0%,
+    rgba(236, 72, 153, 0.5) 100%
+  ) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+}
+
 .ai-btn-active:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
 }
 
 .ai-icon {
   transition: transform 0.6s ease;
+}
+
+// o2-ai-context-btn — table row AI context button (O2AIContextAddBtn)
+.o2-ai-context-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+html.dark .o2-ai-context-btn,
+body.body--dark .o2-ai-context-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.5) 0%,
+    rgba(236, 72, 153, 0.5) 100%
+  ) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+}
+
+.o2-ai-context-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+}
+
+html.dark .o2-ai-context-btn:hover,
+body.body--dark .o2-ai-context-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
+}
+
+// ai-floating-button — QueryEditor floating AI button
+.ai-floating-button {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+html.dark .ai-floating-button,
+body.body--dark .ai-floating-button {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.5) 0%,
+    rgba(236, 72, 153, 0.5) 100%
+  ) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+}
+
+.ai-floating-button:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+}
+
+html.dark .ai-floating-button:hover,
+body.body--dark .ai-floating-button:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
+}
+
+// ai-icon-button — CodeQueryEditor AI button
+.ai-icon-button {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+html.dark .ai-icon-button,
+body.body--dark .ai-icon-button {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.5) 0%,
+    rgba(236, 72, 153, 0.5) 100%
+  ) !important;
+  border: none !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+}
+
+.ai-icon-button:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+}
+
+html.dark .ai-icon-button:hover,
+body.body--dark .ai-icon-button:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
 }
 
 // Form-field label — shared by OInput / OTextarea / OSelect / OCombobox /
