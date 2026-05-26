@@ -58,7 +58,7 @@ use crate::{
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
-            cpu_cores::estimated_secs, settings::calculate_partition_settings,
+            cpu_cores::estimated_secs, generate_partitions, settings::calculate_partition_settings,
             sql_context::PartitionSqlContext, stream_files::collect_stream_files,
         },
     },
@@ -655,6 +655,20 @@ pub async fn search_partition(
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        let (streaming_aggs, streaming_id, cache_strategy) =
+            prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
+        resp.streaming_output = streaming_aggs;
+        resp.streaming_aggs = streaming_aggs;
+        resp.streaming_id = streaming_id;
+
+        if let Some(strategy) = cache_strategy {
+            resp.partitions = strategy.to_time_partitions(ctx.sql_order_by);
+            return Ok(resp);
+        }
+    }
+
     let partition_settings = calculate_partition_settings(
         trace_id,
         total_secs,
@@ -663,32 +677,7 @@ pub async fn search_partition(
         stream_files.max_query_range,
     );
 
-    #[cfg(feature = "enterprise")]
-    let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
-        prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
-    #[cfg(feature = "enterprise")]
-    {
-        resp.streaming_output = streaming_aggs;
-        resp.streaming_aggs = streaming_aggs;
-        resp.streaming_id = streaming_id.clone();
-    }
-
-    let generator = partition::PartitionGenerator::new(
-        partition_settings.min_step,
-        cfg.limit.search_mini_partition_duration_secs,
-        ctx.sql.histogram_interval.is_some(),
-    );
-    let partitions = generator.generate_partitions(
-        req.start_time,
-        req.end_time,
-        partition_settings.step,
-        ctx.sql_order_by,
-        ctx.is_complex_query,
-        #[cfg(feature = "enterprise")]
-        stremaing_aggs_cache_strategy,
-    );
-
-    resp.partitions = partitions;
+    resp.partitions = generate_partitions(&ctx, &partition_settings);
     Ok(resp)
 }
 
