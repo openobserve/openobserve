@@ -47,6 +47,7 @@ env:
 
 jobs:
   check_changes:
+    timeout-minutes: 5
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -70,6 +71,7 @@ jobs:
           fi
 
   build_binary:
+    timeout-minutes: 45
     name: build_binary
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
@@ -137,6 +139,7 @@ jobs:
           if-no-files-found: error
 
   ui_integration_tests:
+    timeout-minutes: 180
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
@@ -783,6 +786,7 @@ jobs:
         run: cat o2.log
 
   merge_and_upload_reports:
+    timeout-minutes: 15
     name: Merge Reports and Upload to TestDino
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
@@ -949,6 +953,7 @@ jobs:
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
   playwright_summary:
+    timeout-minutes: 5
     runs-on:
       labels: ubicloud-standard-8
     permissions: {}
