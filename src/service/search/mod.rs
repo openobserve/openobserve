@@ -627,6 +627,27 @@ pub async fn search_multi(
     Ok(multi_res)
 }
 
+/// Returns true when the query's primary ORDER BY column is not a timestamp column,
+/// meaning per-partition `hits_to_skip` is incorrect and the TopKHeap merge path
+/// must be used instead.
+///
+/// Only the first ORDER BY column is evaluated; secondary columns are not compared.
+/// Aggregate and histogram queries always return false.
+fn detect_non_ts_order_by(
+    order_by: &[(String, config::meta::sql::OrderBy)],
+    ts_column: Option<&str>,
+    is_aggregate: bool,
+    is_histogram: bool,
+) -> bool {
+    if is_aggregate || is_histogram {
+        return false;
+    }
+    order_by
+        .first()
+        .map(|(field, _)| field.as_str() != TIMESTAMP_COL_NAME && ts_column != Some(field.as_str()))
+        .unwrap_or(false)
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
@@ -893,6 +914,7 @@ pub async fn search_partition(
         #[cfg(feature = "enterprise")]
         streaming_id: None,
         is_histogram_eligible,
+        non_ts_order_by_cols: vec![],
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -1011,20 +1033,24 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    if cfg.limit.disable_partitions_for_non_ts_order_by
-        && !is_aggregate
-        && !is_histogram
-        && sql
+    let is_non_ts_order_by = detect_non_ts_order_by(
+        &sql.order_by,
+        ts_column.as_deref(),
+        is_aggregate,
+        is_histogram,
+    );
+
+    if is_non_ts_order_by {
+        resp.non_ts_order_by_cols = sql
             .order_by
-            .first()
-            .map(|(field, _)| {
-                field.as_str() != TIMESTAMP_COL_NAME
-                    && (ts_column.as_deref() != Some(field.as_str()))
-            })
-            .unwrap_or(false)
-    {
+            .iter()
+            .map(|(col, dir)| (col.clone(), matches!(dir, config::meta::sql::OrderBy::Desc)))
+            .collect();
+    }
+
+    if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
         log::info!(
-            "[trace_id {trace_id}] search_partition: ORDER BY on non-timestamp column, disabling partitioning"
+            "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
         );
         resp.partitions = vec![[req.start_time, req.end_time]];
         return Ok(resp);
