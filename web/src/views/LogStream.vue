@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="tw:ml-auto no-border o2-search-input tw:h-[36px]"
+                class="tw:ml-auto no-border o2-search-input"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               >

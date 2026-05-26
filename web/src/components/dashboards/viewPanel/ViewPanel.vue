@@ -63,7 +63,7 @@
             disable
           "
           variant="outline-destructive"
-          size="icon-xs"
+          size="icon-sm"
           @click="cancelViewPanelQuery"
           data-test="dashboard-viewpanel-cancel-btn"
           icon-left="cancel"
@@ -73,7 +73,7 @@
         <OButton
           v-else
           :variant="isVariablesChanged ? 'outline' : 'warning'"
-          size="icon-xs"
+          size="icon-sm"
           @click="refreshData"
           :disabled="disable"
           data-test="dashboard-viewpanel-refresh-data-btn"
@@ -83,7 +83,7 @@
         </OButton>
         <OButton
           variant="outline"
-          size="icon-xs"
+          size="icon-sm"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
           icon-left="close"
@@ -915,7 +915,7 @@ export default defineComponent({
 }
 
 .viewpanel-icons {
-  height: 30px;
+  height: 32px;
   transition: all 0.2s ease;
 
   &:hover {
@@ -923,13 +923,13 @@ export default defineComponent({
   }
 
   :deep(.date-time-button) {
-    height: 30px;
-    min-height: 30px;
+    height: 32px;
+    min-height: 32px;
   }
 
   :deep(.q-btn-dropdown) {
-    height: 30px;
-    min-height: 30px;
+    height: 32px;
+    min-height: 32px;
     padding: 0 8px;
 
     .q-btn__content {

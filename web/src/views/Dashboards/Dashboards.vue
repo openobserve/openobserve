@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchAcrossFolders"
               label="All Folders"
               size="lg"
-              class="toolbar-toggle-container"
+              class="tw:h-8 tw:px-2 tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap"
             >
               <template #tooltip>
                 <OTooltip

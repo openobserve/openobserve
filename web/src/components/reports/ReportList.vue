@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               data-test="report-list-search-input"
               v-model="dynamicQueryModel"
-              class="tw:ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
+              class="tw:ml-auto no-border o2-search-input tw:w-[150px]"
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="report-list-search-across-folders-toggle"
                   v-model="searchAcrossFolders"
                   :label="t('dashboard.allFolders') || 'All Folders'"
-                  class="toolbar-toggle-container"
+                  class="tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
                 />
               </OTooltip>
             </div>
@@ -751,25 +751,4 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
 };
 </script>
 
-<style lang="scss" scoped>
-.toolbar-toggle-container {
-  padding: 0.45rem 0.375rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0.0625rem solid var(--color-button-outline-border); // 1px
-  border-radius: 0.375rem; // 6px
-  transition: all 0.2s ease;
-  cursor: pointer;
-  white-space: nowrap;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid var(--color-button-outline-border);
-}
-</style>
 
