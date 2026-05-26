@@ -1534,20 +1534,23 @@ const validateReportData = async (): Promise<boolean> => {
   }
   timezoneError.value = '';
 
-  if (!formData.value.title) {
-    titleError.value = t('validation.required');
-    step.value = 3;
-    return false;
-  }
-  titleError.value = '';
+  // Share step validation only applies to non-cached reports
+  if (!isCachedReport.value) {
+    if (!formData.value.title) {
+      titleError.value = t('validation.required');
+      step.value = 3;
+      return false;
+    }
+    titleError.value = '';
 
-  const emailRegex = /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
-  if (!emailRegex.test(emails.value)) {
-    recipientsError.value = 'Add valid emails!';
-    step.value = 3;
-    return false;
+    const emailRegex = /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
+    if (!emailRegex.test(emails.value)) {
+      recipientsError.value = 'Add valid emails!';
+      step.value = 3;
+      return false;
+    }
+    recipientsError.value = '';
   }
-  recipientsError.value = '';
 
   return true;
 };

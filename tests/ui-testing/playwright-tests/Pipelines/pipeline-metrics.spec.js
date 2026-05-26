@@ -594,17 +594,13 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
 
-    // Find and click the toggle switch using POM
-    const toggleSwitch = pageManager.pipelinesPage.getPipelineToggle(pipelineName).first();
-    const isToggleVisible = await toggleSwitch.isVisible().catch(() => false);
-    expect(isToggleVisible).toBe(true);
-
-    // Click to toggle
+    let toggleSwitch = await pageManager.pipelinesPage.openPipelineRowMenuAndGetToggle(pipelineName);
     await toggleSwitch.click();
     await page.waitForTimeout(1000);
     testLogger.info('Pipeline toggle clicked');
 
-    // Toggle back
+    // Re-open the menu and toggle back (dropdown closes after the first click)
+    toggleSwitch = await pageManager.pipelinesPage.openPipelineRowMenuAndGetToggle(pipelineName);
     await toggleSwitch.click();
     await page.waitForTimeout(1000);
     testLogger.info('Pipeline toggled back');
