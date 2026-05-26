@@ -604,7 +604,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.fillNameInput(tableName);
         await enrichmentPage.selectSourceOption('file');
 
-        await enrichmentPage.setFileInput('tests/test-data/protocols.csv');
+        await enrichmentPage.setFileInput('../test-data/protocols.csv');
         testLogger.info('File selected');
 
         // Click Save
@@ -637,7 +637,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.fillNameInput(tableName);
         await enrichmentPage.selectSourceOption('file');
 
-        await enrichmentPage.setFileInput('tests/test-data/protocols.csv');
+        await enrichmentPage.setFileInput('../test-data/protocols.csv');
         testLogger.info('File selected');
 
         // Click Save
