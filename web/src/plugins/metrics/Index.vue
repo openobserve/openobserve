@@ -146,6 +146,11 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import {
+  DEFAULT_METRICS_X_FIELD,
+  DEFAULT_METRICS_Y_FIELD,
+  DEFAULT_METRICS_Y_FIELD_COUNT,
+} from "@/utils/metrics/constants";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -178,10 +183,10 @@ export default defineComponent({
     const {
       dashboardPanelData,
       resetDashboardPanelData,
-      resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
-      removeXYFilters,
+      updateGroupedFields,
+      makeAutoSQLQuery,
     } = useDashboardPanelData("metrics");
     const editMode = ref(false);
     const selectedDate: any = ref({
@@ -213,6 +218,33 @@ export default defineComponent({
       resetDashboardPanelData();
     });
 
+    /** Apply default SQL builder fields for metrics.
+     *  Uses avg(value) if the stream has a "value" field, otherwise count(_timestamp). */
+    const applyMetricsDefaults = () => {
+      const query = dashboardPanelData.data.queries[0];
+      query.customQuery = false;
+      query.fields.x = [DEFAULT_METRICS_X_FIELD()];
+
+      // Check if the current stream has a "value" field
+      const streamFields =
+        dashboardPanelData.meta?.streamFields?.groupedFields ?? [];
+      const hasValueField = streamFields.some((stream: any) =>
+        stream?.schema?.some((field: any) => field?.name === "value"),
+      );
+
+      query.fields.y = [
+        hasValueField
+          ? DEFAULT_METRICS_Y_FIELD()
+          : DEFAULT_METRICS_Y_FIELD_COUNT(),
+      ];
+      query.fields.breakdown = [];
+      query.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      };
+    };
+
     // Initialize state before any child components mount so FieldList.vue sees
     // stream_type = "metrics" from the start, preventing a spurious
     // streams?type=logs request and the double stream-list fetch that results
@@ -220,12 +252,10 @@ export default defineComponent({
     onBeforeMount(() => {
       errorData.errors = [];
       editMode.value = false;
-      resetDashboardPanelDataAndAddTimeField();
+      resetDashboardPanelData();
 
       // for metrics page, use stream type as metric
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
-      // need to remove the xy filters
-      removeXYFilters();
 
       // set default chart type as line
       dashboardPanelData.data.type = "line";
@@ -265,6 +295,94 @@ export default defineComponent({
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
         window.dispatchEvent(new Event("resize"));
+      },
+    );
+
+    watch(
+      () => dashboardPanelData.data.queries[0]?.fields?.stream,
+      async (stream: string, oldStream: string) => {
+        // When stream changes while in SQL builder mode and query is empty,
+        // apply defaults and regenerate query. Skip for custom mode.
+        const query = dashboardPanelData.data.queries[0];
+        if (
+          isPanelConfigWatcherActivated &&
+          stream &&
+          oldStream &&
+          stream !== oldStream &&
+          dashboardPanelData.data.queryType === "sql" &&
+          !query?.customQuery &&
+          !query?.query
+        ) {
+          await updateGroupedFields();
+          applyMetricsDefaults();
+          await makeAutoSQLQuery();
+        }
+      },
+    );
+
+    // Handle query type switches on metrics page.
+    // We use nextTick() to ensure this runs AFTER changeToggle's removeXYFilters()
+    // has completed, so the defaults we apply here don't get immediately cleared.
+    // Only applies for builder mode (not custom mode).
+    watch(
+      () => dashboardPanelData.data.queryType,
+      async (newType: string, oldType: string) => {
+        if (!isPanelConfigWatcherActivated) return;
+
+        const query = dashboardPanelData.data.queries[0];
+        const stream = query?.fields?.stream;
+        const isCustomMode = query?.customQuery;
+
+        if (newType === "sql" && oldType === "promql" && !isCustomMode) {
+          // Switching to SQL builder: load stream fields first so applyMetricsDefaults
+          // can check whether the current stream has a "value" field
+          await nextTick();
+          if (stream) {
+            await updateGroupedFields();
+          }
+          applyMetricsDefaults();
+
+          if (stream) {
+            await makeAutoSQLQuery();
+          }
+        } else if (newType === "promql" && oldType === "sql" && !isCustomMode) {
+          // Switching to PromQL builder: set default builder query (streamName{})
+          await nextTick();
+          if (stream) {
+            query.query = `${stream}{}`;
+          }
+        }
+      },
+    );
+
+    // When switching from custom to builder mode, apply defaults.
+    // changeToggle's removeXYFilters() wipes the builder fields, so we
+    // always need to re-apply defaults regardless of whether query text is empty.
+    watch(
+      () => dashboardPanelData.data.queries[0]?.customQuery,
+      async (isCustom: boolean, wasCustom: boolean) => {
+        if (!isPanelConfigWatcherActivated) return;
+        // Only act when switching from custom (true) to builder (false)
+        if (wasCustom && !isCustom) {
+          await nextTick();
+          const query = dashboardPanelData.data.queries[0];
+          const stream = query?.fields?.stream;
+
+          if (dashboardPanelData.data.queryType === "sql") {
+            if (stream) {
+              await updateGroupedFields();
+            }
+            applyMetricsDefaults();
+            if (stream) {
+              await makeAutoSQLQuery();
+            }
+          } else if (
+            dashboardPanelData.data.queryType === "promql" &&
+            stream
+          ) {
+            query.query = `${stream}{}`;
+          }
+        }
       },
     );
 
