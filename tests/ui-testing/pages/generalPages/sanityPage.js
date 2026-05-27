@@ -235,17 +235,34 @@ export class SanityPage {
     // Histogram Methods
     // ================================================================
     async clickHistogramToggle() {
-        // Histogram toggle is now inside the utilities hamburger menu
-        await this.histogramToggleButton.click();
+        // Histogram toggle is inside the utilities ODropdown in SearchBar.vue.
+        // Must open the menu first before the OSwitch element exists in the DOM.
+        const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+        const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isMenuItemVisible) {
+            await this.utilitiesMenuButton.click();
+            await menuHistogramBtn.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await menuHistogramBtn.click();
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(100);
     }
 
     // Returns true when the histogram OSwitch is currently ON.
     // OSwitch surfaces its state via a nested `role="switch"` element carrying
-    // `aria-checked="true|false"` — query that rather than the wrapper div.
+    // `aria-checked="true|false"` — opens the utilities menu to read the state,
+    // then closes it without triggering a toggle.
     async isHistogramOn() {
-        await this.histogramToggleButton.waitFor({ state: 'visible', timeout: 15000 });
+        const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+        const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isMenuItemVisible) {
+            await this.utilitiesMenuButton.click();
+            await this.histogramToggleButton.waitFor({ state: 'visible', timeout: 5000 });
+        }
         const switchControl = this.histogramToggleButton.locator('[role="switch"]');
         const aria = await switchControl.getAttribute('aria-checked');
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(100);
         return aria === 'true';
     }
 
@@ -256,8 +273,10 @@ export class SanityPage {
     async ensureHistogramOn() {
         if (!(await this.isHistogramOn())) {
             await this.clickHistogramToggle();
-            await expect(this.histogramToggleButton.locator('[role="switch"]'))
-                .toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+            // Re-open menu to verify the switch is now on (dropdown closed after the toggle click)
+            if (!(await this.isHistogramOn())) {
+                throw new Error('Failed to enable histogram toggle');
+            }
         }
     }
 
