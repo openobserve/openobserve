@@ -173,6 +173,13 @@ jobs:
               ]
 
     steps:
+      - name: Kill background apt processes
+        run: |
+          sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+          sudo systemctl disable apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+          sudo flock --wait 30 /var/lib/dpkg/lock-frontend true 2>/dev/null || true
+
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
@@ -212,7 +219,28 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies and run ui-tests
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
+
+      - name: Install npm dependencies
+        run: cd tests/ui-testing && npm ci
+
+      - name: Install Playwright browser
+        run: |
+          cd tests/ui-testing
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "Browser cache hit — installing system deps only"
+            npx playwright install-deps chromium
+          else
+            echo "Browser cache miss — installing browser + system deps"
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Write .env and run ui-tests
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
@@ -225,31 +253,18 @@ jobs:
           echo "ORGNAME=${ORGNAME}" >> .env
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
-          cd tests/ui-testing && npm ci
-          npx playwright install --with-deps chromium
+          cd tests/ui-testing
 
-          # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
-          echo "DEBUG: FILE_LIST = $FILE_LIST"
-          echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
-
           if [ -n "$FILE_LIST" ]; then
-            ACTUAL_FOLDER="RegressionSet"
-
-            echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
-
-            # Build file paths
             FILE_PATHS=""
             for file in $FILE_LIST; do
-              FILE_PATH="./playwright-tests/$ACTUAL_FOLDER/$file"
-              echo "DEBUG: Will run file: $FILE_PATH"
-              FILE_PATHS="$FILE_PATHS $FILE_PATH"
+              FILE_PATHS="$FILE_PATHS ./playwright-tests/RegressionSet/$file"
             done
-
-            echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
+            echo "Running: npx playwright test $FILE_PATHS"
             npx playwright test $FILE_PATHS
           else
-            echo "No files specified to run for ${{ matrix.testfolder }} folder"
+            echo "No files specified for ${{ matrix.testfolder }}"
           fi
 
       - name: Upload blob report to GitHub Actions Artifacts
