@@ -615,7 +615,7 @@ pub async fn merge_by_stream(
 
     // Build bloom for the current hour
     let build_start = std::time::Instant::now();
-    match crate::service::compact::bloom_build::build_for_bucket(
+    match crate::service::compact::bloom_build::build_for_stream(
         org_id,
         stream_type,
         stream_name,
@@ -623,13 +623,13 @@ pub async fn merge_by_stream(
     )
     .await
     {
+        Ok(false) => {}
         Ok(true) => {
             let build_time = build_start.elapsed().as_millis();
             log::info!(
                 "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
             );
         }
-        Ok(false) => {}
         Err(e) => {
             log::warn!(
                 "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"

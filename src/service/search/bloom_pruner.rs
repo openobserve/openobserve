@@ -74,7 +74,7 @@ struct Predicate {
 /// — passing an unrelated field would just waste IO on guaranteed misses.
 fn collect_decidable(
     cond: &IndexCondition,
-    bloom_indexed_fields: &HashSet<&String>,
+    bloom_indexed_fields: &HashSet<String>,
 ) -> Vec<Predicate> {
     let mut out: Vec<Predicate> = Vec::new();
     for c in &cond.conditions {
@@ -129,9 +129,9 @@ pub async fn prune(
     stream_name: &str,
     files: Vec<FileKey>,
     index_condition: &IndexCondition,
-    bloom_indexed_fields: &Vec<String>,
+    bloom_indexed_fields: Vec<String>,
 ) -> Vec<FileKey> {
-    let bloom_indexed_fields = bloom_indexed_fields.iter().collect::<HashSet<_>>();
+    let bloom_indexed_fields = bloom_indexed_fields.into_iter().collect::<HashSet<_>>();
     let predicates = collect_decidable(index_condition, &bloom_indexed_fields);
     if predicates.is_empty() {
         return files;
@@ -682,13 +682,13 @@ mod tests {
         ];
         let c = cond(vec![Condition::Equal("trace_id".into(), "x".into())]);
         let kept = prune(
-            files.clone(),
-            &c,
-            &fields(&["trace_id"]),
             "tid",
             "o",
             StreamType::Logs,
             "s",
+            files.clone(),
+            &c,
+            vec!["trace_id".to_string()],
         )
         .await;
         assert_eq!(kept.len(), files.len());
@@ -700,13 +700,13 @@ mod tests {
         // A NotEqual is not bloom-decidable → prune returns input untouched.
         let c = cond(vec![Condition::NotEqual("trace_id".into(), "x".into())]);
         let kept = prune(
-            files.clone(),
-            &c,
-            &fields(&["trace_id"]),
             "tid",
             "o",
             StreamType::Logs,
             "s",
+            files.clone(),
+            &c,
+            vec!["trace_id".to_string()],
         )
         .await;
         assert_eq!(kept.len(), 1);
@@ -717,13 +717,13 @@ mod tests {
         let files = vec![fk("files/o/logs/missing/2026/05/08/14/a.parquet", 9_999)];
         let c = cond(vec![Condition::Equal("trace_id".into(), "x".into())]);
         let kept = prune(
-            files.clone(),
-            &c,
-            &fields(&["trace_id"]),
             "tid",
             "o",
             StreamType::Logs,
             "missing",
+            files.clone(),
+            &c,
+            vec!["trace_id".to_string()],
         )
         .await;
         assert_eq!(kept.len(), 1);
@@ -734,13 +734,13 @@ mod tests {
         let files = vec![fk("not-a-files-path", 1234)];
         let c = cond(vec![Condition::Equal("trace_id".into(), "x".into())]);
         let kept = prune(
-            files,
-            &c,
-            &fields(&["trace_id"]),
             "tid",
             "o",
             StreamType::Logs,
             "s",
+            files,
+            &c,
+            vec!["trace_id".to_string()],
         )
         .await;
         assert_eq!(kept.len(), 1);

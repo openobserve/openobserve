@@ -17,7 +17,7 @@
 //!
 //! Two entry points, both driven by the caller's choice of file set:
 //!
-//! - [`build_for_bucket`] takes an explicit list of `file_list` ids and builds `.bf` coverage for
+//! - [`build_for_stream`] takes an explicit list of `file_list` ids and builds `.bf` coverage for
 //!   those of them still at `bloom_ver = 0`. The merge path passes its fresh merge-output ids; the
 //!   dump path passes the `bloom_ver = 0` stragglers it's about to archive. Either way the build
 //!   logic is identical — the caller owns the "which files" decision, this module owns the "how to
@@ -46,6 +46,7 @@ use config::{
 };
 use infra::{
     bloom::{BloomWriter, FieldBloom, path::bloom_path},
+    errors::Result,
     file_list as infra_file_list, storage,
 };
 use tantivy::Directory;
@@ -68,12 +69,12 @@ use crate::service::{
 /// Returns `Ok(())` even when no bloom is built (no target fields, nothing
 /// at `bloom_ver = 0`, recoverable per-file errors). Never propagates a
 /// build failure to user requests.
-pub async fn build_for_bucket(
+pub async fn build_for_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_key: &str,
-) -> anyhow::Result<(bool)> {
+) -> Result<bool> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled {
         return Ok(false);
@@ -157,8 +158,6 @@ pub async fn build_for_bucket(
     let chunk_total = new_files.len().div_ceil(max_files_per_bf);
 
     for (chunk_idx, chunk) in new_files.chunks(max_files_per_bf).enumerate() {
-        let chunk_start = std::time::Instant::now();
-
         // B for this chunk is sized from the chunk's MAX record count, used as
         // a safe NDV upper bound: a file can't hold more distinct values than
         // rows. This never under-sizes (no saturation) for the target

@@ -113,7 +113,7 @@ pub async fn search(
             query.clone(),
             &mut files,
             index_condition.clone(),
-            &bloom_indexed_fields,
+            bloom_indexed_fields,
         )
         .await?;
         if ok {
@@ -453,7 +453,7 @@ pub async fn check_bloom_filter(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
-    bloom_indexed_fields: &Vec<String>,
+    bloom_indexed_fields: Vec<String>,
 ) -> Result<(usize, bool), Error> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled
