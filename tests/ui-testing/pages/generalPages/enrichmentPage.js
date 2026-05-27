@@ -2259,6 +2259,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
             return { deleted: false, reason: 'deletion_failed', error: error.message };
         }
     }
+
+    /**
+     * Set the file input for file upload enrichment
+     * @param {string} filePath - Path to the CSV file to upload
+     */
+    async setFileInput(filePath) {
+        testLogger.debug(`Setting file input: ${filePath}`);
+        const inputFile = this.page.locator(this.fileInput);
+        await inputFile.setInputFiles(filePath);
+        testLogger.debug('File input set');
+    }
 }
 
 module.exports = { EnrichmentPage };
