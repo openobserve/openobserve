@@ -952,7 +952,10 @@ export class AlertsPage {
         await deleteMenuItem.click();
 
         await expect(this.page.locator('span').filter({ hasText: this.locators.deleteFolderConfirmText }).first()).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.confirmButton).click();
+        // FolderList.vue's ConfirmDialog receives data-test="dashboard-confirm-delete-folder-dialog"
+        // from its parent, which via Vue 3 attr fallthrough overrides the inner
+        // ODialog's data-test="confirm-dialog". Use the outer data-test to match.
+        await this.page.locator('[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]').click({ timeout: 10000 });
         await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.folderDeletedMessage })).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Successfully deleted folder', { folderName });
@@ -2125,7 +2128,7 @@ export class AlertsPage {
         });
 
         await this.page.locator(this.locators.alertExportButton).click();
-        await expect(this.page.getByText('Successfully exported')).toBeVisible({ timeout: 60000 });
+        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 
         // Wait for the blob data to be captured (blob.text() is async)
