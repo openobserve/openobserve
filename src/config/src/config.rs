@@ -1957,11 +1957,11 @@ pub struct Compact {
     )]
     pub retention_allowed_hours: String,
     #[env_config(
-        name = "ZO_COMPACT_TANTIVY_PARALLEL_BUILD_WORKERS",
+        name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
         help = "Per-file concurrent row_group workers for tantivy index generation during compaction. 0 disables (single-threaded)"
     )]
-    pub tantivy_parallel_build_workers: usize,
+    pub tantivy_builder_thread_num: usize,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

@@ -31,7 +31,7 @@
 
 use std::sync::Arc;
 
-use anyhow::Context;
+use anyhow::{Context, Error};
 use bytes::Bytes;
 use config::utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -39,6 +39,8 @@ use tantivy::directory::MmapDirectory;
 use tokio::task::JoinHandle;
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
+
+type TaskOutput = (usize, tantivy::Index, usize);
 
 /// Row-group-direct parallel tantivy index builder.
 ///
@@ -69,12 +71,12 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
     tantivy_dir: D,
     buf: Bytes,
     index_schema: TantivyIndexSchema,
-    workers: usize,
-) -> Result<Option<tantivy::Index>, anyhow::Error> {
+    thread_num: usize,
+) -> Result<Option<tantivy::Index>, Error> {
     // Parse parquet metadata once on a blocking thread (footer decode is sync I/O).
     let num_row_groups = {
         let buf = buf.clone();
-        tokio::task::spawn_blocking(move || -> Result<usize, anyhow::Error> {
+        tokio::task::spawn_blocking(move || -> Result<usize, Error> {
             let builder = ParquetRecordBatchReaderBuilder::try_new(buf)
                 .context("failed to open parquet for metadata")?;
             Ok(builder.metadata().num_row_groups())
@@ -85,26 +87,22 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
         return Ok(None);
     }
 
-    let workers = workers.max(1).min(num_row_groups);
-    let semaphore = Arc::new(tokio::sync::Semaphore::new(workers));
+    let thread_num = thread_num.max(1).min(num_row_groups);
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(thread_num));
 
     let start = std::time::Instant::now();
-    // (row_group_index, per-row_group Index, row_count) — packaged together so
-    // we can reorder the tasks by row_group index after they finish.
-    type RgTaskOutput = (usize, tantivy::Index, usize);
-    let mut tasks: Vec<JoinHandle<Result<RgTaskOutput, anyhow::Error>>> =
-        Vec::with_capacity(num_row_groups);
+    let mut tasks: Vec<JoinHandle<Result<TaskOutput, Error>>> = Vec::with_capacity(num_row_groups);
     for rg_idx in 0..num_row_groups {
         let permit = semaphore.clone().acquire_owned().await?;
         let buf_c = buf.clone();
         let index_schema_c = index_schema.clone();
         tasks.push(tokio::task::spawn_blocking(move || {
             let _permit = permit;
-            build_row_group_segment_sync(rg_idx, buf_c, index_schema_c)
+            build_row_group_segment(rg_idx, buf_c, index_schema_c)
         }));
     }
 
-    let mut indexed: Vec<RgTaskOutput> = Vec::with_capacity(tasks.len());
+    let mut indexed: Vec<TaskOutput> = Vec::with_capacity(tasks.len());
     for t in tasks {
         indexed.push(t.await??);
     }
@@ -114,13 +112,12 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
     let indices: Vec<tantivy::Index> = indexed.into_iter().map(|(_, i, _)| i).collect();
 
     log::info!(
-        "parallel::build_index: built {num_row_groups} row_groups, total_rows={total_num_rows}, workers={workers}, elapsed={:?} ms",
+        "parallel::build_index: built {num_row_groups} row_groups, total_rows={total_num_rows}, thread_num={thread_num}, elapsed={} ms",
         start.elapsed().as_millis()
     );
 
+    // merge all row_group indices into a single index.
     let start = std::time::Instant::now();
-    // Merge into the puffin directory. `merge_indices` writes a single segment
-    // referencing the output `Directory`.
     let merged = tokio::task::spawn_blocking(move || {
         tantivy::indexer::merge_indices(&indices, tantivy_dir)
             .map_err(|e| anyhow::anyhow!("merge_indices failed: {e}"))
@@ -128,7 +125,7 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
     .await??;
 
     log::info!(
-        "parallel::build_index: merged row_group indices into single tantivy index, elapsed={:?} ms",
+        "parallel::build_index: merged row_group indices into single tantivy index, elapsed={} ms",
         start.elapsed().as_millis()
     );
 
@@ -150,12 +147,12 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
 }
 
 /// Synchronously builds the tantivy segment for exactly one parquet row_group.
-/// Runs in `spawn_blocking` — uses only sync APIs and no `.await`.
-fn build_row_group_segment_sync(
+/// Return: (row_group_index, per-row_group Index, row_count)
+fn build_row_group_segment(
     rg_idx: usize,
     buf: Bytes,
     index_schema: TantivyIndexSchema,
-) -> Result<(usize, tantivy::Index, usize), anyhow::Error> {
+) -> Result<(usize, tantivy::Index, usize), Error> {
     let builder = ParquetRecordBatchReaderBuilder::try_new(buf)
         .with_context(|| format!("worker {rg_idx}: open parquet"))?;
     let reader = builder
@@ -197,4 +194,248 @@ fn build_row_group_segment_sync(
         .with_context(|| format!("worker {rg_idx}: finalize"))?;
 
     Ok((rg_idx, index, rg_rows))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::{
+        array::{Int64Array, StringArray},
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    };
+    use config::{FileFormat, TIMESTAMP_COL_NAME};
+    use tantivy::directory::RamDirectory;
+
+    use super::*;
+    use crate::service::tantivy::{
+        sequential,
+        tests::{create_test_parquet_bytes, make_index_schema},
+    };
+
+    /// Build a record batch where every row has a globally-unique marker token
+    /// in the `marker` column. The marker is what we search to recover the
+    /// doc_id, so we can assert `doc_id == global_row_index`.
+    fn create_marker_batch(start: usize, num_rows: usize) -> RecordBatch {
+        let fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("marker", DataType::Utf8, false),
+        ];
+        let timestamps: Vec<i64> = (0..num_rows).map(|i| (start + i) as i64).collect();
+        let markers: Vec<String> = (0..num_rows)
+            .map(|i| format!("row{:09}", start + i))
+            .collect();
+        let schema = Arc::new(Schema::new(fields));
+        RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(timestamps)),
+                Arc::new(StringArray::from(markers)),
+            ],
+        )
+        .unwrap()
+    }
+
+    /// Writes a parquet file with explicit row_group boundaries. Each inner
+    /// `Vec<RecordBatch>` is concatenated into exactly one row_group via
+    /// `writer.flush()` between groups. Used to exercise the multi-row_group
+    /// parallel path deterministically without writing 100k+ rows.
+    async fn create_test_parquet_bytes_multi_rg(groups: Vec<Vec<RecordBatch>>) -> bytes::Bytes {
+        let schema = groups[0][0].schema();
+        let mut buffer = Vec::new();
+        let file_meta = config::meta::stream::FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: groups.iter().flatten().map(|b| b.num_rows()).sum::<usize>() as i64,
+            original_size: 1000,
+            ..Default::default()
+        };
+        let mut writer = config::utils::parquet::new_parquet_writer(
+            &mut buffer,
+            &schema,
+            &[],
+            &file_meta,
+            false,
+            None,
+        );
+        let num_groups = groups.len();
+        for (i, batches) in groups.into_iter().enumerate() {
+            for batch in batches {
+                writer.write(&batch).await.unwrap();
+            }
+            // flush() closes the in-progress row_group, forcing the next
+            // batch to start a new one. Skip after the last group; close()
+            // handles the tail.
+            if i + 1 < num_groups {
+                writer.flush().await.unwrap();
+            }
+        }
+        writer.close().await.unwrap();
+        bytes::Bytes::from(buffer)
+    }
+
+    /// The core invariant test: with multiple row_groups parsed by
+    /// per-row_group workers (potentially out of order), every marker's
+    /// `doc_id` must equal its original global row index after merge.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_row_group_parallel_preserves_row_order() {
+        // 4 row_groups of varied sizes, total 2137 rows. The middle row_groups
+        // have multiple batches each to exercise the per-row_group batch loop.
+        let rg0 = vec![create_marker_batch(0, 500)];
+        let rg1 = vec![create_marker_batch(500, 300), create_marker_batch(800, 200)];
+        let rg2 = vec![create_marker_batch(1000, 1000)];
+        let rg3 = vec![create_marker_batch(2000, 137)]; // partial tail
+        let total_rows = 500 + 500 + 1000 + 137;
+        let buf = create_test_parquet_bytes_multi_rg(vec![rg0, rg1, rg2, rg3]).await;
+
+        // Verify the parquet really has 4 row_groups (test the test).
+        let metadata_num_rg = {
+            let buf = buf.clone();
+            tokio::task::spawn_blocking(move || {
+                ParquetRecordBatchReaderBuilder::try_new(buf)
+                    .unwrap()
+                    .metadata()
+                    .num_row_groups()
+            })
+            .await
+            .unwrap()
+        };
+        assert_eq!(metadata_num_rg, 4, "test setup must yield 4 row_groups");
+
+        let stream_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("marker", DataType::Utf8, false),
+        ]));
+
+        let index = build_index(
+            RamDirectory::create(),
+            buf,
+            make_index_schema(&[], &["marker".to_string()], &stream_schema),
+            // workers
+            3, // force out-of-order completion
+        )
+        .await
+        .expect("parallel build must succeed")
+        .expect("parallel build must return Some(index)");
+
+        let segs = index.searchable_segments().unwrap();
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
+
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        let marker_field = index.schema().get_field("marker").unwrap();
+
+        for row in 0..total_rows {
+            let m = format!("row{:09}", row);
+            let q = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(marker_field, &m),
+                tantivy::schema::IndexRecordOption::Basic,
+            );
+            let hits = searcher
+                .search(&q, &tantivy::collector::DocSetCollector)
+                .unwrap();
+            assert_eq!(
+                hits.len(),
+                1,
+                "marker for row {row} must match exactly 1 doc"
+            );
+            let addr = *hits.iter().next().unwrap();
+            assert_eq!(addr.segment_ord, 0);
+            assert_eq!(
+                addr.doc_id as usize, row,
+                "INVARIANT VIOLATION: doc_id != row_index at row {row}"
+            );
+        }
+    }
+
+    /// Same data through parallel-row_group path and sequential path must
+    /// yield the same `(marker → doc_id)` mapping for every row. Verifies
+    /// behavioural equivalence end-to-end.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_row_group_parallel_matches_sequential() {
+        let rg0 = vec![create_marker_batch(0, 250)];
+        let rg1 = vec![create_marker_batch(250, 250)];
+        let rg2 = vec![create_marker_batch(500, 250)];
+        let total = 750;
+
+        let buf_par =
+            create_test_parquet_bytes_multi_rg(vec![rg0.clone(), rg1.clone(), rg2.clone()]).await;
+        let buf_seq = create_test_parquet_bytes(vec![
+            create_marker_batch(0, 250),
+            create_marker_batch(250, 250),
+            create_marker_batch(500, 250),
+        ])
+        .await;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("marker", DataType::Utf8, false),
+        ]));
+
+        let par = build_index(
+            RamDirectory::create(),
+            buf_par,
+            make_index_schema(&[], &["marker".to_string()], &schema),
+            3,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let seq = sequential::build_index(
+            RamDirectory::create(),
+            FileFormat::Parquet,
+            buf_seq,
+            make_index_schema(&[], &["marker".to_string()], &schema),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        let par_total: usize = par
+            .searchable_segments()
+            .unwrap()
+            .iter()
+            .map(|s| s.meta().max_doc() as usize)
+            .sum();
+        let seq_total: usize = seq
+            .searchable_segments()
+            .unwrap()
+            .iter()
+            .map(|s| s.meta().max_doc() as usize)
+            .sum();
+        assert_eq!(par_total, total);
+        assert_eq!(seq_total, total);
+
+        let par_reader = par.reader().unwrap();
+        let par_searcher = par_reader.searcher();
+        let par_marker = par.schema().get_field("marker").unwrap();
+        let seq_reader = seq.reader().unwrap();
+        let seq_searcher = seq_reader.searcher();
+        let seq_marker = seq.schema().get_field("marker").unwrap();
+
+        for row in 0..total {
+            let m = format!("row{:09}", row);
+            let q_par = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(par_marker, &m),
+                tantivy::schema::IndexRecordOption::Basic,
+            );
+            let q_seq = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(seq_marker, &m),
+                tantivy::schema::IndexRecordOption::Basic,
+            );
+            let hits_par = par_searcher
+                .search(&q_par, &tantivy::collector::DocSetCollector)
+                .unwrap();
+            let hits_seq = seq_searcher
+                .search(&q_seq, &tantivy::collector::DocSetCollector)
+                .unwrap();
+            assert_eq!(hits_par.len(), 1);
+            assert_eq!(hits_seq.len(), 1);
+            let addr_par = *hits_par.iter().next().unwrap();
+            let addr_seq = *hits_seq.iter().next().unwrap();
+            assert_eq!(addr_par.doc_id as usize, row);
+            assert_eq!(addr_seq.doc_id as usize, row);
+        }
+    }
 }
