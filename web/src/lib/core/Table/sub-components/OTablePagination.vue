@@ -105,6 +105,15 @@ const pageSizeSelectOptions = computed(() =>
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
+          data-test="o2-table-first-page-btn"
+          @click="emit('first-page')"
+        >
+          <OIcon name="first-page" size="sm" />
+        </OButton>
+        <OButton
+          variant="outline"
+          size="icon"
+          :disabled="isFirstPage"
           data-test="o2-table-prev-page-btn"
           @click="emit('prev-page')"
         >
@@ -118,6 +127,15 @@ const pageSizeSelectOptions = computed(() =>
           @click="emit('next-page')"
         >
           <OIcon name="chevron-right" size="sm" />
+        </OButton>
+        <OButton
+          variant="outline"
+          size="icon"
+          :disabled="isLastPage"
+          data-test="o2-table-last-page-btn"
+          @click="emit('last-page')"
+        >
+          <OIcon name="last-page" size="sm" />
         </OButton>
       </div>
     </div>

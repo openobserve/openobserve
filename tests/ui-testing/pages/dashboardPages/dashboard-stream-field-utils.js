@@ -244,8 +244,21 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
     hasVariableLabel = retryResult.hasVariableLabel;
   }
 
-  // Close dropdown
-  await page.keyboard.press('Escape');
+  // Close dropdown — only press Escape if the popover is still open.
+  // page.evaluate() above can cause focus loss that closes the popover early;
+  // pressing Escape on a closed popover would propagate to the parent dialog.
+  const popoverStillOpen = dataTestMatch
+    ? await page.locator(`[data-test="${dataTestMatch[1]}-popover"]`).isVisible()
+    : true;
+  if (popoverStillOpen) {
+    await page.keyboard.press('Escape');
+    if (dataTestMatch) {
+      await page
+        .locator(`[data-test="${dataTestMatch[1]}-popover"]`)
+        .waitFor({ state: 'hidden', timeout: 3000 })
+        .catch(() => {});
+    }
+  }
 
   return { found, hasVariableLabel };
 }

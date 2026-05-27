@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="field-list-reset">
         <OIcon
           name="restart-alt"
-          size="sm"
+          size="md"
           :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
           class="tw:cursor-pointer reset-icon"
           @click="$emit('reset-fields')"

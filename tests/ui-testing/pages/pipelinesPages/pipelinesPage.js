@@ -19,8 +19,8 @@ export class PipelinesPage {
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
         );
-        this.streamButton = page.getByRole("button", { name: "Stream" }).first();
-        this.queryButton = page.getByRole("button", { name: "Query" });
+        this.streamButton = page.locator('[data-test="pipeline-node-sidebar-stream-input-btn"]');
+        this.queryButton = page.locator('[data-test="pipeline-node-sidebar-query-input-btn"]');
         this.vueFlowPane = page.locator(".vue-flow__pane");
         // Stream-type OSelect inside the input-node form (Stream.vue). Clicking
         // the wrapper opens the OSelect popover with `*-option` items.
@@ -80,9 +80,9 @@ export class PipelinesPage {
         );
         this.deleteButton = page.locator("button").filter({ hasText: "delete" });
         this.confirmDeleteButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-        this.secondStreamButton = page.getByRole('button', { name: 'Stream' }).nth(1);
-        this.functionButton =  page.getByRole('button', { name: 'Function' })
-        this.conditionButton =  page.getByRole('button', { name: 'Condition' })
+        this.secondStreamButton = page.locator('[data-test="pipeline-node-sidebar-stream-output-btn"]');
+        this.functionButton = page.locator('[data-test="pipeline-node-sidebar-function-default-btn"]');
+        this.conditionButton = page.locator('[data-test="pipeline-node-sidebar-condition-default-btn"]');
        this.selectPreviousNodeDropdown = page.getByLabel('Select Previous Node');
        this.previousNodeDropdown = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]');
        this.previousNodeDropdownSecond = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]:last-child');
@@ -698,12 +698,10 @@ export class PipelinesPage {
     }
 
     async selectAndDragSecondStream() {
-        await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.secondStreamButton,{ x: 120, y: 120 });
+        await this.dragStreamToTarget(this.secondStreamButton, { x: 120, y: 120 });
     }
 
     async selectAndDragFunction() {
-        await this.secondStreamButton.click();
         await this.dragStreamToTarget(this.functionButton, { x: 250, y: 200 });
     }
 
@@ -726,6 +724,13 @@ export class PipelinesPage {
 
     // Method to click the input node stream save button
     async clickInputNodeStreamSave() {
+        // If the stream-name popover is still open (Enter path in fillDestinationStreamName),
+        // wait for it to detach. It will close via interactOutside when the save button receives
+        // the pointerdown event. The .catch keeps this non-blocking if already detached.
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'detached', timeout: 5000 })
+            .catch(() => {});
+        await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
     async searchPipeline(pipelineName) {
@@ -1436,25 +1441,31 @@ export class PipelinesPage {
                 await this.page.reload().catch(() => {});
                 await apiPromise;
 
-                // Ensure we're on the "all" tab so realtime + scheduled pipelines
-                // are both visible regardless of any previous tab selection.
-                if (await this.pipelineListAllTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await this.pipelineListAllTab.click().catch(() => {});
-                }
+            // Ensure we're on the "all" tab so realtime + scheduled pipelines
+            // are both visible regardless of any previous tab selection.
+            const allTab = this.page.locator('[data-test="tab-all"]');
+            if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await allTab.click().catch(() => {});
+            }
 
-                // Wait for the table to reach a settled state (rows or empty-
-                // state OR pagination footer) BEFORE reading row content.
-                await this.waitForPipelineListSettled(15000);
+            // Wait for at least one pipeline row so we know the table rendered
+            // its data — search against an empty table never surfaces our row.
+            const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
+            await anyRow.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
-                // Clear and re-fill the search filter.
-                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
-                await this.pipelineSearchInputField.fill('');
-                await this.searchPipeline(pipelineName);
-                return await deleteBtn.isVisible({ timeout: 2000 }).catch(() => false);
-            }, {
-                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
-                timeout: 180000,
-            }).toBe(true);
+            // Clear and re-fill the search filter.
+            await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+            await this.pipelineSearchInputField.fill('');
+            // Wait for full list to restore after clearing the filter
+            await anyRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            await this.searchPipeline(pipelineName);
+
+            // Wait deterministically for the filtered delete button to appear
+            deleteVisible = await deleteBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
+            if (deleteVisible) break;
+        }
+        if (!deleteVisible) {
+            await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
         await deleteBtn.click();
         await this.confirmDeletePipeline();
@@ -2111,12 +2122,12 @@ export class PipelinesPage {
         } else {
             await this.streamNameInput.press('Enter');
         }
-        // Close the popover deterministically — `@create` writes to v-model but
-        // does NOT auto-close the popover. Press Escape to dismiss it so it
-        // doesn't intercept the subsequent Save click.
-        await this.page.keyboard.press('Escape').catch(() => {});
-        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
+        // Wait for the popover to close if it was dismissed by an option click.
+        // For newly created names (Enter path), the popover stays open; the save
+        // button click will close it via interactOutside — do NOT press Escape
+        // here, as that would also trigger the ODrawer's escape handler and
+        // prematurely close the drawer.
+        await popover.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
     }
 
     /**
