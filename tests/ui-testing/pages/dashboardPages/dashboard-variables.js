@@ -184,9 +184,15 @@ export default class DashboardVariables {
     const trigger = this.variableTrigger(label);
     await trigger.waitFor({ state: "visible", timeout: 10000 });
 
-    await trigger.click();
-    // Wait for the popover to open before interacting with its contents
-    await this.variablePopover(label).waitFor({ state: "visible", timeout: 10000 });
+    // Retry-click until popover opens — variable may still be loading after a time-range change,
+    // causing the first click to be silently dismissed when the component re-renders.
+    await expect.poll(async () => {
+      const isOpen = await this.variablePopover(label).isVisible();
+      if (!isOpen) {
+        await trigger.click();
+      }
+      return isOpen;
+    }, { timeout: 15000, intervals: [500, 1000, 1500, 2000, 2000, 2000] }).toBe(true);
 
     const searchInput = this.variableSearchInput(label);
     const hasSearch = await searchInput.count() > 0;

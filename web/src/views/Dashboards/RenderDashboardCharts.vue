@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
                     <div
-                      class="panel-variables-container tw:px-1 tw:py-1"
+                      class="panel-variables-container tw:px-1"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
                       <!-- Panel Time Picker (NEW) -->

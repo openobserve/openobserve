@@ -349,6 +349,7 @@ export default defineComponent({
           //   searchObj.data.stream.functions.push(itemObj);
           // }
         });
+        functionOptions.value = [...functionList.value];
         return;
       } catch (e) {
         showErrorNotification(t("dashboard.errorFetchingFunctions"));

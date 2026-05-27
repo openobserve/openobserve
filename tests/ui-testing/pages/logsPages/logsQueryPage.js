@@ -83,14 +83,24 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-    await this.page.locator(this.histogramToggle).click();
+    // Histogram toggle is inside the utilities ("More") menu.
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.locator(this.utilitiesMenuButton).click();
+    const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+    await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+    await histogramMenuItem.click();
   }
 
   async isHistogramOn() {
-    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-    // OSwitch wrapper carries data-test, inner button carries data-state="checked|unchecked".
-    return (await this.page.locator(this.histogramToggleCheckedBtn).count()) > 0;
+    // Histogram is inside the utilities ("More") menu — open menu, read OSwitch state, close menu.
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.locator(this.utilitiesMenuButton).click();
+    const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+    await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const switchChecked = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"] [data-state="checked"]');
+    const count = await switchChecked.count();
+    await this.page.keyboard.press('Escape').catch(() => {});
+    return count > 0;
   }
 
   async ensureHistogramState(desiredState) {
@@ -118,7 +128,10 @@ export class LogsQueryPage {
     const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
     await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     const state = await stateEl.getAttribute('data-state').catch(() => null);
-    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
     return state === 'checked';
   }
 
@@ -134,7 +147,10 @@ export class LogsQueryPage {
         return s === 'checked';
       }, { timeout: 5000 }).toBe(true);
     }
-    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
   }
 
   async ensureFTSMode() {
@@ -149,7 +165,10 @@ export class LogsQueryPage {
         return s === 'unchecked';
       }, { timeout: 5000 }).toBe(true);
     }
-    if (menuOpened) { await this.page.keyboard.press('Escape'); await this.page.waitForTimeout(100); }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
   }
 
   async _isAutoQueryEnabled() {
