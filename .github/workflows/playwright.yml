@@ -145,7 +145,7 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-8
     permissions:
       contents: read
       actions: read
@@ -816,7 +816,7 @@ jobs:
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-8
     permissions:
       contents: read
       actions: read
@@ -1003,7 +1003,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-8
     permissions: {}
     needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports]
     if: always()
