@@ -380,7 +380,7 @@ export default defineComponent({
 .joins-header {
   display: flex;
   flex-direction: row;
-  padding-left: 16px;
+  padding-left: 0.75rem;
 }
 
 .layout-name {
