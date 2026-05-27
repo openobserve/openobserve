@@ -28,7 +28,7 @@ test.describe("Traces Regression Bugs", () => {
   });
 
   // ==========================================================================
-  // Bug #10769: Traces UI: Column sorting support
+  //  Bug #10769: Traces UI: Column sorting support
   // https://github.com/openobserve/openobserve/issues/10769
   // ==========================================================================
   test("Trace columns should support sorting", {
