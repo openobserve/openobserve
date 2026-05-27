@@ -5275,10 +5275,9 @@ html.dark .file-type label,
   border: none;
 }
 
-// Remove row dividers, normalize cell background, and strip the auto-pin shadow
+// Normalize cell background and strip the auto-pin shadow
 // (isAction columns are auto-pinned right by OTable, which adds an inline box-shadow)
 .saved-view-table :deep(td) {
-  border-bottom: none;
   background: transparent;
   box-shadow: none !important;
 }
