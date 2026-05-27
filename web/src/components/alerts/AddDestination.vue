@@ -814,19 +814,28 @@ const setupDestinationData = () => {
       }
     }
     // Priority 3: Check if template starts with 'prebuilt_' (user templates)
+    // Also verify the URL matches the prebuilt type to avoid misclassifying custom
+    // destinations that happen to use a template with a prebuilt_ prefix.
     else if (props.destination.template?.startsWith("prebuilt_")) {
       const extractedType = props.destination.template.replace("prebuilt_", "");
-      formData.value.destination_type = isPrebuiltType(extractedType)
-        ? extractedType
-        : "custom";
+      if (isPrebuiltType(extractedType) && props.destination.url) {
+        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
+        formData.value.destination_type = urlType === extractedType ? extractedType : "custom";
+      } else {
+        formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : "custom";
+      }
     }
     // Priority 4: Check if template includes 'prebuilt' (legacy format)
+    // Also verify the URL matches the prebuilt type (same guard as Priority 3).
     else if (props.destination.template?.includes("prebuilt")) {
       const parts = props.destination.template.split("-");
       const extractedType = parts[parts.length - 1];
-      formData.value.destination_type = isPrebuiltType(extractedType)
-        ? extractedType
-        : "custom";
+      if (isPrebuiltType(extractedType) && props.destination.url) {
+        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
+        formData.value.destination_type = urlType === extractedType ? extractedType : "custom";
+      } else {
+        formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : "custom";
+      }
     }
     // Priority 5: Fallback to URL-based detection (for destinations created before metadata was added)
     else if (props.destination.url) {
