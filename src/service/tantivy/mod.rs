@@ -263,25 +263,17 @@ pub(super) fn convert_batch_to_docs_sync(
         }
     }
 
-    // _timestamp field — default to zeros when missing or the wrong type, so
-    // the tantivy doc count always matches the parquet row count.
-    let owned_default;
-    let column_data: &Int64Array = match batch.column_by_name(TIMESTAMP_COL_NAME) {
+    // _timestamp field, should we report error when _timestamp not found
+    let ts_data: &Int64Array = match batch.column_by_name(TIMESTAMP_COL_NAME) {
         Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
             Some(ts) => ts,
-            None => {
-                owned_default = Int64Array::from(vec![0; num_rows]);
-                &owned_default
-            }
+            None => &Int64Array::from(vec![0; num_rows]),
         },
-        None => {
-            owned_default = Int64Array::from(vec![0; num_rows]);
-            &owned_default
-        }
+        None => &Int64Array::from(vec![0; num_rows]),
     };
     let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap();
     for (i, doc) in docs.iter_mut().enumerate() {
-        doc.add_i64(ts_field, column_data.value(i));
+        doc.add_i64(ts_field, ts_data.value(i));
     }
 
     docs

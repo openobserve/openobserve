@@ -15,7 +15,7 @@
 
 //! Row-group-direct parallel tantivy index builder.
 //!
-//! Activated when `compact.tantivy_parallel_build_workers > 0` and the input
+//! Activated when `compact.tantivy_parallel_build_workers > 1` and the input
 //! file format is parquet. Each parquet row_group becomes one independent
 //! chunk segment built off the runtime in `tokio::task::spawn_blocking`; the
 //! resulting per-row_group segments are stitched together by
@@ -25,9 +25,13 @@
 //!   1. each per-row_group `SingleSegmentIndexWriter` writes rows in stored order, so its local
 //!      doc_ids equal the row's offset inside that row_group;
 //!   2. `IndexMerger` stacks input segments in input order (current tantivy has no `sort_by_field`
-//!      path), so segment `i`'s doc_ids land at `[Σ_{j<i} rg_size_j, Σ_{j≤i} rg_size_j)`;
+//!      path), so each segment's doc_ids land at `i * PARQUET_MAX_ROW_GROUP_SIZE`. For example,
+//!      pretending the fixed row_group size were 100, segment 0 would occupy doc_ids `[0, 100)`,
+//!      segment 1 `[100, 200)`, segment 2 `[200, 300)`, etc. (the final row_group may be shorter,
+//!      but it is always the last segment);
 //!   3. parquet stores row_groups in row order, so the global row index of row_group `i`'s row `k`
-//!      is exactly `Σ_{j<i} rg_size_j + k`.
+//!      is `i * PARQUET_MAX_ROW_GROUP_SIZE + k` (with size 100, row 5 of row_group 1 maps to global
+//!      row index `100 + 5 = 105`).
 
 use std::sync::Arc;
 

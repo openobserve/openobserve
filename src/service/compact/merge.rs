@@ -996,11 +996,6 @@ async fn generate_inverted_index(
     latest_schema: Arc<Schema>,
     buf: Bytes,
 ) -> Result<(), anyhow::Error> {
-    // `create_tantivy_index` decides internally whether to take the legacy
-    // streaming path or the row_group-parallel path based on
-    // `compact.tantivy_parallel_build_workers`. The latter needs the raw
-    // parquet bytes to dispatch per-row_group workers, so we hand it `buf`
-    // directly instead of pre-opening a RecordBatchStream.
     let index_size = create_tantivy_index(
         "COMPACTOR",
         org_id,

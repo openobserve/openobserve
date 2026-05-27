@@ -22,9 +22,6 @@ use std::{
 use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
-// `get_recordbatch_reader_from_bytes` is only consumed by the enterprise-gated
-// `queue_services_from_parquet` below; keep the import behind the same cfg to
-// avoid an unused-import warning in non-enterprise builds.
 #[cfg(feature = "enterprise")]
 use config::utils::parquet::get_recordbatch_reader_from_bytes;
 use config::{
@@ -931,10 +928,6 @@ async fn merge_files(
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
-    // Generate tantivy inverted index and write to storage. We hand the raw
-    // parquet bytes to `create_tantivy_index`; it decides internally whether
-    // to open a `RecordBatchStream` (legacy path) or dispatch one worker per
-    // row_group in parallel (`compact.tantivy_parallel_build_workers > 0`).
     let index_size = create_tantivy_index(
         "INGESTER",
         &org_id,
