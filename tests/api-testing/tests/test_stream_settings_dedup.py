@@ -43,7 +43,7 @@ STREAM_TYPE = "logs"
 FTS_SAFE_FIELDS = ["level", "message", "log", "stream"]
 # FloatValue is numeric; _timestamp is used for bloom but not FTS
 INDEX_SAFE_FIELDS = ["_timestamp", "FloatValue"]
-BLOOM_SAFE_FIELDS = ["level", "message", "log", "stream", "_timestamp", "FloatValue"]
+BLOOM_SAFE_FIELDS = ["kubernetes_pod_id", "FloatValue"]
 
 
 def get_field_for_fts(settings):
