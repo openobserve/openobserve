@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-name"
               v-model="dashboardPanelData.data.title"
               :label="t('panel.name') + '*'"
+              labelPosition="inside"
               class="tw:ml-6 dynamic-input"
               :style="inputStyle"
             />

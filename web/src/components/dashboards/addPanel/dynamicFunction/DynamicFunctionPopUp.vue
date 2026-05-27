@@ -12,24 +12,20 @@
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
           <div class="text-label-normal tw:text-sm" data-test="dynamic-function-popup-label-text">Label</div>
-          <input
+          <OInput
             v-model="fields.label"
-            :class="[
-              store.state.theme === 'dark' ? 'tw:bg-gray-800' : '',
-              'edit-input',
-            ]"
+            size="sm"
+            class="tw:w-full"
             data-test="dynamic-function-popup-label-input"
           />
         </div>
         <div>
           <div class="text-label-normal tw:text-sm">Alias</div>
-          <input
+          <OInput
             v-model="fields.alias"
+            size="sm"
             disabled
-            :class="[
-              store.state.theme === 'dark' ? 'tw:bg-gray-800' : '',
-              'edit-input',
-            ]"
+            class="tw:w-full"
             data-test="dynamic-function-popup-alias-input"
           />
         </div>

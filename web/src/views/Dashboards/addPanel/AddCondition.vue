@@ -39,9 +39,9 @@
             >
             </OButton>
           </div>
-          <div style="height: 100%">
-            <div class="tw:p-1" style="height: 100%">
-              <div class="tw:gap-1" style="height: 100%">
+          <div>
+            <div class="tw:p-1">
+              <div class="tw:gap-1">
                 <OTabs v-model="condition.type" dense>
                   <OTab
                     name="list"
@@ -55,10 +55,10 @@
                   ></OTab>
                 </OTabs>
                 <OSeparator />
-                <div class="tw:h-full">
+                <div>
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
-                      <div class="tw:flex column tw:gap-2" style="height: 220px">
+                      <div class="tw:flex column tw:gap-2">
                         <OSelect
                           v-model="condition.operator"
                           :options="operators"
@@ -289,6 +289,10 @@ export default defineComponent({
 .add-condition-dropdown {
   :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
+  }
+
+  :deep(.o-tab) {
+    flex: 1;
   }
 }
 
