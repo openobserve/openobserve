@@ -1313,11 +1313,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="logs-search-saved-view-list" class="tw:flex">
             <div
               class="tw:flex tw:flex-col"
-              :style="
-                localSavedViews.length > 0
-                  ? 'width: 60%; border-right: 1px solid lightgray'
-                  : 'width: 100%'
-              "
+              :class="localSavedViews.length > 0 ? 'tw:border-r tw:border-[var(--o2-border-color)]' : ''"
+              :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
             >
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
@@ -1331,13 +1328,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="saved-view-table full-height o2-table-hide-header"
               >
                 <template #top>
-                  <div class="tw:w-full">
+                  <div class="tw:px-2 tw:py-2 tw:w-full tw:min-w-0 tw:box-border">
                     <OInput
                       data-test="log-search-saved-view-field-search-input"
                       v-model="searchObj.data.savedViewFilterFields"
                       clearable
                       :debounce="300"
-                      class="tw:mx-2 tw:my-2"
+                      class="tw:w-full"
                       :placeholder="t('search.searchSavedView')"
                     >
                       <template #icon-left>
@@ -1356,80 +1353,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div class="field_list">
-                    <div
-                      class="tw:p-1 saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
-                      :data-test="`logs-search-bar-dialog-saved-view-row-${value}`"
+                  <div
+                    class="tw:truncate tw:cursor-pointer tw:text-sm tw:min-w-0 tw:w-full"
+                    :title="value"
+                    :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
+                    @click.stop="
+                      applySavedView(row);
+                      savedViewsListDialog = false;
+                    "
+                  >
+                    {{ value }}
+                  </div>
+                </template>
+                <template #cell-actions="{ row, value }">
+                  <div class="tw:flex tw:items-center tw:gap-0.5">
+                    <OButton
+                      :title="t('common.favourite')"
+                      class="logs-saved-view-icon action-btn-hover"
+                      variant="ghost-neutral"
+                      size="icon-sm"
+                      :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
+                      @click.stop="
+                        handleFavoriteSavedView(
+                          row,
+                          favoriteViews.includes(row.view_id),
+                        )
+                      "
                     >
-                      <div
-                        class="tw:flex tw:flex-1 tw:min-w-0"
-                        :title="value"
-                        :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
-                        @click.stop="
-                          applySavedView(row);
-                          savedViewsListDialog = false;
+                      <OIcon
+                        :name="
+                          favoriteViews.includes(row.view_id)
+                            ? 'favorite'
+                            : 'favorite-border'
                         "
-                      >
-                        <span
-                          class="tw:truncate tw:max-w-[8.75rem]"
-                          >{{ value }}</span
-                        >
-                      </div>
-                      <div
-                        class="tw:flex tw:items-center tw:shrink-0"
-                        :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
-                        @click.stop="
-                          handleFavoriteSavedView(
-                            row,
-                            favoriteViews.includes(row.view_id),
-                          )
-                        "
-                      >
-                        <OButton
-                          :title="t('common.favourite')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                        >
-                          <OIcon
-                            :name="
-                              favoriteViews.includes(row.view_id)
-                                ? 'favorite'
-                                : 'favorite-border'
-                            "
-                            size="xs"
-                          />
-                        </OButton>
-                      </div>
-                      <div
-                        class="tw:flex tw:items-center tw:shrink-0"
-                        :data-test="`logs-search-bar-update-${value}-saved-view-btn`"
-                        @click.stop="handleUpdateSavedView(row)"
-                      >
-                        <OButton
-                          :title="t('common.edit')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                        >
-                          <OIcon name="edit" size="xs" />
-                        </OButton>
-                      </div>
-                      <div
-                        class="tw:flex tw:items-center tw:shrink-0"
-                        :data-test="`logs-search-bar-delete-${value}-saved-view-btn`"
-                        @click.stop="handleDeleteSavedView(row)"
-                      >
-                        <OButton
-                          :title="t('common.delete')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                        >
-                          <OIcon name="delete" size="xs" />
-                        </OButton>
-                      </div>
-                    </div>
+                        size="xs"
+                      />
+                    </OButton>
+                    <OButton
+                      :title="t('common.edit')"
+                      class="logs-saved-view-icon action-btn-hover"
+                      variant="ghost-neutral"
+                      size="icon-sm"
+                      :data-test="`logs-search-bar-update-${value}-saved-view-btn`"
+                      @click.stop="handleUpdateSavedView(row)"
+                    >
+                      <OIcon name="edit" size="xs" />
+                    </OButton>
+                    <OButton
+                      :title="t('common.delete')"
+                      class="logs-saved-view-icon action-btn-hover"
+                      variant="ghost-neutral"
+                      size="icon-sm"
+                      :data-test="`logs-search-bar-delete-${value}-saved-view-btn`"
+                      @click.stop="handleDeleteSavedView(row)"
+                    >
+                      <OIcon name="delete" size="xs" />
+                    </OButton>
                   </div>
                 </template>
                 <template #empty>
@@ -1446,7 +1425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div
-              class="tw:flex tw:flex-col tw:w-[40%] tw:ml-0"
+              class="tw:flex tw:flex-col tw:w-[40%] tw:ml-0 tw:pl-3"
               v-if="localSavedViews.length > 0"
             >
               <OTable
@@ -1466,72 +1445,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tw:border-t tw:my-1 tw:border-border" />
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div class="field_list tw:p-1">
-                    <div
-                      class="tw:p-1 saved-view-item tw:flex tw:items-center tw:gap-1 tw:cursor-pointer"
-                      :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
+                  <div
+                    class="tw:truncate tw:cursor-pointer tw:text-sm tw:min-w-0 tw:w-full"
+                    :title="value"
+                    :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
+                    @click.stop="
+                      applySavedView(row);
+                      savedViewsListDialog = false;
+                    "
+                  >
+                    {{ value }}
+                  </div>
+                </template>
+                <template #cell-actions="{ row, value }">
+                  <div class="tw:flex tw:items-center tw:gap-0.5">
+                    <OButton
+                      :title="t('common.favourite')"
+                      class="logs-saved-view-icon action-btn-hover"
+                      variant="ghost-neutral"
+                      size="icon-sm"
+                      :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
+                      @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <div
-                        class="tw:flex tw:flex-1 tw:min-w-0"
-                        @click.stop="
-                          applySavedView(row);
-                          savedViewsListDialog = false;
-                        "
-                      >
-                        <span
-                          class="tw:truncate tw:max-w-[5.625rem]"
-                          >{{ value }}</span
-                        >
-                      </div>
-                      <div
-                        class="tw:flex tw:items-center tw:shrink-0"
-                        :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
-                        @click.stop="
-                          handleFavoriteSavedView(
-                            row,
-                            favoriteViews.includes(row.view_id),
-                          )
-                        "
-                      >
-                        <OIcon
-                          :name="
-                            favoriteViews.includes(row.view_id)
-                              ? 'favorite'
-                              : 'favorite-border'
-                          "
-                          color="grey"
-                          size="xs"
-                        />
-                      </div>
-                      <div
-                        class="tw:flex tw:items-center tw:shrink-0"
-                        :data-test="`logs-search-bar-update-${value}-favorite-saved-view-btn`"
-                        @click.stop="handleUpdateSavedView(row)"
-                      >
-                        <OButton
-                          :title="t('common.edit')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                        >
-                          <OIcon name="edit" size="xs" />
-                        </OButton>
-                      </div>
-                      <div
-                        class="tw:flex tw:items-center tw:shrink-0"
-                        :data-test="`logs-search-bar-delete-${value}-favorite-saved-view-btn`"
-                        @click.stop="handleDeleteSavedView(row)"
-                      >
-                        <OButton
-                          :title="t('common.delete')"
-                          class="logs-saved-view-icon"
-                          variant="ghost"
-                          size="icon"
-                        >
-                          <OIcon name="delete" size="xs" />
-                        </OButton>
-                      </div>
-                    </div>
+                      <OIcon name="favorite" size="xs" />
+                    </OButton>
+                    <OButton
+                      :title="t('common.edit')"
+                      class="logs-saved-view-icon action-btn-hover"
+                      variant="ghost-neutral"
+                      size="icon-sm"
+                      :data-test="`logs-search-bar-update-${value}-favorite-saved-view-btn`"
+                      @click.stop="handleUpdateSavedView(row)"
+                    >
+                      <OIcon name="edit" size="xs" />
+                    </OButton>
+                    <OButton
+                      :title="t('common.delete')"
+                      class="logs-saved-view-icon action-btn-hover"
+                      variant="ghost-neutral"
+                      size="icon-sm"
+                      :data-test="`logs-search-bar-delete-${value}-favorite-saved-view-btn`"
+                      @click.stop="handleDeleteSavedView(row)"
+                    >
+                      <OIcon name="delete" size="xs" />
+                    </OButton>
                   </div>
                 </template>
               </OTable>
@@ -1885,6 +1842,14 @@ export default defineComponent({
         accessorKey: "view_name",
         sortable: false,
         meta: { align: "left" },
+      },
+      {
+        id: "actions",
+        header: "",
+        isAction: true,
+        sortable: false,
+        size: 30,
+        meta: { align: "right" },
       },
     ];
     const regionFilter = ref();
@@ -5294,6 +5259,33 @@ html.dark .file-type label,
 
 .o2-table-hide-header :deep(thead) {
   display: none;
+}
+
+.saved-view-table :deep(.action-btn-hover) {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.saved-view-table :deep(tr:hover .action-btn-hover) {
+  opacity: 1;
+}
+
+// Remove outer box border so both panels blend into the dialog background
+.saved-view-table :deep(.tw\:border) {
+  border: none;
+}
+
+// Remove row dividers, normalize cell background, and strip the auto-pin shadow
+// (isAction columns are auto-pinned right by OTable, which adds an inline box-shadow)
+.saved-view-table :deep(td) {
+  border-bottom: none;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+// Remove pagination top separator
+.saved-view-table :deep(.tw\:border-t) {
+  border-top: none;
 }
 
 // VRL disabled warning background — theme-aware via CSS cascade
