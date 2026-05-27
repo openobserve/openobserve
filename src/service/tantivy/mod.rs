@@ -57,7 +57,7 @@ pub(crate) async fn create_tantivy_index(
     };
 
     let dir = PuffinDirWriter::new();
-    let index = if thread_num > 0 && matches!(file_format, FileFormat::Parquet) {
+    let index = if thread_num > 1 && matches!(file_format, FileFormat::Parquet) {
         parallel::build_index(dir.clone(), buf, index_schema, thread_num).await?
     } else {
         sequential::build_index(dir.clone(), file_format, buf, index_schema).await?
