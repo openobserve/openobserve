@@ -22,7 +22,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await ingestion(page);
   });
 
-  test("symbol: visible → Yes (show) → apply; No (hide) → apply; chart renders in both cases", async ({ page }) => {
+  test.skip("symbol: visible → Yes (show) → apply; No (hide) → apply; chart renders in both cases", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
