@@ -174,6 +174,13 @@ class UnflattenedPage {
         await this.page
             .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
             .waitFor({ state: 'visible', timeout: 10000 });
+        // JSON content renders asynchronously after the drawer opens. Wait for
+        // at least one field key to appear before the caller probes specific fields.
+        await this.page
+            .locator('[data-test="log-detail-json-content"] [data-test^="log-expand-detail-key-"]')
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .catch(() => {});
     }
 
     /**
