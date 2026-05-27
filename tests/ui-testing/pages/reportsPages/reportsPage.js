@@ -382,15 +382,19 @@ export class ReportsPage {
   async pauseReport(reportName) {
     const btn = this.pauseStartReportBtn(reportName);
     await this.reportSearchInputField.fill(reportName);
-    const visible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
+    const visible = await btn.isVisible().catch(() => false);
 
     // Cross-cluster (super-cluster / SC) propagation race:
+    // Use URL navigation with explicit org_identifier to ensure the correct
+    // organization context (after SC login the default org may differ).
     if (!visible) {
+      const origin = new URL(this.page.url()).origin;
+      const reportsUrl = `${origin}/web/reports?org_identifier=${process.env["ORGNAME"]}`;
       await expect.poll(async () => {
-        await this.page.reload();
+        await this.page.goto(reportsUrl, { waitUntil: 'domcontentloaded' });
         await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
-        return await btn.isVisible({ timeout: 2000 }).catch(() => false);
+        return await btn.isVisible().catch(() => false);
       }, {
         intervals: [2000, 3000, 5000, 5000],
         timeout: 60000,
