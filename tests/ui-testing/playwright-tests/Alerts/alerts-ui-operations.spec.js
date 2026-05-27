@@ -39,7 +39,7 @@ test.describe("Alerts UI Operations", () => {
     testLogger.info('Created template', { templateName });
 
     const destinationName = 'auto_playwright_destination_' + suffix;
-    const slackUrl = "DEMO";
+    const slackUrl = "http://demo.com";
     await pm.alertDestinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
     testLogger.info('Created destination', { destinationName });
   });
@@ -192,7 +192,7 @@ test.describe("Alerts UI Operations", () => {
     testLogger.info('Template ready for use', { templateName });
 
     const destinationName = 'auto_playwright_destination_' + suffix;
-    const slackUrl = "DEMO";
+    const slackUrl = "http://demo.com";
     await pm.alertDestinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
     testLogger.info('Destination ready for use', { destinationName });
 

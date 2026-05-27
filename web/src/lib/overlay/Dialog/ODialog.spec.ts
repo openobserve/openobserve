@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ODialog from "./ODialog.vue";
+import { DialogContent } from "reka-ui";
 
 // Reka UI portals content into <body>. Stub the portal so content
 // is rendered inline for unit tests.
@@ -264,15 +265,24 @@ describe("ODialog", () => {
   });
 
   describe("Escape key behaviour", () => {
+    // reka-ui fires @escape-key-down via a document-level listener that does not
+    // run in jsdom. We simulate it by calling vm.$emit('escapeKeyDown', …) on the
+    // DialogContent component that owns the @escape-key-down handler.
+    function findDialogPanel(wrapper: ReturnType<typeof mount>) {
+      return wrapper
+        .findAllComponents(DialogContent)
+        .find((c) => c.attributes("data-o2-dialog") !== undefined)!;
+    }
+
     it("emits update:open=false when Escape is pressed (non-persistent)", async () => {
       const wrapper = mount(ODialog, {
         props: { open: true, title: "Test" },
       });
-      // reka-ui listens for Escape on the document, not the content element
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      const panel = findDialogPanel(wrapper);
+      await panel.vm.$emit(
+        "escapeKeyDown",
+        new KeyboardEvent("keydown", { key: "Escape" }),
       );
-      await nextTick();
       const emitted = wrapper.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted?.[0]).toEqual([false]);
@@ -282,8 +292,11 @@ describe("ODialog", () => {
       const wrapper = mount(ODialog, {
         props: { open: true, title: "Test", persistent: true },
       });
-      const content = wrapper.find("[data-o2-dialog]");
-      await content.trigger("keydown", { key: "Escape" });
+      const panel = findDialogPanel(wrapper);
+      await panel.vm.$emit(
+        "escapeKeyDown",
+        new KeyboardEvent("keydown", { key: "Escape" }),
+      );
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
   });

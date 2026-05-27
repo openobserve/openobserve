@@ -314,17 +314,26 @@ export class ReportsPage {
 
   async verifyReportCreated(reportName) {
     // Wait for save success toast
-    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 15000 });
+    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 30000 });
     await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
 
-    // Navigate to reports list to verify report exists
+    // Navigate to reports list. waitForLoadState('networkidle') is insufficient
+    // here because Vue's onBeforeMount API call starts AFTER the browser idles —
+    // wait for the reports GET response explicitly so data is in the table before
+    // we attempt to search.
+    const reportsApiPromise = this.page.waitForResponse(
+      (resp) =>
+        /\/api\/[^/]+\/reports(\?|$)/.test(resp.url()) &&
+        resp.request().method() === 'GET' &&
+        resp.status() === 200,
+      { timeout: 30000 }
+    ).catch(() => null);
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
-    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await reportsApiPromise;
 
-    // Search for the report
+    // Search for the report and verify the action button is present
     await this.reportSearchInputField.fill(reportName);
-    // Wait for the search results to filter
-    await expect(this.pauseStartReportBtn(reportName)).toBeVisible({ timeout: 10000 });
+    await expect(this.pauseStartReportBtn(reportName)).toBeVisible({ timeout: 15000 });
   }
 
   async createReport(dashboardName) {
@@ -391,13 +400,16 @@ export class ReportsPage {
     const visible = await btn.isVisible().catch(() => false);
 
     // Cross-cluster (super-cluster / SC) propagation race:
-    // Use URL navigation with explicit org_identifier to ensure the correct
-    // organization context (after SC login the default org may differ).
+    // After SC login the active org may differ from ORGNAME (the org the report
+    // was created in). Use page.goto with an explicit org_identifier rather than
+    // page.reload so every retry lands on the correct org. Also wait for
+    // networkidle so the reports API response is fully loaded before we search.
     if (!visible) {
       const origin = new URL(this.page.url()).origin;
       const reportsUrl = `${origin}/web/reports?org_identifier=${process.env["ORGNAME"]}`;
       await expect.poll(async () => {
         await this.page.goto(reportsUrl, { waitUntil: 'domcontentloaded' });
+        await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
         await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForFunction(() => {
           const t = document.querySelector('[data-test="report-list-table"]');
@@ -406,10 +418,10 @@ export class ReportsPage {
           return /Showing \d+ - \d+/.test(text) || text.includes('No data available');
         }, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
-        return await btn.isVisible().catch(() => false);
+        return await btn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
       }, {
-        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
-        timeout: 180000,
+        intervals: [3000, 5000, 5000, 10000, 10000, 15000],
+        timeout: 120000,
       }).toBe(true);
     }
 

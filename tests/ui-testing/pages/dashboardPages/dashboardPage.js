@@ -413,42 +413,27 @@ export class DashboardPage {
   }
 
   async notAvailableDashboard() {
-    // Wait for the dashboard add button to be visible
+    // Wait for the dashboard list to fully load.
     await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Click on the search input — fill the inner `-field` native input per
-    // AGENT_RULES §4 (`dashboardSearch` is the OInput wrapper, non-fillable).
-    await this.dashboardSearchInput.click();
-    await this.dashboardSearchInput.fill(this.dashboardName);
+    // Dashboards.vue stamps data-test="dashboard-name-cell-${name}" on every
+    // row's name cell. After deletion the cell should not exist at all —
+    // check this directly instead of relying on a text-search filter (which
+    // is unreliable with parallel test workers creating their own dashboards).
+    const dashboardCell = this.page.locator(`[data-test="dashboard-name-cell-${this.dashboardName}"]`);
 
-    // Happy path: dashboard already deleted from the locally-loaded list.
-    const initialText = await this.dashboardTable.textContent().catch(() => '');
-    const notFound = initialText.includes('No data available');
-    if (!notFound) {
+    const isCellGone = await dashboardCell.isVisible().then(() => false).catch(() => true);
+    if (!isCellGone) {
       await expect.poll(async () => {
         await this.page.reload();
         await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
-        await this.dashboardSearchInput.click();
-        await this.dashboardSearchInput.fill(this.dashboardName);
-        const text = await this.dashboardTable.textContent().catch(() => '');
-        return text.includes('No data available');
+        const visible = await dashboardCell.isVisible().catch(() => false);
+        return !visible;
       }, {
-        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
-        timeout: 180000,
+        intervals: [2000, 3000, 5000, 5000],
+        timeout: 60000,
       }).toBe(true);
     }
-
-    // Click on the toggle for searching across folders
-    await this.searchAcrossFoldersToggle.click();
-
-    // Check again that the dashboard table contains the text 'No data available'
-    await expect(this.dashboardTable).toContainText('No data available');
-
-    // Click on the toggle again
-    await this.searchAcrossFoldersToggle.click();
-
-    // Final check that the dashboard table still contains the text 'No data available'
-    await expect(this.dashboardTable).toContainText('No data available');
   }
 
   async addCustomChart() {

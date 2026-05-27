@@ -661,7 +661,7 @@ export class PipelinesPage {
             `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`
         ).first();
         await optionLocator.waitFor({ state: 'visible', timeout: 15000 });
-        await optionLocator.click();
+        await optionLocator.click({ force: true });
         await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
@@ -1149,10 +1149,16 @@ export class PipelinesPage {
     }
 
     async waitForPipelineSaved() {
+        let saved = false;
         await Promise.race([
-            this.pipelineSavedMessage.waitFor({ state: 'visible', timeout: 15000 }).catch(() => null),
-            this.page.waitForURL(/\/pipeline\/pipelines(\?|$)/, { timeout: 15000 }).catch(() => null),
+            this.pipelineSavedMessage.waitFor({ state: 'visible', timeout: 15000 })
+                .then(() => { saved = true; })
+                .catch(() => null),
+            this.page.waitForURL(/\/pipeline\/pipelines(\?|$)/, { timeout: 15000 })
+                .then(() => { saved = true; })
+                .catch(() => null),
         ]);
+        expect(saved, 'Pipeline save timed out — neither success toast nor URL transition to /pipeline/pipelines was observed within 15 s').toBe(true);
     }
 
     async exploreStreamAndNavigateToPipeline(streamName) {
@@ -1236,8 +1242,9 @@ export class PipelinesPage {
                 ).catch(() => null);
                 await this.page.reload().catch(() => {});
                 await reloadApi;
-                if (await this.pipelineListAllTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await this.pipelineListAllTab.click().catch(() => {});
+                const allTab = this.page.locator('[data-test="tab-all"]');
+                if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await allTab.click().catch(() => {});
                 }
                 await this.waitForPipelineListSettled(15000);
                 await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
@@ -1446,6 +1453,13 @@ export class PipelinesPage {
         // Delete is inside the more-options dropdown and is not in the DOM until opened.
         const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
 
+        // Apply the search filter up front so the initial visibility check works
+        // even when the unfiltered list spans many pipelines and the target row
+        // is off-screen or on a virtual page.
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await this.pipelineSearchInputField.fill('').catch(() => {});
+        await this.searchPipeline(pipelineName);
+
         // First quick check — when the row is already in the list we skip
         // the heavier poll-with-reload loop below entirely.
         const initialVisible = await editBtn.isVisible({ timeout: 5000 }).catch(() => false);
@@ -1457,7 +1471,7 @@ export class PipelinesPage {
             await expect.poll(async () => {
                 const apiPromise = this.page.waitForResponse(
                     (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
-                    { timeout: 20000 }
+                    { timeout: 5000 }
                 ).catch(() => null);
                 await this.page.reload().catch(() => {});
                 await apiPromise;
@@ -2051,11 +2065,27 @@ export class PipelinesPage {
         // Ensure no dialogs are blocking
         await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
+        // Give VueFlow time to finish laying out nodes after any preceding form close
+        await this.page.waitForTimeout(2000);
+
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
         await this.page.mouse.down();
         await this.pipelineNodeOutputInputHandle.hover({ force: true });
         await this.page.mouse.up();
         await this.page.waitForTimeout(1000);
+
+        // Verify edge was created; retry once if not
+        const edgeCount = await this.page.locator('.vue-flow__edge').count();
+        if (edgeCount < 1) {
+            testLogger.info('connectInputToOutput: no edge after first attempt, retrying');
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
+            await this.pipelineNodeInputOutputHandle.hover({ force: true });
+            await this.page.mouse.down();
+            await this.pipelineNodeOutputInputHandle.hover({ force: true });
+            await this.page.mouse.up();
+            await this.page.waitForTimeout(1000);
+        }
     }
 
     /**

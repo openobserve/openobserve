@@ -175,9 +175,12 @@ export class AlertManagement {
      * @param {string} alertName - Name of the alert to search for
      */
     async searchAlert(alertName) {
-        await this.page.locator(this.locators.alertSearchInput).click();
-        await this.page.locator(this.locators.alertSearchInput).fill('');
-        await this.page.locator(this.locators.alertSearchInput).fill(alertName.toLowerCase());
+        // OInput renders data-test on a wrapper div; the native <input> gets data-test="{parent}-field".
+        // Playwright can't fill a div — target the inner input and force to bypass hidden-input check.
+        const inputField = this.page.locator(this.locators.alertSearchInputField);
+        await inputField.waitFor({ state: 'attached', timeout: 10000 });
+        await inputField.fill('', { force: true });
+        await inputField.fill(alertName.toLowerCase(), { force: true });
         await this.page.waitForTimeout(2000);
 
         // Wait for either search results or no data message
@@ -211,9 +214,10 @@ export class AlertManagement {
         await this.page.locator(this.locators.searchAcrossFoldersToggle).locator('div').nth(1).click({ force: true });
         await this.page.waitForTimeout(500);
 
-        await this.page.locator(this.locators.alertSearchInput).click();
-        await this.page.locator(this.locators.alertSearchInput).fill('');
-        await this.page.locator(this.locators.alertSearchInput).fill(alertName);
+        const inputField = this.page.locator(this.locators.alertSearchInputField);
+        await inputField.waitFor({ state: 'attached', timeout: 10000 });
+        await inputField.fill('', { force: true });
+        await inputField.fill(alertName, { force: true });
         await this.page.waitForTimeout(2000);
 
         let deletedCount = 0;

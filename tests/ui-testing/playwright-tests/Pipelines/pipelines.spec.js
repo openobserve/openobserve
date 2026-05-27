@@ -481,9 +481,8 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
     await pipelinePage.selectLogs();
 
-    await pipelinePage.enterStreamName("e2e");
     await pipelinePage.enterStreamName("e2e_automate");
-    await pipelinePage.selectStreamOption();
+    await pipelinePage.selectStreamOptionByName("e2e_automate");
     await pipelinePage.saveInputNodeStream();
 
     // Delete auto-created output and add new destination
