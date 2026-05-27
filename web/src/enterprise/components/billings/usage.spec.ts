@@ -32,6 +32,7 @@ installQuasar({
 vi.mock("@/services/billings", () => ({
   default: {
     get_data_usage: vi.fn(),
+    list_billing_group_members: vi.fn(),
   },
 }));
 
@@ -93,6 +94,10 @@ describe("Usage Component", () => {
       }
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
+    // onMounted -> fetchBillingMembers (isCloud is "true" in test env via .env)
+    mockBillingService.list_billing_group_members.mockResolvedValue({
+      data: [],
+    });
 
     // Mock quasar notify
     mockNotify = vi.fn(() => vi.fn()); // Returns dismiss function
@@ -516,7 +521,8 @@ describe("Usage Component", () => {
     expect(mockBillingService.get_data_usage).toHaveBeenCalledWith(
       orgIdentifier,
       "30days",
-      "gb"
+      "gb",
+      undefined
     );
   });
 
@@ -679,5 +685,36 @@ describe("Usage Component", () => {
   // Test 55: Router access in component
   it("should have access to router", () => {
     expect(wrapper.vm.router).toBeDefined();
+  });
+
+  // Member organization selector (billing group)
+  describe("member organization selector", () => {
+    it("always offers the current-org option first with an empty value", () => {
+      expect(wrapper.vm.memberOptions[0].value).toBe("");
+    });
+
+    it("formats members as 'name | identifier'", async () => {
+      wrapper.vm.billingMembers = [{ id: "child-1", name: "Child One" }];
+      await nextTick();
+      const opt = wrapper.vm.memberOptions[1];
+      expect(opt.value).toBe("child-1");
+      expect(opt.label).toBe("Child One | child-1");
+    });
+
+    it("truncates member names longer than 20 chars", async () => {
+      wrapper.vm.billingMembers = [
+        { id: "child-2", name: "An Extremely Long Organization Name" },
+      ];
+      await nextTick();
+      expect(wrapper.vm.memberOptions[1].label).toBe(
+        "An Extremely Long Or... | child-2"
+      );
+    });
+
+    it("shows only the identifier when no member name is returned", async () => {
+      wrapper.vm.billingMembers = [{ id: "child-3", name: "" }];
+      await nextTick();
+      expect(wrapper.vm.memberOptions[1].label).toBe("child-3");
+    });
   });
 });

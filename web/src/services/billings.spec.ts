@@ -376,13 +376,128 @@ describe("Billings Service", () => {
 
       for (const dataType of dataTypes) {
         await billings.get_data_usage(mockOrgId, usageDate, dataType);
-        
+
         expect(mockHttp().get).toHaveBeenCalledWith(
           `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`
         );
       }
 
       expect(mockHttp().get).toHaveBeenCalledTimes(3);
+    });
+
+    it("should append member query param when a member org is provided", async () => {
+      const usageDate = "2024-01-01";
+      const dataType = "gb";
+      const member = "child-org";
+
+      mockHttp.mockReturnValue({
+        get: vi.fn().mockResolvedValue({ data: {} })
+      } as any);
+
+      await billings.get_data_usage(mockOrgId, usageDate, dataType, member);
+
+      expect(mockHttp().get).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}&member=${member}`
+      );
+    });
+
+    it("should not append member query param for empty member values", async () => {
+      const usageDate = "2024-01-01";
+      const dataType = "gb";
+
+      mockHttp.mockReturnValue({
+        get: vi.fn().mockResolvedValue({ data: {} })
+      } as any);
+
+      await billings.get_data_usage(mockOrgId, usageDate, dataType, "");
+
+      expect(mockHttp().get).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`
+      );
+    });
+  });
+
+  describe("billing group", () => {
+    it("list_billing_group_members should GET the members endpoint", async () => {
+      const mockResponse = { data: [{ member_org_id: "child-1" }] };
+      mockHttp.mockReturnValue({
+        get: vi.fn().mockResolvedValue(mockResponse)
+      } as any);
+
+      const result = await billings.list_billing_group_members(mockOrgId);
+
+      expect(mockHttp().get).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/members`
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it("get_billing_group_membership should GET the membership endpoint", async () => {
+      const mockResponse = { data: { membership: null } };
+      mockHttp.mockReturnValue({
+        get: vi.fn().mockResolvedValue(mockResponse)
+      } as any);
+
+      const result = await billings.get_billing_group_membership(mockOrgId);
+
+      expect(mockHttp().get).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/membership`
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it("list_billing_group_invites should GET the invites endpoint", async () => {
+      const mockResponse = { data: [] };
+      mockHttp.mockReturnValue({
+        get: vi.fn().mockResolvedValue(mockResponse)
+      } as any);
+
+      const result = await billings.list_billing_group_invites(mockOrgId);
+
+      expect(mockHttp().get).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/invites`
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it("send_billing_group_invite should POST the invitee org id in the body", async () => {
+      const inviteeOrgId = "invitee-org";
+      mockHttp.mockReturnValue({
+        post: vi.fn().mockResolvedValue({ data: "successfully invited" })
+      } as any);
+
+      await billings.send_billing_group_invite(mockOrgId, inviteeOrgId);
+
+      expect(mockHttp().post).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/invites`,
+        { org_id: inviteeOrgId }
+      );
+    });
+
+    it("accept_billing_group_invite should POST to the accept endpoint with the token", async () => {
+      const token = "invite-token-123";
+      mockHttp.mockReturnValue({
+        post: vi.fn().mockResolvedValue({ data: "accepted" })
+      } as any);
+
+      await billings.accept_billing_group_invite(mockOrgId, token);
+
+      expect(mockHttp().post).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/invites/${token}/accept`
+      );
+    });
+
+    it("reject_billing_group_invite should DELETE the reject endpoint with the token", async () => {
+      const token = "invite-token-456";
+      mockHttp.mockReturnValue({
+        delete: vi.fn().mockResolvedValue({ data: "rejected" })
+      } as any);
+
+      await billings.reject_billing_group_invite(mockOrgId, token);
+
+      expect(mockHttp().delete).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/invites/${token}/reject`
+      );
     });
   });
 
