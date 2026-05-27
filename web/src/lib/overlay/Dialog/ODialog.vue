@@ -283,6 +283,7 @@ watch(internalOpen, (open) => {
     <DialogPortal>
       <!-- Overlay / scrim -->
       <DialogOverlay
+        data-test="o-dialog-overlay"
         :class="[
           'tw:fixed tw:inset-0 tw:z-5999',
           'tw:bg-dialog-overlay',

@@ -2745,25 +2745,19 @@ export class LogsPage {
         await this.page.locator('[data-test="saved-views-list-dialog"]')
             .waitFor({ state: 'hidden', timeout: 3000 })
             .catch(() => {}); // dialog may not have been open — treat as no-op
+        // Wait for the Reka dialog backdrop overlay to fully detach BEFORE clicking
+        // the utilities menu — its fade-out animation intercepts pointer events.
+        await this.page.locator('[data-test="o-dialog-overlay"]')
+            .waitFor({ state: 'detached', timeout: 5000 })
+            .catch(() => {});
         const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
         const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isVisible) {
             await this.page.locator(this.utilitiesMenuButton).click();
             await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
-        await this.page.keyboard.press('Escape').catch(() => {});
-        // Wait for any dialog backdrop/overlay (the fixed inset overlay with data-state="open") to
-        // disappear — its 200ms fade-out animation intercepts pointer events until it's gone.
-        await this.page.waitForFunction(
-            () => !document.querySelector('[data-state="open"][aria-hidden="true"]'),
-            { timeout: 5000 }
-        ).catch(() => {});
-        const createMenuItem = this.page.locator(this.menuCreateSavedViewBtn);
-        await createMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await createMenuItem.waitFor({ state: 'visible', timeout: 5000 });
         // force:true bypasses pointer-event interception from sibling portals (e.g. FunctionSelector popper)
-        await createMenuItem.click({ force: true });
+        await createSavedViewBtn.click({ force: true });
         await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
     }
 
