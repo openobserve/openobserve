@@ -168,6 +168,11 @@ pub async fn invite(
         return HttpResponse::bad_request(format!("billing group is not enabled for this org"));
     }
 
+    let org_info = crate::service::organization::get_org(&req.org_id).await;
+    if org_info.is_none() {
+        return HttpResponse::bad_request(format!("org with org_id {} does not exist", req.org_id));
+    }
+
     if let Err(e) = billing_invites::invite_org(&user, &org_id, &req.org_id).await {
         return HttpResponse::bad_request(format!("error in creating invite: {e}"));
     }
