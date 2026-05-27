@@ -2750,7 +2750,7 @@ export class LogsPage {
         const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
         const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
+            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
             await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
         await createSavedViewBtn.click();
@@ -2917,7 +2917,7 @@ export class LogsPage {
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.locator(`[data-test="logs-search-bar-dialog-saved-view-row-${text}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -5040,6 +5040,7 @@ export class LogsPage {
             }
         };
         this.page.on('request', observer);
+        this._queryTriggerTime = Date.now();
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
         try {
             await this.page.waitForFunction(() => true, { timeout: 1 }).catch(() => {});
@@ -5054,8 +5055,11 @@ export class LogsPage {
     }
 
     async verifyAPICallCounts(allRequests, requestHandler) {
-        // Filter recent requests made after cmd+enter
-        const recentRequests = allRequests.filter(req => Date.now() - req.timestamp < 5000);
+        // Filter requests that arrived after cmd+enter was pressed.
+        // Using a fixed 5 s window from "now" is wrong — waitForLoadState can
+        // take up to 10 s, pushing the captured timestamps past the 5 s cutoff.
+        const cutoff = this._queryTriggerTime || (Date.now() - 30000);
+        const recentRequests = allRequests.filter(req => req.timestamp >= cutoff);
 
         // Histogram calls have size: 0, regular search calls have size > 0 (typically 51)
         const searchCalls = recentRequests.filter(req =>

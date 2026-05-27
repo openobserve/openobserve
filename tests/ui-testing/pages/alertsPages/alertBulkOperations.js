@@ -187,7 +187,7 @@ export class AlertBulkOperations {
         // between the click and the toast check — it would burn the toast's lifetime.
         await this.page.locator(this.locators.moveButton).click();
 
-        await expect(this.page.getByText(this.locators.alertsMovedMessage)).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertsMovedMessage })).toBeVisible({ timeout: 15000 });
         testLogger.info('Move operation confirmed via success message');
 
         // Wait for UI to update
@@ -324,7 +324,7 @@ export class AlertBulkOperations {
 
         await this.page.getByText('Delete', { exact: true }).click();
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.alertDeletedMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertDeletedMessage })).toBeVisible();
         await this.page.waitForTimeout(1000);
     }
 }

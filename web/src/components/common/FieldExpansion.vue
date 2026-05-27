@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OFieldRow
         :data-test="`log-search-expand-${field.name}-field-btn`"
+        :highlight="isFieldSelected"
       >
         <span class="field-type-container">
           <OIcon
@@ -51,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon"
           @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
         >
-          <OIcon :name="field.isInterestingField ? 'info' : 'info-outline'" size="sm" />
+          <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
         </OButton>
 
         <template #actions>
@@ -97,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
           >
-            <OIcon :name="field.isInterestingField ? 'info' : 'info-outline'" size="sm" />
+            <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
           </OButton>
         </template>
       </OFieldRow>

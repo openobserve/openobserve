@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :target="target"
     :class="[
       'nav-menu-item',
-      'tw:group tw:block tw:![text-decoration:none] tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:border tw:border-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
-      isDark ? 'tw:hover:bg-[rgba(89,155,174,0.15)]' : 'tw:hover:bg-primary-100',
+      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:border-l-2 tw:border-l-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      'tw:text-tabs-inactive-text tw:hover:bg-tabs-hover-bg tw:hover:text-tabs-active-text',
       { 'menu-link-function': title === 'Functions' }
     ]"
     :aria-current="isActive ? 'page' : undefined"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
       <div
         class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
-        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >
         <OIcon
           :name="icon"
@@ -51,13 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
-        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
       <div
         class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
-        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >
         <component
           :is="iconComponent"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
-        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
   </a>
@@ -91,10 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="[
       'nav-menu-item',
-      'tw:group tw:block tw:![text-decoration:none] tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:border tw:border-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:border-l-2 tw:border-l-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
       isActive
-        ? isDark ? 'tw:bg-[rgba(89,155,174,0.45)] tw:!border-[rgba(89,155,174,0.60)]' : 'tw:bg-primary-200 tw:!border-primary-300'
-        : isDark ? 'tw:hover:bg-[rgba(89,155,174,0.15)]' : 'tw:hover:bg-primary-100',
+        ? 'tw:bg-tabs-active-bg tw:text-tabs-active-text tw:border-l-tabs-indicator!'
+        : 'tw:text-tabs-inactive-text tw:hover:bg-tabs-hover-bg tw:hover:text-tabs-active-text',
       { 'nav-menu-item--active': isActive, 'menu-link-function': title === 'Functions' }
     ]"
     :target="target"
@@ -105,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
         :class="[
-          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600',
-          isActive ? (isDark ? 'tw:!text-white' : 'tw:!text-primary-600') : ''
+          'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text',
+          isActive ? 'tw:text-tabs-active-text!' : ''
         ]"
       >
         <OIcon
@@ -125,8 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
         :class="[
-          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700',
-          isActive ? (isDark ? 'tw:font-semibold tw:!text-white' : 'tw:font-semibold tw:!text-primary-700') : 'tw:font-normal'
+          'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text',
+          isActive ? 'tw:font-semibold tw:text-tabs-active-text!' : 'tw:font-normal'
         ]"
       >{{ title }}</div>
     </div>
@@ -134,8 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
         :class="[
-          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600',
-          isActive ? (isDark ? 'tw:!text-white' : 'tw:!text-primary-600') : ''
+          'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text',
+          isActive ? 'tw:text-tabs-active-text!' : ''
         ]"
       >
         <component
@@ -154,8 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
         :class="[
-          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700',
-          isActive ? (isDark ? 'tw:font-semibold tw:!text-white' : 'tw:font-semibold tw:!text-primary-700') : 'tw:font-normal'
+          'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text',
+          isActive ? 'tw:font-semibold tw:text-tabs-active-text!' : 'tw:font-normal'
         ]"
       >{{ title }}</div>
     </div>
@@ -249,14 +249,11 @@ export default defineComponent({
       return label;
     });
 
-    const isDark = computed(() => store.state.theme === 'dark');
-
     return {
       store,
       router,
       openWebPage,
       isActive,
-      isDark,
       ariaLabel,
     };
   },

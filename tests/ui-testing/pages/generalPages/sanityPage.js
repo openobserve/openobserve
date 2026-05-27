@@ -100,9 +100,9 @@ export class SanityPage {
         this.streamNameInputField = page.locator('[data-test="add-stream-name-input-field"]');
         this.streamTypeDropdown = page.locator('[data-test="add-stream-type-input"]');
         this.streamTypeLogsOption = page.locator('[data-test="add-stream-type-input-option"][data-test-value="logs"]');
-        // AddStream.vue uses an inline OButton inside its OForm — not the ODrawer
-        // built-in primary footer button — so it exposes its own `add-stream-save-btn`.
-        this.saveStreamButton = page.locator('[data-test="add-stream-save-btn"]');
+        // AddStream.vue uses ODrawer (isInPipeline=false on the Streams page).
+        // The save action is the ODrawer built-in primary footer button.
+        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]');
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).
@@ -235,17 +235,34 @@ export class SanityPage {
     // Histogram Methods
     // ================================================================
     async clickHistogramToggle() {
-        // Histogram toggle is now inside the utilities hamburger menu
-        await this.histogramToggleButton.click();
+        // Histogram toggle is inside the utilities ODropdown in SearchBar.vue.
+        // Must open the menu first before the OSwitch element exists in the DOM.
+        const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+        const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isMenuItemVisible) {
+            await this.utilitiesMenuButton.click();
+            await menuHistogramBtn.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await menuHistogramBtn.click();
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(100);
     }
 
     // Returns true when the histogram OSwitch is currently ON.
     // OSwitch surfaces its state via a nested `role="switch"` element carrying
-    // `aria-checked="true|false"` — query that rather than the wrapper div.
+    // `aria-checked="true|false"` — opens the utilities menu to read the state,
+    // then closes it without triggering a toggle.
     async isHistogramOn() {
-        await this.histogramToggleButton.waitFor({ state: 'visible', timeout: 15000 });
+        const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+        const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isMenuItemVisible) {
+            await this.utilitiesMenuButton.click();
+            await this.histogramToggleButton.waitFor({ state: 'visible', timeout: 5000 });
+        }
         const switchControl = this.histogramToggleButton.locator('[role="switch"]');
         const aria = await switchControl.getAttribute('aria-checked');
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(100);
         return aria === 'true';
     }
 
@@ -256,8 +273,10 @@ export class SanityPage {
     async ensureHistogramOn() {
         if (!(await this.isHistogramOn())) {
             await this.clickHistogramToggle();
-            await expect(this.histogramToggleButton.locator('[role="switch"]'))
-                .toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+            // Re-open menu to verify the switch is now on (dropdown closed after the toggle click)
+            if (!(await this.isHistogramOn())) {
+                throw new Error('Failed to enable histogram toggle');
+            }
         }
     }
 
@@ -328,29 +347,23 @@ export class SanityPage {
         await this.refreshButton.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Check if VRL editor is visible, if not try to enable it via toggle
-        if (await this.fnEditor.count() === 0) {
-            if (await this.vrlToggleButton.count() > 0 && await this.vrlToggleButton.isVisible()) {
-                await this.vrlToggleButton.click({ force: true });
-                await this.page.waitForLoadState('domcontentloaded');
+        // Ensure VRL function editor pane is visible.
+        // The toggle is an OSwitch inside the "More" utilities dropdown — open the menu first.
+        if (!(await this.fnEditor.first().isVisible().catch(() => false))) {
+            const transformEditorMenuItem = this.page.locator('[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]');
+            const isMenuItemVisible = await transformEditorMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+            if (!isMenuItemVisible) {
+                await this.utilitiesMenuButton.click();
+                await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 });
             }
+            await transformEditorMenuItem.click();
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(100);
         }
 
-        try {
-            await expect(this.fnEditor.first()).toBeVisible({ timeout: 5000 });
-            await this.page.waitForLoadState('domcontentloaded');
-            await this.fnEditor.first().click({ force: true });
-        } catch (error) {
-            // Monaco editor not visible, try clicking toggle button
-            testLogger.warn('Monaco editor not visible, trying toggle button');
-            if (await this.vrlToggleButton.count() > 0) {
-                await this.vrlToggleButton.click({ force: true });
-                await expect(this.fnEditor.first()).toBeVisible({ timeout: 10000 });
-                await this.fnEditor.first().click({ force: true });
-            } else {
-                throw error;
-            }
-        }
+        await expect(this.fnEditor.first()).toBeVisible({ timeout: 10000 });
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.fnEditor.first().click({ force: true });
 
         // Type into the Monaco editor via keyboard after focusing it.
         await this.fnEditor.first().click({ force: true });
@@ -988,8 +1001,15 @@ export class SanityPage {
         const isFnEditorVisible = await this.fnEditor.first().isVisible();
 
         if (!isFnEditorVisible) {
-            // Click VRL toggle button only if editor is not displayed
-            await this.vrlToggleButton.click();
+            // Toggle is inside the "More" utilities dropdown — open menu first.
+            const transformEditorMenuItem = this.page.locator('[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]');
+            const isMenuItemVisible = await transformEditorMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+            if (!isMenuItemVisible) {
+                await this.utilitiesMenuButton.click();
+                await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+            }
+            await transformEditorMenuItem.click();
+            await this.page.keyboard.press('Escape');
 
             // Wait for VRL editor to appear after toggle
             await expect(this.fnEditor.first()).toBeVisible({ timeout: 15000 });

@@ -231,21 +231,27 @@ export class ServicesCatalogPage {
   async filterByServiceName(text) {
     await this.filterInputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
     await this.filterInputField.fill(text);
-    // OInput :debounce="300" — poll until the filterText debounce has settled
-    // by reading the input value back and confirming the value reflects the
-    // typed text. The debounce only delays the v-model write; the native
-    // <input> reflects the value immediately, but the filtered table needs
-    // the 300ms window. We wait for the input to report the value AND for
-    // the table to repaint by waiting on the first service link OR empty state.
+    // Confirm the native input value reflects the typed text.
     await expect.poll(
       async () => await this.filterInputField.inputValue(),
       { timeout: 5000, intervals: [50, 100, 200] },
     ).toBe(text);
-    // After debounce, the filtered table converges — either we have rows or empty state.
-    await Promise.race([
-      this.firstServiceLink.waitFor({ state: 'attached', timeout: 2000 }),
-      this.emptyState.waitFor({ state: 'attached', timeout: 2000 }),
-    ]).catch(() => {});
+    // Wait for OInput's 300ms debounce to fire AND the filtered table to settle.
+    // We cannot just wait for firstServiceLink to be attached — it was already
+    // attached before the filter was applied, so that Promise.race resolves
+    // immediately and the unfiltered rows are still visible.
+    // Instead, poll until all visible service-name cells contain the filter text
+    // (filter applied with matches) OR no cells are visible (filter applied, 0 matches).
+    await expect.poll(
+      async () => {
+        const names = await this.allServiceLinks.allTextContents();
+        // 0 rows means the filter has applied and there are no matches — settled.
+        if (names.length === 0) return true;
+        // All rows contain the filter text — filter has settled with matches.
+        return names.every((n) => n.toLowerCase().includes(text.toLowerCase()));
+      },
+      { timeout: 5000, intervals: [100, 200, 300] },
+    ).toBeTruthy();
   }
 
   async getFilterInputLocator() {
@@ -381,7 +387,16 @@ export class ServicesCatalogPage {
   }
 
   async getVisibleServiceNames() {
-    return await this.allServiceLinks.allTextContents();
+    // Use the inner service-name span (data-test="trace-row-service-name") for clean
+    // text without trailing whitespace or icon alt-text from the outer link element.
+    const nameSpans = this.page.locator(
+      `[data-test^="${this.serviceLinkPrefix}"] [data-test="trace-row-service-name"]`,
+    );
+    const spanCount = await nameSpans.count();
+    if (spanCount > 0) {
+      return (await nameSpans.allTextContents()).map((n) => (n || '').trim());
+    }
+    return (await this.allServiceLinks.allTextContents()).map((n) => (n || '').trim());
   }
 
   async getServiceCellText(serviceName) {

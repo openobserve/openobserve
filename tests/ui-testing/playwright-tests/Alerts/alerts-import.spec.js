@@ -82,15 +82,17 @@ test.describe("Alerts Import/Export", () => {
 
     // Wait for alert to register in the system before triggering — poll the alerts
     // list endpoint until our alert appears with status active. Replaces fixed 30s wait.
+    // Uses v2 API which is the current endpoint; getOrgIdentifier() handles both cloud and self-hosted.
+    const orgId = getOrgIdentifier() || process.env.ORGNAME || 'default';
     await expect.poll(
       async () => {
         const resp = await page.request.get(
-          `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/api/${process.env.ORGNAME || 'default'}/alerts`,
+          `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/api/v2/${orgId}/alerts`,
           { failOnStatusCode: false }
         ).catch(() => null);
         if (!resp || !resp.ok()) return false;
         const body = await resp.json().catch(() => null);
-        const list = Array.isArray(body?.list) ? body.list : (Array.isArray(body) ? body : []);
+        const list = Array.isArray(body?.list) ? body.list : (Array.isArray(body?.alerts) ? body.alerts : (Array.isArray(body) ? body : []));
         return list.some(a => (a?.name === alertName) || (a?.alert?.name === alertName));
       },
       { intervals: [2000, 3000, 5000, 5000, 5000, 5000, 5000], timeout: ALERT_REGISTRATION_WAIT_MS }
