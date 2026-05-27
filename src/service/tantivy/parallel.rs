@@ -87,6 +87,20 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
         return Ok(None);
     }
 
+    // single row_group fast path
+    if num_row_groups == 1 {
+        let start = std::time::Instant::now();
+        let (_, index, num_rows) = tokio::task::spawn_blocking(move || {
+            build_row_group_segment(0, buf, index_schema, tantivy_dir)
+        })
+        .await??;
+        log::info!(
+            "parallel::build_index: single row_group fast path, rows={num_rows}, elapsed={} ms",
+            start.elapsed().as_millis()
+        );
+        return Ok(Some(index));
+    }
+
     let thread_num = thread_num.max(1).min(num_row_groups);
     let semaphore = Arc::new(tokio::sync::Semaphore::new(thread_num));
 
@@ -98,7 +112,8 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
         let index_schema_c = index_schema.clone();
         tasks.push(tokio::task::spawn_blocking(move || {
             let _permit = permit;
-            build_row_group_segment(rg_idx, buf_c, index_schema_c)
+            let dir = MmapDirectory::create_from_tempdir()?;
+            build_row_group_segment(rg_idx, buf_c, index_schema_c, dir)
         }));
     }
 
@@ -146,52 +161,41 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
     Ok(Some(merged))
 }
 
-/// Synchronously builds the tantivy segment for exactly one parquet row_group.
+/// Synchronously builds the tantivy segment for exactly one parquet row_group
+/// into the caller-supplied directory.
 /// Return: (row_group_index, per-row_group Index, row_count)
-fn build_row_group_segment(
+fn build_row_group_segment<D: tantivy::Directory>(
     rg_idx: usize,
     buf: Bytes,
     index_schema: TantivyIndexSchema,
+    dir: D,
 ) -> Result<(usize, tantivy::Index, usize), Error> {
-    let builder = ParquetRecordBatchReaderBuilder::try_new(buf)
-        .with_context(|| format!("worker {rg_idx}: open parquet"))?;
-    let reader = builder
-        .with_row_groups(vec![rg_idx])
-        .build()
-        .with_context(|| format!("worker {rg_idx}: build row_group reader"))?;
+    let builder = ParquetRecordBatchReaderBuilder::try_new(buf)?;
+    let reader = builder.with_row_groups(vec![rg_idx]).build()?;
 
-    // The `TempDir` handle is owned by the directory, so
-    // when the directory (and the merged `Index` referencing it)
-    // is dropped, the tempdir is cleaned up automatically.
-    let dir = MmapDirectory::create_from_tempdir()
-        .with_context(|| format!("worker {rg_idx}: create tempdir-backed mmap directory"))?;
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let mut writer = tantivy::IndexBuilder::new()
         .schema(index_schema.schema.clone())
         .tokenizers(tokenizer_manager)
-        .single_segment_index_writer::<tantivy::TantivyDocument>(dir, 50_000_000)
-        .with_context(|| format!("worker {rg_idx}: create index writer"))?;
+        .single_segment_index_writer::<tantivy::TantivyDocument>(dir, 50_000_000)?;
 
     let mut rg_rows: usize = 0;
     for batch_res in reader {
-        let batch =
-            batch_res.with_context(|| format!("worker {rg_idx}: read batch from row_group"))?;
+        let batch = batch_res?;
         if batch.num_rows() == 0 {
             continue;
         }
         rg_rows += batch.num_rows();
         let docs = convert_batch_to_docs_sync(&batch, &index_schema);
         for doc in docs {
-            writer
-                .add_document(doc)
-                .with_context(|| format!("worker {rg_idx}: add_document"))?;
+            writer.add_document(doc)?;
         }
     }
 
     let index = writer
         .finalize()
-        .with_context(|| format!("worker {rg_idx}: finalize"))?;
+        .map_err(|e| anyhow::anyhow!("worker {rg_idx}: finalize failed: {e}"))?;
 
     Ok((rg_idx, index, rg_rows))
 }
@@ -347,6 +351,54 @@ mod tests {
                 addr.doc_id as usize, row,
                 "INVARIANT VIOLATION: doc_id != row_index at row {row}"
             );
+        }
+    }
+
+    /// Single row_group hits the fast path that bypasses `merge_indices` and
+    /// writes the segment straight into the caller-supplied directory.
+    /// Validates that the resulting index lands in `tantivy_dir` and that
+    /// `doc_id == row_index` is preserved.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_row_group_parallel_single_row_group_fast_path() {
+        let rg0 = vec![create_marker_batch(0, 321)];
+        let total_rows = 321;
+        let buf = create_test_parquet_bytes_multi_rg(vec![rg0]).await;
+
+        let stream_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("marker", DataType::Utf8, false),
+        ]));
+
+        let index = build_index(
+            RamDirectory::create(),
+            buf,
+            make_index_schema(&[], &["marker".to_string()], &stream_schema),
+            4,
+        )
+        .await
+        .expect("single row_group build must succeed")
+        .expect("single row_group build must return Some(index)");
+
+        let segs = index.searchable_segments().unwrap();
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
+
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        let marker_field = index.schema().get_field("marker").unwrap();
+        for row in 0..total_rows {
+            let m = format!("row{:09}", row);
+            let q = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(marker_field, &m),
+                tantivy::schema::IndexRecordOption::Basic,
+            );
+            let hits = searcher
+                .search(&q, &tantivy::collector::DocSetCollector)
+                .unwrap();
+            assert_eq!(hits.len(), 1);
+            let addr = *hits.iter().next().unwrap();
+            assert_eq!(addr.segment_ord, 0);
+            assert_eq!(addr.doc_id as usize, row);
         }
     }
 
