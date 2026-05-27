@@ -18,7 +18,7 @@ use std::sync::Arc;
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use arrow::array::RecordBatch;
 use bytes::Bytes;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     FileFormat, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -115,34 +115,7 @@ pub async fn generate_job_by_stream(
 
     // format to hour with zero minutes, seconds
     let offset = offset - offset % hour_micros(1);
-
-    let cfg = get_config();
-    // check offset
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    // must wait for at least 3 * max_file_retention_time
-    // -- first period: the last hour local file upload to storage, write file list
-    // -- second period, the last hour file list upload to storage
-    // -- third period, we can do the merge, so, at least 3 times of
-    // max_file_retention_time
-    if offset >= time_now_hour
-        || time_now.timestamp_micros() - offset
-            <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-                * 3
-    {
+    if !super::is_past_hour(offset) {
         return Ok(()); // the time is future, just wait
     }
 
@@ -417,6 +390,13 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
+    // A job whose offset hour has not yet fully passed is an incremental round on the
+    // still-open current hour (enqueued by the ingester, see service::compact::incremental):
+    // only seal full-size groups and carry the remainder, so each file is merged into a
+    // sealed output exactly once. The scheduled hour-end pass seals whatever is left.
+    let offset = offset - offset % hour_micros(1);
+    let is_incremental = !super::is_past_hour(offset);
+
     // check offset
     let partition_time_level = get_partition_time_level(stream_type);
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
@@ -538,7 +518,12 @@ pub async fn merge_by_stream(
                     new_file_size += file.meta.original_size;
                     new_file_list.push(file.clone());
                 }
-                if new_file_list.len() > 1 {
+                // The trailing batch is always below max_file_size (the loop flushes a group
+                // only when adding the next file would exceed it). In incremental mode we do
+                // NOT seal this remainder: more files will arrive in the still-open hour, and
+                // sealing now would force re-merging it later (write amplification). Carry it
+                // to the next round; the scheduled hour-end pass seals whatever is left.
+                if new_file_list.len() > 1 && !is_incremental {
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
                         org_id: org_id.clone(),

@@ -19,7 +19,7 @@ use axum::{
     http::HeaderMap,
     response::Response,
 };
-use config::SIZE_IN_MB;
+use config::{SIZE_IN_MB, utils::schema::format_stream_name};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -71,6 +71,30 @@ pub async fn save_enrichment_table(
 
     if let Some(msg) = bad_req_msg {
         return MetaHttpResponse::bad_request(msg);
+    }
+
+    // Format the table name to normalize it (lowercase, replace special chars)
+    let table_name = format_stream_name(table_name.trim().to_string());
+
+    // Reject if a URL enrichment already exists with this name
+    // to prevent cross-type silent overwrite
+    {
+        use config::meta::stream::StreamType;
+
+        use crate::{
+            common::infra::config::ENRICHMENT_TABLES,
+            service::db::enrichment_table::get_url_jobs_for_table,
+        };
+
+        let key = format!("{org_id}/{}/{}", StreamType::EnrichmentTables, table_name);
+        if ENRICHMENT_TABLES.contains_key(&key)
+            && let Ok(jobs) = get_url_jobs_for_table(&org_id, &table_name).await
+            && !jobs.is_empty()
+        {
+            return MetaHttpResponse::bad_request(format!(
+                "Enrichment table [{table_name}] already exists as a URL enrichment. Use the URL enrichment API to update it."
+            ));
+        }
     }
 
     let content_type = headers.get("content-type");
@@ -272,6 +296,9 @@ pub async fn save_enrichment_table_from_url(
         }
     }
 
+    // Format the table name to normalize it (lowercase, replace special chars)
+    let table_name = format_stream_name(table_name.trim().to_string());
+
     // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
     // Fetch all existing jobs for this table
     let existing_jobs = match get_url_jobs_for_table(&org_id, &table_name).await {
@@ -286,6 +313,23 @@ pub async fn save_enrichment_table_from_url(
             return MetaHttpResponse::internal_error("Failed to check job status");
         }
     };
+
+    // Reject if a file upload enrichment already exists with this name
+    // to prevent cross-type silent overwrite. A file upload enrichment has
+    // data in ENRICHMENT_TABLES but no URL jobs. If the table exists in the
+    // cache but there are no URL jobs, it must be a file upload enrichment.
+    {
+        use config::meta::stream::StreamType;
+
+        use crate::common::infra::config::ENRICHMENT_TABLES;
+
+        let key = format!("{org_id}/{}/{}", StreamType::EnrichmentTables, table_name);
+        if ENRICHMENT_TABLES.contains_key(&key) && existing_jobs.is_empty() {
+            return MetaHttpResponse::bad_request(format!(
+                "Enrichment table [{table_name}] already exists as a file upload enrichment. Use the file upload API to update it."
+            ));
+        }
+    }
 
     // Check job statuses
     let has_processing = existing_jobs
