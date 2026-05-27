@@ -131,16 +131,13 @@ mod tests {
         array::{RecordBatch, StringArray},
         datatypes::{DataType, Field, Schema},
     };
-    use config::utils::parquet::RecordBatchStream;
-    use futures::stream;
     use tantivy::directory::RamDirectory;
 
     use super::*;
-    use crate::service::tantivy::generate_tantivy_index;
-
-    fn batches_to_stream(batches: Vec<RecordBatch>) -> RecordBatchStream {
-        Box::pin(stream::iter(batches.into_iter().map(Ok)))
-    }
+    use crate::service::tantivy::{
+        sequential::build_index,
+        tests::{create_test_parquet_bytes, make_index_schema},
+    };
 
     /// Build a real in-memory tantivy index from a single record batch and
     /// then verify the bloom we extract round-trips term membership.
@@ -169,18 +166,20 @@ mod tests {
         .unwrap();
 
         let dir = RamDirectory::create();
-        let reader = batches_to_stream(vec![batch]);
-
-        let index = generate_tantivy_index(
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+        let index = build_index(
             dir,
-            reader,
-            &[],
-            &[
-                "trace_id".to_string(),
-                "user_id".to_string(),
-                "level".to_string(),
-            ],
-            schema,
+            config::FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &[],
+                &[
+                    "trace_id".to_string(),
+                    "user_id".to_string(),
+                    "level".to_string(),
+                ],
+                &schema,
+            ),
         )
         .await
         .unwrap()
@@ -259,11 +258,16 @@ mod tests {
         let batch =
             RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(vec!["x"]))])
                 .unwrap();
-        let reader = batches_to_stream(vec![batch]);
-        let index = generate_tantivy_index(dir, reader, &[], &["f".to_string()], schema)
-            .await
-            .unwrap()
-            .unwrap();
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+        let index = build_index(
+            dir,
+            config::FileFormat::Parquet,
+            buf,
+            make_index_schema(&[], &["f".to_string()], &schema),
+        )
+        .await
+        .unwrap()
+        .unwrap();
         let blooms = build_blooms_from_index(&index, 1, &[], 256).await.unwrap();
         assert!(blooms.is_empty());
     }

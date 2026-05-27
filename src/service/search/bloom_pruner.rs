@@ -233,8 +233,9 @@ pub async fn prune(
 
     // Also fold "checked successfully but some predicate had no info" — those
     // files default to keep. We track this by recording which (file_idx, pred_idx)
-    // pairs had at least one block_range_for hit. If a pair has no hits at all
-    // for any of its values, we treat that predicate as "unknown" → keep file.
+    // pairs produced at least one checked block (i.e. `row_range` resolved a row
+    // and the file had a column in it). If a pair has no checked block at all for
+    // any of its values, we treat that predicate as "unknown" → keep file.
     let mut has_info: HashMap<usize, Vec<bool>> = HashMap::new();
     for (_, result) in &results {
         if let GroupResult::Ok(outcomes) = result {

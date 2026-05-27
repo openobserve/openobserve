@@ -1378,7 +1378,9 @@ pub async fn update_fields_type(
 /// so we must use get_stream_setting_fts_fields() and get_stream_setting_index_fields()
 /// to get the complete list including defaults.
 ///
-/// Note: Bloom Filter is independent and can coexist with either FTS or Secondary Index
+/// Note: Bloom Filter fields are not checked here — they are required to also
+/// be Secondary Index fields (folded into index_fields at update time), so they
+/// are governed by the same FTS-vs-Index exclusivity as any index field.
 fn validate_index_field_conflicts(
     current_settings: &config::meta::stream::StreamSettings,
     new_settings: &config::meta::stream::UpdateStreamSettings,

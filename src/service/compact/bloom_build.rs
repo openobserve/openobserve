@@ -15,19 +15,18 @@
 
 //! Bloom filter build + orphan cleanup for the compactor.
 //!
-//! Two entry points, both driven by the caller's choice of file set:
+//! One public entry point, [`build_for_stream`], called once per hour bucket
+//! at the end of a merge round. It does two things in order:
 //!
-//! - [`build_for_stream`] takes an explicit list of `file_list` ids and builds `.bf` coverage for
-//!   those of them still at `bloom_ver = 0`. The merge path passes its fresh merge-output ids; the
-//!   dump path passes the `bloom_ver = 0` stragglers it's about to archive. Either way the build
-//!   logic is identical — the caller owns the "which files" decision, this module owns the "how to
-//!   bloom" mechanics.
-//! - [`cleanup_orphan_blooms`] takes the `bloom_ver` values of files a merge round just deleted and
-//!   retires any `.bf` no longer referenced by a live row in the bucket.
+//! 1. **Orphan cleanup.** Given the `bloom_ver` values of the files this merge round just deleted,
+//!    [`cleanup_orphan_blooms`] retires any `.bf` no longer referenced by a live row in the bucket.
+//! 2. **Build.** It queries the bucket itself (`query_for_bloom` → rows with `index_size > 0` and
+//!    `bloom_ver = 0`) and builds `.bf` coverage for those files. The caller does not pass a file
+//!    list; this module owns both the "which files" and the "how to bloom" decisions.
 //!
-//! `bloom_ver` is no longer append-only: a merge produces new output files
-//! with a fresh `bloom_ver` and deletes the small inputs, so an old `.bf`
-//! whose every file got merged away becomes an orphan. Cleanup catches it.
+//! `bloom_ver` is not append-only: a merge produces new output files with a
+//! fresh `bloom_ver` and deletes the small inputs, so an old `.bf` whose every
+//! file got merged away becomes an orphan — step 1 catches it.
 //!
 //! Failure is **always non-fatal**. A failed build leaves `bloom_ver = 0`
 //! on the affected files and the search side falls back to opening every
@@ -58,17 +57,19 @@ use crate::service::{
     search::grpc::storage::get_tantivy_directory, tantivy::bloom_builder::build_blooms_from_index,
 };
 
-/// Build `.bf` coverage for the `bloom_ver = 0` files among `file_ids`,
-/// inside one (stream, `date_key`) bucket.
+/// Clean orphan `.bf`s for `orphan_blooms`, then build `.bf` coverage for the
+/// bucket's `bloom_ver = 0` files (queried internally via `query_for_bloom`).
 ///
 /// `date_key` is the `YYYY/MM/DD/HH` string used in `file_list.date`.
-/// Files already carrying a non-zero `bloom_ver` are skipped —
-/// we never re-stamp a blessed row, so no live file ever migrates off a
-/// `bloom_ver` that a dumped row may still point to.
+/// `orphan_blooms` is the `bloom_ver` values of the files the merge round just
+/// deleted — used only for cleanup. Files already carrying a non-zero
+/// `bloom_ver` are never re-stamped, so no live file migrates off a `bloom_ver`
+/// that a dumped row may still point to.
 ///
-/// Returns `Ok(())` even when no bloom is built (no target fields, nothing
-/// at `bloom_ver = 0`, recoverable per-file errors). Never propagates a
-/// build failure to user requests.
+/// Returns `Ok(false)` when bloom is disabled or there is nothing to build (no
+/// target fields, nothing at `bloom_ver = 0`); `Ok(true)` when a build ran.
+/// Recoverable per-file/per-chunk errors are logged, not propagated — never
+/// surfaces a build failure to user requests.
 pub async fn build_for_stream(
     org_id: &str,
     stream_type: StreamType,
