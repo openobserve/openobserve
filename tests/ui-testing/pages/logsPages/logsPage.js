@@ -2750,7 +2750,7 @@ export class LogsPage {
         const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
         const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
+            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
             await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
         await createSavedViewBtn.click();
