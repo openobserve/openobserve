@@ -447,17 +447,20 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         }
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
+        let cfg = get_config();
+        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
-    WHERE stream = $1 AND date >= $2 AND date <= $3;
+    WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#,
             )
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
+            .bind(max_size)
             .fetch_all(&pool)
             .await;
         Ok(ret?.iter().map(|r| r.into()).collect())
@@ -1718,7 +1721,7 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    bloom_ver BIGINT default 0 not null,
+    bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1744,7 +1747,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    bloom_ver BIGINT default 0 not null,
+    bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
