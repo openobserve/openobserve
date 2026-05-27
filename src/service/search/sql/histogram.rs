@@ -21,6 +21,13 @@ use sqlparser::{
     parser::Parser,
 };
 
+/// Snaps `timestamp_us` down to the nearest histogram bucket boundary.
+/// Both arguments are in microseconds. Ensures the scan start aligns with
+/// `date_bin()` bucket boundaries so the first bucket is fully populated.
+pub fn histogram_bucket_start(timestamp_us: i64, interval_us: i64) -> i64 {
+    timestamp_us - timestamp_us % interval_us
+}
+
 /// Converts an original query to a histogram query
 /// Extracts WHERE clause and builds histogram query with provided stream name
 pub fn convert_to_histogram_query(
