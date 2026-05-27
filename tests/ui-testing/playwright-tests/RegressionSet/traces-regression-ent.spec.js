@@ -36,7 +36,7 @@ test.describe('Traces Regression - Enterprise Features', () => {
   // Enterprise-only: service graph toggle is gated behind config.isEnterprise == 'true'
   // ==========================================================================
   test('Service graph node side panel should render without errors after $ pattern fix', {
-    tag: ['@bug-11687', '@P0', '@regression', '@tracesRegression', '@serviceGraph'],
+    tag: ['@bug-11687', '@P0', '@regression', '@tracesRegressionEnt', '@serviceGraph', '@enterprise'],
   }, async ({ page }) => {
     testLogger.info('Test: Verify service graph side panel renders without errors (Bug #11687)');
 

@@ -88,7 +88,7 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
   });
 
   test('No Undefined Length error after navigating Logs -> Scheduled Search -> Streams -> Logs', {
-    tag: ['@regression', '@logs', '@scheduledSearch', '@P0'],
+    tag: ['@regression', '@logs', '@logsScheduledSearch', '@enterprise', '@P0'],
   }, async ({ page }) => {
     const traceId = page._jobTraceId;
     testLogger.info('Starting reproduction path: Logs -> List Scheduled Search');
@@ -110,7 +110,7 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
     const hasError = await pm.logsPage.hasErrorMessage();
     expect(hasError).toBe(false);
 
-    const pageText = await page.evaluate(() => document.body.innerText);
+    const pageText = await pm.logsPage.getPageContent();
     const hasUndefinedLength = pageText.includes('Undefined Length') || pageText.includes('undefined length');
     expect(hasUndefinedLength).toBe(false);
 
@@ -118,7 +118,7 @@ test.describe('Regression: Undefined Length error on Logs -> Scheduled Search ->
   });
 
   test('No console errors after navigating the reproduction path', {
-    tag: ['@regression', '@logs', '@scheduledSearch', '@P1'],
+    tag: ['@regression', '@logs', '@logsScheduledSearch', '@enterprise', '@P1'],
   }, async ({ page }) => {
     const traceId = page._jobTraceId;
     testLogger.info('Starting reproduction path with console error monitoring');
