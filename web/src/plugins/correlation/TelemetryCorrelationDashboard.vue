@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-else
-                    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
                   >
                     <div
                       class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
@@ -512,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Traces Found State -->
           <div
             v-else-if="traceCorrelationMode !== null"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-20"
           >
             <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
               {{ t("correlation.noTracesFound") }}
@@ -842,7 +842,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
                 >
                   <div
                     class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
@@ -978,7 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Traces Found State -->
         <div
           v-else-if="traceCorrelationMode !== null"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
         >
           <OIcon
             name="search-off"
