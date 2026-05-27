@@ -1009,7 +1009,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       ];
       wrapper = createWrapper({ fields });
 
-      const fieldLabel = wrapper.find(".field_label");
+      const fieldLabel = wrapper.find(".o-field-label");
       expect(fieldLabel.exists()).toBe(true);
     });
 

@@ -883,7 +883,7 @@ describe("VariableQueryValueSelector", () => {
         variableItem: { ...defaultVariableItem, isLoading: true }
       });
       wrapper.vm.selectedValue = null;
-      expect(wrapper.vm.displayValue).toBe("");
+      expect(wrapper.vm.displayValue).toBe("(No Data Found)");
     });
 
     it("should show no data found display", () => {
