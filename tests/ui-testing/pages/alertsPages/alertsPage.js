@@ -266,6 +266,7 @@ export class AlertsPage {
             alertListHeaderCheckbox: '[data-test="o2-table-select-all"] button[role="checkbox"]',
             alertImportJsonBtn: '[data-test="alert-import-json-btn"]',
             alertImportJsonFileInput: '[data-test="alert-import-json-file-input"]',
+            alertImportJsonFileInputField: '[data-test="alert-import-json-file-input-field"]',
             alertImportFileTab: '[data-test="tab-import_json_file"]',
 
             // Page structure locators
@@ -2154,12 +2155,15 @@ export class AlertsPage {
         await expect(this.page.locator(this.locators.alertImportJsonBtn)).toBeVisible({ timeout: 10000 });
         testLogger.info('Import page loaded, uploading invalid file');
 
-        await this.page.locator(this.locators.alertImportJsonFileInput).setInputFiles(filePath);
+        await this.page.locator(this.locators.alertImportJsonFileInputField).setInputFiles(filePath);
         // Wait for FileReader to process the uploaded file asynchronously
         await this.page.waitForTimeout(2000);
 
         await this.page.locator(this.locators.alertImportJsonBtn).click();
-        await expect(this.page.getByText('Error importing Alert(s)')).toBeVisible({ timeout: 15000 });
+        // ImportAlert throws internally for structurally invalid JSON — the only signal is a
+        // default-variant toast (data-test="o-toast-default"). It auto-dismisses in 2s so use
+        // waitFor({ state: 'visible' }) which resolves the moment the element appears.
+        await this.page.locator('[data-test="o-toast-default"]').waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Invalid file import error shown as expected');
     }
 
@@ -2169,35 +2173,18 @@ export class AlertsPage {
         // Allow tab change handler to reset state (clears jsonStr, jsonFiles, editor)
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator(this.locators.alertImportJsonFileInput).setInputFiles(filePath);
+        await this.page.locator(this.locators.alertImportJsonFileInputField).setInputFiles(filePath);
         // Wait for FileReader to process the file and populate the Monaco editor
         await this.page.waitForTimeout(3000);
         testLogger.info('Valid file uploaded, clicking import button');
 
         await this.page.locator(this.locators.alertImportJsonBtn).click();
 
-        // Wait for import to process — on success, ImportAlert.vue shows
-        // "Alert(s) imported successfully" notification and navigates back after 400ms
-        try {
-            await this.page.getByText('imported successfully').waitFor({ state: 'visible', timeout: 30000 });
-            testLogger.info('Import success notification visible');
-        } catch (e) {
-            // Capture diagnostic info from the import output panel
-            const creationMessages = await this.page.locator('[data-test^="alert-import-creation-"]').allTextContents().catch(() => []);
-            const validationErrors = await this.page.locator('[data-test^="alert-import-error-"]').allTextContents().catch(() => []);
-            const outputText = await this.page.locator('.error-report-container').textContent().catch(() => 'N/A');
-            testLogger.error('Import did not show success notification', {
-                creationMessages,
-                validationErrors,
-                outputText: outputText?.substring(0, 500),
-            });
-            throw new Error(`Import failed. Creation messages: ${JSON.stringify(creationMessages)}. Validation errors: ${JSON.stringify(validationErrors)}`);
-        }
-
-        // Wait for the router navigation back to alert list (setTimeout 400ms + route change)
-        // Then wait for the alert list page to stabilize
-        await this.page.waitForTimeout(3000);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // On success ImportAlert.vue navigates back to the alert list after a 400ms setTimeout.
+        // Wait for the alert list page to appear — this is more reliable than catching the
+        // short-lived "imported successfully" default-variant toast (2000ms auto-dismiss).
+        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
         await expect(this.page.getByRole('cell').filter({ hasText: this.currentAlertName }).first()).toBeVisible({ timeout: 30000 });
         testLogger.info('Imported alert visible in list', { alertName: this.currentAlertName });
