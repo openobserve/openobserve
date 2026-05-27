@@ -712,10 +712,6 @@ export default defineComponent({
     watch(
       activeFolderId,
       async () => {
-        const dismiss = toast({
-          variant: "loading",
-          message: "Please wait while loading dashboards...",
-        });
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
         //the selected dashboards are not shown
         selectedIds.value = [];
@@ -737,7 +733,6 @@ export default defineComponent({
           );
         } finally {
           loading.value = false;
-          dismiss();
           searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
