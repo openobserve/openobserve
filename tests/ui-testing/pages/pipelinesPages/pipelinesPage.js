@@ -19,8 +19,8 @@ export class PipelinesPage {
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
         );
-        this.streamButton = page.getByRole("button", { name: "Stream" }).first();
-        this.queryButton = page.getByRole("button", { name: "Query" });
+        this.streamButton = page.locator('[data-test="pipeline-node-sidebar-stream-input-btn"]');
+        this.queryButton = page.locator('[data-test="pipeline-node-sidebar-query-input-btn"]');
         this.vueFlowPane = page.locator(".vue-flow__pane");
         // Stream-type OSelect inside the input-node form (Stream.vue). Clicking
         // the wrapper opens the OSelect popover with `*-option` items.
@@ -80,9 +80,9 @@ export class PipelinesPage {
         );
         this.deleteButton = page.locator("button").filter({ hasText: "delete" });
         this.confirmDeleteButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-        this.secondStreamButton = page.getByRole('button', { name: 'Stream' }).nth(1);
-        this.functionButton =  page.getByRole('button', { name: 'Function' })
-        this.conditionButton =  page.getByRole('button', { name: 'Condition' })
+        this.secondStreamButton = page.locator('[data-test="pipeline-node-sidebar-stream-output-btn"]');
+        this.functionButton = page.locator('[data-test="pipeline-node-sidebar-function-default-btn"]');
+        this.conditionButton = page.locator('[data-test="pipeline-node-sidebar-condition-default-btn"]');
        this.selectPreviousNodeDropdown = page.getByLabel('Select Previous Node');
        this.previousNodeDropdown = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]');
        this.previousNodeDropdownSecond = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]:last-child');
@@ -688,12 +688,10 @@ export class PipelinesPage {
     }
 
     async selectAndDragSecondStream() {
-        await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.secondStreamButton,{ x: 120, y: 120 });
+        await this.dragStreamToTarget(this.secondStreamButton, { x: 120, y: 120 });
     }
 
     async selectAndDragFunction() {
-        await this.secondStreamButton.click();
         await this.dragStreamToTarget(this.functionButton, { x: 250, y: 200 });
     }
 
@@ -716,6 +714,13 @@ export class PipelinesPage {
 
     // Method to click the input node stream save button
     async clickInputNodeStreamSave() {
+        // If the stream-name popover is still open (Enter path in fillDestinationStreamName),
+        // wait for it to detach. It will close via interactOutside when the save button receives
+        // the pointerdown event. The .catch keeps this non-blocking if already detached.
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'detached', timeout: 5000 })
+            .catch(() => {});
+        await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
     async searchPipeline(pipelineName) {
@@ -1212,11 +1217,7 @@ export class PipelinesPage {
         await this.exploreStreamAndNavigateToPipeline(expectedStreamName);
         await listApiResponse;
 
-        // Wait for the pipeline-list table to render at least one row so we
-        // know the data has loaded. Without this, searching against an empty
-        // table filters to nothing and the search itself can't surface our row.
-        const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
-        await anyRow.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+        await this.waitForPipelineListSettled();
 
         // Verify pipeline creation and cleanup
         await this.searchPipeline(pipelineName);
@@ -1226,13 +1227,60 @@ export class PipelinesPage {
         // more-options ODropdown. PipelinesList.vue:194-201 uses data-test=
         // `pipeline-list-${row.name}-delete-pipeline`. The ODropdown only contains
         // pause/start, export, backfill, view-error — no delete-action item.
-        const deleteBtn = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
-        ).first();
-        await deleteBtn.waitFor({ state: 'visible', timeout: 30000 });
+        const deleteBtn = this.pipelineDeleteBtn(pipelineName);
+        const found = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
+        if (!found) {
+            testLogger.info(`createAndVerifyPipeline: pipeline ${pipelineName} not in list, polling with reload`);
+            await expect.poll(async () => {
+                const reloadApi = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
+                await this.page.reload().catch(() => {});
+                await reloadApi;
+                if (await this.pipelineListAllTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await this.pipelineListAllTab.click().catch(() => {});
+                }
+                await this.waitForPipelineListSettled(15000);
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+                await this.pipelineSearchInputField.fill('');
+                await this.searchPipeline(pipelineName);
+                return await deleteBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+                timeout: 180000,
+            }).toBe(true);
+        }
         await deleteBtn.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
+    }
+
+    /**
+     * Wait for the pipeline-list table to reach a settled state — either
+     * at least one pipeline row has rendered, or the empty-state (no-data-
+     * message) has appeared. This avoids the read-after-write race where
+     * the test races the GET /api/<org>/pipelines response and filters an
+     * unloaded table to zero rows, hiding the freshly-created pipeline.
+     *
+     * Gates on three orthogonal signals so we are robust to any one of them
+     * being temporarily missing (skeleton mid-flight, virtualised row not
+     * yet stamped with a delete-btn data-test, etc.):
+     *   - a row with a `-delete-pipeline` data-test, OR
+     *   - the empty-state `no-data-message`, OR
+     *   - the OTable pagination footer "Showing X - Y" / "No data available"
+     *     (matches the reportsPage settle pattern that proved stable in CI).
+     */
+    async waitForPipelineListSettled(timeout = 30000) {
+        await this.page.waitForFunction(() => {
+            const table = document.querySelector('[data-test="pipeline-list-table"]');
+            if (!table) return false;
+            const hasRow = !!table.querySelector('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]');
+            const hasEmpty = !!table.querySelector('[data-test="no-data-message"]');
+            const text = table.textContent || '';
+            const hasFooter = /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+            return hasRow || hasEmpty || hasFooter;
+        }, { timeout }).catch(() => {});
     }
 
     // ========== Condition-specific methods ==========
@@ -1365,28 +1413,29 @@ export class PipelinesPage {
     }
 
     async deletePipelineByName(pipelineName) {
-        const deleteBtn = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
-        ).first();
-        let deleteVisible = false;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            const apiPromise = this.page.waitForResponse(
-                (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
-                { timeout: 20000 }
-            ).catch(() => null);
+        const deleteBtn = this.pipelineDeleteBtn(pipelineName);
 
-            if (attempt > 1) {
-                testLogger.info(`deletePipelineByName: pipeline row not visible, reloading list (attempt ${attempt}/3)`);
+        // First quick check — when the row is already in the list we skip
+        // the heavier poll-with-reload loop below entirely.
+        const initialVisible = await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!initialVisible) {
+            // Per-pipeline propagation in CI can be slow (cross-cluster, search
+            // re-index, etc.). Match the reportsPage.pauseReport budget (180s,
+            // escalating intervals) instead of a 3-attempt cap that timed out.
+            testLogger.info(`deletePipelineByName: pipeline ${pipelineName} not visible, polling list with reload`);
+            await expect.poll(async () => {
+                const apiPromise = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
                 await this.page.reload().catch(() => {});
-            }
-            await apiPromise;
+                await apiPromise;
 
             // Ensure we're on the "all" tab so realtime + scheduled pipelines
             // are both visible regardless of any previous tab selection.
             const allTab = this.page.locator('[data-test="tab-all"]');
             if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await allTab.click().catch(() => {});
-                await this.page.waitForTimeout(300);
             }
 
             // Wait for at least one pipeline row so we know the table rendered
@@ -1397,11 +1446,12 @@ export class PipelinesPage {
             // Clear and re-fill the search filter.
             await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
             await this.pipelineSearchInputField.fill('');
-            await this.page.waitForTimeout(300);
+            // Wait for full list to restore after clearing the filter
+            await anyRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
             await this.searchPipeline(pipelineName);
-            await this.page.waitForTimeout(1000);
 
-            deleteVisible = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
+            // Wait deterministically for the filtered delete button to appear
+            deleteVisible = await deleteBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
             if (deleteVisible) break;
         }
         if (!deleteVisible) {
@@ -2062,12 +2112,12 @@ export class PipelinesPage {
         } else {
             await this.streamNameInput.press('Enter');
         }
-        // Close the popover deterministically — `@create` writes to v-model but
-        // does NOT auto-close the popover. Press Escape to dismiss it so it
-        // doesn't intercept the subsequent Save click.
-        await this.page.keyboard.press('Escape').catch(() => {});
-        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
+        // Wait for the popover to close if it was dismissed by an option click.
+        // For newly created names (Enter path), the popover stays open; the save
+        // button click will close it via interactOutside — do NOT press Escape
+        // here, as that would also trigger the ODrawer's escape handler and
+        // prematurely close the drawer.
+        await popover.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
     }
 
     /**

@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Name column: badges for type/preview -->
                 <template #cell-name="{ row }">
-                  <span>{{ row.name }}</span>
+                  <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
                   <OBadge
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
                     variant="primary-outline"

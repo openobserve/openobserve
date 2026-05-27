@@ -153,16 +153,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <!-- Metrics Tab Panel -->
-        <OTabPanel name="metrics" layout="flex-col">
+        <OTabPanel name="metrics" layout="flex-col" stretch class="tw:min-h-0">
           <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <OSplitter
             v-model="splitterModel"
-            class="tw:flex-1 full-height tw:w-full"
+            class="tw:flex-1 tw:min-h-0 full-height tw:w-full"
           >
             <!-- -- Left sidebar -- -->
             <template #before>
               <div
-                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
+                class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
               >
                 <!-- Search -->
                   <div
@@ -181,7 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Grouped metric list -->
                 <div
-                  class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
+                  class="dimension-list-container tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-[0.325rem]"
+                  style="max-height: calc(100vh - 210px)"
                 >
                   <template
                     v-if="
@@ -370,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-else
-                    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
                   >
                     <div
                       class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
@@ -511,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Traces Found State -->
           <div
             v-else-if="traceCorrelationMode !== null"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-20"
           >
             <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
               {{ t("correlation.noTracesFound") }}
@@ -629,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Left sidebar -- -->
           <template #before>
             <div
-              class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
+              class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
             >
             <div
               class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -647,7 +648,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped metric list -->
               <div
-                class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
+                class="dimension-list-container tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-[0.325rem]"
+                style="max-height: calc(100vh - 210px)"
               >
                 <template
                   v-if="
@@ -840,7 +842,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
                 >
                   <div
                     class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
@@ -976,7 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Traces Found State -->
         <div
           v-else-if="traceCorrelationMode !== null"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
         >
           <OIcon
             name="search-off"

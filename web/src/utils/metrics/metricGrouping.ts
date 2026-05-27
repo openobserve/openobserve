@@ -70,7 +70,7 @@ export interface GroupedMetricStreams {
  * - Socket and connection metrics
  * - Bandwidth and throughput
  */
-const NETWORK_PATTERNS: RegExp[] = [
+export const NETWORK_PATTERNS: RegExp[] = [
   // Keyword "network" (catches container_network_*, node_network_*, etc.)
   /network/,
   // Packet metrics

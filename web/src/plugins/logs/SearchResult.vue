@@ -502,6 +502,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :service-name="correlationDashboardProps.serviceName"
       :matched-dimensions="correlationDashboardProps.matchedDimensions"
       :additional-dimensions="correlationDashboardProps.additionalDimensions"
+      :matched-set-id="correlationDashboardProps.matchedSetId"
+      :chip-dimensions="correlationDashboardProps.chipDimensions"
+      :source-event="correlationDashboardProps.sourceEvent"
       :metric-streams="correlationDashboardProps.metricStreams"
       :log-streams="correlationDashboardProps.logStreams"
       :trace-streams="correlationDashboardProps.traceStreams"
@@ -556,6 +559,8 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
+import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -880,7 +885,7 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const detailTableInitialTab = ref<string>("json");
-    const { findRelatedTelemetry } = useServiceCorrelation();
+    const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
     const correlationFetchInProgress = ref(false);
@@ -1238,22 +1243,12 @@ export default defineComponent({
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
           correlationError.value = "No matching service found for correlation";
-          toast({
-            variant: "warning",
-            message: "No matching service found for correlation",
-            timeout: 3000,
-          });
           return;
         }
 
         if (!result.correlationData) {
           console.warn("[SearchResult] No correlation data in result");
           correlationError.value = "Unable to retrieve correlation data";
-          toast({
-            variant: "warning",
-            message: "Unable to retrieve correlation data",
-            timeout: 3000,
-          });
           return;
         }
 
@@ -1288,10 +1283,36 @@ export default defineComponent({
             ? logFilters
             : result.correlationData.matched_dimensions;
 
+        const sourceEvent = {
+          timestamp: logData._timestamp,
+          severity: extractSeverity(logData) ?? undefined,
+          message:
+            logData.body ||
+            logData.message ||
+            logData.log ||
+            logData.msg,
+        };
+
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
           matchedDimensions: actualMatchedDimensions,
           additionalDimensions: {},
+          matchedSetId: result.correlationData.matched_set_id,
+          // Semantic-id keyed dims for the chip row. Start from the
+          // correlate response (matched + additional), then layer in
+          // workload-specific subjects (Pod, Node, …) by walking the source
+          // row via the SUBJECT_BUTTONS_BY_SET registry — needed because
+          // pod/node aren't service-identifying and the backend drops them.
+          chipDimensions: {
+            ...(result.correlationData.matched_dimensions || {}),
+            ...(result.correlationData.additional_dimensions || {}),
+            ...buildWorkloadChipDimensions(
+              result.correlationData.matched_set_id,
+              semanticGroups.value,
+              logData,
+            ),
+          },
+          sourceEvent,
           metricStreams: result.correlationData.related_streams.metrics || [],
           logStreams: result.correlationData.related_streams.logs || [],
           traceStreams: result.correlationData.related_streams.traces || [],
@@ -1329,11 +1350,6 @@ export default defineComponent({
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
         correlationError.value = `Correlation error: ${err.message || err}`;
-        toast({
-          variant: "error",
-          message: `Correlation error: ${err.message || err}`,
-          timeout: 3000,
-        });
         correlationDashboardProps.value = null;
       } finally {
         correlationLoading.value = false;

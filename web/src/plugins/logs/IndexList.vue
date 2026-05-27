@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="tw:text-center tw:w-5/6 tw:mx-0 tw:pt-3"
       >
-        <OIcon name="info" size="xs" class="tw:align-middle tw:mr-1" />
+        <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
         {{ t("search.noFieldFoundInStream") }}
       </div>
     </div>

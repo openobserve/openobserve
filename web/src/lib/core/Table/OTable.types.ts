@@ -139,6 +139,10 @@ export interface OTableProps<TData = any> {
   selection?: OTableSelectionMode;
   /** Selected row ids (v-model) */
   selectedIds?: string[];
+  /** Per-row predicate: return false to disable that row's selection checkbox
+   *  (renders with `cursor: not-allowed` and ignores toggles). E.g. block bulk
+   *  selection of the root user in IAM. */
+  isRowSelectable?: (row: TData) => boolean;
   /** Field used as unique row identifier */
   rowKey?: string;
 

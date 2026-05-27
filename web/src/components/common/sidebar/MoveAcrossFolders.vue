@@ -115,14 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               props.activeFolderId
             );
 
-            showPositiveNotification(`${props.type} Moved successfully`, {
-              timeout: 2000,
+            showPositiveNotification(`${props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1)} moved successfully`, {
+              timeout: 5000,
             });
 
             emit("updated", props.activeFolderId, selectedFolder.value.value);
           } catch (err: any) {
-            showErrorNotification(err?.message ?? `${props.type} move failed.`, {
-              timeout: 2000,
+            showErrorNotification(err?.message ?? `${props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1)} move failed.`, {
+              timeout: 5000,
             });
           }
       });

@@ -1321,11 +1321,25 @@ export class MetricsBuilderPage {
     /**
      * Verify the table chart has rendered with data rows.
      * Checks for the table with headers and at least one data row.
+     *
+     * The PromQL table chart races between the query response and the row
+     * render — the data API can return rows that haven't yet hydrated into
+     * `[data-test="dashboard-data-row"]` DOM nodes when we read. Poll for up
+     * to 15s for either rows OR the table-loading indicator to settle to a
+     * stable count, so we never measure a mid-render zero.
+     *
      * @returns {Promise<{visible: boolean, rowCount: number, headers: string[]}>}
      */
     async getTableChartData() {
         const visible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         if (!visible) return { visible: false, rowCount: 0, headers: [] };
+
+        // Wait for the table to settle (rows hydrated, or loading complete) BEFORE counting.
+        // Loading attribute `data-test-loading="false"` on `o2-table` signals query completion.
+        await this.page.locator('[data-test="o2-table"][data-test-loading="false"]')
+            .first()
+            .waitFor({ state: 'attached', timeout: 15000 })
+            .catch(() => {});
 
         // Get header texts via the data-test header cells
         const headers = [];

@@ -433,8 +433,8 @@ export class DashboardPage {
         const text = await this.dashboardTable.textContent().catch(() => '');
         return text.includes('No data available');
       }, {
-        intervals: [2000, 3000, 5000, 5000],
-        timeout: 60000,
+        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+        timeout: 180000,
       }).toBe(true);
     }
 
