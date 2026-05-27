@@ -89,9 +89,15 @@ export class ReportsPage {
     // Report list — search + row actions
     this.reportSearchInput = page.locator('[data-test="report-list-search-input"]');
     this.reportSearchInputField = page.locator('[data-test="report-list-search-input-field"]');
-    this.pauseStartReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`);
-    this.editReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-edit-report"]`);
-    this.deleteReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-delete-report"]`);
+    // Scope-based row resolution: find the per-name cell (added in ReportList.vue
+    // §6 source edit), walk up to the OTable row, then locate the action button
+    // within. More robust than relying on a standalone embedded-name data-test
+    // which can race the rendering of the row.
+    this.reportRow = (reportName) => page.locator(`[data-test="report-list-name-cell-${reportName}"]`)
+        .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]').first();
+    this.pauseStartReportBtn = (reportName) => this.reportRow(reportName).locator('[data-test$="-pause-start-report"]');
+    this.editReportBtn = (reportName) => this.reportRow(reportName).locator('[data-test$="-edit-report"]');
+    this.deleteReportBtn = (reportName) => this.reportRow(reportName).locator('[data-test$="-delete-report"]');
 
     // Confirm dialog (delete)
     this.confirmDialog = page.locator('[data-test="confirm-dialog"]');
