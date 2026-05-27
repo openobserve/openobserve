@@ -1223,12 +1223,10 @@ export class PipelinesPage {
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
 
-        // The delete icon button is rendered DIRECTLY in the row, NOT inside the
-        // more-options ODropdown. PipelinesList.vue:194-201 uses data-test=
-        // `pipeline-list-${row.name}-delete-pipeline`. The ODropdown only contains
-        // pause/start, export, backfill, view-error — no delete-action item.
-        const deleteBtn = this.pipelineDeleteBtn(pipelineName);
-        const found = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
+        // Delete is inside the more-options dropdown (not inline in the row).
+        // Use the edit button as the visibility sentinel since it is always inline.
+        const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+        const found = await editBtn.isVisible({ timeout: 15000 }).catch(() => false);
         if (!found) {
             testLogger.info(`createAndVerifyPipeline: pipeline ${pipelineName} not in list, polling with reload`);
             await expect.poll(async () => {
@@ -1245,13 +1243,13 @@ export class PipelinesPage {
                 await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
                 await this.pipelineSearchInputField.fill('');
                 await this.searchPipeline(pipelineName);
-                return await deleteBtn.isVisible({ timeout: 2000 }).catch(() => false);
+                return await editBtn.isVisible({ timeout: 2000 }).catch(() => false);
             }, {
                 intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
                 timeout: 180000,
             }).toBe(true);
         }
-        await deleteBtn.click();
+        await this.openMoreOptionsAndClickDelete(pipelineName);
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -1275,12 +1273,43 @@ export class PipelinesPage {
         await this.page.waitForFunction(() => {
             const table = document.querySelector('[data-test="pipeline-list-table"]');
             if (!table) return false;
-            const hasRow = !!table.querySelector('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]');
+            // Use the edit button (always inline in the row) as the settled signal.
+            // Delete moved into the more-options dropdown and is not in the DOM until opened.
+            const hasRow = !!table.querySelector('[data-test^="pipeline-list-"][data-test$="-update-pipeline"]');
             const hasEmpty = !!table.querySelector('[data-test="no-data-message"]');
             const text = table.textContent || '';
             const hasFooter = /Showing \d+ - \d+/.test(text) || text.includes('No data available');
             return hasRow || hasEmpty || hasFooter;
         }, { timeout }).catch(() => {});
+    }
+
+    /**
+     * Return a locator for the per-row delete action. Delete lives inside the
+     * more-options dropdown — callers must open that menu before this locator
+     * is visible.
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator}
+     */
+    pipelineDeleteBtn(pipelineName) {
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        );
+    }
+
+    /**
+     * Open the more-options dropdown for a pipeline row, then click Delete and
+     * wait for the confirmation dialog.
+     * @param {string} pipelineName - Pipeline name
+     */
+    async openMoreOptionsAndClickDelete(pipelineName) {
+        const moreOptions = this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-more-options"]`
+        );
+        await moreOptions.waitFor({ state: 'visible', timeout: 15000 });
+        await moreOptions.click();
+        const deleteItem = this.pipelineDeleteBtn(pipelineName);
+        await deleteItem.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteItem.click();
     }
 
     // ========== Condition-specific methods ==========
@@ -1413,11 +1442,13 @@ export class PipelinesPage {
     }
 
     async deletePipelineByName(pipelineName) {
-        const deleteBtn = this.pipelineDeleteBtn(pipelineName);
+        // Use the edit button (always inline) as the row-visibility sentinel.
+        // Delete is inside the more-options dropdown and is not in the DOM until opened.
+        const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
 
         // First quick check — when the row is already in the list we skip
         // the heavier poll-with-reload loop below entirely.
-        const initialVisible = await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        const initialVisible = await editBtn.isVisible({ timeout: 5000 }).catch(() => false);
         if (!initialVisible) {
             // Per-pipeline propagation in CI can be slow (cross-cluster, search
             // re-index, etc.). Match the reportsPage.pauseReport budget (180s,
@@ -1431,33 +1462,32 @@ export class PipelinesPage {
                 await this.page.reload().catch(() => {});
                 await apiPromise;
 
-            // Ensure we're on the "all" tab so realtime + scheduled pipelines
-            // are both visible regardless of any previous tab selection.
-            const allTab = this.page.locator('[data-test="tab-all"]');
-            if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await allTab.click().catch(() => {});
-            }
+                // Ensure we're on the "all" tab so realtime + scheduled pipelines
+                // are both visible regardless of any previous tab selection.
+                const allTab = this.page.locator('[data-test="tab-all"]');
+                if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await allTab.click().catch(() => {});
+                }
 
-            // Wait for at least one pipeline row so we know the table rendered
-            // its data — search against an empty table never surfaces our row.
-            const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
-            await anyRow.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+                // Wait for at least one pipeline row so we know the table rendered
+                // its data — search against an empty table never surfaces our row.
+                const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-update-pipeline"]').first();
+                await anyRow.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
-            // Clear and re-fill the search filter.
-            await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
-            await this.pipelineSearchInputField.fill('');
-            // Wait for full list to restore after clearing the filter
-            await anyRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-            await this.searchPipeline(pipelineName);
+                // Clear and re-fill the search filter.
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+                await this.pipelineSearchInputField.fill('');
+                // Wait for full list to restore after clearing the filter
+                await anyRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+                await this.searchPipeline(pipelineName);
 
-            // Wait deterministically for the filtered delete button to appear
-            deleteVisible = await deleteBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
-            if (deleteVisible) break;
+                return await editBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+                timeout: 180000,
+            }).toBe(true);
         }
-        if (!deleteVisible) {
-            await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
-        }
-        await deleteBtn.click();
+        await this.openMoreOptionsAndClickDelete(pipelineName);
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -2888,25 +2918,19 @@ export class PipelinesPage {
 
     /**
      * Get pipeline toggle (pause/start) locator for a specific pipeline.
-     * The OButton in PipelinesList exposes a unique per-row data-test:
-     * `pipeline-list-{name}-pause-start-alert`.
+     * The pause/start OButton is rendered directly in the row (first action button)
+     * and is always visible — no dropdown needed.
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Toggle locator
      */
     getPipelineToggle(pipelineName) {
-        // The pause/start control is an ODropdownItem rendered INSIDE the per-row
-        // ODropdown (PipelinesList.vue:212-220). It only exists in the DOM when
-        // that dropdown is open. Callers must first click
-        // `pipeline-list-${name}-more-options` to open the menu.
         return this.page.locator(
             `[data-test="pipeline-list-${pipelineName}-pause-start-action"]`
         );
     }
 
     /**
-     * Fallback alias for the pause/start button — `pipeline-list-{name}-pause-start-action`
-     * is the only enable/disable control rendered per row in PipelinesList.vue. It's
-     * inside the more-options ODropdown, so the menu must be opened first.
+     * Alias for getPipelineToggle — pause/start OButton is inline in the row.
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Enable/disable button locator
      */
@@ -2917,30 +2941,24 @@ export class PipelinesPage {
     }
 
     /**
-     * Open the per-row more-options dropdown menu, then return a locator scoped
-     * to the now-visible pause/start action item. Use this when you need to
-     * toggle a pipeline state — the dropdown must be open for the action item
-     * to exist in the DOM.
+     * Return the pause/start toggle locator after waiting for it to be visible.
+     * No dropdown needs to be opened — the button is always inline in the row.
      * @param {string} pipelineName - Pipeline name
-     * @returns {Promise<import('@playwright/test').Locator>} Locator for the pause/start action
+     * @returns {Promise<import('@playwright/test').Locator>} Locator for the pause/start button
      */
     async openPipelineRowMenuAndGetToggle(pipelineName) {
-        const moreOptions = this.page.locator(
-            `[data-test="pipeline-list-${pipelineName}-more-options"]`
-        );
-        await moreOptions.waitFor({ state: 'visible', timeout: 15000 });
-        await moreOptions.click();
         const toggle = this.getPipelineToggle(pipelineName);
-        await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await toggle.waitFor({ state: 'visible', timeout: 15000 });
         return toggle;
     }
 
     /**
-     * Toggle pipeline enabled/disabled state via the per-row more-options menu.
+     * Toggle pipeline enabled/disabled state via the inline pause/start button.
      * @param {string} pipelineName - Pipeline name
      */
     async togglePipeline(pipelineName) {
-        const toggle = await this.openPipelineRowMenuAndGetToggle(pipelineName);
+        const toggle = this.getPipelineToggle(pipelineName);
+        await toggle.waitFor({ state: 'visible', timeout: 15000 });
         await toggle.click();
         testLogger.info(`Toggled pipeline: ${pipelineName}`);
     }
