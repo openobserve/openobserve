@@ -140,7 +140,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Auto persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legend-position-trigger"]')).toHaveAttribute('data-test-selected-value', '');
+    await expect(page.locator('[data-test="dashboard-config-legend-position-trigger"]')).toHaveAttribute('data-test-selected-value', 'null');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
