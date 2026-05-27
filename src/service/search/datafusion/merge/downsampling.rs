@@ -54,7 +54,6 @@ const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
 pub async fn merge_parquet_files_with_downsampling(
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
-    bloom_filter_fields: &[String],
     rule: &DownsamplingRule,
     metadata: &FileMeta,
 ) -> Result<MergeParquetResult> {
@@ -114,9 +113,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     // Write batches to the appropriate format
     let (bufs, file_metas) = match cfg.common.file_format {
-        FileFormat::Parquet => {
-            write_downsampled_parquet(rx, &schema, bloom_filter_fields, &metadata, &cfg).await?
-        }
+        FileFormat::Parquet => write_downsampled_parquet(rx, &schema, &metadata, &cfg).await?,
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => {
             write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?

@@ -68,14 +68,7 @@ pub async fn merge_parquet_files(
             log::info!(
                 "merge_parquet_files: stream_type={stream_type}, stream_name={stream_name}, downsampling rule={rule:?}"
             );
-            return merge_parquet_files_with_downsampling(
-                schema,
-                tables,
-                bloom_filter_fields,
-                rule,
-                &metadata,
-            )
-            .await;
+            return merge_parquet_files_with_downsampling(schema, tables, rule, &metadata).await;
         }
     }
 
