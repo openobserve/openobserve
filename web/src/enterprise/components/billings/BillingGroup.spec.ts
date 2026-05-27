@@ -149,25 +149,6 @@ describe("BillingGroup.vue", () => {
       expect(wrapper.vm.role).toBe("super");
     });
 
-    it("resolves to 'super' when the org's sent invite was rejected", async () => {
-      ({ wrapper } = await mountBillingGroup({
-        org: "default",
-        members: [],
-        invites: [
-          {
-            token: "sent-2",
-            inviter_org_id: "default",
-            invitee_org_id: "target-org",
-            inviter_id: "me@default.com",
-            status: "Rejected",
-            created_at: 1,
-            expires_at: 2,
-          },
-        ],
-      }));
-      expect(wrapper.vm.role).toBe("super");
-    });
-
     it("resolves to 'child' when the org has a membership (membership dominates)", async () => {
       ({ wrapper } = await mountBillingGroup({
         membership: {
@@ -366,6 +347,69 @@ describe("BillingGroup.vue", () => {
         "date",
         "actions",
       ]);
+    });
+  });
+
+  describe("super-org stats and table (no rejected)", () => {
+    const members = [
+      {
+        id: 1,
+        payer_org_id: "default",
+        member_org_id: "child-1",
+        member_org_name: "Child One",
+        created_at: 1,
+        created_by: "a@b.com",
+        accepted_by: null,
+      },
+    ];
+    const sentPending = {
+      token: "sent-1",
+      inviter_org_id: "default",
+      invitee_org_id: "target-org",
+      invitee_org_name: "Target Org",
+      inviter_id: "me@default.com",
+      status: "Pending",
+      created_at: 2,
+      expires_at: 3,
+    };
+
+    it("counts only active members and pending sent invites (total = active + pending)", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        org: "default",
+        members,
+        invites: [sentPending],
+      }));
+      expect(wrapper.vm.activeCount).toBe(1);
+      expect(wrapper.vm.pendingCount).toBe(1);
+      expect(wrapper.vm.totalCount).toBe(2);
+      // rejectedCount no longer exists on the component
+      expect(wrapper.vm.rejectedCount).toBeUndefined();
+    });
+
+    it("offers only All / Active / Pending filter tabs", async () => {
+      ({ wrapper } = await mountBillingGroup({ org: "default", members }));
+      const values = wrapper.vm.superFilterTabs.map((t: any) => t.value);
+      expect(values).toEqual(["all", "Active", "Pending"]);
+    });
+
+    it("super table rows carry both org identifier and org name", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        org: "default",
+        members,
+        invites: [sentPending],
+      }));
+      const rows = wrapper.vm.filteredSuperRows;
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toMatchObject({
+        org_id: "child-1",
+        org_name: "Child One",
+        status: "Active",
+      });
+      expect(rows[1]).toMatchObject({
+        org_id: "target-org",
+        org_name: "Target Org",
+        status: "Pending",
+      });
     });
   });
 

@@ -55,12 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ pendingCount }}
             </div>
           </div>
-          <div class="feature-card tw:flex-1">
-            <div class="stat-card-title">
-              {{ t("billing.billingGroup.statRejected") }}
-            </div>
-            <div class="stat-card-value tw:text-red-500">{{ rejectedCount }}</div>
-          </div>
         </div>
 
         <!-- Status filter + view usage -->
@@ -500,8 +494,8 @@ export default defineComponent({
 
     const role = computed(() => {
       if (membership.value) return "child";
-      // An org that has members OR has sent any invites (still pending or
-      // rejected) is acting as a payer, so it gets the management view.
+      // An org that has members OR has sent any invites is acting as a payer,
+      // so it gets the management view.
       const hasSentInvites = invites.value.some(
         (i) => i.inviter_org_id === currentOrg.value
       );
@@ -536,11 +530,6 @@ export default defineComponent({
     const pendingSentInvites = computed(() =>
       invites.value.filter(
         (i) => i.inviter_org_id === currentOrg.value && i.status === "Pending"
-      )
-    );
-    const rejectedInvites = computed(() =>
-      invites.value.filter(
-        (i) => i.inviter_org_id === currentOrg.value && i.status === "Rejected"
       )
     );
     const receivedInvites = computed(() =>
@@ -582,16 +571,15 @@ export default defineComponent({
     // Super-org view: stats + unified child-org table
     const activeCount = computed(() => members.value.length);
     const pendingCount = computed(() => pendingSentInvites.value.length);
-    const rejectedCount = computed(() => rejectedInvites.value.length);
     const totalCount = computed(
-      () => activeCount.value + pendingCount.value + rejectedCount.value
+      () => activeCount.value + pendingCount.value
     );
 
     interface SuperRow {
       key: string;
       org_id: string;
       org_name: string;
-      status: "Active" | "Pending" | "Rejected";
+      status: "Active" | "Pending";
       invited_by: string;
       accepted_by: string;
       date: number;
@@ -622,17 +610,6 @@ export default defineComponent({
           date: i.created_at,
         })
       );
-      rejectedInvites.value.forEach((i) =>
-        rows.push({
-          key: `r-${i.token}`,
-          org_id: i.invitee_org_id,
-          org_name: i.invitee_org_name || "",
-          status: "Rejected",
-          invited_by: i.inviter_id,
-          accepted_by: "-",
-          date: i.created_at,
-        })
-      );
       return rows;
     });
 
@@ -647,26 +624,15 @@ export default defineComponent({
       { label: t("billing.billingGroup.filterAll"), value: "all" },
       { label: t("billing.billingGroup.statusActive"), value: "Active" },
       { label: t("billing.billingGroup.statusPending"), value: "Pending" },
-      {
-        label: t("billing.billingGroup.statusRejected"),
-        value: "Rejected",
-      },
     ]);
 
     const statusColor = (status: string) =>
-      status === "Active"
-        ? "positive"
-        : status === "Pending"
-          ? "warning"
-          : "negative";
+      status === "Active" ? "positive" : "warning";
 
-    const statusLabel = (status: string) => {
-      if (status === "Active")
-        return t("billing.billingGroup.statusActive");
-      if (status === "Pending")
-        return t("billing.billingGroup.statusPending");
-      return t("billing.billingGroup.statusRejected");
-    };
+    const statusLabel = (status: string) =>
+      status === "Active"
+        ? t("billing.billingGroup.statusActive")
+        : t("billing.billingGroup.statusPending");
 
     const inviteColumns = computed<QTableProps["columns"]>(() => [
       {
@@ -874,7 +840,6 @@ export default defineComponent({
       superColumns,
       activeCount,
       pendingCount,
-      rejectedCount,
       totalCount,
       statusColor,
       statusLabel,
