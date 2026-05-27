@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :footer-title="t('iam.basicUsers')"
           sorting="client"
           selection="multiple"
+          :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
           :show-global-filter="false"

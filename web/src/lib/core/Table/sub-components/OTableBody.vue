@@ -12,6 +12,9 @@ const props = defineProps<{
   selectionEnabled?: boolean;
   selectionMultiple?: boolean;
   isRowSelectedFn?: (row: any) => boolean;
+  /** When provided, rows for which this returns false render a disabled
+   *  (not-allowed cursor) selection checkbox. Forwarded to OTableBodyRow. */
+  isRowSelectable?: (row: any) => boolean;
   expansionEnabled?: boolean;
   isExpandedFn?: (row: any) => boolean;
   getRowExpansionEnabled?: (row: any) => boolean;
@@ -79,6 +82,7 @@ function getRowForIndex(index: number) {
       :selection-enabled="selectionEnabled"
       :selection-multiple="selectionMultiple"
       :is-row-selected="isRowSelectedFn?.(row.original)"
+      :is-row-selectable="isRowSelectable"
       :expansion-enabled="expansionEnabled"
       :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(row.original) : true"
       :is-expanded="isExpandedFn?.(row.original)"
@@ -138,6 +142,7 @@ function getRowForIndex(index: number) {
       :selection-enabled="selectionEnabled"
       :selection-multiple="selectionMultiple"
       :is-row-selected="isRowSelectedFn?.(getRowForIndex(virtualRow.index)?.original)"
+      :is-row-selectable="isRowSelectable"
       :expansion-enabled="expansionEnabled"
       :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(getRowForIndex(virtualRow.index)?.original) : true"
       :is-expanded="isExpandedFn?.(getRowForIndex(virtualRow.index)?.original)"

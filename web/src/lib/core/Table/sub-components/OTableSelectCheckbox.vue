@@ -9,6 +9,7 @@ const props = defineProps<{
   modelValue: boolean;
   indeterminate?: boolean;
   rowId?: string;
+  disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -21,6 +22,7 @@ const checkboxModel = computed<CheckboxModelValue>(() => {
 });
 
 function handleUpdate(val: CheckboxModelValue) {
+  if (props.disabled) return;
   if (typeof val === "boolean") {
     emit("update:modelValue", val);
   } else {
@@ -34,6 +36,7 @@ function handleUpdate(val: CheckboxModelValue) {
     :model-value="checkboxModel"
     :data-test="`o2-table-select-${rowId ?? 'header'}`"
     size="sm"
+    :disabled="disabled"
     @update:model-value="handleUpdate"
   />
 </template>
