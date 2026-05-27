@@ -26,9 +26,7 @@
               size="sm"
             />
           </span>
-          <span class="field_label tw:truncate tw:flex tw:items-center" :title="row.name">
-            {{ row.name }}
-          </span>
+          <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
         </template>
 
         <!-- Field actions: always add button, copy for expandable -->
@@ -131,6 +129,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
+import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -549,12 +548,6 @@ const copyContentValue = (value: string) => {
 
   .index-table {
     width: 100%;
-  }
-
-  .field_label {
-    font-size: 0.75rem;
-    flex: 1;
-    min-width: 0;
   }
 
   .field-type-container {
