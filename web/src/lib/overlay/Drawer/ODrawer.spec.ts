@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import ODrawer from "./ODrawer.vue";
 
 // Reka UI portals content into <body>. Stub the portal so content
@@ -259,8 +260,11 @@ describe("ODrawer", () => {
       const wrapper = mount(ODrawer, {
         props: { open: true, title: "Test" },
       });
-      const content = wrapper.find("[data-o2-drawer]");
-      await content.trigger("keydown", { key: "Escape" });
+      // reka-ui listens for Escape on the document, not the content element
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
+      await nextTick();
       const emitted = wrapper.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted?.[0]).toEqual([false]);

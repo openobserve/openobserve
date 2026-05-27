@@ -344,7 +344,7 @@ describe('MoveAcrossFolders.vue', () => {
     await wrapper.vm.onSubmit.execute();
 
     expect(mockShowErrorNotification).toHaveBeenCalledWith('Move operation failed', {
-      timeout: 2000,
+      timeout: 5000,
     });
   });
 
@@ -363,8 +363,8 @@ describe('MoveAcrossFolders.vue', () => {
 
     await wrapper.vm.onSubmit.execute();
 
-    expect(mockShowErrorNotification).toHaveBeenCalledWith('pipelines move failed.', {
-      timeout: 2000,
+    expect(mockShowErrorNotification).toHaveBeenCalledWith('Pipelines move failed.', {
+      timeout: 5000,
     });
   });
 
@@ -399,8 +399,8 @@ describe('MoveAcrossFolders.vue', () => {
 
     await wrapper.vm.onSubmit.execute();
 
-    expect(mockShowPositiveNotification).toHaveBeenCalledWith('alerts Moved successfully', {
-      timeout: 2000,
+    expect(mockShowPositiveNotification).toHaveBeenCalledWith('Alerts moved successfully', {
+      timeout: 5000,
     });
   });
 
@@ -624,7 +624,7 @@ describe('MoveAcrossFolders.vue', () => {
     await wrapper.vm.onSubmit.execute();
 
     expect(mockShowErrorNotification).toHaveBeenCalledWith('Custom error message', {
-      timeout: 2000,
+      timeout: 5000,
     });
   });
 
@@ -780,7 +780,7 @@ describe('MoveAcrossFolders.vue', () => {
     await wrapper.vm.onSubmit.execute();
 
     expect(mockShowErrorNotification).toHaveBeenCalledWith('Top level message', {
-      timeout: 2000,
+      timeout: 5000,
     });
   });
 
@@ -859,8 +859,8 @@ describe('MoveAcrossFolders.vue', () => {
       'alerts',
       'folder1'
     );
-    expect(mockShowPositiveNotification).toHaveBeenCalledWith('alerts Moved successfully', {
-      timeout: 2000,
+    expect(mockShowPositiveNotification).toHaveBeenCalledWith('Alerts moved successfully', {
+      timeout: 5000,
     });
     expect(wrapper.emitted('updated')).toBeTruthy();
   });
