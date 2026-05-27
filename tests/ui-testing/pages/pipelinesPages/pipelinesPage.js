@@ -95,16 +95,6 @@ export class PipelinesPage {
         // OInput inner native input — `.fill()` MUST target the `-field`
         // variant per §4 (the wrapper isn't the input).
         this.pipelineSearchInputField = page.locator('[data-test="pipeline-list-search-input-field"]');
-        // OTable rendering the pipeline rows. Used for settled-state checks
-        // (rows rendered OR no-data-message visible) before reading row content.
-        this.pipelineListTable = page.locator('[data-test="pipeline-list-table"]');
-        // The "all" tab on PipelinesList — clicking it ensures both realtime
-        // and scheduled pipelines are visible regardless of prior tab state.
-        this.pipelineListAllTab = page.locator('[data-test="tab-all"]');
-        // Per-pipeline delete button factory — runtime-dynamic name.
-        this.pipelineDeleteBtn = (name) => page.locator(
-            `[data-test="pipeline-list-${name}-delete-pipeline"]`,
-        ).first();
         this.deletionSuccessMessage = page.locator('[data-test-message="Pipeline deleted successfully"]')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
