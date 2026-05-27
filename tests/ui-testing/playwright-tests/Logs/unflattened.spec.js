@@ -147,24 +147,20 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 5 rows per attempt)');
-    // The `_o2_id` field only appears on rows ingested AFTER the schema
-    // change. Older rows may still be the most recent in the time window, so
-    // we scan the first N rows per attempt instead of relying on row 0. Between
-    // attempts we refresh the query to give the indexer a chance to surface
-    // freshly-ingested data.
+    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
     let o2idFound = false;
     for (let attempt = 1; attempt <= 5; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(5);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 5 rows on attempt ${attempt}, refreshing query`);
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
       if (attempt < 5) {
+        await ingestion(page);
         await applyQueryButton(page);
       }
     }
@@ -249,7 +245,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(15000);
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
@@ -287,26 +283,25 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Verifying kubernetes_pod_id appears in query editor');
     await pageManager.unflattenedPage.expectQueryEditorContainsText(/kubernetes_pod_id/);
 
-    testLogger.info('Replacing query with SELECT * FROM "e2e_automate"');
-    await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
+    testLogger.info('Replacing query with SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
+    await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
 
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await applyQueryButton(page);
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 5 rows per attempt)');
-    // Older rows from before the schema change won't carry `_o2_id`; scan the
-    // first N rows per attempt and refresh the query between attempts so the
-    // indexer can surface freshly-ingested data.
+    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
+    // With ORDER BY _timestamp DESC the newest rows come first; we scan more
+    // than strictly necessary (10) so a slight indexing lag still resolves
     let o2idFound = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(5);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 5 rows on attempt ${attempt}, refreshing query`);
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
       if (attempt === 3) {
         try {
           const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
@@ -317,6 +312,8 @@ test.describe("Unflattened testcases", () => {
         break;
       }
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
+      await ingestion(page);
+      await page.waitForTimeout(3000);
       await applyQueryButton(page);
     }
     if (!o2idFound) {

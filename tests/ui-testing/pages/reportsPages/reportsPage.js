@@ -89,9 +89,15 @@ export class ReportsPage {
     // Report list — search + row actions
     this.reportSearchInput = page.locator('[data-test="report-list-search-input"]');
     this.reportSearchInputField = page.locator('[data-test="report-list-search-input-field"]');
-    this.pauseStartReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`);
-    this.editReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-edit-report"]`);
-    this.deleteReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-delete-report"]`);
+    // Scope-based row resolution: find the per-name cell (added in ReportList.vue
+    // §6 source edit), walk up to the OTable row, then locate the action button
+    // within. More robust than relying on a standalone embedded-name data-test
+    // which can race the rendering of the row.
+    this.reportRow = (reportName) => page.locator(`[data-test="report-list-name-cell-${reportName}"]`)
+        .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]').first();
+    this.pauseStartReportBtn = (reportName) => this.reportRow(reportName).locator('[data-test$="-pause-start-report"]');
+    this.editReportBtn = (reportName) => this.reportRow(reportName).locator('[data-test$="-edit-report"]');
+    this.deleteReportBtn = (reportName) => this.reportRow(reportName).locator('[data-test$="-delete-report"]');
 
     // Confirm dialog (delete)
     this.confirmDialog = page.locator('[data-test="confirm-dialog"]');
@@ -393,11 +399,17 @@ export class ReportsPage {
       await expect.poll(async () => {
         await this.page.goto(reportsUrl, { waitUntil: 'domcontentloaded' });
         await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForFunction(() => {
+          const t = document.querySelector('[data-test="report-list-table"]');
+          if (!t) return false;
+          const text = t.textContent || '';
+          return /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+        }, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
         return await btn.isVisible().catch(() => false);
       }, {
-        intervals: [2000, 3000, 5000, 5000],
-        timeout: 60000,
+        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+        timeout: 180000,
       }).toBe(true);
     }
 

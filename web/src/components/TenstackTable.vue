@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <table
         v-if="table"
         data-test="o2-table"
+        :data-test-loading="loading ? 'true' : 'false'"
         :class="['tw:w-full', 'tw:table-auto']"
         :style="{
           minWidth: '100%',

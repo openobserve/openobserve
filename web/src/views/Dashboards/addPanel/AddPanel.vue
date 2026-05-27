@@ -1783,8 +1783,8 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 :deep(.date-time-button) {
-  height: 36px !important;
-  min-height: 36px !important;
+  height: 32px !important;
+  min-height: 32px !important;
 }
 
 .dynamic-input {
