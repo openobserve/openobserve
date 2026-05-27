@@ -2,7 +2,7 @@
   <div
     class="group"
     data-test="dashboard-group"
-    :style="`--group-index: ${groupNestedIndex}`"
+    :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}`"
   >
     <div class="group-conditions" data-test="dashboard-group-conditions">
       <div
@@ -188,7 +188,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .group {
   display: flex;
-  padding: 0px 0px 0px 5px;
+  padding: 0px;
   background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));
   border-radius: 5px;
 }
