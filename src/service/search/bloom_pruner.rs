@@ -55,56 +55,32 @@ struct Predicate {
     values: Vec<String>,
 }
 
-/// Pull the bloom-decidable predicates out of a top-level `IndexCondition`.
-///
-/// Only **positive equality / IN** on a bloom-indexed field is useful: a
-/// bloom can prove a value is definitely *absent* from a file, never that
-/// it's present. Everything else is ignored — those conditions don't
-/// participate in pruning and the file passes the bloom step untouched:
-///
-/// - `NotEqual` / `Not`: a bloom can't refute "not X".
-/// - `StrMatch` / `Regex` / `MatchAll` / `FuzzyMatchAll`: tokenized; the bloom is keyed by the
-///   exact term.
-/// - `Or`: a single OR would need every branch bloom-prunable, and OR-joining branch results
-///   weakens the filter.
-/// - nested `And`: not recursed into (top-level conditions are already AND'd).
-/// - empty `In` / negated `In`: nothing to test / can't refute.
-///
-/// `bloom_indexed_fields` is the stream's `bloom_filter_fields ∩ index_fields`
-/// — passing an unrelated field would just waste IO on guaranteed misses.
-fn collect_decidable(
-    cond: &IndexCondition,
-    bloom_indexed_fields: &HashSet<String>,
-) -> Vec<Predicate> {
-    let mut out: Vec<Predicate> = Vec::new();
-    for c in &cond.conditions {
-        match c {
-            Condition::Equal(field, value) if bloom_indexed_fields.contains(field) => {
-                out.push(Predicate {
-                    field: field.clone(),
-                    values: vec![value.clone()],
-                });
-            }
-            Condition::In(field, values, false)
-                if bloom_indexed_fields.contains(field) && !values.is_empty() =>
-            {
-                out.push(Predicate {
-                    field: field.clone(),
-                    values: values.clone(),
-                });
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
 /// Bytes pulled from the tail of a `.bf` on footer-cache miss. Big
 /// enough to cover the footer payload for hour buckets up to ~150 indexed
 /// (file, field) pairs (footer ≈ 24 B per file × few fields + per-field
 /// header ≈ 7.5 KB at the high end). When the actual footer overflows
 /// this probe, the group falls back to "keep all".
 const BLOOM_SUFFIX_PROBE_BYTES: u64 = 16 * 1024;
+
+/// Outcome of running one (date, bloom_ver) bucket. The `Ok` variant carries
+/// one tuple per resolvable `(file_idx, pred_idx, value_idx)`; missing
+/// entries imply "no info" for that target and are handled by the caller.
+enum GroupResult {
+    Ok(Vec<(usize, usize, usize, bool)>),
+    Err(String, FetchError),
+}
+
+/// Errors observable by the per-group fetch helper. Folded into a `log::warn`
+/// + "keep all" in the prune loop — never surfaced to the query caller.
+#[derive(Debug, thiserror::Error)]
+enum FetchError {
+    #[error("object store: {0}")]
+    Store(#[from] object_store::Error),
+    #[error("bloom parse: {0:?}")]
+    Parse(infra::bloom::ReadError),
+    #[error("row count mismatch: expected {expected} got {got}")]
+    RowMismatch { expected: usize, got: usize },
+}
 
 /// Outer concurrency cap on `.bf` buckets processed in parallel.
 ///
@@ -329,26 +305,6 @@ pub async fn prune(
     kept
 }
 
-/// Outcome of running one (date, bloom_ver) bucket. The `Ok` variant carries
-/// one tuple per resolvable `(file_idx, pred_idx, value_idx)`; missing
-/// entries imply "no info" for that target and are handled by the caller.
-enum GroupResult {
-    Ok(Vec<(usize, usize, usize, bool)>),
-    Err(String, FetchError),
-}
-
-/// Errors observable by the per-group fetch helper. Folded into a `log::warn`
-/// + "keep all" in the prune loop — never surfaced to the query caller.
-#[derive(Debug, thiserror::Error)]
-enum FetchError {
-    #[error("object store: {0}")]
-    Store(#[from] object_store::Error),
-    #[error("bloom parse: {0:?}")]
-    Parse(infra::bloom::ReadError),
-    #[error("row count mismatch: expected {expected} got {got}")]
-    RowMismatch { expected: usize, got: usize },
-}
-
 async fn run_group(
     trace_id: &str,
     account: &str,
@@ -509,6 +465,50 @@ fn footer_shortfall(suffix: &[u8], total: u64) -> Option<u64> {
         return None;
     }
     Some(needed)
+}
+
+/// Pull the bloom-decidable predicates out of a top-level `IndexCondition`.
+///
+/// Only **positive equality / IN** on a bloom-indexed field is useful: a
+/// bloom can prove a value is definitely *absent* from a file, never that
+/// it's present. Everything else is ignored — those conditions don't
+/// participate in pruning and the file passes the bloom step untouched:
+///
+/// - `NotEqual` / `Not`: a bloom can't refute "not X".
+/// - `StrMatch` / `Regex` / `MatchAll` / `FuzzyMatchAll`: tokenized; the bloom is keyed by the
+///   exact term.
+/// - `Or`: a single OR would need every branch bloom-prunable, and OR-joining branch results
+///   weakens the filter.
+/// - nested `And`: not recursed into (top-level conditions are already AND'd).
+/// - empty `In` / negated `In`: nothing to test / can't refute.
+///
+/// `bloom_indexed_fields` is the stream's `bloom_filter_fields ∩ index_fields`
+/// — passing an unrelated field would just waste IO on guaranteed misses.
+fn collect_decidable(
+    cond: &IndexCondition,
+    bloom_indexed_fields: &HashSet<String>,
+) -> Vec<Predicate> {
+    let mut out: Vec<Predicate> = Vec::new();
+    for c in &cond.conditions {
+        match c {
+            Condition::Equal(field, value) if bloom_indexed_fields.contains(field) => {
+                out.push(Predicate {
+                    field: field.clone(),
+                    values: vec![value.clone()],
+                });
+            }
+            Condition::In(field, values, false)
+                if bloom_indexed_fields.contains(field) && !values.is_empty() =>
+            {
+                out.push(Predicate {
+                    field: field.clone(),
+                    values: values.clone(),
+                });
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 #[cfg(test)]

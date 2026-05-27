@@ -102,33 +102,14 @@ pub async fn build_for_stream(
     }
 
     // Pull every file currently in this hour bucket.
-    let date_range = (date_key.to_string(), date_key.to_string());
-    let files = infra_file_list::query_for_merge(org_id, stream_type, stream_name, date_range)
-        .await
-        .context("query_for_merge for bloom build")?;
+    let mut files =
+        infra_file_list::query_for_bloom(org_id, stream_type, stream_name, date_key).await?;
     if files.is_empty() {
         return Ok(false);
     }
 
-    // Trigger: rebuild only when **at least one file has bloom_ver=0**
-    // (i.e., new data needs blooming). A bucket where every file already
-    // has a non-zero bloom_ver — even if those values differ across files
-    // (e.g., older rows already dumped at one version, newer rows
-    // produced by a later compaction round at another) — has nothing
-    // new to do here. The search side handles mixed `bloom_ver` natively
-    // by grouping per (date, bloom_ver) and fetching each `.bf`.
-    //
-    // This is the key invariant that prevents `.bf` orphaning: rebuild
-    // never re-stamps an already-stamped file, so no live row ever
-    // moves off a `bloom_ver` while a dumped row may still point to it.
-    let any_zero = files.iter().any(|f| f.meta.bloom_ver == 0);
-    if !any_zero {
-        log::debug!(
-            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: every file already has a bloom_ver, skipping ({} files)",
-            files.len()
-        );
-        return Ok(false);
-    }
+    let build_key = format!("{org_id}/{stream_type}/{stream_name}/{date_key}");
+    let bloom_dir = infra::bloom::path::bloom_dir(org_id, stream_type, stream_name, date_key);
 
     // Build blooms only for files without a `.bf` yet (bloom_ver = 0).
     //
@@ -146,95 +127,125 @@ pub async fn build_for_stream(
     // chunk's max cardinality).
     let fpp = cfg.common.bloom_filter_fpp;
     let max_files_per_bf = cfg.common.bloom_filter_max_files_per_bf.max(1);
-
-    let mut new_files: Vec<&FileKey> = files.iter().filter(|f| f.meta.bloom_ver == 0).collect();
-    if new_files.is_empty() {
-        return Ok(false);
-    }
-    new_files.sort_by(|a, b| b.meta.records.cmp(&a.meta.records));
+    files.sort_by(|a, b| b.meta.records.cmp(&a.meta.records));
 
     let base_ver = now_micros();
-    let mut wrote_any = false;
-    let chunk_total = new_files.len().div_ceil(max_files_per_bf);
-
-    for (chunk_idx, chunk) in new_files.chunks(max_files_per_bf).enumerate() {
-        // B for this chunk is sized from the chunk's MAX record count, used as
-        // a safe NDV upper bound: a file can't hold more distinct values than
-        // rows. This never under-sizes (no saturation) for the target
-        // high-cardinality fields where distinct ≈ rows. It over-sizes for
-        // fields that repeat heavily (distinct ≪ rows) — acceptable; exact
-        // sizing would read each file's tantivy term count in a pre-pass.
-        let max_records = chunk
-            .iter()
-            .map(|f| f.meta.records.max(0) as u64)
-            .max()
-            .unwrap_or(0)
-            .max(1);
-        let num_blocks = infra::bloom::num_blocks_for(max_records, fpp);
-
-        let mut all_blooms: Vec<FieldBloom> = Vec::new();
-        let mut contributing_ids: Vec<i64> = Vec::new();
-        for f in chunk {
-            match build_blooms_for_file(f, &target_fields, num_blocks).await {
-                Ok(mut blooms) if !blooms.is_empty() => {
-                    all_blooms.append(&mut blooms);
-                    contributing_ids.push(f.id);
-                }
-                Ok(_) => {} // no blooms (no index / field absent) — leave at 0
-                Err(e) => {
-                    log::warn!("[BLOOM_BUILD] skipping {} (bloom build failed): {e}", f.key);
-                }
-            }
-        }
-        if all_blooms.is_empty() {
-            continue;
-        }
-
-        // Distinct bloom_ver per chunk (base + idx) → distinct `.bf` path.
+    let chunk_total = files.len().div_ceil(max_files_per_bf);
+    for (chunk_idx, chunk) in files.chunks(max_files_per_bf).enumerate() {
         let bloom_ver = base_ver + chunk_idx as i64;
-        let blob = match BloomWriter::serialize(all_blooms) {
-            Ok(b) => b,
-            Err(e) => {
-                log::warn!(
-                    "[BLOOM_BUILD] serialize failed for {org_id}/{stream_type}/{stream_name}/{date_key} chunk {chunk_idx}: {e}"
+        match build_for_chunk(org_id, bloom_ver, &bloom_dir, chunk, &target_fields, fpp).await {
+            Ok((took, num_blocks, contributing_ids)) => {
+                log::info!(
+                    "[BLOOM_BUILD] {build_key}: wrote chunk {}/{chunk_total}, num_blocks={num_blocks} covering {contributing_ids} files in {took} ms",
+                    chunk_idx + 1,
                 );
-                continue;
             }
-        };
-        let bf_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
-        let bf_account = storage::get_account(org_id, &bf_path).unwrap_or_default();
-        if let Err(e) = storage::put(&bf_account, &bf_path, Bytes::from(blob)).await {
-            log::warn!("[BLOOM_BUILD] upload {bf_path} failed: {e}");
-            continue;
+            Err(e) => {
+                log::warn!("[BLOOM_BUILD] {build_key}: build chunk {chunk_idx} failed: {e}");
+            }
         }
-
-        debug_assert!(
-            contributing_ids.iter().all(|id| *id > 0),
-            "bloom builder must only stamp file_list rows with assigned ids"
-        );
-        if let Err(e) = infra_file_list::update_bloom_ver(&contributing_ids, bloom_ver).await {
-            log::warn!(
-                "[BLOOM_BUILD] update_bloom_ver failed for {org_id}/{stream_type}/{stream_name}/{date_key} chunk {chunk_idx}: {e}"
-            );
-            continue;
-        }
-
-        wrote_any = true;
-        log::debug!(
-            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {bf_path} (chunk {}/{chunk_total}, num_blocks={num_blocks}) covering {} file(s)",
-            chunk_idx + 1,
-            contributing_ids.len(),
-        );
-    }
-
-    if !wrote_any {
-        log::debug!(
-            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: no blooms produced from {} new file(s); skipping",
-            new_files.len()
-        );
     }
 
     Ok(true)
+}
+
+// B for this chunk is sized from the chunk's MAX record count, used as
+// a safe NDV upper bound: a file can't hold more distinct values than
+// rows. This never under-sizes (no saturation) for the target
+// high-cardinality fields where distinct ≈ rows. It over-sizes for
+// fields that repeat heavily (distinct ≪ rows) — acceptable; exact
+// sizing would read each file's tantivy term count in a pre-pass.
+async fn build_for_chunk(
+    org_id: &str,
+    bloom_ver: i64,
+    bloom_dir: &str,
+    files: &[FileKey],
+    target_fields: &[String],
+    fpp: f64,
+) -> Result<(u64, u32, usize)> {
+    let start = std::time::Instant::now();
+    let bf_path = format!("{bloom_dir}/{bloom_ver}.bf");
+
+    let max_records = files
+        .iter()
+        .map(|f| f.meta.records.max(0) as u64)
+        .max()
+        .unwrap_or(0)
+        .max(1);
+    let num_blocks = infra::bloom::num_blocks_for(max_records, fpp);
+
+    let mut all_blooms: Vec<FieldBloom> = Vec::new();
+    let mut contributing_ids: Vec<i64> = Vec::new();
+    for f in files {
+        match build_for_file(f, &target_fields, num_blocks).await {
+            Ok(mut blooms) if !blooms.is_empty() => {
+                all_blooms.append(&mut blooms);
+                contributing_ids.push(f.id);
+            }
+            Ok(_) => {} // no blooms (no index / field absent) — leave at 0
+            Err(e) => {
+                log::warn!(
+                    "[BLOOM_BUILD] {bf_path}: skipping {} (bloom build failed): {e}",
+                    f.key
+                );
+            }
+        }
+    }
+    if all_blooms.is_empty() {
+        return Ok((0, 0, 0));
+    }
+
+    // Distinct bloom_ver per chunk (base + idx) → distinct `.bf` path.
+    let blob: Vec<u8> = BloomWriter::serialize(all_blooms).context("serialize blooms")?;
+    let bf_account = storage::get_account(org_id, &bf_path).unwrap_or_default();
+    storage::put(&bf_account, &bf_path, Bytes::from(blob))
+        .await
+        .context("upload blooms")?;
+
+    debug_assert!(
+        contributing_ids.iter().all(|id| *id > 0),
+        "bloom builder must only stamp file_list rows with assigned ids"
+    );
+    infra_file_list::update_bloom_ver(&contributing_ids, bloom_ver)
+        .await
+        .context("update bloom ver")?;
+
+    let took = start.elapsed().as_millis() as u64;
+
+    Ok((took, num_blocks, contributing_ids.len()))
+}
+
+async fn build_for_file(
+    file: &FileKey,
+    target_fields: &[String],
+    num_blocks: u32,
+) -> anyhow::Result<Vec<FieldBloom>> {
+    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&file.key) else {
+        return Ok(Vec::new()); // not an indexable file
+    };
+    if file.meta.index_size == 0 {
+        return Ok(Vec::new()); // no .ttv was emitted
+    }
+    let file_account = file.account.clone();
+    let puffin_dir = Arc::new(
+        get_tantivy_directory(
+            "bloom_build",
+            &file_account,
+            &ttv_file_name,
+            file.meta.index_size,
+        )
+        .await?,
+    );
+    let footer_cache = FooterCache::from_directory(puffin_dir.clone(), &ttv_file_name).await?;
+    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+    let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
+    let index = tantivy::Index::open(reader_directory).context("open index")?;
+
+    // file.id is the file_list row id, assigned by the INSERT that
+    // happened in `write_file_list` before this build runs. Always > 0
+    // by the time we get here.
+    let file_id = file.id as u64;
+    build_blooms_from_index(&index, file_id, target_fields, num_blocks).await
 }
 
 /// Retire any `.bf` whose `bloom_ver` is no longer referenced by a live file
@@ -256,7 +267,7 @@ pub async fn cleanup_orphan_blooms(
     stream_name: &str,
     date_key: &str,
     deleted_bloom_vers: &[i64],
-) -> anyhow::Result<()> {
+) -> Result<()> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled {
         return Ok(());
@@ -321,38 +332,4 @@ pub async fn cleanup_orphan_blooms(
         );
     }
     Ok(())
-}
-
-async fn build_blooms_for_file(
-    file: &FileKey,
-    target_fields: &[String],
-    num_blocks: u32,
-) -> anyhow::Result<Vec<FieldBloom>> {
-    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&file.key) else {
-        return Ok(Vec::new()); // not an indexable file
-    };
-    if file.meta.index_size == 0 {
-        return Ok(Vec::new()); // no .ttv was emitted
-    }
-    let file_account = file.account.clone();
-    let puffin_dir = Arc::new(
-        get_tantivy_directory(
-            "bloom_build",
-            &file_account,
-            &ttv_file_name,
-            file.meta.index_size,
-        )
-        .await
-        .context("open puffin dir")?,
-    );
-    let footer_cache = FooterCache::from_directory(puffin_dir.clone(), &ttv_file_name).await?;
-    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
-    let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
-    let index = tantivy::Index::open(reader_directory)?;
-
-    // file.id is the file_list row id, assigned by the INSERT that
-    // happened in `write_file_list` before this build runs. Always > 0
-    // by the time we get here.
-    let file_id = file.id as u64;
-    build_blooms_from_index(&index, file_id, target_fields, num_blocks).await
 }

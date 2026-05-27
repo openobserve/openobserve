@@ -111,6 +111,13 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<Vec<FileRecord>>;
     async fn query_for_dump_by_updated_at(&self, time_range: (i64, i64))
     -> Result<Vec<FileRecord>>;
+    async fn query_for_bloom(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+    ) -> Result<Vec<FileKey>>;
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
@@ -387,6 +394,19 @@ pub async fn query_for_dump(
 #[tracing::instrument(name = "infra:file_list:db:query_for_dump_by_updated_at")]
 pub async fn query_for_dump_by_updated_at(time_range: (i64, i64)) -> Result<Vec<FileRecord>> {
     CLIENT.query_for_dump_by_updated_at(time_range).await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_for_bloom")]
+pub async fn query_for_bloom(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date: &str,
+) -> Result<Vec<FileKey>> {
+    CLIENT
+        .query_for_bloom(org_id, stream_type, stream_name, date)
+        .await
 }
 
 #[inline]
@@ -707,10 +727,15 @@ pub struct FileRecord {
     pub file: String,
     #[sqlx(default)]
     pub deleted: bool,
+    #[sqlx(default)]
     pub min_ts: i64,
+    #[sqlx(default)]
     pub max_ts: i64,
+    #[sqlx(default)]
     pub records: i64,
+    #[sqlx(default)]
     pub original_size: i64,
+    #[sqlx(default)]
     pub compressed_size: i64,
     #[sqlx(default)]
     pub index_size: i64,

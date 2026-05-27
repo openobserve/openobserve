@@ -48,7 +48,7 @@ pub async fn build_blooms_from_index(
     file_id: u64,
     fields: &[String],
     num_blocks: u32,
-) -> anyhow::Result<Vec<FieldBloom>> {
+) -> Result<Vec<FieldBloom>, anyhow::Error> {
     if fields.is_empty() {
         return Ok(Vec::new());
     }
@@ -65,7 +65,6 @@ pub async fn build_blooms_from_index(
     let warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> = HashMap::new();
     let mut need_all_term_fields = HashSet::new();
     let need_fast_field = HashSet::new();
-
     for field in fields {
         let Ok(field) = schema.get_field(field) else {
             continue;

@@ -548,7 +548,6 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#;
-
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
             .bind(date_start)
@@ -624,6 +623,36 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .with_label_values(&["query_by_updated_at", "file_list"])
             .observe(time);
         Ok(ret?)
+    }
+
+    async fn query_for_bloom(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+    ) -> Result<Vec<FileKey>> {
+        let start = std::time::Instant::now();
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["query_for_bloom", "file_list"])
+            .inc();
+
+        let sql = r#"
+SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
+                "#;
+        let ret = sqlx::query_as::<_, super::FileRecord>(sql)
+            .bind(stream_key)
+            .bind(date)
+            .fetch_all(&pool)
+            .await;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["query_for_bloom", "file_list"])
+            .observe(time);
+        Ok(ret?.iter().map(|r| r.into()).collect())
     }
 
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>> {
