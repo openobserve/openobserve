@@ -1252,7 +1252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("search.maxEventsScheduleJob") }}
       </div>
       <div class="tw:opacity-80 tw:text-left mapping-warning-msg tw:mt-3">
-        <OIcon name="warning" size="sm" class="tw:mr-2" />
+        <OIcon name="warning" size="sm" class="tw:mr-2 tw:text-red-500" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
