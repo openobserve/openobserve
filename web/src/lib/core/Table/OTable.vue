@@ -465,6 +465,7 @@ defineExpose({
             : (props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)'),
         }"
         data-test="o2-table"
+        :data-test-loading="props.loading ? 'true' : 'false'"
       >
         <!-- ── Header ───────────────────────────────────────── -->
         <OTableHeader

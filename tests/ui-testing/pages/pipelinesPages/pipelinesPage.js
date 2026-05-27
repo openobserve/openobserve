@@ -95,6 +95,16 @@ export class PipelinesPage {
         // OInput inner native input — `.fill()` MUST target the `-field`
         // variant per §4 (the wrapper isn't the input).
         this.pipelineSearchInputField = page.locator('[data-test="pipeline-list-search-input-field"]');
+        // OTable rendering the pipeline rows. Used for settled-state checks
+        // (rows rendered OR no-data-message visible) before reading row content.
+        this.pipelineListTable = page.locator('[data-test="pipeline-list-table"]');
+        // The "all" tab on PipelinesList — clicking it ensures both realtime
+        // and scheduled pipelines are visible regardless of prior tab state.
+        this.pipelineListAllTab = page.locator('[data-test="tab-all"]');
+        // Per-pipeline delete button factory — runtime-dynamic name.
+        this.pipelineDeleteBtn = (name) => page.locator(
+            `[data-test="pipeline-list-${name}-delete-pipeline"]`,
+        ).first();
         this.deletionSuccessMessage = page.locator('[data-test-message="Pipeline deleted successfully"]')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
@@ -1222,23 +1232,30 @@ export class PipelinesPage {
         // more-options ODropdown. PipelinesList.vue:194-201 uses data-test=
         // `pipeline-list-${row.name}-delete-pipeline`. The ODropdown only contains
         // pause/start, export, backfill, view-error — no delete-action item.
-        const deleteBtn = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
-        ).first();
+        const deleteBtn = this.pipelineDeleteBtn(pipelineName);
         const found = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
         if (!found) {
-            testLogger.info(`createAndVerifyPipeline: pipeline ${pipelineName} not in list, reloading and retrying`);
-            const reloadApi = this.page.waitForResponse(
-                (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
-                { timeout: 20000 }
-            ).catch(() => null);
-            await this.page.reload().catch(() => {});
-            await reloadApi;
-            await this.waitForPipelineListSettled();
-            await this.pipelineSearchInputField.fill('');
-            await this.searchPipeline(pipelineName);
+            testLogger.info(`createAndVerifyPipeline: pipeline ${pipelineName} not in list, polling with reload`);
+            await expect.poll(async () => {
+                const reloadApi = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
+                await this.page.reload().catch(() => {});
+                await reloadApi;
+                if (await this.pipelineListAllTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await this.pipelineListAllTab.click().catch(() => {});
+                }
+                await this.waitForPipelineListSettled(15000);
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+                await this.pipelineSearchInputField.fill('');
+                await this.searchPipeline(pipelineName);
+                return await deleteBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+                timeout: 180000,
+            }).toBe(true);
         }
-        await deleteBtn.waitFor({ state: 'visible', timeout: 30000 });
         await deleteBtn.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
@@ -1250,6 +1267,14 @@ export class PipelinesPage {
      * message) has appeared. This avoids the read-after-write race where
      * the test races the GET /api/<org>/pipelines response and filters an
      * unloaded table to zero rows, hiding the freshly-created pipeline.
+     *
+     * Gates on three orthogonal signals so we are robust to any one of them
+     * being temporarily missing (skeleton mid-flight, virtualised row not
+     * yet stamped with a delete-btn data-test, etc.):
+     *   - a row with a `-delete-pipeline` data-test, OR
+     *   - the empty-state `no-data-message`, OR
+     *   - the OTable pagination footer "Showing X - Y" / "No data available"
+     *     (matches the reportsPage settle pattern that proved stable in CI).
      */
     async waitForPipelineListSettled(timeout = 30000) {
         await this.page.waitForFunction(() => {
@@ -1257,7 +1282,9 @@ export class PipelinesPage {
             if (!table) return false;
             const hasRow = !!table.querySelector('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]');
             const hasEmpty = !!table.querySelector('[data-test="no-data-message"]');
-            return hasRow || hasEmpty;
+            const text = table.textContent || '';
+            const hasFooter = /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+            return hasRow || hasEmpty || hasFooter;
         }, { timeout }).catch(() => {});
     }
 
@@ -1391,44 +1418,43 @@ export class PipelinesPage {
     }
 
     async deletePipelineByName(pipelineName) {
-        const deleteBtn = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
-        ).first();
-        let deleteVisible = false;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            const apiPromise = this.page.waitForResponse(
-                (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
-                { timeout: 20000 }
-            ).catch(() => null);
+        const deleteBtn = this.pipelineDeleteBtn(pipelineName);
 
-            if (attempt > 1) {
-                testLogger.info(`deletePipelineByName: pipeline row not visible, reloading list (attempt ${attempt}/3)`);
+        // First quick check — when the row is already in the list we skip
+        // the heavier poll-with-reload loop below entirely.
+        const initialVisible = await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!initialVisible) {
+            // Per-pipeline propagation in CI can be slow (cross-cluster, search
+            // re-index, etc.). Match the reportsPage.pauseReport budget (180s,
+            // escalating intervals) instead of a 3-attempt cap that timed out.
+            testLogger.info(`deletePipelineByName: pipeline ${pipelineName} not visible, polling list with reload`);
+            await expect.poll(async () => {
+                const apiPromise = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
                 await this.page.reload().catch(() => {});
-            }
-            await apiPromise;
+                await apiPromise;
 
-            // Ensure we're on the "all" tab so realtime + scheduled pipelines
-            // are both visible regardless of any previous tab selection.
-            const allTab = this.page.locator('[data-test="tab-all"]');
-            if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await allTab.click().catch(() => {});
-                await this.page.waitForTimeout(300);
-            }
+                // Ensure we're on the "all" tab so realtime + scheduled pipelines
+                // are both visible regardless of any previous tab selection.
+                if (await this.pipelineListAllTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await this.pipelineListAllTab.click().catch(() => {});
+                }
 
-            await this.waitForPipelineListSettled(15000);
+                // Wait for the table to reach a settled state (rows or empty-
+                // state OR pagination footer) BEFORE reading row content.
+                await this.waitForPipelineListSettled(15000);
 
-            // Clear and re-fill the search filter.
-            await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
-            await this.pipelineSearchInputField.fill('');
-            await this.page.waitForTimeout(300);
-            await this.searchPipeline(pipelineName);
-            await this.page.waitForTimeout(1000);
-
-            deleteVisible = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
-            if (deleteVisible) break;
-        }
-        if (!deleteVisible) {
-            await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+                // Clear and re-fill the search filter.
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+                await this.pipelineSearchInputField.fill('');
+                await this.searchPipeline(pipelineName);
+                return await deleteBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+                timeout: 180000,
+            }).toBe(true);
         }
         await deleteBtn.click();
         await this.confirmDeletePipeline();
