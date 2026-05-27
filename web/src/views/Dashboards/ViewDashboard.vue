@@ -23,13 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{
         fullscreen: isFullscreen,
         'print-mode-container': store.state.printMode,
+        'tw:h-full': !store.state.printMode && !isFullscreen,
       }"
-      :style="
-        !store.state.printMode && !isFullscreen
-          ? { height: 'calc(100vh - var(--navbar-height))' }
-          : {}
-      "
-      class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden tw:pt-1"
+      class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden"
     >
       <div
         :class="`${

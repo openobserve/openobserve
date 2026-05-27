@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="isLoading"
             :key="store.state.selectedOrganization?.identifier"
-            class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
+            class="o2-content-scroll tw:flex-1 tw:overflow-y-auto tw:pt-2.5 tw:pb-2.5"
           >
             <router-view v-slot="{ Component }">
               <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />

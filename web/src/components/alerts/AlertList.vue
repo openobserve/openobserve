@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-list-page"
-    class="tw:flex tw:flex-col"
-    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
+    class="tw:flex tw:flex-col tw:h-full"
   >
     <div
       class="tw:shrink-0 tw:px-[0.625rem]"
@@ -133,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:gap-[0.625rem]"
     >
       <!-- Left: FolderList -->
       <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
@@ -160,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :page-size="pageSize"
                 :page-size-options="pageSizeOptions"
                 width="100%"
+                style="width: 100%; height: 100%"
                 :show-global-filter="false"
                 :default-columns="false"
                 @row-click="triggerExpand"

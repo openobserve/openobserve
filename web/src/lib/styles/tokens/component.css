@@ -11,6 +11,11 @@
 
 /* ── Light-mode defaults ─────────────────────────────────── */
 :root {
+  /* PageHeader */
+  --color-page-header-bg: var(--color-surface-panel);
+  --color-page-header-border: var(--color-border-default);
+  --color-page-header-title: var(--color-text-primary);
+
   /* Separator */
   --spacing-separator: var(--spacing-px);
   --color-separator: var(--color-border-default);
@@ -1188,6 +1193,11 @@
   --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
   --color-table-streaming-bar: var(--color-table-streaming-bar);
   --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
+
+  /* PageHeader */
+  --color-page-header-bg: var(--color-page-header-bg);
+  --color-page-header-border: var(--color-page-header-border);
+  --color-page-header-title: var(--color-page-header-title);
 
   /* Nav */
   --color-nav-icon: var(--color-nav-icon);

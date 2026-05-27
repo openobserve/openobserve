@@ -17,11 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="action-scripts-list-page">
+  <div data-test="action-scripts-list-page" class="tw:flex tw:flex-col tw:h-full">
     <div
       v-if="!showAddActionScriptDialog"
-      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
+      class="tw:flex tw:flex-col tw:h-full"
     >
+      <div class="tw:shrink-0 tw:px-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
           class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]"
@@ -55,8 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-124px)]">
+      </div>
+      <div class="tw:flex-1 tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem]">
+        <div class="card-container tw:h-full">
           <OTable
             data-test="action-scripts-table"
             :data="visibleRows"
@@ -72,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filter-mode="client"
             :default-columns="false"
             :show-global-filter="false"
+            style="width: 100%; height: 100%"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #empty>

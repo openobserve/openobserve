@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:overflow-hidden tw:flex-1 tw:min-h-0"
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
+          <div class="tw:w-full tw:h-full tw:pl-[0.625rem]">
             <div
               v-if="showSidebar"
               class="card-container tw:h-full"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
             @get:templates="getTemplates" -->
-            <div class="tw:h-full tw:pt-1 tw:pb-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
+            <div class="tw:h-full tw:pt-1 tw:flex tw:flex-col tw:min-h-0">
               <RouterView v-slot="{ Component }">
                 <component :is="Component" @sendToAiChat="sendToAiChat" />
               </RouterView>

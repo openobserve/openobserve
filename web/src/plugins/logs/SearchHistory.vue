@@ -68,7 +68,7 @@
       </div>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div
-          class="tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container"
+          class="tw:h-[calc(100vh_-_var(--navbar-height)_-_115px)] card-container"
         >
           <OTable
             :data="dataToBeLoaded"
@@ -89,7 +89,7 @@
             width="100%"
             :style="
               dataToBeLoaded.length > 0
-                ? 'height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;'
+                ? 'height: calc(100vh - var(--navbar-height) - 115px); overflow-y: auto;'
                 : 'height: 0px'
             "
             @update:expanded-ids="onExpandedIdsChange"

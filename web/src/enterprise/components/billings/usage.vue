@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="tw:p-3 " style="height: calc(100vh - 130px); width: 100%;" >
+    <div class="tw:p-3 tw:h-full tw:w-full">
       <div class="tw:flex tw:items-baseline tw:justify-between">
         <div class="tw:flex tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:pb-3 usage-title">
           <span>{{ t("billing.totalUsage") }}</span>

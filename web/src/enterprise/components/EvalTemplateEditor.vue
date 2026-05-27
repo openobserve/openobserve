@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="eval-template-editor-page"
     class="tw:flex tw:flex-col tw:pr-[0.625rem]"
-    style="height: calc(100vh - var(--navbar-height) - 14px)"
   >
     <!-- Header bar -->
     <div class="card-container tw:mb-2 tw:shrink-0">

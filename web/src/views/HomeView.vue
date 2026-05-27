@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md tw:px-[0.625rem] tw:pt-1 home-page"
-    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view tw:pb-2' : ''"
+    class="tw:rounded-md tw:px-[0.625rem] home-page tw:h-full tw:flex tw:flex-col"
+    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view' : ''"
     data-test="home-page"
   >
     <div
-      class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+      class="card-container tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
     >
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
       <div
@@ -276,7 +276,7 @@ export default defineComponent({
   gap: 0;
   border-bottom: 1px solid var(--color-tabs-bar-border);
   margin: 0 0.625rem 0 0.625rem;
-  padding-top: 0.25rem;
+  padding-top: 0.875rem;
 }
 
 .home-tab-btn {

@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:rounded-md">
+  <div class="tw:rounded-md tw:h-full tw:flex tw:flex-col">
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -245,6 +245,8 @@ const updateDateTime = (value: IDateTime) => {
 
 <style scoped lang="scss">
 .stream-data-table {
-  height: calc(100vh - (140px + 57px));
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 </style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details tw:h-[calc(100vh-2.625rem)]">
+  <div class="trace-details tw:h-full">
     <!-- Original View -->
     <div
       class="trace-details-content"

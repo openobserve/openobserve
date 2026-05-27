@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:pt-1 tw:px-2.5 tw:pb-2.5" data-test="iam-page">
+  <div class="tw:rounded-md tw:p-0 tw:px-2.5" data-test="iam-page">
     <OSplitter
       v-model="splitterModel"
       unit="px"

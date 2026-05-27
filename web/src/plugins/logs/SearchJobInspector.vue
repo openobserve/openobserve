@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md search-job-inspector tw:p-0">
-    <div class="tw:w-full tw:flex tw:flex-col tw:h-[calc(100vh_-_var(--navbar-height))] tw:overflow-hidden tw:px-[0.625rem] tw:pb-[0.625rem]">
+    <div class="tw:w-full tw:flex tw:flex-col tw:h-full tw:overflow-hidden tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:shrink-0">
         <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="session-details-page tw:h-[calc(100vh-2.6rem)] tw:px-[0.625rem] tw:py-[0.375rem]"
+    class="session-details-page tw:h-full tw:px-[0.625rem] tw:py-[0.375rem]"
   >
   <div
     class="session-details card-container tw:h-full tw:flex tw:flex-col tw:px-[1rem] tw:py-[0.625rem] tw:overflow-y-auto"

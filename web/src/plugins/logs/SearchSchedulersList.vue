@@ -40,7 +40,7 @@
       </div>
 
    <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class=" tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container">
+      <div class=" tw:h-[calc(100vh_-_var(--navbar-height)_-_115px)] card-container">
           <OTable
             data-test="search-scheduler-table"
             :data="dataToBeLoaded"
@@ -51,7 +51,7 @@
             expansion="single"
             :expand-on-row-click="true"
             v-model:expanded-ids="expandedIds"
-            style="height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;"
+            style="height: calc(100vh - var(--navbar-height) - 115px); overflow-y: auto;"
             @update:expanded-ids="onExpandedIdsChange"
             :show-global-filter="false"
           >
