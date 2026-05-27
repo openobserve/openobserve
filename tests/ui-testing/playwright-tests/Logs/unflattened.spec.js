@@ -287,26 +287,26 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Verifying kubernetes_pod_id appears in query editor');
     await pageManager.unflattenedPage.expectQueryEditorContainsText(/kubernetes_pod_id/);
 
-    testLogger.info('Replacing query with SELECT * FROM "e2e_automate"');
-    await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
+    testLogger.info('Replacing query with SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
+    await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
 
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await applyQueryButton(page);
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 5 rows per attempt)');
-    // Older rows from before the schema change won't carry `_o2_id`; scan the
-    // first N rows per attempt and refresh the query between attempts so the
-    // indexer can surface freshly-ingested data.
+    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
+    // With ORDER BY _timestamp DESC the newest rows come first; we scan more
+    // than strictly necessary (10) so a slight indexing lag still resolves
+    // within one attempt. The retry loop is kept as a fallback for slow CI.
     let o2idFound = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(5);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 5 rows on attempt ${attempt}, refreshing query`);
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, refreshing query`);
       if (attempt === 3) {
         try {
           const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
