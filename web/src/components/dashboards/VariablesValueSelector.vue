@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="max-width: 150px !important"
           v-model="item.value"
           :label="item.label || item.name"
+          label-position="inside"
           readonly
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
@@ -55,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :debounce="1000"
           v-model="item.value"
           :label="item.label || item.name"
+          label-position="inside"
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
         />

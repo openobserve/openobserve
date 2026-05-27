@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<InputProps>(), {
   autofocus: false,
   autogrow: false,
   rows: 3,
+  labelPosition: "outside",
 });
 
 const emit = defineEmits<InputEmits>();
@@ -233,13 +234,15 @@ const wrapperClasses = computed(() => [
     ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed tw:border-dashed"
     : "",
   props.readonly ? "tw:border-input-border tw:bg-input-bg" : "",
+  // Inside-label mode: wrapper is relative so the floating label can be absolutely placed
+  props.labelPosition === "inside" && props.label && !isTextarea.value ? "tw:relative" : "",
 ]);
 </script>
 
 <template>
   <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <label
-      v-if="label || $slots.tooltip"
+      v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
         'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
@@ -258,6 +261,12 @@ const wrapperClasses = computed(() => [
 
     <!-- Input row -->
     <div :class="wrapperClasses">
+      <!-- Inside label: floating mini-label at the top of the input border -->
+      <span
+        v-if="label && labelPosition === 'inside' && !isTextarea"
+        class="tw:absolute tw:top-0.75 tw:start-3 tw:end-7 tw:text-[0.625rem] tw:leading-none tw:text-input-placeholder tw:select-none tw:pointer-events-none tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+      >{{ label }}</span>
+
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
       <span
         v-if="$slots['icon-left']"
@@ -328,7 +337,8 @@ const wrapperClasses = computed(() => [
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
           'tw:h-full',
-          textSizeClasses[size ?? 'md'],
+          // Inside-label: push text down to leave room for the floating mini-label
+          labelPosition === 'inside' && label ? 'tw:pt-3.5 tw:pb-0.5 tw:text-xs' : textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
         ]"

@@ -78,6 +78,11 @@ export interface InputProps {
    * @see FieldWidth
    */
   width?: FieldWidth;
+  /**
+   * Position of the label: 'outside' renders above the field (default),
+   * 'inside' renders as a compact floating mini-label inside the field border.
+   */
+  labelPosition?: 'inside' | 'outside';
 }
 
 export interface InputEmits {
