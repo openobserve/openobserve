@@ -15,6 +15,10 @@ const props = defineProps<{
   selectionEnabled?: boolean;
   selectionMultiple?: boolean;
   isRowSelected?: boolean;
+  /** When provided, returning false for a row disables its selection checkbox
+   *  (visual not-allowed cursor + ignored toggles). Used e.g. to block bulk
+   *  selection of the root user in IAM. */
+  isRowSelectable?: (row: any) => boolean;
   expansionEnabled?: boolean;
   canExpand?: boolean;
   isExpanded?: boolean;
@@ -167,12 +171,17 @@ function onDblclick(event: MouseEvent) {
     <!-- Selection checkbox cell -->
     <td
       v-if="selectionEnabled"
-      :class="['tw:w-9 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
+      :class="[
+        'tw:w-9 tw:text-center tw:align-middle',
+        bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
+        isRowSelectable && !isRowSelectable(row.original) ? 'tw:cursor-not-allowed' : '',
+      ]"
       data-test="o2-table-select-cell"
     >
       <OTableSelectCheckbox
         :model-value="isRowSelected ?? false"
         :row-id="String(row.index)"
+        :disabled="isRowSelectable ? !isRowSelectable(row.original) : false"
         @update:model-value="emit('toggle-selection', row.original)"
       />
     </td>

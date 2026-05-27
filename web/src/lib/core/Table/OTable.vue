@@ -517,6 +517,7 @@ defineExpose({
           :selection-enabled="selection.isEnabled.value"
           :selection-multiple="selection.isMultiple.value"
           :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
+          :is-row-selectable="props.isRowSelectable"
           :expansion-enabled="expansion.isEnabled.value"
           :is-expanded-fn="(row: TData) => expansion.isExpanded(row)"
           :get-row-expansion-enabled="props.getRowExpansionEnabled"
