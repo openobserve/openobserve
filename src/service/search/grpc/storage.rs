@@ -449,6 +449,7 @@ pub async fn cache_files(
 }
 
 /// Check bloom filter for the file list
+#[tracing::instrument(name = "service:search:grpc:storage:check_bloom_filter", skip_all)]
 pub async fn check_bloom_filter(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
