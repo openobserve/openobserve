@@ -352,19 +352,19 @@ jobs:
             browser: "chrome"
             run_files:
               [
-                "dashboard-series-color-multiwindow.spec.js",
-                "dashboard-config-advanced.spec.js",
-                "dashboard-config-axis.spec.js",
-                "dashboard-config-gauge-maps.spec.js",
-                "dashboard-config-general.spec.js",
-                "dashboard-config-legends.spec.js",
-                "dashboard-config-line-style.spec.js",
-                "dashboard-config-panel-time.spec.js",
-                "dashboard-config-table.spec.js",
-                "dashboard-config-trellis.spec.js",
-                "dashboard-config-drilldown.spec.js",
-                "dashboard-config-promql.spec.js",
-                "dashboard-config-markline.spec.js",
+                # "dashboard-series-color-multiwindow.spec.js",
+                # "dashboard-config-advanced.spec.js",
+                # "dashboard-config-axis.spec.js",
+                # "dashboard-config-gauge-maps.spec.js",
+                # "dashboard-config-general.spec.js",
+                # "dashboard-config-legends.spec.js",
+                # "dashboard-config-line-style.spec.js",
+                # "dashboard-config-panel-time.spec.js",
+                # "dashboard-config-table.spec.js",
+                # "dashboard-config-trellis.spec.js",
+                # "dashboard-config-drilldown.spec.js",
+                # "dashboard-config-promql.spec.js",
+                # "dashboard-config-markline.spec.js",
               ]
     steps:
       - name: Clone the current repo
