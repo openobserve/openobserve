@@ -2099,6 +2099,8 @@
       "invitesPanelHint": "These organizations have invited you to join their billing group. If you accept, this organization's usage will be billed to them.",
       "inviteTabPrompt": "Invite another organization to join your billing group. Their usage will be billed to this organization.",
       "emptyTitle": "Start Billing Group",
+      "notEnabledTitle": "Billing Group Not Available",
+      "notEnabledDesc": "This organization isn't enabled to start a billing group. Contact your administrator if you need this feature.",
       "chipConsolidatedBill": "One Consolidated Bill",
       "chipLinkOrgs": "Link Multiple Orgs",
       "accept": "Accept",

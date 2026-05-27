@@ -302,31 +302,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="og-empty__title">
-            {{ t("billing.billingGroup.emptyTitle") }}
+            {{
+              allowedForBillingGroup
+                ? t("billing.billingGroup.emptyTitle")
+                : t("billing.billingGroup.notEnabledTitle")
+            }}
           </div>
           <div class="og-empty__desc">
-            {{ t("billing.billingGroup.inviteTabPrompt") }}
+            {{
+              allowedForBillingGroup
+                ? t("billing.billingGroup.inviteTabPrompt")
+                : t("billing.billingGroup.notEnabledDesc")
+            }}
           </div>
 
-          <div class="og-empty__chips">
-            <span class="og-empty__chip">
-              <q-icon name="receipt_long" size="13px" />
-              {{ t("billing.billingGroup.chipConsolidatedBill") }}
-            </span>
-            <span class="og-empty__chip">
-              <q-icon name="groups" size="13px" />
-              {{ t("billing.billingGroup.chipLinkOrgs") }}
-            </span>
-          </div>
+          <template v-if="allowedForBillingGroup">
+            <div class="og-empty__chips">
+              <span class="og-empty__chip">
+                <q-icon name="receipt_long" size="13px" />
+                {{ t("billing.billingGroup.chipConsolidatedBill") }}
+              </span>
+              <span class="og-empty__chip">
+                <q-icon name="groups" size="13px" />
+                {{ t("billing.billingGroup.chipLinkOrgs") }}
+              </span>
+            </div>
 
-          <OButton
-            variant="primary"
-            class="og-empty__btn"
-            data-test="org-group-standalone-invite-btn-empty"
-            @click="showInviteDialog = true"
-          >
-            {{ t("billing.billingGroup.inviteOrgButton") }}
-          </OButton>
+            <OButton
+              variant="primary"
+              class="og-empty__btn"
+              data-test="org-group-standalone-invite-btn-empty"
+              @click="showInviteDialog = true"
+            >
+              {{ t("billing.billingGroup.inviteOrgButton") }}
+            </OButton>
+          </template>
         </div>
       </div>
     </template>
@@ -494,6 +504,16 @@ export default defineComponent({
       return "standalone";
     });
 
+    // Only orgs listed in billing_group_allowed_orgs (comma-separated, from
+    // config) can act as a payer org and send invites.
+    const allowedForBillingGroup = computed(() => {
+      const allowed = (store.state.zoConfig?.billing_group_allowed_orgs || "")
+        .split(",")
+        .map((o: string) => o.trim())
+        .filter(Boolean);
+      return allowed.includes(currentOrg.value);
+    });
+
     // Header-hosted "Invite Organization" button (rendered by Billing.vue)
     // communicates via this injected reactive object: we expose canInvite and
     // react to the click trigger to open the invite side panel.
@@ -524,12 +544,14 @@ export default defineComponent({
       )
     );
 
-    // Keep the header "Invite Organization" button in sync with this org's role.
+    // Keep the header "Invite Organization" button in sync with this org's role
+    // and whether the org is allowed to run a billing group.
     watch(
-      role,
-      (r) => {
+      [role, allowedForBillingGroup],
+      ([r, allowed]) => {
         if (!headerInvite) return;
-        headerInvite.canInvite = r === "super" || r === "standalone";
+        headerInvite.canInvite =
+          (r === "super" || r === "standalone") && allowed;
       },
       { immediate: true }
     );
@@ -849,6 +871,7 @@ export default defineComponent({
       goToUsage,
       receivedInvites,
       inviteColumns,
+      allowedForBillingGroup,
       formatDate,
       payerName,
       sendInvite,

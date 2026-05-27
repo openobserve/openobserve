@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
 
           <q-checkbox
-            v-if="!beingUpdated && config.isCloud == 'true'"
+            v-if="!beingUpdated && config.isCloud == 'true' && canMakeBilledMember"
             v-model="makeBilledMember"
             :label="t('organization.makeBilledMember', { org: currentOrgName })"
             dense
@@ -189,6 +189,16 @@ export default defineComponent({
         ""
     );
 
+    // Only orgs listed in billing_group_allowed_orgs (comma-separated, from
+    // config) can act as a payer org, so the checkbox is shown only for them.
+    const canMakeBilledMember = computed(() => {
+      const allowed = (store.state.zoConfig?.billing_group_allowed_orgs || "")
+        .split(",")
+        .map((o: string) => o.trim())
+        .filter(Boolean);
+      return allowed.includes(store.state.selectedOrganization?.identifier);
+    });
+
     return {
       t,
       router,
@@ -204,6 +214,7 @@ export default defineComponent({
       config,
       makeBilledMember,
       currentOrgName,
+      canMakeBilledMember,
     };
   },
   created() {
