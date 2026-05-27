@@ -67,6 +67,7 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
     return;
   }
   clearBodyValidation();
+  handleOpenChange(false);
 }
 
 function handleInteractOutside(e: Event) {
