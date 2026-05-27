@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="test-class"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row">
-              <span class="folder-name" :title="tab.name">{{
+          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <span class="folder-name" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
               <div class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2">

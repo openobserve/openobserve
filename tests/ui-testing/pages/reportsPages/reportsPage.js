@@ -391,14 +391,15 @@ export class ReportsPage {
     const visible = await btn.isVisible().catch(() => false);
 
     // Cross-cluster (super-cluster / SC) propagation race:
-    // After reload the table mounts immediately (empty) before the reports API call
-    // completes, so we must wait for networkidle before filtering; otherwise
-    // staticReportsList is empty and the button never appears.
+    // After SC login the active org may differ from ORGNAME (the org the report
+    // was created in). Use page.goto with an explicit org_identifier rather than
+    // page.reload so every retry lands on the correct org. Also wait for
+    // networkidle so the reports API response is fully loaded before we search.
     if (!visible) {
       const origin = new URL(this.page.url()).origin;
       const reportsUrl = `${origin}/web/reports?org_identifier=${process.env["ORGNAME"]}`;
       await expect.poll(async () => {
-        await this.page.reload();
+        await this.page.goto(reportsUrl, { waitUntil: 'domcontentloaded' });
         await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
         await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForFunction(() => {
