@@ -152,7 +152,7 @@ export default defineConfig({
   build: {
     sourcemap: false,
     target: "es2020",
-    chunkSizeWarningLimit: 3000,
+    chunkSizeWarningLimit: 4000,
     rollupOptions: {
       plugins: [
         nodePolyfills() as any,
