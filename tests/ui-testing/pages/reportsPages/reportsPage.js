@@ -389,6 +389,12 @@ export class ReportsPage {
       await expect.poll(async () => {
         await this.page.reload();
         await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForFunction(() => {
+          const t = document.querySelector('[data-test="report-list-table"]');
+          if (!t) return false;
+          const text = t.textContent || '';
+          return /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+        }, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
         return await btn.isVisible({ timeout: 2000 }).catch(() => false);
       }, {

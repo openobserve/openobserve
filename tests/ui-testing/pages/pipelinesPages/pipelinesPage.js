@@ -1212,11 +1212,7 @@ export class PipelinesPage {
         await this.exploreStreamAndNavigateToPipeline(expectedStreamName);
         await listApiResponse;
 
-        // Wait for the pipeline-list table to render at least one row so we
-        // know the data has loaded. Without this, searching against an empty
-        // table filters to nothing and the search itself can't surface our row.
-        const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
-        await anyRow.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+        await this.waitForPipelineListSettled();
 
         // Verify pipeline creation and cleanup
         await this.searchPipeline(pipelineName);
@@ -1229,10 +1225,40 @@ export class PipelinesPage {
         const deleteBtn = this.page.locator(
           `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
         ).first();
+        const found = await deleteBtn.isVisible({ timeout: 15000 }).catch(() => false);
+        if (!found) {
+            testLogger.info(`createAndVerifyPipeline: pipeline ${pipelineName} not in list, reloading and retrying`);
+            const reloadApi = this.page.waitForResponse(
+                (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                { timeout: 20000 }
+            ).catch(() => null);
+            await this.page.reload().catch(() => {});
+            await reloadApi;
+            await this.waitForPipelineListSettled();
+            await this.pipelineSearchInputField.fill('');
+            await this.searchPipeline(pipelineName);
+        }
         await deleteBtn.waitFor({ state: 'visible', timeout: 30000 });
         await deleteBtn.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
+    }
+
+    /**
+     * Wait for the pipeline-list table to reach a settled state — either
+     * at least one pipeline row has rendered, or the empty-state (no-data-
+     * message) has appeared. This avoids the read-after-write race where
+     * the test races the GET /api/<org>/pipelines response and filters an
+     * unloaded table to zero rows, hiding the freshly-created pipeline.
+     */
+    async waitForPipelineListSettled(timeout = 30000) {
+        await this.page.waitForFunction(() => {
+            const table = document.querySelector('[data-test="pipeline-list-table"]');
+            if (!table) return false;
+            const hasRow = !!table.querySelector('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]');
+            const hasEmpty = !!table.querySelector('[data-test="no-data-message"]');
+            return hasRow || hasEmpty;
+        }, { timeout }).catch(() => {});
     }
 
     // ========== Condition-specific methods ==========
@@ -1389,10 +1415,7 @@ export class PipelinesPage {
                 await this.page.waitForTimeout(300);
             }
 
-            // Wait for at least one pipeline row so we know the table rendered
-            // its data — search against an empty table never surfaces our row.
-            const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
-            await anyRow.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+            await this.waitForPipelineListSettled(15000);
 
             // Clear and re-fill the search filter.
             await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
