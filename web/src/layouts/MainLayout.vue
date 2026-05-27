@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="tw:flex-1 tw:flex tw:min-h-0">
       <ONavbar
+        v-if="store.state.printMode !== true"
         :links-list="linksList"
         :mini-mode="miniMode"
         :visible="leftDrawerOpen"

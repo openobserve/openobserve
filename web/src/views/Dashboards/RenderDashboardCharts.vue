@@ -1761,13 +1761,33 @@ export default defineComponent({
 }
 
 @media print {
-  /* Prevent panel content from expanding beyond its allocated grid cell.
-   * Without this, tables with many rows (position:static in print mode)
-   * can grow taller than the cell, pushing the grid container's height up
-   * while other absolutely-positioned panels stay at their original pixel
-   * offsets — causing visible overlap across printed pages. */
+  /* Multi-page print at the EXACT layout the dashboard renders on screen.
+   *
+   * GridStack writes inline `position: absolute; top/left/width/height; px`
+   * onto every `.grid-stack-item` and an explicit `height` onto `.grid-stack`
+   * equal to the lowest panel bottom. Browsers paginate absolutely-positioned
+   * content correctly when the containing block has a real height and no
+   * ancestor clips with `overflow: hidden|auto|scroll` or a viewport-locked
+   * height — so all we do here is keep the grid intact and clear those clips.
+   *
+   * (Do NOT convert panels to `position: static` — that changes the visual
+   * layout to a single-column stack.) */
+  .grid-stack {
+    /* keep GridStack's inline height — it's the true content height */
+    overflow: visible !important;
+  }
+
+  .grid-stack-item {
+    /* keep absolute positioning + computed top/left/width/height */
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Drop the previous `overflow: hidden` — it was clipping each panel to
+   * its grid-cell rectangle for the on-screen layout but, paired with
+   * print pagination, prevents browsers from honouring panel heights. */
   .grid-stack-item-content {
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   /* Quasar virtual-scroll inserts padding divs above/below the rendered
@@ -1776,5 +1796,12 @@ export default defineComponent({
   :deep(.q-virtual-scroll__padding) {
     display: none !important;
   }
+}
+
+/* Print page setup — landscape A4 fits the dashboard width better than
+ * portrait, with a small margin so charts don't bleed to the edge. */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
 }
 </style>
