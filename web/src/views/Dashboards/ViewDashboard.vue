@@ -131,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               @trigger="refreshData"
               class="dashboard-icons hideOnPrintMode"
-              style="padding-left: 0px; padding-right: 0px"
               size="sm"
             />
             <OButton

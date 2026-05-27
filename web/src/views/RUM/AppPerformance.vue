@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               trigger
-              class="app-performance-auto-refresh-interval tw:pl-0! tw:overflow-hidden!"
+              class="app-performance-auto-refresh-interval"
               @trigger="refreshData"
             />
             <OButton
@@ -454,18 +454,6 @@ export default defineComponent({
   }
 }
 
-:deep(.app-performance-auto-refresh-interval) {
-  .q-btn {
-    height: 1.9rem !important;
-    min-height: 1.9rem !important;
-    border-radius: 0.375rem !important;
-    padding: 0.125rem 0.25rem !important;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
 </style>
 
 <style lang="scss">
