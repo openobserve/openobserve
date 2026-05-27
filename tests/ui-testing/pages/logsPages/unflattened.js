@@ -120,6 +120,23 @@ class UnflattenedPage {
         await expect(this.logsSearchBarQueryEditor).toContainText(textOrRegex, { timeout: 10000 });
     }
 
+    /**
+     * Toggle SQL mode via the utilities ("More") menu.
+     *
+     * Post-menu-migration: the SQL mode switch was moved from the main search bar
+     * into the utilities dropdown, so the switch isn't in the DOM until the menu
+     * is opened. Open the menu, then click the inner switch button (auto-generated
+     * `-btn` suffix on the OSwitch parent data-test in SearchBar.vue).
+     */
+    async toggleSqlMode() {
+        const isAlreadyVisible = await this.sqlModeToggle.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isAlreadyVisible) {
+            await this.utilitiesMenuButton.click();
+            await this.sqlModeToggle.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await this.sqlModeToggle.click();
+    }
+
     async ensureStoreOriginalDataEnabled() {
         const isEnabled = await this.isStoreOriginalDataEnabled();
         console.log('DEBUG: ensureStoreOriginalDataEnabled - isEnabled:', isEnabled);
