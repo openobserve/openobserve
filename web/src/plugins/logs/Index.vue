@@ -223,12 +223,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw:flex tw:justify-center"
                     >
-                      <h3
+                      <div
                         data-test="logs-search-error-message"
-                        class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
                       >
-                        <OIcon name="info"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.noRecordFound") }}
                         <OButton
                           v-if="
@@ -241,7 +240,7 @@ size="md" />
                           data-test="logs-page-result-error-details-btn-norecord"
                           >{{ t("search.functionErrorBtnLabel") }}</OButton
                         ><br />
-                      </h3>
+                      </div>
                     </div>
                     <div
                       v-else-if="
@@ -253,14 +252,13 @@ size="md" />
                       "
                       class="tw:flex tw:justify-center"
                     >
-                      <h3
+                      <div
                         data-test="logs-search-error-message"
-                        class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
                       >
-                        <OIcon name="info"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.applySearch") }}
-                      </h3>
+                      </div>
                     </div>
                     <div
                       v-else-if="
@@ -271,14 +269,13 @@ size="md" />
                       "
                       class="tw:flex tw:justify-center"
                     >
-                      <h3
+                      <div
                         data-test="logs-search-error-message"
-                        class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
                       >
-                        <OIcon name="info"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.applySearch") }}
-                      </h3>
+                      </div>
                     </div>
                     <div
                       v-else
