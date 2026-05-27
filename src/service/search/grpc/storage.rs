@@ -109,7 +109,7 @@ pub async fn search(
     let mut is_add_filter_back = false;
     if *use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
         // check bloom filter first
-        let (boom_took, ok) = check_bloom_filter(
+        let (bloom_took, ok) = check_bloom_filter(
             query.clone(),
             &mut files,
             index_condition.clone(),
@@ -121,7 +121,7 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, bloom filter reduced file_list num to {} in {boom_took} ms",
+                    "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, bloom filter reduced file_list num to {} in {bloom_took} ms",
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
@@ -131,7 +131,7 @@ pub async fn search(
                     .search_role("follower".to_string())
                     .duration(idx_took)
                     .desc(format!(
-                        "bloom filter reduced file_list from {original_files_len} to {} in {boom_took} ms",
+                        "bloom filter reduced file_list from {original_files_len} to {} in {bloom_took} ms",
                         files.len(),
                     ))
                     .build()
