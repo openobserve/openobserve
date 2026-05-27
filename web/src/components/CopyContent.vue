@@ -16,16 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:relative tw:rounded-lg tw:overflow-hidden copy-content-block">
-    <OButton
-      data-test="rum-copy-btn"
-      variant="ghost"
-      size="icon-xs-sq"
-      class="tw:absolute tw:top-2 tw:right-2 tw:z-10"
-      @click="copyToClipboardFn()"
-    >
-      <OIcon name="content-copy" size="sm" />
-      <OTooltip content="Copy" side="top" />
-    </OButton>
+    <div class="tw:absolute tw:top-2 tw:right-2 tw:z-10">
+      <OButton
+        data-test="rum-copy-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        @click="copyToClipboardFn()"
+      >
+        <OIcon name="content-copy" size="sm" />
+        <OTooltip content="Copy" side="top" />
+      </OButton>
+    </div>
     <pre data-test="rum-content-text" class="tw:text-sm tw:whitespace-pre-wrap tw:wrap-break-word tw:m-0 tw:p-3 tw:pr-10 tw:leading-5">{{ computedContent }}</pre>
   </div>
 </template>
