@@ -61,6 +61,8 @@ type NormalizedOption = {
   subLabelInline?: boolean;
   /** Array of CSS color strings used to render a gradient swatch below the label. */
   colorPalette?: string[];
+  /** Optional badge/chip text rendered inline next to the label (e.g. "recommended"). */
+  badge?: string;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -188,6 +190,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
     colorPalette: Array.isArray(rawColorPalette)
       ? (rawColorPalette as string[])
       : undefined,
+    badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
   };
 }
 
@@ -612,14 +615,19 @@ const virtualizer = useVirtualizer(
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;
       const hasPalette = !!(opt.colorPalette?.length);
+      const hasBadge = !!opt.badge;
       // Inline subLabel renders on the same line — single-row height.
       if (hasSubLabel && isInline) return 28;
       // py-2(16) + label(20) + gap(4) + 2-line subLabel(34) + gap(4) + gradient(6) = 84px
       if (hasPalette && hasSubLabel) return 84;
       // py-2(16) + label(20) + gap(4) + gradient(6) = 46px  — no subLabel
       if (hasPalette) return 46;
-      // py-2(16) + label(20) + gap(4) + 2-line subLabel(34) = 74px  — no palette
-      if (hasSubLabel) return 74;
+      // badge+subLabel: py-2(16) + label+badge(20) + gap(4) + 1-line subLabel(16) = 56px
+      if (hasBadge && hasSubLabel) return 56;
+      // py-2(16) + label(20) + gap(4) + 1-line subLabel(16) = 56px
+      if (hasSubLabel) return 56;
+      // badge is inline with label — same single-row height
+      if (hasBadge) return 28;
       return 28;
     },
     overscan: 8,
@@ -1272,16 +1280,21 @@ const fieldWidthClass = computed(() => {
                           <span class="tw:text-text-secondary tw:truncate tw:text-xs">{{ filteredOptions[vRow.index].subLabel }}</span>
                         </template>
 
-                        <!-- Rich item: label + optional subLabel + optional color palette swatch.
+                        <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
                              Wrapped in a single div so ListboxItem's gap-2 does not
                              add unexpected space between each child and overflow the fixed height. -->
                         <template
-                          v-else-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length"
+                          v-else-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length || filteredOptions[vRow.index].badge"
                         >
                           <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full tw:overflow-hidden">
-                            <span class="tw:truncate tw:w-full tw:leading-snug tw:font-medium">{{
-                              filteredOptions[vRow.index].label
-                            }}</span>
+                            <span class="tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:leading-snug">
+                              <span class="tw:truncate tw:font-medium">{{ filteredOptions[vRow.index].label }}</span>
+                              <span
+                                v-if="filteredOptions[vRow.index].badge"
+                                class="tw:shrink-0 tw:text-[10px] tw:font-medium tw:px-1 tw:py-px tw:rounded tw:border tw:border-solid tw:leading-tight"
+                                style="color: var(--o2-positive); border-color: var(--o2-positive);"
+                              >{{ filteredOptions[vRow.index].badge }}</span>
+                            </span>
                             <span
                               v-if="filteredOptions[vRow.index].subLabel"
                               class="tw:text-xs tw:text-text-secondary tw:line-clamp-2 tw:whitespace-normal tw:w-full tw:leading-snug"

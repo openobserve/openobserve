@@ -415,7 +415,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="value"
                       searchable
                       :placeholder="t('settings.correlation.selectField')"
-                      style="min-width: 220px; max-width: 220px"
+                      style="width: 13.75rem"
+                      :dropdown-style="{ minWidth: '18.75rem' }"
                       data-test="service-identity-add-distinguish-btn"
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
                     />
@@ -482,7 +483,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     valueKey="value"
                     searchable
                     :placeholder="t('settings.correlation.selectField')"
-                    style="min-width: 220px; max-width: 220px"
+                    style="width: 13.75rem"
+                    :dropdown-style="{ minWidth: '18.75rem' }"
                     data-test="service-identity-add-distinguish-btn"
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
                   />
@@ -680,7 +682,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     valueKey="value"
                     searchable
                     placeholder="Select alias group"
-                    style="min-width: 220px; max-width: 220px"
+                    style="width: 13.75rem"
+                    :dropdown-style="{ minWidth: '18.75rem' }"
                     @update:model-value="onAddTrackedAlias($event)"
                   />
                   <OButton
@@ -3324,6 +3327,8 @@ function getAddFieldOptionsForEnv(envKey: string) {
         label: g.display,
         value: g.group_id,
         streamTypes: g.stream_types,
+        subLabel: g.stream_types?.join(", ") || undefined,
+        badge: g.recommended ? "recommended" : undefined,
         recommended: g.recommended,
         uniqueValues: dim?.cardinality ?? g.unique_values ?? null,
         cardinalityLabel: cardClass,

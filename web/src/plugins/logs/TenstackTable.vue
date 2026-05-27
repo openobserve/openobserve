@@ -1117,11 +1117,17 @@ defineExpose({
 
 // Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat
 .log-row-expand-btn {
-  height: 24px !important;
-  width: 24px !important;
-  min-height: 24px !important;
-  min-width: 24px !important;
+  height: 1.25rem !important;
+  width: 1.25rem !important;
+  min-height: 1.25rem !important;
+  min-width: 1.25rem !important;
   padding: 0 !important;
+  vertical-align: middle !important;
+}
+
+:deep(.log-row-expand-btn svg) {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
 }
 
 // Add explicit hover styles for log rows
@@ -1140,13 +1146,19 @@ defineExpose({
 // Tailwind v4 sets tw:-translate-y-1/2 via the CSS `translate` shorthand property.
 :deep(.ai-btn) {
   position: absolute !important;
-  top: 0 !important;
-  translate: -50% 0 !important;
-  height: 100% !important;
+  top: 50% !important;
+  right: 0.875rem !important;
+  translate: -50% -50% !important;
+  height: 0.875rem !important;
   min-height: 0 !important;
-  width: 1.875rem !important;
+  width: 0.900rem !important;
   min-width: 0 !important;
   border-radius: 0.25rem !important;
+}
+
+:deep(.ai-btn img.ai-icon) {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
 }
 
 // Suppress the hover box-shadow — it visually bleeds outside the row boundary
