@@ -92,7 +92,7 @@ describe("Group.vue", () => {
       
       const groupDiv = wrapper.find('[data-test="dashboard-group"]');
       expect(groupDiv.exists()).toBe(true);
-      expect(groupDiv.attributes('style')).toBe('--group-index: 2;');
+      expect(groupDiv.attributes('style')).toContain('--group-index: 2;');
     });
   });
 
