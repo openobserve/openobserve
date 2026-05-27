@@ -1939,6 +1939,19 @@ export default defineComponent({
     overflow: visible !important;
     // max-height: none !important;
   }
+
+  /* Make every ancestor flex/scroll container release its viewport height
+   * so the absolute → block flow conversion in RenderDashboardCharts.vue's
+   * print CSS can actually grow beyond one page. Without these, the .scroll
+   * / overflow-y wrappers clip the dashboard at viewport-height in print. */
+  :global(.o2-app-root),
+  :global(main),
+  :global(.o2-content-scroll),
+  :global(.scroll) {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
 }
 
 .dashboard-icons {
