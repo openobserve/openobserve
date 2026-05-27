@@ -84,7 +84,7 @@ test.describe("dashboard maps testcases", () => {
     // selct the variable and enter the value
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
-      "china"
+      "China"
     );
 
     // apply the filter condition
