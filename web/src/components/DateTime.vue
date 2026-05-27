@@ -1170,8 +1170,7 @@ export default defineComponent({
 }
 
 .date-time-tab-panels-wrapper {
-  max-height: 21.875rem;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .date-time-dialog {
