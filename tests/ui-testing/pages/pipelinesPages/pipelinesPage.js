@@ -19,8 +19,8 @@ export class PipelinesPage {
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
         );
-        this.streamButton = page.getByRole("button", { name: "Stream" }).first();
-        this.queryButton = page.getByRole("button", { name: "Query" });
+        this.streamButton = page.locator('[data-test="pipeline-node-sidebar-stream-input-btn"]');
+        this.queryButton = page.locator('[data-test="pipeline-node-sidebar-query-input-btn"]');
         this.vueFlowPane = page.locator(".vue-flow__pane");
         // Stream-type OSelect inside the input-node form (Stream.vue). Clicking
         // the wrapper opens the OSelect popover with `*-option` items.
@@ -80,9 +80,9 @@ export class PipelinesPage {
         );
         this.deleteButton = page.locator("button").filter({ hasText: "delete" });
         this.confirmDeleteButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-        this.secondStreamButton = page.getByRole('button', { name: 'Stream' }).nth(1);
-        this.functionButton =  page.getByRole('button', { name: 'Function' })
-        this.conditionButton =  page.getByRole('button', { name: 'Condition' })
+        this.secondStreamButton = page.locator('[data-test="pipeline-node-sidebar-stream-output-btn"]');
+        this.functionButton = page.locator('[data-test="pipeline-node-sidebar-function-default-btn"]');
+        this.conditionButton = page.locator('[data-test="pipeline-node-sidebar-condition-default-btn"]');
        this.selectPreviousNodeDropdown = page.getByLabel('Select Previous Node');
        this.previousNodeDropdown = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]');
        this.previousNodeDropdownSecond = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]:last-child');
@@ -698,12 +698,10 @@ export class PipelinesPage {
     }
 
     async selectAndDragSecondStream() {
-        await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.secondStreamButton,{ x: 120, y: 120 });
+        await this.dragStreamToTarget(this.secondStreamButton, { x: 120, y: 120 });
     }
 
     async selectAndDragFunction() {
-        await this.secondStreamButton.click();
         await this.dragStreamToTarget(this.functionButton, { x: 250, y: 200 });
     }
 
@@ -726,6 +724,13 @@ export class PipelinesPage {
 
     // Method to click the input node stream save button
     async clickInputNodeStreamSave() {
+        // If the stream-name popover is still open (Enter path in fillDestinationStreamName),
+        // wait for it to detach. It will close via interactOutside when the save button receives
+        // the pointerdown event. The .catch keeps this non-blocking if already detached.
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'detached', timeout: 5000 })
+            .catch(() => {});
+        await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
     async searchPipeline(pipelineName) {
@@ -2111,12 +2116,12 @@ export class PipelinesPage {
         } else {
             await this.streamNameInput.press('Enter');
         }
-        // Close the popover deterministically — `@create` writes to v-model but
-        // does NOT auto-close the popover. Press Escape to dismiss it so it
-        // doesn't intercept the subsequent Save click.
-        await this.page.keyboard.press('Escape').catch(() => {});
-        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
+        // Wait for the popover to close if it was dismissed by an option click.
+        // For newly created names (Enter path), the popover stays open; the save
+        // button click will close it via interactOutside — do NOT press Escape
+        // here, as that would also trigger the ODrawer's escape handler and
+        // prematurely close the drawer.
+        await popover.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
     }
 
     /**
