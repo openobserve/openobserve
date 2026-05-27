@@ -446,9 +446,9 @@ interface BillingGroupMember {
 interface BillingGroupInvite {
   id: number;
   inviter_org_id: string;
-  // TODO: populated from API once the backend returns a display name.
   inviter_org_name?: string;
   invitee_org_id: string;
+  invitee_org_name?: string;
   inviter_id: string;
   created_at: number;
   expires_at: number;
@@ -500,7 +500,12 @@ export default defineComponent({
 
     const role = computed(() => {
       if (membership.value) return "child";
-      if (members.value.length > 0) return "super";
+      // An org that has members OR has sent any invites (still pending or
+      // rejected) is acting as a payer, so it gets the management view.
+      const hasSentInvites = invites.value.some(
+        (i) => i.inviter_org_id === currentOrg.value
+      );
+      if (members.value.length > 0 || hasSentInvites) return "super";
       return "standalone";
     });
 
@@ -585,6 +590,7 @@ export default defineComponent({
     interface SuperRow {
       key: string;
       org_id: string;
+      org_name: string;
       status: "Active" | "Pending" | "Rejected";
       invited_by: string;
       accepted_by: string;
@@ -597,6 +603,7 @@ export default defineComponent({
         rows.push({
           key: `m-${m.member_org_id}`,
           org_id: m.member_org_id,
+          org_name: m.member_org_name || "",
           status: "Active",
           invited_by: m.created_by,
           accepted_by:
@@ -608,6 +615,7 @@ export default defineComponent({
         rows.push({
           key: `p-${i.token}`,
           org_id: i.invitee_org_id,
+          org_name: i.invitee_org_name || "",
           status: "Pending",
           invited_by: i.inviter_id,
           accepted_by: "-",
@@ -618,6 +626,7 @@ export default defineComponent({
         rows.push({
           key: `r-${i.token}`,
           org_id: i.invitee_org_id,
+          org_name: i.invitee_org_name || "",
           status: "Rejected",
           invited_by: i.inviter_id,
           accepted_by: "-",
@@ -712,7 +721,13 @@ export default defineComponent({
       {
         name: "org_id",
         field: "org_id",
-        label: t("billing.billingGroup.childOrgColumn"),
+        label: t("billing.billingGroup.childOrgIdColumn"),
+        align: "left",
+      },
+      {
+        name: "org_name",
+        field: (row: SuperRow) => row.org_name || "-",
+        label: t("billing.billingGroup.childOrgNameColumn"),
         align: "left",
       },
       {

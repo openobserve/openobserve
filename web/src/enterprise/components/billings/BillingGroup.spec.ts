@@ -130,6 +130,44 @@ describe("BillingGroup.vue", () => {
       expect(wrapper.vm.role).toBe("super");
     });
 
+    it("resolves to 'super' when the org has sent invites but has no members yet", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        org: "default",
+        members: [],
+        invites: [
+          {
+            token: "sent-1",
+            inviter_org_id: "default",
+            invitee_org_id: "target-org",
+            inviter_id: "me@default.com",
+            status: "Pending",
+            created_at: 1,
+            expires_at: 2,
+          },
+        ],
+      }));
+      expect(wrapper.vm.role).toBe("super");
+    });
+
+    it("resolves to 'super' when the org's sent invite was rejected", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        org: "default",
+        members: [],
+        invites: [
+          {
+            token: "sent-2",
+            inviter_org_id: "default",
+            invitee_org_id: "target-org",
+            inviter_id: "me@default.com",
+            status: "Rejected",
+            created_at: 1,
+            expires_at: 2,
+          },
+        ],
+      }));
+      expect(wrapper.vm.role).toBe("super");
+    });
+
     it("resolves to 'child' when the org has a membership (membership dominates)", async () => {
       ({ wrapper } = await mountBillingGroup({
         membership: {
