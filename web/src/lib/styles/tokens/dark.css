@@ -303,9 +303,9 @@
     --color-inner-loading-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
     --color-inner-loading-label: var(--color-text-secondary);
 
-    /* Skeleton */
-    --color-skeleton-base: var(--color-grey-700);
-    --color-skeleton-highlight: var(--color-grey-600);
+    /* Skeleton — dark surface base; shimmer is a subtle white gloss. */
+    --color-skeleton-base: var(--color-grey-800);
+    --color-skeleton-shimmer: rgba(255, 255, 255, 0.07);
 
     /* ProgressBar */
     --color-progress-bar-default: var(--color-primary-500);
@@ -379,4 +379,12 @@
     --color-table-sort-icon-active: var(--color-primary-400);
     --color-table-streaming-bar: var(--color-primary-400);
     --color-table-row-expanded-bg: var(--color-grey-850);
+
+    /* ── Sidebar nav (dark) ────────────────────────────────── */
+    --color-nav-icon: var(--color-grey-400);
+    --color-nav-icon-active: var(--color-primary-400);
+    --color-nav-label-hover: var(--color-primary-300);
+    --color-nav-item-hover-bg: rgba(89, 155, 174, 0.15);
+    --color-nav-item-active-bg: rgba(89, 155, 174, 0.30);
+    --color-nav-item-active-border: rgba(89, 155, 174, 0.45);
 }

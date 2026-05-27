@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-nowrap tw:items-center tw:min-h-10 tw:w-full">
+  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-surface-panel tw:border-b tw:border-border-default tw:shrink-0">
     <!-- LEFT SIDE: Logo -->
     <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0 tw:pl-3">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
@@ -158,16 +158,18 @@ size="xs" class="warning" />{{
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
-    <div class="header-menu tw:flex tw:items-center tw:gap-1">
-      <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
+    <div class="header-menu tw:flex tw:items-center tw:gap-2">
+      <!-- EDITION BADGE / UPGRADE BUTTON -->
+      <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
+      <!-- Open Source: primary CTA to drive upgrades -->
       <OButton
-        variant="primary"
+        :variant="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'outline-primary' : 'primary'"
         size="xs"
         data-test="upgrade-to-enterprise-btn"
         @click="openEnterpriseDialog"
       >
         <template #icon-left>
-          <OIcon name="card-giftcard" size="sm" />
+          <OIcon :name="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'verified' : 'card-giftcard'" size="sm" />
         </template>
         {{ enterpriseButtonText }}
       </OButton>
@@ -179,13 +181,13 @@ size="xs" class="warning" />{{
           store.state.zoConfig.ingestion_quota_used >= 85
         "
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-toolbar"
         data-test="ingestion-quota-warning-icon"
       >
         <OIcon
           name="warning"
           size="md"
-          class="header-icon tw:opacity-70"
+          class="tw:opacity-70"
           :style="{ color: ingestionQuotaColor }"
         />
         <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
@@ -203,31 +205,27 @@ size="xs" class="warning" />{{
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >
-        <img :src="getBtnLogo" class="header-icon ai-icon" style="width: 18px; height: 18px;" />
+        <img :src="getBtnLogo" class="ai-icon tw:w-4.5 tw:h-4.5 tw:shrink-0" />
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select" class="tw:mx-2 tw:flex">
+      <div data-test="navbar-organizations-select">
         <ODropdown
           v-model:open="orgMenuOpen"
           side="bottom"
           align="center"
-          class="tw:p-0"
         >
           <template #trigger>
             <OButton
-              variant="ghost"
-              size="sm"
+              variant="outline"
+              size="sm-toolbar"
               data-test="navbar-organizations-select-trigger"
-              style="max-width: 250px"
-              class="org-selector-trigger tw:text-ellipsis tw:overflow-hidden"
+              class="tw:max-w-50"
             >
-              <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full tw:gap-2">
-                <div class="tw:flex tw:flex-col tw:truncate tw:text-left">
-                  {{ userClickedOrg?.label || "" }}
-                </div>
-                <OIcon name="arrow-drop-down" size="sm" class="tw:ml-auto tw:opacity-70 tw:shrink-0" />
-              </div>
+              <span class="tw:truncate tw:max-w-35">{{ userClickedOrg?.label || "" }}</span>
+              <template #icon-right>
+                <OIcon name="arrow-drop-down" size="sm" class="tw:opacity-70 tw:shrink-0" />
+              </template>
             </OButton>
           </template>
 
@@ -319,25 +317,28 @@ size="xs" class="warning" />{{
         </ODropdown>
       </div>
 
+      <!-- Visual separator: org context from utility icons -->
+      <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0 tw:mx-2" aria-hidden="true" />
+
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
       <!-- SLACK COMMUNITY LINK -->
       <OButton
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-toolbar"
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" class="header-icon tw:opacity-70 tw:size-5 tw:shrink-0" />
+        <component :is="slackIcon" class="tw:opacity-70 tw:size-6 tw:shrink-0" />
         <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
-          <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-            <OIcon name="help-outline" size="md" class="header-icon tw:opacity-70" />
+          <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
+            <OIcon name="help-outline" size="md" class="tw:opacity-70" />
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
         </template>
@@ -382,11 +383,11 @@ size="xs" class="warning" />{{
       <!-- SETTINGS BUTTON -->
       <OButton
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-toolbar"
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <OIcon name="settings" size="md" class="header-icon tw:opacity-70" />
+        <OIcon name="settings" size="md" class="tw:opacity-70" />
         <OTooltip side="top" align="center" :content="t('menu.settings')" />
       </OButton>
 
@@ -399,13 +400,13 @@ size="xs" class="warning" />{{
         <template #trigger>
           <OButton
             variant="ghost"
-            size="icon-circle-sm"
+            size="icon-toolbar"
             data-test="header-my-account-profile-icon"
           >
             <OIcon
               :name="user.picture ? user.picture : 'person'"
               size="md"
-              class="header-icon tw:opacity-70"
+              class="tw:opacity-70"
             />
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
           </OButton>
@@ -534,13 +535,12 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "HeaderComponent",
   components: {
-    OSeparator,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OButton,

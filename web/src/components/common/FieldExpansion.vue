@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #trigger>
       <OFieldRow
-        :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
         <span class="field-type-container">

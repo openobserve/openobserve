@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -21,54 +21,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`menu-link-${link}-item`"
     href="#"
     :target="target"
-    :class="['nav-menu-item', { 'menu-link-function': title === 'Functions' }]"
+    :class="[
+      'nav-menu-item',
+      'tw:group tw:block tw:![text-decoration:none] tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:border tw:border-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      isDark ? 'tw:hover:bg-[rgba(89,155,174,0.15)]' : 'tw:hover:bg-primary-100',
+      { 'menu-link-function': title === 'Functions' }
+    ]"
     :aria-current="isActive ? 'page' : undefined"
     :aria-label="ariaLabel"
     @click.prevent="openWebPage(link)"
   >
-    <div v-if="icon" class="nav-menu-item-avatar">
-      <div class="icon-wrapper">
+    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
+      <div
+        class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
+        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600'"
+      >
         <OIcon
           :name="icon"
           size="md"
-          :style="
-            isActive
-              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
-              : undefined
-          "
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge"
+          class="menu-badge tw:absolute tw:-top-1 tw:-right-2 tw:min-w-4 tw:h-4 tw:px-1 tw:bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] tw:border-2 tw:border-[#0f172a] tw:rounded-full tw:text-[9px] tw:font-bold tw:text-white tw:flex tw:items-center tw:justify-center tw:leading-none tw:shadow-[0_4px_8px_rgba(239,68,68,0.5)] tw:animate-pulse tw:z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <div class="nav-menu-item-label">{{ title }}</div>
+      <div
+        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700'"
+      >{{ title }}</div>
     </div>
-    <div v-else-if="iconComponent" class="nav-menu-item-avatar">
-      <div class="icon-wrapper">
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
+      <div
+        class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
+        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600'"
+      >
         <component
           :is="iconComponent"
           class="o-icon tw:size-6"
-          :style="
-            isActive
-              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
-              : undefined
-          "
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge"
+          class="menu-badge tw:absolute tw:-top-1 tw:-right-2 tw:min-w-4 tw:h-4 tw:px-1 tw:bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] tw:border-2 tw:border-[#0f172a] tw:rounded-full tw:text-[9px] tw:font-bold tw:text-white tw:flex tw:items-center tw:justify-center tw:leading-none tw:shadow-[0_4px_8px_rgba(239,68,68,0.5)] tw:animate-pulse tw:z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <div class="nav-menu-item-label">{{ title }}</div>
+      <div
+        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        :class="isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700'"
+      >{{ title }}</div>
     </div>
   </a>
 
@@ -84,58 +91,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="[
       'nav-menu-item',
-      {
-        'nav-menu-item--active': isActive,
-        'menu-link-function': title === 'Functions',
-      },
+      'tw:group tw:block tw:![text-decoration:none] tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:border tw:border-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      isActive
+        ? isDark ? 'tw:bg-[rgba(89,155,174,0.45)] tw:!border-[rgba(89,155,174,0.60)]' : 'tw:bg-primary-200 tw:!border-primary-300'
+        : isDark ? 'tw:hover:bg-[rgba(89,155,174,0.15)]' : 'tw:hover:bg-primary-100',
+      { 'nav-menu-item--active': isActive, 'menu-link-function': title === 'Functions' }
     ]"
     :target="target"
     :aria-current="isActive ? 'page' : undefined"
     :aria-label="ariaLabel"
   >
-    <div v-if="icon" class="nav-menu-item-avatar">
-      <div class="icon-wrapper">
+    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
+      <div
+        class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
+        :class="[
+          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600',
+          isActive ? (isDark ? 'tw:!text-white' : 'tw:!text-primary-600') : ''
+        ]"
+      >
         <OIcon
           :name="icon"
           size="md"
-          :style="
-            isActive
-              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
-              : undefined
-          "
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge"
+          class="menu-badge tw:absolute tw:-top-1 tw:-right-2 tw:min-w-4 tw:h-4 tw:px-1 tw:bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] tw:border-2 tw:border-[#0f172a] tw:rounded-full tw:text-[9px] tw:font-bold tw:text-white tw:flex tw:items-center tw:justify-center tw:leading-none tw:shadow-[0_4px_8px_rgba(239,68,68,0.5)] tw:animate-pulse tw:z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <div class="nav-menu-item-label">{{ title }}</div>
+      <div
+        class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        :class="[
+          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700',
+          isActive ? (isDark ? 'tw:font-semibold tw:!text-white' : 'tw:font-semibold tw:!text-primary-700') : 'tw:font-normal'
+        ]"
+      >{{ title }}</div>
     </div>
-    <div v-else-if="iconComponent" class="nav-menu-item-avatar">
-      <div class="icon-wrapper">
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
+      <div
+        class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
+        :class="[
+          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-600',
+          isActive ? (isDark ? 'tw:!text-white' : 'tw:!text-primary-600') : ''
+        ]"
+      >
         <component
           :is="iconComponent"
           class="o-icon tw:size-6"
-          :style="
-            isActive
-              ? { color: store.state.theme === 'dark' ? '#ffffff' : '#19191e' }
-              : undefined
-          "
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge"
+          class="menu-badge tw:absolute tw:-top-1 tw:-right-2 tw:min-w-4 tw:h-4 tw:px-1 tw:bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] tw:border-2 tw:border-[#0f172a] tw:rounded-full tw:text-[9px] tw:font-bold tw:text-white tw:flex tw:items-center tw:justify-center tw:leading-none tw:shadow-[0_4px_8px_rgba(239,68,68,0.5)] tw:animate-pulse tw:z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <div class="nav-menu-item-label">{{ title }}</div>
+      <div
+        class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        :class="[
+          isDark ? 'tw:text-white/65 tw:group-hover:!text-white' : 'tw:text-[var(--color-text-primary)] tw:group-hover:text-primary-700',
+          isActive ? (isDark ? 'tw:font-semibold tw:!text-white' : 'tw:font-semibold tw:!text-primary-700') : 'tw:font-normal'
+        ]"
+      >{{ title }}</div>
     </div>
   </router-link>
 </template>
@@ -227,267 +249,16 @@ export default defineComponent({
       return label;
     });
 
+    const isDark = computed(() => store.state.theme === 'dark');
+
     return {
       store,
       router,
       openWebPage,
       isActive,
+      isDark,
       ariaLabel,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.nav-menu-item {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-  padding: 1px 8px;
-  margin: 0px;
-  border-radius: 6px;
-  flex-shrink: 0;
-
-  /* Always have a border to prevent layout shift when active */
-  border: 1px solid transparent;
-
-  /* Minimal height to prevent scrollbar */
-  min-height: 24px;
-
-  // Add top margin to first item so border is visible
-  &:first-child {
-    margin-top: 4px;
-  }
-
-  // Phase 2: Enhanced transitions
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-
-  // Phase 6: Performance optimizations
-  // Use transform and opacity for GPU acceleration
-  will-change: transform;
-  transform: translateZ(0);
-
-  // Phase 2: Enhanced hover state with 3D icon effect
-  &:hover:not(.nav-menu-item--active) {
-    transform: translateZ(0);
-    // background-color: rgba(30, 41, 59, 0.6);
-.nav-menu-item-label {
-      color: var(--o2-menu-color);
-      // Removed `transform: translateY(-2px)` — combined with the elastic
-      // bounce transition on .nav-menu-item-label, the label appeared to
-      // shrink/jitter on hover. Color change alone is enough hover feedback.
-    }
-  }
-
-  // Phase 2 & 3: Enhanced active state with modern UX
-  &.nav-menu-item--active {
-    transform: translateZ(0) !important;
-    // Rich, vibrant multi-layer gradient background
-    // background:
-    //   linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(236, 72, 153, 0.35) 100%),
-    //   linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.25) 100%) !important;
-    // // Stronger border with glow
-    // border: 1px solid rgba(168, 85, 247, 0.6) !important;
-    // // Minimal shadow for subtle depth
-    // box-shadow:
-    //   0 0 8px rgba(168, 85, 247, 0.2),
-    //   0 2px 8px rgba(168, 85, 247, 0.25),
-    //   inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-    background: linear-gradient(135deg, var(--o2-menu-gradient-start) 0%, var(--o2-menu-gradient-end) 100%) !important;
-
-    box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
-    color: var(--o2-menu-color) !important;
-    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    // Subtle inner highlight for depth
-    position: relative;
-    backdrop-filter: blur(8px) !important;
-.nav-menu-item-label {
-      font-weight: 500;
-      color: var(--o2-menu-color); // Very light purple/white for contrast
-      text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
-    }
-
-    // Phase 3: Enhanced active indicator with minimal shadow
-    &::before {
-      content: " ";
-      width: 6px;
-      height: 100%;
-      position: absolute;
-      left: -8px;
-      top: 50%;
-      transform: translateY(-50%);
-      // Brighter gradient
-      background: linear-gradient(180deg, var(--o2-primary-btn-bg) 0%, var(--o2-primary-btn-bg) 50%, var(--o2-primary-btn-bg) 100%);
-      border-radius: 0 2px 2px 0;
-      // Minimal glow
-      box-shadow: 0 0 6px var(--o2-menu-color);
-    }
-
-    // Subtle animated glow overlay
-    &::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: --o2-menu-gradient-start;
-      border-radius: 0 6px 6px 0;
-      pointer-events: none;
-    }
-  }
-
-  // Phase 2: Enhanced focus state for keyboard navigation
-  &:focus-visible {
-    outline: 2px solid #a855f7;
-    outline-offset: 2px;
-  }
-
-  &.ql-item-mini {
-    margin: 0;
-
-    &::before {
-      display: none;
-    }
-  }
-
-  &[aria-label="Billing"] {
-}
-}
-
-// Phase 3: Enhanced icon container with 3D effects and spring bounce-back
-.nav-menu-item-avatar {
-  margin: 0;
-  padding: 0;
-  min-width: 40px;
-  perspective: 1000px; // Enable 3D space
-}
-
-// Label transition — `color` only (not `all`) with a plain ease curve.
-// The previous elastic `cubic-bezier(0.68, -0.55, 0.265, 1.55)` combined with
-// a translateY on hover made the label appear to shrink/spring at the start
-// of the animation.
-.nav-menu-item-label {
-  transition: color 200ms ease;
-}
-
-// Phase 4: Badge support
-.icon-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.menu-badge {
-  position: absolute;
-  top: -4px;
-  right: -8px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  background: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
-  border: 2px solid #0f172a;
-  border-radius: 50%;
-  font-size: 9px;
-  font-weight: 700;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.5);
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  z-index: 1;
-
-  // Phase 6: Performance - GPU acceleration
-  will-change: opacity;
-  transform: translateZ(0);
-
-  // Light mode
-  body.body--light & {
-    border-color: #ffffff;
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
-  }
-}
-
-</style>
-
-<!-- Unscoped: targets nav-menu-item rendered inside .navbar-links container -->
-<style lang="scss">
-.navbar-links {
-  padding-top: 0.25rem;
-
-  .nav-menu-item {
-    margin: 0 0.156rem;
-    padding: 0.125rem;
-    border-radius: 0.313rem;
-    display: list-item;
-    text-align: center;
-    list-style: none;
-
-    .nav-menu-item-avatar {
-      padding-right: 0;
-      min-width: 1.5rem;
-      display: list-item;
-      text-align: center;
-      list-style: none;
-    }
-
-    /* OIcon span itself — bump sidebar icons a notch larger than the default md */
-    :deep(.nav-menu-item-avatar > span),
-    :deep(.icon-wrapper > span) {
-      height: 1.5rem !important;
-      width: 1.5rem !important;
-    }
-
-    /* Sidebar nav icons should look like main layout sections: darker
-       and sharper than the default muted text color. Stroke + crisp-edges
-       shape rendering gives the icons a more defined, pronounced look. */
-    :deep(.nav-menu-item-avatar svg),
-    :deep(.icon-wrapper svg) {
-      color: var(--o2-text-primary);
-      stroke: currentColor;
-      stroke-width: 0.5;
-      shape-rendering: geometricPrecision;
-    }
-
-    body.body--dark &:not(.nav-menu-item--active) :deep(.nav-menu-item-avatar svg),
-    body.body--dark &:not(.nav-menu-item--active) :deep(.icon-wrapper svg) {
-      color: #e5e5e5;
-    }
-
-    .nav-menu-item-label {
-      padding-bottom: 0.25rem;
-      font-size: 0.75rem;
-      font-weight: 400;
-      color: var(--o2-text-secondary);
-    }
-
-    &.nav-menu-item--active {
-      /* Do NOT set `color: var(--o2-menu-color)` on the outer container —
-         it cascades into the OIcon SVG (paths use currentColor) and tints
-         the selected-page icon with the theme/menu color. The active
-         affordance lives in the gradient background + side indicator + the
-         label override below. Icons inherit normal text-primary instead. */
-      .OIcon img {
-        filter: brightness(100);
-      }
-
-      .nav-menu-item-label {
-        color: var(--o2-menu-color);
-      }
-
-      body.body--light & {
-.nav-menu-item-label {
-          color: #19191e !important;
-        }
-      }
-
-      body.body--dark & {
-.nav-menu-item-label {
-          color: #ffffff !important;
-        }
-      }
-    }
-  }
-}
-</style>

@@ -517,7 +517,6 @@ describe("AddTab", () => {
 
       expect(mockShowPositiveNotification).toHaveBeenCalledWith(
         "Tab added successfully",
-        { timeout: 2000 },
       );
     });
   });
@@ -604,7 +603,6 @@ describe("AddTab", () => {
 
       expect(mockShowPositiveNotification).toHaveBeenCalledWith(
         "Tab updated successfully",
-        { timeout: 2000 },
       );
     });
   });

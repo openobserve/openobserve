@@ -136,14 +136,14 @@ describe("AddStream", () => {
       await flushPromises();
     });
 
-    it("should render ODrawer with localized title and inline buttons", async () => {
+    it("should render ODrawer with localized title and button labels", async () => {
       const wrapper = mountComp();
       await flushPromises();
       const drawer = wrapper.findComponent(ODrawerStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("title")).toBeTruthy();
-      expect(wrapper.find('[data-test="add-stream-cancel-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-stream-save-btn"]').exists()).toBe(true);
+      expect(drawer.props("secondaryButtonLabel")).toBeTruthy();
+      expect(drawer.props("primaryButtonLabel")).toBeTruthy();
     });
 
     it("should pass through the open prop to ODrawer", async () => {
@@ -209,8 +209,8 @@ describe("AddStream", () => {
     it("should emit update:open=false when Cancel button is clicked", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const cancelBtn = wrapper.find('[data-test="add-stream-cancel-btn"]');
-      await cancelBtn.trigger("click");
+      const drawer = wrapper.findComponent(ODrawerStub);
+      await drawer.vm.$emit("click:secondary");
       expect(wrapper.emitted("update:open")).toBeTruthy();
       expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
     });
@@ -228,9 +228,13 @@ describe("AddStream", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      // Save button should be a submit button (type="submit")
-      const saveBtn = wrapper.find('[data-test="add-stream-save-btn"]');
-      expect(saveBtn.attributes("type")).toBe("submit");
+      // In drawer mode, Save is wired to ODrawer's click:primary event
+      const drawer = wrapper.findComponent(ODrawerStub);
+      await drawer.vm.$emit("click:primary");
+      await flushPromises();
+
+      // submitForm triggers validation; with empty name/type, createStream is not called
+      expect(mockCreateStream).not.toHaveBeenCalled();
     });
 
     it("should emit close when Cancel is clicked in pipeline mode", async () => {

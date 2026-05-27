@@ -62,9 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   row.name === store.state.zoConfig.timestamp_column
                 "
               >
-                <div class="field_label tw:truncate tw:pl-4">
-                  {{ row.name }}
-                </div>
+                <OFieldLabel :field="row" class="tw:pl-4" />
               </template>
               <template v-else>
                 <OCollapsible
@@ -74,13 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => { openMetricRows[row.name] = v; if (v) openFilterCreator(null, row); }"
                 >
                   <template #trigger>
-                    <div
-                      class="tw:flex content-center tw:truncate"
-                      :title="row.name"
-                    >
-                      <div class="field_label tw:truncate">
-                        {{ row.name }}
-                      </div>
+                    <div class="tw:flex tw:items-center tw:min-w-0">
+                      <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
                       <div class="field_overlay">
                         <OButton
                           icon-left="add"
@@ -242,6 +235,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
+import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
@@ -255,7 +249,7 @@ export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
   components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
-    OIcon, OTable, OCollapsible,
+    OIcon, OTable, OCollapsible, OFieldLabel,
 },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
@@ -619,16 +613,6 @@ export default defineComponent({
     position: relative;
     overflow: visible;
     cursor: default;
-
-    .field_label {
-      pointer-events: none;
-      font-size: 0.825rem;
-      position: relative;
-      display: inline;
-      z-index: 2;
-      left: 0;
-      // text-transform: capitalize;
-    }
 
     .field-container {
       height: 25px;

@@ -24,16 +24,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="xs"
       class="tw:flex-shrink-0 tw:opacity-60 tw:text-field-list-label-icon"
     />
-    <span
-      class="tw:truncate tw:flex-1 tw:min-w-0 tw:leading-relaxed tw:text-[0.82rem] tw:text-field-list-label-text"
-    >
-      {{ field.label ?? field.name }}
-    </span>
+    <OTooltip :content="field.label ?? field.name" :disabled="!isTruncated" side="right">
+      <span
+        ref="labelRef"
+        class="tw:truncate tw:flex-1 tw:min-w-0 tw:leading-relaxed tw:text-[0.82rem] tw:text-field-list-label-text"
+      >
+        {{ field.label ?? field.name }}
+      </span>
+    </OTooltip>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   field: { name: string; label?: string; type?: string };
@@ -42,6 +47,29 @@ interface Props {
 
 withDefaults(defineProps<Props>(), {
   showTypeIcon: false,
+});
+
+const labelRef = ref<HTMLSpanElement | null>(null);
+const isTruncated = ref(false);
+
+function updateTruncation() {
+  if (labelRef.value) {
+    isTruncated.value = labelRef.value.scrollWidth > labelRef.value.clientWidth;
+  }
+}
+
+let ro: ResizeObserver | null = null;
+
+onMounted(() => {
+  updateTruncation();
+  if (labelRef.value) {
+    ro = new ResizeObserver(updateTruncation);
+    ro.observe(labelRef.value);
+  }
+});
+
+onUnmounted(() => {
+  ro?.disconnect();
 });
 
 function getTypeIcon(type: string | undefined): string {

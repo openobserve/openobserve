@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-search-across-folders-toggle"
               v-model="searchAcrossFolders"
               size="lg"
-              class="tw:ml-2 tw:flex tw:items-center tw:py-[0.45rem] tw:px-[0.375rem] tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-md tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)]"
+              class="tw:ml-2 tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
             >
               <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
               <template #tooltip>

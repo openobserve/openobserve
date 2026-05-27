@@ -181,6 +181,7 @@ import ListIcon from "~icons/material-symbols/list";
 import NumbersIcon from "~icons/material-symbols/123";
 import PaidIcon from "~icons/material-symbols/paid-outline-rounded";
 import AutorenewIcon from "~icons/material-symbols/autorenew";
+import ProgressActivityIcon from "~icons/material-symbols/progress-activity";
 import CardGiftcardIcon from "~icons/material-symbols/redeem";
 import CircleIcon from "~icons/material-symbols/circle-outline";
 import CloudDoneIcon from "~icons/material-symbols/cloud-done-outline";
@@ -250,6 +251,7 @@ import StopIcon from "~icons/material-symbols/stop-outline";
 import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
 import SwapVertIcon from "~icons/material-symbols/swap-vert";
 import SyncIcon from "~icons/material-symbols/sync-outline";
+import SyncDisabledIcon from "~icons/material-symbols/sync-disabled";
 import SyncProblemIcon from "~icons/material-symbols/sync-problem-outline";
 import TableViewIcon from "~icons/material-symbols/table-view-outline";
 import TagIcon from "~icons/material-symbols/tag";
@@ -512,6 +514,7 @@ export const iconRegistry = {
   "123": NumbersIcon,
   "paid": PaidIcon,
   "autorenew": AutorenewIcon,
+  "progress-activity": ProgressActivityIcon,
   "card-giftcard": CardGiftcardIcon,
   "check-circle-outline": CheckCircleOutline,
   "circle": CircleIcon,
@@ -584,6 +587,7 @@ export const iconRegistry = {
   "swap-horiz": SwapHorizIcon,
   "swap-vert": SwapVertIcon,
   "sync": SyncIcon,
+  "sync-disabled": SyncDisabledIcon,
   "sync-problem": SyncProblemIcon,
   "table-view": TableViewIcon,
   "tag": TagIcon,

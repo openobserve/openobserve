@@ -102,6 +102,13 @@ export class LogsPage {
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+        this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
+        this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
+        this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
+        this.savedViewsListDialogEl = '[data-test="saved-views-list-dialog"]';
+        this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
+        this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
+        this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
@@ -1468,9 +1475,10 @@ export class LogsPage {
 
     // Quick Mode methods (now inside the utilities hamburger menu)
     async verifyQuickModeToggle() {
+        const quickModeToggle = this.page.locator(this.quickModeToggle);
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await quickModeToggle.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(quickModeToggle).toBeVisible();
         await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
@@ -1494,20 +1502,21 @@ export class LogsPage {
 
     // Click on the Quick Mode toggle menu item (wrapper ODropdownItem) - for testing #10821
     async clickQuickModeTextLabel() {
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        // Click the ODropdownItem wrapper that contains the quick-mode toggle
-        await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]').click();
+        await quickModeItem.waitFor({ state: 'visible', timeout: 5000 });
+        // Click immediately — no fixed delay avoids reka-ui focus-outside closing the portal in CI.
+        await quickModeItem.click({ force: true });
         await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     // Get the current quick mode state (true/false)
     async getQuickModeState() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
         // OSwitch inner button carries data-test="logs-search-bar-quick-mode-switch-btn"
         // and data-state="checked|unchecked".
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]');
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await toggleInner.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const state = await toggleInner.getAttribute('data-state').catch(() => null);
         const isOn = state === 'checked';
         await this.page.keyboard.press('Escape').catch(() => {});
@@ -1516,10 +1525,12 @@ export class LogsPage {
 
     // Histogram methods
     async toggleHistogram() {
-        // await this.page.locator(this.utilitiesMenuButton).click();
-        // await this.page.waitForTimeout(200);
-        // await this.page.locator(this.histogramToggle).click();
-        await this.page.locator(this.histogramToggle).click();
+        // Histogram toggle is now inside the utilities ("More") menu.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
+        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        await histogramMenuItem.click();
     }
 
     async toggleHistogramAndExecute() {
@@ -1548,9 +1559,14 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
-        // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-        // OSwitch wrapper carries data-test, inner button carries data-state="checked|unchecked".
-        await expect(this.page.locator(this.histogramToggleUncheckedBtn)).toBeVisible({ timeout: 5000 });
+        // Histogram is now inside the utilities menu — open the menu and check the switch is unchecked.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
+        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
+        await expect(switchEl).toBeVisible({ timeout: 5000 });
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     // Error handling methods
@@ -2627,7 +2643,7 @@ export class LogsPage {
      * Returns true if the dropdown was opened; false if it was already open.
      */
     async _openUtilitiesMenuForSqlMode() {
-        const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+        const sqlModeMenuItem = this.page.locator(this.menuSqlModeBtn);
         const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
         if (!isVisible) {
             await this.page.locator(this.utilitiesMenuButton).click();
@@ -2640,22 +2656,32 @@ export class LogsPage {
     /** Press Escape to close the utilities dropdown after a SQL mode check/toggle. */
     async _closeUtilitiesMenuAfterSqlToggle() {
         await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(100);
+        await this.page.locator(this.menuSqlModeBtn).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     async clickSQLModeToggle() {
         // SQL mode lives in the utilities ("More") dropdown.
-        // Click [data-test="logs-search-bar-menu-sql-mode-btn"] (ODropdownItem) — @select.prevent
-        // toggles sqlMode without closing the dropdown.
+        // Click menuSqlModeBtn (ODropdownItem) — @select.prevent toggles sqlMode without closing.
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+        const sqlModeBtn = this.page.locator(this.menuSqlModeBtn);
+        await expect(sqlModeBtn).toBeVisible({ timeout: 5000 });
+        await sqlModeBtn.click({ force: true });
         if (menuOpened) {
             await this._closeUtilitiesMenuAfterSqlToggle();
         }
     }
 
     async clickShowQueryToggle() {
-        return await this.page.locator(this.showQueryToggle).click({ force: true });
+        // Transform editor toggle moved to the utilities ("More") menu.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const toggleItem = this.page.locator(this.menuTransformEditorToggleBtn);
+        await toggleItem.waitFor({ state: 'visible', timeout: 5000 });
+        await toggleItem.click();
+        // @select.prevent keeps the dropdown open after the click — close it explicitly.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await toggleItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        testLogger.info('Clicked show-query toggle via utilities menu');
     }
 
     async clickFieldListCollapseButton() {
@@ -2709,12 +2735,36 @@ export class LogsPage {
     }
 
     async clickSaveViewButton() {
-        // Close any open dialogs/menus first (e.g., saved views dropdown).
-        // Press Escape to dismiss without relying on a body click + arbitrary wait.
+        // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
+        // Close any open menus/dialogs first, then open the menu and click the item.
         await this.page.keyboard.press('Escape').catch(() => {});
-        const saveBtn = this.page.locator('[data-test="logs-search-saved-views-btn"]');
-        await saveBtn.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-        return await saveBtn.click();
+        // If the saved-views list dialog was open (e.g. from clickSavedViewsExpand), its
+        // portal close animation is still running after Escape. Opening the utilities menu
+        // while the portal tears down causes the dropdown to be dismissed immediately.
+        // Wait for the dialog to fully close before proceeding.
+        await this.page.locator('[data-test="saved-views-list-dialog"]')
+            .waitFor({ state: 'hidden', timeout: 3000 })
+            .catch(() => {}); // dialog may not have been open — treat as no-op
+        const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
+        const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
+        }
+        await this.page.keyboard.press('Escape').catch(() => {});
+        // Wait for any dialog backdrop/overlay (the fixed inset overlay with data-state="open") to
+        // disappear — its 200ms fade-out animation intercepts pointer events until it's gone.
+        await this.page.waitForFunction(
+            () => !document.querySelector('[data-state="open"][aria-hidden="true"]'),
+            { timeout: 5000 }
+        ).catch(() => {});
+        const createMenuItem = this.page.locator(this.menuCreateSavedViewBtn);
+        await createMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await createMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        // force:true bypasses pointer-event interception from sibling portals (e.g. FunctionSelector popper)
+        await createMenuItem.click({ force: true });
+        await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async fillSavedViewName(name) {
@@ -2809,9 +2859,10 @@ export class LogsPage {
     }
 
     async clickSavedViewByTitle(title) {
-        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${title}"]`).first();
+        const element = this.page.locator(`[data-test="logs-search-bar-apply-${title}-saved-view-btn"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
-        return await element.click();
+        // force: true — ODropdown portal transiently detaches items during initial render
+        return await element.click({ force: true });
     }
 
     async clickDeleteButton() {
@@ -2823,7 +2874,10 @@ export class LogsPage {
     }
 
     async clickConfirmButton() {
-        return await this.page.locator(this.confirmButton).click();
+        const btn = this.page.locator(this.confirmButton);
+        await btn.waitFor({ state: 'visible', timeout: 5000 });
+        // force: true — dialog portal can transiently detach during initial render
+        return await btn.click({ force: true });
     }
 
     async clickStreamsMenuItem() {
@@ -2867,13 +2921,13 @@ export class LogsPage {
     }
 
     async clickSavedViewByText(text) {
-        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${text}"]`).first();
+        const element = this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.locator(`[data-test="logs-search-saved-view-item-${text}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(`[data-test="logs-search-bar-dialog-saved-view-row-${text}"]`).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -2900,30 +2954,24 @@ export class LogsPage {
         const backdrop = this.page.locator('[data-test="o-dialog-close-btn"]');
         const isBackdropVisible = await backdrop.isVisible().catch(() => false);
         if (isBackdropVisible) {
-            await backdrop.click();
-            await this.waitForTimeout(500);
+            // force: true — ODropdown portal transiently detaches items during initial render
+            await backdrop.click({ force: true });
+            await backdrop.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         }
 
-        // Wait for the saved views area to be stable after navigation
-        await this.waitForTimeout(2000);
-
-        // Ensure saved views panel is expanded and wait for stability
+        // Ensure saved views panel is expanded
         await this.clickSavedViewsExpand();
-        await this.waitForTimeout(1000);
 
-        // Wait for the search input to be stable and ready
-        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
-        await this.waitForTimeout(500);
+        // Wait for the search input to be visible and ready
+        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'visible', timeout: 5000 });
 
         // Click and fill the search input with better error handling
         await this.page.locator(this.savedViewSearchInput).click({ force: true });
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
-        await this.waitForTimeout(1500);
 
         // Wait for and click the delete button
         await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(deleteButtonSelector).click({ force: true });
-        await this.waitForTimeout(500);
     }
 
     async clickResetFiltersButton() {
@@ -3289,7 +3337,7 @@ export class LogsPage {
     }
 
     async clickSavedViewByLabel(label) {
-        const element = this.page.locator(`[data-test="logs-search-saved-view-item-${label}"]`).first();
+        const element = this.page.locator(`[data-test="logs-search-bar-apply-${label}-saved-view-btn"]`).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click({ force: true });
     }
@@ -3635,9 +3683,18 @@ export class LogsPage {
     }
 
     async toggleVrlEditor() {
-        // OSwitch renders the wrapper with data-test and the click handler on the wrapper;
-        // the inner `div` suffix from the Quasar era no longer matches. Use the wrapper.
-        return await this.page.locator(this.vrlToggleButton).first().click();
+        // Transform editor toggle is inside the utilities ("More") menu.
+        // Ensure it is ON (idempotent) — only enable if the function dropdown is not already visible.
+        const functionDropdown = this.page.locator('[data-test="logs-search-bar-function-dropdown"]');
+        const isVisible = await functionDropdown.isVisible({ timeout: 2000 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.locator(this.utilitiesMenuButton).click();
+            const toggleItem = this.page.locator(this.menuTransformEditorToggleBtn);
+            await toggleItem.waitFor({ state: 'visible', timeout: 5000 });
+            await toggleItem.click();
+            await functionDropdown.waitFor({ state: 'visible', timeout: 10000 });
+        }
     }
 
     async clickVrlEditor() {
@@ -3777,25 +3834,13 @@ export class LogsPage {
     }
 
     async clickVrlToggle() {
-        // Check both toggle button selectors to understand which one exists
-        const showQueryToggle = this.page.locator(this.vrlToggleButton);
-        const vrlToggle = this.page.locator(this.vrlToggleBtn);
-
-        const showQueryCount = await showQueryToggle.count();
-        const vrlCount = await vrlToggle.count();
-
-        testLogger.info(`Found ${showQueryCount} elements for show-query-toggle, ${vrlCount} elements for vrl-toggle`);
-
-        // Use the VRL toggle button instead of show-query toggle
-        if (vrlCount > 0) {
-            await vrlToggle.first().click();
-            testLogger.info('Clicked VRL toggle button (logs-search-bar-vrl-toggle-btn)');
-        } else if (showQueryCount > 0) {
-            await showQueryToggle.first().click();
-            testLogger.info('Clicked show-query toggle button (logs-search-bar-show-query-toggle-btn)');
-        } else {
-            throw new Error('No VRL toggle button found');
-        }
+        // Transform editor toggle is inside the utilities ("More") menu — toggle it.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const toggleItem = this.page.locator(this.menuTransformEditorToggleBtn);
+        await toggleItem.waitFor({ state: 'visible', timeout: 5000 });
+        await toggleItem.click();
+        testLogger.info('Clicked VRL toggle via utilities menu');
 
         // Deterministic wait — let the VRL/results panel transition settle. The reactive
         // state change is observable via the VRL editor's presence or absence.
@@ -4132,20 +4177,15 @@ export class LogsPage {
     }
 
     async clickFunctionDropdownSave() {
-        // The save button is now a standalone button (not in dropdown)
-        // Try FunctionSelector button first, then TransformSelector button
-        try {
-            // Try FunctionSelector save button (when actions are disabled)
-            await this.page.locator('[data-test="logs-search-bar-save-function-btn"]').click({ timeout: 3000 });
-        } catch (error) {
-            try {
-                // Try TransformSelector save button (when actions are enabled)
-                await this.page.locator(this.logsSearchBarSaveTransformBtn).click({ timeout: 3000 });
-            } catch (transformError) {
-                // Fallback: Try the save function button directly
-                await this.page.locator('[data-test="logs-search-bar-save-function-btn"], [data-test="logs-search-bar-save-transform-btn"]').first().click();
-            }
+        // In the new UI, the transform editor (FunctionSelector/TransformSelector) is hidden by
+        // default. The save button only renders when the editor is visible. Ensure it's open first.
+        const saveBtn = this.page.locator('[data-test="logs-search-bar-save-function-btn"], [data-test="logs-search-bar-save-transform-btn"]');
+        const isBtnVisible = await saveBtn.first().isVisible({ timeout: 1000 }).catch(() => false);
+        if (!isBtnVisible) {
+            await this.toggleVrlEditor();
         }
+        await saveBtn.first().waitFor({ state: 'visible', timeout: 5000 });
+        await saveBtn.first().click();
     }
 
     async clickSavedFunctionNameInput() {
@@ -4274,8 +4314,8 @@ export class LogsPage {
     }
 
     async clickHistogramToggleDiv() {
-        // Histogram toggle is now directly in the toolbar (moved out of utilities menu)
-        return await this.page.locator(this.histogramToggle).click();
+        // Histogram toggle lives in the utilities ("More") menu — delegate to toggleHistogram().
+        await this.toggleHistogram();
     }
 
     async expectQueryEditorContainsExpectedQuery(expectedQuery) {
@@ -4887,9 +4927,9 @@ export class LogsPage {
     async addIncludeSearchTermFromLogDetails() {
         // Ensure Quick Mode is OFF for include/exclude buttons to work
         // Quick mode is now inside the utilities hamburger menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]');
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await toggleInner.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const state = await toggleInner.getAttribute('data-state').catch(() => null);
         const isQuickModeOn = state === 'checked';
 
@@ -5172,7 +5212,10 @@ export class LogsPage {
         const isOn = state === 'checked';
 
         if (desiredState !== isOn) {
-            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch"]').click();
+            // Click the inner OSwitch <button> (data-state="checked|unchecked") — the outer wrapper
+            // is a <div> that Playwright treats as non-interactive and times out on.
+            // force: true — ODropdown portal transiently detaches items during initial render
+            await this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]').click({ force: true });
             // Wait for OSwitch data-state to flip to the desired value
             const expectedState = desiredState ? 'checked' : 'unchecked';
             await this.page.waitForFunction(
@@ -5189,17 +5232,23 @@ export class LogsPage {
     }
 
     async ensureHistogramToggleState(desiredState) {
+        // Histogram is now inside the utilities ("More") menu.
+        await this.page.keyboard.press('Escape').catch(() => {});
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const histogramToggle = this.page.locator(this.histogramToggle);
-        const isEnabled = await histogramToggle.getAttribute('aria-pressed');
+        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
+        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+        const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state]`).first();
+        await switchEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const state = await switchEl.getAttribute('data-state').catch(() => null);
+        const isOn = state === 'checked';
 
-        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
-            await histogramToggle.click();
-            await this.page.waitForTimeout(500);
+        if (desiredState !== isOn) {
+            // force: true — ODropdown portal transiently detaches items during initial render
+            await histogramMenuItem.click({ force: true });
+            await this.page.keyboard.press('Escape').catch(() => {});
             return true; // State was changed
         }
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        await this.page.keyboard.press('Escape').catch(() => {});
         return false; // State was already correct
     }
 
@@ -5269,13 +5318,34 @@ export class LogsPage {
     }
 
     async toggleQueryModeEditor() {
-        // Post-OSwitch-migration: the toggle is a `<button data-state>` inside
-        // the wrapper data-test. Click the inner [data-state] button (see
-        // sqlModeToggleStateBtn for the canonical pattern).
-        await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] [data-state]').first().click();
-        // Wait for the VRL function editor container to appear (Firefox needs this)
-        await this.page.waitForTimeout(2000);
-        await this.page.locator('[data-test="logs-vrl-function-editor"]').first().waitFor({ state: 'visible', timeout: 15000 });
+        // Post-menu-migration: the function/transform editor toggle moved into the
+        // utilities ("More") dropdown as logs-search-bar-menu-transform-editor-toggle-btn.
+        // Open the dropdown if needed, click the toggle item, then close the menu.
+        // Retry loop: in headless CI, reka-ui's focus-outside detection can close the portal
+        // between the open click and the item click. Retry up to 3 times to be resilient.
+        const transformEditorMenuItem = this.page.locator('[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]');
+        let clicked = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const isVisible = await transformEditorMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+            if (!isVisible) {
+                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+                const appeared = await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 })
+                    .then(() => true).catch(() => false);
+                if (!appeared) continue;
+            }
+            // Click immediately — no fixed delay. The waitFor above already confirmed the element
+            // is visible. A fixed delay here allows reka-ui's focus-outside to close the portal
+            // in headless Chromium CI before the click executes.
+            const success = await transformEditorMenuItem.click({ force: true, timeout: 3000 })
+                .then(() => true).catch(() => false);
+            if (success) { clicked = true; break; }
+        }
+        if (!clicked) throw new Error('toggleQueryModeEditor: could not click transform editor menu item after 3 attempts');
+
+        // @select.prevent keeps the menu open — close it so it doesn't overlap the editor
+        await this.page.keyboard.press('Escape');
+        // Wait for the VRL function editor container to appear
+        await this.page.locator(this.fnEditor).first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async clickMonacoEditor() {
@@ -6311,11 +6381,12 @@ export class LogsPage {
      * Wait for SQL mode to be active after switching
      */
     async waitForSQLModeActive() {
-        // Deterministic signal: OSwitch's inner button has data-state="checked" once v-model flips to true.
-        // Wait on the visible checked state directly — avoids strict-mode collisions with any
-        // OTooltip grace-area spans that may also carry data-state attributes inside the wrapper.
-        await this.page.locator(this.sqlModeToggleCheckedBtn).first()
-            .waitFor({ state: 'visible', timeout: 10000 });
+        // SQL mode switch is inside the utilities menu. Use getSQLModeState() poll to confirm
+        // the OSwitch inner button reaches data-state="checked" without leaving the menu open.
+        await expect.poll(
+            () => this.getSQLModeState(),
+            { timeout: 10000 }
+        ).toBe('checked');
         testLogger.info('SQL mode switch stabilized');
     }
 
@@ -6646,7 +6717,7 @@ export class LogsPage {
      */
     async isSqlModeEnabled() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         const state = await stateEl.getAttribute('data-state').catch(() => null);
         if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
@@ -6659,11 +6730,11 @@ export class LogsPage {
      */
     async enableSqlModeIfDisabled() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         const state = await stateEl.getAttribute('data-state').catch(() => null);
         if (state !== 'checked') {
-            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            await this.page.locator(this.menuSqlModeBtn).click();
             await expect.poll(async () => {
                 const s = await stateEl.getAttribute('data-state').catch(() => null);
                 return s === 'checked';
@@ -7001,7 +7072,7 @@ export class LogsPage {
      */
     async clickSQLModeSwitch() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+        await this.page.locator(this.menuSqlModeBtn).click();
         if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
     }
 
@@ -7012,7 +7083,7 @@ export class LogsPage {
      */
     async getSQLModeState() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         const state = await stateEl.getAttribute('data-state').catch(() => null);
         if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
@@ -7147,11 +7218,12 @@ export class LogsPage {
         if (isToolbarVisible) {
             await toolbarToggle.click();
         } else {
+            const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
             await this.page.locator(this.utilitiesMenuButton).click();
-            await this.page.waitForTimeout(200);
-            await this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]').click();
+            await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+            // Click immediately — no fixed delay avoids reka-ui focus-outside closing the portal in CI.
+            await menuItem.click({ force: true });
         }
-        await this.page.waitForTimeout(500);
         testLogger.info('Histogram toggled');
     }
 
@@ -7282,11 +7354,12 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickSavedViewByName(name) {
-        // Target the per-row data-test on the saved-view list row (SearchBar.vue):
-        // `logs-search-saved-view-item-${row.view_name}` — §2-compliant, no text-matching.
-        const savedView = this.page.locator(`[data-test="logs-search-saved-view-item-${name}"]`).first();
+        // SearchBar.vue uses data-test="logs-search-bar-apply-${value}-saved-view-btn" for the apply button.
+        // The previously used `logs-search-saved-view-item-${name}` does not exist in the DOM.
+        const savedView = this.page.locator(`[data-test="logs-search-bar-apply-${name}-saved-view-btn"]`).first();
         await savedView.waitFor({ state: 'visible', timeout: 10000 });
-        await savedView.click();
+        // force: true — ODropdown portal transiently detaches items during initial render
+        await savedView.click({ force: true });
         testLogger.info(`Clicked saved view: ${name}`);
     }
 
@@ -7316,10 +7389,27 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
-        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
-        await dropdownArrow.click();
-        await this.page.waitForTimeout(500);
+        // Saved views list is now opened via the utilities ("More") dropdown menu.
+        // Ensure any previously open dropdown is closed before opening fresh.
+        const listMenuItem = this.page.locator(this.menuListSavedViewsBtn);
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await listMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        // After navigation the Vue component may need an extra render cycle before its
+        // click handler responds. Retry the open sequence up to 3 times: force-click the
+        // trigger, wait up to 5 s for the menu item to appear, then reset and try again.
+        let opened = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+            opened = await listMenuItem.waitFor({ state: 'visible', timeout: 5000 })
+                .then(() => true).catch(() => false);
+            if (opened) break;
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await listMenuItem.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
+        }
+        if (!opened) throw new Error('Could not open saved views menu after 3 attempts');
+        // force: true — ODropdown portal transiently detaches items during initial render
+        await listMenuItem.click({ force: true });
+        await this.page.locator(this.savedViewsListDialogEl).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Clicked saved views dropdown arrow');
     }
 
@@ -7328,18 +7418,9 @@ export class LogsPage {
      * Tries arrow click first, then main button if search input doesn't appear
      */
     async expandSavedViewsDropdown() {
-        try {
-            await this.clickSavedViewsDropdownArrow();
-            const searchInput = this.page.locator(this.savedViewSearchInput);
-            await searchInput.waitFor({ state: 'visible', timeout: 5000 });
-            return;
-        } catch (e) {
-            testLogger.debug('Arrow click did not show search input, retrying');
-        }
-
-        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
-        await dropdownArrow.click();
-        await this.page.waitForTimeout(500);
+        await this.clickSavedViewsDropdownArrow();
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+        await searchInput.waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -7502,11 +7583,12 @@ export class LogsPage {
      */
     async enableSqlModeIfNeeded() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (!isOn) {
-            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            // force: true bypasses actionability checks — ODropdown portal transiently detaches items on render
+            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
             // Dropdown stays open (ODropdownItem has @select.prevent) — poll the inner button directly
             await expect.poll(async () => {
                 const s = await stateEl.getAttribute('data-state').catch(() => null);
@@ -7525,11 +7607,11 @@ export class LogsPage {
      */
     async disableSqlModeIfNeeded() {
         const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
         await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (isOn) {
-            await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+            await this.page.locator(this.menuSqlModeBtn).click();
             await expect.poll(async () => {
                 const s = await stateEl.getAttribute('data-state').catch(() => null);
                 return s === 'unchecked';
@@ -9781,5 +9863,4 @@ export class LogsPage {
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
     }
-
 }

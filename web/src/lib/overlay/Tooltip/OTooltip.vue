@@ -35,7 +35,14 @@ let cleanupFn: (() => void) | null = null;
 
 onMounted(() => {
   if (!hasDefaultSlot.value && childAnchorRef.value) {
-    parentEl.value = childAnchorRef.value.parentElement;
+    // Walk up past any display:contents ancestors — they have no layout box
+    // and getBoundingClientRect() returns all-zeros, sending the tooltip to (0,0).
+    // This is needed because OButton wraps slot content in <span class="tw:contents">.
+    let candidate: Element | null = childAnchorRef.value.parentElement;
+    while (candidate && window.getComputedStyle(candidate).display === "contents") {
+      candidate = candidate.parentElement;
+    }
+    parentEl.value = candidate;
     if (parentEl.value) {
       const show = () => { if (!props.disabled) childOpen.value = true; };
       const hide = () => { childOpen.value = false; };
@@ -53,24 +60,22 @@ onUnmounted(() => cleanupFn?.());
 
 const effectiveSideOffset = computed(() => props.sideOffset);
 
-// Using filter:drop-shadow instead of CSS border so the bubble and the arrow SVG
-// child are composited together first ΓÇö the drop-shadow then traces the combined
-// speech-bubble silhouette with no seam at the arrow base.
+// filter:drop-shadow composites the bubble + SVG arrow as one silhouette so
+// the shadow wraps the full speech-bubble shape with no seam at the arrow base.
+// Layer 1: zero-offset soft halo — uniform separation from any background.
+// Layer 2: directional depth shadow for elevation.
 const contentStyle = computed(() => ({
   maxWidth: props.maxWidth,
   filter: [
-    'drop-shadow(1px 0 0 var(--color-tooltip-border))',
-    'drop-shadow(-1px 0 0 var(--color-tooltip-border))',
-    'drop-shadow(0 1px 0 var(--color-tooltip-border))',
-    'drop-shadow(0 -1px 0 var(--color-tooltip-border))',
-    'drop-shadow(0 2px 6px rgba(0,0,0,0.10))',
+    'drop-shadow(0 0 1px rgba(0,0,0,0.15))',
+    'drop-shadow(0 4px 12px rgba(0,0,0,0.14))',
   ].join(' '),
 }));
 
 const contentClasses = computed(() => [
   "tw:z-[10100] tw:px-2.5 tw:py-1.5",
-  "tw:bg-[var(--color-tooltip-bg)] tw:rounded-md",
-  "tw:text-xs tw:text-[var(--color-tooltip-text)] tw:leading-relaxed",
+  "tw:bg-[var(--color-surface-overlay)] tw:rounded-md",
+  "tw:text-xs tw:text-[var(--color-text-primary)] tw:font-medium tw:leading-relaxed",
   "tw:data-[state=delayed-open]:animate-in tw:data-[state=delayed-open]:fade-in-0 tw:data-[state=delayed-open]:zoom-in-95",
   "tw:data-[state=instant-open]:animate-in tw:data-[state=instant-open]:fade-in-0",
   "tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95",
@@ -107,7 +112,7 @@ const contentClasses = computed(() => [
           <TooltipArrow
             :width="10"
             :height="5"
-            :class="'tw:fill-[var(--color-tooltip-arrow)]'"
+            :class="'tw:fill-[var(--color-surface-overlay)]'"
           />
         </TooltipContent>
       </TooltipPortal>
@@ -143,7 +148,7 @@ const contentClasses = computed(() => [
             <TooltipArrow
               :width="10"
               :height="5"
-              :class="'tw:fill-[var(--color-tooltip-arrow)]'"
+              :class="'tw:fill-[var(--color-surface-overlay)]'"
             />
           </TooltipContent>
         </TooltipPortal>

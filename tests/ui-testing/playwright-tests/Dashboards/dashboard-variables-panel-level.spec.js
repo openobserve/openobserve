@@ -130,7 +130,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
       await pm.dashboardPanelActions.addPanelName(`DummyPanel${i + 1}`);
       await pm.dashboardPanelActions.savePanel();
-      await page.locator(SELECTORS.PANEL_ANY).nth(i).waitFor({ state: "visible", timeout: 10000 });
+      await page.locator(SELECTORS.PANEL_CONTAINER).nth(i).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     }
 
@@ -143,7 +143,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added and rendered
-    await page.locator(SELECTORS.PANEL_ANY).nth(6).waitFor({ state: "visible", timeout: 15000 });
+    await page.locator(SELECTORS.PANEL_CONTAINER).nth(6).waitFor({ state: "visible", timeout: 15000 });
     await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
 

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
         </OButton>
       </template>
-      <div class="tw:w-[300px] tw:p-2">
+      <div class="tw:w-75 tw:p-2">
         <div class="tw:flex">
           <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
             <OButton
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <hr class="tw:border-0 tw:border-t tw:border-solid tw:border-[var(--o2-border)] tw:my-0" />
+        <hr class="tw:border-0 tw:border-t tw:border-solid tw:border-(--o2-border) tw:my-0" />
         <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
           <div
             v-for="(item, j) in items"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="item.disabled"
                 side="right"
                 align="center"
-                max-width="300px"
+                max-width="18.75rem"
                 :content="minRangeRestrictionMessageVal"
               />
               {{ item.label }}
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
           variant="outline"
-          size="sm-toolbar"
+          size="sm"
         >
           <div class="tw:flex tw:items-center tw:flex-nowrap">
             <OIcon
@@ -105,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'tw:mr-0.5',
               ]"
             />
-            <div class="tw:text-center">{{ selectedLabel }}</div>
+            <div class="tw:text-center tw:text-[0.8125rem] tw:leading-4">{{ selectedLabel }}</div>
             <OIcon name="arrow-drop-down" size="sm" class="tw:ml-0.5" />
           </div>
         </OButton>
       </template>
-      <div class="tw:w-[300px] tw:p-2">
+      <div class="tw:w-75 tw:p-2">
         <div class="tw:flex">
           <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
             <OButton
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="item.disabled"
                 side="right"
                 align="center"
-                max-width="300px"
+                max-width="18.75rem"
                 :content="minRangeRestrictionMessageVal"
               />
               {{ item.label }}
@@ -380,11 +380,11 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .refresh-interval-dropdown {
-  min-width: 36px;
+  min-width: 2.25rem;
   height: 100%;
-  min-height: 30px;
-  line-height: 30px;
-  padding: 0px 5px;
+  min-height: 1.875rem;
+  line-height: 1.875rem;
+  padding: 0 0.3125rem;
 }
 
 @keyframes rotate {

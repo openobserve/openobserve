@@ -116,6 +116,8 @@ export interface SelectProps {
    *   saving vertical space when the label is short (e.g. in config panels).
    */
   labelPosition?: "inside" | "outside";
+  /** When true, replaces the chevron with a spinner to indicate async loading */
+  loading?: boolean;
 }
 
 export interface SelectEmits {

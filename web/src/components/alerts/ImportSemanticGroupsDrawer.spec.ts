@@ -19,6 +19,31 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "title",
+    "subTitle",
+    "secondaryButtonLabel",
+    "primaryButtonLabel",
+    "primaryButtonDisabled",
+    "primaryButtonLoading",
+    "persistent",
+    "showClose",
+    "size",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary"],
+  template: `
+    <div data-test="o-drawer-stub" :data-open="String(open)">
+      <slot />
+      <button data-test="import-drawer-cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+      <button data-test="import-drawer-apply-btn" @click="$emit('click:primary')" :disabled="primaryButtonDisabled">{{ primaryButtonLabel }}</button>
+    </div>
+  `,
+};
+
 const ODialogStub = {
   name: "ODialog",
   template:
@@ -87,6 +112,7 @@ async function mountComp(props: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
+        ODrawer: ODrawerStub,
         ODialog: ODialogStub,
       },
     },
@@ -127,17 +153,19 @@ describe("ImportSemanticGroupsDrawer - rendering", () => {
 });
 
 describe("ImportSemanticGroupsDrawer - close & cancel", () => {
-  it("clicking close button (handleClose) emits close", async () => {
+  it("clicking close button (handleClose) emits update:open=false", async () => {
     const w = await mountComp();
     (w.vm as any).handleClose();
     await w.vm.$nextTick();
-    expect(w.emitted("close")).toBeTruthy();
+    expect(w.emitted("update:open")).toBeTruthy();
+    expect(w.emitted("update:open")![0]).toEqual([false]);
   });
 
-  it("clicking cancel button emits close", async () => {
+  it("clicking cancel button emits update:open=false", async () => {
     const w = await mountComp();
     await w.find('[data-test="import-drawer-cancel-btn"]').trigger("click");
-    expect(w.emitted("close")).toBeTruthy();
+    expect(w.emitted("update:open")).toBeTruthy();
+    expect(w.emitted("update:open")![0]).toEqual([false]);
   });
 
   it("handleClose clears diffData", async () => {
@@ -246,12 +274,13 @@ describe("ImportSemanticGroupsDrawer - handleApply", () => {
     expect(payload.some((g: any) => g.id === "add-1")).toBe(true);
   });
 
-  it("emits close after apply", async () => {
+  it("emits update:open=false after apply", async () => {
     const w = await mountComp();
     (w.vm as any).diffData = mockDiffData;
     (w.vm as any).selectedAdditions = ["add-1"];
     (w.vm as any).handleApply();
-    expect(w.emitted("close")).toBeTruthy();
+    expect(w.emitted("update:open")).toBeTruthy();
+    expect(w.emitted("update:open")![0]).toEqual([false]);
   });
 
   it("does nothing when no changes selected", async () => {

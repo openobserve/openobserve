@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <OFieldRow
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
-    :title="field.name"
     :data-test="`logs-field-list-item-${field.name}`"
     class="tw:pl-[1.5rem]"
   >

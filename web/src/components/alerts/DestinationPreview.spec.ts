@@ -118,16 +118,17 @@ describe("DestinationPreview", () => {
     expect(dialog.props("open")).toBe(false);
   });
 
-  it("should pass width=55 to ODialog", () => {
+  it("should pass size=md to ODialog", () => {
+    // width=55 replaced with size="md" in commit 1f896ef747
     wrapper = mountComponent({ type: "slack" });
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("width")).toBe(55);
+    expect(dialog.props("size")).toBe("md");
   });
 
-  it("should pass 'Close' as primaryButtonLabel to ODialog", () => {
+  it("should render a Close button in the footer", () => {
+    // primaryButtonLabel prop removed — Close moved to manual footer slot (commit 1f896ef747)
     wrapper = mountComponent({ type: "slack" });
-    const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonLabel")).toBe("Close");
+    expect(wrapper.text()).toContain("Close");
   });
 
   it("should render Slack preview when type is slack", () => {
@@ -195,10 +196,12 @@ describe("DestinationPreview", () => {
     expect(wrapper.find('[data-test="opsgenie-preview"]').exists()).toBe(true);
   });
 
-  it("should emit update:modelValue=false when ODialog primary click is received", async () => {
+  it("should emit update:modelValue=false when Close button is clicked", async () => {
+    // @click:primary removed from ODialog — Close button now lives in footer slot (commit 1f896ef747)
     wrapper = mountComponent({ type: "slack" });
-    const dialog = wrapper.findComponent(ODialogStub);
-    await dialog.vm.$emit("click:primary");
+    const closeBtn = wrapper.findAll("button").find((b) => b.text().trim() === "Close");
+    expect(closeBtn?.exists()).toBe(true);
+    await closeBtn!.trigger("click");
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();

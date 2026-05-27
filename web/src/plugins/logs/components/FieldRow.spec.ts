@@ -147,13 +147,12 @@ describe("FieldRow", () => {
       expect(label.text()).toContain(defaultField.name);
     });
 
-    it("sets title on the field container", () => {
+    it("renders OTooltip with field name as tooltip content", () => {
       const wrapper = createWrapper({ field: { ...defaultField, ftsKey: true } });
-      // OFieldRow renders with :title="field.name" — find by data-test
-      const container = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
-      expect(container.attributes("title")).toBe(defaultField.name);
+      // Title moved from native attribute to OTooltip child (commit 72774719c3)
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(tooltip.props("content")).toBe(defaultField.name);
     });
   });
 

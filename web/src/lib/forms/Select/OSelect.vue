@@ -11,6 +11,7 @@ import type {
 import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import {
   ListboxFilter,
   ListboxItem,
@@ -290,22 +291,21 @@ const listboxModeEnabled = computed(
 
 const selectedValues = computed<SelectPrimitiveValue[]>(() => {
   if (Array.isArray(props.modelValue)) return props.modelValue;
-  // Treat null/undefined/'' as "no selection" — otherwise the clear (X)
-  // button appears even when nothing is selected.
-  if (
-    props.modelValue === undefined ||
-    props.modelValue === null ||
-    props.modelValue === ""
-  ) {
+  if (props.modelValue === undefined || props.modelValue === "") {
     return [];
+  }
+  if (props.modelValue === null) {
+    // null is a valid selection when a null-valued option exists (e.g. "Auto", "None", "Default")
+    const hasNullOption = normalizedOptions.value.some(
+      (opt) => !opt.header && opt.value === null,
+    );
+    return hasNullOption ? [null] : [];
   }
   return [props.modelValue];
 });
 
 const hasSelection = computed(() =>
-  selectedValues.value.some(
-    (v) => v !== undefined && v !== null && v !== "",
-  ),
+  selectedValues.value.some((v) => v !== undefined),
 );
 
 const selectedLabels = computed(() => {
@@ -631,7 +631,7 @@ function getPaletteGradient(colors: string[]): string {
   return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
-// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
+// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density; raised to h-9 (36px) to match OButton sm.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-6 tw:text-sm",
   md: "tw:h-8 tw:text-sm",
@@ -891,14 +891,17 @@ const fieldWidthClass = computed(() => {
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               triggerEndPadding,
               labelPosition === 'inside' && label
-                ? 'tw:items-end tw:h-10'
+                ? [
+                    'tw:items-end tw:pb-0.5 tw:text-sm',
+                    heightClasses[size ?? 'md'],
+                  ]
                 : ['tw:items-center', heightClasses[size ?? 'md']],
             ]"
           >
             <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+              class="tw:absolute tw:top-0.5 tw:start-3 tw:text-[0.625rem] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
               >{{ label }}</span
             >
 
@@ -918,11 +921,11 @@ const fieldWidthClass = computed(() => {
                   <slot
                     v-for="(labelText, idx) in visibleSelectedLabels"
                     name="chip"
-                    :label="labelText"
+                    :label="String(labelText ?? '')"
                     :value="selectedValues[idx]"
                   >
                     <span
-                      :key="labelText"
+                      :key="`${idx}-${String(labelText ?? '')}`"
                       class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
                     >
                       {{ labelText }}
@@ -940,7 +943,10 @@ const fieldWidthClass = computed(() => {
               <span
                 v-else
                 :class="[
-                  'tw:flex-1 tw:text-start tw:truncate',
+                  'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+                  labelPosition === 'inside' && label
+                    ? 'tw:text-xs tw:leading-4'
+                    : '',
                   disabled
                     ? 'tw:text-select-disabled-text'
                     : hasSelection
@@ -989,7 +995,9 @@ const fieldWidthClass = computed(() => {
               </svg>
             </button>
 
+            <OSpinner v-if="loading" size="xs" />
             <span
+              v-else
               aria-hidden="true"
               :class="[
                 'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
@@ -1339,21 +1347,27 @@ const fieldWidthClass = computed(() => {
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             triggerEndPadding,
             labelPosition === 'inside' && label
-              ? 'tw:items-end tw:h-10 tw:pb-1.5'
+              ? [
+                  'tw:items-end tw:pb-0.5 tw:text-sm',
+                  heightClasses[size ?? 'md'],
+                ]
               : ['tw:items-center', heightClasses[size ?? 'md']],
           ]"
         >
           <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+            class="tw:absolute tw:top-0.5 tw:start-3 tw:text-[0.625rem] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
             >{{ label }}</span
           >
 
           <SelectValue
             :placeholder="placeholder"
             :class="[
-              'tw:flex-1 tw:text-start tw:truncate',
+              'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+              labelPosition === 'inside' && label
+                ? 'tw:text-xs tw:leading-4'
+                : '',
               disabled
                 ? 'tw:text-select-disabled-text'
                 : hasSelection
@@ -1395,7 +1409,9 @@ const fieldWidthClass = computed(() => {
             </svg>
           </button>
 
+          <OSpinner v-if="loading" size="xs" />
           <span
+            v-else
             aria-hidden="true"
             :class="[
               'tw:flex tw:items-center tw:justify-center tw:text-select-icon',

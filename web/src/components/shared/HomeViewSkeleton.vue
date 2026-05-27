@@ -349,64 +349,59 @@ const store = useStore();
   margin-bottom: 16px;
 }
 
-/* Skeleton Animation */
+/* Flat base + sliding ::after overlay — same pattern as OSkeleton/SkeletonBox.
+   Dark/light theme overrides set the base colour explicitly since this is
+   a legacy component that may load before the O2 token root is applied. */
 .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: skeleton-wave 1.5s ease-in-out infinite;
+  background-color: var(--color-skeleton-base, #f5f5f5);
   position: relative;
   overflow: hidden;
 }
 
-/* Dark theme skeleton */
+.skeleton-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent       0%,
+    transparent      30%,
+    var(--color-skeleton-shimmer, rgba(255, 255, 255, 0.8)) 50%,
+    transparent      70%,
+    transparent     100%
+  );
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+/* Dark theme — swap to dark surface base, dimmer shimmer */
 .dark-stream-container .skeleton-box,
 .dark-tile-content .skeleton-box,
 .chart-container-dark .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.02),
-    rgba(255, 255, 255, 0.08),
-    rgba(255, 255, 255, 0.02)
-  );
-  background-size: 200% 100%;
+  background-color: #262626;
 }
 
-/* Light theme skeleton */
+.dark-stream-container .skeleton-box::after,
+.dark-tile-content .skeleton-box::after,
+.chart-container-dark .skeleton-box::after {
+  background: linear-gradient(
+    90deg,
+    transparent                   0%,
+    transparent                  30%,
+    rgba(255, 255, 255, 0.07)    50%,
+    transparent                  70%,
+    transparent                 100%
+  );
+}
+
+/* Light theme — explicit override in case token isn't resolved */
 .light-stream-container .skeleton-box,
 .light-tile-content .skeleton-box,
 .chart-container-light .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.02),
-    rgba(0, 0, 0, 0.08),
-    rgba(0, 0, 0, 0.02)
-  );
-  background-size: 200% 100%;
+  background-color: #f5f5f5;
 }
 
-@keyframes skeleton-wave {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-/* Additional skeleton styling for better visibility */
-.skeleton-box::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: inherit;
-  border-radius: inherit;
+@keyframes skeleton-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 </style>

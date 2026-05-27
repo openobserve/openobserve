@@ -199,6 +199,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:enabled:hover:text-[#1e40af]",
     "tw:disabled:opacity-60",
   ].join(" "),
+  // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
+  // Use for edition/tier badges that must stand out without being a heavy CTA.
+  "outline-primary": [
+    "tw:bg-button-ghost-primary-active-bg tw:text-button-ghost-primary-text tw:border tw:border-button-outline-hover-border",
+    "tw:enabled:hover:bg-button-ghost-primary-active-bg tw:enabled:hover:border-button-outline-hover-border",
+    "tw:enabled:active:bg-button-ghost-primary-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-primary-focus-ring",
+    "tw:disabled:opacity-50",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "tw:bg-transparent tw:text-inherit tw:border tw:border-border-default",
@@ -211,7 +220,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
-  sm: "tw:h-9 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
+  sm: "tw:h-8 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
     "tw:h-[1.875rem] tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1.5 tw:rounded-md",
@@ -222,7 +231,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // (needed because Quasar sets html font-size to 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "tw:h-6 tw:ps-2 tw:pe-1.5 tw:!text-[12px] tw:gap-1 tw:rounded tw:leading-none",
   "sm-action":
-    "tw:h-9 tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-md",
+    "tw:h-8 tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-md",
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
   lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
   icon: "tw:size-6 tw:p-0 tw:rounded-md tw:gap-x-0",
@@ -233,7 +242,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-xs-sq": "tw:h-7 tw:w-7 tw:p-0 tw:rounded-md tw:gap-x-0",
   // 24px square — matches chip size for paired close/remove buttons
   "icon-chip": "tw:h-6 tw:w-6 tw:p-0 tw:rounded tw:gap-x-0",
-  "icon-sm": "tw:h-9 tw:w-9 tw:p-0 tw:rounded-md tw:gap-x-0",
+  "icon-sm": "tw:h-8 tw:w-8 tw:p-0 tw:rounded-md tw:gap-x-0",
   "icon-md": "tw:h-10 tw:w-10 tw:p-0 tw:rounded-lg tw:gap-x-0",
   "icon-lg": "tw:h-12 tw:w-12 tw:p-0 tw:rounded-lg tw:gap-x-0",
   "icon-circle": "tw:size-8 tw:p-0 tw:rounded-full tw:gap-x-0",
@@ -258,6 +267,7 @@ const classes = computed<string[]>(() => [
   props.block
     ? "tw:flex tw:w-full tw:items-center tw:justify-center"
     : "tw:inline-flex tw:items-center tw:justify-center",
+  "tw:relative",
   "tw:whitespace-nowrap",
   "tw:font-medium tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150",
   "tw:outline-none",
@@ -288,12 +298,27 @@ function handleClick(event: MouseEvent): void {
     v-bind="$attrs"
     @click="handleClick"
   >
-    <slot name="icon-left">
-      <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
-    </slot>
-    <slot />
-    <slot name="icon-right">
-      <OIcon v-if="iconRight" :name="iconRight" size="sm" />
-    </slot>
+    <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
+    <span
+      v-if="loading"
+      class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center tw:pointer-events-none"
+      aria-hidden="true"
+    >
+      <OIcon name="progress-activity" size="sm" class="tw:animate-spin" />
+    </span>
+
+    <!-- Original content — invisible (not hidden) when loading to preserve button dimensions -->
+    <span
+      :class="loading ? 'tw:invisible tw:inline-flex tw:items-center' : 'tw:contents'"
+      :style="loading ? { gap: 'inherit' } : undefined"
+    >
+      <slot name="icon-left">
+        <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
+      </slot>
+      <slot />
+      <slot name="icon-right">
+        <OIcon v-if="iconRight" :name="iconRight" size="sm" />
+      </slot>
+    </span>
   </Primitive>
 </template>

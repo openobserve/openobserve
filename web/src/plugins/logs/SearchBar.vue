@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch
                 v-model="searchObj.meta.showHistogram"
                 size="md"
+                data-test="logs-search-bar-show-histogram-toggle-btn"
                 @click.stop
               />
             </template>
@@ -151,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon-left>
               <OSwitch
+                data-test="logs-search-bar-show-query-toggle-btn"
                 v-model="searchObj.meta.showTransformEditor"
                 size="md"
                 @click.stop
@@ -837,14 +839,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <span>
-                    <div class="tw:font-medium tw:text-[12px]">
+                    <div class="tw:font-medium">
                       {{
                         searchObj.meta.liveMode
                           ? t("search.turnOffLiveMode")
                           : t("search.turnOnLiveMode")
                       }}
                     </div>
-                    <div class="tw:text-[11px] tw:text-muted-foreground">
+                    <div class="tw:text-xs tw:text-[var(--o2-text-secondary)]">
                       {{ t("search.liveModeTooltip") }}
                     </div>
                   </span>
@@ -1361,6 +1363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         class="tw:flex tw:flex-1 tw:min-w-0"
                         :title="value"
+                        :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
                         @click.stop="
                           applySavedView(row);
                           savedViewsListDialog = false;
@@ -1774,6 +1777,7 @@ export default defineComponent({
     },
     handleDeleteSavedView(item: any) {
       this.savedViewDropdownModel = false;
+      this.savedViewsListDialog = false;
       this.deleteViewID = item.view_id;
       this.confirmDelete = true;
     },
@@ -1786,6 +1790,7 @@ export default defineComponent({
         return;
       }
       this.savedViewDropdownModel = false;
+      this.savedViewsListDialog = false;
       this.updateViewObj = item;
       this.confirmUpdate = true;
     },
