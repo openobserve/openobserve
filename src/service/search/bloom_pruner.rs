@@ -127,7 +127,7 @@ pub async fn prune(
     }
     if with_bloom.is_empty() {
         log::warn!(
-            "[bloom-prune] [trace_id {trace_id}] {org_id}/{stream_type}/{stream_name}: \
+            "[trace_id {trace_id}] search->bloom: stream {org_id}/{stream_type}/{stream_name}, \
              all {total_input} files have bloom_ver=0 — no `.bf` covers any of them. \
              Likely causes: compactor hasn't built `.bf` for this hour yet, or these files \
              produced no blooms (target field not in tantivy schema at build time, or \
@@ -136,7 +136,7 @@ pub async fn prune(
         return without_bloom;
     }
     log::info!(
-        "[bloom-prune] [trace_id {trace_id}] {org_id}/{stream_type}/{stream_name}: \
+        "[trace_id {trace_id}] search->bloom: stream {org_id}/{stream_type}/{stream_name}, \
          input={total_input} (with_bloom={}, without_bloom={}), \
          predicates=[{}]",
         with_bloom.len(),
@@ -225,7 +225,7 @@ pub async fn prune(
             }
             GroupResult::Err(path, e) => {
                 log::warn!(
-                    "[bloom-prune] [trace_id {trace_id}] group `{path}` failed: {e}; keeping its files"
+                    "[trace_id {trace_id}] search->bloom: group `{path}` failed: {e}; keeping its files"
                 );
             }
         }
@@ -295,7 +295,7 @@ pub async fn prune(
         }
     }
     log::info!(
-        "[bloom-prune] [trace_id {trace_id}] {org_id}/{stream_type}/{stream_name}: \
+        "[trace_id {trace_id}] search->bloom: stream {org_id}/{stream_type}/{stream_name}, \
          groups={total_groups}, input={total_input}, kept={} \
          (predicate_hit={kept_predicate_hit}, no_info={kept_no_info}, \
          bucket_failed={kept_bucket_failed}, unparseable_key={kept_unparseable_key}, \
@@ -356,7 +356,7 @@ async fn run_group(
         let footer_fields: Vec<&str> = reader.fields().collect();
         let requested_fields: Vec<&str> = predicates.iter().map(|p| p.field.as_str()).collect();
         log::warn!(
-            "[bloom-prune] [trace_id {trace_id}] group `{path}`: no rows resolved — \
+            "[trace_id {trace_id}] search->bloom: group `{path}`: no rows resolved — \
              footer fields=[{}], requested=[{}]. Likely cause: stream \
              `bloom_filter_fields ∩ index_fields` at build time differed from the queried \
              field. Keeping all files in this group.",

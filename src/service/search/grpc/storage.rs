@@ -121,7 +121,7 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, bloom filter reduced file_list num to {} in {bloom_took} ms",
+                    "[trace_id {trace_id}] search->bloom: stream {org_id}/{stream_type}/{stream_name}, bloom filter reduced file_list num to {} in {bloom_took} ms",
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
@@ -152,7 +152,7 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, inverted index reduced file_list num to {} in {idx_took} ms",
+                    "[trace_id {trace_id}] search->tantivy: stream {org_id}/{stream_type}/{stream_name}, inverted index reduced file_list num to {} in {idx_took} ms",
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
