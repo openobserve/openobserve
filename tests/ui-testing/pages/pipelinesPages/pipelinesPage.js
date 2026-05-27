@@ -1441,25 +1441,31 @@ export class PipelinesPage {
                 await this.page.reload().catch(() => {});
                 await apiPromise;
 
-                // Ensure we're on the "all" tab so realtime + scheduled pipelines
-                // are both visible regardless of any previous tab selection.
-                if (await this.pipelineListAllTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await this.pipelineListAllTab.click().catch(() => {});
-                }
+            // Ensure we're on the "all" tab so realtime + scheduled pipelines
+            // are both visible regardless of any previous tab selection.
+            const allTab = this.page.locator('[data-test="tab-all"]');
+            if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await allTab.click().catch(() => {});
+            }
 
-                // Wait for the table to reach a settled state (rows or empty-
-                // state OR pagination footer) BEFORE reading row content.
-                await this.waitForPipelineListSettled(15000);
+            // Wait for at least one pipeline row so we know the table rendered
+            // its data — search against an empty table never surfaces our row.
+            const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-delete-pipeline"]').first();
+            await anyRow.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
-                // Clear and re-fill the search filter.
-                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
-                await this.pipelineSearchInputField.fill('');
-                await this.searchPipeline(pipelineName);
-                return await deleteBtn.isVisible({ timeout: 2000 }).catch(() => false);
-            }, {
-                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
-                timeout: 180000,
-            }).toBe(true);
+            // Clear and re-fill the search filter.
+            await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+            await this.pipelineSearchInputField.fill('');
+            // Wait for full list to restore after clearing the filter
+            await anyRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            await this.searchPipeline(pipelineName);
+
+            // Wait deterministically for the filtered delete button to appear
+            deleteVisible = await deleteBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
+            if (deleteVisible) break;
+        }
+        if (!deleteVisible) {
+            await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
         await deleteBtn.click();
         await this.confirmDeletePipeline();
