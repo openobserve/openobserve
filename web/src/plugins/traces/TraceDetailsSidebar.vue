@@ -852,6 +852,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
+            :chip-dimensions="correlationProps.chipDimensions"
+            :source-event="correlationProps.sourceEvent"
             :metric-streams="correlationProps.metricStreams"
             :log-streams="correlationProps.logStreams"
             :trace-streams="correlationProps.traceStreams"
@@ -928,6 +931,8 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
+import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
@@ -1596,7 +1601,11 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const correlationProps = ref<any>(null);
-    const { findRelatedTelemetry, loadSemanticGroups } = useServiceCorrelation();
+    const {
+      findRelatedTelemetry,
+      loadSemanticGroups,
+      semanticGroups,
+    } = useServiceCorrelation();
 
     // Write correlation data to shared searchObj for TraceDetails to use
     watch(correlationProps, (newVal) => {
@@ -1665,6 +1674,22 @@ export default defineComponent({
       return dimensions;
     };
 
+    // Map a span row to a source-event severity label. Spans in this codebase
+    // expose span status as `span_status` ("OK" | "ERROR" | "UNSET"); fall back
+    // to OTel `status.code` (numeric, 2 = ERROR) and finally any severity-like
+    // text field on the span. Returns null when nothing classifiable is set.
+    const deriveSpanSeverity = (span: any): string | null => {
+      if (!span) return null;
+      const spanStatus = typeof span.span_status === "string"
+        ? span.span_status.toUpperCase()
+        : null;
+      if (spanStatus === "ERROR") return "ERROR";
+      const otelStatusCode =
+        span.status?.code ?? span.statusCode ?? span.status_code;
+      if (otelStatusCode === 2 || otelStatusCode === "ERROR") return "ERROR";
+      return normalizeSeverity(span.severity_text ?? span.severity);
+    };
+
     /**
      * Load correlation data for this span (called when user clicks on correlation tabs)
      */
@@ -1693,6 +1718,14 @@ export default defineComponent({
       correlationError.value = null;
 
       try {
+        // Ensure org semantic groups are loaded — buildWorkloadChipDimensions
+        // walks them to populate Pod/Node chips.
+        try {
+          await loadSemanticGroups();
+        } catch {
+          // Non-fatal: workload chips degrade to matched/additional only.
+        }
+
         // Build telemetry context from span
         const context: TelemetryContext = {
           timestamp: convertTimeFromNsToUs(props.span.start_time) * 1000, // Convert to nanoseconds
@@ -1767,6 +1800,21 @@ export default defineComponent({
             serviceName: correlationData.service_name,
             matchedDimensions: actualMatchedDimensions,
             additionalDimensions: {},
+            matchedSetId: correlationData.matched_set_id,
+            chipDimensions: {
+              ...(correlationData.matched_dimensions || {}),
+              ...(correlationData.additional_dimensions || {}),
+              ...buildWorkloadChipDimensions(
+                correlationData.matched_set_id,
+                semanticGroups.value,
+                props.span as Record<string, any>,
+              ),
+            },
+            sourceEvent: {
+              timestamp: props.span?.start_time,
+              severity: deriveSpanSeverity(props.span) ?? undefined,
+              message: props.span?.operation_name,
+            },
             metricStreams: correlationData.related_streams.metrics,
             logStreams: correlationData.related_streams.logs,
             traceStreams: correlationData.related_streams.traces,
