@@ -70,6 +70,7 @@ use crate::service::{
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         match_file,
+        sql::histogram::histogram_bucket_start,
     },
 };
 
@@ -208,7 +209,7 @@ pub async fn search(
     // Non-histogram queries (histogram_interval == 0) are unaffected.
     let effective_start_time = if req.search_info.histogram_interval > 0 {
         let interval_us = req.search_info.histogram_interval * 1_000_000;
-        req.search_info.start_time - req.search_info.start_time % interval_us
+        histogram_bucket_start(req.search_info.start_time, interval_us)
     } else {
         req.search_info.start_time
     };
