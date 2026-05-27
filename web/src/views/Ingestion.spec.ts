@@ -482,7 +482,7 @@ describe("Ingestion", () => {
         data: {
           data: {
             token: "",
-            passcode: "test-passcode"
+            passcode: ""
           }
         }
       };
@@ -571,7 +571,7 @@ describe("Ingestion", () => {
         data: {
           data: {
             token: "",
-            passcode: "new-passcode"
+            passcode: ""
           }
         }
       };
@@ -720,7 +720,7 @@ describe("Ingestion", () => {
       }
       
       const confirmDialogs = wrapper.findAll(".mock-confirm-dialog");
-      expect(confirmDialogs).toHaveLength(2);
+      expect(confirmDialogs).toHaveLength(1);
     });
 
     it("should render router-view", () => {

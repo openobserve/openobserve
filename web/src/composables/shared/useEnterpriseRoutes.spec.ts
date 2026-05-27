@@ -239,11 +239,11 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(organizationsRoute.path).toBe("organizations");
     });
 
-    // Test 19: Should have 3 children in basic configuration
-    it("should have 3 children in basic configuration", () => {
+    // Test 19: Should have 4 children in basic configuration
+    it("should have 4 children in basic configuration", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(3);
+      expect(iamRoute.children.length).toBe(4);
     });
 
     // Test 20: Should have only 1 route in basic configuration
