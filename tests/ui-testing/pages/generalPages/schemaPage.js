@@ -80,6 +80,9 @@ class SchemaPage {
         // VRL / show-query toggle
         this.fnEditor = page.locator('[data-test="logs-vrl-function-editor"]');
         this.showQueryToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+        // Utilities dropdown — the toggle is now inside an ODropdown in SearchBar.vue
+        this.utilitiesMenuBtn = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+        this.menuTransformEditorToggleBtn = page.locator('[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]');
 
         // Per-row action buttons on the LogStream OTable (cell-actions template)
         this.logStreamSchemaBtnFirst = page.locator('[data-test="log-stream-schema-btn"]').first();
@@ -494,10 +497,17 @@ class SchemaPage {
         } catch (error) {
             testLogger.warn('Failed to find monaco editor visible, trying toggle button');
 
-            // Click toggle button to reveal/enable VRL editor. Only one of
-            // TransformSelector / FunctionSelector renders at a time (v-if/v-else-if
-            // in SearchBar.vue), so the show-query toggle is a single element.
-            await this.showQueryToggleBtn.first().click({ force: true });
+            // The show-query toggle moved into the utilities ODropdown in SearchBar.vue.
+            // Check if it is directly visible (FunctionSelector/TransformSelector path);
+            // if not, open the utilities menu first and click the dropdown item.
+            const isToggleDirectlyVisible = await this.showQueryToggleBtn.first().isVisible().catch(() => false);
+            if (isToggleDirectlyVisible) {
+                await this.showQueryToggleBtn.first().click({ force: true });
+            } else {
+                await this.utilitiesMenuBtn.click();
+                await this.menuTransformEditorToggleBtn.waitFor({ state: 'visible', timeout: 5000 });
+                await this.menuTransformEditorToggleBtn.click();
+            }
             await this.fnEditor.first().waitFor({ state: 'visible', timeout: 15000 });
         }
         await this._pickStreamOption(fromStream);

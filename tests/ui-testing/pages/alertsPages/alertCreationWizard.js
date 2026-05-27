@@ -410,34 +410,30 @@ export class AlertCreationWizard {
         testLogger.info('Closed SQL Editor dialog — portal cleaned up');
 
         // ==================== ALERT SETTINGS ====================
-        // In v3 UI, threshold operator + input are in the Alert Rules tab ("Alert if No. of events *")
-        // Use data-test selectors for the threshold operator OSelect and value OInput
-        const thresholdOperatorTrigger = this.page.locator('[data-test="alert-threshold-operator-select-trigger"]');
-        await thresholdOperatorTrigger.waitFor({ state: 'visible', timeout: 10000 });
+        // SQL tab: threshold row uses data-test="alert-trigger-operator-select" (not alert-threshold-operator-select)
+        // The visible "Alert if No. of events" row lives directly on the SQL query config panel.
+        const thresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'No. of events' }).first();
+        await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
         const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        // Focus the operator and use keyboard to open the dropdown (more reliable
-        // than clicking when overlays may interfere).
-        await thresholdOperator.focus();
-        await this.page.waitForTimeout(300);
-        await this.page.keyboard.press('Enter');
-        await this.page.waitForTimeout(1000);
-        // Find the ">=" option in the visible popover.
-        const dropdownOption = this.page.locator('[data-test$="-popover"]')
-            .getByText('>=', { exact: true }).first();
+        await thresholdOperator.click({ force: true });
+        await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        let operatorSelected = false;
         try {
-            await dropdownOption.click({ timeout: 5000 });
+            await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
+            operatorSelected = true;
         } catch {
-            testLogger.warn('popover text not found, trying broader selector');
-            await this.page.locator('[data-test$="-popover"]')
-                .locator('text=">="').first()
-                .click({ timeout: 3000 });
+            testLogger.warn('Role option not found, trying popover fallback');
+        }
+        if (!operatorSelected) {
+            await this.page.locator('[data-test$="-popover"]').getByText('>=', { exact: true }).click({ timeout: 3000 });
         }
         testLogger.info('Set threshold operator: >=');
 
-        const thresholdInput = this.page.locator('[data-test="alert-threshold-value-input-field"]');
+        // SQL threshold OInput has no data-test — scope to the section's number input
+        const thresholdInput = thresholdSection.locator('input[type="number"]').first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');

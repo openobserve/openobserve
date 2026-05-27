@@ -951,9 +951,9 @@ export class AlertsPage {
         await expect(deleteMenuItem).toBeVisible({ timeout: 3000 });
         await deleteMenuItem.click();
 
-        await expect(this.page.getByText(this.locators.deleteFolderConfirmText)).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('span').filter({ hasText: this.locators.deleteFolderConfirmText }).first()).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.folderDeletedMessage)).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.folderDeletedMessage })).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Successfully deleted folder', { folderName });
     }
@@ -1104,7 +1104,7 @@ export class AlertsPage {
         // Wait for any of these outcomes within the timeout window.
         const errorFields = this.page.locator('.q-field--error');
         const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
-        const successMsg = this.page.getByText(this.locators.alertSuccessMessage);
+        const successMsg = this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertSuccessMessage });
 
         const outcomes = await Promise.race([
             errorFields.first().waitFor({ state: 'visible', timeout: 10000 }).then(() => 'validation'),
