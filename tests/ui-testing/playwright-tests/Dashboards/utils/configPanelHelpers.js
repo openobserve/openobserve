@@ -270,7 +270,7 @@ export async function buildPromQLPanel(page, pm, dashboardName, {
   // character-by-character typing, which can truncate/mangle the query
   await page.keyboard.insertText(query);
   await page.keyboard.press('Escape'); // dismiss any autocomplete
-  // Wait for Monaco debounce to sync editor content to Vue data model
+  // Wait for Monaco's textarea to reflect the typed query
   await page.waitForFunction(
     (expectedQuery) => {
       const textarea = document.querySelector('[data-test="dashboard-panel-query-editor"] textarea');
@@ -279,6 +279,11 @@ export async function buildPromQLPanel(page, pm, dashboardName, {
     query,
     { timeout: 10000 }
   );
+  // Monaco debounce is 500ms — the textarea updates instantly but the Vue data model
+  // (queries[0].query) only updates after the debounce fires. Without this wait,
+  // applyDashboardBtn is clicked before the debounce fires, causing runQuery→isValid
+  // to see an empty query and show an error toast that later trips savePanel's race.
+  await page.waitForTimeout(600);
 
   await pm.dashboardPanelActions.addPanelName(panelName);
   await pm.dashboardPanelActions.applyDashboardBtn();
