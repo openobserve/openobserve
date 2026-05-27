@@ -2735,18 +2735,21 @@ export class LogsPage {
     }
 
     async clickSaveViewButton() {
-        // Create saved view is now via the utilities ("More") dropdown menu.
-        // Close the saved-views-list dialog explicitly if it's open — Escape can be intercepted
-        // by a focused OInput inside the dialog and may not reach the dialog dismiss handler.
-        const listDialog = this.page.locator(this.savedViewsListDialogEl);
-        const isDialogOpen = await listDialog.isVisible({ timeout: 1000 }).catch(() => false);
-        if (isDialogOpen) {
-            const closeBtn = this.page.locator('[data-test="saved-views-list-dialog"] [data-test="o-dialog-close-btn"]');
-            await closeBtn.click({ timeout: 5000 }).catch(() => {
-                // Fallback to Escape if close button is not reachable
-                return this.page.keyboard.press('Escape');
-            });
-            await listDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
+        // Close any open menus/dialogs first, then open the menu and click the item.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        // If the saved-views list dialog was open (e.g. from clickSavedViewsExpand), its
+        // portal close animation is still running after Escape. Opening the utilities menu
+        // while the portal tears down causes the dropdown to be dismissed immediately.
+        // Wait for the dialog to fully close before proceeding.
+        await this.page.locator('[data-test="saved-views-list-dialog"]')
+            .waitFor({ state: 'hidden', timeout: 3000 })
+            .catch(() => {}); // dialog may not have been open — treat as no-op
+        const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
+        const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isVisible) {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
         await this.page.keyboard.press('Escape').catch(() => {});
         // Wait for any dialog backdrop/overlay (the fixed inset overlay with data-state="open") to
