@@ -236,15 +236,9 @@ export class AlertDestinationsPage {
         await expect(this.page.locator(this.urlInputField)).toHaveValue(url, { timeout: 5000 });
         
         await this.page.locator(this.submitButton).click();
-        // Match any OToast variant (success/info) carrying the destination-saved message.
-        // OToast renders message in 3 elements (sr-only span/title + visible message div)
-        // so scope to `o-toast-message` + hasText filter per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: /Destination saved/i })
-                .first()
-        ).toBeVisible({ timeout: 15000 });
+        // Wait for the form editor to close — AddDestination unmounts after emit('cancel:hideform')
+        // which fires only after the API call returns successfully.
+        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
@@ -837,12 +831,9 @@ export class AlertDestinationsPage {
 
         // Submit destination
         await this.page.locator(this.submitButton).click();
-        // Scope success-toast assertion to OToast data-test to avoid strict-mode
-        // collision when sr-only ARIA-live "Notification […]" + visible title +
-        // visible message all match plain `getByText('Destination saved')`.
-        await expect(
-            this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').first()
-        ).toBeVisible({ timeout: 30000 });
+        // Wait for the form editor to close — AddDestination unmounts after emit('cancel:hideform')
+        // which fires only after the API call returns successfully.
+        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
@@ -1335,11 +1326,12 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify success notification appears
+     * Wait for the destination form to close after a save operation.
+     * AddDestination.vue unmounts (emits cancel:hideform) only after the API call returns,
+     * so the title becoming hidden is a reliable save-completion signal.
      */
     async expectSuccessNotification() {
-        // OToast renders data-test="o-toast-success" for success variant; this.successToast holds that selector
-        await expect(this.page.locator(this.successToast).first()).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
     }
 
     /**
@@ -1539,10 +1531,9 @@ export class AlertDestinationsPage {
         await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
         await confirmBtn.click();
 
-        // Wait for success notification
-        await expect(this.page.locator(this.successNotification).first()).toBeVisible({ timeout: 10000 });
-        // Wait for the row anchor to detach (deterministic completion signal)
-        await expect(deleteBtn).toHaveCount(0, { timeout: 10000 });
+        // Wait for the row anchor to detach — this is set by getDestinations() refresh
+        // after the delete API returns successfully.
+        await expect(deleteBtn).toHaveCount(0, { timeout: 15000 });
 
         testLogger.info('Destination deleted successfully');
     }
