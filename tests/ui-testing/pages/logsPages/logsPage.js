@@ -7203,21 +7203,15 @@ export class LogsPage {
 
     /**
      * Toggle histogram on/off.
-     * The histogram toggle is in the toolbar when viewport > 1280px (direct click).
-     * When viewport <= 1280px it moves into the utilities menu.
      */
     async toggleHistogram() {
-        const toolbarToggle = this.page.locator(this.histogramToggle);
-        const isToolbarVisible = await toolbarToggle.isVisible({ timeout: 1000 }).catch(() => false);
-        if (isToolbarVisible) {
-            await toolbarToggle.click();
-        } else {
-            const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+        const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+        const isMenuItemVisible = await menuItem.isVisible({ timeout: 500 }).catch(() => false);
+        if (!isMenuItemVisible) {
             await this.page.locator(this.utilitiesMenuButton).click();
             await menuItem.waitFor({ state: 'visible', timeout: 5000 });
-            // Click immediately — no fixed delay avoids reka-ui focus-outside closing the portal in CI.
-            await menuItem.click({ force: true });
         }
+        await menuItem.click();
         testLogger.info('Histogram toggled');
     }
 

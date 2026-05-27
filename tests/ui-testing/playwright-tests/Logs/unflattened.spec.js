@@ -147,24 +147,20 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 5 rows per attempt)');
-    // The `_o2_id` field only appears on rows ingested AFTER the schema
-    // change. Older rows may still be the most recent in the time window, so
-    // we scan the first N rows per attempt instead of relying on row 0. Between
-    // attempts we refresh the query to give the indexer a chance to surface
-    // freshly-ingested data.
+    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
     let o2idFound = false;
     for (let attempt = 1; attempt <= 5; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(5);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 5 rows on attempt ${attempt}, refreshing query`);
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
       if (attempt < 5) {
+        await ingestion(page);
         await applyQueryButton(page);
       }
     }
