@@ -549,6 +549,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :additional-dimensions="
                   metricsCorrelationData.additionalDimensions
                 "
+                :matched-set-id="metricsCorrelationData.matchedSetId"
+                :chip-dimensions="metricsCorrelationData.chipDimensions"
+                :source-event="metricsCorrelationData.sourceEvent"
                 :metric-streams="metricsCorrelationData.metricStreams"
                 :log-streams="metricsCorrelationData.logStreams"
                 :trace-streams="metricsCorrelationData.traceStreams"
@@ -585,6 +588,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :service-name="correlationData.serviceName"
     :matched-dimensions="correlationData.matchedDimensions"
     :additional-dimensions="correlationData.additionalDimensions"
+    :matched-set-id="correlationData.matchedSetId"
+    :chip-dimensions="correlationData.chipDimensions"
     :log-streams="correlationData.logStreams"
     :metric-streams="correlationData.metricStreams"
     :trace-streams="correlationData.traceStreams"
@@ -635,6 +640,8 @@ import {
   type MetricGroupDefinition,
   K8S_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
+import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
+import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
 
@@ -980,6 +987,8 @@ export default defineComponent({
       serviceName: string;
       matchedDimensions: Record<string, string>;
       additionalDimensions: Record<string, string>;
+      matchedSetId?: string;
+      chipDimensions?: Record<string, string>;
       logStreams: any[];
       metricStreams: any[];
       traceStreams: any[];
@@ -997,6 +1006,13 @@ export default defineComponent({
       serviceName: string;
       matchedDimensions: Record<string, string>;
       additionalDimensions: Record<string, string>;
+      matchedSetId?: string;
+      chipDimensions?: Record<string, string>;
+      sourceEvent?: {
+        timestamp?: number | string;
+        severity?: string;
+        message?: string;
+      };
       logStreams: any[];
       metricStreams: any[];
       traceStreams: any[];
@@ -1035,6 +1051,11 @@ export default defineComponent({
           serviceName: data.service_name,
           matchedDimensions: data.matched_dimensions || {},
           additionalDimensions: data.additional_dimensions || {},
+          matchedSetId: data.matched_set_id,
+          chipDimensions: {
+            ...(data.matched_dimensions || {}),
+            ...(data.additional_dimensions || {}),
+          },
           logStreams: data.related_streams?.logs || [],
           metricStreams: data.related_streams?.metrics || [],
           traceStreams: data.related_streams?.traces || [],
@@ -1146,6 +1167,16 @@ export default defineComponent({
           service: serviceName,
         };
 
+        // Resolve org semantic groups so we can layer Pod/Node/… subject chips
+        // into chipDimensions consistently with the logs/trace-detail sidebars.
+        let orgSemanticGroups: FieldAlias[] = [];
+        try {
+          const sgResp = await getSemanticGroups(org);
+          orgSemanticGroups = sgResp.data || [];
+        } catch {
+          orgSemanticGroups = [];
+        }
+
         const correlateResponse = await correlateStreams(org, {
           source_stream: props.streamFilter || "default",
           source_type: "traces",
@@ -1158,10 +1189,38 @@ export default defineComponent({
           return;
         }
 
+        const spanSeverity = (() => {
+          if (!latestSpan) return undefined;
+          const ss = typeof latestSpan.span_status === "string"
+            ? latestSpan.span_status.toUpperCase()
+            : null;
+          if (ss === "ERROR") return "ERROR";
+          return normalizeSeverity(
+            latestSpan.severity_text ?? latestSpan.severity,
+          ) ?? undefined;
+        })();
+
         metricsCorrelationData.value = {
           serviceName: data.service_name,
           matchedDimensions: data.matched_dimensions || {},
           additionalDimensions: data.additional_dimensions || {},
+          matchedSetId: data.matched_set_id,
+          chipDimensions: {
+            ...(data.matched_dimensions || {}),
+            ...(data.additional_dimensions || {}),
+            ...buildWorkloadChipDimensions(
+              data.matched_set_id,
+              orgSemanticGroups,
+              latestSpan ?? undefined,
+            ),
+          },
+          sourceEvent: latestSpan
+            ? {
+                timestamp: latestSpan.start_time ?? latestSpan._timestamp,
+                severity: spanSeverity,
+                message: latestSpan.operation_name,
+              }
+            : undefined,
           logStreams: data.related_streams?.logs || [],
           metricStreams: data.related_streams?.metrics || [],
           traceStreams: data.related_streams?.traces || [],
