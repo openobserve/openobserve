@@ -29,9 +29,12 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::is_complex_plan,
-    utils::{get_column_name, is_column},
+use crate::service::search::{
+    datafusion::optimizer::physical_optimizer::{
+        index_optimizer::utils::is_complex_plan,
+        utils::{get_column_name, is_column},
+    },
+    sql::histogram::histogram_bucket_start,
 };
 
 #[rustfmt::skip]
@@ -97,7 +100,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                         let (start_time, end_time) = self.time_range;
                         // round the bucket edges to even start
                         let rounding_by = histogram_interval as i64;
-                        let min_value = start_time - start_time % rounding_by;
+                        let min_value = histogram_bucket_start(start_time, rounding_by);
                         let max_value = end_time;
                         let num_buckets = ((max_value - min_value) as f64
                             / histogram_interval as f64)
