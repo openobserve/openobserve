@@ -34,19 +34,24 @@ installQuasar({
 vi.mock("@/services/organizations", () => ({
   default: {
     get_organization_passcode: vi.fn(() => Promise.resolve({
-      data: { 
-        data: { 
-          token: "default-token", 
-          passcode: "default-passcode" 
-        } 
+      data: {
+        data: {
+          token: "default-token",
+          passcode: "default-passcode"
+        }
       }
     })),
     update_organization_passcode: vi.fn(() => Promise.resolve({
-      data: { 
-        data: { 
-          token: "updated-token", 
-          passcode: "updated-passcode" 
-        } 
+      data: {
+        data: {
+          token: "updated-token",
+          passcode: "updated-passcode"
+        }
+      }
+    })),
+    list_org_ingestion_tokens: vi.fn(() => Promise.resolve({
+      data: {
+        data: []
       }
     })),
   }
@@ -140,6 +145,7 @@ describe("Ingestion", () => {
             'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
             'q-tabs': { template: '<div class="q-tabs"><slot /></div>' },
             'q-route-tab': { template: '<div class="q-route-tab"><slot /></div>' },
+            OButton: { template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>', props: ['variant', 'size', 'disabled', 'icon', 'title', 'data-test', 'class'], emits: ['click'] },
             OTabs: { template: '<div class="o-tabs-stub"><slot /></div>', props: ['modelValue', 'horizontal', 'align'], emits: ['update:modelValue'] },
             ORouteTab: { template: '<div class="o-route-tab-stub"><slot /></div>', props: ['name', 'to', 'label', 'icon'] },
             'q-separator': { template: '<div class="q-separator"></div>' },
@@ -628,17 +634,6 @@ describe("Ingestion", () => {
   });
 
   describe("Simple Function Tests", () => {
-    it("should set confirmUpdate to true via showUpdateDialogFn", () => {
-      if (!wrapper) {
-        expect.fail("Component failed to mount");
-        return;
-      }
-      
-      expect(wrapper.vm.confirmUpdate).toBe(false);
-      wrapper.vm.showUpdateDialogFn();
-      expect(wrapper.vm.confirmUpdate).toBe(true);
-    });
-
     it("should set confirmRUMUpdate to true via showRUMUpdateDialogFn", () => {
       if (!wrapper) {
         expect.fail("Component failed to mount");
