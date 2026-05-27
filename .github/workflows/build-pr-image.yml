@@ -21,12 +21,25 @@ jobs:
     runs-on: ubicloud-standard-4
     permissions:
       contents: read
+    outputs:
+      GIT_TAG: ${{ steps.set-git-tag.outputs.GIT_TAG }}
+      GIT_HASH: ${{ steps.set-git-tag.outputs.GIT_HASH }}
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           repository: ${{ github.repository }}
           ref: ${{ inputs.branch }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set GIT_TAG env
+        id: set-git-tag
+        run: |
+          GIT_TAG=$(git describe --tags --abbrev=0)
+          GIT_HASH=$(git rev-parse --short=7 HEAD)
+          echo "GIT_TAG=$GIT_TAG" >> $GITHUB_OUTPUT
+          echo "GIT_HASH=$GIT_HASH" >> $GITHUB_OUTPUT
 
       - uses: actions/setup-node@v5
         with:
@@ -127,19 +140,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
-
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           file: deploy/build/Dockerfile.pr
           context: .
           tags: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
-            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
           push: true
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,mode=max,scope=amd64
@@ -221,26 +229,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
-
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           file: deploy/build/Dockerfile.pr
           context: .
           tags: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
-            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
           push: true
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,mode=max,scope=arm64
           platforms: linux/arm64
 
   build:
-    needs: [build_pr_image_amd64, build_pr_image_arm64]
+    needs: [build_pr_image_amd64, build_pr_image_arm64, build_frontend]
     if: ${{ needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
     runs-on: ubicloud-standard-16-arm
     permissions:
@@ -248,17 +251,6 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ inputs.branch }}
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -282,18 +274,18 @@ jobs:
       - uses: int128/docker-manifest-create-action@v2
         with:
           tags: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}
           sources: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
 
       - uses: int128/docker-manifest-create-action@v2
         with:
           tags: |
-            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}
           sources: |
-            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
-            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
 
   build_pr_image_summary:
     runs-on: ubuntu-latest
