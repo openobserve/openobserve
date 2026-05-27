@@ -690,7 +690,7 @@ export class HomePage {
      */
     async validateIngestionPageElements() {
         await expect(this.page.locator('.ingestionPage')).toBeVisible({ timeout: 10000 });
-        await expect(this.page.getByRole('button', { name: /Reset Token/i })).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByRole('button', { name: /Manage Tokens/i })).toBeVisible({ timeout: 5000 });
     }
 
     /**
