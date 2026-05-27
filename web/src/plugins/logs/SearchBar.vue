@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch
                 v-model="searchObj.meta.showHistogram"
                 size="md"
+                data-test="logs-search-bar-show-histogram-toggle-btn"
                 @click.stop
               />
             </template>
