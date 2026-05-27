@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
-use o2_enterprise::enterprise::cloud::{
-    billing_group, billing_group::BillingGroupMember, billing_invites,
-};
+use o2_enterprise::enterprise::cloud::{billing_group, billing_invites, billing_invites::Status};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -32,7 +30,38 @@ pub struct InviteRequest {
 
 #[derive(Serialize)]
 pub struct MembershipResponse {
-    membership: Option<BillingGroupMember>,
+    membership: Option<MemberResponseItem>,
+}
+
+#[derive(Serialize)]
+pub struct MemberResponseItem {
+    id: i32,
+    payer_org_id: String,
+    payer_org_name: String,
+    member_org_id: String,
+    member_org_name: String,
+    created_at: i64,
+    created_by: String,
+    accepted_by: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct InviteResponseItem {
+    id: i32,
+    inviter_org_id: String,
+    inviter_org_name: String,
+    invitee_org_id: String,
+    invitee_org_name: String,
+    inviter_id: String,
+    created_at: i64,
+    expires_at: i64,
+    status: Status,
+    token: String,
+}
+
+async fn get_org_name(org_id: &str) -> String {
+    let info = crate::service::organization::get_org(org_id).await;
+    info.map(|v| v.name).unwrap_or("".to_string())
 }
 
 /// get invites for the org
@@ -58,7 +87,26 @@ pub struct MembershipResponse {
 )]
 pub async fn list_invites(Path(org_id): Path<String>) -> Response {
     match billing_invites::list_all_invites(&org_id).await {
-        Ok(v) => HttpResponse::json(v),
+        Ok(v) => {
+            let mut res = Vec::with_capacity(v.len());
+            for invite in v {
+                let inviter_org_name = get_org_name(&invite.inviter_org_id).await;
+                let invitee_org_name = get_org_name(&invite.invitee_org_id).await;
+                res.push(InviteResponseItem {
+                    id: invite.id,
+                    inviter_org_id: invite.inviter_org_id,
+                    inviter_org_name,
+                    invitee_org_id: invite.invitee_org_id,
+                    invitee_org_name,
+                    inviter_id: invite.inviter_id,
+                    created_at: invite.created_at,
+                    expires_at: invite.expires_at,
+                    status: invite.status,
+                    token: invite.token,
+                })
+            }
+            HttpResponse::json(res)
+        }
         Err(e) => {
             log::error!("error listing billing group invites for org {org_id} : {e}");
             HttpResponse::internal_error(format!("error listing invites : {e}"))
@@ -247,7 +295,23 @@ pub async fn reject(
 )]
 pub async fn check_membership(Path(org_id): Path<String>) -> Response {
     match billing_group::list_billing_membership_of(&org_id).await {
-        Ok(membership) => HttpResponse::json(MembershipResponse { membership }),
+        Ok(Some(membership)) => {
+            let payer_org_name = get_org_name(&membership.payer_org_id).await;
+            let member_org_name = get_org_name(&membership.member_org_id).await;
+            HttpResponse::json(MembershipResponse {
+                membership: Some(MemberResponseItem {
+                    id: membership.id,
+                    payer_org_id: membership.payer_org_id,
+                    payer_org_name,
+                    member_org_id: membership.member_org_id,
+                    member_org_name,
+                    created_at: membership.created_at,
+                    created_by: membership.created_by,
+                    accepted_by: membership.accepted_by,
+                }),
+            })
+        }
+        Ok(None) => HttpResponse::json(MembershipResponse { membership: None }),
         Err(e) => {
             log::error!("error checking billing group membership for {org_id} : {e}");
             HttpResponse::internal_error(format!("error in checking membership : {e}"))
@@ -286,8 +350,26 @@ pub async fn check_membership(Path(org_id): Path<String>) -> Response {
     )
 )]
 pub async fn check_members(Path(org_id): Path<String>) -> Response {
+    let payer_org_name = get_org_name(&org_id).await;
+
     match billing_group::list_billing_group_members_of(&org_id).await {
-        Ok(members) => HttpResponse::json(members),
+        Ok(members) => {
+            let mut res = Vec::with_capacity(members.len());
+            for member in members {
+                let member_org_name = get_org_name(&member.member_org_id).await;
+                res.push(MemberResponseItem {
+                    id: member.id,
+                    payer_org_id: member.payer_org_id,
+                    payer_org_name: payer_org_name.clone(),
+                    member_org_id: member.member_org_id,
+                    member_org_name,
+                    created_at: member.created_at,
+                    created_by: member.created_by,
+                    accepted_by: member.accepted_by,
+                });
+            }
+            HttpResponse::json(res)
+        }
         Err(e) => {
             log::error!("error checking billing group members for {org_id} : {e}");
             HttpResponse::internal_error(format!("error in checking members : {e}"))
