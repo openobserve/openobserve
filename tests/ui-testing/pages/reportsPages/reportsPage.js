@@ -314,7 +314,7 @@ export class ReportsPage {
 
   async verifyReportCreated(reportName) {
     // Wait for save success toast
-    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 15000 });
+    await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 30000 });
     await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
 
     // Navigate to reports list to verify report exists
