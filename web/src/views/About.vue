@@ -123,12 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("about.license_info_msg") }}
               </p>
             </div>
-            <div class="tw:mt-4 tw:p-3 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-blue-400' : 'tw:bg-blue-500'">
-              <p class="tw:text-sm tw:mb-0">
-                <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
-                {{ t("about.license_info_note") }}
-              </p>
-            </div>
+            <OBanner variant="info" icon="info" class="tw:mt-4">
+              {{ t("about.license_info_note") }}
+            </OBanner>
           </div>
 
           <!-- Community Card (if no license card) -->
@@ -183,18 +180,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-else-if="!licenseData || !licenseData.license" class="tw:py-4">
-              <div class="tw:flex tw:items-start tw:gap-3 tw:p-4 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-yellow-400' : 'tw:bg-yellow-500'">
-                <OIcon name="warning" size="md" class="tw:text-yellow-500" />
-                <div>
-                  <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
-                  <p class="tw:text-sm tw:mb-2 tw:opacity-80">
-                    {{ t("about.no_license_installed_msg") }}
-                  </p>
-                  <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:opacity-70 tw:mb-2">
-                    {{ t("about.installation_id_lbl") }}: <code class="tw:px-2 tw:py-1 tw:rounded tw:bg-black tw:bg-opacity-10">{{ licenseData.installation_id }}</code>
-                  </div>
+              <OBanner variant="warning" icon="warning">
+                <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
+                <p class="tw:text-sm tw:mb-2">
+                  {{ t("about.no_license_installed_msg") }}
+                </p>
+                <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:mb-2 tw:flex tw:items-center tw:flex-wrap tw:gap-1">
+                  {{ t("about.installation_id_lbl") }}: <code class="tw:px-2 tw:py-0.5 tw:rounded tw:font-mono tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-code-bg)] tw:select-all">{{ licenseData.installation_id }}</code>
                 </div>
-              </div>
+              </OBanner>
             </div>
 
             <div v-else>
@@ -283,6 +277,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -293,6 +288,7 @@ export default defineComponent({
     OIcon,
     OBadge,
     OSpinner,
+    OBanner,
   },
   setup() {
     const store = useStore();
