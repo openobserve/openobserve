@@ -42,6 +42,7 @@ export default {
         :class="`o2vf_node_${node.io_type}`"
         class="tw:p-0 btn-fixed-width node-draggable"
         style="width: 170px; justify-content: flex-start"
+        :data-test="`pipeline-node-sidebar-${node.subtype}-${node.io_type}-btn`"
         :draggable="true"
         @dragstart="onDragStart($event, node)"
         v-if="node.isSectionHeader == false"
