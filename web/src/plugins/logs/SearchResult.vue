@@ -1243,22 +1243,12 @@ export default defineComponent({
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
           correlationError.value = "No matching service found for correlation";
-          toast({
-            variant: "warning",
-            message: "No matching service found for correlation",
-            timeout: 3000,
-          });
           return;
         }
 
         if (!result.correlationData) {
           console.warn("[SearchResult] No correlation data in result");
           correlationError.value = "Unable to retrieve correlation data";
-          toast({
-            variant: "warning",
-            message: "Unable to retrieve correlation data",
-            timeout: 3000,
-          });
           return;
         }
 
@@ -1360,11 +1350,6 @@ export default defineComponent({
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
         correlationError.value = `Correlation error: ${err.message || err}`;
-        toast({
-          variant: "error",
-          message: `Correlation error: ${err.message || err}`,
-          timeout: 3000,
-        });
         correlationDashboardProps.value = null;
       } finally {
         correlationLoading.value = false;
