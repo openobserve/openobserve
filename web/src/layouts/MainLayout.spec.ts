@@ -193,8 +193,7 @@ describe("MainLayout Methods and Functions", () => {
 
       const langWithAllData = {
         code: "de",
-        label: "Deutsch",
-        icon: "flag-icon flag-icon-de"
+        label: "Deutsch"
       };
 
       changeLanguage(langWithAllData);
@@ -631,19 +630,20 @@ describe("MainLayout Methods and Functions", () => {
   describe("Language Configuration", () => {
     it("should have correct language list", () => {
       const langList = [
-        { code: "en-gb", label: "English", icon: "flag-icon flag-icon-gb" },
-        { code: "zh-cn", label: "中文 (简体)", icon: "flag-icon flag-icon-cn" },
-        { code: "zh-tw", label: "中文 (繁體)", icon: "flag-icon flag-icon-tw" },
-        { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" },
-        { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" },
-        { code: "es", label: "Español", icon: "flag-icon flag-icon-es" },
-        { code: "pt", label: "Português", icon: "flag-icon flag-icon-pt" },
-        { code: "it", label: "Italiano", icon: "flag-icon flag-icon-it" },
-        { code: "tr", label: "Türkçe", icon: "flag-icon flag-icon-tr" },
-        { code: "ko", label: "한국어", icon: "flag-icon flag-icon-kr" }
+        { code: "en-gb", label: "English" },
+        { code: "tr-turk", label: "Türkçe" },
+        { code: "zh-cn", label: "简体中文" },
+        { code: "fr", label: "Français" },
+        { code: "es", label: "Español" },
+        { code: "de", label: "Deutsch" },
+        { code: "it", label: "Italiano" },
+        { code: "ja", label: "日本語" },
+        { code: "ko", label: "한국어" },
+        { code: "nl", label: "Nederlands" },
+        { code: "pt", label: "Português" },
       ];
 
-      expect(langList).toHaveLength(10);
+      expect(langList).toHaveLength(11);
       expect(langList[0].code).toBe("en-gb");
       expect(langList[0].label).toBe("English");
     });
