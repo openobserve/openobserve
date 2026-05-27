@@ -1365,14 +1365,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ value }}
                   </div>
                 </template>
-                <template #cell-actions="{ row, value }">
+                <template #cell-actions="{ row }">
                   <div class="tw:flex tw:items-center tw:gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
                       class="logs-saved-view-icon action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
-                      :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
+                      :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="
                         handleFavoriteSavedView(
                           row,
@@ -1394,7 +1394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="logs-saved-view-icon action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
-                      :data-test="`logs-search-bar-update-${value}-saved-view-btn`"
+                      :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn`"
                       @click.stop="handleUpdateSavedView(row)"
                     >
                       <OIcon name="edit" size="xs" />
@@ -1404,7 +1404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="logs-saved-view-icon action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
-                      :data-test="`logs-search-bar-delete-${value}-saved-view-btn`"
+                      :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn`"
                       @click.stop="handleDeleteSavedView(row)"
                     >
                       <OIcon name="delete" size="xs" />
@@ -1457,14 +1457,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ value }}
                   </div>
                 </template>
-                <template #cell-actions="{ row, value }">
+                <template #cell-actions="{ row }">
                   <div class="tw:flex tw:items-center tw:gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
                       class="logs-saved-view-icon action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
-                      :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
+                      :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
                       <OIcon name="favorite" size="xs" />
@@ -1474,7 +1474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="logs-saved-view-icon action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
-                      :data-test="`logs-search-bar-update-${value}-favorite-saved-view-btn`"
+                      :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn`"
                       @click.stop="handleUpdateSavedView(row)"
                     >
                       <OIcon name="edit" size="xs" />
@@ -1484,7 +1484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="logs-saved-view-icon action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
-                      :data-test="`logs-search-bar-delete-${value}-favorite-saved-view-btn`"
+                      :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn`"
                       @click.stop="handleDeleteSavedView(row)"
                     >
                       <OIcon name="delete" size="xs" />

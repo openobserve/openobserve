@@ -2856,7 +2856,7 @@ export class LogsPage {
     }
 
     async clickDeleteButton() {
-        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{name}-saved-view-btn"
+        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{view_id}-saved-view-btn"
         // Click the first visible delete button in the saved views area
         const deleteBtn = this.page.locator('[data-test*="logs-search-bar-delete-"][data-test*="-saved-view-btn"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
@@ -2938,8 +2938,6 @@ export class LogsPage {
     }
 
     async clickDeleteSavedViewButton(savedViewName) {
-        const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
-
         // The caller (clickSavedViewByTitle) closes the dialog. Wait passively for it to
         // reach hidden state so the re-open sequence doesn't race the close animation.
         await this.page.locator('[data-test="saved-views-list-dialog"]')
@@ -2959,9 +2957,13 @@ export class LogsPage {
         await searchInput.click({ force: true });
         await searchInput.fill(savedViewName);
 
-        // Wait for and click the delete button
-        await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(deleteButtonSelector).click({ force: true });
+        // The delete button data-test uses view_id (a UUID), not the view name, so we
+        // can't build the exact selector. Instead scope to the main saved-views table
+        // (not favorites) — after filtering by name there is exactly one visible row.
+        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
+        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click({ force: true });
     }
 
     async clickResetFiltersButton() {
@@ -7424,7 +7426,9 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickDeleteSavedViewByName(name) {
-        const deleteBtn = this.page.locator(`[data-test*="delete"][data-test*="${name}"]`);
+        // data-test uses view_id (UUID), not name — scope to main table after filtering.
+        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
+        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
         testLogger.info(`Clicked delete for saved view: ${name}`);
