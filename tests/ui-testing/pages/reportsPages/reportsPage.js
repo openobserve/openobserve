@@ -317,14 +317,23 @@ export class ReportsPage {
     await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 30000 });
     await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });
 
-    // Navigate to reports list to verify report exists
+    // Navigate to reports list. waitForLoadState('networkidle') is insufficient
+    // here because Vue's onBeforeMount API call starts AFTER the browser idles —
+    // wait for the reports GET response explicitly so data is in the table before
+    // we attempt to search.
+    const reportsApiPromise = this.page.waitForResponse(
+      (resp) =>
+        /\/api\/[^/]+\/reports(\?|$)/.test(resp.url()) &&
+        resp.request().method() === 'GET' &&
+        resp.status() === 200,
+      { timeout: 30000 }
+    ).catch(() => null);
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
-    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await reportsApiPromise;
 
-    // Search for the report
+    // Search for the report and verify the action button is present
     await this.reportSearchInputField.fill(reportName);
-    // Wait for the search results to filter
-    await expect(this.pauseStartReportBtn(reportName)).toBeVisible({ timeout: 10000 });
+    await expect(this.pauseStartReportBtn(reportName)).toBeVisible({ timeout: 15000 });
   }
 
   async createReport(dashboardName) {
