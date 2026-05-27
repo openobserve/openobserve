@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:w-full tw:h-full tw:flex">
         <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:grow">
           <div
-            class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold tw:text-xl"
+            class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold"
           >
             <span>
               {{ t("search.metrics") }}
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <MetricLegends />
         </div>
         <div
-          class="tw:text-right tw:flex tw:flex-row tw:justify-end tw:items-center"
+          class="tw:text-right tw:flex tw:flex-row tw:justify-end tw:items-center tw:gap-2"
         >
           <DateTimePickerDashboard
             v-if="
@@ -59,12 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state?.zoConfig?.min_auto_refresh_interval || 5
             "
             @trigger="runQuery"
-            class="tw:px-0 dashboards-icon dashboards-auto-refresh-interval"
+            class="dashboard-icons"
             data-test="metrics-auto-refresh"
           />
           <div
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-            class="dashboard-icons tw:mx-2"
+            class="dashboard-icons tw:mr-2"
           >
             <OButton
               v-if="
@@ -635,18 +635,3 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
-.dashboards-auto-refresh-interval {
-  .q-btn {
-    min-height: 2rem; // 30px
-    max-height: 2rem; // 30px
-    padding: 0 0.25rem; // 4px
-    border-radius: 0.375rem; // 6px
-    transition: all 0.2s ease;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-}
-}
-</style>

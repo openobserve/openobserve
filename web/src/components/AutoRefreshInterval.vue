@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :class="isCompact ? 'tw:flex tw:items-center' : 'tw:pl-2 float-left'">
+  <div class="tw:flex tw:items-center">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
     <ODropdown
       v-if="isCompact"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
           variant="outline"
-          size="sm"
+          size="sm-toolbar"
         >
           <div class="tw:flex tw:items-center tw:flex-nowrap">
             <OIcon
