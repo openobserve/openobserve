@@ -446,7 +446,7 @@ pub async fn merge_by_stream(
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
+        let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
@@ -474,7 +474,7 @@ pub async fn merge_by_stream(
             let skip_group_files = false;
 
             if files_with_size.len() <= 1 && !skip_group_files {
-                return Ok(());
+                return Ok(vec![]);
             }
 
             // group files need to merge
@@ -535,7 +535,7 @@ pub async fn merge_by_stream(
                 }
 
                 if batch_groups.is_empty() {
-                    return Ok(()); // no files need to merge
+                    return Ok(vec![]); // no files need to merge
                 }
             }
 
@@ -556,6 +556,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
+            let mut orphan_blooms = Vec::new();
             for ret in worker_results {
                 let (batch_id, new_files) = match ret {
                     Ok(v) => v,
@@ -599,18 +600,27 @@ pub async fn merge_by_stream(
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
+
+                // collect orphan blooms after writing file list successfully
+                for file in delete_file_list {
+                    if file.meta.bloom_ver > 0 {
+                        orphan_blooms.push(file.meta.bloom_ver);
+                    }
+                }
             }
             drop(permit);
             if let Some(e) = last_error {
                 return Err(e);
             }
-            Ok(())
+            Ok(orphan_blooms)
         });
         tasks.push(task);
     }
 
+    // collect bloom files which need to be clean
+    let mut orphan_blooms = Vec::new();
     for task in tasks {
-        task.await??;
+        orphan_blooms.extend(task.await??);
     }
 
     // Build bloom for the current hour
@@ -620,6 +630,7 @@ pub async fn merge_by_stream(
         stream_type,
         stream_name,
         &date_start,
+        orphan_blooms,
     )
     .await
     {

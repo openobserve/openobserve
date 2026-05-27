@@ -74,10 +74,18 @@ pub async fn build_for_stream(
     stream_type: StreamType,
     stream_name: &str,
     date_key: &str,
+    orphan_blooms: Vec<i64>,
 ) -> Result<bool> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled {
         return Ok(false);
+    }
+
+    // clean up orphan blooms
+    if let Err(e) =
+        cleanup_orphan_blooms(org_id, stream_type, stream_name, date_key, orphan_blooms).await
+    {
+        log::warn!("[BLOOM_BUILD] cleanup orphan blooms failed: {e}");
     }
 
     // Resolve target fields from current stream settings: a field is bloomed
@@ -108,9 +116,6 @@ pub async fn build_for_stream(
         return Ok(false);
     }
 
-    let build_key = format!("{org_id}/{stream_type}/{stream_name}/{date_key}");
-    let bloom_dir = infra::bloom::path::bloom_dir(org_id, stream_type, stream_name, date_key);
-
     // Build blooms only for files without a `.bf` yet (bloom_ver = 0).
     //
     // **Sub-grouping**: a single hour can hold thousands of files. Since the
@@ -131,9 +136,11 @@ pub async fn build_for_stream(
 
     let base_ver = now_micros();
     let chunk_total = files.len().div_ceil(max_files_per_bf);
+    let build_key = format!("{org_id}/{stream_type}/{stream_name}/{date_key}");
     for (chunk_idx, chunk) in files.chunks(max_files_per_bf).enumerate() {
         let bloom_ver = base_ver + chunk_idx as i64;
-        match build_for_chunk(org_id, bloom_ver, &bloom_dir, chunk, &target_fields, fpp).await {
+        let bloom_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
+        match build_for_chunk(org_id, bloom_ver, &bloom_path, chunk, &target_fields, fpp).await {
             Ok((took, num_blocks, contributing_ids)) => {
                 log::info!(
                     "[BLOOM_BUILD] {build_key}: wrote chunk {}/{chunk_total}, num_blocks={num_blocks} covering {contributing_ids} files in {took} ms",
@@ -158,13 +165,12 @@ pub async fn build_for_stream(
 async fn build_for_chunk(
     org_id: &str,
     bloom_ver: i64,
-    bloom_dir: &str,
+    bf_path: &str,
     files: &[FileKey],
     target_fields: &[String],
     fpp: f64,
 ) -> Result<(u64, u32, usize)> {
     let start = std::time::Instant::now();
-    let bf_path = format!("{bloom_dir}/{bloom_ver}.bf");
 
     let max_records = files
         .iter()
@@ -177,7 +183,7 @@ async fn build_for_chunk(
     let mut all_blooms: Vec<FieldBloom> = Vec::new();
     let mut contributing_ids: Vec<i64> = Vec::new();
     for f in files {
-        match build_for_file(f, &target_fields, num_blocks).await {
+        match build_for_file(f, target_fields, num_blocks).await {
             Ok(mut blooms) if !blooms.is_empty() => {
                 all_blooms.append(&mut blooms);
                 contributing_ids.push(f.id);
@@ -197,8 +203,8 @@ async fn build_for_chunk(
 
     // Distinct bloom_ver per chunk (base + idx) → distinct `.bf` path.
     let blob: Vec<u8> = BloomWriter::serialize(all_blooms).context("serialize blooms")?;
-    let bf_account = storage::get_account(org_id, &bf_path).unwrap_or_default();
-    storage::put(&bf_account, &bf_path, Bytes::from(blob))
+    let bf_account = storage::get_account(org_id, bf_path).unwrap_or_default();
+    storage::put(&bf_account, bf_path, Bytes::from(blob))
         .await
         .context("upload blooms")?;
 
@@ -261,27 +267,17 @@ async fn build_for_file(
 /// EXISTS probe or the enqueue fails, we log and move on — the stale `.bf`
 /// stays until data-retention reaps the day's subtree. Errors never
 /// propagate.
-pub async fn cleanup_orphan_blooms(
+async fn cleanup_orphan_blooms(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_key: &str,
-    deleted_bloom_vers: &[i64],
+    orphan_blooms: Vec<i64>,
 ) -> Result<()> {
-    let cfg = get_config();
-    if !cfg.common.bloom_filter_enabled {
+    if orphan_blooms.is_empty() {
         return Ok(());
     }
-
-    let mut seen = HashSet::new();
-    let candidates: Vec<i64> = deleted_bloom_vers
-        .iter()
-        .copied()
-        .filter(|v| *v != 0 && seen.insert(*v))
-        .collect();
-    if candidates.is_empty() {
-        return Ok(());
-    }
+    let candidates: HashSet<i64> = orphan_blooms.into_iter().collect();
 
     let mut orphans: Vec<FileListDeleted> = Vec::new();
     for v_old in candidates {
