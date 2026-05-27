@@ -23,22 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>-</span>
           <span> {{ new Date(endTime/1000).toDateString() }} </span>
         </div>
-        <div v-if="billingMembers.length > 0" class="tw:min-w-[240px]">
-          <q-select
-            v-model="selectedMember"
-            :options="memberOptions"
-            :label="t('billing.billingGroup.usageMemberLabel')"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            bg-color="input-bg"
-            color="input-border"
-            emit-value
-            map-options
-            data-test="usage-member-select"
-          />
-        </div>
       </div>
       <div>
         <div v-if="Object.keys(usageData).length === 0" >
@@ -256,18 +240,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </template>
   <script lang="ts">
-  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick } from "vue";
+  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick, inject } from "vue";
   import { useStore } from "vuex";
   import { useQuasar, date } from "quasar";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
-  import config from "@/aws-exports";
   import { convertBillingData } from "@/utils/billing/convertBillingData";
 import router from "@/router";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
-  
+
   let currentDate = new Date(); // Get the current date and time
   
   // Subtract 30 days from the current date
@@ -304,38 +287,14 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         ai_credits: "0.00"
       });
       let chartData: any = ref({});
-      const selectedMember = ref("");
-      const billingMembers = ref<{ id: string; name: string }[]>([]);
-      const memberOptions = computed(() => [
-        { label: t("billing.billingGroup.usageAllMembers"), value: "" },
-        ...billingMembers.value.map((m) => {
-          const name =
-            m.name && m.name.length > 20
-              ? `${m.name.substring(0, 20)}...`
-              : m.name;
-          return {
-            label: name ? `${name} | ${m.id}` : m.id,
-            value: m.id,
-          };
-        }),
-      ]);
-      const fetchBillingMembers = () => {
-        if (config.isCloud !== "true") return;
-        BillingService.list_billing_group_members(
-          store.state.selectedOrganization.identifier
-        )
-          .then((res: any) => {
-            billingMembers.value = (res.data ?? []).map((m: any) => ({
-              id: m.member_org_id,
-              name: m.member_org_name,
-            }));
-          })
-          .catch(() => {
-            billingMembers.value = [];
-          });
-      };
+      // The member-org selector lives in Billing.vue (rendered beside this
+      // component) and shares the current selection via this injected reactive.
+      const usageMember = inject<{ selected: string }>(
+        "usageMember",
+        undefined as any
+      );
+      const selectedMember = computed(() => usageMember?.selected || "");
       onMounted(async () => {
-        fetchBillingMembers();
         selectUsageDate();
       });
       const usageDate: any = computed(() => {
@@ -1007,8 +966,6 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         dataRetentionIcon,
         aiIcon,
         selectedMember,
-        billingMembers,
-        memberOptions,
       };
     },
   });

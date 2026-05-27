@@ -32,7 +32,6 @@ installQuasar({
 vi.mock("@/services/billings", () => ({
   default: {
     get_data_usage: vi.fn(),
-    list_billing_group_members: vi.fn(),
   },
 }));
 
@@ -94,10 +93,6 @@ describe("Usage Component", () => {
       }
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    // onMounted -> fetchBillingMembers (isCloud is "true" in test env via .env)
-    mockBillingService.list_billing_group_members.mockResolvedValue({
-      data: [],
-    });
 
     // Mock quasar notify
     mockNotify = vi.fn(() => vi.fn()); // Returns dismiss function
@@ -687,34 +682,7 @@ describe("Usage Component", () => {
     expect(wrapper.vm.router).toBeDefined();
   });
 
-  // Member organization selector (billing group)
-  describe("member organization selector", () => {
-    it("always offers the current-org option first with an empty value", () => {
-      expect(wrapper.vm.memberOptions[0].value).toBe("");
-    });
-
-    it("formats members as 'name | identifier'", async () => {
-      wrapper.vm.billingMembers = [{ id: "child-1", name: "Child One" }];
-      await nextTick();
-      const opt = wrapper.vm.memberOptions[1];
-      expect(opt.value).toBe("child-1");
-      expect(opt.label).toBe("Child One | child-1");
-    });
-
-    it("truncates member names longer than 20 chars", async () => {
-      wrapper.vm.billingMembers = [
-        { id: "child-2", name: "An Extremely Long Organization Name" },
-      ];
-      await nextTick();
-      expect(wrapper.vm.memberOptions[1].label).toBe(
-        "An Extremely Long Or... | child-2"
-      );
-    });
-
-    it("shows only the identifier when no member name is returned", async () => {
-      wrapper.vm.billingMembers = [{ id: "child-3", name: "" }];
-      await nextTick();
-      expect(wrapper.vm.memberOptions[1].label).toBe("child-3");
-    });
-  });
+  // The member-org selector now lives in Billing.vue (rendered beside this
+  // component) and shares the selection via inject; its formatting/search is
+  // covered in UsageMemberList.spec.ts.
 });

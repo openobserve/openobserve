@@ -134,8 +134,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-          <div class="card-container q-pb-sm"  style="height: calc(100vh - var(--navbar-height) - 87px);">
+        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:gap-[0.625rem]">
+          <div
+            v-if="isUsageRoute && billingMembers.length > 0"
+            class="tw:w-[260px] tw:shrink-0"
+            style="height: calc(100vh - var(--navbar-height) - 87px);"
+            data-test="usage-member-list"
+          >
+            <UsageMemberList
+              v-model="usageMember.selected"
+              :members="billingMembers"
+            />
+          </div>
+          <div class="card-container q-pb-sm tw:flex-1 tw:min-w-0"  style="height: calc(100vh - var(--navbar-height) - 87px);">
             <router-view title=""> </router-view>
           </div>
         </div>
@@ -162,11 +173,12 @@ import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { HardDrive, Database } from "lucide-vue-next";
 import BillingService from "@/services/billings";
+import UsageMemberList from "./UsageMemberList.vue";
 
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OButton },
+    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OButton, UsageMemberList },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -180,6 +192,27 @@ export default defineComponent({
     const billingProvider = ref(""); // empty until loaded
     const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
+
+    // Billing-group members for the Usage member selector (rendered as a
+    // sidebar beside the usage view). Shared with usage.vue via provide/inject.
+    const billingMembers = ref<{ id: string; name: string }[]>([]);
+    const usageMember = reactive({ selected: "" });
+    provide("usageMember", usageMember);
+    const fetchBillingMembers = () => {
+      if (config.isCloud !== "true") return;
+      BillingService.list_billing_group_members(
+        store.state.selectedOrganization.identifier
+      )
+        .then((res: any) => {
+          billingMembers.value = (res.data ?? []).map((m: any) => ({
+            id: m.member_org_id,
+            name: m.member_org_name,
+          }));
+        })
+        .catch(() => {
+          billingMembers.value = [];
+        });
+    };
 
     // Fetch billing info to determine provider
     const fetchBillingInfo = async () => {
@@ -231,6 +264,7 @@ export default defineComponent({
     onMounted(async () => {
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
+      fetchBillingMembers();
 
       // Default to current cycle for paid Stripe users (only on the usage tab)
       if (
@@ -328,6 +362,8 @@ export default defineComponent({
       showInvoiceTab,
       billingProvider,
       isPaidUser,
+      billingMembers,
+      usageMember,
     };
   },
 });
