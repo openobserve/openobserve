@@ -128,7 +128,12 @@ import { useStore } from "vuex";
 export default defineComponent({
   name: "QueryTypeSelector",
   component: { ConfirmDialog },
-  props: [],
+  props: {
+    showQueryType: {
+      type: Boolean,
+      default: true,
+    },
+  },
   emits: [],
   setup() {
     const router = useRouter();
@@ -310,14 +315,28 @@ export default defineComponent({
       removeXYFilters();
       updateXYFieldsForCustomQueryMode();
 
+      const queryIdx = dashboardPanelData.layout.currentQueryIndex;
+
       // Clear query when switching query types (SQL <-> PromQL)
       if (
         isQueryTypeChange &&
         dashboardPanelData.data.type !== "custom_chart"
       ) {
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = "";
+        dashboardPanelData.data.queries[queryIdx].query = "";
+      }
+
+
+      // When switching to SQL mode, multi-query is not supported.
+      // Keep only the current query, remove others, and reset index to 0.
+      if (
+        isQueryTypeChange &&
+        popupSelectedButtonType.value === "sql" &&
+        dashboardPanelData.data.queries.length > 1
+      ) {
+        const currentQuery = dashboardPanelData.data.queries[queryIdx];
+        dashboardPanelData.data.queries = [currentQuery];
+        dashboardPanelData.layout.currentQueryIndex = 0;
+        dashboardPanelData.layout.hiddenQueries = [];
       }
 
       // For metrics page: when switching from custom to builder in PromQL, set sample query
@@ -327,7 +346,7 @@ export default defineComponent({
         dashboardPanelData.data.queryType === "promql" &&
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
+        ]?.fields?.stream
       ) {
         const streamName =
           dashboardPanelData.data.queries[

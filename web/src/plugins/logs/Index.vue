@@ -333,21 +333,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <BuildQueryPage
               ref="buildQueryPageRef"
-              :searchQuery="searchObj.data.query"
+              :searchQuery="searchObj.meta.sqlMode ? searchObj.data.query : ''"
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
+              :isSqlMode="searchObj.meta.sqlMode"
+              :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
+              class="tw:pb-[0.75rem]! tw:pr-[0.625rem]"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
               @customQueryModeChanged="onCustomQueryModeChanged"
               @initialized="onBuildInitialized"
-              @fieldsUpdated="
-                updateUrlQueryParams(
-                  null,
-                  buildQueryPageRef?.dashboardPanelData,
-                )
-              "
             />
           </div>
         </template>
@@ -457,6 +454,7 @@ import {
   getFieldsFromQuery,
   isSimpleSelectAllQuery,
   getStreamFromQuery,
+  extractWhereClause,
 } from "@/utils/query/sqlUtils";
 import {
   buildColumnIdentifierAst,
@@ -2188,6 +2186,32 @@ export default defineComponent({
       },
     );
 
+    // Watch for build page config changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.config,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+      { deep: true },
+    );
+
+    // Watch for SQL mode changes while in build mode.
+    // When SQL mode is toggled, re-sync the search bar query:
+    //   ON  → show the builder's full generated SQL
+    //   OFF → show only the WHERE clause (filter text)
+    watch(
+      () => searchObj.meta.sqlMode,
+      async () => {
+        if (searchObj.meta.logsVisualizeToggle !== "build") return;
+
+        const generatedQuery =
+          buildDashboardPanelData.data.queries?.[0]?.query || "";
+        await onBuildQueryGenerated(generatedQuery);
+      },
+    );
+
     watch(
       () => splitterModel.value,
       () => {
@@ -2214,17 +2238,6 @@ export default defineComponent({
     watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
       deep: true,
     });
-
-    // Watch for build page config changes to sync URL params
-    watch(
-      () => buildDashboardPanelData.data.config,
-      () => {
-        if (searchObj.meta.logsVisualizeToggle === "build") {
-          updateUrlQueryParams(null, buildDashboardPanelData);
-        }
-      },
-      { deep: true },
-    );
 
     // Sync searchObj.data.query to build page's dashboardPanelData when in custom query mode
     // This ensures edited queries are reflected in the panel schema immediately
@@ -2386,8 +2399,8 @@ export default defineComponent({
           buildDashboardPanelData.data.queries[0]?.customQuery === true;
         if (
           isCustomQueryMode &&
-          searchObj.meta.sqlMode &&
-          !searchObj.data.query?.trim()
+          !searchObj.data.query?.trim() &&
+          !buildDashboardPanelData.data.queries[0]?.query?.trim()
         ) {
           showErrorNotification(
             "Query is empty, please select fields to build query",
@@ -2438,11 +2451,18 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
-    const onBuildQueryGenerated = (query: string) => {
-      // Sync generated query to logs composables so user can see it in the editor
-      // Always update, including empty string when all fields are removed
-      searchObj.data.query = query;
-      searchObj.data.editorValue = query;
+    const onBuildQueryGenerated = async (query: string) => {
+      if (searchObj.meta.sqlMode) {
+        // SQL mode ON: sync the full generated SQL to the search bar
+        searchObj.data.query = query;
+        searchObj.data.editorValue = query;
+      } else {
+        // SQL mode OFF: extract only the WHERE clause and sync that
+        // so the search bar stays in filter mode
+        const whereClause = await extractWhereClause(query);
+        searchObj.data.query = whereClause;
+        searchObj.data.editorValue = whereClause;
+      }
     };
 
     const onCustomQueryModeChanged = (isCustomMode: boolean) => {
@@ -2457,18 +2477,31 @@ export default defineComponent({
       if (buildDashboardPanelData.data.queries[0]) {
         buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
 
-        // Reuse the same logic as QueryTypeSelector's changeToggle:
-        // clear fields and query when switching modes
+        // Builder → Custom: show the generated SQL in the editor for editing
+        if (isCustomMode) {
+          const generatedQuery =
+            buildDashboardPanelData.data.queries[0]?.query || "";
+          if (searchObj.meta.sqlMode) {
+            searchObj.data.query = generatedQuery;
+            searchObj.data.editorValue = generatedQuery;
+          } else {
+            // SQL mode OFF: sync only the WHERE clause
+            const whereClause = await extractWhereClause(generatedQuery);
+            searchObj.data.query = whereClause;
+            searchObj.data.editorValue = whereClause;
+          }
+          return;
+        }
+
+        // Custom → Builder: clear fields and query
         await nextTick();
         buildRemoveXYFilters();
         buildUpdateXYFieldsForCustomQueryMode();
 
-        // Clear query when switching from Custom to Builder mode
-        if (!isCustomMode) {
-          buildDashboardPanelData.data.queries[
-            buildDashboardPanelData.layout.currentQueryIndex
-          ].query = "";
-          // Also clear the search bar editor
+        buildDashboardPanelData.data.queries[
+          buildDashboardPanelData.layout.currentQueryIndex
+        ].query = "";
+        if (searchObj.meta.sqlMode) {
           searchObj.data.query = "";
           searchObj.data.editorValue = "";
         }
@@ -3027,6 +3060,7 @@ export default defineComponent({
       extractPatternsForCurrentQuery,
       patternsState,
       buildQueryPageRef,
+      buildDashboardPanelData,
       onBuildApply,
       onBuildCancel,
       onBuildQueryGenerated,
@@ -3211,6 +3245,11 @@ export default defineComponent({
       }
     },
     async fullSQLMode(newVal) {
+      // Build mode handles SQL mode changes via its own watcher in setup()
+      if (this.searchObj.meta.logsVisualizeToggle === "build") {
+        return;
+      }
+
       if (newVal) {
         await nextTick();
         if (this.searchObj.meta.sqlModeManualTrigger) {

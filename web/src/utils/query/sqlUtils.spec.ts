@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { 
-  buildSqlQuery, 
+import {
+  buildSqlQuery,
   convertQueryIntoSingleLine,
   addLabelsToSQlQuery,
   addLabelToSQlQuery,
@@ -29,7 +29,9 @@ import {
   parseCondition,
   convertWhereToFilter,
   extractFilters,
-  extractTableName
+  extractTableName,
+  parseWhereClauseToFilter,
+  extractWhereClause,
 } from "./sqlUtils";
 import store from "@/test/unit/helpers/store";
 
@@ -3568,6 +3570,199 @@ describe("sqlUtils", () => {
     it("should handle floating point precision", async () => {
       const result = formatValue("3.141592653589793238462643383279502884197");
       expect(result).toBe("'3.141592653589793238462643383279502884197'");
+    });
+  });
+
+  describe("parseWhereClauseToFilter", () => {
+    const defaultFilter = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+    };
+
+    it("should return default filter for empty string", async () => {
+      const result = await parseWhereClauseToFilter("");
+      expect(result).toEqual(defaultFilter);
+    });
+
+    it("should return default filter for whitespace-only string", async () => {
+      const result = await parseWhereClauseToFilter("   ");
+      expect(result).toEqual(defaultFilter);
+    });
+
+    it("should return default filter for null/undefined input", async () => {
+      const result = await parseWhereClauseToFilter(null as any);
+      expect(result).toEqual(defaultFilter);
+    });
+
+    it("should parse a single condition into a group with one condition", async () => {
+      const singleConditionAst = {
+        type: "binary_expr",
+        operator: "=",
+        left: { column: { expr: { value: "status" } } },
+        right: { value: "error" },
+      };
+      mockAstify.mockReturnValue({ where: singleConditionAst });
+
+      const result = await parseWhereClauseToFilter("status = 'error'");
+
+      expect(mockAstify).toHaveBeenCalledWith(
+        'SELECT * FROM "dummy" WHERE status = \'error\'',
+      );
+      // convertWhereToFilter returns a condition — parseWhereClauseToFilter
+      // wraps it in a group
+      expect(result.filterType).toBe("group");
+      expect(result.logicalOperator).toBe("AND");
+      expect(Array.isArray(result.conditions)).toBe(true);
+      expect(result.conditions.length).toBe(1);
+    });
+
+    it("should parse AND conditions into a group filter", async () => {
+      const andAst = {
+        type: "binary_expr",
+        operator: "AND",
+        left: {
+          type: "binary_expr",
+          operator: "=",
+          left: { column: { expr: { value: "level" } } },
+          right: { value: "ERROR" },
+        },
+        right: {
+          type: "binary_expr",
+          operator: "=",
+          left: { column: { expr: { value: "status" } } },
+          right: { value: "404" },
+        },
+      };
+      mockAstify.mockReturnValue({ where: andAst });
+
+      const result = await parseWhereClauseToFilter(
+        "level = 'ERROR' AND status = '404'",
+      );
+
+      expect(result.filterType).toBe("group");
+      expect(Array.isArray(result.conditions)).toBe(true);
+    });
+
+    it("should return default filter when AST has no where clause", async () => {
+      mockAstify.mockReturnValue({ from: [{ table: "dummy" }] });
+
+      const result = await parseWhereClauseToFilter("some invalid text");
+
+      expect(result).toEqual(defaultFilter);
+    });
+
+    it("should return default filter when parser throws", async () => {
+      mockAstify.mockImplementation(() => {
+        throw new Error("Parse error");
+      });
+
+      const result = await parseWhereClauseToFilter("completely invalid }{][");
+
+      expect(result).toEqual(defaultFilter);
+    });
+
+    it("should preserve group structure for OR conditions", async () => {
+      const orAst = {
+        type: "binary_expr",
+        operator: "OR",
+        left: {
+          type: "binary_expr",
+          operator: "=",
+          left: { column: { expr: { value: "level" } } },
+          right: { value: "ERROR" },
+        },
+        right: {
+          type: "binary_expr",
+          operator: "=",
+          left: { column: { expr: { value: "level" } } },
+          right: { value: "WARN" },
+        },
+      };
+      mockAstify.mockReturnValue({ where: orAst });
+
+      const result = await parseWhereClauseToFilter(
+        "level = 'ERROR' OR level = 'WARN'",
+      );
+
+      expect(result.filterType).toBe("group");
+      expect(Array.isArray(result.conditions)).toBe(true);
+      expect(result.conditions.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("extractWhereClause", () => {
+    it("should return empty string for empty input", async () => {
+      expect(await extractWhereClause("")).toBe("");
+      expect(await extractWhereClause("  ")).toBe("");
+    });
+
+    it("should return empty string for null/undefined", async () => {
+      expect(await extractWhereClause(null as any)).toBe("");
+      expect(await extractWhereClause(undefined as any)).toBe("");
+    });
+
+    it("should return empty string for query without WHERE clause", async () => {
+      mockAstify.mockReturnValue({ where: null });
+      const result = await extractWhereClause(
+        'SELECT * FROM "stream"',
+      );
+      expect(result).toBe("");
+    });
+
+    it("should extract simple WHERE clause", async () => {
+      const whereAst = {
+        type: "binary_expr",
+        operator: "=",
+        left: { type: "column_ref", table: null, column: "level" },
+        right: { type: "single_quote_string", value: "ERROR" },
+      };
+      mockAstify.mockReturnValue({ where: whereAst });
+      mockSqlify.mockReturnValue(
+        "SELECT * FROM `dummy` WHERE `level` = 'ERROR'",
+      );
+
+      const result = await extractWhereClause(
+        "SELECT histogram(_timestamp) FROM \"stream\" WHERE level = 'ERROR' GROUP BY x_axis_1",
+      );
+      expect(result).toBe("\"level\" = 'ERROR'");
+    });
+
+    it("should extract compound WHERE clause", async () => {
+      const whereAst = {
+        type: "binary_expr",
+        operator: "AND",
+        left: {
+          type: "binary_expr",
+          operator: "=",
+          left: { type: "column_ref", table: null, column: "level" },
+          right: { type: "single_quote_string", value: "ERROR" },
+        },
+        right: {
+          type: "binary_expr",
+          operator: ">",
+          left: { type: "column_ref", table: null, column: "code" },
+          right: { type: "number", value: 500 },
+        },
+      };
+      mockAstify.mockReturnValue({ where: whereAst });
+      mockSqlify.mockReturnValue(
+        "SELECT * FROM `dummy` WHERE `level` = 'ERROR' AND `code` > 500",
+      );
+
+      const result = await extractWhereClause(
+        "SELECT histogram(_timestamp) FROM \"stream\" WHERE level = 'ERROR' AND code > 500 GROUP BY x_axis_1",
+      );
+      expect(result).toBe("\"level\" = 'ERROR' AND \"code\" > 500");
+    });
+
+    it("should return empty string when parser throws", async () => {
+      mockAstify.mockImplementation(() => {
+        throw new Error("parse error");
+      });
+
+      const result = await extractWhereClause("not valid sql");
+      expect(result).toBe("");
     });
   });
 });
