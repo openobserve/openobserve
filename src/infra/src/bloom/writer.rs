@@ -197,11 +197,10 @@ impl BloomWriter {
         //                        + file_count(4) + body_offset(8) + 12×files
         //   tail:   footer_len(4) + MAGIC(4)
         let body_total: usize = by_field.values().flatten().map(|b| b.bytes.len()).sum();
-        let footer_total: usize = 4
-            + field_order
-                .iter()
-                .map(|f| 2 + f.len() + 1 + 4 + 4 + 8 + by_field.get(f).map_or(0, Vec::len) * (8 + 4))
-                .sum::<usize>();
+        let footer_total: usize = 4 + field_order
+            .iter()
+            .map(|f| 2 + f.len() + 1 + 4 + 4 + 8 + by_field.get(f).map_or(0, Vec::len) * (8 + 4))
+            .sum::<usize>();
         let total = 4 + 1 + body_total + footer_total + 4 + 4;
 
         let mut out = Vec::with_capacity(total);

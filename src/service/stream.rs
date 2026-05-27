@@ -740,6 +740,23 @@ pub async fn update_stream_settings(
             .retain(|field| !new_settings.index_fields.remove.contains(field));
     }
 
+    // Bloom filter is built on top of the secondary index: every bloom field
+    // must also be a secondary-index field, otherwise enabling bloom without
+    // adding the field to index_fields would silently build no `.bf`. Fold any
+    // bloom field that isn't indexed yet into index_fields. Add-only —
+    // removing a bloom field leaves it indexed (harmless), and we bump
+    // index_updated_at so the secondary index is rebuilt to cover it.
+    let missing_index: Vec<String> = settings
+        .bloom_filter_fields
+        .iter()
+        .filter(|&f| !settings.index_fields.contains(f))
+        .cloned()
+        .collect();
+    if !missing_index.is_empty() {
+        settings.index_fields.extend(missing_index);
+        settings.index_updated_at = now_micros();
+    }
+
     if !new_settings.extended_retention_days.add.is_empty() {
         let mut seen = std::collections::HashSet::new();
         let new_retention: Vec<_> = new_settings

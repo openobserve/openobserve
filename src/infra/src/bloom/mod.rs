@@ -74,8 +74,8 @@ pub mod writer;
 pub use footer_cache::{BLOOM_FOOTER_CACHE, BloomFooterCache};
 pub use reader::{BloomReader, FieldInspect, ReadError};
 pub use sbbf::{
-    BLOCK_BYTES, Sbbf, block_index, check_block, check_block_with_mask, hash_value,
-    mask_from_hash, num_blocks_for,
+    BLOCK_BYTES, Sbbf, block_index, check_block, check_block_with_mask, hash_value, mask_from_hash,
+    num_blocks_for,
 };
 pub use writer::{BloomBuilder, BloomWriter, FieldBloom};
 
