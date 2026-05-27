@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <thead
         class="tw:sticky tw:top-0 tw:z-10"
-        style="max-height: 44px; height: 22px"
+        style="max-height: 44px"
         v-for="headerGroup in table.getHeaderGroups()"
         :key="headerGroup.id"
       >
@@ -817,12 +817,14 @@ const rowVirtualizerOptions = computed(() => {
             // Only measure expanded rows (check if it's actually an expanded row)
             const isExpandedRow =
               formattedRows.value[index]?.original?.isExpandedRow;
-            if (isExpandedRow || props.wrap) {
+            if (isExpandedRow) {
               const height = element.getBoundingClientRect().height;
               expandedRowHeights.value[index] = height;
               return height;
             }
-            return 24; // Fixed height for collapsed rows
+            // Return actual measured height so the virtualizer positions rows
+            // with the correct stride — prevents both overlap and gap artifacts.
+            return element.getBoundingClientRect().height;
           }
         : undefined,
   };
@@ -1129,5 +1131,26 @@ defineExpose({
   &:hover {
     background-color: var(--o2-hover-gray) !important;
   }
+}
+
+// Fix: OButton base class (tw:relative) overrides tw:absolute passed via props.
+// Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
+// and height:100% to fill the td height (= row height minus 1px border).
+// Overriding the CSS `translate` property (not `transform`) is required because
+// Tailwind v4 sets tw:-translate-y-1/2 via the CSS `translate` shorthand property.
+:deep(.ai-btn) {
+  position: absolute !important;
+  top: 0 !important;
+  translate: -50% 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  width: 1.875rem !important;
+  min-width: 0 !important;
+  border-radius: 0.25rem !important;
+}
+
+// Suppress the hover box-shadow — it visually bleeds outside the row boundary
+:deep(.ai-btn:hover) {
+  box-shadow: none !important;
 }
 </style>
