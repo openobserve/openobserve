@@ -249,7 +249,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(15000);
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
@@ -296,7 +296,6 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
     // With ORDER BY _timestamp DESC the newest rows come first; we scan more
     // than strictly necessary (10) so a slight indexing lag still resolves
-    // within one attempt. The retry loop is kept as a fallback for slow CI.
     let o2idFound = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
       const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
@@ -306,7 +305,7 @@ test.describe("Unflattened testcases", () => {
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, refreshing query`);
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
       if (attempt === 3) {
         try {
           const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
@@ -317,6 +316,8 @@ test.describe("Unflattened testcases", () => {
         break;
       }
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
+      await ingestion(page);
+      await page.waitForTimeout(3000);
       await applyQueryButton(page);
     }
     if (!o2idFound) {

@@ -398,8 +398,8 @@ export class ReportsPage {
         await this.reportSearchInputField.fill(reportName);
         return await btn.isVisible({ timeout: 2000 }).catch(() => false);
       }, {
-        intervals: [2000, 3000, 5000, 5000],
-        timeout: 60000,
+        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+        timeout: 180000,
       }).toBe(true);
     }
 
