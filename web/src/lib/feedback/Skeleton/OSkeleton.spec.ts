@@ -29,13 +29,13 @@ describe("OSkeleton", () => {
   });
 
   describe("animation prop", () => {
-    it("applies tw:animate-pulse for animation=pulse (default)", () => {
-      const wrapper = mount(OSkeleton);
+    it("applies tw:animate-pulse for animation=pulse", () => {
+      const wrapper = mount(OSkeleton, { props: { animation: "pulse" } });
       expect(wrapper.find("span").classes()).toContain("tw:animate-pulse");
     });
 
-    it("applies tw:skeleton-wave for animation=wave", () => {
-      const wrapper = mount(OSkeleton, { props: { animation: "wave" } });
+    it("applies tw:skeleton-wave for animation=wave (default)", () => {
+      const wrapper = mount(OSkeleton);
       expect(wrapper.find("span").classes()).toContain("tw:skeleton-wave");
     });
 

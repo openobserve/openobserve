@@ -46,7 +46,6 @@
           :min-refresh-interval="
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
-          style="padding-left: 0px; padding-right: 0px"
           @trigger="refreshData"
           class="viewpanel-icons"
           data-test="dashboard-viewpanel-refresh-interval"

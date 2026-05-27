@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="o-field-row tw:h-6 tw:flex tw:items-center tw:gap-1 tw:w-full tw:relative tw:rounded-[0.25rem] tw:hover:bg-field-list-row-hover-bg"
+    :class="[highlight && 'tw:bg-field-list-row-hover-bg!']"
   >
     <slot />
     <div v-if="$slots.actions" class="o-field-row__actions">
@@ -26,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-// Shell component — provides consistent row height, hover background,
-// and an optional positioned action overlay for field list rows.
-// Slot consumers own their label content and hover actions independently.
+defineProps<{
+  highlight?: boolean
+}>()
 </script>
 
 <style scoped lang="scss">

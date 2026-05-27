@@ -71,6 +71,7 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
     return;
   }
   clearBodyValidation();
+  handleOpenChange(false);
 }
 
 function handleInteractOutside(e: Event) {
@@ -307,6 +308,7 @@ watch(internalOpen, (open) => {
     <DialogPortal :to="props.portalTarget ?? 'body'">
       <!-- Overlay / scrim — same z-index as ODialog -->
       <DialogOverlay
+        data-test="o-drawer-overlay"
         :class="[
           isContained ? 'tw:absolute tw:inset-0' : 'tw:fixed tw:inset-0',
           seamless

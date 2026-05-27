@@ -61,6 +61,7 @@ import GroupWork from "~icons/material-symbols/group-work-outline";
 import Groups from "~icons/material-symbols/groups-outline";
 import HelpOutline from "~icons/material-symbols/help-outline";
 import History from "~icons/material-symbols/history";
+import InfoFilled from "~icons/material-symbols/info";
 import Info from "~icons/material-symbols/info-outline";
 import InfoOutline from "~icons/material-symbols/info-outline";
 import AccountTree from "~icons/material-symbols/account-tree-outline";
@@ -367,6 +368,7 @@ export const iconRegistry = {
   "help-outline": HelpOutline,
   "history": History,
   "info": Info,
+  "info-filled": InfoFilled,
   "info-outline": InfoOutline,
   "account-tree": AccountTree,
   "dark-mode": DarkMode,

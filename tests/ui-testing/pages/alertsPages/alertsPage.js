@@ -263,7 +263,7 @@ export class AlertsPage {
             // Import/Export locators
             alertImportButton: '[data-test="alert-import"]',
             alertExportButton: '[data-test="alert-list-export-alerts-btn"]',
-            alertListHeaderCheckbox: '[data-test="alert-list-table"] thead .o2-table-checkbox',
+            alertListHeaderCheckbox: '[data-test="o2-table-select-all"] button[role="checkbox"]',
             alertImportJsonBtn: '[data-test="alert-import-json-btn"]',
             alertImportJsonFileInput: '[data-test="alert-import-json-file-input"]',
             alertImportFileTab: '[data-test="tab-import_json_file"]',
@@ -277,8 +277,8 @@ export class AlertsPage {
             // Table locators
             tableBodyRowWithIndex: 'tbody tr[data-index]',
             tableLocator: 'table',
-            tableCheckbox: '.o2-table-checkbox',
-            headerCheckbox: '[data-test="alert-list-select-all-checkbox"]',
+            tableCheckbox: '[data-test="o2-table-select-cell"] button[role="checkbox"]',
+            headerCheckbox: '[data-test="o2-table-select-all"] button[role="checkbox"]',
 
             // Alert settings inline locators
             silenceNotificationInput: '.silence-notification-input input',
@@ -946,12 +946,14 @@ export class AlertsPage {
 
         await dotButton.click({ force: true });
 
-        await expect(this.page.getByText(this.locators.deleteFolderOption)).toBeVisible({ timeout: 3000 });
+        // Use specific data-test locator to avoid ambiguous getByText('Delete') match
+        const deleteMenuItem = this.page.locator('[data-test="dashboard-delete-folder-icon"]');
+        await expect(deleteMenuItem).toBeVisible({ timeout: 3000 });
+        await deleteMenuItem.click();
 
-        await this.page.getByText(this.locators.deleteFolderOption).click();
-        await expect(this.page.getByText(this.locators.deleteFolderConfirmText)).toBeVisible();
+        await expect(this.page.locator('span').filter({ hasText: this.locators.deleteFolderConfirmText }).first()).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.folderDeletedMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.folderDeletedMessage })).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Successfully deleted folder', { folderName });
     }
@@ -1102,7 +1104,7 @@ export class AlertsPage {
         // Wait for any of these outcomes within the timeout window.
         const errorFields = this.page.locator('.q-field--error');
         const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
-        const successMsg = this.page.getByText(this.locators.alertSuccessMessage);
+        const successMsg = this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertSuccessMessage });
 
         const outcomes = await Promise.race([
             errorFields.first().waitFor({ state: 'visible', timeout: 10000 }).then(() => 'validation'),

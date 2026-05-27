@@ -19,6 +19,7 @@ on:
 
 jobs:
   auto_rerun_on_failure:
+    timeout-minutes: 15
     name: Auto Rerun Failed Jobs
     permissions:
       actions: write
