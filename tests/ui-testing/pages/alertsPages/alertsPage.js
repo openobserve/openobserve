@@ -986,8 +986,9 @@ export class AlertsPage {
             await this.page.waitForTimeout(2000);
 
             // Search for the alert
-            await this.page.locator(this.locators.alertSearchInput).click();
-            await this.page.locator(this.locators.alertSearchInput).fill(nameToVerify);
+            const inputField = this.page.locator(this.locators.alertSearchInputField);
+            await inputField.waitFor({ state: 'attached', timeout: 10000 });
+            await inputField.fill(nameToVerify, { force: true });
             await this.page.waitForTimeout(2000);
         }
 
