@@ -619,40 +619,48 @@ export class SanityPage {
         await this.streamTypeLogsOption.click();
 
         await this.saveStreamButton.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-        // Wait for AddStream dialog to dismiss (success path).
+        // Wait for AddStream drawer to fully dismiss before interacting with the table.
+        // The drawer uses a portal + closing animation; if it's still in the DOM it can
+        // intercept clicks meant for table rows below it.
         await this.page.waitHelpers.waitForElementHidden('[data-test="add-stream-dialog"]', {
-            timeout: 10000,
+            timeout: 15000,
             description: 'add-stream-dialog to be dismissed'
-        }).catch(() => {
-            // No dialog present, continue
-        });
+        }).catch(() => {});
 
-
-        await this.page.waitForLoadState('domcontentloaded');
+        // Extra settle to let the closing animation complete and any getLogStream() refresh
+        // API call (triggered by streamAdded) finish before we interact with the table.
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Search for the newly created stream by name.
         await this.searchStreamInputField.fill(uniqueStreamName);
         await this.page.waitForLoadState('domcontentloaded');
 
-        // Wait for the deterministic per-name name cell to appear (added in LogStream.vue).
+        // Wait for the stream to appear — also confirms creation was successful.
         const streamNameCell = this.getStreamNameCellByName(uniqueStreamName);
         await expect(streamNameCell).toBeVisible({ timeout: 15000 });
 
-        // Click the per-row delete button (data-test added on the OButton this pass).
-        await this.streamDeleteFirstRowBtn.click();
-
-        // Confirm the ODialog destructive primary.
-        await this.streamDeleteDialogPrimary.waitFor({ state: 'visible', timeout: 10000 });
-        await this.streamDeleteDialogPrimary.click();
-
-        // Wait for the confirm dialog to close (deterministic post-delete settle).
-        await this.streamDeleteDialogPrimary.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+        // Extra networkidle ensures the list has fully settled before we click delete.
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Verify stream was deleted - the stream cell should disappear from the table.
-        // OInput uses a 300ms debounce on the filter; poll for absence instead of one-shot check.
+        // Give the UI a moment to fully settle after filtering — the delete button may not
+        // register clicks immediately after the list re-renders from the search filter.
+        await this.page.waitForTimeout(1500);
+
+        // Click the per-row delete button.
+        await this.streamDeleteFirstRowBtn.click();
+
+        // Confirm via any visible primary dialog button (ODialog teleports content to body,
+        // so scope to visible buttons to pick up the confirmation regardless of dialog wrapper).
+        const confirmBtn = this.page.locator('[data-test="o-dialog-primary-btn"]:visible').first();
+        await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await confirmBtn.click();
+
+        // Wait for the delete to settle.
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Verify deletion via search: the stream must no longer appear in filtered results.
         await expect(streamNameCell).toBeHidden({ timeout: 15000 });
     }
 
