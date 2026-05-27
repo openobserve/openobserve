@@ -379,14 +379,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Clickable Trace Button -->
                     <OButton
                       v-if="item._oo_trace_id"
-                      variant="ghost"
-                      size="icon-chip"
+                      variant="outline"
+                      size="xs"
                       title="View trace details"
                       data-test="view-trace-btn"
+                      class="tw:ml-2 tw:h-5! tw:px-1.5"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
                     >
-                      <OIcon name="git-branch" size="xs" />
-                      <span v-if="item._oo_trace_id" class="tw:text-[10px] tw:pl-[0.2rem]">Trace</span>
+                      <OIcon name="account-tree" size="xs" />
+                      <span v-if="item._oo_trace_id">View Trace</span>
                     </OButton>
                   </div>
                 </div>
