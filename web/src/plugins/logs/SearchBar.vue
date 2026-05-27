@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="searchObj.meta.sqlMode"
                 :disabled="isSqlModeDisabled"
                 size="md"
+                data-test="logs-search-bar-sql-mode-toggle"
                 @click.stop
               />
             </template>

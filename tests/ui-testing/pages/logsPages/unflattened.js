@@ -32,6 +32,7 @@ class UnflattenedPage {
         // OFieldList inner search input — scope under the logs index list to avoid
         // collision with the dashboard panel-editor field list also on the page.
         this.indexFieldSearchInput = page.locator('[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]');
+        this.utilitiesMenuButton = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
         this.sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
         this.logsSearchBarQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
         // FieldListPagination receives data-test-prefix="logs-page" from IndexList.vue,
