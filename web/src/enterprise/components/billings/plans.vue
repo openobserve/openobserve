@@ -36,11 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="managed-empty__title">
-        {{ t("billing.organizationGroup.plansManagedTitle") }}
+        {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
       <div class="managed-empty__desc">
         {{
-          t("billing.organizationGroup.plansManagedDescription", {
+          t("billing.billingGroup.plansManagedDescription", {
             payer: membership?.payer_org_id,
           })
         }}
@@ -49,15 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="managed-empty__chips">
         <span class="managed-empty__chip">
           <q-icon name="receipt_long" size="13px" />
-          {{ t("billing.organizationGroup.chipConsolidatedBill") }}
+          {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
         <span class="managed-empty__chip">
           <q-icon name="lock" size="13px" />
-          {{ t("billing.organizationGroup.chipPlanManaged") }}
+          {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
         <span class="managed-empty__chip">
           <q-icon name="description" size="13px" />
-          {{ t("billing.organizationGroup.chipNoInvoices") }}
+          {{ t("billing.billingGroup.chipNoInvoices") }}
         </span>
       </div>
 
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="plans-view-org-group-btn"
         @click="goToOrgGroup"
       >
-        {{ t("billing.organizationGroup.viewOrgGroup") }}
+        {{ t("billing.billingGroup.viewOrgGroup") }}
         <template #icon-right>
           <q-icon name="arrow_forward" size="16px" class="tw:ml-1" />
         </template>
@@ -182,7 +182,7 @@ export default defineComponent({
   methods: {
     goToOrgGroup() {
       this.$router.push({
-        name: "organization_group",
+        name: "billing_group",
         query: {
           org_identifier: this.store.state.selectedOrganization.identifier,
         },

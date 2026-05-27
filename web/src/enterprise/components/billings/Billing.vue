@@ -23,28 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="isOrgGroupRoute" class="tw:flex tw:items-center tw:gap-2">
       <OButton
-        v-if="orgGroupInvite.showInvites"
-        variant="outline"
-        size="sm-action"
-        data-test="org-group-pending-invites-btn"
-        @click="orgGroupInvite.invitesTrigger++"
-      >
-        {{ t("billing.organizationGroup.receivedInvitesTab") }}
-        <q-badge
-          v-if="orgGroupInvite.pendingCount > 0"
-          color="warning"
-          class="tw:ml-1"
-          :label="orgGroupInvite.pendingCount"
-        />
-      </OButton>
-      <OButton
         v-if="orgGroupInvite.canInvite"
         variant="primary"
         size="sm-action"
         data-test="org-group-invite-org-btn"
         @click="orgGroupInvite.trigger++"
       >
-        {{ t("billing.organizationGroup.inviteOrgButton") }}
+        {{ t("billing.billingGroup.inviteOrgButton") }}
       </OButton>
     </div>
     <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
@@ -124,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ORouteTab
             v-if="config.isCloud == 'true'"
             exact
-            name="organization_group"
+            name="billing_group"
             :to="
-              '/billings/organization_group?org_identifier=' +
+              '/billings/billing_group?org_identifier=' +
               store.state.selectedOrganization.identifier
             "
             icon="groups"
-            :label="t('billing.organizationGroup.tabLabel')"
+            :label="t('billing.billingGroup.tabLabel')"
           />
         </OTabs>
         <!-- <OButton
@@ -271,8 +256,8 @@ export default defineComponent({
         return t("billing.plansLabel");
       } else if (router.currentRoute.value.name == "invoice_history") {
         return t("billing.invoiceHistoryLabel");
-      } else if (router.currentRoute.value.name == "organization_group") {
-        return t("billing.organizationGroup.tabLabel");
+      } else if (router.currentRoute.value.name == "billing_group") {
+        return t("billing.billingGroup.tabLabel");
       }
       return "";
     };
@@ -282,17 +267,13 @@ export default defineComponent({
       return router.currentRoute.value.name == "usage";
     })
     const isOrgGroupRoute = computed(() => {
-      return router.currentRoute.value.name == "organization_group";
+      return router.currentRoute.value.name == "billing_group";
     })
-    // Shared with the OrganizationGroup route component (via inject): the child
-    // sets canInvite / showInvites / pendingCount based on the org's role and
-    // we bump the triggers to open its side panels.
+    // Shared with the BillingGroup route component (via inject): the child sets
+    // canInvite based on the org's role and we bump trigger to open its invite panel.
     const orgGroupInvite = reactive({
       trigger: 0,
       canInvite: false,
-      showInvites: false,
-      pendingCount: 0,
-      invitesTrigger: 0,
     });
     provide("orgGroupInvite", orgGroupInvite);
     const selectUsageDate = () => {

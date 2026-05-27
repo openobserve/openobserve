@@ -37,19 +37,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="feature-card tw:flex-1">
             <div class="stat-card-title">
-              {{ t("billing.organizationGroup.statTotal") }}
+              {{ t("billing.billingGroup.statTotal") }}
             </div>
             <div class="stat-card-value">{{ totalCount }}</div>
           </div>
           <div class="feature-card tw:flex-1">
             <div class="stat-card-title">
-              {{ t("billing.organizationGroup.statActive") }}
+              {{ t("billing.billingGroup.statActive") }}
             </div>
             <div class="stat-card-value tw:text-green-600">{{ activeCount }}</div>
           </div>
           <div class="feature-card tw:flex-1">
             <div class="stat-card-title">
-              {{ t("billing.organizationGroup.statPending") }}
+              {{ t("billing.billingGroup.statPending") }}
             </div>
             <div class="stat-card-value tw:text-amber-500">
               {{ pendingCount }}
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="feature-card tw:flex-1">
             <div class="stat-card-title">
-              {{ t("billing.organizationGroup.statRejected") }}
+              {{ t("billing.billingGroup.statRejected") }}
             </div>
             <div class="stat-card-value tw:text-red-500">{{ rejectedCount }}</div>
           </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="org-group-view-usage-btn"
             @click="goToUsage"
           >
-            {{ t("billing.organizationGroup.viewUsage") }}
+            {{ t("billing.billingGroup.viewUsage") }}
             <template #icon-right>
               <q-icon name="arrow_forward" size="16px" class="tw:ml-1" />
             </template>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #no-data>
               <div class="full-width tw:py-4 tw:text-center o2-page-subtitle">
-                {{ t("billing.organizationGroup.noMembers") }}
+                {{ t("billing.billingGroup.noMembers") }}
               </div>
             </template>
             <template #body-cell-index="props">
@@ -142,14 +142,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="og-hero__left">
             <div class="og-hero__eyebrow">
               <q-icon name="verified" size="14px" />
-              {{ t("billing.organizationGroup.statusActive") }}
+              {{ t("billing.billingGroup.statusActive") }}
             </div>
             <div class="og-hero__headline">
-              {{ t("billing.organizationGroup.childHeadline") }}
-              <span class="og-hero__brand">{{ membership?.payer_org_id }}</span>
+              {{ t("billing.billingGroup.childHeadline") }}
+              <span class="og-hero__brand">
+                {{ payerName }}
+                <q-tooltip
+                  anchor="bottom middle"
+                  self="top middle"
+                  class="tw:text-sm"
+                >
+                  {{ membership?.payer_org_id }}
+                </q-tooltip>
+              </span>
             </div>
             <div class="og-hero__sub">
-              {{ t("billing.organizationGroup.childHeroSub") }}
+              {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <OButton
               variant="primary"
@@ -157,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-group-child-view-usage-btn"
               @click="goToUsage"
             >
-              {{ t("billing.organizationGroup.viewUsage") }}
+              {{ t("billing.billingGroup.viewUsage") }}
               <template #icon-right>
                 <q-icon name="arrow_forward" size="16px" class="tw:ml-1" />
               </template>
@@ -172,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="og-feature__content">
                 <div class="og-feature__title">
-                  {{ t("billing.organizationGroup.invitedBy") }}
+                  {{ t("billing.billingGroup.invitedBy") }}
                 </div>
                 <div class="og-feature__desc tw:truncate">
                   {{ membership?.created_by }}
@@ -185,12 +194,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="og-feature__content">
                 <div class="og-feature__title">
-                  {{ t("billing.organizationGroup.acceptedBy") }}
+                  {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
                 <div class="og-feature__desc tw:truncate">
                   {{
                     membership?.accepted_by ||
-                    t("billing.organizationGroup.addedOnCreation")
+                    t("billing.billingGroup.addedOnCreation")
                   }}
                 </div>
               </div>
@@ -201,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="og-feature__content">
                 <div class="og-feature__title">
-                  {{ t("billing.organizationGroup.memberSince") }}
+                  {{ t("billing.billingGroup.memberSince") }}
                 </div>
                 <div class="og-feature__desc">
                   {{ formatDate(membership?.created_at) }}
@@ -212,14 +221,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- STANDALONE ORG VIEW -->
+      <!-- STANDALONE ORG VIEW — has pending invites: invites table -->
+      <div
+        v-else-if="receivedInvites.length > 0"
+        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
+        data-test="org-group-standalone-invites-view"
+      >
+        <div class="o2-page-subtitle tw:mb-3 tw:shrink-0">
+          {{ t("billing.billingGroup.invitesPanelHint") }}
+        </div>
+        <div class="tw:flex-1 tw:min-h-0">
+          <q-table
+            ref="qTable"
+            :rows="receivedInvites"
+            :columns="inviteColumns"
+            row-key="token"
+            flat
+            dense
+            :pagination="pagination"
+            class="org-group-table o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw:h-full"
+            data-test="org-group-invites-table"
+          >
+            <template #body-cell-index="props">
+              <q-td :props="props">{{ props.rowIndex + 1 }}</q-td>
+            </template>
+            <template #body-cell-actions="props">
+              <q-td :props="props" class="tw:text-right tw:pr-3">
+                <OButton
+                  variant="primary"
+                  size="xs"
+                  class="q-mr-sm"
+                  :disabled="actioningToken === props.row.token"
+                  :data-test="`org-group-accept-invite-${props.row.inviter_org_id}`"
+                  @click="acceptInvite(props.row.token)"
+                >
+                  {{ t("billing.billingGroup.accept") }}
+                </OButton>
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  :disabled="actioningToken === props.row.token"
+                  :data-test="`org-group-reject-invite-${props.row.inviter_org_id}`"
+                  @click="rejectInvite(props.row.token)"
+                >
+                  {{ t("billing.billingGroup.reject") }}
+                </OButton>
+              </q-td>
+            </template>
+            <template #bottom="scope">
+              <div
+                class="tw:flex tw:items-center tw:justify-end tw:w-full tw:h-[48px]"
+              >
+                <QTablePagination
+                  :scope="scope"
+                  :resultTotal="receivedInvites.length"
+                  :perPageOptions="perPageOptions"
+                  position="bottom"
+                  @update:changeRecordPerPage="changePagination"
+                />
+              </div>
+            </template>
+          </q-table>
+        </div>
+      </div>
+
+      <!-- STANDALONE ORG VIEW — no invites: polished empty state -->
       <div
         v-else
-        class="tw:flex-1 tw:min-h-0 tw:overflow-auto"
+        class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col"
         data-test="org-group-standalone-view"
       >
-        <!-- Polished empty state — invites are reached via the header button -->
-        <div class="og-empty" data-test="org-group-standalone-invite">
+        <div
+          class="og-empty"
+          data-test="org-group-standalone-invite"
+        >
           <div class="og-empty__icon-outer">
             <div class="og-empty__icon-inner">
               <q-icon name="group_add" size="28px" class="og-empty__icon" />
@@ -227,124 +302,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="og-empty__title">
-            {{ t("billing.organizationGroup.emptyTitle") }}
+            {{ t("billing.billingGroup.emptyTitle") }}
           </div>
           <div class="og-empty__desc">
-            {{ t("billing.organizationGroup.inviteTabPrompt") }}
+            {{ t("billing.billingGroup.inviteTabPrompt") }}
           </div>
 
           <div class="og-empty__chips">
             <span class="og-empty__chip">
               <q-icon name="receipt_long" size="13px" />
-              {{ t("billing.organizationGroup.chipConsolidatedBill") }}
+              {{ t("billing.billingGroup.chipConsolidatedBill") }}
             </span>
             <span class="og-empty__chip">
               <q-icon name="groups" size="13px" />
-              {{ t("billing.organizationGroup.chipLinkOrgs") }}
+              {{ t("billing.billingGroup.chipLinkOrgs") }}
             </span>
           </div>
 
           <OButton
             variant="primary"
             class="og-empty__btn"
-            data-test="org-group-standalone-invite-btn"
+            data-test="org-group-standalone-invite-btn-empty"
             @click="showInviteDialog = true"
           >
-            {{ t("billing.organizationGroup.inviteOrgButton") }}
+            {{ t("billing.billingGroup.inviteOrgButton") }}
           </OButton>
         </div>
       </div>
     </template>
-
-    <!-- Pending invites side panel -->
-    <q-dialog
-      v-model="showInvitesPanel"
-      position="right"
-      full-height
-      maximized
-    >
-      <q-card
-        class="o2-side-dialog column full-height"
-        data-test="org-group-invites-panel"
-      >
-        <q-card-section class="q-py-md tw:w-full">
-          <div class="row items-center no-wrap q-py-sm">
-            <div class="col">
-              <div class="tw:text-[18px] tw:font-semibold">
-                {{ t("billing.organizationGroup.receivedInvitesTab") }}
-              </div>
-            </div>
-            <div class="col-auto">
-              <q-icon
-                data-test="org-group-invites-close-btn"
-                name="cancel"
-                class="cursor-pointer"
-                size="20px"
-                @click="showInvitesPanel = false"
-              />
-            </div>
-          </div>
-
-          <q-separator />
-
-          <!-- Empty -->
-          <div
-            v-if="receivedInvites.length === 0"
-            class="tw:flex tw:flex-col tw:items-center tw:text-center tw:py-12 tw:gap-2"
-          >
-            <q-icon name="mark_email_unread" size="40px" class="tw:opacity-40" />
-            <div class="tw:font-semibold">
-              {{ t("billing.organizationGroup.noPendingInvites") }}
-            </div>
-            <div class="o2-page-subtitle tw:max-w-[300px]">
-              {{ t("billing.organizationGroup.noPendingInvitesHint") }}
-            </div>
-          </div>
-
-          <!-- Invite list -->
-          <div v-else class="tw:mt-4 tw:flex tw:flex-col tw:gap-3">
-            <div
-              v-for="inv in receivedInvites"
-              :key="inv.token"
-              class="feature-card tw:p-3"
-              :data-test="`org-group-invite-card-${inv.inviter_org_id}`"
-            >
-              <div class="tw:font-semibold tw:truncate">
-                {{ inv.inviter_org_id }}
-              </div>
-              <div class="o2-page-subtitle tw:text-xs tw:mt-1">
-                {{
-                  t("billing.organizationGroup.invitedByOn", {
-                    inviter: inv.inviter_id,
-                  })
-                }}
-                · {{ formatDate(inv.created_at) }}
-              </div>
-              <div class="tw:flex tw:gap-2 tw:mt-3">
-                <OButton
-                  variant="primary"
-                  size="sm-action"
-                  :disabled="actioningToken === inv.token"
-                  :data-test="`org-group-accept-invite-${inv.inviter_org_id}`"
-                  @click="acceptInvite(inv.token)"
-                >
-                  {{ t("billing.organizationGroup.accept") }}
-                </OButton>
-                <OButton
-                  variant="outline"
-                  size="sm-action"
-                  :disabled="actioningToken === inv.token"
-                  :data-test="`org-group-reject-invite-${inv.inviter_org_id}`"
-                  @click="rejectInvite(inv.token)"
-                >
-                  {{ t("billing.organizationGroup.reject") }}
-                </OButton>
-              </div>
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
 
     <!-- Invite side panel -->
     <q-dialog
@@ -361,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="row items-center no-wrap q-py-sm">
             <div class="col">
               <div class="tw:text-[18px] tw:font-semibold">
-                {{ t("billing.organizationGroup.inviteTitle") }}
+                {{ t("billing.billingGroup.inviteTitle") }}
               </div>
             </div>
             <div class="col-auto">
@@ -387,8 +372,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stack-label
             hide-bottom-space
             autofocus
-            :label="t('billing.organizationGroup.inviteOrgIdLabel')"
-            :placeholder="t('billing.organizationGroup.inviteOrgIdPlaceholder')"
+            :label="t('billing.billingGroup.inviteOrgIdLabel')"
+            :placeholder="t('billing.billingGroup.inviteOrgIdPlaceholder')"
             data-test="org-group-invite-input"
             @keyup.enter="sendInvite"
           />
@@ -399,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-group-invite-cancel-btn"
               @click="showInviteDialog = false"
             >
-              {{ t("billing.organizationGroup.cancel") }}
+              {{ t("billing.billingGroup.cancel") }}
             </OButton>
             <OButton
               variant="primary"
@@ -408,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-group-send-invite-btn"
               @click="sendInvite"
             >
-              {{ t("billing.organizationGroup.sendInvite") }}
+              {{ t("billing.billingGroup.sendInvite") }}
             </OButton>
           </div>
         </q-card-section>
@@ -440,7 +425,9 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 interface BillingGroupMember {
   id: number;
   payer_org_id: string;
+  payer_org_name?: string;
   member_org_id: string;
+  member_org_name?: string;
   created_at: number;
   created_by: string;
   accepted_by: string | null;
@@ -449,6 +436,8 @@ interface BillingGroupMember {
 interface BillingGroupInvite {
   id: number;
   inviter_org_id: string;
+  // TODO: populated from API once the backend returns a display name.
+  inviter_org_name?: string;
   invitee_org_id: string;
   inviter_id: string;
   created_at: number;
@@ -458,7 +447,7 @@ interface BillingGroupInvite {
 }
 
 export default defineComponent({
-  name: "OrganizationGroup",
+  name: "BillingGroup",
   components: { OButton, AppTabs, QTablePagination },
   setup() {
     const { t } = useI18n();
@@ -474,7 +463,6 @@ export default defineComponent({
     const sending = ref(false);
     const actioningToken = ref("");
     const showInviteDialog = ref(false);
-    const showInvitesPanel = ref(false);
     const superFilter = ref("all");
     const qTable = ref<any>(null);
     const pagination = ref({ rowsPerPage: 10 });
@@ -506,26 +494,17 @@ export default defineComponent({
       return "standalone";
     });
 
-    // Header-hosted buttons (rendered by Billing.vue) communicate via this
-    // injected reactive object: we expose canInvite / showInvites / pendingCount
-    // and react to the click triggers to open the matching side panels.
+    // Header-hosted "Invite Organization" button (rendered by Billing.vue)
+    // communicates via this injected reactive object: we expose canInvite and
+    // react to the click trigger to open the invite side panel.
     const headerInvite = inject<{
       trigger: number;
       canInvite: boolean;
-      showInvites: boolean;
-      pendingCount: number;
-      invitesTrigger: number;
     }>("orgGroupInvite", undefined as any);
     watch(
       () => headerInvite?.trigger,
       () => {
         showInviteDialog.value = true;
-      }
-    );
-    watch(
-      () => headerInvite?.invitesTrigger,
-      () => {
-        showInvitesPanel.value = true;
       }
     );
 
@@ -545,14 +524,12 @@ export default defineComponent({
       )
     );
 
-    // Keep the header buttons in sync with this org's role + pending invites.
+    // Keep the header "Invite Organization" button in sync with this org's role.
     watch(
-      [role, receivedInvites],
-      ([r, invitesList]) => {
+      role,
+      (r) => {
         if (!headerInvite) return;
         headerInvite.canInvite = r === "super" || r === "standalone";
-        headerInvite.pendingCount = invitesList.length;
-        headerInvite.showInvites = r === "standalone" || invitesList.length > 0;
       },
       { immediate: true }
     );
@@ -565,6 +542,15 @@ export default defineComponent({
         "yyyy-MM-dd HH:mm"
       );
     };
+
+    // Child view headline: show the payer org name (truncated to 10 chars),
+    // falling back to the identifier when no name is returned.
+    const payerName = computed(() => {
+      const name = membership.value?.payer_org_name || "";
+      if (!name) return membership.value?.payer_org_id || "";
+      return name.length > 10 ? `${name.substring(0, 10)}...` : name;
+    });
+
 
     // Super-org view: stats + unified child-org table
     const activeCount = computed(() => members.value.length);
@@ -592,7 +578,7 @@ export default defineComponent({
           status: "Active",
           invited_by: m.created_by,
           accepted_by:
-            m.accepted_by || t("billing.organizationGroup.addedOnCreation"),
+            m.accepted_by || t("billing.billingGroup.addedOnCreation"),
           date: m.created_at,
         })
       );
@@ -627,11 +613,11 @@ export default defineComponent({
     const resultTotal = computed(() => filteredSuperRows.value.length);
 
     const superFilterTabs = computed(() => [
-      { label: t("billing.organizationGroup.filterAll"), value: "all" },
-      { label: t("billing.organizationGroup.statusActive"), value: "Active" },
-      { label: t("billing.organizationGroup.statusPending"), value: "Pending" },
+      { label: t("billing.billingGroup.filterAll"), value: "all" },
+      { label: t("billing.billingGroup.statusActive"), value: "Active" },
+      { label: t("billing.billingGroup.statusPending"), value: "Pending" },
       {
-        label: t("billing.organizationGroup.statusRejected"),
+        label: t("billing.billingGroup.statusRejected"),
         value: "Rejected",
       },
     ]);
@@ -645,11 +631,52 @@ export default defineComponent({
 
     const statusLabel = (status: string) => {
       if (status === "Active")
-        return t("billing.organizationGroup.statusActive");
+        return t("billing.billingGroup.statusActive");
       if (status === "Pending")
-        return t("billing.organizationGroup.statusPending");
-      return t("billing.organizationGroup.statusRejected");
+        return t("billing.billingGroup.statusPending");
+      return t("billing.billingGroup.statusRejected");
     };
+
+    const inviteColumns = computed<QTableProps["columns"]>(() => [
+      {
+        name: "index",
+        field: "index",
+        label: "#",
+        align: "left",
+        style: "width: 56px",
+        headerStyle: "width: 56px",
+      },
+      {
+        name: "org_name",
+        field: (row: BillingGroupInvite) => row.inviter_org_name || "-",
+        label: t("billing.billingGroup.orgColumn"),
+        align: "left",
+      },
+      {
+        name: "org_id",
+        field: "inviter_org_id",
+        label: t("billing.billingGroup.orgIdColumn"),
+        align: "left",
+      },
+      {
+        name: "inviter_id",
+        field: "inviter_id",
+        label: t("billing.billingGroup.invitedBy"),
+        align: "left",
+      },
+      {
+        name: "date",
+        field: (row: BillingGroupInvite) => formatDate(row.created_at),
+        label: t("billing.billingGroup.dateColumn"),
+        align: "left",
+      },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("billing.billingGroup.actionsColumn"),
+        align: "center",
+      },
+    ]);
 
     const superColumns = computed<QTableProps["columns"]>(() => [
       {
@@ -663,7 +690,7 @@ export default defineComponent({
       {
         name: "org_id",
         field: "org_id",
-        label: t("billing.organizationGroup.childOrgColumn"),
+        label: t("billing.billingGroup.childOrgColumn"),
         align: "left",
       },
       {
@@ -675,19 +702,19 @@ export default defineComponent({
       {
         name: "invited_by",
         field: "invited_by",
-        label: t("billing.organizationGroup.invitedBy"),
+        label: t("billing.billingGroup.invitedBy"),
         align: "left",
       },
       {
         name: "accepted_by",
         field: "accepted_by",
-        label: t("billing.organizationGroup.acceptedBy"),
+        label: t("billing.billingGroup.acceptedBy"),
         align: "left",
       },
       {
         name: "date",
         field: (row: SuperRow) => formatDate(row.date),
-        label: t("billing.organizationGroup.dateColumn"),
+        label: t("billing.billingGroup.dateColumn"),
         align: "left",
       },
     ]);
@@ -721,7 +748,7 @@ export default defineComponent({
       if (target === currentOrg.value) {
         $q.notify({
           type: "negative",
-          message: t("billing.organizationGroup.inviteSameOrg"),
+          message: t("billing.billingGroup.inviteSameOrg"),
           timeout: 5000,
         });
         return;
@@ -731,7 +758,7 @@ export default defineComponent({
         await BillingService.send_billing_group_invite(currentOrg.value, target);
         $q.notify({
           type: "positive",
-          message: t("billing.organizationGroup.inviteSent"),
+          message: t("billing.billingGroup.inviteSent"),
           timeout: 5000,
         });
         inviteOrgId.value = "";
@@ -755,7 +782,7 @@ export default defineComponent({
         await BillingService.accept_billing_group_invite(currentOrg.value, token);
         $q.notify({
           type: "positive",
-          message: t("billing.organizationGroup.inviteAccepted"),
+          message: t("billing.billingGroup.inviteAccepted"),
           timeout: 5000,
         });
         await loadAll();
@@ -777,7 +804,7 @@ export default defineComponent({
         await BillingService.reject_billing_group_invite(currentOrg.value, token);
         $q.notify({
           type: "positive",
-          message: t("billing.organizationGroup.inviteRejected"),
+          message: t("billing.billingGroup.inviteRejected"),
           timeout: 5000,
         });
         await loadAll();
@@ -804,7 +831,6 @@ export default defineComponent({
       sending,
       actioningToken,
       showInviteDialog,
-      showInvitesPanel,
       superFilter,
       superFilterTabs,
       filteredSuperRows,
@@ -822,7 +848,9 @@ export default defineComponent({
       changePagination,
       goToUsage,
       receivedInvites,
+      inviteColumns,
       formatDate,
+      payerName,
       sendInvite,
       acceptInvite,
       rejectInvite,
@@ -970,6 +998,7 @@ export default defineComponent({
   &__brand {
     color: var(--q-primary);
     word-break: break-word;
+    cursor: pointer;
   }
   &__sub {
     font-size: 0.95rem;

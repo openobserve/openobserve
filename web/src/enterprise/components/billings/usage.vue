@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-select
             v-model="selectedMember"
             :options="memberOptions"
-            :label="t('billing.organizationGroup.usageMemberLabel')"
+            :label="t('billing.billingGroup.usageMemberLabel')"
             class="showLabelOnTop"
             stack-label
             borderless
@@ -305,10 +305,19 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       });
       let chartData: any = ref({});
       const selectedMember = ref("");
-      const billingMembers = ref<string[]>([]);
+      const billingMembers = ref<{ id: string; name: string }[]>([]);
       const memberOptions = computed(() => [
-        { label: t("billing.organizationGroup.usageAllMembers"), value: "" },
-        ...billingMembers.value.map((m) => ({ label: m, value: m })),
+        { label: t("billing.billingGroup.usageAllMembers"), value: "" },
+        ...billingMembers.value.map((m) => {
+          const name =
+            m.name && m.name.length > 20
+              ? `${m.name.substring(0, 20)}...`
+              : m.name;
+          return {
+            label: name ? `${name} | ${m.id}` : m.id,
+            value: m.id,
+          };
+        }),
       ]);
       const fetchBillingMembers = () => {
         if (config.isCloud !== "true") return;
@@ -316,9 +325,10 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
           store.state.selectedOrganization.identifier
         )
           .then((res: any) => {
-            billingMembers.value = (res.data ?? []).map(
-              (m: any) => m.member_org_id
-            );
+            billingMembers.value = (res.data ?? []).map((m: any) => ({
+              id: m.member_org_id,
+              name: m.member_org_name,
+            }));
           })
           .catch(() => {
             billingMembers.value = [];
