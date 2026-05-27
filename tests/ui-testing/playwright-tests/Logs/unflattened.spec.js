@@ -281,8 +281,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.clickInterestingFieldButton('kubernetes_pod_id');
 
     testLogger.info('Switching to SQL mode');
-    await pageManager.unflattenedPage.sqlModeToggle.waitFor();
-    await pageManager.unflattenedPage.sqlModeToggle.click();
+    await pageManager.unflattenedPage.toggleSqlMode();
     await page.waitForTimeout(500);
 
     testLogger.info('Verifying kubernetes_pod_id appears in query editor');

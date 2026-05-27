@@ -2737,33 +2737,23 @@ export class LogsPage {
     async clickSaveViewButton() {
         // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
         // Close any open menus/dialogs first, then open the menu and click the item.
-        await this.page.keyboard.press('Escape').catch(() => {});
-        // If the saved-views list dialog was open (e.g. from clickSavedViewsExpand), its
-        // portal close animation is still running after Escape. Opening the utilities menu
-        // while the portal tears down causes the dropdown to be dismissed immediately.
-        // Wait for the dialog to fully close before proceeding.
-        await this.page.locator('[data-test="saved-views-list-dialog"]')
-            .waitFor({ state: 'hidden', timeout: 3000 })
-            .catch(() => {}); // dialog may not have been open — treat as no-op
+        const listDialog = this.page.locator('[data-test="saved-views-list-dialog"]');
+        const isListOpen = await listDialog.isVisible({ timeout: 500 }).catch(() => false);
+        if (isListOpen) {
+            await listDialog.locator('[data-test="o-dialog-close-btn"]').click();
+            await listDialog.waitFor({ state: 'hidden', timeout: 5000 });
+            // The overlay has a 200ms fade-out — wait for it to fully detach so
+            // it doesn't intercept the utilities-menu click. Scoped by data-test.
+            await this.page.locator('[data-test="o-dialog-overlay"]')
+                .waitFor({ state: 'detached', timeout: 5000 });
+        }
         const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
         const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isVisible) {
             await this.page.locator(this.utilitiesMenuButton).click();
             await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
-        await this.page.keyboard.press('Escape').catch(() => {});
-        // Wait for any dialog backdrop/overlay (the fixed inset overlay with data-state="open") to
-        // disappear — its 200ms fade-out animation intercepts pointer events until it's gone.
-        await this.page.waitForFunction(
-            () => !document.querySelector('[data-state="open"][aria-hidden="true"]'),
-            { timeout: 5000 }
-        ).catch(() => {});
-        const createMenuItem = this.page.locator(this.menuCreateSavedViewBtn);
-        await createMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await createMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        // force:true bypasses pointer-event interception from sibling portals (e.g. FunctionSelector popper)
-        await createMenuItem.click({ force: true });
+        await createSavedViewBtn.click();
         await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
     }
 

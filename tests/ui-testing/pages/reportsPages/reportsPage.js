@@ -380,8 +380,24 @@ export class ReportsPage {
   }
 
   async pauseReport(reportName) {
+    const btn = this.pauseStartReportBtn(reportName);
     await this.reportSearchInputField.fill(reportName);
-    await this.pauseStartReportBtn(reportName).click({ force: true });
+    const visible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
+
+    // Cross-cluster (super-cluster / SC) propagation race:
+    if (!visible) {
+      await expect.poll(async () => {
+        await this.page.reload();
+        await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
+        await this.reportSearchInputField.fill(reportName);
+        return await btn.isVisible({ timeout: 2000 }).catch(() => false);
+      }, {
+        intervals: [2000, 3000, 5000, 5000],
+        timeout: 60000,
+      }).toBe(true);
+    }
+
+    await btn.click();
     // Wait for stopped/success toast
     await this.toastSuccess.first().waitFor({ state: 'visible', timeout: 10000 });
     await expect(this.toastSuccess.first()).toBeVisible({ timeout: 5000 });

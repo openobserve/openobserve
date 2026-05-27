@@ -421,8 +421,22 @@ export class DashboardPage {
     await this.dashboardSearchInput.click();
     await this.dashboardSearchInput.fill(this.dashboardName);
 
-    // Check that the dashboard table contains the text 'No data available'
-    await expect(this.dashboardTable).toContainText('No data available');
+    // Happy path: dashboard already deleted from the locally-loaded list.
+    const initialText = await this.dashboardTable.textContent().catch(() => '');
+    const notFound = initialText.includes('No data available');
+    if (!notFound) {
+      await expect.poll(async () => {
+        await this.page.reload();
+        await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.dashboardSearchInput.click();
+        await this.dashboardSearchInput.fill(this.dashboardName);
+        const text = await this.dashboardTable.textContent().catch(() => '');
+        return text.includes('No data available');
+      }, {
+        intervals: [2000, 3000, 5000, 5000],
+        timeout: 60000,
+      }).toBe(true);
+    }
 
     // Click on the toggle for searching across folders
     await this.searchAcrossFoldersToggle.click();
