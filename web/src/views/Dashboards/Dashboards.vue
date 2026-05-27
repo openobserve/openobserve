@@ -719,7 +719,9 @@ export default defineComponent({
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
         //the selected dashboards are not shown
         selectedIds.value = [];
-        loading.value = true;
+        // skip the skeleton for already-cached folders so we don't flash it
+        loading.value =
+          !store.state.organizationData.allDashboardList[activeFolderId.value];
         try {
           const response = await getAllDashboardsByFolderId(
             store,

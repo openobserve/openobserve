@@ -102,10 +102,10 @@ const skeletonRowCount = computed(() => {
 });
 
 // ── Skeleton hold ───────────────────────────────────────────────
-// Show the skeleton for at least 2s once loading starts, so it doesn't
+// Show the skeleton for at least 50ms once loading starts, so it doesn't
 // flash-and-disappear on fast responses. If the server is slow, the
 // skeleton stays visible until data actually arrives.
-const MIN_SKELETON_MS = 2000;
+const MIN_SKELETON_MS = 50;
 const heldLoading = ref(false);
 let loadingStartedAt = 0;
 let releaseTimer: ReturnType<typeof setTimeout> | null = null;
