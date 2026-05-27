@@ -1475,9 +1475,10 @@ export class LogsPage {
 
     // Quick Mode methods (now inside the utilities hamburger menu)
     async verifyQuickModeToggle() {
+        const quickModeToggle = this.page.locator(this.quickModeToggle);
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await quickModeToggle.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(quickModeToggle).toBeVisible();
         await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
@@ -1501,20 +1502,21 @@ export class LogsPage {
 
     // Click on the Quick Mode toggle menu item (wrapper ODropdownItem) - for testing #10821
     async clickQuickModeTextLabel() {
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        // Click the ODropdownItem wrapper that contains the quick-mode toggle
-        await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]').click();
+        await quickModeItem.waitFor({ state: 'visible', timeout: 5000 });
+        // Click immediately — no fixed delay avoids reka-ui focus-outside closing the portal in CI.
+        await quickModeItem.click({ force: true });
         await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     // Get the current quick mode state (true/false)
     async getQuickModeState() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
         // OSwitch inner button carries data-test="logs-search-bar-quick-mode-switch-btn"
         // and data-state="checked|unchecked".
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]');
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await toggleInner.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const state = await toggleInner.getAttribute('data-state').catch(() => null);
         const isOn = state === 'checked';
         await this.page.keyboard.press('Escape').catch(() => {});
@@ -4922,9 +4924,9 @@ export class LogsPage {
     async addIncludeSearchTermFromLogDetails() {
         // Ensure Quick Mode is OFF for include/exclude buttons to work
         // Quick mode is now inside the utilities hamburger menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-switch-btn"]');
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await toggleInner.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const state = await toggleInner.getAttribute('data-state').catch(() => null);
         const isQuickModeOn = state === 'checked';
 
@@ -5313,19 +5315,31 @@ export class LogsPage {
     }
 
     async toggleQueryModeEditor() {
-        // The function/transform editor toggle lives in the utilities ("More") dropdown.
-        // Mirror the clickSQLModeToggle / _openUtilitiesMenuForSqlMode pattern:
-        // check visibility first so we don't close-reopen a dropdown that's already open.
-        const menuItem = this.page.locator(this.menuTransformEditorToggleBtn);
-        const isMenuItemVisible = await menuItem.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isMenuItemVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
-            await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+        // Post-menu-migration: the function/transform editor toggle moved into the
+        // utilities ("More") dropdown as logs-search-bar-menu-transform-editor-toggle-btn.
+        // Open the dropdown if needed, click the toggle item, then close the menu.
+        // Retry loop: in headless CI, reka-ui's focus-outside detection can close the portal
+        // between the open click and the item click. Retry up to 3 times to be resilient.
+        const transformEditorMenuItem = this.page.locator('[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]');
+        let clicked = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const isVisible = await transformEditorMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+            if (!isVisible) {
+                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+                const appeared = await transformEditorMenuItem.waitFor({ state: 'visible', timeout: 5000 })
+                    .then(() => true).catch(() => false);
+                if (!appeared) continue;
+            }
+            // Click immediately — no fixed delay. The waitFor above already confirmed the element
+            // is visible. A fixed delay here allows reka-ui's focus-outside to close the portal
+            // in headless Chromium CI before the click executes.
+            const success = await transformEditorMenuItem.click({ force: true, timeout: 3000 })
+                .then(() => true).catch(() => false);
+            if (success) { clicked = true; break; }
         }
-        // ODropdown portal can transiently detach items during initial render — force: true
-        // bypasses actionability checks, matching the clickSQLModeToggle pattern.
-        await menuItem.click({ force: true });
-        // Close the dropdown (ODropdownItem @select.prevent keeps it open)
+        if (!clicked) throw new Error('toggleQueryModeEditor: could not click transform editor menu item after 3 attempts');
+
+        // @select.prevent keeps the menu open — close it so it doesn't overlap the editor
         await this.page.keyboard.press('Escape');
         // Wait for the VRL function editor container to appear
         await this.page.locator(this.fnEditor).first().waitFor({ state: 'visible', timeout: 15000 });
@@ -7201,16 +7215,11 @@ export class LogsPage {
         if (isToolbarVisible) {
             await toolbarToggle.click();
         } else {
-            // Mirror the clickSQLModeToggle pattern: check visibility first so a
-            // second consecutive call (dropdown still open from first) just clicks.
-            const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-            const isMenuItemVisible = await histogramMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-            if (!isMenuItemVisible) {
-                await this.page.locator(this.utilitiesMenuButton).click();
-                await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-            }
-            // force: true — ODropdown portal transiently detaches items during initial render
-            await histogramMenuItem.click({ force: true });
+            const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+            // Click immediately — no fixed delay avoids reka-ui focus-outside closing the portal in CI.
+            await menuItem.click({ force: true });
         }
         testLogger.info('Histogram toggled');
     }
