@@ -220,10 +220,10 @@ describe("FieldExpansion", () => {
         field: { ...defaultField, isInterestingField: true },
       });
       // The OIcon stub renders data-name on a span inside the OButton stub.
-      // Find all OIcon stubs whose data-name is "info".
+      // Find all OIcon stubs whose data-name is "info-filled".
       const iconSpans = wrapper.findAll(".OIcon-stub");
       const infoIcon = iconSpans.find(
-        (i) => i.attributes("data-name") === "info"
+        (i) => i.attributes("data-name") === "info-filled"
       );
       expect(infoIcon).toBeDefined();
     });

@@ -831,7 +831,13 @@ const fieldWidthClass = computed(() => {
 <template>
   <div
     v-bind="$attrs"
-    :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]"
+    :class="[
+      'tw:flex tw:flex-col tw:gap-1',
+      fieldWidthClass,
+      // Inside-label: grow to fit label text when it is wider than the
+      // natural container width, but don't shrink smaller than the container.
+      labelPosition === 'inside' ? 'tw:min-w-max' : '',
+    ]"
   >
     <!-- Label -->
     <label
@@ -880,7 +886,8 @@ const fieldWidthClass = computed(() => {
             :data-test-selected-label="triggerDisplayLabel"
             :class="[
               'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
-              $slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3',
+              // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
+              labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3'),
               'tw:bg-select-bg',
               hasError
                 ? 'tw:border-select-border-error'
@@ -889,74 +896,80 @@ const fieldWidthClass = computed(() => {
               'tw:focus:outline-none tw:focus:border-select-border-focus',
               'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
-              triggerEndPadding,
               labelPosition === 'inside' && label
                 ? [
-                    'tw:items-end tw:pb-0.5 tw:text-sm',
+                    'tw:flex-col tw:justify-between tw:py-0.5 tw:min-w-max',
                     heightClasses[size ?? 'md'],
                   ]
-                : ['tw:items-center', heightClasses[size ?? 'md']],
+                : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
             ]"
           >
-            <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
+            <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="tw:absolute tw:top-0.5 tw:start-3 tw:text-[0.625rem] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+              class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
               >{{ label }}</span
             >
 
-            <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
-            <span
-              v-if="$slots['icon-left']"
-              class="tw:flex tw:items-center tw:me-1.5 tw:text-select-placeholder tw:shrink-0"
+            <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
+            <div
+              :class="labelPosition === 'inside' && label
+                ? ['tw:flex tw:items-center tw:flex-1 tw:w-full tw:min-w-0', triggerEndPadding, $slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3']
+                : 'tw:contents'"
             >
-              <slot name="icon-left" />
-            </span>
-
-            <slot name="trigger" :value="modelValue">
-              <template v-if="multiple && selectedLabels.length > 0">
-                <div
-                  class="tw:flex-1 tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:overflow-hidden tw:pe-2"
-                >
-                  <slot
-                    v-for="(labelText, idx) in visibleSelectedLabels"
-                    name="chip"
-                    :label="String(labelText ?? '')"
-                    :value="selectedValues[idx]"
-                  >
-                    <span
-                      :key="`${idx}-${String(labelText ?? '')}`"
-                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
-                    >
-                      {{ labelText }}
-                    </span>
-                  </slot>
-                  <span
-                    v-if="overflowSelectedCount > 0"
-                    class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-hover-bg tw:text-select-text tw:shrink-0"
-                    data-test="o-select-overflow-chip"
-                  >
-                    +{{ overflowSelectedCount }} more
-                  </span>
-                </div>
-              </template>
+              <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
               <span
-                v-else
-                :class="[
-                  'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
-                  labelPosition === 'inside' && label
-                    ? 'tw:text-xs tw:leading-4'
-                    : '',
-                  disabled
-                    ? 'tw:text-select-disabled-text'
-                    : hasSelection
-                      ? 'tw:text-select-text'
-                      : 'tw:text-select-placeholder',
-                ]"
+                v-if="$slots['icon-left']"
+                class="tw:flex tw:items-center tw:me-1.5 tw:text-select-placeholder tw:shrink-0"
               >
-                {{ hasSelection ? triggerDisplayLabel : placeholder }}
+                <slot name="icon-left" />
               </span>
-            </slot>
+
+              <slot name="trigger" :value="modelValue">
+                <template v-if="multiple && selectedLabels.length > 0">
+                  <div
+                    class="tw:flex-1 tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:overflow-hidden tw:pe-2"
+                  >
+                    <slot
+                      v-for="(labelText, idx) in visibleSelectedLabels"
+                      name="chip"
+                      :label="String(labelText ?? '')"
+                      :value="selectedValues[idx]"
+                    >
+                      <span
+                        :key="`${idx}-${String(labelText ?? '')}`"
+                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
+                      >
+                        {{ labelText }}
+                      </span>
+                    </slot>
+                    <span
+                      v-if="overflowSelectedCount > 0"
+                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-hover-bg tw:text-select-text tw:shrink-0"
+                      data-test="o-select-overflow-chip"
+                    >
+                      +{{ overflowSelectedCount }} more
+                    </span>
+                  </div>
+                </template>
+                <span
+                  v-else
+                  :class="[
+                    'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+                    labelPosition === 'inside' && label
+                      ? 'tw:text-xs tw:leading-4'
+                      : '',
+                    disabled
+                      ? 'tw:text-select-disabled-text'
+                      : hasSelection
+                        ? 'tw:text-select-text'
+                        : 'tw:text-select-placeholder',
+                  ]"
+                >
+                  {{ hasSelection ? triggerDisplayLabel : placeholder }}
+                </span>
+              </slot>
+            </div>
           </PopoverTrigger>
 
           <!--
@@ -1336,7 +1349,9 @@ const fieldWidthClass = computed(() => {
             parentDataTest ? `${parentDataTest}-trigger` : undefined
           "
           :class="[
-            'tw:relative tw:flex tw:w-full tw:rounded-md tw:border tw:ps-3',
+            'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
+            // In inside-label mode padding is handled per-row
+            labelPosition === 'inside' && label ? '' : 'tw:ps-3',
             'tw:bg-select-bg',
             hasError
               ? 'tw:border-select-border-error'
@@ -1345,38 +1360,44 @@ const fieldWidthClass = computed(() => {
             'tw:focus:outline-none tw:focus:border-select-border-focus',
             'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
-            triggerEndPadding,
             labelPosition === 'inside' && label
               ? [
-                  'tw:items-end tw:pb-0.5 tw:text-sm',
+                  'tw:flex-col tw:justify-between tw:py-0.5 tw:min-w-max',
                   heightClasses[size ?? 'md'],
                 ]
-              : ['tw:items-center', heightClasses[size ?? 'md']],
+              : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
           ]"
         >
-          <!-- Floating inside-label: absolutely pinned to the top of the trigger -->
+          <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="tw:absolute tw:top-0.5 tw:start-3 tw:text-[0.625rem] tw:leading-none tw:text-select-placeholder tw:select-none tw:pointer-events-none"
+            class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
             >{{ label }}</span
           >
 
-          <SelectValue
-            :placeholder="placeholder"
-            :class="[
-              'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
-              labelPosition === 'inside' && label
-                ? 'tw:text-xs tw:leading-4'
-                : '',
-              disabled
-                ? 'tw:text-select-disabled-text'
-                : hasSelection
-                  ? 'tw:text-select-text'
-                  : 'tw:text-select-placeholder',
-            ]"
+          <!-- Content row: flex-row for inside-label; display:contents for normal mode -->
+          <div
+            :class="labelPosition === 'inside' && label
+              ? ['tw:flex tw:items-center tw:flex-1 tw:w-full tw:min-w-0', triggerEndPadding, 'tw:ps-3']
+              : 'tw:contents'"
           >
-            <slot name="trigger" :value="modelValue" />
-          </SelectValue>
+            <SelectValue
+              :placeholder="placeholder"
+              :class="[
+                'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+                labelPosition === 'inside' && label
+                  ? 'tw:text-xs tw:leading-4'
+                  : '',
+                disabled
+                  ? 'tw:text-select-disabled-text'
+                  : hasSelection
+                    ? 'tw:text-select-text'
+                    : 'tw:text-select-placeholder',
+              ]"
+            >
+              <slot name="trigger" :value="modelValue" />
+            </SelectValue>
+          </div>
         </SelectTrigger>
 
         <!-- Trailing icons: clear (left) then chevron (right). See note in

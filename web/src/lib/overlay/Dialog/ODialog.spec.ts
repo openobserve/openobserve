@@ -261,4 +261,26 @@ describe("ODialog", () => {
       expect(wrapper.emitted("click:primary")).toBeTruthy();
     });
   });
+
+  describe("Escape key behaviour", () => {
+    it("emits update:open=false when Escape is pressed (non-persistent)", async () => {
+      const wrapper = mount(ODialog, {
+        props: { open: true, title: "Test" },
+      });
+      const content = wrapper.find("[data-o2-dialog]");
+      await content.trigger("keydown", { key: "Escape" });
+      const emitted = wrapper.emitted("update:open");
+      expect(emitted).toBeTruthy();
+      expect(emitted?.[0]).toEqual([false]);
+    });
+
+    it("does NOT emit update:open when Escape is pressed and persistent=true", async () => {
+      const wrapper = mount(ODialog, {
+        props: { open: true, title: "Test", persistent: true },
+      });
+      const content = wrapper.find("[data-o2-dialog]");
+      await content.trigger("keydown", { key: "Escape" });
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+  });
 });

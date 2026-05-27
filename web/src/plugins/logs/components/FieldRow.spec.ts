@@ -333,7 +333,7 @@ describe("FieldRow", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       const infoIcon = infoIcons.find(
-        (i) => i.attributes("data-name") === "info"
+        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-filled"
       );
       expect(infoIcon).toBeDefined();
     });
@@ -347,7 +347,7 @@ describe("FieldRow", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       const outlineIcon = infoIcons.find(
-        (i) => i.attributes("data-name") === "info-outline"
+        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-outline"
       );
       expect(outlineIcon).toBeDefined();
     });
@@ -497,7 +497,7 @@ describe("FieldRow", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       expect(labelInterestingIcons.length).toBeGreaterThan(0);
-      expect(labelInterestingIcons[0].attributes("data-name")).toBe("info-outline");
+      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe("info-outline");
     });
 
     it("renders interesting icon in label for light theme", () => {
@@ -510,7 +510,7 @@ describe("FieldRow", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       expect(labelInterestingIcons.length).toBeGreaterThan(0);
-      expect(labelInterestingIcons[0].attributes("data-name")).toBe("info-outline");
+      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe("info-outline");
     });
   });
 

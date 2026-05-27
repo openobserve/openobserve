@@ -17,18 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer data-test="event-detail-drawer"
     :open="open"
-    size="lg"
+    size="xl"
     @update:open="emit('update:open', $event)"
   >
     <template #header>
-      <div class="tw:px-2 tw:py-[0.625rem] tw:w-full">
-        <div class="tw:flex tw:items-center tw:flex-nowrap">
-        <div class="tw:flex tw:flex-col">
+      <div class="tw:px-1 tw:py-[0.625rem] tw:w-full">
+        <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full">
+        <div class="tw:flex tw:flex-col tw:w-full">
           <!-- Event Header -->
-          <div>
-            <div class="tw:flex tw:items-center tw:justify-between tw:mb-[0.625rem]">
+          <div class="tw:flex tw:items-center tw:justify-between tw:mb-[0.625rem]">
               <div
-                class="tw:flex tw:items-center tw:w-full tw:max-w-[calc(100%-1.9rem)]"
+                class="tw:flex tw:items-center tw:w-full"
               >
                 <div
                   class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
@@ -49,19 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <div
-                  class="tw:text-sm tw:semi-bold tw:leading-tight tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:max-w-[calc(100%-12rem)]"
+                  class="tw:text-sm tw:semi-bold tw:leading-tight tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap flex-1"
                   :title="event.name"
                 >
                   {{ event.name }}
                 </div>
               </div>
-            </div>
-            <div
+          </div>
+          <div
               data-test="event-session-meta-data"
               class="tw:flex tw:items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
             >
               <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="language" size="xs" class="tw:pr-1" />
+                <OIcon name="language" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.ip }}
               </div>
               <div class="tw:text-xs tw:flex tw:items-center">
@@ -72,22 +71,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 V {{ rawEvent.version || "Unknown User" }}
               </div>
               <div class="tw:text-xs tw:flex tw:items-center">
-                <OIcon name="mail" size="xs" class="tw:pr-1" />
+                <OIcon name="mail" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.user_email || "Unknown User" }}
               </div>
               <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="settings" size="xs" class="tw:pr-1" />
+                <OIcon name="settings" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.browser }}, {{ sessionDetails.os }}
               </div>
               <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="location-on" size="xs" class="tw:pr-1" />
+                <OIcon name="location-on" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.city }}, {{ sessionDetails.country }}
               </div>
               <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="schedule" size="xs" class="tw:pr-1" />
+                <OIcon name="schedule" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.date }}
               </div>
-            </div>
           </div>
         </div>
       </div>
@@ -97,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tabs Navigation -->
     <div class="tw:flex tw:pt-2 tw:px-2">
       <div class="tw:w-full">
-        <OTabs v-model="activeTab" align="left">
+        <OTabs v-model="activeTab" align="left" dense>
           <OTab
             data-test="event-detail-overview-tab"
             name="overview"
@@ -477,8 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             icon-left="content-copy"
             variant="outline"
-            size="sm-action"
-            class="tw:px-2"
+            size="xs"
             data-test="attributes-copy-btn"
             @click="copyAttributesToClipboard"
           >

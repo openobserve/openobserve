@@ -2856,7 +2856,7 @@ export class LogsPage {
     }
 
     async clickDeleteButton() {
-        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{name}-saved-view-btn"
+        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{view_id}-saved-view-btn"
         // Click the first visible delete button in the saved views area
         const deleteBtn = this.page.locator('[data-test*="logs-search-bar-delete-"][data-test*="-saved-view-btn"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
@@ -2938,30 +2938,32 @@ export class LogsPage {
     }
 
     async clickDeleteSavedViewButton(savedViewName) {
-        const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
+        // The caller (clickSavedViewByTitle) closes the dialog. Wait passively for it to
+        // reach hidden state so the re-open sequence doesn't race the close animation.
+        await this.page.locator('[data-test="saved-views-list-dialog"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
 
-        // Close any open saved views dialog from previous operations
-        const backdrop = this.page.locator('[data-test="o-dialog-close-btn"]');
-        const isBackdropVisible = await backdrop.isVisible().catch(() => false);
-        if (isBackdropVisible) {
-            // force: true — ODropdown portal transiently detaches items during initial render
-            await backdrop.click({ force: true });
-            await backdrop.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        }
-
-        // Ensure saved views panel is expanded
+        // Re-open the saved views panel (waits for any ongoing search to settle first).
         await this.clickSavedViewsExpand();
 
-        // Wait for the search input to be visible and ready
-        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'visible', timeout: 5000 });
+        // Use the same robust waiting pattern as clickSavedViewSearchInput():
+        // the saved-views table may still be re-rendering after the previous apply, so
+        // 15 s visibility + 1 s stability buffer + attached check mirror that method.
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+        await searchInput.waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.waitForTimeout(1000);
+        await searchInput.waitFor({ state: 'attached', timeout: 5000 });
+        await searchInput.click({ force: true });
+        await searchInput.fill(savedViewName);
 
-        // Click and fill the search input with better error handling
-        await this.page.locator(this.savedViewSearchInput).click({ force: true });
-        await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
-
-        // Wait for and click the delete button
-        await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(deleteButtonSelector).click({ force: true });
+        // The delete button data-test uses view_id (a UUID), not the view name, so we
+        // can't build the exact selector. Instead scope to the main saved-views table
+        // (not favorites) — after filtering by name there is exactly one visible row.
+        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
+        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click({ force: true });
     }
 
     async clickResetFiltersButton() {
@@ -4997,14 +4999,14 @@ export class LogsPage {
         const allRequests = [];
         
         const requestHandler = (request) => {
-            if (request.url().includes('/_search') && request.method() === 'POST') {
+            if (request.url().includes('/_search_stream') && request.method() === 'POST') {
                 let postData = null;
                 try {
                     postData = request.postData();
                 } catch (e) {
                     postData = 'Unable to read post data';
                 }
-                
+
                 allRequests.push({
                     url: request.url(),
                     postData: postData,
@@ -5026,16 +5028,16 @@ export class LogsPage {
         await this.page.keyboard.type(query);
 
         // Use cmd+enter to run the query — track BOTH the regular search POST and
-        // the histogram POST (size=0) so the verify step has accurate counts.
-        let sawSize0 = false;
-        let sawNonZero = false;
+        // the histogram POST. Histogram calls go to _search_stream with is_ui_histogram=true
+        // in the URL; regular search calls go to _search_stream without that param.
+        let sawHistogram = false;
+        let sawSearch = false;
         const observer = (req) => {
-            if (req.url().includes('/_search') && req.method() === 'POST') {
-                const post = (() => { try { return req.postData(); } catch { return null; } })() || '';
-                if (post.includes('"size":0') || post.includes('"size": 0')) {
-                    sawSize0 = true;
+            if (req.url().includes('/_search_stream') && req.method() === 'POST') {
+                if (req.url().includes('is_ui_histogram=true')) {
+                    sawHistogram = true;
                 } else {
-                    sawNonZero = true;
+                    sawSearch = true;
                 }
             }
         };
@@ -5044,7 +5046,7 @@ export class LogsPage {
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
         try {
             await this.page.waitForFunction(() => true, { timeout: 1 }).catch(() => {});
-            await expect.poll(() => sawSize0 && sawNonZero, { timeout: 15000, intervals: [200] }).toBe(true);
+            await expect.poll(() => sawHistogram && sawSearch, { timeout: 15000, intervals: [200] }).toBe(true);
         } catch {
             // Fall through — verifyAPICallCounts will assert the failure with full context.
         } finally {
@@ -5061,12 +5063,13 @@ export class LogsPage {
         const cutoff = this._queryTriggerTime || (Date.now() - 30000);
         const recentRequests = allRequests.filter(req => req.timestamp >= cutoff);
 
-        // Histogram calls have size: 0, regular search calls have size > 0 (typically 51)
+        // Histogram calls go to _search_stream with is_ui_histogram=true in the URL.
+        // Regular search calls go to _search_stream without that parameter.
         const searchCalls = recentRequests.filter(req =>
-            req.postData && (req.postData.includes('"size":51') || req.postData.includes('"size": 51'))
+            !req.url.includes('is_ui_histogram=true')
         );
         const histogramCalls = recentRequests.filter(req =>
-            req.postData && (req.postData.includes('"size":0') || req.postData.includes('"size": 0'))
+            req.url.includes('is_ui_histogram=true')
         );
 
         // Verify exactly 1 search call and 1 histogram call are made
@@ -7417,7 +7420,9 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickDeleteSavedViewByName(name) {
-        const deleteBtn = this.page.locator(`[data-test*="delete"][data-test*="${name}"]`);
+        // data-test uses view_id (UUID), not name — scope to main table after filtering.
+        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
+        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
         testLogger.info(`Clicked delete for saved view: ${name}`);
