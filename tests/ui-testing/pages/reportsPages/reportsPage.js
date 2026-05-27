@@ -391,13 +391,15 @@ export class ReportsPage {
     const visible = await btn.isVisible().catch(() => false);
 
     // Cross-cluster (super-cluster / SC) propagation race:
-    // Use URL navigation with explicit org_identifier to ensure the correct
-    // organization context (after SC login the default org may differ).
+    // After reload the table mounts immediately (empty) before the reports API call
+    // completes, so we must wait for networkidle before filtering; otherwise
+    // staticReportsList is empty and the button never appears.
     if (!visible) {
       const origin = new URL(this.page.url()).origin;
       const reportsUrl = `${origin}/web/reports?org_identifier=${process.env["ORGNAME"]}`;
       await expect.poll(async () => {
-        await this.page.goto(reportsUrl, { waitUntil: 'domcontentloaded' });
+        await this.page.reload();
+        await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
         await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForFunction(() => {
           const t = document.querySelector('[data-test="report-list-table"]');
@@ -406,10 +408,10 @@ export class ReportsPage {
           return /Showing \d+ - \d+/.test(text) || text.includes('No data available');
         }, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
-        return await btn.isVisible().catch(() => false);
+        return await btn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
       }, {
-        intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
-        timeout: 180000,
+        intervals: [3000, 5000, 5000, 10000, 10000, 15000],
+        timeout: 120000,
       }).toBe(true);
     }
 
