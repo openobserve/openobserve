@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <OSplitter
-        class="tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]"
+        class="tw:h-[calc(100%-8.125rem)]"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="tw:pr-[0.625rem] tw:h-full">
+          <div class="tw:h-full">
             <div class="card-container tw:h-full">
                 <OTable
                   :data="tableRows"
