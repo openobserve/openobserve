@@ -70,7 +70,6 @@ use crate::service::{
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         match_file,
-        sql::histogram::histogram_bucket_start,
     },
 };
 
@@ -197,30 +196,13 @@ pub async fn search(
     let index_condition = { index_condition_ref.lock().clone() };
     let idx_optimize_rule = { index_optimizer_rule_ref.lock().clone() };
 
-    // date_bin() always assigns records to the LEFT boundary of their bucket —
-    // e.g. a record at 08:10:17 with a 30s interval gets key 08:10:00.
-    // The scan filter previously used the raw start_time (08:10:10), so records
-    // in [08:10:00, 08:10:10) were excluded, but date_bin still labeled the
-    // surviving records with the pre-start-time key 08:10:00. Result: first
-    // bucket existed but only held a fraction of a full interval → false drop.
-    //
-    // Fix: snap start_time DOWN to the bucket boundary so the scan includes all
-    // records for that bucket, making the first bar complete.
-    // Non-histogram queries (histogram_interval == 0) are unaffected.
-    let effective_start_time = if req.search_info.histogram_interval > 0 {
-        let interval_us = req.search_info.histogram_interval * 1_000_000;
-        histogram_bucket_start(req.search_info.start_time, interval_us)
-    } else {
-        req.search_info.start_time
-    };
-
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
         stream: stream.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
-        time_range: (effective_start_time, req.search_info.end_time),
+        time_range: (req.search_info.start_time, req.search_info.end_time),
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
             && cfg.common.inverted_index_enabled
