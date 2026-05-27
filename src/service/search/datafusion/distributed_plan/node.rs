@@ -23,6 +23,8 @@ use datafusion::common::TableReference;
 use hashbrown::HashMap;
 use proto::cluster_rpc::{IndexInfo, KvItem, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
+use crate::service::search::sql::histogram::histogram_bucket_start;
+
 #[derive(Debug, Clone)]
 pub struct RemoteScanNodes {
     pub req: Request,
@@ -73,7 +75,14 @@ impl RemoteScanNodes {
                 .get(table_name)
                 .unwrap_or(&vec![])
                 .clone(),
-            start_time: self.req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
+            start_time: {
+                let t = self.req.time_range.as_ref().map(|x| x.0).unwrap_or(0);
+                if self.req.histogram_interval > 0 {
+                    histogram_bucket_start(t, self.req.histogram_interval * 1_000_000)
+                } else {
+                    t
+                }
+            },
             end_time: self.req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
             timeout: self.req.timeout as u64,
             use_cache: self.req.use_cache,
