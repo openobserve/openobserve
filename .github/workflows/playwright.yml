@@ -896,7 +896,7 @@ jobs:
             echo "::notice::Using cache ID: $CACHE_ID"
 
             # Suppress verbose debug output from TestDino, only show result
-            if CACHE_OUTPUT=$(npx tdpw cache --cache-id "$CACHE_ID" 2>&1); then
+            if CACHE_OUTPUT=$(npx --yes tdpw cache --cache-id "$CACHE_ID" 2>&1); then
               # Extract only the success message, filter out debug spam
               SUCCESS_MSG=$(echo "$CACHE_OUTPUT" | grep "Cache data submitted successfully" || echo "")
               if [ -n "$SUCCESS_MSG" ]; then
@@ -935,8 +935,28 @@ jobs:
             mv playwright-results/report.json.tmp playwright-results/report.json
           fi
 
+          # Filter report to only include failed tests for TestDino upload
+          node -e "
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('playwright-results/report.json', 'utf8'));
+          function filterSuite(s) {
+            const specs = (s.specs||[]).filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'));
+            const suites = (s.suites||[]).map(filterSuite).filter(sub=>(sub.specs&&sub.specs.length)||(sub.suites&&sub.suites.length));
+            return {...s,specs,suites};
+          }
+          const filtered = {
+            ...report,
+            suites: report.suites.map(filterSuite).filter(s=>(s.specs&&s.specs.length)||(s.suites&&s.suites.length)),
+            stats: {...report.stats,expected:0,flaky:0,skipped:0}
+          };
+          fs.writeFileSync('playwright-results/report-failures-only.json',JSON.stringify(filtered));
+          const total=(report.stats.expected||0)+(report.stats.unexpected||0)+(report.stats.skipped||0)+(report.stats.flaky||0);
+          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino');
+          "
+          echo "::notice::Report filtered to failures only"
+
           npx --yes tdpw@latest upload playwright-results \
-            --json-report playwright-results/report.json \
+            --json-report playwright-results/report-failures-only.json \
             --html-report playwright-results/html-report \
             --upload-html \
             --verbose \
