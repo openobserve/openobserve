@@ -37,8 +37,11 @@ use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use bytes::Bytes;
-use config::utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use config::{
+    TIMESTAMP_COL_NAME,
+    utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
+};
+use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
 use tantivy::directory::MmapDirectory;
 use tokio::task::JoinHandle;
 
@@ -175,7 +178,25 @@ fn build_row_group_segment<D: tantivy::Directory>(
     dir: D,
 ) -> Result<(usize, tantivy::Index, usize), Error> {
     let builder = ParquetRecordBatchReaderBuilder::try_new(buf)?;
-    let reader = builder.with_row_groups(vec![rg_idx]).build()?;
+
+    let arrow_schema = builder.schema();
+    let projection_indices: Vec<usize> = arrow_schema
+        .fields()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, f)| {
+            (f.name() == TIMESTAMP_COL_NAME || index_schema.fields.contains(f.name())).then_some(i)
+        })
+        .collect();
+    let projection_mask = ProjectionMask::roots(
+        builder.metadata().file_metadata().schema_descr(),
+        projection_indices,
+    );
+
+    let reader = builder
+        .with_projection(projection_mask)
+        .with_row_groups(vec![rg_idx])
+        .build()?;
 
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
