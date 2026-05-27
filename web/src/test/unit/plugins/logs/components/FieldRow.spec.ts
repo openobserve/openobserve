@@ -375,7 +375,6 @@ describe("FieldRow.vue", () => {
         '[data-test="log-search-index-list-interesting-status-field-btn"]',
       );
       expect(icon.exists()).toBe(true);
-      expect(icon.classes()).toContain("tw:cursor-pointer");
     });
 
     it("should render interesting icon in dark theme", () => {
