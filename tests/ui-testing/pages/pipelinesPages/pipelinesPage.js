@@ -3631,33 +3631,30 @@ export class PipelinesPage {
      */
     async getStatusCounts() {
         // Each status badge stamps `data-test-status="<status>"` (lowercased).
-        // Covers all statuses mapped by PipelineHistory.vue getStatusVariant():
-        //   success-outline  → success | ok | completed
-        //   error-outline    → error | failed
-        //   warning-outline  → warning
-        //   primary-outline  → pending | running
-        //   default-outline  → anything else (cancelled, skipped, …)
+        // Backend TriggerDataStatus enum (usage.rs) defines exactly four values:
+        //   completed | failed | condition_not_satisfied | skipped
+        // getStatusVariant() in PipelineHistory.vue maps them to badge variants.
         const successCount = await this.page.locator(
-            '[data-test="pipeline-history-status-badge"][data-test-status="success"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="completed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="success"], ' +
             '[data-test="pipeline-history-status-badge"][data-test-status="ok"]'
         ).count();
         const errorCount = await this.page.locator(
-            '[data-test="pipeline-history-status-badge"][data-test-status="error"], ' +
-            '[data-test="pipeline-history-status-badge"][data-test-status="failed"]'
+            '[data-test="pipeline-history-status-badge"][data-test-status="failed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="error"]'
         ).count();
         const warningCount = await this.page.locator(
             '[data-test="pipeline-history-status-badge"][data-test-status="warning"]'
         ).count();
-        const pendingCount = await this.page.locator(
-            '[data-test="pipeline-history-status-badge"][data-test-status="pending"], ' +
-            '[data-test="pipeline-history-status-badge"][data-test-status="running"]'
+        const skippedCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="condition_not_satisfied"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="skipped"]'
         ).count();
         return {
             success: successCount,
             error: errorCount,
             warning: warningCount,
-            pending: pendingCount,
+            skipped: skippedCount,
         };
     }
 

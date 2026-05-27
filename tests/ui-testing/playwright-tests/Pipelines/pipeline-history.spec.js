@@ -271,9 +271,9 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
 
       // Get status counts using POM method — include all recognized status families
       const statusCounts = await pageManager.pipelinesPage.getStatusCounts();
-      const totalRecognized = statusCounts.success + statusCounts.error + statusCounts.warning + (statusCounts.pending ?? 0);
+      const totalRecognized = statusCounts.success + statusCounts.error + statusCounts.warning + (statusCounts.skipped ?? 0);
       expect(totalRecognized).toBeGreaterThan(0);
-      testLogger.info(`Status counts - Success: ${statusCounts.success}, Error: ${statusCounts.error}, Warning: ${statusCounts.warning}, Pending: ${statusCounts.pending}`);
+      testLogger.info(`Status counts - Success: ${statusCounts.success}, Error: ${statusCounts.error}, Warning: ${statusCounts.warning}, Skipped: ${statusCounts.skipped}`);
     } else {
       testLogger.info('No status elements found - history may be empty');
     }

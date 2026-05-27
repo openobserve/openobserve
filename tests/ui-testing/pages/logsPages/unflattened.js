@@ -174,13 +174,10 @@ class UnflattenedPage {
         await this.page
             .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
             .waitFor({ state: 'visible', timeout: 10000 });
-        // JSON content renders asynchronously after the drawer opens. Wait for
-        // at least one field key to appear before the caller probes specific fields.
-        await this.page
-            .locator('[data-test="log-detail-json-content"] [data-test^="log-expand-detail-key-"]')
-            .first()
-            .waitFor({ state: 'visible', timeout: 10000 })
-            .catch(() => {});
+        // JSON content renders asynchronously after the drawer opens.
+        // Hard wait gives Vue time to populate the field list before callers
+        // probe for specific keys like _o2_id.
+        await this.page.waitForTimeout(3000);
     }
 
     /**
