@@ -123,13 +123,13 @@ fn bloom_prefetch_concurrency() -> usize {
 ///
 /// `trace_id` is threaded through purely for logging.
 pub async fn prune(
-    files: Vec<FileKey>,
-    index_condition: &IndexCondition,
-    bloom_indexed_fields: &HashSet<String>,
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    files: Vec<FileKey>,
+    index_condition: &IndexCondition,
+    bloom_indexed_fields: &Vec<String>,
 ) -> Vec<FileKey> {
     let predicates = collect_decidable(index_condition, bloom_indexed_fields);
     if predicates.is_empty() {

@@ -73,10 +73,10 @@ pub async fn build_for_bucket(
     stream_type: StreamType,
     stream_name: &str,
     date_key: &str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<(bool)> {
     let cfg = get_config();
     if !cfg.common.bloom_filter_enabled {
-        return Ok(());
+        return Ok(false);
     }
 
     // Resolve target fields from current stream settings: a field is bloomed
@@ -86,7 +86,7 @@ pub async fn build_for_bucket(
     let bloom_filter_fields =
         infra::schema::get_stream_setting_bloom_filter_fields(&stream_settings);
     if bloom_filter_fields.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
     let index_fields: HashSet<String> =
         infra::schema::get_stream_setting_index_fields(&stream_settings)
@@ -97,7 +97,7 @@ pub async fn build_for_bucket(
         .filter(|f| index_fields.contains(f))
         .collect();
     if target_fields.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
 
     // Pull every file currently in this hour bucket.
@@ -106,7 +106,7 @@ pub async fn build_for_bucket(
         .await
         .context("query_for_merge for bloom build")?;
     if files.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
 
     // Trigger: rebuild only when **at least one file has bloom_ver=0**
@@ -126,7 +126,7 @@ pub async fn build_for_bucket(
             "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: every file already has a bloom_ver, skipping ({} files)",
             files.len()
         );
-        return Ok(());
+        return Ok(false);
     }
 
     // Build blooms only for files without a `.bf` yet (bloom_ver = 0).
@@ -148,7 +148,7 @@ pub async fn build_for_bucket(
 
     let mut new_files: Vec<&FileKey> = files.iter().filter(|f| f.meta.bloom_ver == 0).collect();
     if new_files.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
     new_files.sort_by(|a, b| b.meta.records.cmp(&a.meta.records));
 
@@ -220,14 +220,6 @@ pub async fn build_for_bucket(
             continue;
         }
 
-        // Observe the build time for the whole chunk (serialize + put +
-        // update_bloom_ver) once it has fully succeeded.
-        config::metrics::BLOOM_FILE_BUILD_SECONDS
-            .with_label_values(&[org_id, stream_type.as_str()])
-            .observe(chunk_start.elapsed().as_secs_f64());
-        config::metrics::BLOOM_FILE_BUILT_TOTAL
-            .with_label_values(&[org_id, stream_type.as_str()])
-            .inc();
         wrote_any = true;
         log::debug!(
             "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {bf_path} (chunk {}/{chunk_total}, num_blocks={num_blocks}) covering {} file(s)",
@@ -243,7 +235,7 @@ pub async fn build_for_bucket(
         );
     }
 
-    Ok(())
+    Ok(true)
 }
 
 /// Retire any `.bf` whose `bloom_ver` is no longer referenced by a live file

@@ -588,41 +588,6 @@ pub static BLOOM_PRUNE_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Counts every .bf file uploaded by the compactor.
-pub static BLOOM_FILE_BUILT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "bloom_file_built_total",
-            "Number of bloom filter (.bf) files built by the compactor.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
-    )
-    .expect("Metric created")
-});
-
-// Time to build one `.bf` chunk (serialize + upload + update_bloom_ver).
-// Observed once per chunk written by the compactor. p99 should stay in
-// the low seconds; a long tail means chunks are too large or tantivy
-// read amplification is high.
-pub static BLOOM_FILE_BUILD_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "bloom_file_build_seconds",
-            "Time to build one .bf chunk (serialize + upload + update_bloom_ver).".to_owned()
-                + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .buckets(vec![
-            0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0,
-        ])
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
-    )
-    .expect("Metric created")
-});
-
 // Counts file_list rows archived into a dump parquet, split by whether
 // `bloom_ver` was still 0 at dump time. A non-zero count on the
 // `bloom_ver_zero="true"` line means data was frozen at zero — those
@@ -2009,12 +1974,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(BLOOM_PRUNE_DURATION.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(BLOOM_FILE_BUILT_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(BLOOM_FILE_BUILD_SECONDS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(BLOOM_DUMPED_FILES_TOTAL.clone()))
