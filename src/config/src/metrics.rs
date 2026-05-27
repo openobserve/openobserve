@@ -588,25 +588,6 @@ pub static BLOOM_PRUNE_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Counts file_list rows archived into a dump parquet, split by whether
-// `bloom_ver` was still 0 at dump time. A non-zero count on the
-// `bloom_ver_zero="true"` line means data was frozen at zero — those
-// rows can no longer be reached by the live build path and need the
-// backfill CLI to recover bloom coverage.
-pub static BLOOM_DUMPED_FILES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "bloom_dumped_files_total",
-            "Number of file_list rows archived to dump parquet, by bloom_ver=0 vs not.".to_owned()
-                + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type", "bloom_ver_zero"],
-    )
-    .expect("Metric created")
-});
-
 // compactor stats
 pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
@@ -1974,9 +1955,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(BLOOM_PRUNE_DURATION.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(BLOOM_DUMPED_FILES_TOTAL.clone()))
         .expect("Metric registered");
 
     // stream stats aggregation metrics

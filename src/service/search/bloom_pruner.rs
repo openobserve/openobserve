@@ -74,7 +74,7 @@ struct Predicate {
 /// — passing an unrelated field would just waste IO on guaranteed misses.
 fn collect_decidable(
     cond: &IndexCondition,
-    bloom_indexed_fields: &HashSet<String>,
+    bloom_indexed_fields: &HashSet<&String>,
 ) -> Vec<Predicate> {
     let mut out: Vec<Predicate> = Vec::new();
     for c in &cond.conditions {
@@ -131,7 +131,8 @@ pub async fn prune(
     index_condition: &IndexCondition,
     bloom_indexed_fields: &Vec<String>,
 ) -> Vec<FileKey> {
-    let predicates = collect_decidable(index_condition, bloom_indexed_fields);
+    let bloom_indexed_fields = bloom_indexed_fields.iter().collect::<HashSet<_>>();
+    let predicates = collect_decidable(index_condition, &bloom_indexed_fields);
     if predicates.is_empty() {
         return files;
     }
