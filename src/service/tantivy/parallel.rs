@@ -214,6 +214,7 @@ mod tests {
         record_batch::RecordBatch,
     };
     use config::{FileFormat, TIMESTAMP_COL_NAME};
+    use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
     use tantivy::directory::RamDirectory;
 
     use super::*;
@@ -245,39 +246,27 @@ mod tests {
         .unwrap()
     }
 
-    /// Writes a parquet file with explicit row_group boundaries. Each inner
-    /// `Vec<RecordBatch>` is concatenated into exactly one row_group via
-    /// `writer.flush()` between groups. Used to exercise the multi-row_group
-    /// parallel path deterministically without writing 100k+ rows.
-    async fn create_test_parquet_bytes_multi_rg(groups: Vec<Vec<RecordBatch>>) -> bytes::Bytes {
-        let schema = groups[0][0].schema();
+    /// Writes batches to an in-memory parquet file with a caller-specified
+    /// fixed row_group row count. We deliberately bypass
+    /// `config::utils::parquet::new_parquet_writer` because it hard-codes the
+    /// row_group cap to `PARQUET_MAX_ROW_GROUP_SIZE` (128k). The parallel
+    /// builder's `doc_id == i * row_group_size + k` invariant only holds when
+    /// every non-tail row_group has the same row count, so the test needs to
+    /// drive that exact splitting boundary at a size small enough to keep the
+    /// test fast.
+    async fn create_test_parquet_bytes_fixed_rg(
+        batches: Vec<RecordBatch>,
+        row_group_row_count: usize,
+    ) -> bytes::Bytes {
+        let schema = batches[0].schema();
         let mut buffer = Vec::new();
-        let file_meta = config::meta::stream::FileMeta {
-            min_ts: 1000,
-            max_ts: 2000,
-            records: groups.iter().flatten().map(|b| b.num_rows()).sum::<usize>() as i64,
-            original_size: 1000,
-            ..Default::default()
-        };
-        let mut writer = config::utils::parquet::new_parquet_writer(
-            &mut buffer,
-            &schema,
-            &[],
-            &file_meta,
-            false,
-            None,
-        );
-        let num_groups = groups.len();
-        for (i, batches) in groups.into_iter().enumerate() {
-            for batch in batches {
-                writer.write(&batch).await.unwrap();
-            }
-            // flush() closes the in-progress row_group, forcing the next
-            // batch to start a new one. Skip after the last group; close()
-            // handles the tail.
-            if i + 1 < num_groups {
-                writer.flush().await.unwrap();
-            }
+        let writer_props = WriterProperties::builder()
+            .set_max_row_group_row_count(Some(row_group_row_count))
+            .build();
+        let mut writer =
+            AsyncArrowWriter::try_new(&mut buffer, schema, Some(writer_props)).unwrap();
+        for batch in batches {
+            writer.write(&batch).await.unwrap();
         }
         writer.close().await.unwrap();
         bytes::Bytes::from(buffer)
@@ -288,16 +277,19 @@ mod tests {
     /// `doc_id` must equal its original global row index after merge.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_row_group_parallel_preserves_row_order() {
-        // 4 row_groups of varied sizes, total 2137 rows. The middle row_groups
-        // have multiple batches each to exercise the per-row_group batch loop.
-        let rg0 = vec![create_marker_batch(0, 500)];
-        let rg1 = vec![create_marker_batch(500, 300), create_marker_batch(800, 200)];
-        let rg2 = vec![create_marker_batch(1000, 1000)];
-        let rg3 = vec![create_marker_batch(2000, 137)]; // partial tail
-        let total_rows = 500 + 500 + 1000 + 137;
-        let buf = create_test_parquet_bytes_multi_rg(vec![rg0, rg1, rg2, rg3]).await;
+        // Fixed row_group size of 500 + 2137 total rows ⇒ 5 row_groups of
+        // exactly 500 rows and a 137-row partial tail. This matches the
+        // production layout where every non-tail row_group has the same size.
+        let row_group_size = 500usize;
+        let total_rows = 2137usize;
+        let buf = create_test_parquet_bytes_fixed_rg(
+            vec![create_marker_batch(0, total_rows)],
+            row_group_size,
+        )
+        .await;
 
-        // Verify the parquet really has 4 row_groups (test the test).
+        // Verify the parquet split into the expected fixed-size row_groups.
+        let expected_num_rg = total_rows.div_ceil(row_group_size);
         let metadata_num_rg = {
             let buf = buf.clone();
             tokio::task::spawn_blocking(move || {
@@ -309,7 +301,10 @@ mod tests {
             .await
             .unwrap()
         };
-        assert_eq!(metadata_num_rg, 4, "test setup must yield 4 row_groups");
+        assert_eq!(
+            metadata_num_rg, expected_num_rg,
+            "test setup must yield {expected_num_rg} fixed-size row_groups"
+        );
 
         let stream_schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
@@ -364,9 +359,11 @@ mod tests {
     /// `doc_id == row_index` is preserved.
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_row_group_parallel_single_row_group_fast_path() {
-        let rg0 = vec![create_marker_batch(0, 321)];
-        let total_rows = 321;
-        let buf = create_test_parquet_bytes_multi_rg(vec![rg0]).await;
+        // 321 rows with a 500-row max row_group ⇒ exactly 1 row_group, so the
+        // builder takes the single-row_group fast path.
+        let total_rows = 321usize;
+        let buf =
+            create_test_parquet_bytes_fixed_rg(vec![create_marker_batch(0, total_rows)], 500).await;
 
         let stream_schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
@@ -411,13 +408,10 @@ mod tests {
     /// behavioural equivalence end-to-end.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_row_group_parallel_matches_sequential() {
-        let rg0 = vec![create_marker_batch(0, 250)];
-        let rg1 = vec![create_marker_batch(250, 250)];
-        let rg2 = vec![create_marker_batch(500, 250)];
-        let total = 750;
-
+        // 750 rows, fixed row_group size 250 ⇒ 3 full row_groups of 250 each.
+        let total = 750usize;
         let buf_par =
-            create_test_parquet_bytes_multi_rg(vec![rg0.clone(), rg1.clone(), rg2.clone()]).await;
+            create_test_parquet_bytes_fixed_rg(vec![create_marker_batch(0, total)], 250).await;
         let buf_seq = create_test_parquet_bytes(vec![
             create_marker_batch(0, 250),
             create_marker_batch(250, 250),
