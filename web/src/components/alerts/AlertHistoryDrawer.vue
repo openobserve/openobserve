@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content -->
-    <div class="tw:flex tw:flex-col tw:h-[calc(100vh-3.5rem)]" v-if="alertDetails">
+    <div class="tw:flex tw:flex-col tw:h-[calc(100vh-4rem)]" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
