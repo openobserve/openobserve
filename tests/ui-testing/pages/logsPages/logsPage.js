@@ -96,8 +96,9 @@ export class LogsPage {
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input-field"]';
-        // ConfirmDialog migrated to ODialog — primary button is now scoped inside the dialog panel
-        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        // Matches both ConfirmDialog.vue (data-test="confirm-dialog") and SearchBar's inline
+        // ODialog (data-test="search-bar-confirm-dialog") via substring selector.
+        this.confirmButton = '[data-test*="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
@@ -2865,7 +2866,7 @@ export class LogsPage {
 
     async clickConfirmButton() {
         const btn = this.page.locator(this.confirmButton);
-        await btn.waitFor({ state: 'visible', timeout: 5000 });
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
         // force: true — dialog portal can transiently detach during initial render
         return await btn.click({ force: true });
     }
@@ -2956,6 +2957,8 @@ export class LogsPage {
         await searchInput.waitFor({ state: 'attached', timeout: 5000 });
         await searchInput.click({ force: true });
         await searchInput.fill(savedViewName);
+        // Allow OInput debounce (300 ms) to apply the filter before looking for the row.
+        await this.page.waitForTimeout(1000);
 
         // The delete button data-test uses view_id (a UUID), not the view name, so we
         // can't build the exact selector. Instead scope to the main saved-views table
@@ -2963,7 +2966,10 @@ export class LogsPage {
         const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
         const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await deleteBtn.click({ force: true });
+        await deleteBtn.scrollIntoViewIfNeeded();
+        await deleteBtn.click();
+        // Allow Vue to process the confirmDelete state change before returning.
+        await this.page.waitForTimeout(500);
     }
 
     async clickResetFiltersButton() {

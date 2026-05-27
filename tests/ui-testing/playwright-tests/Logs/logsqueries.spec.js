@@ -121,9 +121,14 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.fillSearchStreamInput('e2e');
     // Wait for explore button to be visible (DOM-stable signal that filter applied)
     await pm.logsPage.expectExploreButtonVisible();
+    // Allow filtered results to fully settle before clicking (avoids stale-element click)
+    await page.waitForTimeout(2000);
     await pm.logsPage.clickExploreButton();
-    // Wait for navigation to stream explorer / logs page
-    await page.waitForLoadState('domcontentloaded');
+    // Wait for SPA navigation to complete — domcontentloaded does not re-fire
+    // on client-side route changes, so wait for the URL to settle on the logs
+    // route and then for the refresh button (reliable "logs page ready" signal).
+    await page.waitForURL(/\/logs(\?|$)/, { timeout: 30000 });
+    await pm.logsPage.expectRefreshButtonVisible();
     await pm.logsPage.waitForSavedViewsButton();
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
