@@ -747,6 +747,13 @@ export default defineComponent({
     );
 
     watch(searchQuery, async (newQuery) => {
+      if (newQuery) {
+        loading.value = true;
+      } else {
+        // Query cleared — reset state and stop the skeleton.
+        filteredResults.value = [];
+        loading.value = false;
+      }
       await debouncedSearch(newQuery);
       if (searchQuery.value == "") {
         filteredResults.value = [];
@@ -761,8 +768,7 @@ export default defineComponent({
           filterQuery.value = "";
         }
         if (searchQuery.value) {
-          // const searchResults = await fetchSearchResults.execute(searchQuery.value);
-          // filteredResults.value = toRaw(searchResults);
+          loading.value = true;
           try {
             // Cancel any in-flight search
             if (currentSearchAbortController) {
@@ -778,6 +784,8 @@ export default defineComponent({
               filteredResults.value = [];
               // Handle error state
             }
+          } finally {
+            loading.value = false;
           }
         } else {
           // If no search query, clear filtered results
@@ -1127,13 +1135,13 @@ export default defineComponent({
 
     const debouncedSearch = debounce(async (query) => {
       if (!query) return;
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while searching for dashboards...",
-      });
-      const results = await fetchSearchResults.execute(query);
-      dismiss();
-      filteredResults.value = toRaw(results);
+      loading.value = true;
+      try {
+        const results = await fetchSearchResults.execute(query);
+        filteredResults.value = toRaw(results);
+      } finally {
+        loading.value = false;
+      }
     }, 600);
 
     const activeFolderToMove = computed(() => {
