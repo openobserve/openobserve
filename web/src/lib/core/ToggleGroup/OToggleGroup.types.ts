@@ -31,6 +31,10 @@ export interface ToggleGroupProps {
   orientation?: ToggleGroupOrientation;
   /** Visual variant — use 'primary' when the toggle sits on a primary-colored bar */
   variant?: ToggleGroupVariant;
+  /** Label text rendered next to the toggle bar. For richer content use the `label` slot. */
+  label?: string;
+  /** Position of the label relative to the toggle bar */
+  labelPosition?: "left" | "right" | "top";
 }
 
 export interface ToggleGroupEmits {
@@ -40,4 +44,6 @@ export interface ToggleGroupEmits {
 export interface ToggleGroupSlots {
   /** One or more OToggleGroupItem children */
   default?: () => unknown;
+  /** Custom label content (overrides the `label` prop) */
+  label?: () => unknown;
 }

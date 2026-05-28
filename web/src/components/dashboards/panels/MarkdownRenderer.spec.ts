@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 
 // Mock external dependencies
@@ -63,6 +62,7 @@ vi.mock("marked", () => ({
   }),
 }));
 
+
 describe("MarkdownRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -70,7 +70,7 @@ describe("MarkdownRenderer", () => {
     return mount(MarkdownRenderer, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };
@@ -281,7 +281,7 @@ describe("MarkdownRenderer", () => {
       // Create wrapper with dark theme store from the start
       wrapper = mount(MarkdownRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -307,7 +307,7 @@ describe("MarkdownRenderer", () => {
       
       wrapper = mount(MarkdownRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -326,7 +326,7 @@ describe("MarkdownRenderer", () => {
           markdownContent: "# Initial content"
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -422,7 +422,7 @@ describe("MarkdownRenderer", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="markdown-renderer-scroll-container"]');
       expect(container.exists()).toBe(true);
       expect(container.attributes('style')).toContain('width: 100%');
       expect(container.attributes('style')).toContain('height: 100%');
@@ -444,7 +444,7 @@ describe("MarkdownRenderer", () => {
       
       wrapper = createWrapper({ markdownContent: longContent });
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="markdown-renderer-scroll-container"]');
       expect(container.attributes('style')).toContain('overflow: auto');
     });
   });

@@ -1,10 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import i18n from "@/locales";
 
-installQuasar();
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `/mocked/${path}`)
@@ -17,12 +15,6 @@ describe("NoOrganizationSelected", () => {
     wrapper = mount(NoOrganizationSelected, {
       global: {
         plugins: [i18n],
-        stubs: {
-          'q-img': {
-            template: '<div class="q-img" :src="src"><slot /></div>',
-            props: ['src']
-          }
-        }
       },
     });
   });
@@ -38,7 +30,7 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should display the organization selection image", () => {
-    const image = wrapper.find('.q-img');
+    const image = wrapper.find('[data-test="no-organization-selected-image"]');
     expect(image.exists()).toBe(true);
     expect(image.attributes('src')).toBe('/mocked/images/common/selectOrganization.svg');
   });
@@ -65,10 +57,11 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should have correct CSS classes", () => {
-    expect(wrapper.classes()).toContain('full-width');
-    expect(wrapper.classes()).toContain('column');
+    expect(wrapper.classes()).toContain('tw:w-full');
+    expect(wrapper.classes()).toContain('tw:flex');
+    expect(wrapper.classes()).toContain('tw:flex-col');
     expect(wrapper.classes()).toContain('flex-center');
-    expect(wrapper.classes()).toContain('q-gutter-sm');
+    expect(wrapper.classes()).toContain('tw:gap-2');
   });
 
   it("should have correct font size styling", () => {

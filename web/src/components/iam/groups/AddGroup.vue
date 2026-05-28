@@ -14,85 +14,65 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-card class="o2-side-dialog column full-height">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div data-test="add-group-section-title" style="font-size: 18px">
-            {{ t("iam.addGroup") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-group-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="emits('cancel:hideform')"
-          />
-        </div>
-      </div>
+  <ODrawer data-test="add-group-dialog"
+    :open="open"
+    :width="30"
+    :title="t('iam.addGroup')"
+    @update:open="emits('update:open', $event)"
+  >
+    <div data-test="add-group-section" class="tw:p-4">
+      <OInput
+        v-model.trim="name"
+        :label="t('common.name') + ' *'"
+        class="showLabelOnTop tw:mt-2"
+        maxlength="100"
+        data-test="add-group-groupname-input-btn"
+        :error="showNameError"
+        :error-message="nameErrorMessage"
+        :help-text="!showNameError ? `Use alphanumeric and '_' characters only, without spaces.` : undefined"
+        @update:model-value="showNameError = !!name && !isValidGroupName"
+      />
 
-      <q-separator />
-      <div data-test="add-group-section">
-        <q-input
-          v-model.trim="name"
-          :label="t('common.name') + ' *'"
-          class="showLabelOnTop tw:mt-2"
-          stack-label
-          hide-bottom-space
-          borderless
-          dense
-          :rules="[
-            (val: any, rules: any) =>
-              !!val
-                ? isValidGroupName ||
-                  `Use alphanumeric and '_' characters only, without spaces.`
-                : t('common.nameRequired'),
-          ]"
-          maxlength="100"
-          data-test="add-group-groupname-input-btn"
+      <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="emits('update:open', false)"
+          data-test="add-group-cancel-btn"
         >
-          <template v-slot:hint>
-            Use alphanumeric and '_' characters only, without spaces.
-          </template>
-        </q-input>
-
-        <div class="flex justify-start tw:mt-6 tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="$emit('cancel:hideform')"
-            data-test="add-group-cancel-btn"
-          >
-            {{ t('alerts.cancel') }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!name || !isValidGroupName"
-            @click="saveGroup"
-            data-test="add-group-submit-btn"
-          >
-            {{ t('alerts.save') }}
-          </OButton>
-        </div>
+          {{ t('alerts.cancel') }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="!name || !isValidGroupName"
+          @click="saveGroup"
+          data-test="add-group-submit-btn"
+        >
+          {{ t('alerts.save') }}
+        </OButton>
       </div>
-    </q-card-section>
-  </q-card>
+    </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { createGroup } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useQuasar } from "quasar";
-import { ref, computed } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   group: {
     type: Object,
     default: () => null,
@@ -103,11 +83,10 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["cancel:hideform", "added:group"]);
+const emits = defineEmits(["update:open", "added:group"]);
 
 const name = ref(props.group?.name || "");
 
-const q = useQuasar();
 
 const { track } = useReo();
 
@@ -115,30 +94,42 @@ const store = useStore();
 
 const isValidGroupName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9_]+$/;
-  // Check if the role name is valid
   return roleNameRegex.test(name.value);
 });
+
+const showNameError = ref(false);
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      name.value = props.group?.name || "";
+      showNameError.value = false;
+    }
+  }
+);
+const nameErrorMessage = computed(() =>
+  !name.value ? t('common.nameRequired') : `Use alphanumeric and '_' characters only, without spaces.`
+);
 
 const saveGroup = () => {
   if (!name.value || !isValidGroupName.value) return;
   createGroup(name.value, store.state.selectedOrganization.identifier)
     .then((res) => {
       emits("added:group", res.data);
-      emits("cancel:hideform");
+      emits("update:open", false);
 
-      q.notify({
+      toast({
         message: `User Group "${name.value}" Created Successfully!`,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-right",
         timeout: 3000,
       });
     })
     .catch((err) => {
       if(err.response.status != 403){
-        q.notify({
+        toast({
         message: "Error while creating group",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-right",
         timeout: 3000,
       });
       }

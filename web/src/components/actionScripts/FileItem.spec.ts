@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import FileItem from "@/components/actionScripts/FileItem.vue";
-import { Quasar } from "quasar";
+
 
 describe("FileItem.vue", () => {
   let wrapper: VueWrapper;
@@ -24,9 +24,9 @@ describe("FileItem.vue", () => {
     return mount(FileItem, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
-          "q-icon": true,
+          "OIcon": true,
         },
       },
     });
@@ -65,8 +65,9 @@ describe("FileItem.vue", () => {
       const editButton = buttons[0];
       const deleteButton = buttons[1];
 
-      expect(editButton.find("q-icon-stub").attributes("name")).toBe("edit");
-      expect(deleteButton.find("q-icon-stub").attributes("name")).toBe(
+      // When stubs: { OIcon: true }, Vue renders the stub as <o-icon-stub> (lowercase kebab)
+      expect(editButton.find("o-icon-stub").attributes("name")).toBe("edit");
+      expect(deleteButton.find("o-icon-stub").attributes("name")).toBe(
         "delete",
       );
     });
@@ -284,7 +285,7 @@ describe("FileItem.vue", () => {
   describe("Button Styling", () => {
     it("applies light gray styling to buttons when active", () => {
       wrapper = createWrapper({ isActive: true });
-      const icons = wrapper.findAll(".file-actions .q-icon");
+      const icons = wrapper.findAll(".file-actions .OIcon");
 
       icons.forEach((icon) => {
         expect(icon.classes()).toContain("tw:text-gray-100");
@@ -294,7 +295,7 @@ describe("FileItem.vue", () => {
 
     it("applies dark gray styling to buttons when not active", () => {
       wrapper = createWrapper({ isActive: false });
-      const icons = wrapper.findAll(".file-actions .q-icon");
+      const icons = wrapper.findAll(".file-actions .OIcon");
 
       icons.forEach((icon) => {
         expect(icon.classes()).toContain("tw:text-gray-600");

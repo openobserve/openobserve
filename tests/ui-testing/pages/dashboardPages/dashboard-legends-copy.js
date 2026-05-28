@@ -10,8 +10,9 @@ export default class DashboardLegendsCopy {
 
     // ShowLegendsPopup selectors (VERIFIED from ShowLegendsPopup.vue)
     this.legendsPopup = page.locator('[data-test="dashboard-show-legends-popup"]');
+    this.legendsCount = page.locator('[data-test="dashboard-show-legends-count"]');
     this.copyAllBtn = page.locator('[data-test="dashboard-show-legends-copy-all"]');
-    this.closeBtn = page.locator('[data-test="dashboard-show-legends-close"]');
+    this.closeBtn = page.locator('[data-test="o-dialog-close-btn"]');
 
     // Chart renderer selector (VERIFIED from ChartRenderer.vue - data-test="chart-renderer")
     this.chartRenderer = page.locator('[data-test="chart-renderer"]');
@@ -30,8 +31,8 @@ export default class DashboardLegendsCopy {
    * @returns {import('@playwright/test').Locator}
    */
   getShowLegendsButton() {
-    // The button renders icon "format_list_bulleted" as text content via Quasar's q-icon
-    return this.page.getByRole('button').filter({ hasText: 'format_list_bulleted' }).first();
+    // The button renders icon "format_list_bulleted" as text content via Quasar's OIcon
+    return this.page.locator('[data-test="dashboard-show-legends-btn"]').first();
   }
 
   /**
@@ -72,7 +73,13 @@ export default class DashboardLegendsCopy {
    */
   async getLegendCount() {
     await this.waitForPopupVisible();
-    const items = this.page.locator('[data-test^="dashboard-legend-item-"]');
+    // Use :not() to exclude dashboard-legend-item-text which also starts with
+    // "dashboard-legend-item-" and would otherwise double-count each item.
+    // Use .first() to scope to a single popup instance (PanelEditor can render
+    // multiple popup DOM nodes simultaneously).
+    const items = this.legendsPopup.first().locator('[data-test^="dashboard-legend-item-"]:not([data-test="dashboard-legend-item-text"])');
+    // Items are populated asynchronously after the popup opens
+    await items.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
     const count = await items.count();
     testLogger.info(`Found ${count} legend items`);
     return count;
@@ -94,7 +101,7 @@ export default class DashboardLegendsCopy {
    */
   async getLegendText(index) {
     const item = this.getLegendItem(index);
-    const text = await item.locator('.legend-text').textContent();
+    const text = await item.locator('[data-test="dashboard-legend-item-text"]').textContent();
     return text.trim();
   }
 
@@ -142,7 +149,7 @@ export default class DashboardLegendsCopy {
    * @returns {Promise<boolean>}
    */
   async isNoLegendsMessageVisible() {
-    const noLegendsEl = this.legendsPopup.locator('.no-legends');
+    const noLegendsEl = this.legendsPopup.locator('[data-test="dashboard-no-legends-message"]');
     return await noLegendsEl.isVisible();
   }
 
@@ -151,8 +158,7 @@ export default class DashboardLegendsCopy {
    * @returns {Promise<string>}
    */
   async getTotalLegendsText() {
-    const countEl = this.legendsPopup.locator('.legend-count');
-    return await countEl.textContent();
+    return await this.legendsCount.textContent();
   }
 
   // ===== TABLE CELL COPY METHODS =====
@@ -175,25 +181,23 @@ export default class DashboardLegendsCopy {
       }
     });
     // Wait for data cells to be attached after scroll reset
-    await this.dashboardTable.locator('td.copy-cell-td').first()
+    await this.dashboardTable.locator('[data-test="dashboard-data-row-cell"]').first()
       .waitFor({ state: 'attached', timeout: 10000 });
   }
 
   /**
    * Get a table cell by row and column index.
-   * Filters out virtual scroll spacer rows (which have <td colspan="N">)
-   * by only targeting rows that contain .copy-cell-td cells.
+   * Filters out virtual scroll spacer rows by only targeting rows
+   * that contain data-test="dashboard-data-row-cell" cells.
    * @param {number} rowIndex - 0-based row index
    * @param {number} colIndex - 0-based column index
    * @returns {import('@playwright/test').Locator}
    */
   getTableCell(rowIndex, colIndex) {
-    // TanStack table (dashboard mode) renders rows with data-test="dashboard-data-row".
-    // All data cells use class copy-cell-td.
     const dataRows = this.dashboardTable
       .locator('[data-test="dashboard-data-row"]')
-      .filter({ has: this.page.locator('td.copy-cell-td') });
-    return dataRows.nth(rowIndex).locator('td.copy-cell-td').nth(colIndex);
+      .filter({ has: this.page.locator('[data-test="dashboard-data-row-cell"]') });
+    return dataRows.nth(rowIndex).locator('[data-test="dashboard-data-row-cell"]').nth(colIndex);
   }
 
   /**
@@ -215,7 +219,7 @@ export default class DashboardLegendsCopy {
       await cell.hover({ force: true });
     }
     // Wait for copy button to become visible (opacity transition from 0 to 1 on hover)
-    const copyBtn = cell.locator('.copy-btn');
+    const copyBtn = cell.locator('[data-test="dashboard-table-cell-copy-btn"]');
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     await copyBtn.click({ force: true });
 
@@ -230,9 +234,12 @@ export default class DashboardLegendsCopy {
    */
   async isTableCellCopied(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
-    const copyBtn = cell.locator('.copy-btn');
-    const icon = await copyBtn.locator('.q-icon').textContent();
-    return icon.includes('check');
+    const copyBtn = cell.locator('[data-test="dashboard-table-cell-copy-btn"]');
+    // Hover to reveal the copy button, then check data-copied attribute
+    await cell.hover({ force: true });
+    await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
+    const copiedAttr = await copyBtn.getAttribute('data-copied');
+    return copiedAttr === 'true';
   }
 
   /**
@@ -244,7 +251,7 @@ export default class DashboardLegendsCopy {
   async getTableCellText(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
     // Get the span with the actual text, excluding the copy button
-    const textSpan = cell.locator('span.q-mr-xs').or(cell.locator('span').first());
+    const textSpan = cell.locator('[data-test="dashboard-table-cell-value"]');
     const text = await textSpan.textContent();
     return text.trim();
   }
@@ -269,7 +276,7 @@ export default class DashboardLegendsCopy {
       await cell.hover({ force: true });
     }
     // Wait briefly for opacity transition, then check visibility
-    const copyBtn = cell.locator('.copy-btn');
+    const copyBtn = cell.locator('[data-test="dashboard-table-cell-copy-btn"]');
     try {
       await copyBtn.waitFor({ state: 'visible', timeout: 3000 });
       return true;

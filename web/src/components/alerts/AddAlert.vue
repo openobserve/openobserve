@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg q-pt-xs">
+  <div class="tw:w-full tw:pt-1">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
@@ -34,28 +34,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-alert-back-btn"
               @click="goBackToAlertsList"
             >
-              <q-icon name="arrow_back_ios_new" />
+              <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
 
           <!-- EDIT MODE: (folder → chevron → name) -->
           <template v-if="beingUpdated || anomalyEditMode">
             <span
-              class="q-table__title alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+              class="tw:text-xl tw:tracking-[0.005em] alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
               @click="goBackToAlertsList"
             >{{ activeFolderName }}</span>
-            <q-icon name="chevron_right" class="q-table__title tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
+            <OIcon name="chevron-right" size="sm" class="tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
             <template v-if="!isAnomalyMode">
-              <span class="q-table__title tw:truncate tw:max-w-[200px]">
+              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
                 {{ formData.name }}
-                <q-tooltip v-if="formData.name?.length > 24" class="tw:text-sm">{{ formData.name }}</q-tooltip>
+                <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
               </span>
             </template>
             <template v-else>
-              <span class="q-table__title tw:truncate tw:max-w-[200px]">
+              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
                 {{ anomalyConfig.name }}
-                <q-tooltip v-if="anomalyConfig.name?.length > 24" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
+                <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
-              <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
+              <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="tw:text-xs">{{ anomalyConfig.status }}</OBadge>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="tw:text-[11px] tw:whitespace-nowrap"
@@ -63,8 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
               </span>
-              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain">
-                  <template #icon-left><q-icon name="replay" /></template>
+              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" icon-left="replay">
                   {{ t('alerts.retry') }}
                 </OButton>
             </template>
@@ -74,29 +73,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
               <label class="alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-red-500">*</span></label>
-              <q-input
+              <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
-                dense
-                borderless
-                no-error-icon
                 :placeholder="t('alerts.alertNamePlaceholder')"
                 class="alert-v3-field topbar-name-input tw:text-sm"
                 :class="alertNameError ? 'field-error' : ''"
-                hide-bottom-space
                 @update:model-value="alertNameError = false"
               />
-              <q-input
+              <OInput
                 v-else
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
-                dense
-                borderless
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
                 class="alert-v3-field topbar-name-input tw:text-sm"
-                hide-bottom-space
               />
             </div>
 
@@ -132,70 +124,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Stream Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
           <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
-          <q-select
+          <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
-            :popup-content-style="{ textTransform: 'lowercase' }"
+            :searchable="false"
             class="no-case alert-v3-field stream-type-select"
             :class="streamTypeError ? 'field-error' : ''"
-            dense
-            borderless
-            use-input
-            fill-input
-            hide-selected
-            hide-bottom-space
-            :input-debounce="200"
-            :readonly="beingUpdated || anomalyEditMode"
-            :disable="beingUpdated || anomalyEditMode"
-            @filter="(val, update) => update(() => {})"
+            :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
-            behavior="menu"
           />
         </div>
 
         <!-- Stream Name -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
           <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
-          <q-select
+          <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
-            :options="filteredStreams"
+            :options="indexOptions"
             :loading="isFetchingStreams"
-            color="input-border"
             class="no-case alert-v3-field stream-name-select"
             :class="streamNameError ? 'field-error' : ''"
-            dense
-            borderless
-            use-input
-            hide-selected
-            hide-bottom-space
-            fill-input
-            :input-debounce="400"
-            :readonly="beingUpdated || anomalyEditMode"
-            :disable="beingUpdated || anomalyEditMode || !formData.stream_type"
-            @filter="filterStreams"
+            :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
-            behavior="menu"
           />
-          <q-tooltip v-if="!formData.stream_type">{{ t('alerts.selectStreamTypeFirst') }}</q-tooltip>
+          <OTooltip v-if="!formData.stream_type" :content="t('alerts.selectStreamTypeFirst')" />
         </div>
 
         <!-- Alert Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
           <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
-          <q-select
+          <OSelect
+            data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
-            emit-value
-            map-options
-            dense
-            borderless
-            hide-bottom-space
-            :disable="beingUpdated || anomalyEditMode"
+            :disabled="beingUpdated || anomalyEditMode"
             class="alert-v3-field alert-type-select"
+            :searchable="false"
           />
         </div>
         </div>
@@ -214,19 +182,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tab.key"
             :value="tab.key"
             size="sm"
+            :data-test="`add-alert-tab-${tab.key}`"
           >
             <template #icon-left>
-              <Shield v-if="tab.key === 'condition'" class="tw:size-3.5 tw:shrink-0" />
-              <SlidersHorizontal v-else-if="tab.key === 'advanced'" class="tw:size-3.5 tw:shrink-0" />
-              <TrendingUp v-else-if="tab.key === 'anomaly-config'" class="tw:size-3.5 tw:shrink-0" />
-              <Bell v-else-if="tab.key === 'anomaly-alerting'" class="tw:size-3.5 tw:shrink-0" />
+              <OIcon v-if="tab.key === 'condition'" name="shield" size="sm" />
+              <OIcon v-else-if="tab.key === 'advanced'" name="tune" size="sm" />
+              <OIcon v-else-if="tab.key === 'anomaly-config'" name="trending-up" size="sm" />
+              <OIcon v-else-if="tab.key === 'anomaly-alerting'" name="notifications" size="sm" />
             </template>
             {{ tab.label }}{{ tab.required ? ' *' : '' }}
           </OToggleGroupItem>
         </OToggleGroup>
 
         <!-- Tab Content -->
-        <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
+        <div class="tw:flex-1 tw:overflow-auto">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
           <div v-show="activeTab === 'condition'" class="tw:flex tw:flex-col tw:gap-4">
             <div>
@@ -344,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @refresh:destinations="$emit('refresh:destinations')"
             />
           </div>
-        </q-form>
+        </div>
       </div><!-- end TIER 3 card -->
 
       <!-- Footer: Cancel / Save (left column, separate card) -->
@@ -380,8 +349,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
-              <q-icon :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="16px" />
-              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'">
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'" size="sm" />
+              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
               <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
@@ -393,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
-                <q-icon name="query_stats" size="36px" class="tw:opacity-20" />
+                <OIcon name="query-stats" size="lg" class="tw:opacity-20" />
                 <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ t('alerts.previewEmptyState') }}
                 </span>
@@ -444,15 +413,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
       </div>
-
   </div>
 
-  <q-dialog
-    v-model="showJsonEditorDialog"
-    position="right"
-    full-height
-    maximized
-    :persistent="true"
+  <ODrawer data-test="add-alert-json-editor-drawer"
+    v-model:open="showJsonEditorDialog"
+    size="lg"
+    :title="t('alerts.editJson')"
+    persistent
   >
     <JsonEditor
       :data="formData"
@@ -463,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @saveJson="saveAlertJson"
       :isEditing="beingUpdated"
     />
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -471,7 +438,7 @@ import { defineComponent, computed, watch } from "vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import { Shield, SlidersHorizontal, TrendingUp, Bell } from 'lucide-vue-next';
+import OIcon from '@/lib/core/Icon/OIcon.vue';
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -487,6 +454,11 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -515,6 +487,7 @@ export default defineComponent({
     "refresh:templates",
   ],
   components: {
+    OIcon,
     JsonEditor,
     QueryConfig,
     AlertSettings,
@@ -531,10 +504,11 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
-    Shield,
-    SlidersHorizontal,
-    TrendingUp,
-    Bell,
+    ODrawer,
+    OBadge,
+    OTooltip,
+    OInput,
+    OSelect,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
@@ -977,85 +951,6 @@ body.body--dark .query-mode-tabs {
   border-top: 0.0625rem solid var(--o2-border-color);
 }
 
-// Wizard Stepper Styles
-.alert-wizard-stepper {
-  box-shadow: none;
-  .q-stepper__step-inner {
-    padding: 0.375rem !important;
-  }
-  .q-stepper__tab {
-    padding-left: 0.375rem !important;
-    min-height: 30px !important;
-  }
-
-  :deep(.q-stepper__header) {
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  :deep(.q-stepper__tab) {
-    padding: 12px 16px;
-    min-height: 60px;
-  }
-
-  // Hide captions for inactive steps
-  :deep(.q-stepper__tab) {
-    .q-stepper__caption {
-      display: none !important;
-    }
-  }
-
-  // Show caption only on active step
-  :deep(.q-stepper__tab--active) {
-    .q-stepper__caption {
-      display: block !important;
-      opacity: 0.7;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-  }
-
-  :deep(.q-stepper__tab--active) {
-    color: #1976d2;
-    font-weight: 600;
-  }
-
-  :deep(.q-stepper__tab--done) {
-    color: #4caf50;
-    cursor: pointer;
-  }
-
-  :deep(.q-stepper__dot) {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-  }
-
-  .q-stepper--horizontal .q-stepper__step-inner {
-    padding: 8px !important;
-  }
-
-  // Make step titles more compact
-  :deep(.q-stepper__title) {
-    font-size: 14px;
-    line-height: 1.2;
-  }
-}
-
-.wizard-view-container {
-  .q-stepper {
-    background: transparent !important;
-  }
-}
-
-// Dark mode adjustments
-.dark-mode1 {
-  .alert-wizard-stepper {
-    :deep(.q-stepper__header) {
-      border-bottom-color: #424242;
-    }
-  }
-}
-
 // Persistent step caption styles (helper text style)
 .persistent-step-caption {
   font-size: 12px;
@@ -1098,7 +993,7 @@ body.body--dark .query-mode-tabs {
   background-color: var(--o2-tab-bg) !important;
 }
 
-// Folder breadcrumb select — matches q-table__title sizing/weight
+// Folder breadcrumb select — matches tw:text-xl tw:tracking-[0.005em] sizing/weight
 .topbar-folder-select {
   min-width: 60px;
   max-width: 140px;

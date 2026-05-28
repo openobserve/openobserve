@@ -15,184 +15,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onClose" maximized>
-    <q-card class="query-plan-dialog full-height">
-      <q-card-section class="row items-center q-pb-sm q-pt-sm">
-        <div class="text-h6">{{ t("search.queryPlan") }}</div>
-        <q-space />
-        <OButton variant="ghost" size="icon" @click="onClose">
-          <q-icon name="close" size="14px" />
-          <q-tooltip>Close (ESC)</q-tooltip>
-        </OButton>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section class="query-plan-content full-height q-pa-none">
-        <q-splitter v-model="splitterPosition" class="full-height">
-          <!-- Left Pane: SQL Query -->
-          <template #before>
-            <div class="sql-query-pane full-height">
-              <div
-                class="pane-header q-pa-sm tw:px-[1rem] row items-center"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'pane-header-dark'
-                    : 'pane-header-light'
-                "
-              >
-                <q-icon name="code" size="20px" class="q-mr-sm" />
-                <div class="text-subtitle1 text-weight-medium">SQL Query</div>
+  <ODialog
+    v-model:open="showDialog"
+    data-test="query-plan-dialog"
+    size="full"
+    :title="t('search.queryPlan')"
+    @update:open="(v) => !v && onClose()"
+  >
+    <div class="query-plan-content tw:h-full tw:p-0">
+      <OSplitter
+        v-model="splitterPosition"
+        :horizontal="false"
+        separator-class="query-plan-splitter"
+        class="tw:h-full"
+      >
+        <!-- Left Pane: SQL Query -->
+        <template #before>
+          <section class="sql-query-pane tw:h-full">
+            <header class="pane-header">
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <OIcon name="code" size="sm" class="pane-header__icon" />
+                <h3 class="pane-header__title">SQL Query</h3>
               </div>
-              <q-separator />
-              <div
-                class="sql-query-content q-pa-md"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'sql-query-content-dark'
-                    : 'sql-query-content-light'
-                "
+            </header>
+            <div class="sql-query-content">
+              <pre class="sql-query-text"><code>{{ sqlQuery }}</code></pre>
+            </div>
+          </section>
+        </template>
+
+        <!-- Right Pane: Explain/Analyze Results -->
+        <template #after>
+          <section class="explain-results-pane tw:h-full">
+            <header class="pane-header">
+              <h3 class="pane-header__title">
+                {{
+                  showAnalyzeResults
+                    ? t("search.analyzeResults")
+                    : t("search.explainResults")
+                }}
+              </h3>
+              <div class="tw:flex-1" />
+              <OButton
+                v-if="!isAnalyzing && !showAnalyzeResults"
+                variant="primary"
+                size="sm"
+                :loading="loading"
+                @click="runAnalyze"
               >
-                <div class="sql-query-wrapper">
-                  <pre class="sql-query-text">{{ sqlQuery }}</pre>
+                {{ t("search.analyze") }}
+                <OTooltip :content="t('search.analyzeTooltip')" />
+              </OButton>
+            </header>
+
+            <div v-if="loading" class="state-container">
+              <div class="tw:text-center">
+                <OSpinner variant="dots" size="lg" />
+                <div class="tw:mt-3 state-container__label">
+                  {{
+                    isAnalyzing
+                      ? t("search.runningAnalyze")
+                      : t("search.loadingPlan")
+                  }}
                 </div>
               </div>
             </div>
-          </template>
 
-          <!-- Right Pane: Explain/Analyze Results -->
-          <template #after>
-            <div class="explain-results-pane full-height">
-              <div
-                class="pane-header q-pa-sm tw:px-[1rem] row items-center"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'pane-header-dark'
-                    : 'pane-header-light'
-                "
-              >
-                <div class="text-subtitle1 text-weight-medium">
-                  {{
-                    showAnalyzeResults
-                      ? t("search.analyzeResults")
-                      : t("search.explainResults")
-                  }}
+            <div v-else-if="error" class="tw:p-4">
+              <OBanner variant="error" icon="error" :content="error" />
+            </div>
+
+            <!-- EXPLAIN ANALYZE view -->
+            <div v-else-if="showAnalyzeResults" class="plan-container">
+              <MetricsSummaryCard
+                v-if="summaryMetrics"
+                :metrics="summaryMetrics"
+                class="tw:mb-3"
+              />
+
+              <div class="plan-surface">
+                <div class="plan-surface__header">
+                  <span class="plan-surface__title">{{ t("search.executionPlan") }}</span>
                 </div>
-                <q-space />
-                <OButton
-                  v-if="!isAnalyzing && !showAnalyzeResults"
-                  variant="primary"
-                  size="sm"
-                  :loading="loading"
-                  @click="runAnalyze"
-                >
-                  {{ t('search.analyze') }}
-                  <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
-                </OButton>
-              </div>
-              <q-separator />
-
-              <div v-if="loading" class="flex flex-center q-pa-xl full-height">
-                <div class="text-center">
-                  <q-spinner-dots color="primary" size="50px" />
-                  <div class="q-mt-md">
-                    {{
-                      isAnalyzing
-                        ? t("search.runningAnalyze")
-                        : t("search.loadingPlan")
-                    }}
+                <div class="plan-scroll-area">
+                  <QueryPlanTree
+                    v-if="planTree"
+                    :tree="planTree"
+                    :is-analyze="true"
+                  />
+                  <div v-else class="plan-empty">
+                    {{ t("search.noAnalyzePlanFound") }}
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div v-else-if="error" class="q-pa-md">
-                <q-banner class="bg-negative text-white">
-                  <template v-slot:avatar>
-                    <q-icon name="error" />
-                  </template>
-                  {{ error }}
-                </q-banner>
-              </div>
-
-              <!-- EXPLAIN ANALYZE view -->
-              <div
-                v-else-if="showAnalyzeResults"
-                class="plan-container q-pa-md"
-              >
-                <!-- Metrics Summary Card -->
-                <MetricsSummaryCard
-                  v-if="summaryMetrics"
-                  :metrics="summaryMetrics"
-                  class="q-mb-md"
-                />
-
-                <!-- Execution Plan Tree -->
-                <q-card flat bordered class="plan-card">
-                  <q-card-section class="q-pa-none">
-                    <div class="plan-scroll-area">
-                      <QueryPlanTree
-                        v-if="planTree"
-                        :tree="planTree"
-                        :is-analyze="true"
-                      />
-                      <div v-else class="q-pa-md text-grey-6">
-                        {{ t("search.noAnalyzePlanFound") }}
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
-              </div>
-
-              <!-- EXPLAIN view (tabs for logical/physical) -->
-              <div v-else class="plan-container q-pa-md">
-                <q-card flat bordered class="plan-card">
-                  <OTabs
-                    v-model="activeTab"
-                    dense
-                    class="text-grey"
-                    align="left"
-                  >
+            <!-- EXPLAIN view (tabs for logical/physical) -->
+            <div v-else class="plan-container">
+              <div class="plan-surface">
+                <div class="plan-surface__tabs">
+                  <OTabs v-model="activeTab" dense align="left">
                     <OTab name="logical" :label="t('search.logicalPlan')" />
                     <OTab name="physical" :label="t('search.physicalPlan')" />
                   </OTabs>
+                </div>
 
-                  <q-separator />
-
-                  <OTabPanels v-model="activeTab" animated>
-                    <OTabPanel name="logical">
-                      <div class="plan-scroll-area">
-                        <QueryPlanTree
-                          v-if="logicalPlanTree"
-                          :tree="logicalPlanTree"
-                          :is-analyze="false"
-                        />
-                        <div v-else class="q-pa-md text-grey-6">
-                          {{ t("search.noLogicalPlan") }}
-                        </div>
+                <OTabPanels v-model="activeTab" animated>
+                  <OTabPanel name="logical">
+                    <div class="plan-scroll-area">
+                      <QueryPlanTree
+                        v-if="logicalPlanTree"
+                        :tree="logicalPlanTree"
+                        :is-analyze="false"
+                      />
+                      <div v-else class="plan-empty">
+                        {{ t("search.noLogicalPlan") }}
                       </div>
-                    </OTabPanel>
+                    </div>
+                  </OTabPanel>
 
-                    <OTabPanel name="physical">
-                      <div class="plan-scroll-area">
-                        <QueryPlanTree
-                          v-if="physicalPlanTree"
-                          :tree="physicalPlanTree"
-                          :is-analyze="false"
-                        />
-                        <div v-else class="q-pa-md text-grey-6">
-                          {{ t("search.noPhysicalPlan") }}
-                        </div>
+                  <OTabPanel name="physical">
+                    <div class="plan-scroll-area">
+                      <QueryPlanTree
+                        v-if="physicalPlanTree"
+                        :tree="physicalPlanTree"
+                        :is-analyze="false"
+                      />
+                      <div v-else class="plan-empty">
+                        {{ t("search.noPhysicalPlan") }}
                       </div>
-                    </OTabPanel>
-                  </OTabPanels>
-                </q-card>
+                    </div>
+                  </OTabPanel>
+                </OTabPanels>
               </div>
             </div>
-          </template>
-        </q-splitter>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+          </section>
+        </template>
+      </OSplitter>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -201,10 +162,12 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -218,10 +181,14 @@ import {
 import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export default defineComponent({
   name: "QueryPlanDialog",
   components: {
+    OSplitter,
     OTabs,
     OTab,
     OTabPanels,
@@ -229,6 +196,11 @@ export default defineComponent({
     MetricsSummaryCard,
     QueryPlanTree,
     OButton,
+    ODialog,
+    OSpinner,
+    OIcon,
+    OTooltip,
+    OBanner,
   },
   props: {
     modelValue: {
@@ -244,7 +216,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const { getSearchQueryPayload } = useSearchStream();
 
     const loading = ref(false);
@@ -632,7 +603,6 @@ export default defineComponent({
 
     return {
       t,
-      store,
       showDialog,
       loading,
       error,
@@ -653,136 +623,168 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.query-plan-dialog {
+.query-plan-content {
+  overflow: hidden;
+}
+
+.sql-query-pane,
+.explain-results-pane {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background-color: var(--o2-card-background);
+}
 
-  .query-plan-content {
-    flex: 1;
-    overflow: hidden;
+.pane-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.75rem;
+  padding: 0 1rem;
+  background-color: var(--o2-card-bg);
+  border-bottom: 1px solid var(--o2-border-color);
 
-    .sql-query-pane,
-    .explain-results-pane {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+  &__icon {
+    color: var(--o2-text-secondary);
+  }
 
-      .pane-header {
-        flex-shrink: 0;
-      }
-
-      .pane-header-light {
-        background-color: #f5f5f5;
-      }
-
-      .pane-header-dark {
-        background-color: #181a1b;
-      }
-
-      .sql-query-content {
-        flex: 1;
-        overflow-y: auto;
-
-        .sql-query-wrapper {
-          border-radius: 4px;
-          padding: 12px;
-          min-height: 100%;
-        }
-
-        .sql-query-text {
-          font-family: monospace;
-          font-size: 12px;
-          line-height: 1.6;
-          margin: 0;
-          white-space: pre-wrap;
-          word-break: break-word;
-        }
-      }
-
-      .sql-query-content-light {
-        background-color: #f8f9fa;
-        color: #1d1d1d;
-
-        .sql-query-wrapper {
-          background-color: #ffffff;
-          border: 1px solid #e0e0e0;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-      }
-
-      .sql-query-content-dark {
-        background-color: #121212;
-        color: #e0e0e0;
-
-        .sql-query-wrapper {
-          background-color: #1e1e1e;
-          border: 1px solid #3d3d3d;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-        }
-      }
-    }
-
-    .explain-results-pane {
-      .plan-container {
-        flex: 1;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .plan-card {
-        flex: 1;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-
-        .o-tabs {
-          flex-shrink: 0;
-        }
-
-        .o-tab-panels {
-          flex: 1;
-          overflow: hidden;
-        }
-      }
-
-      .plan-scroll-area {
-        max-height: calc(100vh - 250px);
-        overflow-y: auto;
-      }
-    }
+  &__title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--o2-text-heading);
+    margin: 0;
+    letter-spacing: 0.01em;
   }
 }
 
-// Verbose output styling
-.verbose-output-container {
-  display: flex;
-  flex-direction: column;
+.sql-query-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
 }
 
-.verbose-output {
-  font-family: monospace;
-  font-size: 12px;
+.sql-query-text {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
   line-height: 1.6;
   margin: 0;
-  padding: 12px;
+  padding: 0.875rem 1rem;
   white-space: pre-wrap;
   word-break: break-word;
-  overflow-x: auto;
-  border-radius: 4px;
+  background-color: var(--o2-code-bg);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  color: var(--o2-text-code);
+  min-height: 100%;
+  box-sizing: border-box;
 
-  // Light mode
-  background-color: #f5f5f5;
-  color: #1d1d1d;
-  border: 1px solid #e0e0e0;
+  code {
+    font-family: inherit;
+    color: inherit;
+    background: transparent;
+    padding: 0;
+  }
 }
 
-// Dark mode for verbose output
-body.body--dark {
-  .verbose-output {
-    background-color: #1e1e1e;
-    color: #e0e0e0;
-    border-color: #3d3d3d;
+.plan-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 0.75rem;
+}
+
+.plan-surface {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.5rem;
+  overflow: hidden;
+
+  // Make OTabPanels and OTabPanel fill the remaining surface height
+  :deep(.o-tab-panels) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.o-tab-panel) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  &__header {
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--o2-border-color);
+    background-color: var(--o2-card-background);
+  }
+
+  &__title {
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--o2-text-label);
+  }
+
+  &__tabs {
+    border-bottom: 1px solid var(--o2-border-color);
+    padding: 0 0.5rem;
+  }
+}
+
+.plan-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+}
+
+.plan-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--o2-text-muted);
+}
+
+.state-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+
+  &__label {
+    color: var(--o2-text-secondary);
+    font-size: var(--text-sm);
+  }
+}
+
+:deep(.query-plan-splitter) {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--o2-border-color);
+    transform: translateX(-50%);
+    transition: background-color 0.2s ease, width 0.2s ease;
+  }
+
+  &:hover::before {
+    background-color: var(--o2-primary-color);
+    width: 2px;
   }
 }
 </style>

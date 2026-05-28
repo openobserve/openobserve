@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -39,9 +37,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const defaultFieldObj = {
   name: "testField",
@@ -102,7 +97,9 @@ describe("SortByBtnGrp", () => {
     it("should render button group", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[role="group"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists(),
+      ).toBe(true);
     });
 
     it("should render clear sort button", () => {

@@ -306,8 +306,7 @@
         height: 0;
       }
 
-      &,
-      .q-list {
+      & {
         border-radius: 0.375rem; // 6px
       }
     }
@@ -461,14 +460,6 @@
     border-radius: 0.375rem; // 6px
   }
 
-  .q-item {
-    padding: 0 !important;
-
-    &:hover {
-      background-color: var(--o2-hover-accent) !important;
-    }
-  }
-
   .q-focus-helper:hover {
     background: transparent !important;
   }
@@ -501,16 +492,6 @@
   .region-dropdown-list {
     min-width: 9.375rem; // 150px
     border-radius: 0.375rem; // 6px
-
-    .q-item__section {
-      display: inline-block;
-    }
-
-    .q-item__label {
-      margin-left: 1.25rem; // 20px
-      text-transform: capitalize;
-      margin-top: 0.125rem; // 2px
-    }
   }
 }
 .saved-view-table {
@@ -557,10 +538,6 @@
   .saved-view-item {
     padding: 0.25rem 0.3125rem 0.25rem 0.625rem !important; // 4px 5px 4px 10px
   }
-
-  .q-item__section--main ~ .q-item__section--side {
-    padding-left: 0.3125rem !important; // 5px
-  }
 }
 
 .file-type-button-group {
@@ -602,16 +579,6 @@
 /************************* IndexList.vue *************************/
 .logs-index-menu {
   width: 100%;
-
-  .q-menu {
-    // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-    transform: translateY(0.5rem);
-    border-radius: 0px;
-
-    .q-virtual-scroll__content {
-      padding: 0.5rem;
-    }
-  }
 
   .q-field {
     &__control {
@@ -870,20 +837,6 @@
     }
   }
 
-  .q-item {
-    min-height: 1.3rem;
-    padding: 5px 10px;
-
-    &__label {
-      font-size: 0.75rem;
-    }
-
-    &.q-manual-focusable--focused > .q-focus-helper {
-      background: currentColor !important;
-      opacity: 0.3 !important;
-    }
-  }
-
   .q-field--dense .q-field__before,
   .q-field--dense .q-field__prepend {
     padding: 0px 0px 0px 0px;
@@ -913,30 +866,6 @@
       table-layout: fixed;
 
       .q-expansion-item {
-        .q-item {
-          display: flex;
-          align-items: center;
-          padding: 0;
-          height: 25px !important;
-          min-height: 25px !important;
-        }
-
-        .q-item__section--avatar {
-          min-width: 12px;
-          max-width: 12px;
-          margin-right: 8px;
-        }
-
-        .filter-values-container {
-          .q-item {
-            padding-left: 4px;
-
-            .q-focus-helper {
-              background: none !important;
-            }
-          }
-        }
-
         .q-item-type {
           &:hover {
             .field_overlay {
@@ -1035,12 +964,13 @@
 
 .paginator-section {
   line-height: 1.5rem; // 24px - more compact
-  max-height: 1.5rem; // 24px
+  max-height: 2rem; // Allow OPagination's compact buttons (1.75rem) to fit
   border-radius: 0.5rem;
   padding: 0.125rem 0.25rem; // Compact padding
   background: rgba(255, 255, 255, 0.1); // Glassmorphic
   backdrop-filter: blur(10px);
-  margin-top: 0.4rem;
+  margin-top: 0;
+  overflow: visible;
 
   .q-btn {
     padding: 0.125rem 0.25rem;
@@ -1049,84 +979,37 @@
     border-radius: 0.25rem;
     line-height: 1rem;
   }
+
+  // OPagination (O2 component) compact sizing
+  .o-pagination__btn {
+    padding: 0.125rem 0.25rem !important;
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    min-width: 1.5rem !important;
+    font-size: 0.75rem !important;
+    border-radius: 0.25rem !important;
+    line-height: 1rem !important;
+
+    :deep(svg) {
+      width: 1rem !important;
+      height: 1rem !important;
+    }
+  }
 }
 
 .select-pagination {
-  line-height: 1.75rem !important; // 28px - slightly taller to prevent clipping
-  border-radius: 0.25rem !important;
-  padding: 0.125rem 0.5rem !important; // Add vertical padding
-  background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
-  backdrop-filter: blur(10px) !important;
-  min-height: 1.45rem !important;
-  height: 1.45rem !important;
-  border: 0.0626rem solid var(--o2-border-color) !important;
-  display: flex !important;
-  align-items: center !important;
-  overflow: visible !important;
-  margin-top: 0.4rem;
+  // OSelect renders its own bordered trigger — keep the outer wrapper neutral
+  position: relative;
+  width: 4rem !important; // compact: just enough for "50 ▼"
+  height: 1.5rem !important; // clamp wrapper height
+  margin-top: 0;
 
-  .q-field__control-container {
-    padding-top: 0 !important;
-  }
-
-  .q-field__control {
-    height: 1.4rem !important;
-    min-height: 1.4rem !important;
-    padding: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    overflow: visible !important;
-    top: -3px;
-    border: none !important;
-
-    &:before,
-    &:after {
-      border: none !important;
-    }
-  }
-
-  .q-field__native {
-    padding: 0 0.25rem !important;
-    min-height: 100% !important;
-    line-height: 100% !important;
+  // Target the Reka UI trigger button inside OSelect to match toolbar height
+  :deep(button) {
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
     font-size: 0.75rem !important;
-    overflow: visible !important;
-    height: 100% !important;
-    display: flex;
-    align-items: center;
-
-    span {
-      padding: 0 !important;
-      height: auto;
-    }
-
-    input {
-      display: none;
-    }
-  }
-
-  .q-field__input {
-    padding: 0 !important;
-    line-height: 100% !important;
-  }
-
-  .q-field__append {
-    padding: 0 !important;
-    padding-left: 0.25rem !important;
-    height: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-  }
-
-  .q-icon {
-    font-size: 1rem !important;
-    transform: none !important;
-  }
-
-  // Selected value display
-  input[readonly] {
-    line-height: 1.75rem !important;
-    padding: 0 !important;
+    padding-inline: 0.5rem !important;
   }
 }
 
@@ -1285,10 +1168,11 @@
   }
 
   .select-noof-records {
-    padding-left: 0.56rem;
-    border-radius: 0.375rem;
-    height: 2.55rem;
+    width: 5rem;
 
+    button[type="button"] {
+      height: 2.25rem;
+    }
   }
 }
 
@@ -1402,8 +1286,8 @@
   min-height: 3em !important;
   min-width: 0.3rem !important;
   position: absolute !important;
-  top: 26px !important;
-  left: 15px !important;
+  top: 1rem !important;
+  left: 0.6rem !important;
   z-index: 100 !important;
   border-radius: 0.325rem;
 }
@@ -1412,8 +1296,8 @@
   min-height: 3em !important;
   min-width: 0.3rem !important;
   position: absolute !important;
-  top: 26px !important;
-  left: 4px !important;
+  top: 1rem !important;
+  left: 0 !important;
   z-index: 100 !important;
   border-radius: 0.325rem;
 }

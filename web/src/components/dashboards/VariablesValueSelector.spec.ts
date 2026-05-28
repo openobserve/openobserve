@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import { nextTick } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
 
@@ -132,6 +131,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   default: vi.fn(() => mockStreamingComposable),
 }));
 
+
 describe("VariablesValueSelector", () => {
   let wrapper: VueWrapper;
 
@@ -229,7 +229,7 @@ describe("VariablesValueSelector", () => {
         ...props,
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           "q-input": {
             name: "QInput",

@@ -18,36 +18,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full" :class="containerClass" :style="containerStyle">
     <!-- Header Section -->
     <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]" :class="headerClass">
-        <div class="col">
-          <div class="flex">
+      <div class="tw:flex tw:px-4 tw:items-center tw:justify-between tw:flex-nowrap tw:h-[68px]" :class="headerClass">
+        <div class="tw:flex tw:flex-col">
+          <div class="tw:flex">
             <OButton
               variant="ghost"
               size="icon"
               @click="handleBack"
               :data-test="`${testPrefix}-import-back-btn`"
             >
-              <q-icon name="arrow_back_ios_new" size="16px" />
+              <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
-            <div :class="titleClass" class="q-ml-md">{{ title }}</div>
+            <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
           </div>
         </div>
 
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="flex justify-center tw:gap-2">
+        <div class="tw:flex tw:ml-auto tw:gap-2">
           <OButton
-            v-close-popup
             variant="outline"
-            size="sm-action"
+            size="sm"
             :class="cancelButtonClass"
             @click="handleCancel"
             :data-test="`${testPrefix}-import-cancel-btn`"
           >{{ t('function.cancel') }}</OButton>
           <OButton
             variant="primary"
-            size="sm-action"
+            size="sm"
             type="submit"
             :class="importButtonClass"
             @click="handleImport"
@@ -59,20 +58,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex" :class="contentWrapperClass">
-      <div class="flex" :style="contentStyle">
-        <q-splitter
+    <div class="tw:flex" :class="contentWrapperClass">
+      <div class="tw:flex" :style="contentStyle">
+        <OSplitter
           v-if="showSplitter"
           class="logs-search-splitter"
-          no-scroll
           v-model="splitterModel"
           :style="splitterStyle"
           :limits="[30, 60]"
+          :horizontal="false"
         >
           <template #before>
             <div class="tw:w-full tw:h-full">
               <!-- Tabs Section -->
-              <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
+              <div class="card-container tw:py-2 tw:px-2 tw:mb-[0.625rem]">
                 <div class="app-tabs-container tw:h-[36px] tw:w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
@@ -89,19 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab === 'import_json_url'"
                 class="editor-container-url card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 tw:pb-2" @submit.prevent>
+                <div class="tw:mx-2 tw:pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
-                      <div style="width: 100%" class="q-pr-sm">
-                        <q-input
+                    <div class="tw:flex tw:mt-3 tw:mb-3">
+                        <OInput
                           :data-test="`${testPrefix}-import-url-input`"
                           v-model="url"
+                          size="md"
                           :placeholder="t('dashboard.addURL')"
-                          borderless
-                          style="padding: 10px 0px;"
                         />
-                      </div>
                     </div>
                   </slot>
 
@@ -122,40 +118,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @focus="queryEditorPlaceholderFlag = false"
                     @blur="queryEditorPlaceholderFlag = true"
                   />
-                </q-form>
+                </div>
               </div>
-
-              <!-- File Upload Tab -->
               <div
                 v-if="activeTab === 'import_json_file'"
                 class="editor-container-json card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit.prevent>
+                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
-                      <div style="width: 100%" class="q-pr-sm">
-                        <q-file
+                    <div style="width: calc(100% - 10px)" class="tw:mb-1 tw:flex">
+                      <div style="width: 100%" class="tw:pr-2">
+                        <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
-                          filled
                           bottom-slots
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
+                          helpText=".json files only"
                         >
                           <template v-slot:prepend>
-                            <q-icon name="cloud_upload" @click.stop.prevent />
+                            <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
                           </template>
                           <template v-slot:append>
-                            <q-icon
-                              name="close"
+                            <OIcon
+                              name="close" size="sm"
                               @click.stop.prevent="jsonFiles = null"
-                              class="cursor-pointer"
+                              class="tw:cursor-pointer"
                             />
                           </template>
-                          <template v-slot:hint> .json files only </template>
-                        </q-file>
+                        </OFile>
                       </div>
                     </div>
                   </slot>
@@ -177,10 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @focus="queryEditorPlaceholderFlag = false"
                     @blur="queryEditorPlaceholderFlag = true"
                   />
-                </q-form>
+                </div>
               </div>
-
-              <!-- Slot for custom tabs (e.g., built-in patterns) -->
+              <!-- Slot for custom tab (e.g., built-in patterns) -->
               <slot name="custom-tab" :activeTab="activeTab" />
             </div>
           </template>
@@ -195,10 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-h6 tw:py-2">Output Messages</div>
-                  <q-separator class="q-mx-md q-mt-md" />
+                  <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
+                  <OSeparator class="tw:mx-4 tw:mt-4" />
                   <div class="error-report-container">
-                    <div class="text-center q-pa-md text-grey-6">
+                    <div class="tw:text-center tw:p-3 tw:text-gray-400">
                       No messages to display
                     </div>
                   </div>
@@ -206,9 +198,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </slot>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
 
-        <!-- Slot for full-width content (when splitter is not shown) -->
+        <!-- Slot for tw:w-full content (when splitter is not shown) -->
         <slot name="full-width-content" v-if="!showSplitter" />
       </div>
     </div>
@@ -226,20 +218,29 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
-import { Upload, Link } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
 
 export default defineComponent({
   name: "BaseImport",
   components: {
+    OSeparator,
+    OSplitter,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
     OButton,
+    OInput,
+    OIcon,
+    OFile,
   },
   props: {
     // Title for the import page
@@ -254,12 +255,12 @@ export default defineComponent({
         {
           label: "File Upload / JSON",
           value: "import_json_file",
-          icon: Upload,
+          icon: "upload",
         },
         {
           label: "URL Import",
           value: "import_json_url",
-          icon: Link,
+          icon: "link",
         },
       ],
     },
@@ -288,7 +289,7 @@ export default defineComponent({
       type: Object,
       default: () => ({
         urlEditor: "calc(100vh - 286px)", // Default for management pages
-        fileEditor: "calc(100vh - 308px)", // Default for management pages
+        fileEditor: "calc(100vh - 290px)", // Default for management pages
         outputContainer: "calc(100vh - 130px)", // Default for management pages
         errorReport: "calc(100vh - 192px)", // Default for management pages
       }),
@@ -296,7 +297,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs",
+      default: "tw:px-[0.625rem] tw:mb-[0.625rem]",
     },
     containerStyle: {
       type: String,
@@ -338,7 +339,6 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const q = useQuasar();
 
     // State
     const jsonStr = ref<any>("");
@@ -434,10 +434,9 @@ export default defineComponent({
                     : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
-                  q.notify({
+                  toast({
                     message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
+                    position: "bottom-right",
                     timeout: 2000,
                   });
                   resolve([]);
@@ -479,27 +478,24 @@ export default defineComponent({
               emit("update:jsonStr", jsonStr.value);
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
-              q.notify({
+              toast({
                 message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
+                position: "bottom-right",
                 timeout: 2000,
               });
             }
           } catch (parseError) {
-            q.notify({
+            toast({
               message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
+              position: "bottom-right",
               timeout: 2000,
             });
           }
         }
       } catch (error) {
-        q.notify({
+        toast({
           message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-right",
           timeout: 2000,
         });
       }

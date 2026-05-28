@@ -14,75 +14,65 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
-    <div class="row items-center no-wrap q-mx-md q-pt-sm">
-      <div class="flex items-center tw:py-2">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit;">
+    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
+      <div class="tw:flex tw:items-center tw:py-2">
         <div
           no-caps
             padding="xs"
             outline
-            icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+            icon="arrow-back-ios-new"
+            class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="col" data-test="add-template-title">
-          <div v-if="isUpdatingCipherKey" class="text-h6">
+        <div class="tw:flex tw:flex-col" data-test="add-template-title">
+          <div v-if="isUpdatingCipherKey" class="tw:text-xl tw:font-semibold">
             {{ t("cipherKey.update") }}
           </div>
-          <div v-else class="text-h6">
+          <div v-else class="tw:text-xl tw:font-semibold">
             {{ t("cipherKey.add") }}
           </div>
         </div>
       </div>
     </div>
-    <q-separator />
-    <q-form
+    <OSeparator />
+    <div
       class="create-cipher-form"
-      ref="addCipherKeyFormRef"
-      @submit="onSubmit"
     >
     <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
-      <div class="row">
-        <div class="col-4 o2-input flex q-mx-md q-mt-md">
-          <q-input
+      <!-- Constrain the whole form to a sensible reading width on wide screens
+           while staying fluid below the breakpoint. Uses Tailwind's design-system
+           max-width token (max-w-3xl ≈ 48rem) instead of arbitrary px values. -->
+      <div class="tw:w-full tw:max-w-3xl">
+      <div class="tw:flex">
+        <div class="tw:w-1/3 o2-input tw:flex tw:mx-3 tw:mt-3 tw:mb-4">
+          <OInput
             data-test="add-cipher-key-name-input"
             v-model="formData.name"
             :label="t('cipherKey.name') + ' *'"
-            class="showLabelOnTop full-width"
-            stack-label
-            borderless
-            dense
+            class="tw:w-full"
             v-bind:readonly="isUpdatingCipherKey"
             v-bind:disable="isUpdatingCipherKey"
-            :rules="[
-              (val: any) =>
-                !!val
-                  ? isValidResourceName(val) ||
-                    `Characters like :, ?, /, #, and spaces are not allowed.`
-                  : 'Name is required',
-              (val: any) => maxLengthCharValidation(val, 50),
-              (val: any) =>
-                /^[a-zA-Z0-9_-]+$/.test(val) ||
-                'Only alphanumeric characters, underscores, and hyphens are allowed',
-            ]"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
             tabindex="0"
           />
         </div>
       </div>
 
       <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
-      <q-stepper
+      <OStepper
         v-model="step"
-        vertical
-        color="primary"
+        orientation="vertical"
         animated
-        class="q-mx-md q-pa-none tw:h-full"
-        header-nav
+        navigable
+        class="tw:mx-3 tw:p-0 tw:h-full"
       >
-        <q-step
+        <OStep
           data-test="cipher-key-key-store-detils-step"
           :name="1"
           :title="
@@ -91,77 +81,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             getTypeLabel(formData.key.store.type) +
             ')'
           "
-          icon="addition"
+          icon="edit"
           :done="step > 1"
         >
           <div>
-            <div class="q-w-lg">
-              <q-select
+            <div class="tw:w-full">
+              <OSelect
                 data-test="add-cipher-key-type-input"
                 v-model="formData.key.store.type"
                 :label="t('cipherKey.type') + ' *'"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop full-width"
-                stack-label
-                dense
-                borderless
-                hide-bottom-space
+                class="tw:w-full"
                 :options="cipherKeyTypes"
-                option-value="value"
-                option-label="label"
-                map-options
-                emit-value
-                :rules="[(val: any) => !!val || 'Type is required']"
+                labelKey="label"
+                valueKey="value"
+                :error="!!storeTypeError"
+                :error-message="storeTypeError"
+                @update:model-value="storeTypeError = ''"
                 tabindex="0"
               />
             </div>
             <add-openobserve-type
               v-if="formData.key.store.type == 'local'"
+              class="tw:mt-2"
+              :submitAttempted="submitAttempted"
               v-model:formData="formData"
             />
             <add-akeyless-type
               v-else-if="formData.key.store.type == 'akeyless'"
+              ref="akeylessTypeRef"
+              class="tw:mt-2"
               v-model:formData="formData"
             />
+            <div class="tw:flex tw:gap-2 tw:mt-4">
+              <OButton
+                data-test="add-report-step1-continue-btn"
+                variant="primary"
+                size="sm-action"
+                @click="validateForm(2)"
+              >
+                Continue
+              </OButton>
+            </div>
           </div>
-          <q-stepper-navigation>
-            <OButton
-              data-test="add-report-step1-continue-btn"
-              variant="primary"
-              size="sm-action"
-              @click="validateForm(2)"
-            >
-              Continue
-            </OButton>
-          </q-stepper-navigation>
-        </q-step>
+        </OStep>
 
-        <q-step
+        <OStep
           data-test="cipher-key-encryption-mechanism-step"
           :name="2"
           :title="t('cipherKey.step2')"
-          icon="addition"
+          icon="add"
           :done="step > 2"
         >
           <add-encryption-mechanism v-model:formData="formData" />
-          <q-stepper-navigation class="q-pa-none">
+          <div class="tw:flex tw:gap-2 tw:mt-4">
             <OButton
               data-test="add-cipher-key-step2-back-btn"
               variant="outline"
               size="sm-action"
-              class="q-mb-sm"
               @click="step = 1"
             >
               {{ t('common.back') }}
             </OButton>
-          </q-stepper-navigation>
-        </q-step>
-      </q-stepper>
+          </div>
+        </OStep>
+      </OStepper>
+      </div>
       </div>
     </div>
     <div class="tw:mx-2">
-            <div class="flex justify-end q-px-sm q-py-lg full-width tw:gap-2"
+            <div class="tw:flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
         <OButton
@@ -179,13 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-save-btn"
           variant="primary"
           size="sm-action"
-          type="submit"
+          @click="onSubmit"
         >
           {{ t('common.save') }}
         </OButton>
       </div>
     </div>
-    </q-form>
+    </div>
     <ConfirmDialog
       v-model="dialog.show"
       :title="dialog.title"
@@ -193,14 +181,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="dialog.okCallback"
       @update:cancel="dialog.show = false"
     />
-  </q-page>
+  </div>
 </template>
 <script lang="ts" setup>
 import { ref, onBeforeMount, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import {
   isValidResourceName,
   maxLengthCharValidation,
@@ -211,13 +198,24 @@ import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechani
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
 const router = useRouter();
-const $q = useQuasar();
 const store = useStore();
 const addCipherKeyFormRef: any = ref();
+const nameError = ref('');
+const storeTypeError = ref('');
+// Flipped to true the first time the user clicks Continue. Passed down to
+// sub-forms so they can surface "X is required" errors on un-touched fields.
+const submitAttempted = ref(false);
 const isUpdatingCipherKey: any = ref(false);
 const step = ref(1);
 const isSubmitting = ref(false);
@@ -303,8 +301,8 @@ const setupTemplateData = () => {
     if (router.currentRoute.value.query.name) {
       const name = String(router.currentRoute.value.query.name) || "";
       if (name === "") {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid cipher key name",
         });
         emit("cancel:hideform");
@@ -320,8 +318,8 @@ const setupTemplateData = () => {
         })
         .catch((error) => {
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response.data.message || "Error fetching cipher key.",
             });
@@ -331,32 +329,56 @@ const setupTemplateData = () => {
   }
 };
 
+const validateName = (): boolean => {
+  if (!formData.value.name) {
+    nameError.value = 'Name is required';
+    return false;
+  }
+  if (!isValidResourceName(formData.value.name)) {
+    nameError.value = 'Characters like :, ?, /, #, and spaces are not allowed.';
+    return false;
+  }
+  if (formData.value.name.length > 50) {
+    nameError.value = 'Name must be 50 characters or less.';
+    return false;
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(formData.value.name)) {
+    nameError.value = 'Only alphanumeric characters, underscores, and hyphens are allowed';
+    return false;
+  }
+  nameError.value = '';
+  return true;
+};
+
+const validateStoreType = (): boolean => {
+  if (!formData.value.key.store.type) {
+    storeTypeError.value = 'Type is required';
+    return false;
+  }
+  storeTypeError.value = '';
+  return true;
+};
+
 const onSubmit = () => {
+  const nameValid = validateName();
+  const typeValid = validateStoreType();
+  if (!nameValid || !typeValid) {
+    toast({ variant: "error", message: 'Please fill all the required fields' });
+    return;
+  }
   isSubmitting.value = true;
-  addCipherKeyFormRef.value
-    .validate()
-    .then((valid: any) => {
-      isSubmitting.value = false;
-      if (isUpdatingCipherKey.value) {
-        updateCipherKey();
-      } else {
-        createCipherKey();
-      }
-    })
-    .catch((error: any) => {
-      isSubmitting.value = false;
-      if (error?.status != 403) {
-        $q.notify({
-          type: "negative",
-          message: "Please fill all the required fields",
-        });
-      }
-    });
+  if (isUpdatingCipherKey.value) {
+    isSubmitting.value = false;
+    updateCipherKey();
+  } else {
+    isSubmitting.value = false;
+    createCipherKey();
+  }
 };
 
 const createCipherKey = () => {
-  const dismiss = $q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while processing your request...",
   });
   CipherKeysService.create(
@@ -365,8 +387,8 @@ const createCipherKey = () => {
   )
     .then((response) => {
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Cipher key created successfully",
       });
       emit("cancel:hideform");
@@ -374,8 +396,8 @@ const createCipherKey = () => {
     .catch((error) => {
       dismiss();
       if (error.status != 403) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error.response.data.message,
         });
       }
@@ -413,15 +435,15 @@ function filterEditedAttributes(formdata: any, originalData: any) {
 
 const updateCipherKey = () => {
   isSubmitting.value = true;
-  const dismiss = $q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while processing your request...",
   });
 
   if (JSON.stringify(formData.value) == originalData.value) {
     dismiss();
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "No changes detected",
     });
     emit("cancel:hideform");
@@ -441,8 +463,8 @@ const updateCipherKey = () => {
     .then((response) => {
       isSubmitting.value = false;
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Cipher key updated successfully",
       });
       emit("cancel:hideform");
@@ -451,8 +473,8 @@ const updateCipherKey = () => {
       isSubmitting.value = false;
       dismiss();
       if (error.status != 403) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error.response.data.message,
         });
       }
@@ -474,11 +496,37 @@ const goToCipherList = () => {
   emit("cancel:hideform");
 };
 
-const validateForm = async (stepNumber: number) => {
-  // Validate form and expand steps with errors
-  let isValid = await addCipherKeyFormRef.value.validate();
+// Template ref to the Akeyless sub-form so we can call its exposed
+// `validate()` method (which runs all field validators and sets the
+// inline error refs).
+const akeylessTypeRef = ref<any>(null);
 
-  if (isValid) {
+const validateStoreSecret = (): boolean => {
+  const type = formData.value.key.store.type;
+  if (type === 'local') {
+    const secret = formData.value.key.store.local;
+    if (!secret || (typeof secret === 'string' && secret.trim() === '')) {
+      return false;
+    }
+  }
+  if (type === 'akeyless') {
+    // Returns false if any required Akeyless field is missing; the child has
+    // already surfaced inline errors for whichever fields failed.
+    const ok = akeylessTypeRef.value?.validate?.();
+    if (ok === false) return false;
+  }
+  return true;
+};
+
+const validateForm = async (stepNumber: number) => {
+  // Flip submitAttempted so child sub-forms surface their inline errors on
+  // un-touched fields. Then run every validator (no short-circuit) so all
+  // missing fields show their errors at once.
+  submitAttempted.value = true;
+  const nameValid = validateName();
+  const typeValid = validateStoreType();
+  const secretValid = validateStoreSecret();
+  if (nameValid && typeValid && secretValid) {
     step.value = stepNumber;
   }
 };

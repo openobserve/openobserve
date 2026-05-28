@@ -4,9 +4,10 @@ const { isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.
 export class LoginPage {
   constructor(page) {
     this.page = page;
-    this.userIdInput = page.locator('[data-cy="login-user-id"]');
-    this.passwordInput = page.locator('[data-cy="login-password"]');
-    this.loginButton = page.locator('[data-cy="login-sign-in"]');
+    // OInput wrapper has data-test="<name>"; the inner native input is "<name>-field"
+    this.userIdInput = page.locator('[data-test="login-user-id-field"]');
+    this.passwordInput = page.locator('[data-test="login-password-field"]');
+    this.loginButton = page.locator('[data-test="login-sign-in"]');
   }
   async gotoLoginPage() {
     // Force navigation to correct URL (overrides any app redirect to localhost)
@@ -24,7 +25,7 @@ export class LoginPage {
     // Wait for page to stabilize before checking for internal login button
     await this.page.waitForLoadState('domcontentloaded');
 
-    const loginAsInternalLink = this.page.getByText('Login as internal user');
+    const loginAsInternalLink = this.page.locator('[data-test="login-as-internal-user"]');
 
     // Wait for the link with a reasonable timeout
     try {
@@ -83,8 +84,8 @@ export class LoginPage {
     // Check if login button is visible, if not click "Login as internal user" first
     const isLoginButtonVisible = await this.loginButton.isVisible().catch(() => false);
     if (!isLoginButtonVisible) {
-      if (await this.page.getByText('Login as internal user').isVisible()) {
-        await this.page.getByText('Login as internal user').click();
+      if (await this.page.locator('[data-test="login-as-internal-user"]').isVisible()) {
+        await this.page.locator('[data-test="login-as-internal-user"]').click();
         await this.page.waitForTimeout(1000);
       }
     }

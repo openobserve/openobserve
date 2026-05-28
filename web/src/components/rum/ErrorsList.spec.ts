@@ -15,22 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorsList from "@/components/rum/ErrorsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-node.style.height = "1024px";
-document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
-});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -42,14 +30,13 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
       if (duration < 3600) return `${Math.floor(duration / 60)}m`;
       return `${Math.floor(duration / 3600)}h`;
     }),
-    mergeRoutes: vi.fn((route1, route2) => [
+    mergeRoutes: vi.fn((route1: any, route2: any) => [
       ...(route1 || []),
       ...(route2 || []),
     ]),
   };
 });
 
-// Mock child components
 vi.mock("@/components/rum/SearchBar.vue", () => ({
   default: {
     name: "SearchBar",
@@ -64,467 +51,407 @@ vi.mock("@/plugins/traces/IndexList.vue", () => ({
   },
 }));
 
-vi.mock("@/components/rum/AppTable.vue", () => ({
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "AppTable",
+    name: "OTable",
     template: `
       <div data-test="app-table">
         <div data-test="table-columns" v-if="columns">{{ columns.length }} columns</div>
-        <div data-test="table-rows" v-if="rows">{{ rows.length }} rows</div>
-        <slot name="error_details" :column="{ error: 'Test Error', error_type: 'JavaScript Error' }"></slot>
+        <div data-test="table-rows" v-if="data">{{ data.length }} rows</div>
+        <slot name="cell-error" :row="{ error: 'Test Error', error_type: 'JavaScript Error' }"></slot>
       </div>
     `,
-    props: ["columns", "rows"],
+    props: ["columns", "data"],
   },
 }));
 
 vi.mock("@/components/rum/ErrorDetail.vue", () => ({
   default: {
     name: "ErrorDetail",
-    template:
-      '<div data-test="error-detail">{{ column.error || "No Error" }}</div>',
+    template: '<div data-test="error-detail">{{ column.error || "No Error" }}</div>',
     props: ["column"],
   },
 }));
 
-describe("ErrorsList Component", () => {
+describe("ErrorsList", () => {
   let wrapper: any;
+
+  const splitterStub = {
+    template: `
+      <div data-test="splitter">
+        <div data-test="before-section"><slot name="before" /></div>
+        <div data-test="separator-section"><slot name="separator" /></div>
+        <div data-test="after-section"><slot name="after" /></div>
+      </div>
+    `,
+    props: ["modelValue", "unit", "vertical"],
+  };
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    try {
-      wrapper = mount(ErrorsList, {
-        global: {
-          plugins: [i18n, router],
-          provide: { store },
-          stubs: {
-            "q-splitter": {
-              template: `
-                <div data-test="splitter">
-                  <div data-test="before-section"><slot name="before" /></div>
-                  <div data-test="separator-section"><slot name="separator" /></div>
-                  <div data-test="after-section"><slot name="after" /></div>
-                </div>
-              `,
-              props: ["modelValue", "unit", "vertical"],
-            },
-            "q-avatar": {
-              template: '<div data-test="avatar" />',
-              props: ["color", "text-color", "size", "icon", "style"],
-            },
-          },
-        },
-      });
+    wrapper = mount(ErrorsList, {
+      global: {
+        plugins: [i18n, router],
+        provide: { store },
+        stubs: { OSplitter: splitterStub },
+      },
+    });
 
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-    } catch (error) {
-      console.error("Mount failed:", error);
-      throw error;
-    }
+    await flushPromises();
+    await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    if (wrapper) wrapper.unmount();
     vi.clearAllTimers();
     vi.restoreAllMocks();
   });
 
+  // ==========================================================================
+  // COMPONENT MOUNTING
+  // ==========================================================================
+
   describe("Component Mounting", () => {
-    it("should mount successfully", () => {
+    it("mounts successfully without errors", () => {
+      // Arrange & Assert
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should render sessions page container", () => {
-      expect(wrapper.find(".sessions_page").exists()).toBe(true);
-    });
-
-    it("should render all child components", () => {
+    it("renders SearchBar component in the layout", () => {
+      // Arrange & Assert
       expect(wrapper.find('[data-test="search-bar"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="index-list"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
     });
 
-    it("should render splitter layout", () => {
+    it("renders IndexList component in the before slot", () => {
+      // Arrange & Assert
+      expect(wrapper.find('[data-test="index-list"]').exists()).toBe(true);
+    });
+
+    it("renders OTable component in the after slot", () => {
+      // Arrange & Assert
+      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(true);
+    });
+
+    it("renders splitter layout with before, separator and after sections", () => {
+      // Arrange & Assert
       expect(wrapper.find('[data-test="splitter"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="before-section"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="separator-section"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="separator-section"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="after-section"]').exists()).toBe(true);
     });
 
-    it("should render separator avatar", () => {
-      expect(wrapper.find('[data-test="avatar"]').exists()).toBe(true);
+    it("renders the drag grip element in the separator slot", () => {
+      // Arrange & Assert
+      expect(wrapper.find('[data-test="errors-list-splitter-drag-grip"]').exists()).toBe(true);
     });
   });
+
+  // ==========================================================================
+  // COMPONENT STRUCTURE
+  // ==========================================================================
 
   describe("Component Structure", () => {
-    it("should have correct layout structure", () => {
+    it("renders IndexList inside the before section", () => {
+      // Arrange
       const beforeSection = wrapper.find('[data-test="before-section"]');
-      const afterSection = wrapper.find('[data-test="after-section"]');
 
-      expect(beforeSection.find('[data-test="index-list"]').exists()).toBe(
-        true,
-      );
-      expect(afterSection.find('[data-test="app-table"]').exists()).toBe(true);
+      // Assert
+      expect(beforeSection.find('[data-test="index-list"]').exists()).toBe(true);
     });
 
-    it("should pass SearchBar to template", () => {
+    it("renders OTable inside the after section", () => {
+      // Arrange
+      const afterSection = wrapper.find('[data-test="after-section"]');
+
+      // Assert
+      expect(afterSection.findComponent({ name: "OTable" }).exists()).toBe(true);
+    });
+
+    it("renders SearchBar component in the component tree", () => {
+      // Arrange & Assert
       expect(wrapper.findComponent({ name: "SearchBar" }).exists()).toBe(true);
     });
-
-    it("should pass IndexList to before slot", () => {
-      const beforeSection = wrapper.find('[data-test="before-section"]');
-      expect(beforeSection.findComponent({ name: "IndexList" }).exists()).toBe(
-        true,
-      );
-    });
-
-    it("should pass AppTable to after slot", () => {
-      const afterSection = wrapper.find('[data-test="after-section"]');
-      expect(afterSection.findComponent({ name: "AppTable" }).exists()).toBe(
-        true,
-      );
-    });
   });
 
-  describe("Data Properties", () => {
-    it("should have splitterModel with default value", () => {
-      expect(wrapper.vm.splitterModel).toBe(250);
-    });
-
-    it("should have empty rows array initially", () => {
-      expect(wrapper.vm.rows).toEqual([]);
-      expect(Array.isArray(wrapper.vm.rows)).toBe(true);
-    });
-
-    it("should have columns array with correct structure", () => {
-      expect(Array.isArray(wrapper.vm.columns)).toBe(true);
-      expect(wrapper.vm.columns.length).toBeGreaterThan(0);
-    });
-  });
+  // ==========================================================================
+  // TABLE COLUMNS CONFIGURATION
+  // ==========================================================================
 
   describe("Columns Configuration", () => {
-    it("should have error column with correct properties", () => {
-      const errorColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error",
-      );
+    it("passes an array of columns to OTable with more than zero columns", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
 
-      expect(errorColumn).toBeDefined();
-      expect(errorColumn.label).toBe("Error");
-      expect(errorColumn.align).toBe("left");
-      expect(errorColumn.sortable).toBe(true);
-      expect(errorColumn.slot).toBe(true);
-      expect(errorColumn.slotName).toBe("error_details");
+      // Assert
+      expect(Array.isArray(oTable.props("columns"))).toBe(true);
+      expect(oTable.props("columns").length).toBeGreaterThan(0);
     });
 
-    it("should have type column with correct properties", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
+    it("includes an error column with header Error and sortable true", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
 
+      // Assert
+      const errorColumn = columns.find((col: any) => col.id === "error");
+      expect(errorColumn).toBeDefined();
+      expect(errorColumn.header).toBe("Error");
+      expect(errorColumn.sortable).toBe(true);
+    });
+
+    it("includes a type column with header Session Type and sortable true", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
+
+      // Assert
+      const typeColumn = columns.find((col: any) => col.id === "type");
       expect(typeColumn).toBeDefined();
-      expect(typeColumn.label).toBe("Session Type");
-      expect(typeColumn.align).toBe("left");
+      expect(typeColumn.header).toBe("Session Type");
       expect(typeColumn.sortable).toBe(true);
     });
 
-    it("should have time_spent column with correct properties", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
+    it("includes a time_spent column with header Time Spent and accessorFn", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
 
+      // Assert
+      const timeSpentColumn = columns.find((col: any) => col.id === "time_spent");
       expect(timeSpentColumn).toBeDefined();
-      expect(timeSpentColumn.label).toBe("Time Spent");
-      expect(timeSpentColumn.align).toBe("left");
+      expect(timeSpentColumn.header).toBe("Time Spent");
       expect(timeSpentColumn.sortable).toBe(true);
-      expect(typeof timeSpentColumn.sort).toBe("function");
+      expect(typeof timeSpentColumn.accessorFn).toBe("function");
     });
 
-    it("should have error_count column with correct properties", () => {
-      const errorCountColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error_count",
-      );
+    it("includes an error_count column with header Error Count and sortable true", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
 
+      // Assert
+      const errorCountColumn = columns.find((col: any) => col.id === "error_count");
       expect(errorCountColumn).toBeDefined();
-      expect(errorCountColumn.label).toBe("Error Count");
-      expect(errorCountColumn.align).toBe("left");
+      expect(errorCountColumn.header).toBe("Error Count");
       expect(errorCountColumn.sortable).toBe(true);
     });
 
-    it("should have initial_view_name column with correct properties", () => {
-      const initialViewColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "initial_view_name",
-      );
+    it("includes an initial_view_name column with header Initial View Name and sortable true", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
 
+      // Assert
+      const initialViewColumn = columns.find((col: any) => col.id === "initial_view_name");
       expect(initialViewColumn).toBeDefined();
-      expect(initialViewColumn.label).toBe("Initial View Name");
-      expect(initialViewColumn.align).toBe("left");
+      expect(initialViewColumn.header).toBe("Initial View Name");
       expect(initialViewColumn.sortable).toBe(true);
     });
-  });
 
-  describe("Column Functions", () => {
-    it("should handle error column field function", () => {
-      const errorColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error",
-      );
-      const mockRow = { error: "Test error message" };
+    it("error column has accessorKey set to error", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
+      const errorColumn = columns.find((col: any) => col.id === "error");
 
-      expect(errorColumn.field(mockRow)).toBe("Test error message");
-      expect(errorColumn.prop(mockRow)).toBe("Test error message");
+      // Assert
+      expect(errorColumn.accessorKey).toBe("error");
     });
 
-    it("should handle type column field function", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const mockRow = { type: "javascript" };
+    it("type column has accessorKey set to type", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
+      const typeColumn = columns.find((col: any) => col.id === "type");
 
-      expect(typeColumn.field(mockRow)).toBe("javascript");
-      expect(typeColumn.prop(mockRow)).toBe("javascript");
+      // Assert
+      expect(typeColumn.accessorKey).toBe("type");
     });
 
-    it("should handle time_spent column field function with formatting", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
-      const mockRow = { time_spent: "120000000" }; // 120 seconds in nanoseconds
+    it("time_spent column accessorFn converts 120 seconds of nanoseconds to 2m", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
+      const timeSpentColumn = columns.find((col: any) => col.id === "time_spent");
+      const mockRow = { time_spent: "120000000" };
 
-      const result = timeSpentColumn.field(mockRow);
-      expect(result).toBe("2m"); // formatDuration should convert 120s to 2m
+      // Act
+      const result = timeSpentColumn.accessorFn(mockRow);
+
+      // Assert
+      expect(result).toBe("2m");
     });
 
-    it("should handle time_spent column sort function", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
-      const rowA = { time_spent: "100000000" };
-      const rowB = { time_spent: "200000000" };
+    it("error_count column has accessorKey set to error_count", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
+      const errorCountColumn = columns.find((col: any) => col.id === "error_count");
 
-      const result = timeSpentColumn.sort(null, null, rowA, rowB);
-      expect(result).toBe(-100000000); // 100000000 - 200000000
+      // Assert
+      expect(errorCountColumn.accessorKey).toBe("error_count");
     });
 
-    it("should handle error_count column field function", () => {
-      const errorCountColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error_count",
-      );
-      const mockRow = { error_count: "5" };
+    it("initial_view_name column has accessorKey set to initial_view_name", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
+      const initialViewColumn = columns.find((col: any) => col.id === "initial_view_name");
 
-      expect(errorCountColumn.field(mockRow)).toBe("5");
-      expect(errorCountColumn.prop(mockRow)).toBe("5");
-    });
-
-    it("should handle initial_view_name column field function", () => {
-      const initialViewColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "initial_view_name",
-      );
-      const mockRow = { initial_view_name: "HomePage" };
-
-      expect(initialViewColumn.field(mockRow)).toBe("HomePage");
-      expect(initialViewColumn.prop(mockRow)).toBe("HomePage");
+      // Assert
+      expect(initialViewColumn.accessorKey).toBe("initial_view_name");
     });
   });
 
-  describe("AppTable Integration", () => {
-    it("should pass columns to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("columns")).toEqual(wrapper.vm.columns);
+  // ==========================================================================
+  // OTABLE INTEGRATION
+  // ==========================================================================
+
+  describe("OTable Integration", () => {
+    it("passes an empty array as data to OTable on initial mount", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+
+      // Assert
+      expect(oTable.props("data")).toEqual([]);
     });
 
-    it("should pass rows to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(wrapper.vm.rows);
-    });
-
-    it("should render error details slot", () => {
+    it("renders ErrorDetail component inside the error cell slot", () => {
+      // Arrange & Assert
       expect(wrapper.find('[data-test="error-detail"]').exists()).toBe(true);
     });
 
-    it("should pass slot props to ErrorDetail component", () => {
+    it("passes column prop to ErrorDetail component in cell slot", () => {
+      // Arrange
       const errorDetail = wrapper.findComponent({ name: "ErrorDetail" });
+
+      // Assert
       expect(errorDetail.exists()).toBe(true);
       expect(errorDetail.props("column")).toBeDefined();
     });
-  });
 
-  describe("Data Updates", () => {
-    it("should allow updating rows data", async () => {
-      const newRows = [
-        {
-          timestamp: "2024-01-01T10:00:00Z",
-          type: "javascript",
-          time_spent: "120000000",
-          error_count: "3",
-          initial_view_name: "HomePage",
-          id: "session1",
-        },
-      ];
-
-      wrapper.vm.rows = newRows;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.rows).toEqual(newRows);
+    it("renders correct column count text in OTable when columns are set", () => {
+      // Arrange & Assert
+      expect(wrapper.find('[data-test="table-columns"]').text()).toContain("5 columns");
     });
 
-    it("should allow updating splitterModel", async () => {
-      wrapper.vm.splitterModel = 300;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.splitterModel).toBe(300);
+    it("renders zero rows text in OTable when data is empty", () => {
+      // Arrange & Assert
+      expect(wrapper.find('[data-test="table-rows"]').text()).toContain("0 rows");
     });
   });
 
-  describe("TypeScript Interface", () => {
-    it("should handle Session interface structure", () => {
-      const mockSession = {
-        timestamp: "2024-01-01T10:00:00Z",
-        type: "javascript",
-        time_spent: "120000000",
-        error_count: "3",
-        initial_view_name: "HomePage",
-        id: "session1",
-      };
+  // ==========================================================================
+  // COLUMN FUNCTIONS
+  // ==========================================================================
 
-      // Test that our columns can handle the Session interface
-      const errorColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "error",
-      );
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
-
-      expect(() => errorColumn.field(mockSession)).not.toThrow();
-      expect(() => typeColumn.field(mockSession)).not.toThrow();
-      expect(() => timeSpentColumn.field(mockSession)).not.toThrow();
-      expect(() =>
-        timeSpentColumn.sort(null, null, mockSession, mockSession),
-      ).not.toThrow();
-    });
-  });
-
-  describe("Component Composition", () => {
-    it("should use useI18n composable", () => {
-      expect(wrapper.vm.t).toBeDefined();
-      expect(typeof wrapper.vm.t).toBe("function");
-    });
-
-    it("should render translated column labels", () => {
-      const columns = wrapper.vm.columns;
-
-      expect(columns[0].label).toBe("Error");
-      expect(columns[1].label).toBe("Session Type");
-      expect(columns[2].label).toBe("Time Spent");
-      expect(columns[3].label).toBe("Error Count");
-      expect(columns[4].label).toBe("Initial View Name");
-    });
-  });
-
-  describe("Layout and Styling", () => {
-    it("should have sessions_page class", () => {
-      expect(wrapper.classes()).toContain("sessions_page");
-    });
-
-    it("should apply correct CSS classes", () => {
-      const sessionsPage = wrapper.find(".sessions_page");
-      expect(sessionsPage.exists()).toBe(true);
-    });
-  });
-
-  describe("Responsive Layout", () => {
-    it("should handle splitter resizing", async () => {
-      const initialModel = wrapper.vm.splitterModel;
-      wrapper.vm.splitterModel = initialModel + 50;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.splitterModel).toBe(initialModel + 50);
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should handle empty rows gracefully", () => {
-      expect(wrapper.vm.rows).toEqual([]);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
-    });
-
-    it("should handle column field functions with missing properties", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const emptyRow = {};
-
-      expect(() => typeColumn.field(emptyRow)).not.toThrow();
-      expect(typeColumn.field(emptyRow)).toBeUndefined();
-    });
-
-    it("should handle time_spent formatting with invalid values", () => {
-      const timeSpentColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "time_spent",
-      );
+  describe("Column Functions", () => {
+    it("time_spent accessorFn does not throw when given invalid value", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
+      const timeSpentColumn = columns.find((col: any) => col.id === "time_spent");
       const invalidRow = { time_spent: "invalid" };
 
-      expect(() => timeSpentColumn.field(invalidRow)).not.toThrow();
+      // Assert
+      expect(() => timeSpentColumn.accessorFn(invalidRow)).not.toThrow();
     });
   });
 
-  describe("Integration", () => {
-    it("should work with store integration", () => {
-      // Component uses Composition API, store is provided via provide/inject
-      // Check that the component mounts successfully, which implies store integration works
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
+  // ==========================================================================
+  // TRANSLATED LABELS
+  // ==========================================================================
 
-    it("should work with router integration", () => {
-      // Router is provided via global plugins, not exposed as a vm property
-      expect(wrapper.vm.$router).toBeDefined();
-    });
+  describe("Column Label Translation", () => {
+    it("renders all expected column headers in correct order", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      const columns = oTable.props("columns");
 
-    it("should work with i18n integration", () => {
-      expect(wrapper.vm.t).toBeDefined();
-      expect(typeof wrapper.vm.t).toBe("function");
+      // Assert
+      expect(columns[0].header).toBe("Error");
+      expect(columns[1].header).toBe("Session Type");
+      expect(columns[2].header).toBe("Time Spent");
+      expect(columns[3].header).toBe("Error Count");
+      expect(columns[4].header).toBe("Initial View Name");
     });
   });
+
+  // ==========================================================================
+  // SLOT RENDERING
+  // ==========================================================================
 
   describe("Slot Rendering", () => {
-    it("should render error_details slot correctly", () => {
+    it("renders error-detail slot with non-empty content", () => {
+      // Arrange
       const errorDetailSlot = wrapper.find('[data-test="error-detail"]');
+
+      // Assert
       expect(errorDetailSlot.exists()).toBe(true);
-      // The slot should render some content, either "Test Error" or "No Error"
       expect(errorDetailSlot.text().length).toBeGreaterThan(0);
     });
 
-    it("should pass correct props to slotted components", () => {
+    it("passes column prop to the slotted ErrorDetail component", () => {
+      // Arrange
       const errorDetail = wrapper.findComponent({ name: "ErrorDetail" });
+
+      // Assert
       expect(errorDetail.props()).toHaveProperty("column");
     });
   });
 
-  describe("Performance", () => {
-    it("should handle large datasets efficiently", async () => {
-      const largeDataset = Array.from({ length: 1000 }, (_, index) => ({
-        timestamp: `2024-01-01T10:${index.toString().padStart(2, "0")}:00Z`,
-        type: index % 2 === 0 ? "javascript" : "network",
-        time_spent: (index * 1000000).toString(),
-        error_count: (index % 10).toString(),
-        initial_view_name: `View${index}`,
-        id: `session${index}`,
-      }));
+  // ==========================================================================
+  // DATA UPDATES
+  // ==========================================================================
 
-      wrapper.vm.rows = largeDataset;
-      await wrapper.vm.$nextTick();
+  describe("Data Updates", () => {
+    it("OTable data prop is an empty array on initial mount", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
 
-      expect(wrapper.vm.rows.length).toBe(1000);
-      expect(wrapper.find('[data-test="app-table"]').exists()).toBe(true);
+      // Assert
+      expect(Array.isArray(oTable.props("data"))).toBe(true);
+      expect(oTable.props("data")).toHaveLength(0);
+    });
+
+    it("OTable columns prop is a non-empty array on initial mount", () => {
+      // Arrange
+      const oTable = wrapper.findComponent({ name: "OTable" });
+
+      // Assert
+      expect(Array.isArray(oTable.props("columns"))).toBe(true);
+      expect(oTable.props("columns").length).toBeGreaterThan(0);
+    });
+  });
+
+  // ==========================================================================
+  // SPLITTER LAYOUT
+  // ==========================================================================
+
+  describe("Splitter Layout", () => {
+    it("renders IndexList inside the before section", () => {
+      // Arrange
+      const beforeSection = wrapper.find('[data-test="before-section"]');
+
+      // Assert
+      expect(beforeSection.findComponent({ name: "IndexList" }).exists()).toBe(true);
+    });
+
+    it("renders OTable inside the after section", () => {
+      // Arrange
+      const afterSection = wrapper.find('[data-test="after-section"]');
+
+      // Assert
+      expect(afterSection.findComponent({ name: "OTable" }).exists()).toBe(true);
+    });
+
+    it("renders drag grip element inside the separator slot", () => {
+      // Arrange
+      const separatorSection = wrapper.find('[data-test="separator-section"]');
+
+      // Assert
+      expect(separatorSection.find('[data-test="errors-list-splitter-drag-grip"]').exists()).toBe(true);
     });
   });
 });

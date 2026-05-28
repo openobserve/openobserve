@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor">
-    <div class="row" :style="rowStyle">
+  <div class="panel-editor tw:px-[0.625rem]! tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
+    <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
-      <div class="tw:pl-[0.625rem]">
+      <div>
         <div
-          class="col scroll card-container tw:mr-[0.625rem]"
+          class="tw:flex tw:flex-col scroll card-container tw:mr-[0.625rem]"
           style="
             overflow-y: auto;
             height: 100%;
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <q-separator vertical />
+      <OSeparator vertical />
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
@@ -51,11 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
           class="field-list-sidebar-header-collapsed card-container"
+          data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
         >
-          <q-icon
-            name="expand_all"
+          <OIcon
+            name="expand-all"
+            size="sm"
             class="field-list-collapsed-icon rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
@@ -65,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Main splitter for field list -->
-        <q-splitter
+        <OSplitter
           v-model="dashboardPanelData.layout.splitter"
           :limits="splitterLimits"
           :style="splitterStyle"
@@ -75,18 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="col scroll card-container"
+                class="tw:flex tw:flex-col card-container"
                 :style="fieldListContainerStyle"
               >
-                <div class="column" style="height: 100%">
-                  <div class="col-auto q-pa-sm">
-                    <span class="text-weight-bold">{{
-                      t("panel.fields")
-                    }}</span>
-                  </div>
-                  <div class="col" :style="fieldListInnerStyle">
-                    <FieldList :editMode="editMode" />
-                  </div>
+                <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
+                  <PanelFieldList :editMode="editMode" />
                 </div>
               </div>
             </div>
@@ -104,15 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'splitter-icon-collapse'
                   : 'splitter-icon-expand'
               "
+              class="tw:absolute!"
               @click.stop="collapseFieldList"
             >
               <template #icon-left>
-                <q-icon
+                <OIcon
                   :name="
                     dashboardPanelData.layout.showFieldList
-                      ? 'chevron_left'
-                      : 'chevron_right'
+                      ? 'chevron-left'
+                      : 'chevron-right'
                   "
+                  size="sm"
                 />
               </template>
             </OButton>
@@ -123,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="mainContentAreaClass" :style="afterSlotStyle">
               <div :class="afterSlotInnerClass" :style="afterSlotInnerStyle">
                 <div
-                  class="layout-panel-container col"
+                  class="layout-panel-container tw:flex tw:flex-col tw:w-full tw:h-full"
                   :style="layoutPanelContainerStyle"
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->
@@ -157,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       handleCustomChartTemplateSelected
                     "
                   />
-                  <q-separator v-if="resolvedConfig.showQueryBuilder" />
+                  <OSeparator v-if="resolvedConfig.showQueryBuilder" />
 
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
@@ -238,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Chart Area -->
                   <div
                     v-if="!resolvedConfig.hideChartPreview"
-                    class="col tw:relative tw:overflow-hidden"
+                    class="tw:flex tw:flex-col tw:relative tw:overflow-hidden tw:h-full"
                   >
                     <div :class="chartAreaClass" :style="chartAreaStyle">
                       <PanelSchemaRenderer
@@ -297,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="row column"
+                  class="tw:flex tw:flex-col"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
@@ -306,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <q-separator vertical />
+              <OSeparator vertical />
 
               <!-- Config Panel Sidebar -->
               <div
@@ -330,13 +327,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
 
       <!-- HTML Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'html'"
-        class="col column tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
         <div class="card-container tw:h-full tw:flex tw:flex-col">
@@ -348,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 q-mb-sm"
+            class="tw:flex-shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -371,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Markdown Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'markdown'"
-        class="col column tw:mr-[0.625rem]"
+        class="tw:flex tw:flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
         <div class="card-container tw:h-full tw:flex tw:flex-col">
@@ -383,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 q-mb-sm"
+            class="tw:flex-shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -406,23 +403,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Custom Chart Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'custom_chart'"
-        class="col tw:mr-[0.625rem]"
-        style="
-          overflow-y: auto;
-          display: flex;
-          flex-direction: row;
-          overflow-x: hidden;
-        "
+        class="tw:flex"
+        :style="{ height: contentHeight, flex: 1, overflow: 'hidden' }"
       >
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
           class="field-list-sidebar-header-collapsed card-container"
+          data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
         >
-          <q-icon
-            name="expand_all"
+          <OIcon
+            name="expand-all"
+            size="sm"
             class="field-list-collapsed-icon rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
@@ -432,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Custom chart splitter -->
-        <q-splitter
+        <OSplitter
           v-model="dashboardPanelData.layout.splitter"
           :limits="[0, 20]"
           :style="{
@@ -444,9 +438,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Field List for custom chart -->
           <template #before>
-            <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:w-full tw:h-full">
               <div
-                class="col scroll card-container"
+                class="tw:flex tw:flex-col scroll card-container"
                 :style="{ height: contentHeight, overflowY: 'auto' }"
               >
                 <div
@@ -454,13 +448,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="column"
                   style="height: 100%"
                 >
-                  <div class="col-auto q-pa-sm">
-                    <span class="text-weight-bold">{{
-                      t("panel.fields")
-                    }}</span>
-                  </div>
-                  <div class="col" style="width: 100%">
-                    <FieldList :editMode="editMode" />
+                  <div class="tw:flex tw:flex-col" style="width: 100%">
+                    <PanelFieldList :editMode="editMode" />
                   </div>
                 </div>
               </div>
@@ -473,16 +462,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="sidebar-button"
               size="sidebar-button"
-              :style="{ top: '14px', zIndex: 100 }"
+              :style="{ zIndex: 100 }"
+              class="tw:top-[0.875rem]! tw:left-[0rem]! tw:absolute!"
               @click="collapseFieldList"
             >
               <template #icon-left>
-                <q-icon
+                <OIcon
                   :name="
                     dashboardPanelData.layout.showFieldList
-                      ? 'chevron_left'
-                      : 'chevron_right'
+                      ? 'chevron-left'
+                      : 'chevron-right'
                   "
+                  size="sm"
                 />
               </template>
             </OButton>
@@ -491,16 +482,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart content area -->
           <template #after>
             <div
-              class="row card-container"
-              :style="{ height: contentHeight, overflowY: 'auto' }"
+              class="tw:flex card-container"
+              :style="{ height: contentHeight, overflow: 'hidden' }"
             >
               <div
-                class="col scroll"
-                style="height: 100%; display: flex; flex-direction: column"
+                class="tw:flex tw:flex-col scroll tw:flex-1 tw:min-w-0 tw:h-full"
               >
                 <!-- Editor/Preview splitter -->
                 <div style="height: 500px; flex-shrink: 0; overflow: hidden">
-                  <q-splitter
+                  <OSplitter
                     class="query-editor-splitter"
                     v-model="splitterModel"
                     style="height: 100%"
@@ -532,16 +522,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="custom-chart-type-selector-btn"
                           >
                             <template #icon-left
-                              ><q-icon name="bar_chart"
+                              ><OIcon name="bar-chart" size="sm"
                             /></template>
                             Example Charts
                           </OButton>
-                          <q-dialog v-model="showCustomChartTypeSelector">
+                          <ODialog
+                            data-test="panel-editor-custom-chart-type-selector-dialog"
+                            v-model:open="showCustomChartTypeSelector"
+                            :show-close="false"
+                            :width="95"
+                          >
                             <CustomChartTypeSelector
                               @select="handleChartTypeSelection"
                               @close="showCustomChartTypeSelector = false"
                             />
-                          </q-dialog>
+                          </ODialog>
                         </div>
                       </div>
                     </template>
@@ -549,14 +544,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Splitter separator -->
                     <template #separator>
                       <div class="splitter-vertical splitter-enabled"></div>
-                      <q-avatar
-                        color="primary"
-                        text-color="white"
-                        size="20px"
-                        icon="drag_indicator"
-                        style="top: 10px; left: 3.5px"
+                      <div
+                        class="tw:absolute tw:bg-button-primary tw:text-button-primary-foreground tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+                        style="top: 10px; left: 3.5px; z-index: 100"
                         data-test="panel-editor-custom-chart-drag-indicator"
-                      />
+                      >
+                        <OIcon name="drag-indicator" size="xs" />
+                      </div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -600,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       />
                     </template>
-                  </q-splitter>
+                  </OSplitter>
                 </div>
 
                 <!-- Errors Component -->
@@ -615,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor for custom chart -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="row column"
+                  class="tw:flex tw:flex-col"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
@@ -624,7 +618,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <q-separator vertical />
+              <OSeparator vertical />
 
               <!-- Config Panel Sidebar for custom chart -->
               <div class="col-auto">
@@ -641,17 +635,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
     </div>
 
     <!-- Legends Dialog -->
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </q-dialog>
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+      data-test="panel-editor-legends-dialog"
+    />
   </div>
 </template>
 
@@ -682,13 +675,17 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 // ============================================================================
 
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
-import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
+import PanelFieldList from "@/components/dashboards/addPanel/PanelFieldList.vue";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(
@@ -845,15 +842,15 @@ const showCustomChartTypeSelector = ref(false);
 const contentHeight = computed(() => {
   switch (props.pageType) {
     case "dashboard":
-      return "calc(100vh - var(--navbar-height) - 74px)";
+      return "100%";
     case "metrics":
-      return "calc(100vh - var(--navbar-height) - 70px)";
+      return "100%";
     case "logs":
       return "calc(100% - 36px)";
     case "build":
       return "calc(100vh - var(--navbar-height) - 24px)";
     default:
-      return "calc(100vh - var(--navbar-height) - 74px)";
+      return "100%";
   }
 });
 
@@ -870,39 +867,51 @@ const chartAreaStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return {};
   }
-  return { height: "calc(100vh - var(--navbar-height) - 464px)", marginTop: '0px' };
+  return {
+    height: "calc(100vh - var(--navbar-height) - 464px)",
+    marginTop: "0px",
+  };
 });
 
 // Main content area class - logs needs flat background without card styling
 const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
-    return "row card-container";
+    return "tw:flex card-container";
   }
-  return "row card-container";
+  return "tw:flex card-container tw:h-full tw:overflow-y-hidden";
 });
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto
 const rowStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return { height: "100%" };
+    return { height: "100%", width: "100%" };
   }
-  return { overflowY: "auto" };
+  return { overflowY: "auto", width: '100%' };
 });
 
 // Main content container class - logs/build uses vertical flex, others use horizontal
 const mainContentContainerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "col flex column";
+    return "tw:flex tw:flex-row tw:flex-1";
   }
-  return "col tw:mr-[0.625rem]";
+  return "tw:flex tw:flex-row tw:flex-1";
 });
 
 // Main content container style
 const mainContentContainerStyle = computed(() => {
-  if (props.pageType === "logs" || props.pageType === "build") {
-    return { width: "100%", height: "100%" };
-  }
-  return { display: "flex", flexDirection: "row", overflowX: "hidden" };
+  // if (props.pageType === "logs" || props.pageType === "build") {
+  //   return { width: "100%", height: "100%" };
+  // }
+  // flex:1 and minWidth:0 are required so this column fills the remaining row width
+  // (alongside the fixed-width ChartSelection sidebar) and lets the inner OSplitter
+  // resolve its `width: 100%` against a real parent width instead of intrinsic content.
+  return {
+    display: "flex",
+    flexDirection: "row",
+    overflowX: "hidden",
+    flex: "1 1 0%",
+    minWidth: "0",
+  };
 });
 
 // Splitter limits - logs/build uses [0, 100], others use [0, 20]
@@ -915,9 +924,6 @@ const splitterLimits = computed(() => {
 
 // Splitter style
 const splitterStyle = computed(() => {
-  if (props.pageType === "logs" || props.pageType === "build") {
-    return { width: "100%", height: "100%" };
-  }
   return {
     width: dashboardPanelData.layout.showFieldList
       ? "100%"
@@ -931,20 +937,18 @@ const afterSlotStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return {
       height: "100%",
-      width: dashboardPanelData.layout.showFieldList
-        ? "100%"
-        : "calc(100% - 58px)",
+      width: "100%"
     };
   }
   return {};
 });
 
-// After slot inner div class - logs/build uses "col", others use "col scroll"
+// After slot inner div class - logs/build uses "tw:flex tw:flex-col", others use "tw:flex tw:flex-col scroll"
 const afterSlotInnerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "col";
+    return "tw:flex tw:flex-col tw:flex-1 tw:min-w-0";
   }
-  return "col scroll";
+  return "scroll tw:flex-1 tw:min-w-0";
 });
 
 // After slot inner div style
@@ -960,7 +964,11 @@ const layoutPanelContainerStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%" };
   }
-  return {};
+  // height: auto overrides the tw:h-full class so the container sizes to its
+  // content instead of filling afterSlotInner. This also makes the chart area
+  // wrapper's tw:h-full resolve to auto, matching the inner chart div's
+  // explicit height and eliminating the empty space below the legends.
+  return { height: "auto" };
 });
 
 // Field list wrapper class - logs/build doesn't need padding-bottom
@@ -968,23 +976,20 @@ const fieldListWrapperClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return "tw:w-full tw:h-full";
   }
-  return "tw:w-full tw:h-full tw:pb-[0.625rem]";
+  return "tw:w-full tw:h-full";
 });
 
 // Field list container style
 const fieldListContainerStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return { height: "100%", overflowY: "auto" };
+    return { height: "100%" };
   }
-  return { height: contentHeight.value, overflowY: "auto" };
+  return { height: contentHeight.value };
 });
 
-// Field list inner div style - logs/build needs height: 100%
+// Field list inner div style - needs height: 100% so PanelFieldList's h-full resolves correctly
 const fieldListInnerStyle = computed(() => {
-  if (props.pageType === "logs" || props.pageType === "build") {
-    return { width: "100%", height: "100%" };
-  }
-  return { width: "100%" };
+  return { width: "100%", height: "100%" };
 });
 
 // Search type for PanelSchemaRenderer
@@ -1255,7 +1260,7 @@ defineExpose({
   background-color: orange;
 }
 
-:deep(.query-editor-splitter .q-splitter__separator) {
+:deep(.query-editor-splitter .o-splitter__separator) {
   background-color: transparent !important;
 }
 
@@ -1279,6 +1284,7 @@ defineExpose({
   writing-mode: vertical-rl;
   text-orientation: mixed;
   font-weight: bold;
+  font-size: 1rem;
 }
 
 .warning {

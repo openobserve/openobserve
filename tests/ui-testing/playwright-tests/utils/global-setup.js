@@ -46,50 +46,54 @@ async function globalSetup() {
     const pageTitle = await page.title();
     testLogger.debug('Page loaded', { currentUrl, pageTitle });
 
-    // Handle internal user login if needed
-    const internalUserButton = page.getByText('Login as internal user');
-    if (await internalUserButton.isVisible()) {
-      await internalUserButton.click();
-      testLogger.debug('Clicked internal user login button');
-      await page.waitForLoadState('domcontentloaded');
+    // Handle internal user login if needed — data-test only, no text matching.
+    const internalUserButton = page.locator('[data-test="login-as-internal-user"]');
+    if (await internalUserButton.count()) {
+      if (await internalUserButton.first().isVisible().catch(() => false)) {
+        await internalUserButton.first().click();
+        testLogger.debug('Clicked internal user login button');
+        await page.waitForLoadState('domcontentloaded');
+      }
     }
 
-    // Fill login credentials
-    const userIdField = page.locator('[data-cy="login-user-id"]');
-    const passwordField = page.locator('[data-cy="login-password"]');
-    const signInButton = page.locator('[data-cy="login-sign-in"]');
+    // Fill login credentials — data-test only. OInput's WRAPPER carries
+    // `data-test="<name>"`; the actual <input>/<textarea> element inside it
+    // carries `data-test="<name>-field"`. Playwright's fill() requires a
+    // fillable element so we target the -field suffix directly.
+    const userIdField = page.locator('[data-test="login-user-id-field"]');
+    const passwordField = page.locator('[data-test="login-password-field"]');
+    const signInButton = page.locator('[data-test="login-sign-in"]');
 
-    // Debug: Check if login fields exist
     testLogger.debug('Waiting for login fields to appear...');
     try {
       await userIdField.waitFor({ state: 'visible', timeout: 15000 });
     } catch (e) {
-      // Take screenshot and log page content for debugging
       await page.screenshot({ path: path.join(__dirname, 'debug-login-page.png') });
-      const bodyText = await page.locator('body').textContent();
+      const html = await page.content();
       testLogger.error('Login field not found', {
         url: page.url(),
-        bodyPreview: bodyText?.substring(0, 500)
+        bodyPreview: html?.substring(0, 500),
       });
       throw new Error(`Login page did not load correctly. Current URL: ${page.url()}`);
     }
     await userIdField.fill(process.env["ZO_ROOT_USER_EMAIL"]);
-    
+
     await passwordField.waitFor({ state: 'visible' });
     await passwordField.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-    
+
     await signInButton.waitFor({ state: 'visible' });
     await signInButton.click();
 
     testLogger.debug('Login credentials submitted');
 
-    // Wait for login to complete - look for navigation or success indicators
+    // Wait for login to complete — look for navigation or success indicators.
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    
-    // Verify login success by checking for a known element
-    await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ 
-      state: 'visible', 
-      timeout: 10000 
+
+    // Verify login success by checking for the home menu item — the home
+    // route is "/" so the resulting data-test contains a literal slash.
+    await page.locator('[data-test="menu-link-/-item"]').waitFor({
+      state: 'visible',
+      timeout: 10000,
     });
     
     testLogger.info('Global login authentication successful');

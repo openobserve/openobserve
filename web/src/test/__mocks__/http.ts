@@ -15,7 +15,8 @@
 
 import { vi } from "vitest";
 import axios from "axios";
-import { Notify } from "quasar"; // ✅ Ensure Quasar Notify works in mock
+import { toast } from "@/lib/feedback/Toast/useToast";
+ // ✅ Ensure Quasar  works in mock
 
 vi.mock("@/services/http.ts", () => ({
   default: () => {
@@ -54,9 +55,8 @@ vi.mock("@/services/http.ts", () => ({
 
         if (error?.response?.status === 403) {
           console.log("Mock 403: Forbidden - Showing notification...");
-          Notify.create({
+          toast({
             message: "Unauthorized Access: Please contact your administrator.",
-            color: "negative",
             timeout: 0,
           });
           return Promise.reject({

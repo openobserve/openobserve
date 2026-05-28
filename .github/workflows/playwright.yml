@@ -6,7 +6,7 @@ on:
       - "main"
   pull_request:
     branches:
-      - "*"
+      - "**"
   merge_group:
 
 concurrency:
@@ -194,8 +194,9 @@ jobs:
       actions: read
     # container:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
-    #   options: --user root 
+    #   options: --user root
     strategy:
+      fail-fast: false
       matrix:
         include:
           - testfolder: "GeneralTests"
@@ -248,8 +249,7 @@ jobs:
               ]
           - testfolder: "Logs-Features"
             browser: "chrome"
-            run_files:
-              [
+            run_files: [
                 "logs-autocomplete-suggestions.spec.js",
                 # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
                 "logs-sql-autocomplete.spec.js",
@@ -262,8 +262,7 @@ jobs:
               ]
           - testfolder: "Alerts"
             browser: "chrome"
-            run_files:
-              [
+            run_files: [
                 # "alerts-e2e-flow.spec.js",
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
@@ -304,7 +303,8 @@ jobs:
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
-            run_files: [
+            run_files:
+              [
                 "custom-charts.spec.js",
                 "dashboard-geoMap.spec.js",
                 "dashboard-maps.spec.js",
@@ -322,7 +322,7 @@ jobs:
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js",]
+            run_files: ["dashboard-streaming.spec.js"]
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
@@ -340,17 +340,19 @@ jobs:
               ]
           - testfolder: "Functions"
             browser: "chrome"
-            run_files: [
+            run_files:
+              [
                 "js-transform-type.spec.js",
                 "row-expansion.spec.js",
                 "enrichment-table-url.spec.js",
               ]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files: [
-              "reportsScheduleNow.spec.js",
-              "reportsScheduleLater.spec.js",
-              "reportFolders.spec.js"
+            run_files:
+              [
+                "reportsScheduleNow.spec.js",
+                "reportsScheduleLater.spec.js",
+                "reportFolders.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"
@@ -374,7 +376,6 @@ jobs:
                 "tracesAnalyzeDimensions.spec.js",
                 "traces-autocomplete-suggestions.spec.js",
               ]
-
           - testfolder: "Metrics"
             browser: "chrome"
             run_files:
@@ -410,16 +411,10 @@ jobs:
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-table-pagination.spec.js",
-              ]
+            run_files: ["dashboard-table-pagination.spec.js"]
           - testfolder: "Dashboard-Pivot-Table"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-pivot-table.spec.js",
-              ]
+            run_files: ["dashboard-pivot-table.spec.js"]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"
             run_files:
@@ -841,7 +836,7 @@ jobs:
             fi
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
-          fi 
+          fi
 
       - name: Upload blob report to GitHub Actions Artifacts
         if: ${{ !cancelled() }}
@@ -873,7 +868,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: "22"
 
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci
@@ -1050,7 +1045,13 @@ jobs:
     runs-on:
       labels: repo-openobserve-standard-4
     permissions: {}
-    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports]
+    needs:
+      [
+        check_changes,
+        build_binary,
+        ui_integration_tests,
+        merge_and_upload_reports,
+      ]
     if: always()
     steps:
       - name: Check test results

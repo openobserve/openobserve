@@ -75,12 +75,10 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-// Mock quasar
-const mockNotify = vi.fn();
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: mockNotify,
-  }),
+// Mock toast
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
 }));
 
 // Mock vue-router
@@ -611,12 +609,11 @@ describe("logsUtils", () => {
   });
 
   describe("showCancelSearchNotification", () => {
-    it("should call notify with correct parameters", () => {
+    it("should call toast with correct parameters", () => {
       utils.showCancelSearchNotification();
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Running query cancelled successfully",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-right",
         timeout: 4000,
       });
     });

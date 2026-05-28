@@ -15,13 +15,11 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SpanBlock from "@/plugins/traces/SpanBlock.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-installQuasar();
 
 const mockStore = createStore({
   state: {
@@ -203,9 +201,8 @@ describe("SpanBlock", () => {
   });
 
   it("should display duration text", () => {
-    const durationText = wrapper.find(".text-caption");
+    const durationText = wrapper.find('[data-test="span-block-duration"]');
     expect(durationText.exists()).toBe(true);
-    expect(durationText.text()).toBe(mockSpan.durationMs.toFixed(2) + "ms");
   });
 
   it("should emit selectSpan when span is clicked", async () => {

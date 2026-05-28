@@ -10,13 +10,18 @@ import {
   DropdownMenuPortal,
   DropdownMenuContent,
 } from "reka-ui";
-import { ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import {
+  O_DROPDOWN_NESTED_KEY,
+  type DropdownNestedRegistry,
+} from "./ODropdown.context";
 
 const props = withDefaults(defineProps<DropdownProps>(), {
   modal: false,
   side: "bottom",
   align: "start",
   sideOffset: 4,
+  persistent: false,
 });
 
 const emit = defineEmits<DropdownEmits>();
@@ -26,7 +31,6 @@ defineSlots<DropdownSlots>();
 // Vue boolean-casts absent `open` prop to `false`, which would lock
 // DropdownMenuRoot into controlled-closed mode. We manage state ourselves
 // so reka-ui stays responsive in both uncontrolled and controlled usage.
-// Initialise from props.open so `open=true` works on first render.
 const internalOpen = ref(props.open ?? false);
 
 watch(
@@ -41,33 +45,140 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 
-/**
- * Prevent Reka UI from closing the dropdown when a pointer-down occurs inside
- * a Quasar body-portaled element (e.g. q-select menu, q-btn-dropdown).
- * Reka's DismissableLayer considers those clicks "outside" because Quasar
- * renders .q-menu nodes directly to <body>, not inside DropdownMenuContent.
- */
+// Register with the nearest ancestor ODropdown while this dropdown is open
+// so the ancestor's pointer-down-outside handler ignores clicks from our portal.
+const parentDropdownRegistry = inject<DropdownNestedRegistry | null>(
+  O_DROPDOWN_NESTED_KEY,
+  null,
+);
+let closeNestedRegistration: ((skipGrace?: boolean) => void) | null = null;
+// Set to true in handlePointerDownOutside when this dropdown is about to close
+// from a real outside click so the parent skips the grace period and also closes.
+let closingFromOutside = false;
+
+// flush:'sync' is required so the parent's nestedOverlayCount increments
+// before reka-ui auto-focuses the new portal content (which would otherwise
+// fire focus-outside on the parent and close it).
+watch(
+  internalOpen,
+  (open) => {
+    if (!parentDropdownRegistry) return;
+    if (open && !closeNestedRegistration) {
+      closeNestedRegistration = parentDropdownRegistry.open();
+    } else if (!open && closeNestedRegistration) {
+      const skipGrace = closingFromOutside;
+      closingFromOutside = false;
+      closeNestedRegistration(skipGrace);
+      closeNestedRegistration = null;
+    }
+  },
+  { flush: "sync" },
+);
+
+onBeforeUnmount(() => {
+  if (closeNestedRegistration) {
+    closeNestedRegistration();
+    closeNestedRegistration = null;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Nested-overlay coordination
+// ═══════════════════════════════════════════════════════════════════════════
+// Descendant overlays (OSelect / OCombobox / nested ODropdown / etc.) call
+// `open()` from the injected registry when they open and the returned
+// `close` when they close. While at least one descendant is open — or one
+// just closed within the same pointer-event tick — outside-clicks on us
+// originate from the descendant's portal, not from a real "outside" click,
+// so we silently swallow them.
+const nestedOverlayCount = ref(0);
+const lastNestedCloseAt = ref(0);
+const NESTED_CLOSE_GRACE_MS = 50;
+
+provide(O_DROPDOWN_NESTED_KEY, {
+  open: () => {
+    nestedOverlayCount.value++;
+    return (skipGrace?: boolean) => {
+      nestedOverlayCount.value = Math.max(0, nestedOverlayCount.value - 1);
+      // Skip grace when the child closed because of a real outside click —
+      // the parent should honour that same click and close too.
+      if (!skipGrace) lastNestedCloseAt.value = Date.now();
+    };
+  },
+});
+
+function withinNestedCloseGrace(): boolean {
+  return Date.now() - lastNestedCloseAt.value < NESTED_CLOSE_GRACE_MS;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// `persistent` prop — controls how many real outside-clicks must happen
+// before the dropdown actually dismisses. See ODropdown.types.ts for spec.
+// ═══════════════════════════════════════════════════════════════════════════
+const persistenceBudget = computed<number>(() => {
+  if (props.persistent === false) return 0;
+  if (props.persistent === true) return Number.POSITIVE_INFINITY;
+  // Numeric value: clamp at >= 1 so any positive number means "needs at
+  // least one swallow".
+  const n = Number(props.persistent);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+});
+
+// Counts how many outside-clicks the dropdown has already swallowed in
+// the current open-session. Reset each time we open.
+const swallowedOutsideClicks = ref(0);
+
+watch(internalOpen, (open) => {
+  if (open) swallowedOutsideClicks.value = 0;
+});
+
+function shouldSwallowRealOutsideClick(): boolean {
+  if (persistenceBudget.value === 0) return false;
+  if (persistenceBudget.value === Number.POSITIVE_INFINITY) return true;
+  if (swallowedOutsideClicks.value < persistenceBudget.value) {
+    swallowedOutsideClicks.value++;
+    return true;
+  }
+  return false;
+}
+
 function handlePointerDownOutside(event: Event) {
-  const target = (event as CustomEvent<{ originalEvent: PointerEvent }>).detail
-    ?.originalEvent?.target as Element | null;
-  if (target?.closest('.q-menu')) {
+  // Click came from a still-open descendant overlay, OR a descendant just
+  // closed in the same pointer-event tick → never our problem.
+  if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
+    event.preventDefault();
+    return;
+  }
+  // Real outside click. Honour `persistent` (false / true / number).
+  if (shouldSwallowRealOutsideClick()) {
+    event.preventDefault();
+    return;
+  }
+  // This dropdown is closing from a real outside click. Signal to the parent
+  // (if any) to skip the grace period so it also closes on this same click.
+  closingFromOutside = true;
+}
+
+function handleFocusOutside(event: Event) {
+  // When nested inside a parent ODropdown, reka-ui focuses parent items on
+  // pointermove (hover), stealing focus from this portal. Suppress focus-outside
+  // so the inner dropdown only closes via click-outside or Escape.
+  if (parentDropdownRegistry) {
+    event.preventDefault();
+    return;
+  }
+  if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
 }
 
-/**
- * When the Quasar q-select popup opens, focus moves into the .q-menu node
- * which lives outside DropdownMenuContent in the DOM. Reka UI fires
- * focus-outside and tries to return focus to the trigger, which causes the
- * browser to land on whatever is behind the dropdown (e.g. the search input).
- * Prevent default so focus stays inside the Quasar popup as intended.
- */
-function handleFocusOutside(event: Event) {
-  const target = (event as CustomEvent<{ originalEvent: FocusEvent }>).detail
-    ?.originalEvent?.target as Element | null;
-  if (target?.closest('.q-menu')) {
-    event.preventDefault();
-  }
+// Close this dropdown when the nearest sidebar scroll container scrolls,
+// preventing the portal from floating disconnected at the top of the screen.
+const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+if (sidebarScrollTick) {
+  watch(sidebarScrollTick, () => {
+    if (internalOpen.value) handleOpenChange(false);
+  });
 }
 </script>
 
@@ -86,6 +197,7 @@ function handleFocusOutside(event: Event) {
         :side="side"
         :align="align"
         :side-offset="sideOffset"
+        :hide-when-detached="true"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[

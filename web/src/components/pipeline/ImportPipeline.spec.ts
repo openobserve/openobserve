@@ -16,13 +16,10 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ImportPipeline from "@/components/pipeline/ImportPipeline.vue";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 // --------------------------------------------------------------------------
 // Module mocks
@@ -1076,9 +1073,9 @@ describe("ImportPipeline.vue", () => {
       expect(wrapper.vm.router).toBeDefined();
     });
 
-    it("exposes q (Quasar) on vm", () => {
+    it("exposes i18n t function on vm", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.q).toBeDefined();
+      expect(typeof wrapper.vm.$t).toBe("function");
     });
   });
 });

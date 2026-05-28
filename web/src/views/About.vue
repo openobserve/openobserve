@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
+  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage tw:pt-1">
     <div class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto">
-      <div class="q-px-sm q-py-sm tw:h-full">
+      <div class="tw:px-2 tw:py-2 tw:h-full">
         <!-- Hero Section -->
         <div class="hero-section">
           <div class="tw:flex tw:flex-col tw:flex-row tw:items-center tw:justify-between tw:gap-8">
@@ -37,19 +37,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ store.state.zoConfig.version }}</span>
                 </div>
                 <div class="build-badge tw:capitalize" :class="store.state.theme === 'dark' ? 'build-badge-dark' : 'build-badge-light'">
-                  <q-icon name="workspaces" size="20px" />
+                  <OIcon name="workspaces" size="sm" />
                   <span>{{ store.state.zoConfig.build_type }}</span>
                 </div>
               </div>
             </div>
             <div class="stats-grid">
               <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
-                <q-icon name="code" size="32px" class="stat-icon" />
+                <OIcon name="code" size="lg" class="stat-icon" />
                 <div class="stat-label">{{ t("about.commit_lbl") }}</div>
                 <div class="stat-value tw:font-mono">{{ store.state.zoConfig.commit_hash }}</div>
               </div>
               <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
-                <q-icon name="event" size="32px" class="stat-icon" />
+                <OIcon name="event" size="lg" class="stat-icon" />
                 <div class="stat-label">{{ t("about.build_lbl") }}</div>
                 <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
               </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4">
               <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="code" size="24px" />
+                  <OIcon name="code" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.os_libraries") }}</h3>
               </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="link-badge"
               >
-                <q-icon name="settings" size="16px" class="tw:mr-1" />
+                <OIcon name="settings" size="sm" class="tw:mr-1" />
                 Cargo.toml
               </a>
               <a
@@ -86,15 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="link-badge"
               >
-              <q-icon name="backpack" class="tw:mr-1" />
+              <OIcon name="backpack" size="sm" class="tw:mr-1" />
                 package.json
               </a>
               <a href="https://npmjs.com" target="_blank" class="link-badge">
-                <q-icon name="javascript" size="16px" class="tw:mr-1" />
+                <OIcon name="javascript" size="md" class="tw:mr-1" />
                 npmjs.com
               </a>
               <a href="https://crates.io" target="_blank" class="link-badge">
-                <q-icon name="inventory_2" size="16px" class="tw:mr-1" />
+                <OIcon name="inventory-2" size="sm" class="tw:mr-1" />
                 crates.io
               </a>
             </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4">
               <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="shield" size="24px" />
+                  <OIcon name="shield" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.license_info") }}</h3>
               </div>
@@ -123,12 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("about.license_info_msg") }}
               </p>
             </div>
-            <div class="tw:mt-4 tw:p-3 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-blue-400' : 'tw:bg-blue-500'">
-              <p class="tw:text-sm tw:mb-0">
-                <q-icon name="info" size="16px" class="tw:mr-1" />
-                {{ t("about.license_info_note") }}
-              </p>
-            </div>
+            <OBanner variant="info" icon="info" class="tw:mt-4">
+              {{ t("about.license_info_note") }}
+            </OBanner>
           </div>
 
           <!-- Community Card (if no license card) -->
@@ -139,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4" style="min-height: 120px;">
               <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="groups" size="24px" />
+                  <OIcon name="groups" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.community_lbl") }}</h3>
               </div>
@@ -149,11 +146,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:flex tw:flex-wrap tw:gap-2">
               <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
-                <q-icon name="code" size="16px" class="tw:mr-1" />
+                <OIcon name="code" size="sm" class="tw:mr-1" />
                 GitHub
               </a>
               <a href="https://openobserve.ai" target="_blank" class="link-badge">
-                <q-icon name="language" size="16px" class="tw:mr-1" />
+                <OIcon name="language" size="sm" class="tw:mr-1" />
                 Website
               </a>
             </div>
@@ -166,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
               <div class="tw:flex tw:items-center tw:gap-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="workspace_premium" size="24px" />
+                  <OIcon name="workspace-premium" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.ent_lincese_detail_lbl") }}</h3>
               </div>
@@ -178,84 +175,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-if="loadingLicense" class="tw:text-center tw:py-8">
-              <q-spinner size="40px" color="primary" />
+              <OSpinner size="md" />
               <div class="tw:mt-3 tw:text-sm tw:opacity-70">{{ t("about.loading_license_info") }}</div>
             </div>
 
             <div v-else-if="!licenseData || !licenseData.license" class="tw:py-4">
-              <div class="tw:flex tw:items-start tw:gap-3 tw:p-4 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-yellow-400' : 'tw:bg-yellow-500'">
-                <q-icon name="warning" size="24px" class="tw:text-yellow-500" />
-                <div>
-                  <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
-                  <p class="tw:text-sm tw:mb-2 tw:opacity-80">
-                    {{ t("about.no_license_installed_msg") }}
-                  </p>
-                  <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:opacity-70 tw:mb-2">
-                    {{ t("about.installation_id_lbl") }}: <code class="tw:px-2 tw:py-1 tw:rounded tw:bg-black tw:bg-opacity-10">{{ licenseData.installation_id }}</code>
-                  </div>
+              <OBanner variant="warning" icon="warning">
+                <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
+                <p class="tw:text-sm tw:mb-2">
+                  {{ t("about.no_license_installed_msg") }}
+                </p>
+                <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:mb-2 tw:flex tw:items-center tw:flex-wrap tw:gap-1">
+                  {{ t("about.installation_id_lbl") }}: <code class="tw:px-2 tw:py-0.5 tw:rounded tw:font-mono tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-code-bg)] tw:select-all">{{ licenseData.installation_id }}</code>
                 </div>
-              </div>
+              </OBanner>
             </div>
 
             <div v-else>
               <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
                 <div>
-                  <q-markup-table flat bordered dense class="compact-table">
+                  <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
                     <tbody>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.lincese_id_lbl") }}</td>
-                        <td>{{ licenseData.license.license_id }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.lincese_id_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ licenseData.license.license_id }}</td>
                       </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.status_lbl") }}</td>
-                        <td>
-                          <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.status_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">
+                          <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
                             {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
-                          </q-badge>
+                          </OBadge>
                         </td>
                       </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.create_at_lbl") }}</td>
-                        <td>{{ formatLicenseDate(licenseData.license.created_at) }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.create_at_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
                       </tr>
                       <tr>
-                        <td class="tw:font-semibold">{{ t("about.expires_at_lbl") }}</td>
-                        <td>
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.expires_at_lbl") }}</td>
+                        <td class="tw:px-3 tw:py-2">
                           <div class="tw:flex tw:items-center tw:justify-start tw:gap-4">
                             <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
                           </div>
                         </td>
                       </tr>
                     </tbody>
-                  </q-markup-table>
+                  </table>
                 </div>
 
                 <div>
-                  <q-markup-table flat bordered dense class="compact-table">
+                  <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
                     <thead>
                       <tr>
-                        <th colspan="2" class="tw:text-center tw:font-semibold">{{ t("about.usage_limits") }}</th>
+                        <th colspan="2" class="tw:text-center tw:font-semibold tw:px-3 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.usage_limits") }}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.ingestion_type") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.ingestion_type") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
                       </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.ingestion_limit") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '50 GB / day' }}</td>
+                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.ingestion_limit") }}</td>
+                        <td class="tw:px-3 tw:py-2">{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '50 GB / day' }}</td>
                       </tr>
                       <tr v-if="licenseData.ingestion_used !== undefined">
-                        <td class="tw:font-semibold">{{ t("about.today_usage") }}</td>
-                        <td>
+                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.today_usage") }}</td>
+                        <td class="tw:px-3 tw:py-2">
                           <span :class="licenseData.ingestion_used > 90 ? 'tw:text-red-500 tw:font-bold' : licenseData.ingestion_used > 70 ? 'tw:text-orange-500' : ''">
                             {{ licenseData.ingestion_used.toFixed(2) }}%
                           </span>
                         </td>
                       </tr>
                     </tbody>
-                  </q-markup-table>
+                  </table>
                 </div>
               </div>
             </div>
@@ -267,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -279,21 +273,28 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageAbout",
   components: {
     FeatureComparisonTable,
     OButton,
+    OIcon,
+    OBadge,
+    OSpinner,
+    OBanner,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
     const pageData = ref("Page Data");
     const { t } = useI18n();
-    const $q = useQuasar();
     const licenseData = ref<any>(null);
     const loadingLicense = ref(false);
 
@@ -367,9 +368,8 @@ export default defineComponent({
         });
       } else {
         // Show error notification when user doesn't have access to meta org
-          $q.notify({
+          toast({
             message: "You are not authorized to manage the license.",
-            color: 'negative',
             timeout: 5000,
           })
         // router.push({

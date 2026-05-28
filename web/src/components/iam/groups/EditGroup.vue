@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="relative-position full-height">
+  <div data-test="edit-group-section" class="tw:flex tw:flex-col tw:h-full">
     <div
       data-test="edit-group-section-title"
-      class="tw:pb-[0.625rem]"
+      class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
-    <div class="card-container q-py-sm">
-      <span style="font-size: 18px" class="q-px-md ">
+    <div class="card-container tw:py-3">
+      <span style="font-size: 18px" class="tw:px-4">
       {{ groupDetails.group_name }}
       </span>
-  <q-separator />
+  <OSeparator />
     <AppTabs
       data-test="edit-group-tabs"
       :tabs="tabs"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     </div>
     </div>
-    <div style="min-height: calc(100% - (39px + 55px + 43px + 6px))">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
@@ -59,8 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-    class="flex justify-end tw:w-full"
-      style="position: sticky; bottom: 0.45rem; z-index: 2"
+      data-test="edit-group-footer"
+    class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0"
+      style="z-index: 2"
     >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
       <OButton
@@ -85,20 +86,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Shield, Users, Bot } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -114,7 +115,6 @@ const router = useRouter();
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const groupDetails = ref({
   group_name: "dev",
@@ -128,26 +128,30 @@ const removedUsers = ref(new Set());
 const addedRoles = ref(new Set());
 const removedRoles = ref(new Set());
 
-const tabs = [
-  {
-    value: "roles",
-    label: "Roles",
-    icon: Shield,
-  },
-  {
-    value: "users",
-    label: "Users",
-    icon: Users,
-  },
-];
+const tabs = computed(() => {
+  const baseTabs = [
+    {
+      value: "roles",
+      label: "Roles",
+      icon: "shield",
+    },
+    {
+      value: "users",
+      label: "Users",
+      icon: "group",
+    },
+  ];
 
-if (store.state.zoConfig.service_account_enabled) {
-  tabs.push({
-    value: "serviceAccounts",
-    label: "Service Accounts",
-    icon: Bot,
-  });
-}
+  if (store.state.zoConfig.service_account_enabled) {
+    baseTabs.push({
+      value: "serviceAccounts",
+      label: "Service Accounts",
+      icon: "smart-toy",
+    });
+  }
+
+  return baseTabs;
+});
 
 const getGroupDetails = () => {
   const groupName: string = router.currentRoute.value.params
@@ -164,10 +168,9 @@ const getGroupDetails = () => {
     })
     .catch((err) => {
       console.log(err);
-      q.notify({
+      toast({
         message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-right",
         timeout: 3000,
       });
       router.push({
@@ -200,8 +203,8 @@ const saveGroupChanges = () => {
       payload.remove_roles.length
     )
   ) {
-    q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `No updates detected.`,
       timeout: 3000,
     });
@@ -215,8 +218,8 @@ const saveGroupChanges = () => {
     payload,
   })
     .then((res) => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Updated group successfully!`,
         timeout: 3000,
       });
@@ -249,8 +252,8 @@ const saveGroupChanges = () => {
     })
     .catch((err) => {
       if(err.response.status != 403){
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while updating group!",
           timeout: 3000,
         });

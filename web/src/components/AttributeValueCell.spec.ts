@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { h } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: (path: string) => `https://cdn.example.com/${path}`,
@@ -24,7 +23,6 @@ vi.mock("@/utils/zincutils", () => ({
 
 import AttributeValueCell from "./AttributeValueCell.vue";
 
-installQuasar();
 
 describe("AttributeValueCell", () => {
   let wrapper: VueWrapper;

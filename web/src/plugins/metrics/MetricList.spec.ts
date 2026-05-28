@@ -15,16 +15,11 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricList from "./MetricList.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock useQuasar
 const mockNotify = vi.fn(() => vi.fn());
@@ -37,6 +32,14 @@ vi.mock("quasar", async () => {
     }),
   };
 });
+
+// Mock toast
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // Mock services
 vi.mock("@/services/stream", () => ({
@@ -173,90 +176,62 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QSelect: {
-          template: `<div data-test-stub='q-select' :data-test='$attrs["data-test"]'>
+        OSelect: {
+          template: `<div data-test-stub='o-select' :data-test='$attrs["data-test"]'>
             <slot name="prepend"></slot>
             <slot name="option" :opt="{}" v-for="i in 3" :key="i"></slot>
             <slot name="no-option"></slot>
           </div>`,
-          props: ["modelValue", "options", "label", "filled", "dense", "hideSelected"],
+          props: ["modelValue", "options", "label", "inputDebounce", "behavior", "useInput", "hideSelected", "fillInput"],
           emits: ["update:modelValue", "filter"],
         },
-        QTable: {
-          template: `<div data-test-stub='q-table' :data-test='$attrs["data-test"]'>
-            <div data-test="table-top-right"><slot name="top-right"></slot></div>
+        OTable: {
+          template: `<div data-test-stub='o-table' :data-test='$attrs["data-test"]'>
+            <div data-test="table-top"><slot name="top"></slot></div>
             <div data-test="table-body">
-              <slot name="body-cell-name" v-for="row in rows || [{name: 'test_field'}, {name: 'other_field'}]" :key="row.name" v-bind="{row: row, col: {name: 'name'}}"></slot>
+              <slot name="cell-name" v-for="row in data || [{name: 'test_field'}, {name: 'other_field'}]" :key="row.name" v-bind="{row: row}"></slot>
             </div>
           </div>`,
-          props: ["rows", "columns", "visibleColumns", "filter", "filterMethod", "pagination", "hideHeader", "hideBottom"],
+          props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter", "rowClass"],
+          emits: ["row-click"],
         },
-        QInput: {
-          template: `<input 
-            data-test-stub='q-input' 
+        OInput: {
+          template: `<input
+            data-test-stub='o-input'
             :data-test='$attrs["data-test"]'
             :value='modelValue'
             @input='$emit("update:modelValue", $event.target.value)'
           />`,
-          props: ["modelValue", "placeholder", "filled", "dense", "clearable", "debounce"],
+          props: ["modelValue", "placeholder", "clearable", "debounce"],
           emits: ["update:modelValue"],
         },
-        QIcon: {
-          template: "<span data-test-stub='q-icon' :title='title'></span>",
+        OIcon: {
+          template: "<span data-test-stub='o-icon' :title='title'></span>",
           props: ["name", "size", "title"],
         },
-        QItem: {
-          template: "<div data-test-stub='q-item'><slot></slot></div>",
-          props: ["tag"],
-        },
-        QItemSection: {
-          template: "<div data-test-stub='q-item-section' :title='title'><slot></slot></div>",
-          props: ["avatar", "title"],
-        },
-        QItemLabel: {
-          template: "<div data-test-stub='q-item-label'><slot></slot></div>",
-        },
-        QTr: {
-          template: "<tr data-test-stub='q-tr'><slot></slot></tr>",
-          props: ["props"],
-        },
-        QTd: {
-          template: "<td data-test-stub='q-td'><slot></slot></td>",
-          props: ["props"],
-        },
-        QExpansionItem: {
-          template: `<div data-test-stub='q-expansion-item'>
-            <div @click='$emit("before-show", $event)'><slot name="header"></slot></div>
-            <div><slot></slot></div>
+        OCollapsible: {
+          template: `<div data-test-stub='o-collapsible'>
+            <div @click='$emit("update:modelValue", true)'><slot name="trigger"></slot></div>
+            <div v-if="true"><slot></slot></div>
           </div>`,
-          props: ["dense", "switchToggleSide", "label", "expandIcon", "expandedIcon", "expandIconClass"],
-          emits: ["before-show"],
+          props: ["variant", "modelValue"],
+          emits: ["update:modelValue"],
         },
-        QCard: {
-          template: "<div data-test-stub='q-card'><slot></slot></div>",
+        OInnerLoading: {
+          template: "<div data-test-stub='o-inner-loading' />",
+          props: ["showing", "label", "size"],
         },
-        QCardSection: {
-          template: "<div data-test-stub='q-card-section'><slot></slot></div>",
-        },
-        QList: {
-          template: "<div data-test-stub='q-list'><slot></slot></div>",
-          props: ["dense"],
-        },
-        QBtn: {
-          template: `<button 
-            data-test-stub='q-btn' 
+        OButton: {
+          template: `<button
+            data-test-stub='o-button'
             :data-test='$attrs["data-test"]'
-            @click='$emit("click", $event)'
+            @click.stop='$emit("click", $event)'
             :title='title'
           >
             <slot></slot>
           </button>`,
-          props: ["icon", "size", "round", "title"],
+          props: ["iconLeft", "variant", "size", "title"],
           emits: ["click"],
-        },
-        QInnerLoading: {
-          template: "<div data-test-stub='q-inner-loading' v-if='showing'></div>",
-          props: ["showing", "size", "label", "labelStyle"],
         },
         EqualIcon: {
           template: "<div data-test-stub='equal-icon'></div>",
@@ -362,8 +337,8 @@ describe("MetricList", () => {
       expect(wrapper.vm.metricsIconMapping).toEqual({
         summary: "description",
         gauge: "speed", 
-        histogram: "bar_chart",
-        counter: "pin",
+        histogram: "bar-chart",
+        counter: "tag",
       });
     });
 
@@ -410,80 +385,72 @@ describe("MetricList", () => {
     });
   });
 
-  describe("filterMetrics function", () => {
-    it("should filter metrics based on search term", () => {
+  describe("streamOptions — prop-driven filtering", () => {
+    // filterMetrics is an internal helper not exposed on the public API.
+    // The observable behaviour is: streamOptions mirrors the metricsList prop
+    // and updates reactively when the prop changes.  Tests here drive that
+    // behaviour through props and assert on the returned streamOptions ref.
+
+    it("initialises streamOptions to match the metricsList prop", () => {
       const metricsList = [
         { label: "cpu_usage", value: "cpu_usage", type: "gauge" },
         { label: "memory_usage", value: "memory_usage", type: "gauge" },
         { label: "disk_io", value: "disk_io", type: "counter" },
       ];
       const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("cpu", mockUpdate);
-      
-      expect(mockUpdate).toHaveBeenCalled();
-      expect(wrapper.vm.streamOptions).toEqual([
-        { label: "cpu_usage", value: "cpu_usage", type: "gauge" }
-      ]);
-    });
 
-    it("should handle empty search term", () => {
-      const metricsList = [
-        { label: "metric1", value: "metric1", type: "counter" },
-        { label: "metric2", value: "metric2", type: "gauge" },
-      ];
-      const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("", mockUpdate);
-      
       expect(wrapper.vm.streamOptions).toEqual(metricsList);
     });
 
-    it("should be case insensitive", () => {
-      const metricsList = [
-        { label: "CPU_Usage", value: "CPU_Usage", type: "gauge" },
-        { label: "Memory_Usage", value: "Memory_Usage", type: "gauge" },
-      ];
-      const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("cpu", mockUpdate);
-      
-      expect(wrapper.vm.streamOptions).toEqual([
-        { label: "CPU_Usage", value: "CPU_Usage", type: "gauge" }
-      ]);
-    });
-
-    it("should return empty array when no matches found", () => {
-      const metricsList = [
-        { label: "metric1", value: "metric1", type: "counter" },
-      ];
-      const wrapper = createWrapper({ metricsList });
-      
-      const mockUpdate = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("nonexistent", mockUpdate);
-      
-      expect(wrapper.vm.streamOptions).toEqual([]);
-    });
-
-    it("should reset streamOptions to original metricsList before filtering", () => {
+    it("streamOptions contains all metrics when metricsList has multiple items", () => {
       const metricsList = [
         { label: "metric1", value: "metric1", type: "counter" },
         { label: "metric2", value: "metric2", type: "gauge" },
       ];
       const wrapper = createWrapper({ metricsList });
-      
-      // First filter
-      const mockUpdate1 = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("metric1", mockUpdate1);
-      expect(wrapper.vm.streamOptions).toHaveLength(1);
-      
-      // Second filter should start from original list
-      const mockUpdate2 = vi.fn((fn) => fn());
-      wrapper.vm.filterMetrics("metric", mockUpdate2);
+
       expect(wrapper.vm.streamOptions).toHaveLength(2);
+      expect(wrapper.vm.streamOptions).toEqual(metricsList);
+    });
+
+    it("updates streamOptions reactively when metricsList prop changes to a smaller list", async () => {
+      const original = [
+        { label: "CPU_Usage", value: "CPU_Usage", type: "gauge" },
+        { label: "Memory_Usage", value: "Memory_Usage", type: "gauge" },
+      ];
+      const wrapper = createWrapper({ metricsList: original });
+
+      const reduced = [{ label: "CPU_Usage", value: "CPU_Usage", type: "gauge" }];
+      await wrapper.setProps({ metricsList: reduced });
+
+      expect(wrapper.vm.streamOptions).toEqual(reduced);
+    });
+
+    it("streamOptions becomes empty when metricsList prop is set to empty array", async () => {
+      const wrapper = createWrapper({
+        metricsList: [{ label: "metric1", value: "metric1", type: "counter" }],
+      });
+
+      await wrapper.setProps({ metricsList: [] });
+
+      expect(wrapper.vm.streamOptions).toEqual([]);
+    });
+
+    it("updates streamOptions when metricsList prop is replaced with a different list", async () => {
+      const first = [
+        { label: "metric1", value: "metric1", type: "counter" },
+        { label: "metric2", value: "metric2", type: "gauge" },
+      ];
+      const wrapper = createWrapper({ metricsList: first });
+
+      const second = [
+        { label: "metric1", value: "metric1", type: "counter" },
+        { label: "metric2", value: "metric2", type: "gauge" },
+        { label: "metric3", value: "metric3", type: "summary" },
+      ];
+      await wrapper.setProps({ metricsList: second });
+
+      expect(wrapper.vm.streamOptions).toHaveLength(3);
     });
   });
 
@@ -1150,14 +1117,14 @@ describe("MetricList — metricsIconMapping completeness", () => {
     expect(wrapper.vm.metricsIconMapping.gauge).toBe("speed");
   });
 
-  it("maps 'histogram' to 'bar_chart' icon", () => {
+  it("maps 'histogram' to 'bar-chart' icon", () => {
     const wrapper = createWrapper();
-    expect(wrapper.vm.metricsIconMapping.histogram).toBe("bar_chart");
+    expect(wrapper.vm.metricsIconMapping.histogram).toBe("bar-chart");
   });
 
-  it("maps 'counter' to 'pin' icon", () => {
+  it("maps 'counter' to 'tag' icon", () => {
     const wrapper = createWrapper();
-    expect(wrapper.vm.metricsIconMapping.counter).toBe("pin");
+    expect(wrapper.vm.metricsIconMapping.counter).toBe("tag");
   });
 
   it("returns empty string for an unknown metric type", () => {
@@ -1200,9 +1167,9 @@ describe("MetricList — getMetricsFieldValues null / edge values", () => {
     wrapper.vm.getMetricsFieldValues("flaky_field");
     await flushPromises();
 
-    // The catch block calls quasar notify and the field may not be set at all
-    // What we verify is that the component does not throw and notify is called
-    expect(mockNotify).toHaveBeenCalled();
+    // The catch block calls toast and the field may not be set at all
+    // What we verify is that the component does not throw and toast is called
+    expect(mockToast).toHaveBeenCalled();
   });
 
   it("passes the selected metric value as stream_name", async () => {

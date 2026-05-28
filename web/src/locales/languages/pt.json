@@ -396,7 +396,9 @@
     "traces": "Traços",
     "switchToLogs": "clique para voltar para Logs",
     "patternNoValuesAvailable": "Não há valores disponíveis",
-    "selectLogStream": "Selecione o fluxo de registros"
+    "selectLogStream": "Selecione o fluxo de registros",
+    "noData": "Não há dados disponíveis",
+    "functionEditorLabel": "Editor de funções"
   },
   "menu": {
     "home": "Início",
@@ -1417,7 +1419,7 @@
     "markLineYAxis": "Eixo Y",
     "colorPalette": "Paleta de cores",
     "colorSeriesBy": "Série de cores de:",
-    "colorBySeries": "<b>Por série</b>",
+    "colorBySeries": "Por série",
     "colorDefaultPaletteBySeries": "Paleta padrão (por série)",
     "colorDefaultPaletteBySeriesSubLabel": "Séries com o mesmo nome usarão a mesma cor",
     "colorPaletteClassic": "Paleta clássica",
@@ -1426,7 +1428,7 @@
     "colorSingleColorSubLabel": "Defina uma cor específica para todas as séries",
     "colorShadesOfSpecificColor": "Tons de cor específica",
     "colorShadesOfSpecificColorSubLabel": "Diferentes tons de cores específicas",
-    "colorByValue": "<b>Por valor</b>",
+    "colorByValue": "Por valor",
     "colorGreenYellowRed": "Verde-amarelo-vermelho (por valor)",
     "colorRedYellowGreen": "Vermelho-amarelo-verde (por valor)",
     "colorTemperature": "Temperatura (por valor)",
@@ -1596,7 +1598,9 @@
     "axisLabelRotateTooltipText": "Gire o texto do rótulo do eixo x em um ângulo escolhido (em graus) para melhorar a legibilidade quando os rótulos estiverem longos ou cheios.",
     "axisLabelTruncateTooltipText": "Trunque os rótulos do eixo x na largura especificada (em pixels).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais."
+    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
+    "allFolders": "Todas as pastas",
+    "selectFile": "Selecionar arquivo"
   },
   "panel": {
     "header": "Painel",
@@ -2625,6 +2629,7 @@
     "serviceAccounts": "Contas de serviço",
     "serviceAccountsName": "Nome das contas de serviço",
     "basicUsers": "Usuários",
+    "organizationMembers": "Membros da Organização",
     "quota": "Cotas",
     "externalUserWarningTitle": "Aviso de usuário externo",
     "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários.",
@@ -3093,7 +3098,10 @@
     "algorithm": "algoritmo",
     "storeType": "Tipo de loja",
     "mechanismType": "Tipo de mecanismo",
-    "actions": "Ações"
+    "actions": "Ações",
+    "providerTypeRequired": "O tipo de provedor é obrigatório",
+    "algorithmRequired": "O algoritmo é necessário",
+    "secretRequired": "O segredo é obrigatório"
   },
   "quota": {
     "header": "Cotas",
@@ -3750,7 +3758,8 @@
     "errSave": "Falha ao salvar",
     "errLoadModel": "Falha ao carregar o modelo",
     "tierDefaultName": "Padrão",
-    "tierConditionalName": "Nível condicional"
+    "tierConditionalName": "Nível condicional",
+    "shadowedWarningBanner": "As regras abaixo são sombreadas por “{name}” — substituídas por uma regra de maior prioridade e não serão usadas para cálculos de custos."
   },
   "overview": {
     "title": "Visão geral do sistema",

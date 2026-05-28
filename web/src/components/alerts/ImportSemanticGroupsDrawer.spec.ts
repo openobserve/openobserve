@@ -15,12 +15,62 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog, Notify] });
+
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "title",
+    "subTitle",
+    "secondaryButtonLabel",
+    "primaryButtonLabel",
+    "primaryButtonDisabled",
+    "primaryButtonLoading",
+    "persistent",
+    "showClose",
+    "size",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary"],
+  template: `
+    <div data-test="o-drawer-stub" :data-open="String(open)">
+      <slot />
+      <button data-test="import-drawer-cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+      <button data-test="import-drawer-apply-btn" @click="$emit('click:primary')" :disabled="primaryButtonDisabled">{{ primaryButtonLabel }}</button>
+    </div>
+  `,
+};
+
+const ODialogStub = {
+  name: "ODialog",
+  template:
+    '<div class="o-dialog-stub" :data-open="open" :data-title="title" :data-sub-title="subTitle" :data-size="size"><slot name="header-left" /><slot name="header-right" /><slot /><slot name="footer" /></div>',
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryVariant",
+    "secondaryVariant",
+    "neutralVariant",
+    "primaryDisabled",
+    "secondaryDisabled",
+    "neutralDisabled",
+    "primaryLoading",
+    "secondaryLoading",
+    "neutralLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+};
 
 const mockDiffData = vi.hoisted(() => ({
   additions: [
@@ -59,7 +109,13 @@ async function mountComp(props: Record<string, any> = {}) {
       orgId: "default",
       ...props,
     },
-    global: { plugins: [i18n, store] },
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        ODrawer: ODrawerStub,
+        ODialog: ODialogStub,
+      },
+    },
   });
 }
 
@@ -67,11 +123,6 @@ describe("ImportSemanticGroupsDrawer - rendering", () => {
   it("renders without errors", async () => {
     const w = await mountComp();
     expect(w.exists()).toBe(true);
-  });
-
-  it("renders the close button", async () => {
-    const w = await mountComp();
-    expect(w.find('[data-test="import-drawer-close-btn"]').exists()).toBe(true);
   });
 
   it("renders the file input", async () => {
@@ -93,19 +144,28 @@ describe("ImportSemanticGroupsDrawer - rendering", () => {
     const w = await mountComp();
     expect(w.text()).toContain("Upload a JSON file");
   });
+
+  it("renders two ODialog instances (group details + modification compare)", async () => {
+    const w = await mountComp();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs).toHaveLength(2);
+  });
 });
 
 describe("ImportSemanticGroupsDrawer - close & cancel", () => {
-  it("clicking close button emits close", async () => {
+  it("clicking close button (handleClose) emits update:open=false", async () => {
     const w = await mountComp();
-    await w.find('[data-test="import-drawer-close-btn"]').trigger("click");
-    expect(w.emitted("close")).toBeTruthy();
+    (w.vm as any).handleClose();
+    await w.vm.$nextTick();
+    expect(w.emitted("update:open")).toBeTruthy();
+    expect(w.emitted("update:open")![0]).toEqual([false]);
   });
 
-  it("clicking cancel button emits close", async () => {
+  it("clicking cancel button emits update:open=false", async () => {
     const w = await mountComp();
     await w.find('[data-test="import-drawer-cancel-btn"]').trigger("click");
-    expect(w.emitted("close")).toBeTruthy();
+    expect(w.emitted("update:open")).toBeTruthy();
+    expect(w.emitted("update:open")![0]).toEqual([false]);
   });
 
   it("handleClose clears diffData", async () => {
@@ -214,12 +274,13 @@ describe("ImportSemanticGroupsDrawer - handleApply", () => {
     expect(payload.some((g: any) => g.id === "add-1")).toBe(true);
   });
 
-  it("emits close after apply", async () => {
+  it("emits update:open=false after apply", async () => {
     const w = await mountComp();
     (w.vm as any).diffData = mockDiffData;
     (w.vm as any).selectedAdditions = ["add-1"];
     (w.vm as any).handleApply();
-    expect(w.emitted("close")).toBeTruthy();
+    expect(w.emitted("update:open")).toBeTruthy();
+    expect(w.emitted("update:open")![0]).toEqual([false]);
   });
 
   it("does nothing when no changes selected", async () => {
@@ -300,5 +361,100 @@ describe("ImportSemanticGroupsDrawer - previewDiff", () => {
     await flushPromises();
     expect((w.vm as any).selectedAdditions).toContain("add-1");
     expect((w.vm as any).selectedModifications).toContain("mod-1");
+  });
+});
+
+describe("ImportSemanticGroupsDrawer - ODialog group details", () => {
+  it("group details ODialog reflects showGroupDialog state via open prop", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewGroup(mockDiffData.additions[0]);
+    await w.vm.$nextTick();
+    const dialogs = w.findAllComponents(ODialogStub);
+    // First dialog corresponds to the group details dialog
+    expect(dialogs[0].props("open")).toBe(true);
+  });
+
+  it("group details ODialog passes selectedGroup display as title", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewGroup(mockDiffData.additions[0]);
+    await w.vm.$nextTick();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[0].props("title")).toBe("New Group 1");
+  });
+
+  it("group details ODialog passes selectedGroup id in subTitle", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewGroup(mockDiffData.additions[0]);
+    await w.vm.$nextTick();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[0].props("subTitle")).toContain("add-1");
+  });
+
+  it("group details ODialog has primaryButtonLabel 'Close'", async () => {
+    const w = await mountComp();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[0].props("primaryButtonLabel")).toBe("Close");
+  });
+
+  it("group details ODialog uses size 'md'", async () => {
+    const w = await mountComp();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[0].props("size")).toBe("md");
+  });
+
+  it("emitting click:primary on group details ODialog closes the dialog", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewGroup(mockDiffData.additions[0]);
+    await w.vm.$nextTick();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect((w.vm as any).showGroupDialog).toBe(true);
+    await dialogs[0].vm.$emit("click:primary");
+    expect((w.vm as any).showGroupDialog).toBe(false);
+  });
+});
+
+describe("ImportSemanticGroupsDrawer - ODialog modification compare", () => {
+  it("modification ODialog reflects showModificationDialog state via open prop", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewModification(mockDiffData.modifications[0]);
+    await w.vm.$nextTick();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[1].props("open")).toBe(true);
+  });
+
+  it("modification ODialog passes proposed.display as title", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewModification(mockDiffData.modifications[0]);
+    await w.vm.$nextTick();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[1].props("title")).toBe("Updated Group");
+  });
+
+  it("modification ODialog passes 'Compare Changes' subTitle", async () => {
+    const w = await mountComp();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[1].props("subTitle")).toBe("Compare Changes");
+  });
+
+  it("modification ODialog has primaryButtonLabel 'Close'", async () => {
+    const w = await mountComp();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[1].props("primaryButtonLabel")).toBe("Close");
+  });
+
+  it("modification ODialog uses size 'lg'", async () => {
+    const w = await mountComp();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect(dialogs[1].props("size")).toBe("lg");
+  });
+
+  it("emitting click:primary on modification ODialog closes the dialog", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewModification(mockDiffData.modifications[0]);
+    await w.vm.$nextTick();
+    const dialogs = w.findAllComponents(ODialogStub);
+    expect((w.vm as any).showModificationDialog).toBe(true);
+    await dialogs[1].vm.$emit("click:primary");
+    expect((w.vm as any).showModificationDialog).toBe(false);
   });
 });

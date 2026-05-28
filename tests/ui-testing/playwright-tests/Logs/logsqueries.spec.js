@@ -4,11 +4,12 @@ const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData } = require('../utils/data-ingestion.js');
 async function applyQueryButton(pm) {
-  const search = pm.page.waitForResponse(logData.applyQuery);
-  // Strategic 1000ms wait for query button DOM stabilization - this is functionally necessary
-  await pm.page.waitForTimeout(1000);
-  await pm.logsPage.clickRefreshButton();
-  await expect.poll(async () => (await search).status()).toBe(200);
+  // Wait for query button to be visible, then run query and wait for the
+  // execution to complete. runQueryAndWaitForResults keys off the button's
+  // UI state (Run -> Cancel -> Run) so it correctly waits for any in-flight
+  // auto-search to settle before clicking, then waits for the new search.
+  await pm.logsPage.expectRefreshButtonVisible();
+  await pm.logsPage.runQueryAndWaitForResults();
 }
 
 function removeUTFCharacters(text) {
@@ -23,23 +24,22 @@ test.describe("Logs Queries testcases", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     // Initialize test setup
     testLogger.testStart(testInfo.title, testInfo.file);
-    
+
     // Navigate to base URL with authentication
     await navigateToBase(page);
     pm = new PageManager(page);
-    
-    // Strategic post-authentication stabilization wait - this is functionally necessary
-    await page.waitForTimeout(1000);
-    
+
+    // Wait for app shell to be ready (deterministic post-auth wait)
+    await page.waitForLoadState('domcontentloaded');
+
     // Data ingestion for logs queries testing (preserve exact logic)
     await ingestTestData(page);
-    // Strategic wait for data ingestion completion - this is functionally necessary
-    await page.waitForTimeout(1000);
 
     // Navigate to logs page and setup for queries testing
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
+    await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(pm);
 
@@ -59,16 +59,16 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@quickModeLogs', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing quick mode toggle button visibility');
-    
+
     await pm.logsPage.expectQuickModeToggleVisible();
-    
+
     testLogger.info('Quick mode toggle visibility test completed');
   });
 
   test.skip("should add timestamp to editor save this view and switch", {
     tag: ['@timestampViewLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await pm.logsPage.waitForTimeout(3000);
+    await pm.logsPage.expectLogTableColumnSourceVisible();
     await pm.logsPage.clickLogTableColumnSource();
     await pm.logsPage.clickIncludeExcludeFieldButton();
     await pm.logsPage.clickIncludeFieldButton();
@@ -78,7 +78,6 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickSavedViewDialogSaveContent();
     await pm.logsPage.clickSavedViewArrow();
     await pm.logsPage.clickSavedViewByLabel(/timestamp/);
-    await pm.logsPage.waitForTimeout(3000);
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.fillSavedViewSearchInput('e2e');
@@ -96,14 +95,14 @@ test.describe("Logs Queries testcases", () => {
     testLogger.info('Testing saved view creation and deletion functionality');
     // Generate a random saved view name
     const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
-  
+
     // Interactions with the page
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSaveViewButton();
     await pm.logsPage.fillSavedViewName(randomSavedViewName); // Use the random name
     await pm.logsPage.clickSavedViewDialogSave();
-    
+
     // Wait for the success toast message to appear briefly after save
     try {
       await pm.logsPage.waitForNotificationWithText('View created successfully', 3000);
@@ -111,42 +110,47 @@ test.describe("Logs Queries testcases", () => {
     } catch (error) {
       testLogger.info('View creation toast may have appeared and disappeared quickly - continuing with test');
     }
-    
-    // Strategic 2000ms wait for saved view creation - this is functionally necessary
-    await pm.logsPage.waitForTimeout(2000);
+
+    // Wait for the save-view dialog to close before navigating (replaces the
+    // legacy 2000ms wait that was masking the dialog close animation).
+    await pm.logsPage.expectSavedViewDialogClosed();
     await pm.logsPage.clickStreamsMenuItem();
+    // Wait for the streams-page search input to mount before clicking
+    await pm.logsPage.expectSearchStreamInputVisible();
     await pm.logsPage.clickSearchStreamInput();
     await pm.logsPage.fillSearchStreamInput('e2e');
-    // Strategic 500ms wait for stream search DOM stabilization - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    // Wait for explore button to be visible (DOM-stable signal that filter applied)
+    await pm.logsPage.expectExploreButtonVisible();
+    // Allow filtered results to fully settle before clicking (avoids stale-element click)
+    await page.waitForTimeout(2000);
     await pm.logsPage.clickExploreButton();
-    // Strategic 2000ms wait for navigation to stream explorer - this is functionally necessary
-    await pm.logsPage.waitForTimeout(2000);
+    // Wait for SPA navigation to complete — domcontentloaded does not re-fire
+    // on client-side route changes, so wait for the URL to settle on the logs
+    // route and then for the refresh button (reliable "logs page ready" signal).
+    await page.waitForURL(/\/logs(\?|$)/, { timeout: 30000 });
+    await pm.logsPage.expectRefreshButtonVisible();
     await pm.logsPage.waitForSavedViewsButton();
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.fillSavedViewSearchInput(randomSavedViewName); // Use the random name here
-    // Strategic 1000ms wait for saved view search results - this is functionally necessary
-    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.waitForSavedViewText(randomSavedViewName);
     await pm.logsPage.clickSavedViewByText(randomSavedViewName);
     // Wait for saved view to be applied and page to settle before re-expanding
     await page.waitForLoadState('domcontentloaded');
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickSavedViewsExpand();
-    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewSearchInput();
+    // Re-filter the saved-views list so the row for our random name appears,
+    // then wait for it to render before clicking by title (deterministic --
+    // replaces the legacy 1s waitForTimeout that was masking the re-render).
+    await pm.logsPage.fillSavedViewSearchInput(randomSavedViewName);
+    await pm.logsPage.waitForSavedViewText(randomSavedViewName);
     await pm.logsPage.clickSavedViewByTitle(randomSavedViewName); // Use the random name here
-    
-    // Wait for UI to stabilize before attempting deletion
-    await pm.logsPage.waitForTimeout(1000);
-    
+
     // Delete the saved view
     await pm.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
-    await pm.logsPage.waitForTimeout(500);
     await pm.logsPage.clickConfirmButton(); // Confirm deletion
     testLogger.info(`Successfully deleted saved view: ${randomSavedViewName}`);
-    
+
     testLogger.info('Saved view creation and deletion test completed');
   });
 
@@ -163,7 +167,7 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickResetFiltersButton();
     await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.expectQueryEditorEmpty();
-    
+
     testLogger.info('Reset filter button test completed');
   });
 
@@ -171,15 +175,25 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@invalidQueryLogs', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing invalid query error handling');
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.typeInQueryEditor("kubernetes");
-    await pm.logsPage.waitForTimeout(2000);
-    await pm.logsPage.clickSearchBarRefreshButton();
+    // Use a deterministically-invalid SQL fragment that the backend MUST reject.
+    // Previous input `kubernetes` (wrapped as `WHERE kubernetes`) was flaky —
+    // on backends with kubernetes log entries the search succeeded (~20% pass
+    // rate flake), defeating the test. `_invalid_field_does_not_exist` is
+    // guaranteed to fail column resolution on any backend.
+    await pm.logsPage.typeInQueryEditor("_invalid_field_does_not_exist");
+    // Monaco's onDidChangeModelContent is debounced 100ms before emitting
+    // update:query → searchObj.data.query. Wait for the Monaco model to reflect
+    // the typed value so the store is updated before Run is clicked.
+    await pm.logsPage.waitForQueryEditorValue("_invalid_field_does_not_exist");
+    // Use runQueryAndWaitForResults -- it waits for any in-flight auto-search
+    // to settle (button exits Cancel state) before clicking, so the click
+    // actually triggers the new (invalid) search instead of cancelling.
+    await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectErrorMessageVisible();
-    
+
     testLogger.info('Invalid query error handling test completed');
   });
 
@@ -198,7 +212,7 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickSearchBarRefreshButton();
 
     await pm.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('Match_all query functionality test completed');
   });
 
@@ -267,16 +281,16 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@functionPersistence', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing function persistence across tab navigation');
-    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.toggleVrlEditor();
+    // Wait for VRL editor input area to be ready before filling
+    await pm.logsPage.expectVrlEditorReady();
     await pm.logsPage.clickVrlEditor();
-    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.clickMenuLinkMetricsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.expectPageContainsText(".a=2");
-    
+
     testLogger.info('Function persistence test completed');
   });
 
@@ -289,23 +303,27 @@ test.describe("Logs Queries testcases", () => {
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
       await pm.logsPage.toggleHistogram();
-      await pm.logsPage.waitForTimeout(1000);
+      // Wait deterministically for the histogram toggle to flip to ON state
+      await expect.poll(
+        async () => pm.logsPage.isHistogramOn().catch(() => false),
+        { timeout: 10000 }
+      ).toBe(true);
     }
 
     await pm.logsPage.clickLogSearchIndexListFieldSearchInput();
     await pm.logsPage.fillLogSearchIndexListFieldSearchInput('code');
-    await pm.logsPage.waitForTimeout(4000);
+    // Wait for the field list to filter & expand control to be visible
+    await pm.logsPage.expectFieldExpandVisible('code');
     await pm.logsPage.clickExpandCode();
-    await pm.logsPage.waitForTimeout(4000);
 
-    // Click refresh and wait for actual results (not just DOM ready — AJAX search on alpha1 can be slow)
+    // Click refresh and wait for actual results (not just DOM ready -- AJAX search on alpha1 can be slow)
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.waitForSearchResults();
 
     // Toggle SQL mode and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
-    // clickBarChartCanvas includes networkidle wait + retry — more reliable than a static timeout
+    // clickBarChartCanvas includes networkidle wait + retry -- more reliable than a static timeout
     await pm.logsPage.clickBarChartCanvas();
 
     // Toggle SQL mode off and refresh
@@ -322,25 +340,23 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@searchAroundHistogram', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing search around functionality in histogram mode');
-    
-    await pm.logsPage.waitForTimeout(1000);
+
+    // Wait for log row to be visible before clicking (deterministic)
+    await pm.logsPage.expectLogTableColumnSourceVisible();
     await pm.logsPage.clickLogTableColumnSource();
     await pm.logsPage.clickLogsDetailTableSearchAroundBtn();
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('Search around histogram mode test completed');
   });
 
   test.skip("should display results for search around after adding function", async ({ page }) => {
-    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.toggleVrlEditor();
+    await pm.logsPage.expectVrlEditorReady();
     await pm.logsPage.clickVrlEditor();
-    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.clickLogTableColumn3Source();
     await pm.logsPage.clickLogsDetailTableSearchAroundBtn();
-    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.expectLogTableColumnSourceVisible();
   });
 
@@ -348,14 +364,14 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@searchAroundSQL', '@sqlMode', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing search around functionality in SQL mode');
-    
-    await pm.logsPage.waitForTimeout(1000);
+
     await pm.logsPage.clickSQLModeToggle();
+    // Wait for log row to be visible before clicking (deterministic -- replaces fixed wait)
+    await pm.logsPage.expectLogTableColumnSourceVisible();
     await pm.logsPage.clickLogTableColumnSource();
     await pm.logsPage.clickLogsDetailTableSearchAroundBtn();
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('Search around SQL mode test completed');
   });
 
@@ -363,20 +379,18 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@searchAroundLimit', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing search around functionality with limit query');
-    
-    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor("match_all('code') limit 5");
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickSQLModeToggle();
-    await pm.logsPage.waitForTimeout(2000);
+    // Wait for log row to be visible before clicking (deterministic)
+    await pm.logsPage.expectLogTableColumnSourceVisible();
     await pm.logsPage.clickLogTableColumnSource();
     await pm.logsPage.clickLogsDetailTableSearchAroundBtn();
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('Search around with limit query test completed');
   });
 
@@ -384,19 +398,16 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@paginationLimit', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing pagination behavior with limit query');
-    
-    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor("match_all('code') limit 5");
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickSQLModeToggle();
-    await pm.logsPage.waitForTimeout(2000);
-    await pm.logsPage.clickRefreshButton();
-    await pm.logsPage.waitForTimeout(2000);
+    // Run query and wait for execution to complete (deterministic -- replaces fixed waits)
+    await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectPaginationNotVisible();
-    
+
     testLogger.info('Pagination limit query test completed');
   });
 
@@ -404,17 +415,15 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@paginationSQLLimit', '@sqlMode', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing pagination behavior with SQL limit query');
-    
-    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
-    await pm.logsPage.waitForTimeout(2000);
-    await pm.logsPage.clickRefreshButton();
-    await pm.logsPage.waitForTimeout(2000);
+    // Run query and wait for execution to complete (deterministic)
+    await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectPaginationNotVisible();
-    
+
     testLogger.info('Pagination SQL limit query test completed');
   });
 
@@ -422,17 +431,15 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@paginationSQLGroupOrder', '@sqlMode', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing pagination behavior with SQL group/order/limit query');
-    
-    await pm.logsPage.waitForTimeout(2000);
+
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" WHERE code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5');
-    await pm.logsPage.waitForTimeout(2000);
-    await pm.logsPage.clickRefreshButton();
-    await pm.logsPage.waitForTimeout(2000);
+    // Run query and wait for execution to complete (deterministic)
+    await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectPaginationNotVisible();
-    
+
     testLogger.info('Pagination SQL group/order/limit query test completed');
   });
 
@@ -442,17 +449,14 @@ test.describe("Logs Queries testcases", () => {
     testLogger.info('Testing pagination reset behavior after re-running query');
 
     // Set up conditions to ensure we have enough data for pagination
-    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickDateTimeButton();
-    await pm.logsPage.waitForTimeout(1000);
 
     // Use wider time range to capture ingested data
     const selectedRange = await pm.logsPage.clickWideRelativeTimeRangeOrFallback();
     testLogger.info(`Set time range to ${selectedRange} to capture ingested data`);
 
-    // Run initial query to get results
-    await pm.logsPage.clickRefreshButton();
-    await pm.logsPage.waitForTimeout(3000);
+    // Run initial query and wait for results (deterministic -- replaces fixed waits)
+    await pm.logsPage.runQueryAndWaitForResults();
 
     // Pagination should exist after ingesting data - expect it to be visible
     await pm.logsPage.expectResultPaginationVisible();
@@ -465,21 +469,19 @@ test.describe("Logs Queries testcases", () => {
     // Navigate to page 4 using POM
     testLogger.info('Navigating to page 4');
     await pm.logsPage.clickPaginationPage(4);
-    await pm.logsPage.waitForTimeout(2000);
+    // Wait for the pagination control to stay attached (deterministic -- the
+    // click triggers a virtual page change; we then read the class state).
+    await pm.logsPage.expectResultPaginationVisible();
 
     // Verify we're on page 4 using POM
-    await pm.logsPage.waitForTimeout(3000);
     const page4Classes = await pm.logsPage.getPaginationPageClasses(4);
     testLogger.info(`Page 4 button classes: ${page4Classes}`);
 
-    // Run query again while on page 4
+    // Run query again while on page 4 and wait for completion
     testLogger.info('Running query again while on page 4');
-    await pm.logsPage.clickRefreshButton();
-    await pm.logsPage.waitForTimeout(3000);
+    await pm.logsPage.runQueryAndWaitForResults();
 
     // Verify pagination resets to page 1 using POM
-    await pm.logsPage.waitForTimeout(2000);
-
     const page4ClassesAfter = await pm.logsPage.getPaginationPageClasses(4).catch(() => null);
     const page1ClassesAfter = await pm.logsPage.getPaginationPageClasses(1).catch(() => null);
 

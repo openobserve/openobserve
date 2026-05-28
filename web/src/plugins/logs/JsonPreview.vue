@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
+    <div class="tw:pb-1 tw:flex tw:justify-start tw:px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="tw:mb-[0.375rem] logs-json-preview-tabs q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
+        class="tw:mb-[0.375rem] logs-json-preview-tabs tw:mr-2 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -12,102 +12,48 @@
 
       <OButton
         :label="t('common.copyToClipboard')"
-        size="sm-action"
+        size="xs"
         variant="outline"
-        class="tw:mb-[0.375rem] q-mr-sm"
+        class="tw:mb-[0.375rem] tw:mr-2"
         @click="copyLogToClipboard"
-      ><q-icon name="content_copy" size="14px" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
-      <OButton
+      ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+        <OButton
         v-if="showViewRelatedBtn"
-        size="sm-action"
+        size="xs"
         variant="outline"
-        class="log-preview-btn q-mr-sm"
+        class="tw:mb-[0.375rem] tw:mr-2"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <q-icon name="link" size="14px" class="tw:mr-1" />{{ t('search.viewRelated') }}
-        <q-tooltip>
-          {{ t("search.viewRelatedTooltip") }}
-        </q-tooltip>
+        <OIcon name="link" size="xs" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
         v-if="
           showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
         "
-        class="o2-input flex items-center logs-trace-selector"
+        class="o2-input tw:flex tw:items-center logs-trace-selector"
       >
-        <q-select
+        <OSelect
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
-          :options="filteredTracesStreamOptions"
-          input-debounce="0"
-          filled
-          size="xs"
-          borderless
-          dense
-          fill-input
-          behavior="menu"
-          :title="searchObj.meta.selectedTraceStream"
+          :options="tracesStreams"
+          class="tw:w-[auto] tw:flex-shrink-0"
           :loading="isTracesStreamsLoading"
-        >
-          <template #no-option>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                filled
-                debounce="500"
-                autofocus
-                dense
-                size="xs"
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-            <q-item>
-              <q-item-section> {{ t("search.noResult") }}</q-item-section>
-            </q-item>
-          </template>
-          <template #before-options>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                debounce="500"
-                filled
-                dense
-                size="xs"
-                autofocus
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-          </template>
-        </q-select>
+          :disabled="isTracesStreamsLoading"
+          size="sm"
+        />
         <OButton
           data-test="trace-view-logs-btn"
-          v-close-popup="true"
           class="traces-view-logs-btn"
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><q-icon :name="outlinedAccountTree" size="14px" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
+        ><OIcon name="account-tree" size="sm" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+    <div v-show="activeTab === 'unflattened'" class="tw:pl-3">
+      <OSpinner size="md" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -119,12 +65,13 @@
         />
       </div>
     </div>
-    <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
+    <div v-show="activeTab !== 'unflattened'" class="tw:pl-3">
       {
       <div
-        class="log_json_content"
+        class="log_json_content tw:flex"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
+        :data-test="`log-detail-row-${key}`"
       >
         <ODropdown
           v-if="!hideFieldOptions"
@@ -135,12 +82,12 @@
           <template #trigger>
             <OButton
               data-test="log-details-include-exclude-field-btn"
-              size="icon-xs"
+              size="xs"
               variant="ghost"
-              class="q-ml-sm log-json-field-dropdown-btn"
+              class="tw:ml-2 log-json-field-dropdown-btn"
               aria-label="Add icon"
             >
-              <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
@@ -174,8 +121,8 @@
           <ODropdownItem
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
+            icon-left="visibility"
           >
-            <template #icon-left><q-icon name="visibility" size="16px" /></template>
             {{ addOrRemoveLabel(key) }}
           </ODropdownItem>
           <!-- Cross-link options -->
@@ -186,8 +133,8 @@
               :key="crossLink.name"
               :data-test="`log-details-cross-link-${crossLink.name}`"
               @select.stop="openCrossLink(crossLink.resolvedUrl)"
+              icon-left="open-in-new"
             >
-              <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
@@ -197,7 +144,7 @@
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="getBtnLogo" />
+              <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
             Send to AI Chat
           </ODropdownItem>
@@ -207,14 +154,14 @@
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="regexIcon" />
+              <img :src="regexIcon" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
           </ODropdownItem>
         </ODropdown>
 
         <span
-          class="q-pl-xs"
+          class="tw:pl-1"
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
@@ -251,62 +198,36 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <OIcon name="content-copy" size="sm" class="tw:mr-2" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
-          <q-img
+          <img
             :src="regexIconForContextMenu"
-            class="q-mr-sm"
+            class="tw:mr-2"
             style="width: 14px; height: 14px"
+            alt=""
           />
           Create regex pattern
         </div>
       </div>
     </div>
-    <q-dialog v-if="config.isEnterprise == 'true'" v-model="typeOfRegexPattern">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">
-            What is the type of regex pattern you want to create?
-          </div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div>
-            <q-input
-              type="text"
-              data-test="regex-pattern-type-input"
-              v-model="regexPatternType"
-              color="input-border"
-              label="Type of regex pattern (e.g. email, phone number, etc.)"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            data-test="search-scheduler-max-records-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-          >{{ t('confirmDialog.cancel') }}</OButton>
-          <OButton
-            data-test="search-scheduler-max-records-submit-btn"
-            variant="primary"
-            size="sm-action"
-            @click="confirmRegexPatternType"
-            v-close-popup
-          >{{ t('confirmDialog.ok') }}</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="json-preview-regex-pattern-dialog"
+      v-if="config.isEnterprise == 'true'"
+      v-model:open="typeOfRegexPattern"
+      size="lg"
+      title="What is the type of regex pattern you want to create?"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="typeOfRegexPattern = false"
+      @click:primary="confirmRegexPatternType"
+    >
+      <OInput
+        data-test="regex-pattern-type-input"
+        v-model="regexPatternType"
+        label="Type of regex pattern (e.g. email, phone number, etc.)"
+      />
+    </ODialog>
   </div>
 </template>
 
@@ -326,24 +247,29 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { AlignLeft, FileJson } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
   name: "JsonPreview",
@@ -391,12 +317,18 @@ export default {
     LogsHighLighting,
     ChunkedContent,
     OButton,
+    ODialog,
+    OIcon,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
+    OSpinner,
+    OTooltip,
+    OInput,
+    OSelect,
   },
   emits: [
     "copy",
@@ -433,7 +365,6 @@ export default {
     const schemaToBeSearch = ref({});
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
-    const $q = useQuasar();
     const unflattendData: any = ref("");
     const loading = ref(false);
 
@@ -446,12 +377,12 @@ export default {
       {
         value: "flattened",
         label: t("search.flattened"),
-        icon: AlignLeft,
+        icon: "align-left",
       },
       {
         value: "unflattened",
         label: t("search.original"),
-        icon: FileJson,
+        icon: "description",
       },
     ];
 
@@ -781,11 +712,10 @@ export default {
         searchObj.data.originalDataCache[cacheKey] = formattedData;
       } catch (err: any) {
         loading.value = false;
-        $q.notify({
+        toast({
           message:
             err.response?.data?.message || "Failed to get the Original data",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-right",
           timeout: 1500,
         });
       } finally {
@@ -931,25 +861,15 @@ export default {
 
     const copySelectedText = () => {
       if (selectedText.value) {
-        navigator.clipboard
-          .writeText(selectedText.value)
-          .then(() => {
+        copyToClipboard(selectedText.value, {
+          successMessage: "Text copied to clipboard",
+          errorMessage: "Failed to copy text",
+          timeout: 1500,
+        }).then((success) => {
+          if (success) {
             showMenu.value = false;
-            $q.notify({
-              message: "Text copied to clipboard",
-              color: "positive",
-              position: "bottom",
-              timeout: 1500,
-            });
-          })
-          .catch(() => {
-            $q.notify({
-              message: "Failed to copy text",
-              color: "negative",
-              position: "bottom",
-              timeout: 1500,
-            });
-          });
+          }
+        });
       }
     };
 
@@ -972,7 +892,6 @@ export default {
       getImageURL,
       addSearchTerm,
       addFieldToTable,
-      outlinedAccountTree,
       dropdownOpenMap,
       store,
       searchObj,

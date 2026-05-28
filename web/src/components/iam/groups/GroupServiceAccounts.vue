@@ -15,14 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="col">
+    <div class="tw:flex tw:flex-col tw:h-full">
       <div
         data-test="iam-service-accounts-selection-filters"
-       class="flex justify-start q-px-md q-py-sm card-container"
-        style="position: sticky; top: 0px; z-index: 2"
+       class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
       >
-        <div data-test="iam-service-accounts-selection-show-toggle" class="q-mr-md">
-          <div class="flex items-center">
+        <div data-test="iam-service-accounts-selection-show-toggle" class="tw:mr-3">
+          <div class="tw:flex tw:items-center">
             <span
               data-test="iam-service-accounts-selection-show-text"
               style="font-size: 14px"
@@ -30,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Show
             </span>
             <OToggleGroup
-              class="q-ml-xs"
+              class="tw:ml-1"
               :model-value="usersDisplay"
               @update:model-value="(v) => updateUserTable(v as string)"
             >
@@ -48,69 +47,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="iam-service-accounts-selection-search-input"
-          class="q-mr-md"
+          class="tw:mr-3"
         >
-          <q-input
+          <OInput
             data-test="service-accounts-list-search-input"
             v-model="userSearchKey"
-            borderless
-            dense
             class=" no-border o2-search-input tw:h-[36px] tw:w-[200px]"
             placeholder="Search Service Accounts"
           >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
+            <template #icon-left>
+              <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon" />
             </template>
-          </q-input>
+          </OInput>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
-        <template v-if="rows.length">
-          <app-table
-            :rows="visibleRows"
-            :columns="columns"
-            :dense="true"
-            :virtual-scroll="false"
-            style="height: fit-content"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-            :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
-            :hideTopPagination="true"
-            :showBottomPaginationWithTitle="true"
-            :filter="{
-              value: userSearchKey,
-              method: filterUsers,
-            }"
-            :title="t('iam.serviceAccounts')"
-          >
-            <template v-slot:select="slotProps: any">
-              <q-checkbox
-                :data-test="`iam-service-accounts-selection-table-body-row-${slotProps.column.row.email}-checkbox`"
-                size="xs"
-                v-model="slotProps.column.row.isInGroup"
-                class="filter-check-box cursor-pointer"
-                @click="toggleUserSelection(slotProps.column.row)"
-              />
-            </template>
-          </app-table>
-        </template>
-        <div
-          data-test="iam-service-accounts-selection-table-no-users-text"
-          v-if="!rows.length"
-          class="text-bold q-pl-md q-py-md"
+      <div data-test="iam-service-accounts-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
+        <OTable
+          :data="rows"
+          :columns="columns"
+          row-key="email"
+          :loading="props.loading"
+          :global-filter="userSearchKey"
+          pagination="client"
+          :page-size="100"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          :footer-title="t('serviceAccounts.header')"
+          dense
         >
-          No Service Accounts added
-        </div>
+          <template #cell-select="{ row }">
+            <OCheckbox
+              :data-test="`iam-service-accounts-selection-table-body-row-${row.email}-checkbox`"
+              :model-value="row.isInGroup"
+              class="filter-check-box tw:cursor-pointer"
+              @update:model-value="toggleUserSelection(row)"
+            />
+          </template>
+          <template #empty>
+            <NoData />
+          </template>
+        </OTable>
       </div>
     </div>
   </template>
   
   <script setup lang="ts">
-  import AppTable from "@/components/AppTable.vue";
+  import OTable from "@/lib/core/Table/OTable.vue";
+  import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+  import NoData from "@/components/shared/grid/NoData.vue";
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+  import OInput from "@/lib/forms/Input/OInput.vue";
+  import OIcon from "@/lib/core/Icon/OIcon.vue";
+  import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";
-  import { computed, watch } from "vue";
+  import { watch } from "vue";
   import type { Ref } from "vue";
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
@@ -135,6 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     removedUsers: {
       type: Set,
       default: () => new Set(),
+    },
+    loading: {
+      type: Boolean,
+      default: false,
     },
   });
   
@@ -167,23 +165,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   const { serviceAccountsState } = usePermissions();
   
-  const columns = [
+  const columns: OTableColumnDef[] = [
     {
-      name: "select",
-      field: "",
-      label: "",
-      align: "left",
-      sortable: false,
-      slot: true,
-      slotName: "select",
-      style: "width: 67px"
+      id: "select",
+      header: "",
+      accessorKey: "isInGroup",
+    cell: (info: any) => info.getValue(),
+    size: 36,
+      minSize: 32,
+      maxSize: 40,
+      meta: { align: "center", compactPadding: true },
     },
     {
-      name: "email",
-      field: "email",
-      label: t("iam.serviceAccountsName"),
-      align: "left",
+      id: "email",
+      header: t("iam.serviceAccountsName"),
+      accessorKey: "email",
       sortable: true,
+      meta: { align: "left" , autoWidth: true },
     },
   ];
   
@@ -255,38 +253,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   };
   
   const toggleUserSelection = (user: any) => {
-    if (user.isInGroup && !groupUsersMap.value.has(user.email)) {
-      props.addedUsers.add(user.email);
-    } else if (!user.isInGroup && groupUsersMap.value.has(user.email)) {
-      props.removedUsers.add(user.email);
-    }
-  
-    if (!user.isInGroup && props.addedUsers.has(user.email)) {
-      props.addedUsers.delete(user.email);
-    }
-  
-    if (!user.isInGroup && props.addedUsers.has(user.email)) {
-      props.removedUsers.delete(user.email);
-    }
-  };
-  
-  const filterUsers = (rows: any[], term: string) => {
-    var filtered = [];
-    for (var i = 0; i < rows.length; i++) {
-      var user = rows[i];
-      if (user.email.toLowerCase().indexOf(term.toLowerCase()) > -1) {
-        filtered.push(user);
+    user.isInGroup = !user.isInGroup;
+
+    if (user.isInGroup) {
+      // Newly selected
+      if (!groupUsersMap.value.has(user.email)) {
+        // Not originally in group — stage for addition
+        props.addedUsers.add(user.email);
+      } else {
+        // Was originally in group — undo pending removal
+        props.removedUsers.delete(user.email);
+      }
+    } else {
+      // Newly deselected
+      if (groupUsersMap.value.has(user.email)) {
+        // Was originally in group — stage for removal
+        props.removedUsers.add(user.email);
+      } else {
+        // Was not originally in group — undo pending addition
+        props.addedUsers.delete(user.email);
       }
     }
-    return filtered;
   };
-
-  const visibleRows = computed(() => {
-    if (!userSearchKey.value) return rows.value || [];
-    return filterUsers(rows.value || [], userSearchKey.value);
-  });
-
-  const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+  
   </script>
   
   <style scoped></style>

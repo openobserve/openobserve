@@ -1,22 +1,31 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Store lifecycle callbacks for testing
-let onDeactivatedCallback: any;
-let onActivatedCallback: any;
-let onMountedCallback: any;
-let onBeforeUnmountCallback: any;
-let onUnmountedCallback: any;
+// Store lifecycle callbacks for testing — use vi.hoisted so they are available
+// when the hoisted vi.mock factory runs
+const {
+  onDeactivatedCallback,
+  onActivatedCallback,
+  onMountedCallback,
+  onBeforeUnmountCallback,
+  onUnmountedCallback,
+} = vi.hoisted(() => ({
+  onDeactivatedCallback: { current: null as any },
+  onActivatedCallback: { current: null as any },
+  onMountedCallback: { current: null as any },
+  onBeforeUnmountCallback: { current: null as any },
+  onUnmountedCallback: { current: null as any },
+}));
 
-// Mock Vue lifecycle hooks individually
-vi.mock("vue", () => {
-  const actualRef = (value: any) => ({ value });
+vi.mock(import("vue"), async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    ref: actualRef,
-    onUnmounted: vi.fn().mockImplementation((callback) => { onUnmountedCallback = callback; }),
-    onDeactivated: vi.fn().mockImplementation((callback) => { onDeactivatedCallback = callback; }),
-    onActivated: vi.fn().mockImplementation((callback) => { onActivatedCallback = callback; }),
-    onMounted: vi.fn().mockImplementation((callback) => { onMountedCallback = callback; }),
-    onBeforeUnmount: vi.fn().mockImplementation((callback) => { onBeforeUnmountCallback = callback; }),
+    ...actual,
+    getCurrentInstance: vi.fn().mockReturnValue({}), // return truthy to trigger lifecycle registration
+    onUnmounted: vi.fn().mockImplementation((callback: any) => { onUnmountedCallback.current = callback; }),
+    onDeactivated: vi.fn().mockImplementation((callback: any) => { onDeactivatedCallback.current = callback; }),
+    onActivated: vi.fn().mockImplementation((callback: any) => { onActivatedCallback.current = callback; }),
+    onMounted: vi.fn().mockImplementation((callback: any) => { onMountedCallback.current = callback; }),
+    onBeforeUnmount: vi.fn().mockImplementation((callback: any) => { onBeforeUnmountCallback.current = callback; }),
   };
 });
 
@@ -109,7 +118,7 @@ describe("useCustomDebouncer", () => {
     const { valueRef, setImmediateValue, setDebounceValue } = useCustomDebouncer(initialValue, delay);
     
     // Simulate component deactivation
-    onDeactivatedCallback();
+    onDeactivatedCallback.current();
     
     // Try to set immediate value
     setImmediateValue(newValue);
@@ -128,14 +137,14 @@ describe("useCustomDebouncer", () => {
     const { valueRef, setImmediateValue, setDebounceValue } = useCustomDebouncer(initialValue, delay);
     
     // Simulate deactivation first
-    onDeactivatedCallback();
+    onDeactivatedCallback.current();
     
     // Try to set value (should not work)
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(initialValue);
     
     // Simulate activation
-    onActivatedCallback();
+    onActivatedCallback.current();
     
     // Now value changes should work
     setImmediateValue(newValue);
@@ -149,7 +158,7 @@ describe("useCustomDebouncer", () => {
     const { valueRef, setImmediateValue } = useCustomDebouncer(initialValue, delay);
     
     // Simulate mount
-    onMountedCallback();
+    onMountedCallback.current();
     
     // Value changes should work after mount
     setImmediateValue(newValue);
@@ -166,7 +175,7 @@ describe("useCustomDebouncer", () => {
     setDebounceValue(newValue);
     
     // Simulate beforeUnmount
-    onBeforeUnmountCallback();
+    onBeforeUnmountCallback.current();
     
     // Fast-forward time
     vi.advanceTimersByTime(delay);
@@ -189,7 +198,7 @@ describe("useCustomDebouncer", () => {
     setDebounceValue(newValue);
     
     // Simulate unmount
-    onUnmountedCallback();
+    onUnmountedCallback.current();
     
     // Fast-forward time
     vi.advanceTimersByTime(delay);
@@ -288,7 +297,7 @@ describe("useCustomDebouncer", () => {
     expect(valueRef.value).toBe(initialValue);
     
     // Trigger deactivation during debounce
-    onDeactivatedCallback();
+    onDeactivatedCallback.current();
     
     // Advance time
     vi.advanceTimersByTime(delay);
@@ -297,7 +306,7 @@ describe("useCustomDebouncer", () => {
     expect(valueRef.value).toBe(initialValue);
     
     // Reactivate and try again
-    onActivatedCallback();
+    onActivatedCallback.current();
     setDebounceValue(debouncedValue);
     vi.advanceTimersByTime(delay);
     

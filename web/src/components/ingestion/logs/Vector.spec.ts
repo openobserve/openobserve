@@ -15,11 +15,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import Vector from "@/components/ingestion/logs/Vector.vue";
 
-installQuasar();
 
 // Mock CopyContent component
 vi.mock("@/components/CopyContent.vue", () => ({
@@ -106,7 +104,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
 
     it("should initialize with all required dependencies", () => {
@@ -455,7 +453,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
   describe("Template Rendering Tests", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.q-pa-sm');
+      const container = wrapper.find('.tw\\:p-2');
       expect(container.exists()).toBe(true);
     });
 
@@ -469,7 +467,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
     it("should render template structure correctly", () => {
       wrapper = createWrapper();
       const template = wrapper.html();
-      expect(template).toContain('q-pa-sm');
+      expect(template).toContain('tw:p-2');
       expect(template).toContain('copy-content-mock');
     });
   });

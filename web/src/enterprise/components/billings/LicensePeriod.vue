@@ -1,7 +1,7 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="full-width license-expiry-container q-pa-md gradient-banner">
-        <div class="row" >
-        <div class="col">
+    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:w-full license-expiry-container tw:p-3 gradient-banner">
+        <div class="tw:flex" >
+        <div class="tw:flex tw:flex-col">
         <span class="o2-license-message">{{ getLicenseExpiryMessage() }}</span>
         <br />
         <span class="o2-license-subtitle">Please update your license by contacting your administrator.</span>

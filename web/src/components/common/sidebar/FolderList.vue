@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-        <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
+        <div class="tw:font-bold tw:px-2  tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -29,29 +29,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-new-folder-btn"
               title="Add Folder"
             >
-              <q-icon name="add" />
+              <OIcon name="add" size="sm" />
             </OButton>
           </div>
         </div>
-        <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
+        <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
 
         <!-- Search Input -->
-        <div style="width: 100%;" class="flex folder-item q-py-xs">
-          <q-input
+        <div class="tw:px-2 tw:py-1">
+          <OInput
             v-model="searchQuery"
-            dense
-            borderless
             data-test="folder-search"
             :placeholder="t('dashboard.searchFolder')"
-            style="width: 100%;"
             clearable
-            class="tw:mx-2 q-px-xs"
-            :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+            class="tw:w-full"
           >
-            <template #prepend>
-              <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+            <template #icon-left>
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </div>
       </div>
       <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
@@ -67,71 +63,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="test-class"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item full-width row justify-between no-wrap">
-              <span class="folder-name" :title="tab.name">{{
+          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <span class="folder-name" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
-              <div class="hover-actions">
-              <OButton
-                  v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  style="cursor: pointer; justify-self: end; height: 0.5rem"
-                  data-test="dashboard-more-icon"
+              <div class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2">
+              <ODropdown
+                v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
+                side="bottom"
+                align="start"
               >
-                  <q-icon name="more_vert" />
-                  <q-menu>
-                  <q-list dense>
-                      <q-item
-                      v-close-popup
-                      clickable
-                      @click.stop="editFolder(tab.folderId)"
-                      data-test="dashboard-edit-folder-icon"
-                      >
-                      <q-item-section avatar>
-                          <q-icon :name="outlinedEdit" size="xs" />
-                      </q-item-section>
-                      <q-item-section>
-                          <q-item-label>{{ t('common.edit') }}</q-item-label>
-                      </q-item-section>
-                      </q-item>
-                      <q-item
-                      v-close-popup
-                      clickable
-                      @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                      data-test="dashboard-delete-folder-icon"
-                      >
-                      <q-item-section avatar>
-                          <q-icon :name="outlinedDelete" size="xs" />
-                      </q-item-section>
-                      <q-item-section>
-                          <q-item-label>{{ t('common.delete') }}</q-item-label>
-                      </q-item-section>
-                      </q-item>
-                  </q-list>
-                  </q-menu>
-              </OButton>
+                <template #trigger>
+                  <OButton
+                    size="icon"
+                    variant="ghost"
+                    icon-left="more-vert"
+                    class="tw:h-6 tw:w-6"
+                    data-test="dashboard-more-icon"
+                  />
+                </template>
+                <ODropdownItem
+                  data-test="dashboard-edit-folder-icon"
+                  @select="editFolder(tab.folderId)"
+                >
+                  <template #icon-left>
+                    <OIcon name="edit" size="xs" />
+                  </template>
+                  {{ t('common.edit') }}
+                </ODropdownItem>
+                <ODropdownItem
+                  variant="destructive"
+                  data-test="dashboard-delete-folder-icon"
+                  @select="showDeleteFolderDialogFn(tab.folderId)"
+                >
+                  <template #icon-left>
+                    <OIcon name="delete" size="xs" />
+                  </template>
+                  {{ t('common.delete') }}
+                </ODropdownItem>
+              </ODropdown>
               </div>
           </div>
           </OTab>
       </OTabs>
       </div>
     </div>
-      <q-dialog
-          v-model="showAddFolderDialog"
-          position="right"
-          full-height
-          maximized
-          data-test="dashboard-folder-dialog"
-        >
-        <AddFolder  
-        style="width: 30vw;"
-        @update:modelValue="updateFolderList"
-        :edit-mode="isFolderEditMode"
-        :folder-id="selectedFolderToEdit ?? 'default'"
-        :type="type"
+      <AddFolder
+          v-model:open="showAddFolderDialog"
+          @update:modelValue="updateFolderList"
+          :edit-mode="isFolderEditMode"
+          :folder-id="selectedFolderToEdit ?? 'default'"
+          :type="type"
         />
-      </q-dialog>
     <ConfirmDialog
     :title="t('dashboard.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"
@@ -145,9 +128,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
   <script lang="ts">
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
+import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   // @ts-nocheck
   import {
     computed,
@@ -160,7 +146,6 @@ import OButton from '@/lib/core/Button/OButton.vue';
     watch,
   } from "vue";
   import { useStore } from "vuex";
-  import { useQuasar, date, debounce } from "quasar";
   import { useI18n } from "vue-i18n";
 
   import dashboardService from "@/services/dashboards";
@@ -180,11 +165,8 @@ import OButton from '@/lib/core/Button/OButton.vue';
     getFoldersList,
     getFoldersListByType
   } from "@/utils/commons";
-  import {
-    outlinedDelete,
-    outlinedDriveFileMove,
-    outlinedEdit,
-  } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
   import { filter, forIn } from "lodash-es";
@@ -203,6 +185,8 @@ import OButton from '@/lib/core/Button/OButton.vue';
 export default defineComponent({  
     name: "FolderList",
     components: {
+      OSeparator,
+      OIcon,
       AddDashboard,
       QTablePagination,
       NoData,
@@ -212,6 +196,9 @@ export default defineComponent({
       OTabs,
       OTab,
       OButton,
+      OInput,
+      ODropdown,
+      ODropdownItem,
     },
     props: {
       type: {
@@ -331,8 +318,6 @@ export default defineComponent({
         addFolder,
         updateFolderList,
         store,
-        outlinedDelete,
-        outlinedEdit,
         deleteFolder,
         selectedFolderDelete,
         confirmDeleteFolderDialog,
@@ -381,30 +366,10 @@ export default defineComponent({
     border-radius: 0.25rem;
     transition: background-color 0.3s;
 
-    &:hover {
-      .hover-actions {
-        display: flex;
-      }
-    }
-
-    // .folder-name {
-    //   white-space: nowrap;
-    //   overflow: hidden;
-    //   text-overflow: ellipsis;
-    // }
-
-    .hover-actions {
-      display: none;
-      align-items: center;
-      // No background change on hover — the button appears inside a folder item
-      // which already has its own hover/active state. Any fill here looks like
-      // a white or grey artifact over the item background.
-      --color-button-ghost-hover-bg: transparent;
-
-      .q-btn {
-        margin-left: 0.5rem;
-      }
-    }
+    // No background change on the action button hover — it sits inside a folder
+    // item that already has its own hover/active state, so any fill looks like
+    // a stray artifact over the item background.
+    --color-button-ghost-hover-bg: transparent;
   }
 
   .o-tabs {

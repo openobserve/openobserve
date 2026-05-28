@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
-    <div class="row tw:m-0! tw:p-[0.375rem]">
-      <div class="float-right col flex items-center tw:gap-[0.375rem]">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full">
+      <div class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem]">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Layers class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="layers" size="sm" class="tw:shrink-0"
             /></template>
             Spans
           </OToggleGroupItem>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><q-icon :name="outlinedAccountTree" class="tw:text-[14px] tw:shrink-0"
+              ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
             /></template>
             Traces
           </OToggleGroupItem>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Network class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="share" size="sm" class="tw:shrink-0"
             /></template>
             Service Graph
           </OToggleGroupItem>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><BookOpen class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="menu-book" size="sm" class="tw:shrink-0"
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><MessagesSquare class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="forum" size="sm" class="tw:shrink-0"
             /></template>
             Sessions
           </OToggleGroupItem>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Sparkles class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="auto-awesome" size="sm" class="tw:shrink-0"
             /></template>
             LLM Insights
           </OToggleGroupItem>
@@ -118,29 +118,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
+            class="toolbar-toggle-container element-box-shadow"
           >
-            <q-toggle
+            <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
-            >
-            </q-toggle>
-            <img
-              :src="metricsIcon"
-              alt="Metrics"
-              style="width: 20px; height: 20px"
+              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
+              size="lg"
             />
-            <q-tooltip>
-              {{ t("traces.RedMetrics") }}
-            </q-tooltip>
+            <OIcon
+              name="bar-chart"
+              size="sm"
+              class="tw:shrink-0"
+            />
+            <OTooltip :content="t('traces.RedMetrics')" />
+          </div>
+          <!-- Error Only Toggle -->
+          <div
+            class="toolbar-toggle-container element-box-shadow"
+            data-test="traces-toolbar-toggle-container"
+          >
+            <OSwitch
+              data-test="traces-search-bar-error-only-toggle-btn"
+              v-model="searchObj.meta.showErrorOnly"
+              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
+              size="lg"
+              @update:model-value="onErrorOnlyToggle"
+            />
+            <OIcon
+              name="error"
+              size="sm"
+              class="tw:shrink-0 tw:text-[var(--o2-status-error)]"
+            />
+            <OTooltip :content="t('traces.showErrorOnly')" />
           </div>
           <OButton
             data-test="traces-search-bar-reset-filters-btn"
@@ -148,42 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             @click="resetFilters"
           >
-            <q-icon name="restart_alt" size="16px" />
-            <q-tooltip>
-              {{ t("search.resetFilters") }}
-            </q-tooltip>
+            <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
+            <OTooltip :content="t('search.resetFilters')" />
           </OButton>
-          <!-- Error Only Toggle -->
-          <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
-          >
-            <q-toggle
-              data-test="traces-search-bar-error-only-toggle-btn"
-              v-model="searchObj.meta.showErrorOnly"
-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
-              @update:model-value="onErrorOnlyToggle"
-            >
-            </q-toggle>
-            <q-icon
-              name="error"
-              size="1.1rem"
-              class="tw:mx-1 tw:text-red-500"
-            />
-            <q-tooltip>
-              {{ t("traces.showErrorOnly") }}
-            </q-tooltip>
-          </div>
           <syntax-guide
             data-test="logs-search-bar-sql-mode-toggle-btn"
             :sqlmode="searchObj.meta.sqlMode"
-            class="tw:border! tw:border-[var(--color-button-outline-border)]! tw:h-[2rem]! tw:w-[2.25rem]!"
+            class=" tw:h-[2rem]! tw:w-[2.25rem]!"
           />
         </template>
       </div>
@@ -192,11 +173,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.meta.searchMode !== 'service-graph' &&
           searchObj.meta.searchMode !== 'services-catalog'
         "
-        class="float-right col-auto tw:flex tw:items-center tw:gap-[0.375rem]"
+        class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.375rem]"
       >
         <date-time
           ref="dateTimeRef"
           auto-apply
+          menu-align="end"
           :default-type="searchObj.data.datetime.type"
           :default-absolute-time="{
             startTime: searchObj.data.datetime.startTime,
@@ -221,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+              class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -231,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="q-pa-none tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary"
+              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary"
               :class="
                 store.state.zoConfig.auto_query_enabled
                   ? 'search-button-enterprise-border-radius'
@@ -241,29 +223,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isLoading"
               :disabled="isLoading"
             >
-              <q-tooltip
+              <OTooltip
                 v-if="
                   searchObj.meta.liveMode &&
                   store.state.zoConfig.auto_query_enabled
                 "
-                >{{ t("search.autoRunEnabled") }}</q-tooltip
-              >
-              <q-icon
+                :content="t('search.autoRunEnabled')"
+              />
+              <OIcon
                 v-if="
                   searchObj.meta.liveMode &&
                   store.state.zoConfig.auto_query_enabled
                 "
                 name="autorenew"
-                size="14px"
-                class="q-mr-xs"
+                size="xs"
+                class="tw:mr-1"
               />
               {{ t("search.runQuery") }}
             </OButton>
-            <!-- Dropdown: shown when live mode feature is enabled -->
-            <q-separator
-              v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
-              class="tw:h-[1.875rem]! tw:w-[1px]"
-            />
+            <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
             <ODropdown
               v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
               side="bottom"
@@ -278,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'search-button-dropdown-enterprise-border-radius',
                   ]"
                 >
-                  <q-icon name="arrow_drop_down" size="18px" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                 </OButton>
               </template>
               <ODropdownItem
@@ -286,12 +264,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="toggleLiveMode"
               >
                 <template #icon-left>
-                  <q-icon
+                  <OIcon
                     :name="
-                      searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                      searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                     "
-                    size="16px"
-                    :color="searchObj.meta.liveMode ? 'primary' : ''"
+                    size="sm"
+                    :class="searchObj.meta.liveMode ? 'tw:text-[var(--o2-primary)]' : ''"
                   />
                 </template>
                 <span>
@@ -317,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Export Traces"
           @click="downloadLogs"
         >
-          <q-icon name="download" size="16px" />
+          <OIcon name="download" size="sm" />
         </OButton>
         <share-button
           data-test="logs-search-bar-share-link-btn"
@@ -330,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
       <div
         v-if="searchObj.meta.searchMode === 'service-graph'"
-        class="float-right col-auto o2-input-full"
+        class="tw:ml-auto"
       >
         <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
           <date-time
@@ -350,11 +328,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-graph-refresh-btn"
             variant="outline"
             size="icon-toolbar"
-            class="tw:mr-[0.375rem]"
+            class="tw:min-w-[1.875rem]!"
             @click="$emit('service-graph-refresh')"
           >
-            <q-icon name="refresh" size="16px" />
-            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+            <OIcon name="refresh" size="sm" />
+            <OTooltip :content="t('common.refresh')" />
           </OButton>
           <OToggleGroup
             :model-value="searchObj.meta.serviceGraphVisualizationType"
@@ -365,9 +343,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value="tree"
               size="sm"
             >
-              <template #icon-left
-                ><GitBranch class="tw:size-3.5 tw:shrink-0"
-              /></template>
+              <template #icon-left>
+                <OIcon name="git-branch" size="sm" />
+              </template>
               Tree View
             </OToggleGroupItem>
             <OToggleGroupItem
@@ -376,20 +354,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             >
               <template #icon-left
-                ><Share2 class="tw:size-3.5 tw:shrink-0"
-              /></template>
+                ><OIcon name="share" size="sm" class="tw:shrink-0" /></template>
               Graph View
             </OToggleGroupItem>
           </OToggleGroup>
-          <q-select
+          <OSelect
             v-model="searchObj.meta.serviceGraphLayoutType"
             :options="serviceGraphLayoutOptions"
-            dense
-            borderless
             class="tw:w-[7.5rem] tw:min-h-[2rem]! tw:h-[2rem]!"
-            emit-value
-            map-options
-            :disable="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+            :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
             @update:model-value="onServiceGraphLayoutChange"
           />
         </div>
@@ -398,12 +371,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Services Catalog right toolbar: DateTime, Refresh -->
       <div
         v-if="searchObj.meta.searchMode === 'services-catalog'"
-        class="float-right col-auto o2-input-full"
+        class="tw:ml-auto"
       >
         <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
           <date-time
             ref="dateTimeRef"
             auto-apply
+            menu-align="end"
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
@@ -421,8 +395,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mr-[0.375rem]"
             @click="$emit('services-catalog-refresh')"
           >
-            <q-icon name="refresh" size="16px" />
-            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+            <OIcon name="refresh" size="sm" />
+            <OTooltip :content="t('common.refresh')" />
           </OButton>
         </div>
       </div>
@@ -436,10 +410,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
-      class="row tw:h-[calc(100%-3.1rem)]!"
+      class="tw:flex tw:h-[calc(100%-3.1rem)]!"
     >
       <div
-        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
+        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full! tw:w-full"
       >
         <code-query-editor
           ref="queryEditorRef"
@@ -478,7 +452,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
@@ -486,10 +459,13 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles, MessagesSquare } from "lucide-vue-next";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -498,31 +474,29 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
-import { getImageURL } from "@/utils/zincutils";
 import {
   applyFilterTerm,
   replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import { isDatetimeChanged } from "./tracesSearchBar.utils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OSeparator,
     DateTime,
     ShareButton,
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
-    Layers,
-    Network,
-    GitBranch,
-    Share2,
-    BookOpen,
-    Sparkles,
-    MessagesSquare,
+    OSwitch,
+    OSelect,
+    OTooltip,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -579,7 +553,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
@@ -701,10 +674,8 @@ export default defineComponent({
             if (streamFound == false) {
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
+              toast({
                 message: "Stream not found",
-                color: "negative",
-                position: "top",
                 timeout: 2000,
               });
             }
@@ -964,11 +935,6 @@ export default defineComponent({
       dateTimeRef.value?.setDateType("absolute");
     };
 
-    const metricsIcon = computed(() => {
-      return store.state.theme === "dark"
-        ? getImageURL("images/common/bar_chart_histogram_light.svg")
-        : getImageURL("images/common/bar_chart_histogram.svg");
-    });
 
     // Service Graph toolbar controls
     const serviceGraphVisualizationTabs = [
@@ -1020,7 +986,6 @@ export default defineComponent({
       resetFilters,
       onErrorOnlyToggle,
       updateNewDateTime,
-      metricsIcon,
       tracesShareURL,
       config,
       applyFilters,
@@ -1030,7 +995,6 @@ export default defineComponent({
       onServiceGraphVisualizationChange,
       onServiceGraphLayoutChange,
       toggleLiveMode,
-      outlinedAccountTree,
     };
   },
   computed: {
@@ -1170,8 +1134,7 @@ export default defineComponent({
         height: 0;
       }
 
-      &,
-      .q-list {
+      & {
         border-radius: 3px;
       }
     }
@@ -1193,12 +1156,7 @@ export default defineComponent({
       background: $secondary;
       border-radius: 3px 3px 3px 3px;
       padding: 0px 5px;
-
-      .q-icon {
-        font-size: 15px;
-        color: #ffffff;
-      }
-    }
+}
   }
 
   .download-logs-btn {
@@ -1224,19 +1182,15 @@ export default defineComponent({
   .reset-filters {
     width: 30px;
     height: 30px;
-
-    .q-icon {
-      margin-right: 0;
-    }
-  }
+}
 }
 
 .o2-run-query-button {
-  font-size: 11px;
-  font-weight: 500 !important;
-  line-height: 16px !important;
-  padding: 0px 0px !important;
-  width: 94px !important;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium) !important;
+  line-height: 1rem !important;
+  padding: 0 !important;
+  width: 5.875rem !important;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
@@ -1248,13 +1202,13 @@ export default defineComponent({
 
   &:hover {
     opacity: 0.9;
-    box-shadow: 0 0 8px
+    box-shadow: 0 0 0.5rem
       color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
 
 .search-button-enterprise-border-radius {
-  border-radius: 0.375rem 0px 0px 0.375rem !important;
+  border-radius: 0.375rem 0 0 0.375rem !important;
 }
 
 .search-button-normal-border-radius {
@@ -1262,11 +1216,30 @@ export default defineComponent({
 }
 
 .search-button-dropdown-enterprise-border-radius {
-  border-radius: 0px 0.375rem 0.375rem 0px !important;
+  border-radius: 0 0.375rem 0.375rem 0 !important;
 }
 
 .o2-color-cancel {
-  background-color: #f67a7a;
+  background-color: var(--o2-cancel-query-bg);
   color: var(--o2-primary-btn-text);
+}
+
+.toolbar-toggle-container {
+  padding: 0.25rem 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid var(--color-button-outline-border);
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+:global(.body--dark) .toolbar-toggle-container {
+  border: 0.0625rem solid var(--color-button-outline-border);
 }
 </style>

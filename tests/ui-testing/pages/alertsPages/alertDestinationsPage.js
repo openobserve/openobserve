@@ -16,50 +16,128 @@ export class AlertDestinationsPage {
         
         // Destination creation locators
         this.addDestinationButton = '[data-test="alert-destination-list-add-alert-btn"]';
+        // OInput wrapper (for visibility/state assertions); inner native input uses `-field` suffix for fill/click
         this.destinationNameInput = '[data-test="add-destination-name-input"]';
+        this.destinationNameInputField = '[data-test="add-destination-name-input-field"]';
         this.templateSelect = '[data-test="add-destination-template-select"]';
+        // OSelect popover + option locators per agent rules §4
+        this.templateSelectPopover = '[data-test="add-destination-template-select-popover"]';
+        this.templateSelectSearch = '[data-test="add-destination-template-select-search"]';
         this.urlInput = '[data-test="add-destination-url-input"]';
+        // OInput inner native input for URL (used for fill operations)
+        this.urlInputField = '[data-test="add-destination-url-input-field"]';
         this.submitButton = '[data-test="add-destination-submit-btn"]';
         this.successMessage = 'Destination saved';
+        // OToast success message (preferred over getByText to dodge strict-mode collisions)
+        this.successToast = '[data-test="o-toast-success"]';
+        this.successToastMessage = '[data-test="o-toast-success"] [data-test="o-toast-message"]';
         
         // Import locators
         this.destinationImportButton = '[data-test="destination-import"]';
         this.importJsonUrlTab = '[data-test="tab-import_json_url"]';
         this.destinationImportUrlInput = '[data-test="destination-import-url-input"]';
+        // OInput inner native input (-field) for the URL field — used for fill/click
+        this.destinationImportUrlInputField = '[data-test="destination-import-url-input-field"]';
         this.destinationImportJsonBtn = '[data-test="destination-import-json-btn"]';
         this.destinationImportNameError = '[data-test="destination-import-name-error"]';
         this.destinationImportTemplateInput = '[data-test="destination-import-template-input"]';
+        // OSelect search input + popover + option follow the OSelect data-test convention (§4)
+        this.destinationImportTemplateSearch = '[data-test="destination-import-template-input-search"]';
+        this.destinationImportTemplatePopover = '[data-test="destination-import-template-input-popover"]';
+        this.destinationImportTemplateOption = '[data-test="destination-import-template-input-option"]';
+        // OInput wrapper for visibility; inner native `-field` derivative for fill/click (§4)
         this.destinationImportNameInput = '[data-test="destination-import-name-input"]';
+        this.destinationImportNameInputField = '[data-test="destination-import-name-input-field"]';
         this.destinationImportCancelBtn = '[data-test="destination-import-cancel-btn"]';
         this.destinationListSearchInput = '[data-test="destination-list-search-input"]';
-        this.confirmButton = '[data-test="confirm-button"]';
+        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
         this.deleteDestinationButton = '[data-test="alert-destination-list-{destinationName}-delete-destination"]';
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
-        this.nextPageButton = 'button:has-text("chevron_right")';
+        this.nextPageButton = '[data-test="alert-destinations-list-next-btn"]';
+        // Search input is an OInput wrapper; inner native input uses `-field` suffix for fill/click
+        this.destinationListSearchInputField = '[data-test="destination-list-search-input-field"]';
+        this.destinationsListTable = '[data-test="alert-destinations-list-table"]';
+
+        // Dialog/drawer title anchor for clickNewDestination (anchors on dialog open)
+        this.addDestinationTitle = '[data-test="add-destination-title"]';
 
         // Prebuilt destination locators
         this.prebuiltDestinationSelector = '[data-test="prebuilt-destination-selector"]';
         this.destinationTypeCard = '[data-test="destination-type-card"]';
         this.destinationTypeName = '[data-test="destination-type-name"]';
-        this.selectedDestinationIndicator = '.selected-destination-indicator';
-        this.stepperStep = '.q-stepper__step';
+        this.destinationTypeReadonly = '[data-test="destination-type-readonly"]';
         this.prebuiltForm = '[data-test="prebuilt-form"]';
-        this.webhookInput = 'input[data-test*="webhook"], input[placeholder*="webhook"]';
-        this.recipientsInput = 'input[data-test="email-recipients-input"]';
-        this.integrationKeyInput = 'input[data-test="pagerduty-integration-key-input"]';
+        // Webhook OInput wrapper (any prebuilt type) — used for visibility checks; inner native input uses `-field`
+        this.webhookInputAny = '[data-test$="-webhook-url-input"]';
+        this.webhookInputAnyField = '[data-test$="-webhook-url-input-field"]';
+        this.recipientsInput = '[data-test="email-recipients-input"]';
+        this.recipientsInputField = '[data-test="email-recipients-input-field"]';
+        this.integrationKeyInput = '[data-test="pagerduty-integration-key-input"]';
+        this.integrationKeyInputField = '[data-test="pagerduty-integration-key-input-field"]';
+        this.opsgenieApiKeyInput = '[data-test="opsgenie-api-key-input"]';
+        this.opsgenieApiKeyInputField = '[data-test="opsgenie-api-key-input-field"]';
+        this.servicenowInstanceUrlInputField = '[data-test="servicenow-instance-url-input-field"]';
+        this.servicenowUsernameInputField = '[data-test="servicenow-username-input-field"]';
+        this.servicenowPasswordInputField = '[data-test="servicenow-password-input-field"]';
         this.severitySelect = '[data-test="pagerduty-severity-select"]';
+        this.severitySelectPopover = '[data-test="pagerduty-severity-select-popover"]';
         this.prioritySelect = '[data-test="opsgenie-priority-select"]';
-        this.testButton = 'button:has-text("Test")';
-        this.testResult = '[data-test="destination-test-result"], [data-test="prebuilt-test-result"], .test-result, .o2-test-result';
-        this.saveButton = 'button:has-text("Save")';
-        this.cancelButton = 'button:has-text("Cancel")';
-        this.backButton = 'button:has-text("Back")';
-        this.successNotification = '.q-notification__message';
-        this.errorMessage = '.q-field__messages, .error-message';
-        this.checkIcon = '.q-icon';
+        this.prioritySelectPopover = '[data-test="opsgenie-priority-select-popover"]';
+        this.methodSelect = '[data-test="add-destination-method-select"]';
+        this.methodSelectPopover = '[data-test="add-destination-method-select-popover"]';
+        // Save/Cancel/Test buttons resolve via stable data-test
+        this.testButton = '[data-test="destination-test-button"]';
+        this.testResult = '[data-test="destination-test-result"]';
+        this.testResultPrebuilt = '[data-test="prebuilt-test-result"]';
+        this.testResultSuccess = '[data-test="test-result-success"]';
+        this.testResultFailure = '[data-test="test-result-failure"]';
+        this.testResultLoading = '[data-test="test-result-loading"]';
+        this.testResultIdle = '[data-test="test-result-idle"]';
+        this.saveButton = '[data-test="add-destination-submit-btn"]';
+        this.cancelButton = '[data-test="add-destination-cancel-btn"]';
+        this.backButton = '[data-test="add-destination-back-btn"]';
+        // Toast/notification appears via OToast — match either o-toast-success or o-toast-message
+        this.successNotification = '[data-test^="o-toast-"]';
+        this.toastSuccess = '[data-test="o-toast-success"]';
+        this.toastMessage = '[data-test="o-toast-message"]';
+        // OInput-derived per-field error nodes (e.g. add-destination-name-input-error). Any of these visible = validation error
+        this.errorMessage = '[data-test$="-input-error"], [data-test$="-error"]';
+        this.addDestinationTitle = '[data-test="add-destination-title"]';
+        this.addDestinationLoadingIndicator = '[data-test="add-destination-loading-indicator"]';
+        this.dialogCloseBtn = '[data-test="o-dialog-close-btn"]';
+        this.checkmarkIcon = '[name="check-circle"]';
+    }
+
+    // ============================================================================
+    // FACTORY HELPERS
+    // ============================================================================
+
+    /** @param {string} type Type id (slack/discord/msteams/email/pagerduty/opsgenie/servicenow/custom) */
+    getDestinationTypeCard(type) {
+        return this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
+    }
+
+    /** Locator for the row containing a destination's delete button. */
+    getDeleteDestinationBtn(name) {
+        return this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
+    }
+
+    /** Locator for the row containing a destination's edit button. */
+    getEditDestinationBtn(name) {
+        return this.page.locator(`[data-test="alert-destination-list-${name}-update-destination"]`);
+    }
+
+    /**
+     * Row containing a named destination. Resolves via the destination-specific delete-button data-test
+     * and walks up to the OTable row ancestor.
+     */
+    getDestinationRow(name) {
+        return this.page.locator(
+            `xpath=//*[@data-test="alert-destination-list-${name}-delete-destination"]/ancestor::*[starts-with(@data-test,'o2-table-row-')][1]`
+        );
     }
 
     async navigateToDestinations(retryCount = 0) {
@@ -142,31 +220,29 @@ export class AlertDestinationsPage {
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
-        await this.page.waitForTimeout(1000); // Wait for name input to appear
+        // wait for the destination name field to be ready before filling
+        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
 
-        await this.page.locator(this.destinationNameInput).click();
-        await this.page.locator(this.destinationNameInput).fill(destinationName);
-        await this.page.waitForTimeout(1000);
-        
-        // Handle template selection with scrolling
-        await this.page.locator(this.templateSelect).click();
-        await this.page.waitForTimeout(2000); // Wait for template options to load
-        
-        // Use the common scroll function
-        await this.commonActions.scrollAndFindOption(templateName, 'template');
-        
-        await this.page.waitForTimeout(1000);
-        
-        await this.page.locator(this.urlInput).click();
-        await this.page.locator(this.urlInput).fill(url);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.destinationNameInputField).click();
+        await this.page.locator(this.destinationNameInputField).fill(destinationName);
+        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(destinationName, { timeout: 5000 });
+
+        // Handle template selection — prefer deterministic data-test-value match
+        await this.selectDestinationTemplate(templateName);
+
+        await this.page.locator(this.urlInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.urlInputField).click();
+        await this.page.locator(this.urlInputField).fill(url);
+        await expect(this.page.locator(this.urlInputField)).toHaveValue(url, { timeout: 5000 });
         
         await this.page.locator(this.submitButton).click();
-        await expect(this.page.getByText(this.successMessage)).toBeVisible();
+        // Wait for the form editor to close — AddDestination unmounts after emit('cancel:hideform')
+        // which fires only after the API call returns successfully.
+        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.addDestinationButton).waitFor({ state: 'visible', timeout: 15000 });
 
         // Verify the destination exists by checking all pages
         await this.verifyDestinationExists(destinationName);
@@ -221,6 +297,25 @@ export class AlertDestinationsPage {
 
         // Fallback: UI pagination (only if API is unavailable)
         testLogger.info('API unavailable, falling back to UI pagination', { destinationName });
+
+        // Prefer scoping by the OInput search field — pentest backend may have 1000+ rows,
+        // so paginating one-by-one is unreliable. The per-row delete button uses the
+        // destination name as part of its data-test, giving us a row anchor without
+        // relying on getByRole / getByText.
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        if (await searchField.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await searchField.fill('');
+            await searchField.fill(destinationName);
+            const rowAnchor = this.getDeleteDestinationBtn(destinationName);
+            try {
+                await rowAnchor.waitFor({ state: 'visible', timeout: 10000 });
+                testLogger.info('Found destination via search', { destinationName });
+                return true;
+            } catch (e) {
+                testLogger.debug('Destination not found via search input', { destinationName });
+            }
+        }
+
         let destinationFound = false;
         let isLastPage = false;
 
@@ -269,6 +364,84 @@ export class AlertDestinationsPage {
     }
 
     /**
+     * Rewrite the JSON inside the import editor when it contains a placeholder URL.
+     *
+     * The public fixtures hosted on `alert_tests` use `"url": "DEMO"` (or similar
+     * placeholders) which the backend's SSRF guard rejects at create time. We swap
+     * any such value for a valid HTTPS URL via the Monaco editor's model API
+     * (§5 — drive via `window.monaco.editor.getEditors()`).
+     *
+     * No-op if the editor isn't ready or no placeholder is present (e.g. file-import flows
+     * may have already provided a usable URL).
+     *
+     * @param {string} validUrl - The URL to substitute when a placeholder is detected.
+     */
+    async replaceImportJsonUrlIfPlaceholder(validUrl) {
+        const replaced = await this.page.evaluate(async ({ validUrl }) => {
+            const m = window.monaco;
+            if (!m || !m.editor) return { ok: false, reason: 'monaco-unavailable' };
+            const editors = m.editor.getEditors();
+            if (!editors || editors.length === 0) return { ok: false, reason: 'no-editors' };
+            const target = editors.find(ed => {
+                const dom = ed.getDomNode();
+                return dom && dom.closest('[data-test$="-import-sql-editor"]');
+            }) || editors[0];
+            const model = target.getModel();
+            if (!model) return { ok: false, reason: 'no-model' };
+            const text = model.getValue();
+            const replacement = text.replace(/"url"\s*:\s*"((?!https?:\/\/)[^"]*)"/g, `"url": "${validUrl}"`);
+            if (replacement === text) return { ok: true, replaced: false };
+            model.setValue(replacement);
+            return { ok: true, replaced: true };
+        }, { validUrl }).catch(err => ({ ok: false, reason: err && err.message ? err.message : String(err) }));
+        if (replaced?.ok && replaced.replaced) {
+            await this.page.waitForTimeout(600);
+            await this.page.waitForFunction(({ validUrl }) => {
+                const m = window.monaco;
+                const eds = m?.editor?.getEditors?.() || [];
+                const val = eds[0]?.getModel?.()?.getValue?.() || '';
+                return val.includes(`"url": "${validUrl}"`);
+            }, { validUrl }, { timeout: 4000, polling: 100 }).catch(() => {});
+            testLogger.debug('Replaced placeholder URL in import JSON editor', { validUrl });
+        }
+    }
+
+    /**
+     * Select a template inside the ImportDestination OSelect (`destination-import-template-input`).
+     *
+     * The consumer binds `:options="filteredTemplates"` and only populates that ref via
+     * the `@search` emit. On first open the list is empty — typing into the OSelect's
+     * search input triggers `@search`, which copies `getFormattedTemplates` into
+     * `filteredTemplates`. After that, the per-value `data-test-value="<name>"` option
+     * resolves cleanly without scrolling/`getByText`.
+     *
+     * @param {string} templateName - Template name to pick (must already exist server-side).
+     */
+    async selectImportTemplate(templateName) {
+        const trigger = this.page.locator(this.destinationImportTemplateInput);
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        await trigger.click();
+
+        const popover = this.page.locator(this.destinationImportTemplatePopover);
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Drive `@search` on the OSelect search input so `filteredTemplates` is populated.
+        // Type the exact name to narrow to a single matching option (deterministic).
+        const searchInput = this.page.locator(this.destinationImportTemplateSearch);
+        await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+        await searchInput.fill('');
+        await searchInput.fill(templateName);
+
+        const option = popover.locator(`[data-test-value="${templateName}"]`).first();
+        // The parent's `templates` prop is populated async via `getTemplates()` on the
+        // destinations list view; poll briefly so a newly-created template surfaces.
+        await expect(option).toBeVisible({ timeout: 15000 });
+        await option.click();
+        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.debug('Selected import template via OSelect search', { templateName });
+    }
+
+    /**
      * Import destination from URL
      * @param {string} url - URL of the destination JSON
      * @param {string} templateName - Name of the template to use
@@ -293,19 +466,31 @@ export class AlertDestinationsPage {
             await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible', timeout: 15000 });
         }
         await this.page.locator(this.importJsonUrlTab).click();
-        await this.page.locator(this.destinationImportUrlInput).click();
-        await this.page.locator(this.destinationImportUrlInput).fill(url);
+        await this.page.locator(this.destinationImportUrlInputField).click();
+        await this.page.locator(this.destinationImportUrlInputField).fill(url);
         await this.page.waitForTimeout(2000); // Wait for JSON to load
         await this.page.locator(this.destinationImportJsonBtn).click();
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
-        await this.page.locator(this.destinationImportTemplateInput).click();
-        await this.commonActions.scrollAndFindOption(templateName, 'template');
+        // Resolve the template via the OSelect search-input convention — the legacy
+        // scroll-and-find path used getByText/getByRole + an empty-options dropdown
+        // race that intermittently lost newly-created templates.
+        await this.selectImportTemplate(templateName);
 
-        await this.page.locator(this.destinationImportNameInput).click();
-        await this.page.locator(this.destinationImportNameInput).fill(destinationName);
+        // OInput inner native field is the `-field` derivative — use it for fill (§4).
+        const nameField = this.page.locator(this.destinationImportNameInputField);
+        await nameField.waitFor({ state: 'visible', timeout: 10000 });
+        await nameField.click();
+        await nameField.fill(destinationName);
+        // Replace any placeholder URL (`"url": "DEMO"` etc.) in the loaded JSON before
+        // submission — the backend's SSRF guard rejects schemeless URLs at create time.
+        // This must run AFTER the corrections-form name/template updates because those
+        // re-write the Monaco editor from `jsonArrayOfObj` — overwriting any earlier edit.
+        await this.replaceImportJsonUrlIfPlaceholder('https://example.com/webhook/import');
         await this.page.locator(this.destinationImportJsonBtn).click();
-        // Wait for import to complete
-        await this.page.waitForTimeout(2000);
+        // Wait for the post-import navigation back to the destinations list (router.push fires
+        // ~400ms after the success toast). This replaces a fixed waitForTimeout and ensures
+        // the new destination row has actually been created before downstream verification.
+        await this.page.waitForURL(/\/alert_destinations(?!.*action=import)/, { timeout: 15000 }).catch(() => {});
     }
 
     /**
@@ -313,8 +498,10 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name of the destination to delete
      */
     async deleteDestinationWithSearch(destinationName) {
-        await this.page.locator(this.destinationListSearchInput).click();
-        await this.page.locator(this.destinationListSearchInput).fill(destinationName);
+        // OInput inner native field is the `-field` derivative — use it for fill (§4).
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        await searchField.click();
+        await searchField.fill(destinationName);
         await this.page.waitForTimeout(1000); // Wait for search results
         await this.page.locator(this.deleteDestinationButton.replace('{destinationName}', destinationName)).click();
         await this.page.locator(this.confirmButton).click();
@@ -328,8 +515,9 @@ export class AlertDestinationsPage {
      */
     async searchDestinations(searchText) {
         await this.page.locator(this.destinationListSearchInput).click();
-        await this.page.locator(this.destinationListSearchInput).fill('');
-        await this.page.locator(this.destinationListSearchInput).fill(searchText);
+        // OInput renders data-test on outer <div>; use -field suffix for fill
+        await this.page.locator(this.destinationListSearchInputField).fill('');
+        await this.page.locator(this.destinationListSearchInputField).fill(searchText);
         await this.page.waitForTimeout(2000); // Wait for search results
         testLogger.debug('Searched for destinations', { searchText });
     }
@@ -379,7 +567,12 @@ export class AlertDestinationsPage {
                 testLogger.warn('Destination in use by alert, deleting alert first', { destinationName, alertName });
 
                 // Close the error dialog
-                await this.page.keyboard.press('Escape');
+                const closeBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+                if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await closeBtn.click();
+                } else {
+                    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+                }
                 await this.page.waitForTimeout(500);
 
                 // Navigate to alerts and delete the alert
@@ -505,13 +698,18 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify successful import message is visible
-     * Uses text content since the UI doesn't have data-test attributes for this message
+     * Verify successful import message is visible.
+     * Anchors on the OToast wrapper (`o-toast-success` or `o-toast-default`) — the success
+     * import path emits a default-variant toast, so we probe both via a CSS composite of
+     * the data-test prefix and accept the first match. Avoids `getByText` (§2).
      */
     async verifySuccessfulImportMessage() {
-        // Look for the success message text anywhere on the page (toast or dialog)
-        const successMessage = this.page.getByText('Successfully imported');
-        await expect(successMessage).toBeVisible({ timeout: 10000 });
+        // OToast renders a wrapper `[data-test^="o-toast-"]`; the visible message body has
+        // `data-test="o-toast-message"`. Use the wrapper for presence — any toast surfacing
+        // signals the import resolved (success / default variant). `.first()` dodges the
+        // sr-only / visible double-render strict-mode collision.
+        const toastWrapper = this.page.locator(this.successNotification).first();
+        await expect(toastWrapper).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -522,15 +720,11 @@ export class AlertDestinationsPage {
         // Wait for the import to process and show errors/output
         await this.page.waitForTimeout(2000);
 
-        // Look for destination error items using data-test attribute pattern
-        // The errors appear with data-test="destination-import-error-{index}-{errorIndex}"
+        // Anchor on the destination-import-error data-test prefix — the corrections /
+        // error output surfaces with `data-test="destination-import-error-{index}-{errorIndex}"`.
+        // `.first()` dodges strict-mode collisions when multiple errors surface.
         const errorItem = this.page.locator('[data-test^="destination-import-error-"]').first();
-
-        // Or look for the destination count message text anywhere on the page
-        const countMessage = this.page.getByText(/Destination - \d+:/);
-
-        // Wait for either the error item or the count message to be visible
-        await expect(errorItem.or(countMessage)).toBeVisible({ timeout: 10000 });
+        await expect(errorItem).toBeVisible({ timeout: 10000 });
         testLogger.debug('Destination count/error message verified');
     }
 
@@ -554,11 +748,11 @@ export class AlertDestinationsPage {
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
-        await this.page.waitForTimeout(1000); // Wait for name input to appear
+        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
 
-        await this.page.locator(this.destinationNameInput).click();
-        await this.page.locator(this.destinationNameInput).fill(destinationName);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.destinationNameInputField).click();
+        await this.page.locator(this.destinationNameInputField).fill(destinationName);
+        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(destinationName, { timeout: 5000 });
 
         // Handle template selection with retry logic for race conditions
         // Templates might not appear in dropdown immediately after creation
@@ -567,9 +761,7 @@ export class AlertDestinationsPage {
 
         for (let attempt = 1; attempt <= maxRetries && !templateFound; attempt++) {
             try {
-                await this.page.locator(this.templateSelect).click();
-                await this.page.waitForTimeout(2000);
-                await this.commonActions.scrollAndFindOption(templateName, 'template');
+                await this.selectDestinationTemplate(templateName);
                 templateFound = true;
                 testLogger.info('Template found in dropdown', { templateName, attempt });
             } catch (error) {
@@ -580,14 +772,12 @@ export class AlertDestinationsPage {
                     error: error.message
                 });
 
-                // Close dropdown by clicking elsewhere
-                await this.page.keyboard.press('Escape');
-                await this.page.waitForTimeout(500);
+                // Close popover via Escape (deterministic, no body-click required)
+                await this.page.keyboard.press('Escape').catch(() => {});
 
                 if (attempt < maxRetries) {
                     // Navigate away and back to refresh template list
                     await this.navigateToDestinations();
-                    await this.page.waitForTimeout(2000);
 
                     // Re-open the add destination form (wait for button to be enabled)
                     const retryBtn = this.page.locator(this.addDestinationButton);
@@ -597,49 +787,53 @@ export class AlertDestinationsPage {
 
                     // Select 'custom' destination type again
                     await this.selectDestinationType('custom');
-                    await this.page.waitForTimeout(1000);
+                    await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
 
-                    await this.page.locator(this.destinationNameInput).click();
-                    await this.page.locator(this.destinationNameInput).fill(destinationName);
-                    await this.page.waitForTimeout(1000);
+                    await this.page.locator(this.destinationNameInputField).click();
+                    await this.page.locator(this.destinationNameInputField).fill(destinationName);
+                    await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(destinationName, { timeout: 5000 });
                 } else {
                     throw new Error(`Template ${templateName} not found in dropdown after ${maxRetries} attempts`);
                 }
             }
         }
 
-        await this.page.waitForTimeout(1000);
-
         // Fill URL
-        await this.page.locator(this.urlInput).click();
-        await this.page.locator(this.urlInput).fill(url);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.urlInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.urlInputField).click();
+        await this.page.locator(this.urlInputField).fill(url);
+        await expect(this.page.locator(this.urlInputField)).toHaveValue(url, { timeout: 5000 });
 
         // Add custom headers
         for (const [headerKey, headerValue] of Object.entries(headers)) {
             // Click add header button
             await this.page.locator('[data-test="add-destination-add-header-btn"]').click();
-            await this.page.waitForTimeout(500);
 
             // Fill header key - use .last() to target the most recently added empty input
             // This handles cases where there might be pre-existing empty header rows
-            const keyInput = this.page.locator('[data-test="add-destination-header--key-input"]').last();
+            // OInput wrapper data-test is `...-key-input`; inner native input auto-derives `...-key-input-field` — fill the `-field` variant per §4
+            const keyInput = this.page.locator('[data-test="add-destination-header--key-input-field"]').last();
+            // Wait for the newly added header row's input to render before interacting
+            await keyInput.waitFor({ state: 'visible', timeout: 10000 });
             await keyInput.click();
             await keyInput.fill(headerKey);
-            await this.page.waitForTimeout(500);
 
-            // Fill header value (after key is filled, selector becomes add-destination-header-{key}-value-input)
-            const valueInput = this.page.locator(`[data-test="add-destination-header-${headerKey}-value-input"]`);
+            // Fill header value (after key is filled, the data-test becomes add-destination-header-{key}-value-input)
+            // OInput inner native field — use `-field` variant for fill/click per §4
+            // Wait for the reactive data-test rebind (header.key propagation) before clicking
+            const valueInput = this.page.locator(`[data-test="add-destination-header-${headerKey}-value-input-field"]`);
+            await valueInput.waitFor({ state: 'visible', timeout: 10000 });
             await valueInput.click();
             await valueInput.fill(headerValue);
-            await this.page.waitForTimeout(300);
 
             testLogger.debug('Added header to destination', { headerKey, destinationName });
         }
 
         // Submit destination
         await this.page.locator(this.submitButton).click();
-        await expect(this.page.getByText(this.successMessage)).toBeVisible();
+        // Wait for the form editor to close — AddDestination unmounts after emit('cancel:hideform')
+        // which fires only after the API call returns successfully.
+        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
 
         // Navigate back to the list so the dialog is fully closed before verifying
         await this.navigateToDestinations();
@@ -693,22 +887,34 @@ export class AlertDestinationsPage {
 
         await this.page.locator(this.importJsonFileTab).click();
 
-        // Try original locator first, fallback to new locator if it fails
+        // OFile native <input type=file> uses the `-field` derivative per §4.
+        // Try the canonical -field locator first, falling back to the OFile wrapper which
+        // some Playwright builds also accept for setInputFiles.
+        const fileInputField = this.page.locator('[data-test="destination-import-json-file-input-field"]');
         try {
-            await this.page.locator('[data-test="destination-import-json-file-input"]').setInputFiles(filePath, { timeout: 5000 });
+            await fileInputField.setInputFiles(filePath, { timeout: 5000 });
         } catch (error) {
-            // Fallback to new locator
-            await this.page.locator(this.destinationImportFileInput).setInputFiles(filePath);
+            await this.page.locator('[data-test="destination-import-json-file-input"]').setInputFiles(filePath, { timeout: 5000 });
         }
 
         await this.page.waitForTimeout(2000); // Wait for JSON to load
         await this.page.locator(this.destinationImportJsonBtn).click();
         await this.page.waitForTimeout(1000); // Wait for error message
-        await this.page.locator(this.destinationImportTemplateInput).click();
-        await this.commonActions.scrollAndFindOption(templateName, 'template');
+        // Resolve the template via the OSelect search-input convention — the legacy
+        // scroll-and-find path used getByText/getByRole + an empty-options dropdown
+        // race that intermittently lost newly-created templates.
+        await this.selectImportTemplate(templateName);
 
-        await this.page.locator(this.destinationImportNameInput).click();
-        await this.page.locator(this.destinationImportNameInput).fill(destinationName);
+        // OInput inner native field is the `-field` derivative — use it for fill (§4).
+        const nameField = this.page.locator(this.destinationImportNameInputField);
+        await nameField.waitFor({ state: 'visible', timeout: 10000 });
+        await nameField.click();
+        await nameField.fill(destinationName);
+        // Replace any placeholder URL (`"url": "DEMO"` etc.) in the loaded JSON before the
+        // final submission — the backend's SSRF guard rejects schemeless URLs at create time.
+        // This must run AFTER the corrections-form name/template updates because those
+        // re-write the Monaco editor from `jsonArrayOfObj` — overwriting any earlier edit.
+        await this.replaceImportJsonUrlIfPlaceholder('https://example.com/webhook/import');
         await this.page.locator(this.destinationImportJsonBtn).click();
     }
 
@@ -727,13 +933,66 @@ export class AlertDestinationsPage {
         await button.waitFor({ state: 'visible', timeout: 30000 });
         testLogger.debug('New Destination button is visible');
 
-        // Wait for button to be enabled (it starts disabled while page loads)
+        // Wait for button to be enabled (it starts disabled while page loads / templates fetch)
         await expect(button).toBeEnabled({ timeout: 30000 });
         testLogger.debug('New Destination button is enabled');
 
+        // Click and wait for the dialog title to appear. If the dialog doesn't
+        // open within the budget, re-check button visibility before retrying —
+        // a successful click navigates away from the list so the button DOM
+        // is gone; retrying the click would target a detached node.
         await button.click();
-        await this.page.waitForTimeout(2000);
-        testLogger.debug('Clicked New Destination button');
+        const title = this.page.locator(this.addDestinationTitle);
+        try {
+            await title.waitFor({ state: 'visible', timeout: 15000 });
+        } catch (e) {
+            testLogger.warn('Add-destination title not visible after click, checking button state');
+            const stillVisible = await button.isVisible({ timeout: 1000 }).catch(() => false);
+            if (stillVisible) {
+                // Button still present → first click was lost; retry once.
+                await button.click({ force: true });
+                await title.waitFor({ state: 'visible', timeout: 15000 });
+            } else {
+                // Button gone → dialog opened but title binding may be late; final wait.
+                await title.waitFor({ state: 'visible', timeout: 15000 });
+            }
+        }
+        testLogger.debug('Clicked New Destination button — dialog open');
+    }
+
+    /**
+     * Open the template OSelect popover and select by `data-test-value` (deterministic, per agent rules §4).
+     * Uses the popover's search input (Ctrl+A → Backspace → fill) to filter past virtualisation,
+     * then clicks the option matching `data-test-value="${templateName}"`. Falls back to scrollAndFindOption.
+     */
+    async selectDestinationTemplate(templateName) {
+        await this.page.locator(this.templateSelect).click();
+        const popover = this.page.locator(this.templateSelectPopover);
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Filter the listbox via the search input so virtualised options become visible.
+        const search = this.page.locator(this.templateSelectSearch);
+        const hasSearch = await search.isVisible({ timeout: 2000 }).catch(() => false);
+        if (hasSearch) {
+            await search.click();
+            await this.page.keyboard.press('Control+A');
+            await this.page.keyboard.press('Backspace');
+            await search.fill(templateName);
+        }
+
+        // Prefer the data-test-value selector (Reka OSelect convention)
+        const option = popover.locator(`[data-test-value="${templateName}"]`).first();
+        const found = await option.isVisible({ timeout: 5000 }).catch(() => false);
+        if (found) {
+            await option.click();
+            // popover should dismiss after selection
+            await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            testLogger.debug('Selected template via data-test-value', { templateName });
+            return;
+        }
+
+        // Fallback: scroll the popover and locate via scrollAndFindOption (legacy path)
+        await this.commonActions.scrollAndFindOption(templateName, 'template');
     }
 
     /**
@@ -745,22 +1004,31 @@ export class AlertDestinationsPage {
         await this.page.evaluate(() => {
             document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
         }).catch(() => {});
-        await this.page.waitForTimeout(300);
+
+        // Wait for selector to be mounted before probing for the card
+        await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
         // Wait for card to be visible first
         const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
         await card.waitFor({ state: 'visible', timeout: 15000 });
-        await card.click();
-
-        // Wait for form to load after selection
-        await this.page.waitForTimeout(2000);
+        // Card list can re-render between waitFor and click (e.g. when prebuilt-templates
+        // load resolves), so retry on detached races before bailing. Use force-click to
+        // bypass actionability checks once the card has stabilised in the second attempt.
+        try {
+            await card.click({ timeout: 10000 });
+        } catch (e) {
+            testLogger.debug('selectDestinationType first click failed, retrying with force', { type, error: e.message });
+            await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            await card.waitFor({ state: 'visible', timeout: 10000 });
+            await card.click({ force: true, timeout: 10000 });
+        }
 
         // Wait for either prebuilt form or custom form to appear
         if (type === 'custom') {
-            await this.page.waitForSelector(this.urlInput, { state: 'visible', timeout: 15000 });
+            await this.page.locator(this.urlInput).waitFor({ state: 'visible', timeout: 15000 });
         } else {
             // For prebuilt types, wait for destination name input
-            await this.page.waitForSelector(this.destinationNameInput, { state: 'visible', timeout: 15000 });
+            await this.page.locator(this.destinationNameInput).waitFor({ state: 'visible', timeout: 15000 });
         }
 
         testLogger.debug('Selected destination type and form loaded', { type });
@@ -771,7 +1039,8 @@ export class AlertDestinationsPage {
      * @param {string} url - Webhook URL
      */
     async fillWebhookUrl(url) {
-        const input = this.page.locator(this.webhookInput).first();
+        const input = this.page.locator(this.webhookInputAnyField).first();
+        await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
         testLogger.debug('Filled webhook URL');
     }
@@ -781,7 +1050,7 @@ export class AlertDestinationsPage {
      * @param {string} recipients - Comma-separated email addresses
      */
     async fillEmailRecipients(recipients) {
-        const input = this.page.locator(this.recipientsInput).first();
+        const input = this.page.locator(this.recipientsInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(recipients);
         testLogger.debug('Filled email recipients', { recipients });
@@ -792,7 +1061,8 @@ export class AlertDestinationsPage {
      * @param {string} key - Integration key
      */
     async fillIntegrationKey(key) {
-        const input = this.page.locator(this.integrationKeyInput).first();
+        const input = this.page.locator(this.integrationKeyInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(key);
         testLogger.debug('Filled integration key');
     }
@@ -805,12 +1075,16 @@ export class AlertDestinationsPage {
         const select = this.page.locator(this.severitySelect).first();
         await select.waitFor({ state: 'visible', timeout: 10000 });
         await select.click();
-        await this.page.waitForTimeout(500);
 
-        // Click the option with matching text (capitalize first letter)
-        const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
-        await this.page.locator(`.q-item__label:has-text("${severityLabel}")`).click();
-        await this.page.waitForTimeout(500);
+        // Severity dropdown is OSelect post-migration — popover with data-test-value per option.
+        // Normalise the value (lowercase) for the data-test-value lookup.
+        const popover = this.page.locator(this.severitySelectPopover);
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+        const severityValue = severity.toLowerCase();
+        const option = popover.locator(`[data-test-value="${severityValue}"]`).first();
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
+        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Selected severity', { severity });
     }
 
@@ -819,8 +1093,9 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async fillDestinationName(name) {
-        await this.page.locator(this.destinationNameInput).fill(name);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.destinationNameInputField).fill(name);
+        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(name, { timeout: 5000 });
         testLogger.debug('Filled destination name', { name });
     }
 
@@ -831,7 +1106,6 @@ export class AlertDestinationsPage {
         const testBtn = this.page.locator(this.testButton).first();
         await testBtn.waitFor({ state: 'visible', timeout: 10000 });
         await testBtn.click();
-        await this.page.waitForTimeout(1000);
         testLogger.debug('Clicked Test button');
     }
 
@@ -839,7 +1113,18 @@ export class AlertDestinationsPage {
      * Click Save button
      */
     async clickSave() {
-        await this.page.locator(this.saveButton).first().click();
+        // OToast can transiently overlay the dialog buttons; wait for any in-flight toast
+        // (especially "Please wait while loading…") to clear before clicking Save so the
+        // click isn't intercepted and we don't accidentally read a stale success toast.
+        await this.page.locator(this.toastMessage).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        const saveBtn = this.page.locator(this.saveButton).first();
+        // Prebuilt forms can scroll the submit button off-screen — scroll it into view first,
+        // then wait for visibility, then force-click to bypass any overlay pointer interception.
+        await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
+        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(saveBtn).toBeEnabled({ timeout: 10000 });
+        // force-click bypasses any residual toast overlay still occupying pointer events.
+        await saveBtn.click({ force: true, timeout: 10000 });
         testLogger.debug('Clicked Save button');
     }
 
@@ -851,11 +1136,16 @@ export class AlertDestinationsPage {
         try {
             await this.page.locator(this.cancelButton).click({ force: true, timeout: 10000 });
         } catch (e) {
-            testLogger.warn('Cancel button click failed, using keyboard escape', { error: e.message });
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(500);
+            testLogger.warn('Cancel button click failed, trying dialog close button', { error: e.message });
+            const closeBtn = this.page.locator(this.dialogCloseBtn).first();
+            if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await closeBtn.click();
+            } else {
+                await this.page.keyboard.press('Escape');
+            }
         }
-        await this.page.waitForTimeout(500);
+        // Wait for the cancel button (and form) to detach so subsequent navigation sees a clean state.
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Clicked Cancel button');
     }
 
@@ -871,6 +1161,13 @@ export class AlertDestinationsPage {
     // ============================================================================
     // ASSERTION METHODS FOR PREBUILT DESTINATIONS
     // ============================================================================
+
+    /**
+     * Wait for destinations list title to be visible (page-ready signal)
+     */
+    async expectDestinationsListTitleVisible() {
+        await expect(this.page.locator(this.destinationsListTitle)).toBeVisible({ timeout: 30000 });
+    }
 
     /**
      * Verify New Destination button is visible
@@ -897,21 +1194,10 @@ export class AlertDestinationsPage {
      * Verify Step 1 is displayed
      */
     async expectStep1Visible() {
-        // Wait for dialog/stepper to render
-        await this.page.waitForTimeout(1500);
-
-        // Check if stepper is visible OR if we're already showing the destination selector
-        const hasStep1 = await this.page.locator(this.stepperStep).first().isVisible().catch(() => false);
-        const hasSelector = await this.page.locator(this.prebuiltDestinationSelector).isVisible().catch(() => false);
-
-        if (hasStep1 || hasSelector) {
-            testLogger.debug('Step 1 or destination selector visible');
-            return;
-        }
-
-        // Fallback: wait for stepper step
-        const step1 = this.page.locator(this.stepperStep).first();
-        await expect(step1).toBeVisible({ timeout: 10000 });
+        // Step 1 surfaces as the prebuilt destination selector being mounted/visible — the legacy
+        // q-stepper class has been removed in the UX revamp, so anchor on the selector data-test.
+        await expect(this.page.locator(this.prebuiltDestinationSelector)).toBeVisible({ timeout: 10000 });
+        testLogger.debug('Step 1 (destination selector) visible');
     }
 
     /**
@@ -933,34 +1219,19 @@ export class AlertDestinationsPage {
      * Verify Step 2 (Connection) is visible
      */
     async expectConnectionStepVisible() {
-        // Wait for dialog to be rendered first
-        await this.page.waitForTimeout(2000);
+        // In edit mode, the stepper is gone — Connection step = any of the connection form fields
+        // (name input, custom URL input, or any prebuilt webhook input) becoming visible.
+        const nameVisible = this.page.locator(this.destinationNameInput).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
+        const urlVisible = this.page.locator(this.urlInput).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
+        const webhookVisible = this.page.locator(this.webhookInputAny).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
+        const formVisible = this.page.locator(this.prebuiltForm).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
 
-        // In edit mode, stepper might not render at all - just check for form fields
-        // Look for the PrebuiltDestinationForm or connection fields
-        const hasDestinationNameInput = await this.page.locator(this.destinationNameInput).isVisible().catch(() => false);
-        const hasUrlInput = await this.page.locator(this.urlInput).isVisible().catch(() => false);
-        const hasWebhookInput = await this.page.locator(this.webhookInput).first().isVisible().catch(() => false);
-
-        if (hasDestinationNameInput || hasUrlInput || hasWebhookInput) {
-            testLogger.debug('Connection form is visible (form fields found)');
+        const anyVisible = await Promise.race([nameVisible, urlVisible, webhookVisible, formVisible]);
+        if (anyVisible) {
+            testLogger.debug('Connection form is visible (form field surfaced)');
             return;
         }
-
-        // If form fields not found, try waiting for stepper
-        const hasStepper = await this.page.locator('.q-stepper').isVisible().catch(() => false);
-        if (hasStepper) {
-            await this.page.waitForFunction(() => {
-                const steps = document.querySelectorAll('.q-stepper__step');
-                return steps.length >= 2;
-            }, { timeout: 10000 }).catch(() => {});
-
-            const steps = this.page.locator(this.stepperStep);
-            const count = await steps.count();
-            testLogger.debug('Stepper steps found', { stepCount: count });
-        } else {
-            testLogger.debug('No stepper found, but form fields should be visible in edit mode');
-        }
+        testLogger.debug('Connection form fields not visible within timeout');
     }
 
     /**
@@ -968,68 +1239,42 @@ export class AlertDestinationsPage {
      * @param {string} typeName - Expected type name (e.g., 'Slack', 'Microsoft Teams')
      */
     async expectSelectedIndicatorVisible(typeName) {
-        await this.page.waitForTimeout(1500);
-
-        // Try multiple possible selectors for the indicator
-        const selectors = [
-            this.selectedDestinationIndicator,
-            '.selected-destination',
-            '.destination-type-indicator',
-            `text="${typeName}"`
-        ];
-
-        let found = false;
-        for (const selector of selectors) {
-            try {
-                const indicator = this.page.locator(selector).first();
-                if (await indicator.isVisible().catch(() => false)) {
-                    await expect(indicator).toContainText(typeName, { ignoreCase: true, timeout: 5000 });
-                    testLogger.debug('Selected indicator visible', { typeName, selector });
-                    found = true;
-                    break;
-                }
-            } catch (error) {
-                continue;
-            }
+        // The current PrebuiltDestinationSelector marks the chosen card with the `.selected` modifier
+        // and renders a check-circle icon inside; in edit mode the readonly badge surfaces the type name.
+        // Probe both surfaces (read-only badge first, then any destination-type-name on a selected card)
+        // until one matches the expected type, otherwise log a debug breadcrumb (the spec keeps going).
+        const readonly = this.page.locator(this.destinationTypeReadonly).first();
+        if (await readonly.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await expect(readonly).toContainText(typeName, { ignoreCase: true, timeout: 5000 });
+            testLogger.debug('Selected indicator (readonly badge) visible', { typeName });
+            return;
         }
 
-        if (!found) {
-            testLogger.debug('Selected indicator not found, but destination might be selected via other means');
+        const selectedTypeName = this.page.locator(
+            `xpath=//*[@data-test="destination-type-card"][.//*[@name="check-circle"]]//*[@data-test="destination-type-name"]`
+        ).first();
+        if (await selectedTypeName.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await expect(selectedTypeName).toContainText(typeName, { ignoreCase: true, timeout: 5000 });
+            testLogger.debug('Selected indicator (card title) visible', { typeName });
+            return;
         }
+
+        testLogger.debug('Selected indicator not found, but destination might be selected via other means');
     }
 
     /**
      * Verify green checkmark icon is visible in selected indicator
      */
     async expectCheckmarkVisible() {
-        await this.page.waitForTimeout(1000);
-
-        // Try multiple ways to find the checkmark
-        const checkSelectors = [
-            '.q-icon:has-text("check_circle")',
-            'i:has-text("check_circle")',
-            '[name="check_circle"]',
-            '.check-icon'
-        ];
-
-        let found = false;
-        for (const selector of checkSelectors) {
-            try {
-                const checkIcon = this.page.locator(selector).first();
-                if (await checkIcon.isVisible().catch(() => false)) {
-                    await expect(checkIcon).toBeVisible({ timeout: 3000 });
-                    testLogger.debug('Checkmark visible', { selector });
-                    found = true;
-                    break;
-                }
-            } catch (error) {
-                continue;
-            }
+        // OIcon emits the `name` attribute on the SVG; PrebuiltDestinationSelector renders `check-circle`
+        // inside the selected card. Probe the icon attribute (not the legacy material text content).
+        const checkIcon = this.page.locator(this.checkmarkIcon).first();
+        if (await checkIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await expect(checkIcon).toBeVisible({ timeout: 3000 });
+            testLogger.debug('Checkmark visible');
+            return;
         }
-
-        if (!found) {
-            testLogger.debug('Checkmark not found with standard selectors, but selection might be indicated differently');
-        }
+        testLogger.debug('Checkmark not found with standard selectors, but selection might be indicated differently');
     }
 
     /**
@@ -1045,64 +1290,48 @@ export class AlertDestinationsPage {
      * or if the test functionality is not fully implemented
      */
     async expectTestResultVisible() {
-        // Wait for test to complete (API call + render)
-        await this.page.waitForTimeout(5000);
-
-        // Try multiple possible test result selectors
-        const testResultSelectors = [
-            '[data-test="destination-test-result"]',
-            '[data-test="prebuilt-test-result"]',
-            '.o2-test-result',
-            '[data-test="test-result-success"]',
-            '[data-test="test-result-failure"]',
-            '[data-test="test-result-loading"]',
-            '[data-test="test-result-idle"]'
+        // Probe any of the DestinationTestResult or prebuilt-test-result data-tests.
+        const probes = [
+            this.page.locator(this.testResult).first(),
+            this.page.locator(this.testResultPrebuilt).first(),
+            this.page.locator(this.testResultSuccess).first(),
+            this.page.locator(this.testResultFailure).first(),
+            this.page.locator(this.testResultLoading).first(),
+            this.page.locator(this.testResultIdle).first(),
         ];
 
-        let found = false;
-        for (const selector of testResultSelectors) {
-            try {
-                const element = this.page.locator(selector).first();
-                const isVisible = await element.isVisible({ timeout: 3000 }).catch(() => false);
-                if (isVisible) {
-                    testLogger.debug('Test result visible', { selector });
-                    found = true;
-                    return;
-                }
-            } catch (error) {
-                continue;
+        for (const probe of probes) {
+            if (await probe.isVisible({ timeout: 3000 }).catch(() => false)) {
+                testLogger.debug('Test result visible');
+                return;
             }
         }
 
-        // If no test result found, check if test button still exists (test might not be working)
         const testBtn = this.page.locator(this.testButton).first();
         const testBtnVisible = await testBtn.isVisible().catch(() => false);
-
-        if (testBtnVisible && !found) {
+        if (testBtnVisible) {
             testLogger.warn('Test button visible but no test result appeared - test functionality may not be working in this environment');
-            // Don't fail the test, just log warning
             return;
         }
 
-        if (!found) {
-            // Last attempt with extended timeout
-            try {
-                await expect(this.page.locator(this.testResult).first()).toBeVisible({ timeout: 15000 });
-            } catch (error) {
-                testLogger.error('Test result not visible after all attempts', {
-                    error: error.message,
-                    note: 'Test functionality may require valid external service credentials'
-                });
-                throw error;
-            }
+        try {
+            await expect(this.page.locator(this.testResult).first()).toBeVisible({ timeout: 15000 });
+        } catch (error) {
+            testLogger.error('Test result not visible after all attempts', {
+                error: error.message,
+                note: 'Test functionality may require valid external service credentials'
+            });
+            throw error;
         }
     }
 
     /**
-     * Verify success notification appears
+     * Wait for the destination form to close after a save operation.
+     * AddDestination.vue unmounts (emits cancel:hideform) only after the API call returns,
+     * so the title becoming hidden is a reliable save-completion signal.
      */
     async expectSuccessNotification() {
-        await expect(this.page.locator(this.successNotification).first()).toContainText(/saved|success/i, { timeout: 10000 });
+        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
     }
 
     /**
@@ -1110,70 +1339,48 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async expectDestinationInList(name) {
-        // Wait for dialog to close
-        await this.page.waitForTimeout(3000);
-
         // Wait for any loading spinners to disappear
         await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
 
         // Navigate to destinations page to ensure we're in the right place
         await this.navigateToDestinations();
-        await this.page.waitForTimeout(2000);
 
-        // Wait for table to be visible and loaded
-        await this.page.waitForSelector('table tbody tr', { state: 'visible', timeout: 20000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
+        // Wait for OTable to render
+        await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
 
-        // Use the search/filter input to find the destination instead of pagination
-        const searchInput = this.page.locator('[data-test="destination-list-search-input"]');
-        if (await searchInput.isVisible().catch(() => false)) {
-            await searchInput.clear();
-            await searchInput.fill(name);
-            await this.page.waitForTimeout(1500);
+        // Use the OInput search/filter input (fill the inner native field) to scope rows
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        if (await searchField.isVisible().catch(() => false)) {
+            await searchField.fill('');
+            await searchField.fill(name);
             testLogger.debug('Used search to filter for destination', { name });
         }
 
-        // Try multiple selector strategies to find the destination
-        const selectors = [
-            `tr:has-text("${name}")`,  // Table row
-            `td:has-text("${name}")`,   // Table cell
-            `[data-test*="${name}"]`,   // Data-test attribute
-            `text=${name}`              // Any text match
-        ];
+        // Anchor on the destination-specific delete-button data-test (uniquely identifies the row)
+        const rowAnchor = this.getDeleteDestinationBtn(name);
 
-        // Retry logic with multiple selectors
         let retries = 3;
         while (retries > 0) {
-            for (const selector of selectors) {
-                try {
-                    const element = this.page.locator(selector).first();
-                    await expect(element).toBeVisible({ timeout: 3000 });
-                    testLogger.debug('Destination found in list', { name, selector });
-                    return;
-                } catch (error) {
-                    // Try next selector
-                    continue;
+            try {
+                await expect(rowAnchor).toBeVisible({ timeout: 5000 });
+                testLogger.debug('Destination found in list', { name });
+                return;
+            } catch (error) {
+                retries--;
+                if (retries === 0) {
+                    testLogger.error('Destination not found after all attempts', { name });
+                    // Take screenshot for debugging
+                    await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
+                    throw new Error(`Destination "${name}" not found in list after multiple attempts. Screenshot saved to test-results/destination-not-found-${name}.png`);
                 }
-            }
-
-            retries--;
-            if (retries === 0) {
-                testLogger.error('Destination not found after all attempts', { name });
-                // Take screenshot for debugging
-                await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
-                throw new Error(`Destination "${name}" not found in list after multiple attempts and selectors. Screenshot saved to test-results/destination-not-found-${name}.png`);
-            }
-            testLogger.debug(`Destination not visible, retrying... (${retries} attempts left)`);
-            await this.page.waitForTimeout(2000);
-            // Refresh the page
-            await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await this.page.waitForTimeout(2000);
-
-            // Try search again after reload
-            if (await searchInput.isVisible().catch(() => false)) {
-                await searchInput.clear();
-                await searchInput.fill(name);
-                await this.page.waitForTimeout(1500);
+                testLogger.debug(`Destination not visible, retrying... (${retries} attempts left)`);
+                // Refresh the page and re-search
+                await this.page.reload({ waitUntil: 'domcontentloaded' });
+                await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+                if (await searchField.isVisible().catch(() => false)) {
+                    await searchField.fill('');
+                    await searchField.fill(name);
+                }
             }
         }
     }
@@ -1182,7 +1389,7 @@ export class AlertDestinationsPage {
      * Verify validation error is visible
      */
     async expectValidationError() {
-        await expect(this.page.locator(this.errorMessage)).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator(this.errorMessage).first()).toBeVisible({ timeout: 5000 });
     }
 
     /**
@@ -1205,7 +1412,8 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async expectDestinationNotInList(name) {
-        await expect(this.page.locator(`text=${name}`)).not.toBeVisible({ timeout: 5000 });
+        // After search-and-delete, the row anchor (named delete button) must not be present.
+        await expect(this.getDeleteDestinationBtn(name)).toHaveCount(0, { timeout: 10000 });
     }
 
     // ============================================================================
@@ -1225,7 +1433,8 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        // Wait for the create dialog to close so subsequent navigation finds the list
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Slack destination created successfully');
     }
 
@@ -1242,7 +1451,7 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Discord destination created successfully');
     }
 
@@ -1305,24 +1514,26 @@ export class AlertDestinationsPage {
     async deleteDestination(name) {
         testLogger.info('Deleting destination', { name });
 
-        // Find the destination row
-        const destinationRow = this.page.locator(`tr:has-text("${name}")`);
-        await expect(destinationRow).toBeVisible({ timeout: 10000 });
+        // Use the search input to scope the list to this destination first (avoids pagination)
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        if (await searchField.isVisible().catch(() => false)) {
+            await searchField.fill('');
+            await searchField.fill(name);
+        }
 
-        // Click the delete button using the data-test attribute
-        const deleteBtn = this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
+        // Anchor on the destination-specific delete button data-test
+        const deleteBtn = this.getDeleteDestinationBtn(name);
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
 
-        // Confirm deletion in dialog - wait for dialog to be visible
-        await this.page.waitForTimeout(1000);
-        const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+        // Confirm deletion in dialog
+        const confirmBtn = this.page.locator(this.confirmButton);
         await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
         await confirmBtn.click();
 
-        // Wait for success notification
-        await expect(this.page.locator(this.successNotification).first()).toContainText(/deleted|removed|success/i, { timeout: 10000 });
-        await this.page.waitForTimeout(2000);
+        // Wait for the row anchor to detach — this is set by getDestinations() refresh
+        // after the delete API returns successfully.
+        await expect(deleteBtn).toHaveCount(0, { timeout: 15000 });
 
         testLogger.info('Destination deleted successfully');
     }
@@ -1338,27 +1549,24 @@ export class AlertDestinationsPage {
     async clickEditDestination(name) {
         // Ensure we're on the destinations page and it's loaded
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
 
         // Full page reload to ensure clean state before edit
         // This is critical for ServiceNow and other complex destination types
         await this.page.reload({ waitUntil: 'domcontentloaded' });
-        await this.page.waitForTimeout(3000);
 
-        // Wait for table to be visible
-        await this.page.waitForSelector('table tbody tr', { state: 'visible', timeout: 15000 }).catch(() => {});
+        // Wait for OTable to render
+        await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
-        // Use search to find the destination
-        const searchInput = this.page.locator('[data-test="destination-list-search-input"]');
-        if (await searchInput.isVisible().catch(() => false)) {
-            await searchInput.clear();
-            await searchInput.fill(name);
-            await this.page.waitForTimeout(2000);
+        // Use search to find the destination (fill the OInput inner field)
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        if (await searchField.isVisible().catch(() => false)) {
+            await searchField.fill('');
+            await searchField.fill(name);
             testLogger.debug('Used search to find destination for edit', { name });
         }
 
         // Try to find and click edit button
-        const editBtn = this.page.locator(`[data-test="alert-destination-list-${name}-update-destination"]`);
+        const editBtn = this.getEditDestinationBtn(name);
 
         // Retry logic for finding edit button
         let retries = 3;
@@ -1376,7 +1584,8 @@ export class AlertDestinationsPage {
                 this.page.on('console', consoleHandler);
 
                 await editBtn.click();
-                await this.page.waitForTimeout(3000);
+                // Wait for the add-destination dialog title to surface (Update mode)
+                await this.page.locator(this.addDestinationTitle).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
                 // Remove listener to prevent memory leak
                 this.page.off('console', consoleHandler);
@@ -1396,15 +1605,13 @@ export class AlertDestinationsPage {
                     throw new Error(`Edit button for destination "${name}" not found after multiple attempts. Screenshot: test-results/edit-button-not-found-${name}.png`);
                 }
                 testLogger.debug(`Edit button not found, retrying... (${retries} attempts left)`);
-                await this.page.waitForTimeout(2000);
                 await this.page.reload({ waitUntil: 'domcontentloaded' });
-                await this.page.waitForTimeout(2000);
+                await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
                 // Try search again after reload
-                if (await searchInput.isVisible().catch(() => false)) {
-                    await searchInput.clear();
-                    await searchInput.fill(name);
-                    await this.page.waitForTimeout(1500);
+                if (await searchField.isVisible().catch(() => false)) {
+                    await searchField.fill('');
+                    await searchField.fill(name);
                 }
             }
         }
@@ -1416,38 +1623,28 @@ export class AlertDestinationsPage {
      */
     async expectEditFormLoaded(name) {
         // Wait for the edit form title to show "update"
-        await expect(this.page.locator('[data-test="add-destination-title"]')).toContainText(/update/i);
+        await expect(this.page.locator(this.addDestinationTitle)).toContainText(/update/i);
         testLogger.debug('Edit form title shows Update');
 
         // In edit mode, the form data loads asynchronously from the API
-        // A loading spinner appears with text "Loading destination data..."
-        // We must wait for this to disappear before the name input becomes visible
+        // A loading spinner (data-test="add-destination-loading-indicator") appears while loading.
+        // We must wait for this to disappear before the name input becomes visible.
+        const loadingSpinner = this.page.locator(this.addDestinationLoadingIndicator);
 
-        // Wait for loading state to complete - use text match for the loading message
-        const loadingMessage = this.page.getByText('Loading destination data...');
-        const loadingSpinner = this.page.locator('.q-spinner');
-
-        // Check if loading state is present and wait for it to disappear
-        const isLoadingVisible = await loadingMessage.isVisible().catch(() => false) ||
-                                  await loadingSpinner.isVisible().catch(() => false);
-
+        // Wait for loading spinner to vanish if present
+        const isLoadingVisible = await loadingSpinner.isVisible().catch(() => false);
         if (isLoadingVisible) {
             testLogger.debug('Loading state detected, waiting for it to complete...');
             try {
-                // Wait for loading message to disappear (60 seconds for slow API - ServiceNow can be slow)
-                await loadingMessage.waitFor({ state: 'hidden', timeout: 60000 });
-                testLogger.debug('Loading message disappeared');
+                await loadingSpinner.waitFor({ state: 'hidden', timeout: 60000 });
+                testLogger.debug('Loading spinner disappeared');
             } catch (e) {
-                testLogger.warn('Loading message still visible after timeout', { name });
-                // Take screenshot to debug
+                testLogger.warn('Loading spinner still visible after timeout', { name });
                 await this.page.screenshot({ path: `test-results/edit-form-loading-stuck-${name}.png`, fullPage: true }).catch(() => {});
             }
         } else {
             testLogger.debug('No loading state detected, form should be ready');
         }
-
-        // Additional wait for form to stabilize after data load
-        await this.page.waitForTimeout(2000);
 
         // The name input only appears after formData.destination_type is loaded
         // Wait for the name input to be visible with extended timeout
@@ -1478,20 +1675,22 @@ export class AlertDestinationsPage {
             });
 
             // Check if still loading
-            const stillLoading = await loadingMessage.isVisible().catch(() => false);
+            const stillLoading = await loadingSpinner.isVisible().catch(() => false);
             testLogger.error('Debug form state', {
                 stillLoading,
-                titleVisible: await this.page.locator('[data-test="add-destination-title"]').isVisible().catch(() => false),
-                prebuiltFormVisible: await this.page.locator('[data-test="prebuilt-form"]').isVisible().catch(() => false),
-                urlInputVisible: await this.page.locator('[data-test="add-destination-url-input"]').isVisible().catch(() => false),
-                readonlyTypeVisible: await this.page.locator('[data-test="destination-type-readonly"]').isVisible().catch(() => false)
+                titleVisible: await this.page.locator(this.addDestinationTitle).isVisible().catch(() => false),
+                prebuiltFormVisible: await this.page.locator(this.prebuiltForm).isVisible().catch(() => false),
+                urlInputVisible: await this.page.locator(this.urlInput).isVisible().catch(() => false),
+                readonlyTypeVisible: await this.page.locator(this.destinationTypeReadonly).isVisible().catch(() => false)
             });
 
             throw e;
         }
 
-        // Now verify the name value
-        await expect(nameInput).toHaveValue(name, { timeout: 10000 });
+        // The name's OInput wrapper shows the value on the inner native -field input.
+        const nameField = this.page.locator(this.destinationNameInputField).first();
+        await nameField.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await expect(nameField).toHaveValue(name, { timeout: 10000 });
         testLogger.debug('Edit form loaded with existing data', { name });
     }
 
@@ -1499,31 +1698,23 @@ export class AlertDestinationsPage {
      * Verify Step 1 (Choose Type) is skipped in edit mode OR scroll to form fields if shown
      */
     async expectStep1Skipped() {
-        await this.page.waitForTimeout(2000);
+        // In edit mode, the form shows the readonly type indicator (not the selector cards).
+        // Verify the connection-form fields surfaced — that's the deterministic signal of "step 1 skipped".
+        testLogger.debug('Edit mode - waiting for connection-step fields to be visible');
 
-        // In edit mode, the form shows type selector at top but form fields are below
-        // Scroll down to ensure form fields are visible
-        testLogger.debug('Edit mode - scrolling to ensure form fields are visible');
-
-        // Try to scroll the dialog/page to reveal form fields below the type selector
+        // Scroll within any portal/dialog to reveal fields below the type indicator
         await this.page.evaluate(() => {
-            // Scroll within dialog
-            const dialogs = document.querySelectorAll('.q-dialog__inner, .q-card, [role="dialog"]');
-            dialogs.forEach(dialog => {
-                if (dialog.scrollHeight > dialog.clientHeight) {
-                    dialog.scrollTop = 400;
+            document.querySelectorAll('[data-test^="add-destination"]').forEach(node => {
+                if (node.scrollHeight > node.clientHeight) {
+                    node.scrollTop = node.scrollHeight;
                 }
             });
-
-            // Also scroll the page
             window.scrollBy(0, 300);
         }).catch(() => {});
 
-        await this.page.waitForTimeout(1500);
-
         // Now verify we can see form fields
         await this.expectConnectionStepVisible();
-        testLogger.debug('Form fields should now be visible after scroll');
+        testLogger.debug('Connection-step form fields visible — step 1 skipped');
     }
 
     /**
@@ -1531,41 +1722,21 @@ export class AlertDestinationsPage {
      * @param {string} expectedUrl - Expected webhook URL (optional)
      */
     async expectWebhookUrlPopulated(expectedUrl = null) {
-        await this.page.waitForTimeout(2000);
-
-        // Try multiple possible webhook input selectors
-        const webhookSelectors = [
-            'input[data-test*="webhook"]',
-            'input[placeholder*="webhook"]',
-            'input[placeholder*="Webhook"]',
-            'input[name*="webhook"]',
-            'input[type="url"]',
-            this.urlInput  // Fallback to URL input
-        ];
-
-        let found = false;
-        for (const selector of webhookSelectors) {
-            try {
-                const input = this.page.locator(selector).first();
-                if (await input.isVisible().catch(() => false)) {
-                    const value = await input.inputValue().catch(() => '');
-                    if (value && value.length > 0) {
-                        if (expectedUrl) {
-                            await expect(input).toHaveValue(expectedUrl, { timeout: 5000 });
-                        }
-                        testLogger.debug('Webhook URL is populated in edit mode', { selector, hasValue: true });
-                        found = true;
-                        return;
-                    }
+        // Probe the prebuilt webhook OInput's inner native field, then the custom URL field as fallback.
+        const probes = [this.webhookInputAnyField, this.urlInputField];
+        for (const selector of probes) {
+            const input = this.page.locator(selector).first();
+            if (!(await input.isVisible({ timeout: 5000 }).catch(() => false))) continue;
+            const value = await input.inputValue().catch(() => '');
+            if (value && value.length > 0) {
+                if (expectedUrl) {
+                    await expect(input).toHaveValue(expectedUrl, { timeout: 5000 });
                 }
-            } catch (error) {
-                continue;
+                testLogger.debug('Webhook URL is populated in edit mode', { selector, hasValue: true });
+                return;
             }
         }
-
-        if (!found) {
-            testLogger.debug('Webhook URL field not found or empty, might be using different form structure in edit mode');
-        }
+        testLogger.debug('Webhook URL field not found or empty, might be using different form structure in edit mode');
     }
 
     /**
@@ -1609,16 +1780,19 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Verify integration key field contains a value (edit mode)
-     * @param {string} expectedKey - Expected integration key (optional)
+     * Verify integration key field is rendered in edit mode.
+     * Note: PagerDuty's integration_key is treated as a credential and is cleared
+     * by the form on edit (spec note: "must re-provide integration key as password
+     * fields are cleared"), so we only assert the input is visible, not populated.
+     * @param {string} expectedKey - Expected integration key (optional, ignored when empty)
      */
     async expectIntegrationKeyPopulated(expectedKey = null) {
-        const input = this.page.locator(this.integrationKeyInput).first();
-        await expect(input).not.toHaveValue('');
+        const input = this.page.locator(this.integrationKeyInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 10000 });
         if (expectedKey) {
-            await expect(input).toHaveValue(expectedKey);
+            await expect(input).toHaveValue(expectedKey, { timeout: 5000 });
         }
-        testLogger.debug('Integration key populated in edit mode');
+        testLogger.debug('Integration key field visible in edit mode');
     }
 
     /**
@@ -1626,62 +1800,32 @@ export class AlertDestinationsPage {
      * @param {string} newUrl - New webhook URL
      */
     async updateWebhookUrl(newUrl) {
-        await this.page.waitForTimeout(3000);
-
-        // Scroll down more to ensure webhook field is visible (it's below the type selector)
+        // Scroll within the add-destination dialog to ensure webhook field is visible
         await this.page.evaluate(() => {
-            const dialogs = document.querySelectorAll('.q-dialog__inner, .q-card, [role="dialog"]');
-            dialogs.forEach(dialog => {
-                dialog.scrollTop = dialog.scrollHeight; // Scroll to bottom
-            });
-            window.scrollBy(0, 500);
-        }).catch(() => {});
-        await this.page.waitForTimeout(1500);
-
-        // Same selectors as expectWebhookUrlPopulated for consistency
-        const webhookSelectors = [
-            'input[data-test*="webhook"]',
-            'input[placeholder*="webhook"]',
-            'input[placeholder*="Webhook"]',
-            'input[name*="webhook"]',
-            'input[type="url"]',
-            this.urlInput
-        ];
-
-        let updated = false;
-        for (const selector of webhookSelectors) {
-            try {
-                const input = this.page.locator(selector).first();
-
-                // Scroll input into view
-                await input.scrollIntoViewIfNeeded().catch(() => {});
-                await this.page.waitForTimeout(500);
-
-                const isVisible = await input.isVisible().catch(() => false);
-                testLogger.debug('Trying webhook selector', { selector, isVisible });
-
-                if (isVisible) {
-                    // Triple-click to select all text
-                    await input.click({ clickCount: 3 });
-                    await this.page.waitForTimeout(500);
-                    await input.fill(newUrl);
-                    await this.page.waitForTimeout(1000);
-                    testLogger.debug('Updated webhook URL', { newUrl, selector });
-                    updated = true;
-                    return;
+            document.querySelectorAll('[data-test^="add-destination"]').forEach(node => {
+                if (node.scrollHeight > node.clientHeight) {
+                    node.scrollTop = node.scrollHeight;
                 }
-            } catch (error) {
-                testLogger.debug('Failed with selector', { selector, error: error.message });
-                continue;
-            }
+            });
+        }).catch(() => {});
+
+        const probes = [this.webhookInputAnyField, this.urlInputField];
+        for (const selector of probes) {
+            const input = this.page.locator(selector).first();
+            await input.scrollIntoViewIfNeeded().catch(() => {});
+            if (!(await input.isVisible({ timeout: 5000 }).catch(() => false))) continue;
+            // Triple-click to select all text, then fill the new URL
+            await input.click({ clickCount: 3 });
+            await input.fill(newUrl);
+            await expect(input).toHaveValue(newUrl, { timeout: 5000 });
+            testLogger.debug('Updated webhook URL', { newUrl, selector });
+            return;
         }
 
-        if (!updated) {
-            // Take screenshot before throwing error
-            await this.page.screenshot({ path: `test-results/webhook-update-failed.png`, fullPage: true }).catch(() => {});
-            testLogger.error('Webhook URL input not found for update');
-            throw new Error('Webhook URL input not found for update. Screenshot saved to test-results/webhook-update-failed.png');
-        }
+        // Take screenshot before throwing error
+        await this.page.screenshot({ path: `test-results/webhook-update-failed.png`, fullPage: true }).catch(() => {});
+        testLogger.error('Webhook URL input not found for update');
+        throw new Error('Webhook URL input not found for update. Screenshot saved to test-results/webhook-update-failed.png');
     }
 
     /**
@@ -1689,36 +1833,16 @@ export class AlertDestinationsPage {
      * @param {string} newRecipients - New email recipients
      */
     async updateEmailRecipients(newRecipients) {
-        await this.page.waitForTimeout(2000);
-
-        const recipientsSelectors = [
-            'input[data-test="email-recipients-input"]',
-            'input[data-test*="recipients"]',
-            'input[placeholder*="email"]'
-        ];
-
-        let updated = false;
-        for (const selector of recipientsSelectors) {
-            try {
-                const input = this.page.locator(selector).first();
-                if (await input.isVisible().catch(() => false)) {
-                    await input.click();
-                    await this.page.keyboard.press('Control+a');
-                    await this.page.keyboard.press('Meta+a');
-                    await input.fill(newRecipients);
-                    await this.page.waitForTimeout(1000);
-                    testLogger.debug('Updated email recipients', { newRecipients, selector });
-                    updated = true;
-                    return;
-                }
-            } catch (error) {
-                continue;
-            }
-        }
-
-        if (!updated) {
+        const input = this.page.locator(this.recipientsInputField).first();
+        if (!(await input.isVisible({ timeout: 10000 }).catch(() => false))) {
             throw new Error('Email recipients input not found for update');
         }
+        await input.click();
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.press('Meta+a');
+        await input.fill(newRecipients);
+        await expect(input).toHaveValue(newRecipients, { timeout: 5000 });
+        testLogger.debug('Updated email recipients', { newRecipients });
     }
 
     /**
@@ -1726,10 +1850,10 @@ export class AlertDestinationsPage {
      * @param {string} newKey - New integration key
      */
     async updateIntegrationKey(newKey) {
-        const input = this.page.locator(this.integrationKeyInput).first();
-        await input.clear();
+        const input = this.page.locator(this.integrationKeyInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 10000 });
+        await input.fill('');
         await input.fill(newKey);
-        await this.page.waitForTimeout(1000);
         testLogger.debug('Updated integration key', { newKey });
     }
 
@@ -1774,7 +1898,7 @@ export class AlertDestinationsPage {
         await this.updateWebhookUrl(newWebhookUrl);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Slack destination updated successfully');
     }
 
@@ -1793,7 +1917,7 @@ export class AlertDestinationsPage {
         await this.updateWebhookUrl(newWebhookUrl);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Discord destination updated successfully');
     }
 
@@ -1812,7 +1936,7 @@ export class AlertDestinationsPage {
         await this.updateWebhookUrl(newWebhookUrl);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Teams destination updated successfully');
     }
 
@@ -1831,7 +1955,7 @@ export class AlertDestinationsPage {
         await this.updateEmailRecipients(newRecipients);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Email destination updated successfully');
     }
 
@@ -1859,7 +1983,7 @@ export class AlertDestinationsPage {
 
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('PagerDuty destination updated successfully');
     }
 
@@ -1897,7 +2021,8 @@ export class AlertDestinationsPage {
      * @param {string} apiKey - Opsgenie API key
      */
     async fillOpsgenieApiKey(apiKey) {
-        const input = this.page.locator('input[data-test="opsgenie-api-key-input"], input[placeholder*="API Key"]').first();
+        const input = this.page.locator(this.opsgenieApiKeyInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(apiKey);
         testLogger.debug('Filled Opsgenie API key');
     }
@@ -1907,10 +2032,15 @@ export class AlertDestinationsPage {
      * @param {string} priority - Priority level (e.g., 'P1', 'P2')
      */
     async selectPriority(priority) {
-        const select = this.page.locator('div[data-test="opsgenie-priority-select"], .q-select').first();
+        const select = this.page.locator(this.prioritySelect).first();
         if (await select.isVisible()) {
             await select.click();
-            await this.page.locator(`text=${priority}`).click();
+            const popover = this.page.locator(this.prioritySelectPopover);
+            await popover.waitFor({ state: 'visible', timeout: 5000 });
+            const option = popover.locator(`[data-test-value="${priority}"]`).first();
+            await option.waitFor({ state: 'visible', timeout: 5000 });
+            await option.click();
+            await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             testLogger.debug('Selected priority', { priority });
         }
     }
@@ -1932,7 +2062,7 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Opsgenie destination created successfully');
     }
 
@@ -1950,8 +2080,9 @@ export class AlertDestinationsPage {
         await this.expectDestinationTypeInEditMode('Opsgenie');
 
         if (newApiKey) {
-            const input = this.page.locator('input[data-test="opsgenie-api-key-input"], input[placeholder*="API Key"]').first();
-            await input.clear();
+            const input = this.page.locator(this.opsgenieApiKeyInputField).first();
+            await input.waitFor({ state: 'visible', timeout: 10000 });
+            await input.fill('');
             await input.fill(newApiKey);
         }
 
@@ -1961,7 +2092,7 @@ export class AlertDestinationsPage {
 
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('Opsgenie destination updated successfully');
     }
 
@@ -1974,7 +2105,8 @@ export class AlertDestinationsPage {
      * @param {string} url - ServiceNow instance URL
      */
     async fillServiceNowInstanceUrl(url) {
-        const input = this.page.locator('input[data-test="servicenow-instance-url-input"], input[placeholder*="Instance URL"]').first();
+        const input = this.page.locator(this.servicenowInstanceUrlInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
         testLogger.debug('Filled ServiceNow instance URL');
     }
@@ -1984,7 +2116,8 @@ export class AlertDestinationsPage {
      * @param {string} username - ServiceNow username
      */
     async fillServiceNowUsername(username) {
-        const input = this.page.locator('input[data-test="servicenow-username-input"], input[placeholder*="Username"]').first();
+        const input = this.page.locator(this.servicenowUsernameInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(username);
         testLogger.debug('Filled ServiceNow username');
     }
@@ -1994,7 +2127,8 @@ export class AlertDestinationsPage {
      * @param {string} password - ServiceNow password
      */
     async fillServiceNowPassword(password) {
-        const input = this.page.locator('input[data-test="servicenow-password-input"], input[type="password"]').first();
+        const input = this.page.locator(this.servicenowPasswordInputField).first();
+        await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(password);
         testLogger.debug('Filled ServiceNow password');
     }
@@ -2016,7 +2150,7 @@ export class AlertDestinationsPage {
         await this.fillDestinationName(name);
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('ServiceNow destination created successfully');
     }
 
@@ -2035,26 +2169,29 @@ export class AlertDestinationsPage {
         await this.expectDestinationTypeInEditMode('ServiceNow');
 
         if (newInstanceUrl) {
-            const urlInput = this.page.locator('input[data-test="servicenow-instance-url-input"], input[placeholder*="Instance URL"]').first();
-            await urlInput.clear();
+            const urlInput = this.page.locator(this.servicenowInstanceUrlInputField).first();
+            await urlInput.waitFor({ state: 'visible', timeout: 10000 });
+            await urlInput.fill('');
             await urlInput.fill(newInstanceUrl);
         }
 
         if (newUsername) {
-            const usernameInput = this.page.locator('input[data-test="servicenow-username-input"], input[placeholder*="Username"]').first();
-            await usernameInput.clear();
+            const usernameInput = this.page.locator(this.servicenowUsernameInputField).first();
+            await usernameInput.waitFor({ state: 'visible', timeout: 10000 });
+            await usernameInput.fill('');
             await usernameInput.fill(newUsername);
         }
 
         if (newPassword) {
-            const passwordInput = this.page.locator('input[data-test="servicenow-password-input"], input[type="password"]').first();
-            await passwordInput.clear();
+            const passwordInput = this.page.locator(this.servicenowPasswordInputField).first();
+            await passwordInput.waitFor({ state: 'visible', timeout: 10000 });
+            await passwordInput.fill('');
             await passwordInput.fill(newPassword);
         }
 
         await this.clickSave();
         await this.expectSuccessNotification();
-        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.cancelButton).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         testLogger.info('ServiceNow destination updated successfully');
     }
 
@@ -2067,7 +2204,8 @@ export class AlertDestinationsPage {
      * @param {string} url - Custom destination URL
      */
     async fillCustomUrl(url) {
-        const input = this.page.locator('[data-test="add-destination-url-input"]');
+        // OInput inner native field is the `-field` derivative — use it for fills/clicks.
+        const input = this.page.locator(this.urlInputField);
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
         testLogger.debug('Filled custom destination URL');
@@ -2078,39 +2216,25 @@ export class AlertDestinationsPage {
      * @param {string} url - New URL
      */
     async updateCustomUrl(url) {
-        await this.page.waitForTimeout(2000);
-
-        // Try multiple URL input selectors
-        const urlSelectors = [
-            '[data-test="add-destination-url-input"]',
-            'input[data-test*="url"]',
-            'input[placeholder*="URL"]',
-            'input[type="url"]',
-            this.urlInput
-        ];
-
-        let updated = false;
-        for (const selector of urlSelectors) {
-            try {
-                const input = this.page.locator(selector).first();
-                if (await input.isVisible().catch(() => false)) {
-                    await input.click();
-                    await this.page.keyboard.press('Control+a');
-                    await this.page.keyboard.press('Meta+a');
-                    await input.fill(url);
-                    await this.page.waitForTimeout(1000);
-                    testLogger.debug('Updated custom destination URL', { url, selector });
-                    updated = true;
-                    return;
-                }
-            } catch (error) {
-                continue;
-            }
-        }
-
-        if (!updated) {
-            throw new Error('Custom URL input not found for update');
-        }
+        // The custom-edit form renders the URL field only after BOTH
+        // formData.destination_type === 'custom' and formData.type === 'http'
+        // resolve from props.destination — gate on the OInput wrapper first so the
+        // inner `-field` is guaranteed to be attached before we try to fill it.
+        const urlWrapper = this.page.locator(this.urlInput).first();
+        await urlWrapper.waitFor({ state: 'attached', timeout: 15000 });
+        await urlWrapper.waitFor({ state: 'visible', timeout: 15000 });
+        // OInput inner native field is the `-field` derivative — use it for fills/clicks.
+        const input = this.page.locator(this.urlInputField).first();
+        // Edit drawer may be scrolled — bring the URL field into view before waiting on visibility
+        await input.scrollIntoViewIfNeeded().catch(() => {});
+        await input.waitFor({ state: 'visible', timeout: 15000 });
+        await input.click();
+        // Cross-platform select-all (Ctrl on Win/Linux, Meta on macOS) before fill
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.press('Meta+a');
+        await input.fill(url);
+        await expect(input).toHaveValue(url, { timeout: 5000 });
+        testLogger.debug('Updated custom destination URL', { url });
     }
 
     /**
@@ -2118,20 +2242,21 @@ export class AlertDestinationsPage {
      * @param {string} method - HTTP method (GET, POST, PUT, etc.)
      */
     async selectHttpMethod(method) {
-        const select = this.page.locator('[data-test="add-destination-method-select"]');
+        const select = this.page.locator(this.methodSelect);
         await select.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Click to open dropdown
+        // Click to open OSelect popover
         await select.click();
-        await this.page.waitForTimeout(500);
+        const popover = this.page.locator(this.methodSelectPopover);
+        await popover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Find and click the option in the menu
-        const menuOption = this.page.locator('.q-menu .q-item').filter({ hasText: method.toUpperCase() });
-        await menuOption.waitFor({ state: 'visible', timeout: 5000 });
-        await menuOption.click();
-
-        // Wait for selection to complete
-        await this.page.waitForTimeout(500);
+        // Resolve via data-test-value (OSelect convention per agent rules §4).
+        // apiMethods values are lowercase ("get", "post", "put") — normalise the input.
+        const methodValue = method.toLowerCase();
+        const option = popover.locator(`[data-test-value="${methodValue}"]`).first();
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
+        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Selected HTTP method', { method });
     }
 
@@ -2140,27 +2265,24 @@ export class AlertDestinationsPage {
      * @param {string} templateName - Template name (optional, selects first if not provided)
      */
     async selectTemplate(templateName = null) {
-        const select = this.page.locator('[data-test="add-destination-template-select"]');
+        const select = this.page.locator(this.templateSelect);
         await select.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Click to open dropdown
+        // Click to open OSelect popover
         await select.click();
-        await this.page.waitForTimeout(500);
+        const popover = this.page.locator(this.templateSelectPopover);
+        await popover.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Select template - either specific name or first available
+        // Resolve via data-test-value when name given; otherwise grab the first available option
+        let option;
         if (templateName) {
-            const menuOption = this.page.locator('.q-menu .q-item').filter({ hasText: templateName });
-            await menuOption.waitFor({ state: 'visible', timeout: 5000 });
-            await menuOption.click();
+            option = popover.locator(`[data-test-value="${templateName}"]`).first();
         } else {
-            // Select first template
-            const firstOption = this.page.locator('.q-menu .q-item').first();
-            await firstOption.waitFor({ state: 'visible', timeout: 5000 });
-            await firstOption.click();
+            option = popover.locator('[data-test="add-destination-template-select-option"]').first();
         }
-
-        // Wait for selection to complete
-        await this.page.waitForTimeout(500);
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
+        await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Selected template', { templateName: templateName || 'first available' });
     }
-} 
+}

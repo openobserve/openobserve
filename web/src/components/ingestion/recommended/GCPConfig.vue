@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-ma-md">
-    <CopyContent class="q-mt-sm" :content="content" />
+  <div class="tw:m-3">
+    <CopyContent class="tw:mt-2" :content="content" />
     <div class="tw:text-[16px]">
       <div class="tw:font-bold tw:pt-6 tw:pb-2">
         Check further documentation at:
       </div>
-      <ol class="tw:list-decimal q-pl-md">
+      <ol class="tw:list-decimal tw:pl-3">
         <li class="tw:py-1">
           <a
             href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"

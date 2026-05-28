@@ -17,227 +17,180 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
-    <div>
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
-          <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
-          <div class="full-width tw:flex tw:justify-end tw:gap-3">
-
-            <q-input
+          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              class="tw:w-[12.5rem]"
               :placeholder="t('organization.search')"
+              data-test="organizations-search-input"
             >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
-            </q-input>
-          
+            </OInput>
             <OButton
               variant="primary"
               size="sm"
+              class="tw:!h-8"
               @click="addOrganization"
               data-test="Add Organization"
             >
               {{ t('organization.add') }}
             </OButton>
-            </div>
-        </div>
-        </div>
-    <div>
-      <div class="tw:w-full tw:h-full">
-      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
-      <q-table
-      ref="qTable"
-      :rows="visibleRows"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :loading="loading"
-      class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-      style="overflow-y: auto;"
-      :style="hasVisibleRows
-            ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' 
-            : ''"
-    >
-      <template #no-data><NoData /></template>
-
-      <!-- <template #body-cell-actions="props">
-        <q-td :props="props">
-          <OButton
-            v-if="props.row.role == 'Admin'"
-            :title="t('organization.invite')"
-            variant="ghost"
-            size="icon-sm"
-            @click="redirectToInviteMember(props)"
-          >
-            <q-icon name="group" />
-          </OButton>
-        </q-td>
-      </template> -->
-
-
-      <template #bottom="scope">
-        <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-            {{ resultTotal }} {{ t('organization.header') }}
           </div>
-            <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
         </div>
-      </template>
+    </div>
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <OTable
+          :data="organizations"
+          :columns="columns"
+          row-key="identifier"
+          :loading="loading"
+          :global-filter="filterQuery"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('organization.header')"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+        >
+          <template #empty>
+            <NoData />
+          </template>
 
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <OButton
-            data-test="organization-name-edit"
-            variant="ghost"
-            size="icon-circle-sm"
-            :title="'Edit'"
-            @click="renameOrganization(props)"
-          >
-            <q-icon name="edit" />
-          </OButton>
-        </q-td>
-      </template>
-    </q-table>
+
+          <template #cell-actions="{ row }">
+            <OButton
+              data-test="organization-name-edit"
+              variant="ghost"
+              size="icon-sm"
+              :title="'Edit'"
+              @click="renameOrganization(row)"
+            >
+              <OIcon name="edit" size="sm" />
+            </OButton>
+          </template>
+      </OTable>
     </div>
-    </div>
-    </div>
-      </div>
-    <q-dialog
-      v-model="showAddOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-      @before-hide="hideAddOrgDialog"
-    >
-      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
-    </q-dialog>
-  </q-page>
+    <add-update-organization
+      :open="showAddOrganizationDialog"
+      @update:open="onDrawerOpenChange"
+      @updated="updateOrganizationList"
+      :model-value="toBeUpdatedOrganization"
+    />
+  </div>
 </template>
 
 <script lang="ts">
 
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated, computed } from "vue";
+import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
 import JoinOrganization from "./JoinOrganization.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageOrganization",
   components: {
     AddUpdateOrganization,
-    QTablePagination,
     NoData,
     OButton,
-  },
+    OInput,
+    OIcon,
+    OTable,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);
     const showJoinOrganizationDialog = ref(false);
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
-    const qTable: any = ref(null);
     const filterQuery = ref("");
     const toBeUpdatedOrganization = ref({
       id: "",
       name: "",
       identifier: "",
     });
-    const columns = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px;",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 36,
+        minSize: 32,
+        maxSize: 40,
+        meta: { align: "left", compactPadding: true },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("organization.name"),
-        align: "left",
+        id: "name",
+        header: t("organization.name"),
+        accessorKey: "name",
         sortable: true,
+        size: 500,
+        meta: { align: "left" },
       },
       {
-        name: "identifier",
-        field: "identifier",
-        label: t("organization.identifier"),
-        align: "left",
+        id: "identifier",
+        header: t("organization.identifier"),
+        accessorKey: "identifier",
         sortable: true,
-        
+        meta: { align: "left", autoWidth: true },
       },
       {
-        name: "type",
-        field: "type",
-        label: t("organization.type"),
-        align: "left",
+        id: "type",
+        header: t("organization.type"),
+        accessorKey: "type",
         sortable: true,
-        style: "width: 150px;",
+        size: 150,
+        meta: { align: "left" },
       },
-    ]);
+    ];
 
     if (config.isCloud == "true") {
-      columns.value.push({
-        name: "plan",
-        field: "plan",
-        label: t("organization.subscription_plan"),
-        align: "center",
+      columns.push({
+        id: "plan",
+        header: t("organization.subscription_plan"),
+        accessorKey: "plan",
         sortable: true,
+        meta: { align: "left" },
       });
     }
-      columns.value.push(
-        {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
-        style: "width: 67px;",
-      }
-    )
-
-    const perPageOptions = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-    const resultTotal = ref<number>(0);
-    // const maxRecordToReturn = ref<number>(500);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
+    columns.push({
+      id: "actions",
+      header: t("user.actions"),
+      isAction: true,
+      pinned: "right",
+      size: 80,
+      minSize: 64,
+      maxSize: 100,
+      meta: { align: "center", actionCount: 1 },
     });
 
     watch(
@@ -258,12 +211,12 @@ export default defineComponent({
     );
 
     onMounted(() => {
+      // Only `action=update` deep-links auto-open the dialog so a shared
+      // edit URL still lands directly on the org's edit form. `action=add`
+      // is intentionally NOT handled here — the dialog only opens via the
+      // "Add Organization" button click; refreshing on an `action=add` URL
+      // should leave the user on the list view.
       if (
-        router.currentRoute.value.query.action == "add"
-      ) {
-        showAddOrganizationDialog.value = true;
-      }
-      else if (
         router.currentRoute.value.query.action == "update"
       ) {
         showAddOrganizationDialog.value = true;
@@ -275,49 +228,17 @@ export default defineComponent({
       }
     });
 
-    onUpdated(() => {
-      if (
-        router.currentRoute.value.query.action == "add"
-      ) {
-        showAddOrganizationDialog.value = true;
-      }
-      else if (
-        router.currentRoute.value.query.action == "update"
-      ) {
-        showAddOrganizationDialog.value = true;
-        toBeUpdatedOrganization.value = {
-          id: router.currentRoute.value.query?.to_be_updated_org_id || "",
-          name: router.currentRoute.value.query?.to_be_updated_org_name || "",
-          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
-        };
-      }
-
-      if (router.currentRoute.value.query.action == "invite") {
-        organizations.value.map((org) => {
-          if (org.identifier == router.currentRoute.value.query.id) {
-            organization.value = org;
-            showJoinOrganizationDialog.value = true;
-          }
-        });
-      }
-    });
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-
+    const loading = ref(false);
     const getOrganizations = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading organizations...",
       });
+      loading.value = true;
       organizationsService.list(0, 1000000, "name", false, "").then((res) => {
         // Updating store so that organizations in navbar also gets updated
         store.dispatch("setOrganizations", res.data.data);
 
-        resultTotal.value = res.data.data.length;
         let counter = 1;
         const billingPlans = {
           "0": "Free",
@@ -381,6 +302,8 @@ export default defineComponent({
         });
 
         dismiss();
+      }).finally(() => {
+        loading.value = false;
       });
     };
 
@@ -393,6 +316,7 @@ export default defineComponent({
         name: "",
         identifier: "",
       };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "add",
@@ -419,6 +343,11 @@ export default defineComponent({
       });
     };
 
+    const onDrawerOpenChange = (val: boolean) => {
+      showAddOrganizationDialog.value = val;
+      if (!val) hideAddOrgDialog();
+    };
+
     const inviteTeam = (props: any) => {
       organization.value = {
         id: props.row.id,
@@ -437,29 +366,13 @@ export default defineComponent({
       });
     };
 
-    const filterData = (rows: string | any[], terms: string) => {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
+    const renameOrganization = (row: any) => {
+      toBeUpdatedOrganization.value = {
+        id: row.identifier,
+        name: row.name,
+        identifier: row.identifier,
       };
-
-    const visibleRows = computed(() => {
-      if (!filterQuery.value) return organizations.value || []
-      return filterData(organizations.value || [], filterQuery.value)
-    });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
-
-    const renameOrganization = (props: any) => {
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "update",
@@ -467,22 +380,15 @@ export default defineComponent({
           to_be_updated_org_id: props.row.identifier,
           to_be_updated_org_name: props.row.name,
         },
-      })
-      toBeUpdatedOrganization.value = {
-        id: props.row.identifier,
-        name: props.row.name,
-        identifier: props.row.identifier,
-      };
-
+      });
     };
 
     return {
       t,
       store,
       router,
-      qTable,
       config,
-      loading: ref(false),
+      loading,
       organizations,
       organization,
       columns,
@@ -493,17 +399,9 @@ export default defineComponent({
       addOrganization,
       getOrganizations,
       inviteTeam,
-      pagination,
-      resultTotal,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
       filterQuery,
-      filterData,
       hideAddOrgDialog,
-      visibleRows,
-      hasVisibleRows,
-
+      onDrawerOpenChange,
       renameOrganization,
       toBeUpdatedOrganization,
     };
@@ -526,45 +424,29 @@ export default defineComponent({
       }
       this.getOrganizations();
 
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
       });
     },
     joinOrganization() {
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Request completed successfully.",
         timeout: 5000,
       });
       this.showJoinOrganizationDialog = false;
     },
     copyAPIKey() {
-      copyToClipboard(this.organizationAPIKey)
-        .then(() => {
-          this.$q.notify({
-            type: "positive",
-            message: "API Key Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          this.$q.notify({
-            type: "negative",
-            message: "Error while copy API Key.",
-            timeout: 5000,
-          });
-        });
+      copyToClipboard(this.organizationAPIKey, {
+        successMessage: "API Key Copied Successfully!",
+        errorMessage: "Error while copy API Key.",
+        timeout: 5000,
+      });
     },
   },
 });
 </script>
 
 <style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
 </style>

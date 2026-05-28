@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label="Loading Time"
       :value="metrics.action.loading_time"
       unit="ns"
-      icon="hourglass_empty"
+      icon="hourglass-empty"
       :status="getLoadingTimeStatus(metrics.action.loading_time)"
       description="Time taken for action to complete"
       data-test="metric-loading-time"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label="Resources Loaded"
       :value="metrics.action.resource.count"
       unit=""
-      icon="cloud_download"
+      icon="cloud-download"
       description="Number of resources loaded during action"
       data-test="metric-resources"
     />

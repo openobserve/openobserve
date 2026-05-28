@@ -16,14 +16,14 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import AssociateFunction from "./AssociateFunction.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-installQuasar({ plugins: [Dialog, Notify] });
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -44,6 +44,22 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getImageURL: vi.fn(() => ""),
   };
 });
+
+// ODrawer stub — renders slot content so inner elements are accessible in tests.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open", "size", "showClose", "title", "width", "persistent",
+    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `<div class="o-drawer-stub">
+    <slot />
+    <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+    <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+  </div>`,
+};
 
 // ---------------------------------------------------------------------------
 // Factory helpers
@@ -87,6 +103,7 @@ function createWrapper(props = {}, pipelineObjOverrides = {}) {
           emits: ["update:list", "cancel:hideform"],
         },
         ConfirmDialog: true,
+        ODrawer: ODrawerStub,
       },
     },
     props: {
@@ -204,15 +221,29 @@ describe("AssociateFunction Component", () => {
         currentSelectedNodeData: { data: { name: "alpha" } },
       });
       await flushPromises();
-      const deleteBtn = wrapper.find('[data-test="associate-function-delete-btn"]');
+      const deleteBtn = wrapper.find('[data-test="o-drawer-neutral-btn"]');
       expect(deleteBtn.exists()).toBe(true);
     });
 
     it("hides delete button when isEditNode is false", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const deleteBtn = wrapper.find('[data-test="associate-function-delete-btn"]');
+      const deleteBtn = wrapper.find('[data-test="o-drawer-neutral-btn"]');
       expect(deleteBtn.exists()).toBe(false);
+    });
+
+    it("emits cancel:hideform when the header close icon button is clicked", async () => {
+      vi.useFakeTimers();
+      const wrapper = createWrapper();
+      await flushPromises();
+      // The close button is inside ODrawer's header — simulate via update:open event
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      drawer.vm.$emit("update:open", false);
+      vi.advanceTimersByTime(400);
+      await nextTick();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+      vi.useRealTimers();
     });
   });
 
@@ -237,8 +268,8 @@ describe("AssociateFunction Component", () => {
     it("shows cancel and save buttons when createNewFunction is false", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.find('[data-test="associate-function-cancel-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="associate-function-save-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-primary-btn"]').exists()).toBe(true);
     });
 
     it("hides select input and flattening toggle when createNewFunction is true", async () => {
@@ -267,7 +298,7 @@ describe("AssociateFunction Component", () => {
       await flushPromises();
       wrapper.vm.loading = true;
       await nextTick();
-      expect(wrapper.find(".q-spinner").exists()).toBe(true);
+      expect(wrapper.find('[data-test="associate-function-loading-indicator"]').exists()).toBe(true);
     });
 
     it("hides stream-routing-container when loading is true", async () => {
@@ -428,13 +459,12 @@ describe("AssociateFunction Component", () => {
       wrapper.vm.addFunctionRef = {
         formData: { name: "", function: "" },
       };
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(toast).mockClear();
       await wrapper.vm.saveFunction();
-      expect(notifyMock).toHaveBeenCalledWith(
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Function Name is required",
-          color: "negative",
         })
       );
       expect(mockAddNode).not.toHaveBeenCalled();
@@ -448,10 +478,10 @@ describe("AssociateFunction Component", () => {
       wrapper.vm.addFunctionRef = {
         formData: { name: "newFunc", function: "def newFunc(r): return r" },
       };
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(toast).mockClear();
       await wrapper.vm.saveFunction();
-      expect(notifyMock).not.toHaveBeenCalled();
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 

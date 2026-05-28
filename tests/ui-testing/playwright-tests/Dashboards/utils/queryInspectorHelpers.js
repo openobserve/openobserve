@@ -14,12 +14,11 @@ export async function openQueryInspector(page) {
   testLogger.info('Opening query inspector');
 
   await page.locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]').click();
-  await page.waitForTimeout(1000);
 
-  // Wait for query inspector to be visible
-  await page.locator('.tw\\:text-xl:has-text("Query Inspector")').waitFor({
+  // Wait for query inspector dialog to be visible
+  await page.locator('[data-test="query-inspector-dialog"]').waitFor({
     state: "visible",
-    timeout: 5000
+    timeout: 10000
   });
 
   testLogger.info('Query inspector opened successfully');
@@ -32,8 +31,8 @@ export async function openQueryInspector(page) {
 export async function closeQueryInspector(page) {
   testLogger.info('Closing query inspector');
 
-  await page.locator('[data-test="query-inspector-close-btn"]').click();
-  await page.waitForTimeout(500);
+  await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+  await page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
 
   testLogger.info('Query inspector closed successfully');
 }
@@ -47,13 +46,10 @@ export async function closeQueryInspector(page) {
 export async function getQueryInspectorDateTime(page, queryIndex = 0) {
   testLogger.info('Getting date time from query inspector', { queryIndex });
 
-  // Get all Start Time and End Time sections
-  const startTimeSections = page.locator('.tw\\:space-y-1:has-text("Start Time")');
-  const endTimeSections = page.locator('.tw\\:space-y-1:has-text("End Time")');
-
-  // Get the specific query's time sections (0-indexed)
-  const startTimeSection = startTimeSections.nth(queryIndex);
-  const endTimeSection = endTimeSections.nth(queryIndex);
+  // Use data-test attributes added to QueryInspector.vue time sections — scoped to dialog
+  const dialog = page.locator('[data-test="query-inspector-dialog"]');
+  const startTimeSection = dialog.locator(`[data-test="dashboard-query-inspector-start-time-${queryIndex}"]`);
+  const endTimeSection = dialog.locator(`[data-test="dashboard-query-inspector-end-time-${queryIndex}"]`);
 
   // Verify they are visible
   await expect(startTimeSection).toBeVisible({ timeout: 5000 });
