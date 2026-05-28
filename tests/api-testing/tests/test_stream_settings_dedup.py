@@ -40,9 +40,9 @@ STREAM_TYPE = "logs"
 # From the seed data logs_data.json:
 #   String fields: level, message, log, stream, code
 #   Numeric fields: _timestamp (auto), FloatValue
-FTS_SAFE_FIELDS = ["level", "message", "log", "stream"]
+FTS_SAFE_FIELDS = ["message", "log", "stream"]
 # FloatValue is numeric; _timestamp is used for bloom but not FTS
-INDEX_SAFE_FIELDS = ["_timestamp", "FloatValue"]
+INDEX_SAFE_FIELDS = ["level", "FloatValue"]
 BLOOM_SAFE_FIELDS = ["kubernetes_pod_id", "FloatValue"]
 
 
