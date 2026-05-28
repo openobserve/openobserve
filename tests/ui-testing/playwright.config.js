@@ -19,7 +19,7 @@ if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
-  globalTimeout: process.env.CI ? 110 * 60 * 1000 : undefined,
+  globalTimeout: process.env.CI ? 40 * 60 * 1000 : undefined,
   /* Output directory for test artifacts */
   outputDir: './test-results',
   /* Exclude archived tests from all test runs */

@@ -225,7 +225,7 @@ jobs:
           echo "Disk space after:"; df -h
 
   ui_integration_tests:
-    timeout-minutes: 180
+    timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary, warm_cache]
     if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
