@@ -105,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
           <div
             v-else
-            class="indexDetailsContainer"
-            style="height: calc(100vh - 120px)"
+            class="indexDetailsContainer tw:flex tw:flex-col tw:min-h-0"
+            style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
             <div class="stats-grid tw:grid tw:grid-cols-4 tw:gap-2 tw:mb-2">
@@ -297,11 +297,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="tw:w-full tw:flex tw:gap-2">
+            <div class="tw:w-full tw:flex tw:flex-1 tw:min-h-0 tw:gap-2">
               <!--  left section(includes tabs and schema settings) -->
               <div
                 :class="[
-                  'tw:w-[100%] tw:h-[calc(100vh-200px)] tw:rounded-lg tw:border tw:shadow-sm tw:p-2 tw:flex tw:flex-col tw:h-full',
+                  'tw:w-[100%] tw:h-full tw:min-h-0 tw:rounded-lg tw:border tw:shadow-sm tw:p-2 tw:flex tw:flex-col tw:overflow-hidden',
                   store.state.theme === 'dark'
                     ? 'tw:bg-[#181A1B] tw:border-gray-700'
                     : 'tw:bg-white tw:border-gray-200',
@@ -357,8 +357,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTabs>
                   </div>
                 </div>
+                <!-- Tab content wrapper — fills remaining height, pushes the footer to the bottom -->
+                <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden">
                 <!-- schema settings tab -->
-                <div v-if="activeMainTab == 'schemaSettings'">
+                <div v-if="activeMainTab == 'schemaSettings'" class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden">
                   <div
                     class="tw:flex tw:justify-between tw:items-center"
                     data-test="schema-log-stream-mapping-title-text"
@@ -502,14 +504,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OCard>
                   </div>
 
-                  <!-- Note: Drawer max-height to be dynamically calculated with JS -->
+                  <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                   <div
-                    :class="
+                    :class="[
+                      'tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden',
                       store.state.theme === 'dark'
                         ? 'dark-theme-table'
-                        : 'light-theme-table'
-                    "
-                    style="margin-bottom: 10px"
+                        : 'light-theme-table',
+                    ]"
                   >
                     <OTable
                       data-test="schema-log-stream-field-mapping-table"
@@ -526,10 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :show-global-filter="false"
                       dense
                       class="o2-schema-table"
-                      :style="{
-                        height: `${indexData.defaultFts ? 'calc(100vh - 403px)' : 'calc(100vh - 370px)'}`,
-                        width: '100%',
-                      }"
+                      :style="{ height: '100%', width: '100%' }"
                     >
                       <template #cell-name="{ row }">
                         <div class="tw:flex tw:items-center">
@@ -725,7 +724,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- red button tab -->
-                <div v-else-if="activeMainTab == 'redButton'">
+                <div
+                  v-else-if="activeMainTab == 'redButton'"
+                  class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
+                >
                   <div
                     class="mapping-warning-msg tw:mt-2"
                     style="width: fit-content"
@@ -741,7 +743,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ranges</span
                     >
                   </div>
-                  <div class="tw:mt-2">
+                  <div class="tw:mt-2 tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
                     <div class="tw:text-center tw:mt-2 tw:flex tw:items-center">
                       <div class="tw:flex tw:items-center">
                         <span class="tw:font-bold"> Select Date</span>
@@ -757,7 +759,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="tw:font-bold"> (UTC Timezone) </span>
                     </div>
 
-                    <div class="tw:mt-2" style="margin-bottom: 10px">
+                    <div class="tw:mt-2 tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="redBtnRows"
@@ -776,7 +778,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark'
                             : 'o2-last-row-border-light o2-schema-table-header-sticky-light'
                         "
-                        style="height: calc(100vh - 403px)"
+                        :style="{ height: '100%' }"
                       />
                     </div>
                   </div>
@@ -816,8 +818,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
+                </div>
                 <!-- floating footer for the table -->
-                <div class="floating-buttons tw:px-2 tw:py-1">
+                <div class="floating-buttons tw:flex-shrink-0 tw:px-2 tw:py-1">
                   <!-- LLM Evaluation tab footer -->
                   <div
                     v-if="activeMainTab === 'llmEvaluation'"
