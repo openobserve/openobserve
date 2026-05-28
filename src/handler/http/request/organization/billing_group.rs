@@ -270,7 +270,7 @@ pub async fn reject(
 
 /// get own membership
 #[utoipa::path(
-    delete,
+    get,
     path = "/{org_id}/billing_group/membership",
     context_path = "/api",
     operation_id = "GetBIllingGRoupMembership",
@@ -326,7 +326,7 @@ pub async fn check_membership(Path(org_id): Path<String>) -> Response {
 
 /// get members of self
 #[utoipa::path(
-    delete,
+    get,
     path = "/{org_id}/billing_group/members",
     context_path = "/api",
     operation_id = "GetBIllingGRoupMembers",

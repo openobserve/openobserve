@@ -520,19 +520,10 @@ pub async fn create_org(
         service_account: req.service_account,
     };
 
-    if let Some(oid) = req.make_billed_member_of.as_ref() {
-        if !check_permissions(
-            &oid,
-            &oid,
-            &user_email.user_id,
-            "billing_group",
-            "POST",
-            None,
-        )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
+    if let Some(oid) = req.make_billed_member_of.as_ref()
+        && !check_permissions(oid, oid, &user_email.user_id, "billing_group", "POST", None).await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
     }
 
     let result =
