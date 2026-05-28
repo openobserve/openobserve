@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <div class="tw:rounded-md tw:h-full" :key="store.state.selectedOrganization.identifier">
     <div
       ref="fullscreenDiv"
       :class="[
@@ -25,44 +25,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
-        store.state.printMode === true ? 'tw:px-6 tw:pb-6' : '',
+        store.state.printMode === true
+          ? 'tw:px-6 tw:pb-6'
+          : !isFullscreen
+            ? 'tw:pt-0.5 tw:pl-0.5 tw:pr-2 tw:pb-2'
+            : '',
       ]"
-      class="tw:h-full"
+      :style="
+        !store.state.printMode && !isFullscreen
+          ? { height: 'calc(100vh - var(--navbar-height))' }
+          : {}
+      "
+      class="tw:bg-[var(--color-surface-chrome)] tw:flex tw:flex-col tw:overflow-hidden"
     >
-      <PageLayout
-        :main-panel="false"
-        :header-class="
-          isFullscreen || store.state.printMode === true
-            ? 'stickyHeader fullscreenHeader tw:bg-surface-panel'
-            : 'tw:shrink-0'
+      <!-- ── Single floating content card on the unified chrome ──── -->
+      <div
+        :class="
+          store.state.printMode === true
+            ? 'tw:contents'
+            : !isFullscreen
+              ? 'tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden tw:bg-surface-base tw:border tw:border-border-default tw:rounded-xl'
+              : 'tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden'
         "
       >
-        <template #header>
-          <!-- Breadcrumb path lives in the chrome bar (published below). Row 1
-               shows the dashboard name + actions. In fullscreen/print the chrome
-               is hidden, so this title is the only heading on screen. -->
-          <!-- Normal mode: the icon tile is a Back button (→ dashboards list).
-               Fullscreen/print hide the chrome, so there we keep the module icon
-               as the only on-screen branding (no back affordance). -->
-          <AppPageHeader
-            :subtitle="folderNameFromFolderId"
-            :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
-            :back="
-              !isFullscreen && store.state.printMode !== true
-                ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
-                : undefined
-            "
-            class="tw:px-4 tw:border-b tw:border-border-default"
-          >
+        <!-- ── Page header band ─────────────────────────────────── -->
+        <div
+          class="stickyHeader"
+          :class="
+            isFullscreen || store.state.printMode === true
+              ? 'fullscreenHeader tw:bg-surface-panel'
+              : 'tw:shrink-0 tw:bg-surface-base tw:px-3 tw:border-b tw:border-border-default'
+          "
+        >
+          <AppPageHeader icon="dashboard">
           <template #title>
-            <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+            <span
+              :title="currentDashboardData.data?.title"
+              data-test="dashboard-name-title"
+              >{{ currentDashboardData.data?.title }}</span
+            >
+          </template>
+          <template #subtitle>
+            <nav
+              v-if="!isFullscreen && store.state.printMode !== true"
+              class="tw:flex tw:items-center tw:gap-0.5 tw:-ms-1.5 tw:min-w-0"
+              aria-label="Breadcrumb"
+            >
+              <button
+                type="button"
+                class="tw:text-text-secondary tw:px-1.5 tw:py-0.5 tw:rounded-md tw:outline-none tw:transition-colors tw:hover:text-text-primary tw:hover:bg-surface-subtle tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset tw:shrink-0"
+                data-test="dashboard-back-btn"
+                @click="goBackToDashboardList"
+              >
+                {{ t("dashboard.header") }}
+              </button>
+              <OIcon
+                name="chevron-right"
+                size="sm"
+                class="tw:text-text-disabled tw:shrink-0"
+              />
+              <button
+                type="button"
+                class="tw:text-text-secondary tw:max-w-[12rem] tw:truncate tw:px-1.5 tw:py-0.5 tw:rounded-md tw:outline-none tw:transition-colors tw:hover:text-text-primary tw:hover:bg-surface-subtle tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                data-test="dashboard-view-folder-breadcrumb"
+                :title="folderNameFromFolderId"
+                @click="goBackToDashboardList"
+              >
+                {{ folderNameFromFolderId }}
+              </button>
+              <OSpinner
+                v-if="!store.state.organizationData.folders.length"
+                variant="dots"
+                size="sm"
+              />
+            </nav>
           </template>
           <template #actions>
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-toolbar"
+              size="icon-sm"
               @click="addPanelData"
               data-test="dashboard-panel-add"
               icon-left="add"
@@ -114,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               v-show="store.state.printMode !== true"
               variant="ghost-destructive"
-              size="icon-toolbar"
+              size="icon-sm"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"
               icon-left="cancel"
@@ -125,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               v-show="store.state.printMode !== true"
               :variant="isVariablesChanged ? 'warning' : 'outline'"
-              size="icon-toolbar"
+              size="icon-sm"
               @click="refreshData"
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
@@ -145,14 +188,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="store.state.printMode !== true"
               :url="dashboardShareURL"
               variant="outline"
-              size="icon-toolbar"
+              size="icon-sm"
               data-test="dashboard-share-btn"
             />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-toolbar"
+              size="icon-sm"
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
               icon-left="settings"
@@ -161,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="outline"
-              size="icon-toolbar"
+              size="icon-sm"
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
@@ -174,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-toolbar"
+              size="icon-sm"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
@@ -190,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-toolbar"
+              size="icon-sm"
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
             >
@@ -203,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-toolbar"
+              size="icon-sm"
               data-test="dashboard-json-edit-btn"
               @click="openJsonEditor"
               icon-left="code"
@@ -211,10 +254,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('dashboard.editJson')" />
             </OButton>
           </template>
-          </AppPageHeader>
-        </template>
+        </AppPageHeader>
+      </div>
 
-        <RenderDashboardCharts
+      <RenderDashboardCharts
         :frame="false"
         :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
         :key="
@@ -251,6 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :runId="runId"
         @update:runId="updateRunId"
       />
+      </div>
+      <!-- ── /Single floating content card ──────────────────────── -->
+
       <DashboardSettings
         v-model:open="showDashboardSettingsDialog"
         @refresh="loadDashboard"
@@ -275,12 +321,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :tabs="currentDashboardData?.data?.tabs || []"
       />
 
-        <DashboardJsonEditor
-          v-model:open="showJsonEditorDialog"
-          :dashboard-data="currentDashboardData.data"
-          :save-json-dashboard="saveJsonDashboard"
-        />
-      </PageLayout>
+      <DashboardJsonEditor
+        v-model:open="showJsonEditorDialog"
+        :dashboard-data="currentDashboardData.data"
+        :save-json-dashboard="saveJsonDashboard"
+      />
     </div>
   </div>
 </template>
@@ -292,7 +337,6 @@ import {
   ref,
   watch,
   onActivated,
-  onDeactivated,
   nextTick,
   provide,
   defineAsyncComponent,
@@ -339,13 +383,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
-import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -375,7 +413,6 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
-    PageLayout,
     AppPageHeader,
     OSeparator,
     DateTimePickerDashboard,
@@ -1236,80 +1273,15 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // Breadcrumb root crumb → dashboards list (module root; folder defaults).
-    const goToDashboardList = () => {
-      return router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
-    // back button / folder crumb → dashboards list scoped to the current folder.
+    // back button to render dashboard List page
     const goBackToDashboardList = () => {
       return router.push({
         path: "/dashboards",
         query: {
           folder: route.query.folder ?? "default",
-          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
-
-    // Level-3 ancestor path: Dashboards › <Folder> › <Dashboard> (current).
-    // The two parent crumbs now have distinct targets (root vs current folder)
-    // and the current dashboard is the terminal, non-interactive crumb.
-    const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
-      const items: BreadcrumbItem[] = [
-        {
-          label: t("dashboard.header"),
-          onClick: goToDashboardList,
-          dataTest: "dashboard-back-btn",
-        },
-        {
-          label: folderNameFromFolderId.value,
-          onClick: goBackToDashboardList,
-          title: folderNameFromFolderId.value,
-          dataTest: "dashboard-view-folder-breadcrumb",
-        },
-      ];
-      const title = currentDashboardData.data?.title;
-      if (title) {
-        items.push({
-          label: title,
-          title,
-          dataTest: "dashboard-view-current",
-        });
-      }
-      return items;
-    });
-
-    // Row-1 breadcrumb bar crumbs. In fullscreen/print, collapse to just the
-    // dashboard name (matches the old behavior of hiding the breadcrumb path).
-    const crumbs = computed<Crumb[]>(() => {
-      const title = currentDashboardData.data?.title || "";
-      if (isFullscreen.value || store.state.printMode === true)
-        return title
-          ? [
-              {
-                label: title,
-                icon: "dashboard",
-                current: true,
-                dataTest: "dashboard-name-title",
-              },
-            ]
-          : [];
-      // Drop crumbs whose label hasn't resolved yet (e.g. folder name before
-      // folders load) so we never render a zero-width crumb.
-      return breadcrumbItems.value
-        .filter((b) => (b.label ?? "").toString().trim() !== "")
-        .map((b, i, arr) => ({
-          ...b,
-          icon: i === 0 ? "dashboard" : undefined,
-          current: i === arr.length - 1,
-        }));
-    });
 
     //add panel
     const addPanelData = () => {
@@ -1864,17 +1836,6 @@ export default defineComponent({
       }
     });
 
-    // Publish the breadcrumb path to the top chrome bar. Defined here (end of
-    // setup) because `crumbs` reads `isFullscreen`, which is declared later — an
-    // immediate watch any earlier would hit a TDZ on it. (In fullscreen/print the
-    // chrome is hidden and `crumbs` collapses to just the title — harmless, since
-    // the row-1 AppPageHeader already shows the dashboard name there.)
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
-
     return {
       currentDashboardData,
       dashboardRemountKey,
@@ -1936,8 +1897,6 @@ export default defineComponent({
       savePanelLayout,
       renderDashboardChartsRef,
       folderNameFromFolderId,
-      breadcrumbItems,
-      crumbs,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
@@ -2022,6 +1981,10 @@ export default defineComponent({
 .dashboard-icons {
   height: 30px;
   transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
 
   :deep(.q-btn-dropdown) {
     height: 30px;

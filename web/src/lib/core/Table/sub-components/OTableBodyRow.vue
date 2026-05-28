@@ -7,7 +7,6 @@ import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH, TABLE_CHECKBOX_COL_PAD_LEFT } from "../OTable.types";
 
 const props = defineProps<{
   row: Row<any>;
@@ -104,7 +103,7 @@ const showTreeWarning = computed(() =>
  * Used to align the warning row's content + connector line under the chevron.
  */
 const treeConnectorX = computed(() => {
-  const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
+  const selectionWidth = props.selectionEnabled ? 36 : 0; // tw:w-9
   const expansionWidth = props.expansionEnabled ? 32 : 0; // tw:w-8
   const cellPaddingLeft = 8; // tw:px-2
   const halfChevron = 9; // 18px / 2
@@ -174,14 +173,13 @@ function onDblclick(event: MouseEvent) {
     <td
       v-if="selectionEnabled"
       :class="[
-        'tw:text-left tw:align-middle',
+        'tw:w-9 tw:text-center tw:align-middle',
         bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
         isRowSelectable && !isRowSelectable(row.original) ? 'tw:cursor-not-allowed' : '',
       ]"
-      :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
       data-test="o2-table-select-cell"
     >
-      <div class="tw:flex tw:items-center tw:justify-start">
+      <div class="tw:flex tw:items-center tw:justify-center">
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"
