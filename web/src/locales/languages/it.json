@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Nessun valore disponibile",
     "selectLogStream": "Seleziona lo stream dei log",
     "noData": "Nessun dato disponibile",
-    "functionEditorLabel": "Editor di funzioni"
+    "functionEditorLabel": "Editor di funzioni",
+    "loadingStream": "Caricamento dello stream..."
   },
   "menu": {
     "home": "Home",
@@ -3430,7 +3431,8 @@
     "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
     "noDataFound": "Nessun dato trovato",
     "isWorkloadType": "Identificatore del servizio",
-    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database."
+    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database.",
+    "loadingCorrelation": "Caricamento dei dati di correlazione..."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
