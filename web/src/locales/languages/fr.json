@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Aucune valeur disponible",
     "selectLogStream": "Sélectionnez le flux de journaux",
     "noData": "Aucune donnée disponible",
-    "functionEditorLabel": "Éditeur de fonctions"
+    "functionEditorLabel": "Éditeur de fonctions",
+    "loadingStream": "Chargement du flux..."
   },
   "menu": {
     "home": "Accueil",
@@ -3421,7 +3422,8 @@
     "serviceGroupProtected": "Le groupe de services ne peut pas être supprimé. Vous ne pouvez modifier que les champs mappés.",
     "noDataFound": "Aucune donnée trouvée",
     "isWorkloadType": "Identifiant du service",
-    "isWorkloadTypeTooltip": "Lorsqu'il est activé, ce groupe est utilisé pour identifier de manière unique un service (par exemple, cluster, espace de noms, déploiement). Désactivez cette option pour les groupes qui décrivent des opérations via un service, comme la méthode HTTP ou le nom de la base de données."
+    "isWorkloadTypeTooltip": "Lorsqu'il est activé, ce groupe est utilisé pour identifier de manière unique un service (par exemple, cluster, espace de noms, déploiement). Désactivez cette option pour les groupes qui décrivent des opérations via un service, comme la méthode HTTP ou le nom de la base de données.",
+    "loadingCorrelation": "Chargement des données de corrélation..."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
