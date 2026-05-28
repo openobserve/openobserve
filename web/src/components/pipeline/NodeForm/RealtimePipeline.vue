@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div>
       <fields-input
-        class="q-mt-md"
+        class="tw:mt-3"
         :stream-fields="columns"
         :fields="conditions"
         @add="addField"

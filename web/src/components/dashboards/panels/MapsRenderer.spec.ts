@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import MapsRenderer from "./MapsRenderer.vue";
 
 // Create mock chart instance
@@ -79,6 +78,7 @@ Object.defineProperty(window, 'removeEventListener', {
   }),
 });
 
+
 describe("MapsRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -107,7 +107,7 @@ describe("MapsRenderer", () => {
         ...props
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };
@@ -162,7 +162,7 @@ describe("MapsRenderer", () => {
           data: { options: {} }
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
       await wrapper.vm.$nextTick();
@@ -358,7 +358,7 @@ describe("MapsRenderer", () => {
             data: { options: {} } // Use valid default instead of null
           },
           global: {
-            plugins: [Quasar],
+            plugins: [],
           },
         });
       }).not.toThrow();

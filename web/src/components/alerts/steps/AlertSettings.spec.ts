@@ -15,15 +15,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import AlertSettings from "./AlertSettings.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock router
 const mockRouter = {
@@ -188,10 +183,6 @@ describe("AlertSettings.vue", () => {
       expect(wrapper.vm.localIsAggregationEnabled).toBe(false);
     });
 
-    it("should render form element", () => {
-      const form = wrapper.findComponent({ ref: "alertSettingsForm" });
-      expect(form.exists()).toBe(true);
-    });
   });
 
   describe("Props", () => {
@@ -564,19 +555,9 @@ describe("AlertSettings.vue", () => {
       expect(result.valid).toBe(false);
     });
 
-    it("should filter destinations", async () => {
-      const mockUpdate = vi.fn((cb: Function) => cb());
-      await wrapper.vm.filterDestinations("dest1", mockUpdate);
-      expect(wrapper.vm.filteredDestinations).toBeDefined();
-    });
-
-    it("should reset filtered destinations when search is empty", async () => {
-      const mockUpdate = vi.fn((cb: Function) => cb());
-      await wrapper.vm.filterDestinations("", mockUpdate);
-      expect(wrapper.vm.filteredDestinations).toEqual(
-        wrapper.props().formattedDestinations
-      );
-    });
+    // OSelect handles destination filtering internally via its searchable prop;
+    // the filterDestinations method and filteredDestinations computed were removed
+    // from AlertSettings during the Quasar-to-O2 migration.
 
     it("should emit refresh destinations event", async () => {
       const refreshBtn = wrapper.find(".iconHoverBtn");
@@ -721,7 +702,8 @@ describe("AlertSettings.vue", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle empty destinations array", async () => {
+    // filteredDestinations computed was removed — OSelect handles filtering internally
+    it("should handle empty destinations array without errors", () => {
       const emptyWrapper = mount(AlertSettings, {
         global: {
           mocks: { $store: mockStore, $router: mockRouter },
@@ -737,7 +719,7 @@ describe("AlertSettings.vue", () => {
           formattedDestinations: [],
         },
       });
-      expect(emptyWrapper.vm.filteredDestinations).toEqual([]);
+      expect(emptyWrapper.find(".step-alert-conditions").exists()).toBe(true);
       emptyWrapper.unmount();
     });
 
@@ -786,10 +768,8 @@ describe("AlertSettings.vue", () => {
     });
 
     it("should have info tooltips", () => {
-      const infoIcons = wrapper.findAll(".q-icon");
-      const hasInfoIcon = infoIcons.some((icon) =>
-        icon.html().includes("info")
-      );
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      const hasInfoIcon = icons.some((i) => /^info/.test(i.props("name") ?? ""));
       expect(hasInfoIcon).toBe(true);
     });
 
@@ -923,7 +903,7 @@ describe("AlertSettings.vue", () => {
     });
 
     it("should apply correct input styles in light mode", () => {
-      expect(wrapper.html()).toContain("bg-grey-2");
+      expect(wrapper.html()).toContain("tw:bg-gray-100");
     });
 
     it("should apply correct input styles in dark mode", async () => {
@@ -944,7 +924,7 @@ describe("AlertSettings.vue", () => {
         },
       });
 
-      expect(darkWrapper.html()).toContain("bg-grey-9");
+      expect(darkWrapper.html()).toContain("tw:bg-gray-700");
       darkWrapper.unmount();
     });
   });
@@ -1078,10 +1058,6 @@ describe("AlertSettings.vue", () => {
   });
 
   describe("Form Refs", () => {
-    it("should have alertSettingsForm ref", () => {
-      expect(wrapper.vm.alertSettingsForm).toBeDefined();
-    });
-
     it("should have field refs for focus management", () => {
       expect(wrapper.vm.periodFieldRef).toBeDefined();
       expect(wrapper.vm.thresholdFieldRef).toBeDefined();

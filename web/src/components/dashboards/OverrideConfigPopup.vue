@@ -1,107 +1,66 @@
 <template>
-  <div style="padding: 0px 10px; min-width: min(1000px, 90vw)">
-    <div
-      class="flex justify-between items-center q-py-md header"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span>{{ t("dashboard.overrideConfigTitle") }}</span>
-      </div>
-      <OButton
-        variant="ghost"
-        size="icon"
-        :title="t('dashboard.cancel')"
-        @click.stop="closePopup"
-      >
-        <template #icon-left><q-icon name="close" /></template>
-      </OButton>
-    </div>
+  <ODialog data-test="override-config-popup-dialog"
+    :open="open"
+    @update:open="(v) => { if (!v) closePopup() }"
+    :title="t('dashboard.overrideConfigTitle')"
+    :width="70"
+    :neutral-button-label="t('dashboard.overrideConfigAddNew')"
+    neutral-button-variant="outline"
+    :primary-button-label="t('dashboard.overrideConfigSave')"
+    @click:neutral="addOverrideConfig"
+    @click:primary="saveOverrides"
+  >
 
     <div
       v-for="(overrideConfig, index) in overrideConfigs"
       :key="index"
-      class="q-mb-md flex items-start tw:w-full tw:flex"
+      class="tw:mb-3 tw:flex tw:items-start tw:w-full tw:flex"
       style="gap: 15px"
     >
-      <q-select
+      <OSelect
         v-model="overrideConfig.field.value"
         :label="t('dashboard.overrideConfigFieldLabel')"
         :options="columnsOptions"
-        :display-value="getFieldDisplayValue(overrideConfig.field.value)"
         style="width: 40%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
-        input-debounce="0"
-        emit-value
-        map-options
-        borderless
-        dense
-        class="tw:flex-1 o2-custom-select-dashboard"
-        hide-bottom-space
+        class="tw:flex-1"
       />
-      <div class="tw:flex items-center" style="width: 60%; gap: 10px">
-        <q-select
-          v-model="overrideConfig.config[0].type"
-          :label="t('dashboard.overrideConfigTypeLabel')"
-          :options="configTypeOptions"
-          :disable="!overrideConfig.field.value"
-          style="width: 40%"
-          :data-test="`dashboard-addpanel-config-type-select-${index}`"
-          input-debounce="0"
-          emit-value
-          map-options
-          borderless
-          dense
-          class="o2-custom-select-dashboard"
-          @update:model-value="onConfigTypeChange(index)"
-          hide-bottom-space
+      <div class="tw:flex tw:items-center" style="width: 60%; gap: 10px">
+<OSelect
+            v-model="overrideConfig.config[0].type"
+            :label="t('dashboard.overrideConfigTypeLabel')"
+            :options="configTypeOptions"
+            :disabled="!overrideConfig.field.value"
+            style="width: 40%"
+            :data-test="`dashboard-addpanel-config-type-select-${index}`"
+            @update:model-value="onConfigTypeChange(index)"
         />
 
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
-          class="tw:flex items-center"
+          class="tw:flex tw:items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
-          <q-select
-            v-model="overrideConfig.config[0].value.unit"
-            :label="t('dashboard.overrideConfigUnitLabel')"
-            :options="unitOptions"
-            :disable="!overrideConfig.field.value"
-            style="flex-grow: 1; width: 50%"
-            :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
-            input-debounce="0"
-            emit-value
-            map-options
-            borderless
-            dense
-            class="tw:flex-1 o2-custom-select-dashboard"
-            hide-bottom-space
-          />
-          <q-input
+          <OSelect            v-model="overrideConfig.config[0].value.unit"           :label="t('dashboard.overrideConfigUnitLabel')"            :options="unitOptions"            :disabled="!overrideConfig.field.value"            style="flex-grow: 1; width: 50%"            :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"            class="tw:flex-1"          />
+          <OInput
             v-if="overrideConfig.config[0].value.unit === 'custom'"
             v-model="overrideConfig.config[0].value.customUnit"
             :label="t('dashboard.customunitLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            stack-label
-            dense
-            label-slot
             data-test="dashboard-config-unit"
             style="width: 50%"
-            borderless
-            hide-bottom-space
           />
         </div>
 
         <div
           v-else-if="overrideConfig.config[0].type === 'unique_value_color'"
-          class="tw:flex items-center"
+          class="tw:flex tw:items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
-          <q-checkbox
+          <OCheckbox
             v-model="overrideConfig.config[0].autoColor"
             :label="t('dashboard.overrideConfigUniqueValueColor')"
-            :disable="!overrideConfig.field.value"
-            dense
+            :disabled="!overrideConfig.field.value"
+            :data-test="`dashboard-addpanel-config-override-unique-value-checkbox-${index}`"
           />
         </div>
 
@@ -110,25 +69,12 @@
           size="icon"
           @click="removeOverrideConfig(index)"
           :data-test="`dashboard-addpanel-config-unit-config-delete-btn-${index}`"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </div>
-    <OButton
-      variant="outline"
-      size="sm"
-      class="tw:mt-3"
-      @click="addOverrideConfig"
-      >{{ t("dashboard.overrideConfigAddNew") }}</OButton
-    >
-
-    <q-card-actions align="right">
-      <OButton variant="primary" size="sm-action" @click="saveOverrides">{{
-        t("dashboard.overrideConfigSave")
-      }}</OButton>
-    </q-card-actions>
-  </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -138,15 +84,22 @@ import {
   computed,
   watch,
   PropType,
-  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "OverrideConfigPopup",
-  components: { OButton },
+  components: { OButton, ODialog, OSelect, OInput, OCheckbox },
   props: {
+    open: {
+      type: Boolean,
+      required: true,
+    },
     columns: {
       type: Array as PropType<Array<{ label: string; alias: string }>>,
       required: true,
@@ -367,12 +320,29 @@ export default defineComponent({
       emit("close");
     };
 
-    onMounted(() => {
-      // if overrideconfig is empty, add default overrideconfig
-      if (overrideConfigs.value.length == 0) {
-        addOverrideConfig();
-      }
-    });
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) {
+          originalOverrideConfigs.value = JSON.parse(
+            JSON.stringify(props.overrideConfig.overrideConfigs || []),
+          );
+          const normalized = normalizeOverrideConfigs(
+            props.overrideConfig.overrideConfigs || [],
+          );
+          overrideConfigs.value =
+            normalized.length > 0
+              ? normalized
+              : [
+                  {
+                    field: { matchBy: "name", value: "" },
+                    config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
+                  },
+                ];
+        }
+      },
+      { immediate: true },
+    );
 
     watch(
       () =>

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { Quasar } from 'quasar';
 import AddEnrichmentTable from './AddEnrichmentTable.vue';
 
 // Mock dependencies
@@ -10,6 +9,9 @@ vi.mock('@/services/jstransform', () => ({
   default: {
     create_enrichment_table: vi.fn(() => Promise.resolve({
       data: { message: 'Enrichment table created successfully' }
+    })),
+    create_enrichment_table_from_url: vi.fn(() => Promise.resolve({
+      data: { message: 'Enrichment table job started' }
     })),
   },
 }));
@@ -20,26 +22,78 @@ vi.mock('@/services/segment_analytics', () => ({
   },
 }));
 
-const mockNotify = vi.fn(() => vi.fn()); // Return a dismiss function
-const mockQuasar = {
-  notify: mockNotify,
-};
+vi.mock('@/services/reodotdev_analytics', () => ({
+  useReo: () => ({
+    track: vi.fn(),
+  }),
+}));
 
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-  };
+const { mockToast, mockDismiss } = vi.hoisted(() => {
+  const dismiss = vi.fn();
+  const toast = vi.fn(() => dismiss);
+  return { mockToast: toast, mockDismiss: dismiss };
 });
+
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: mockToast,
+  useToast: () => ({ toast: mockToast }),
+}));
+
 
 describe('AddEnrichmentTable.vue', () => {
   let wrapper: any;
   let store: any;
   let i18n: any;
 
+  const OButtonStub = {
+    name: 'OButton',
+    template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :type="type"><slot /></button>',
+    props: ['label', 'type', 'variant', 'size', 'icon-left'],
+    emits: ['click'],
+    inheritAttrs: false,
+  };
+
+  const OInputStub = {
+    name: 'OInput',
+    template: '<div><input :data-test="$attrs[\'data-test\']" :value="modelValue" :readonly="readonly" :disabled="disabled" @input="$emit(\'update:modelValue\', $event.target.value)" /></div>',
+    props: ['modelValue', 'label', 'rules', 'readonly', 'disabled', 'error', 'errorMessage'],
+    emits: ['update:modelValue'],
+    inheritAttrs: false,
+  };
+
+  const OFileStub = {
+    name: 'OFile',
+    template: '<div class="o-file" :data-test="$attrs[\'data-test\']"><input type="file" /></div>',
+    props: ['modelValue', 'label', 'accept', 'error', 'errorMessage'],
+    emits: ['update:modelValue'],
+    inheritAttrs: false,
+  };
+
+  const OSwitchStub = {
+    name: 'OSwitch',
+    template: '<input type="checkbox" :data-test="$attrs[\'data-test\']" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+    props: ['modelValue', 'label'],
+    emits: ['update:modelValue'],
+    inheritAttrs: false,
+  };
+
+  const OIconStub = {
+    name: 'OIcon',
+    template: '<i></i>',
+    props: ['name', 'size'],
+  };
+
+  const OSeparatorStub = {
+    name: 'OSeparator',
+    template: '<hr />',
+  };
+
+  const OCardStub = {
+    name: 'OCard',
+    template: '<div><slot /></div>',
+  };
+
   const createWrapper = (propsData = {}) => {
-    // Create store with default configuration
     store = createStore({
       state: {
         selectedOrganization: {
@@ -56,7 +110,6 @@ describe('AddEnrichmentTable.vue', () => {
       actions: {},
     });
 
-    // Create i18n instance
     i18n = createI18n({
       legacy: false,
       locale: 'en',
@@ -72,6 +125,9 @@ describe('AddEnrichmentTable.vue', () => {
             appendData: 'Append Data',
             cancel: 'Cancel',
             save: 'Save',
+            dataSource: 'Data Source',
+            uploadFile: 'Upload File',
+            fromUrl: 'From URL',
           },
         },
       },
@@ -88,38 +144,16 @@ describe('AddEnrichmentTable.vue', () => {
         ...propsData,
       },
       global: {
-        plugins: [store, i18n, [Quasar, {}]],
+        plugins: [store, i18n],
         stubs: {
-          'q-form': {
-            template: '<form @submit.prevent="$attrs.onSubmit && $attrs.onSubmit()"><slot /></form>',
-          },
-          'q-input': {
-            template: '<input v-model="modelValue" :readonly="readonly" :disabled="disable" />',
-            props: ['modelValue', 'label', 'rules', 'readonly', 'disable'],
-            emits: ['update:modelValue'],
-          },
-          'q-file': {
-            template: '<div class="q-file"><slot /></div>',
-            props: ['modelValue', 'label', 'rules'],
-            emits: ['update:modelValue'],
-          },
-          'q-toggle': {
-            template: '<input type="checkbox" v-model="modelValue" />',
-            props: ['modelValue', 'label'],
-            emits: ['update:modelValue'],
-          },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" :type="type">{{ label }}<slot /></button>',
-            props: ['label', 'type'],
-            emits: ['click'],
-          },
-          'q-separator': {
-            template: '<hr />',
-          },
-          'q-icon': {
-            template: '<i></i>',
-            props: ['name'],
-          },
+          OButton: OButtonStub,
+          OInput: OInputStub,
+          OFile: OFileStub,
+          OSwitch: OSwitchStub,
+          OIcon: OIconStub,
+          OSeparator: OSeparatorStub,
+          OCard: OCardStub,
+          OOptionGroup: true,
         },
       },
     });
@@ -127,6 +161,7 @@ describe('AddEnrichmentTable.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockToast.mockReturnValue(mockDismiss);
   });
 
   afterEach(() => {
@@ -138,9 +173,9 @@ describe('AddEnrichmentTable.vue', () => {
   describe('Component Initialization', () => {
     it('should render the component with default configuration', () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.text-h6').text()).toBe('Add Enrichment Table');
+      expect(wrapper.find('[data-test="add-enrichment-table-title"]').text()).toBe('Add Enrichment Table');
     });
 
     it('should initialize with correct default values', () => {
@@ -153,8 +188,8 @@ describe('AddEnrichmentTable.vue', () => {
 
     it('should render update mode when isUpdating is true', () => {
       wrapper = createWrapper({ isUpdating: true });
-      
-      expect(wrapper.find('.text-h6').text()).toBe('Update Enrichment Table');
+
+      expect(wrapper.find('[data-test="add-enrichment-table-title"]').text()).toBe('Update Enrichment Table');
     });
 
     it('should initialize with provided modelValue', () => {
@@ -183,7 +218,7 @@ describe('AddEnrichmentTable.vue', () => {
     });
 
     it('should render file upload field', () => {
-      const fileInput = wrapper.find('.q-file');
+      const fileInput = wrapper.find('.o-file');
       expect(fileInput.exists()).toBe(true);
     });
 
@@ -222,16 +257,16 @@ describe('AddEnrichmentTable.vue', () => {
     });
 
     it('should have save and cancel buttons', () => {
-      const buttons = wrapper.findAll('button');
-      expect(buttons.length).toBe(2);
-      expect(buttons[0].text()).toContain('Cancel');
-      expect(buttons[1].text()).toContain('Save');
+      const cancelBtn = wrapper.find('[data-test="add-enrichment-table-cancel-btn"]');
+      const saveBtn = wrapper.find('[data-test="add-enrichment-table-save-btn"]');
+      expect(cancelBtn.exists()).toBe(true);
+      expect(saveBtn.exists()).toBe(true);
     });
 
     it('should emit cancel event when cancel button is clicked', async () => {
-      const cancelBtn = wrapper.findAll('button')[0];
+      const cancelBtn = wrapper.find('[data-test="add-enrichment-table-cancel-btn"]');
       await cancelBtn.trigger('click');
-      
+
       expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
 
@@ -323,14 +358,14 @@ describe('AddEnrichmentTable.vue', () => {
       
       await (wrapper.vm as any).onSubmit();
       
-      // Check that notify was called twice: once for loading, once for success
-      expect(mockNotify).toHaveBeenCalledWith({
-        spinner: true,
+      // Check that toast was called twice: once for loading, once for success
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: 'loading',
         message: 'Please wait...',
         timeout: 2000,
       });
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'positive',
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: 'success',
         message: 'Enrichment table created successfully',
       });
     });
@@ -524,9 +559,9 @@ describe('AddEnrichmentTable.vue', () => {
       
       const submitPromise = (wrapper.vm as any).onSubmit();
       
-      // Check if loading notification was called
-      expect(mockNotify).toHaveBeenCalledWith({
-        spinner: true,
+      // Check if loading toast was called
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: 'loading',
         message: 'Please wait...',
         timeout: 2000,
       });
@@ -556,10 +591,10 @@ describe('AddEnrichmentTable.vue', () => {
 
     it('should emit cancel:hideform event', async () => {
       wrapper = createWrapper();
-      
-      const cancelBtn = wrapper.findAll('button')[0];
+
+      const cancelBtn = wrapper.find('[data-test="add-enrichment-table-cancel-btn"]');
       await cancelBtn.trigger('click');
-      
+
       expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
 

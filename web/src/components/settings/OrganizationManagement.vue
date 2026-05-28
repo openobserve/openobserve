@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,284 +15,210 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div>
-      <q-table
+      <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
+        <div class="tw:text-xl tw:tracking-[0.005em]" data-test="org-management-list-title">
+          {{ t("settings.organizationManagement") }}
+        </div>
+        <OInput
+          data-test="org-management-search-input"
+          v-model="filterQuery"
+          class="tw:ml-auto no-border o2-search-input"
+          :placeholder="t('settings.searchOrgs')"
+        >
+          <template #icon-left>
+            <OIcon name="search" size="sm" />
+          </template>
+        </OInput>
+      </div>
+      <OTable
         data-test="org-management-list-table"
-        ref="qTable"
-        :rows="tabledata"
+        :data="visibleRows"
         :columns="columns"
         row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[5, 10, 20, 50, 100]"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
         :loading="loading"
-        table-style="table-layout: fixed"
-        style="
-          width: 100%;
-          height: calc(100vh - var(--navbar-height) - 87px);
-          overflow-y: auto;
-        "
       >
-        <template #no-data>
+        <template #empty>
           <NoData />
         </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-              <OButton
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="otg-management-extend-trial-btn"
-                @click.stop="toggleExtendTrialDialog(props.row)"
-              >
-                <q-icon name="event" size="14px" />
-                <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="props.row.billing_provider === '-'"
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="org-management-add-contract-btn"
-                @click.stop="toggleContractDialog(props.row, 'create')"
-              >
-                <q-icon name="note_add" size="14px" />
-                <q-tooltip>Add Contract</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="props.row.billing_provider === 'no_op'"
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="org-management-extend-contract-btn"
-                @click.stop="toggleContractDialog(props.row, 'extend')"
-              >
-                <q-icon name="event" size="14px" />
-                <q-tooltip>Extend Contract</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="props.row.billing_provider === 'no_op'"
-                variant="ghost-destructive"
-                size="icon-xs-circle"
-                data-test="org-management-revoke-contract-btn"
-                @click.stop="confirmRevokeContract(props.row)"
-              >
-                <q-icon name="block" size="14px" />
-                <q-tooltip>Revoke</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="!props.row.org_storage_enabled"
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="org-management-storage-enable-btn"
-                @click.stop="toggleOrgStorage(props.row)"
-              >
-                <q-icon name="cloud_upload" size="14px" />
-                <q-tooltip>Enable Storage</q-tooltip>
-              </OButton>
-              <OButton
-                v-else
-                variant="ghost"
-                size="icon-xs-circle"
-                disabled
-                class="text-positive"
-                data-test="org-management-storage-enabled-btn"
-              >
-                <q-icon name="cloud_done" size="14px" />
-                <q-tooltip>Storage Enabled</q-tooltip>
-              </OButton>
-            </div>
-          </q-td>
-        </template>
-        <template #top="scope">
-          <div class="q-table__title" data-test="org-management-list-title">
-            {{ t("settings.organizationManagement") }}
+        <template #cell-actions="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+            <OButton
+              variant="ghost"
+              size="icon-xs-circle"
+              icon-left="event"
+              data-test="otg-management-extend-trial-btn"
+              @click.stop="toggleExtendTrialDialog(row)"
+            >
+              <OTooltip :content="t('settings.extendTrial')" />
+            </OButton>
+            <OButton
+              v-if="row.billing_provider === '-'"
+              variant="ghost"
+              size="icon-xs-circle"
+              icon-left="note-add"
+              data-test="org-management-add-contract-btn"
+              @click.stop="toggleContractDialog(row, 'create')"
+            >
+              <OTooltip content="Add Contract" />
+            </OButton>
+            <OButton
+              v-if="row.billing_provider === 'no_op'"
+              variant="ghost"
+              size="icon-xs-circle"
+              icon-left="event"
+              data-test="org-management-extend-contract-btn"
+              @click.stop="toggleContractDialog(row, 'extend')"
+            >
+              <OTooltip content="Extend Contract" />
+            </OButton>
+            <OButton
+              v-if="row.billing_provider === 'no_op'"
+              variant="ghost-destructive"
+              size="icon-xs-circle"
+              icon-left="block"
+              data-test="org-management-revoke-contract-btn"
+              @click.stop="confirmRevokeContract(row)"
+            >
+              <OTooltip content="Revoke" />
+            </OButton>
+            <OButton
+              v-if="!row.org_storage_enabled"
+              variant="ghost"
+              size="icon-xs-circle"
+              icon-left="cloud-upload"
+              data-test="org-management-storage-enable-btn"
+              @click.stop="toggleOrgStorage(row)"
+            >
+              <OTooltip content="Enable Storage" />
+            </OButton>
+            <OButton
+              v-else
+              variant="ghost"
+              size="icon-xs-circle"
+              icon-left="cloud-done"
+              disabled
+              class="tw:text-green-500"
+              data-test="org-management-storage-enabled-btn"
+            >
+              <OTooltip content="Storage Enabled" />
+            </OButton>
           </div>
-          <q-input
-            data-test="org-management-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border col-3"
-            :placeholder="t('settings.searchOrgs')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('settings.paginationOrganizationLabel')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
         </template>
-
-        <template #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-      </q-table>
+      </OTable>
     </div>
 
     <!-- Extend Trial Dialog -->
-    <q-dialog v-model="extendTrialPrompt">
-      <q-card class="q-pa-sm" style="min-width: 450px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name"
-              >Extend Trial for {{ extendTrialDataRow.name }}</span
-            >
-            <span class="text-subtitle2 flex"
-              >Set the new trial extension period.</span
-            >
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div>
-            <div class="float-left text-bold">Week(s)</div>
-            <div class="float-right q-gutter-xs">
-              <span
-                v-for="page in 4"
-                :key="page"
-                @click="extendedTrial = page"
-                :class="[
-                  'cursor-pointer q-px-sm q-py-xs page-border',
-                  extendedTrial === page
-                    ? 'bg-primary text-white'
-                    : 'bg-white text-gray-700 border-gray-3',
-                ]"
-              >
-                {{ page }}
-              </span>
-            </div>
-          </div>
-        </q-card-section>
-        <q-card-actions align="right" class="text-primary q-mt-md">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
+    <ODialog
+      data-test="organization-management-extend-trial-dialog"
+      v-model:open="extendTrialPrompt"
+      size="sm"
+      :title="`Extend Trial for ${extendTrialDataRow?.name}`"
+      sub-title="Set the new trial extension period."
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="`Extend trial by ${extendedTrial} week(s)`"
+      @click:secondary="extendTrialPrompt = false"
+      @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+    >
+      <div>
+        <div class="float-left tw:font-bold">Week(s)</div>
+        <div class="float-right tw:gap-1">
+          <span
+            v-for="page in 4"
+            :key="page"
+            @click="extendedTrial = page"
+            :class="[
+              'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
+              extendedTrial === page
+                ? 'tw:bg-[var(--o2-primary)] tw:text-white'
+                : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
+            ]"
           >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
-          >
-            Extend trial by {{ extendedTrial }} week(s)
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+            {{ page }}
+          </span>
+        </div>
+      </div>
+    </ODialog>
 
     <!-- External Contract Dialog -->
-    <q-dialog v-model="contractPrompt">
-      <q-card class="q-pa-sm" style="min-width: 500px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="contractDataRow.name">
-              {{ contractMode === "create" ? "Create" : "Extend" }} External
-              Contract for {{ contractDataRow.name }}
-            </span>
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div class="q-mb-md">
-            <div class="text-bold q-mb-xs">
-              {{ contractMode === "create" ? "End Date" : "New End Date" }}
-            </div>
-            <q-input
-              v-model="contractEndDate"
-              dense
-              outlined
-              type="date"
-              data-test="contract-end-date-input"
-            />
-          </div>
-          <div
-            v-if="
-              contractMode === 'extend' && contractDataRow.contract_end_date
-            "
-            class="text-caption text-grey"
-          >
-            Current end date:
-            {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="text-primary">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="submitContract"
-          >
-            {{ contractMode === 'create' ? 'Create Contract' : 'Extend Contract' }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-page>
+    <ODialog
+      data-test="organization-management-contract-dialog"
+      v-model:open="contractPrompt"
+      size="sm"
+      :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+      @click:secondary="contractPrompt = false"
+      @click:primary="submitContract"
+    >
+      <div class="tw:mb-3">
+        <div class="tw:font-bold tw:mb-1">
+          {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
+        </div>
+        <OInput
+          v-model="contractEndDate"
+          type="date"
+          data-test="contract-end-date-input"
+        />
+      </div>
+      <div
+        v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
+        class="tw:text-xs tw:text-gray-500"
+      >
+        Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+      </div>
+    </ODialog>
+  </div>
 </template>
 <script lang="ts">
 import {
   ref,
-  onBeforeMount,
-  onActivated,
+  onMounted,
   watch,
   defineComponent,
-  onMounted,
+  computed,
 } from "vue";
-import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+
 export default defineComponent({
   name: "PageAlerts",
   components: {
     NoData,
-    QTablePagination,
     OButton,
+    ODialog,
+    OTooltip,
+    OInput,
+    OIcon,
+    OTable,
   },
   setup() {
-    const qTable = ref();
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
+    const { confirm } = useConfirmDialog();
 
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
@@ -300,10 +226,7 @@ export default defineComponent({
     const extendTrialPrompt = ref(false);
     const tabledata = ref<any>([]);
     const resultTotal = ref(0);
-    const selectedPerPage = ref(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+    const filterQuery = ref("");
 
     // Contract management state
     const contractPrompt = ref(false);
@@ -327,83 +250,70 @@ export default defineComponent({
       }
     });
 
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 50px",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 50,
+        meta: { align: "left" },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("settings.org_name"),
-        align: "left",
+        id: "name",
+        header: t("settings.org_name"),
+        accessorKey: "name",
         sortable: true,
-        classes: "w-[150px]",
+        meta: { align: "left" },
       },
       {
-        name: "identifier",
-        field: "identifier",
-        label: t("settings.org_identifier"),
-        align: "left",
-        sortable: false,
-        style: "col-3",
+        id: "identifier",
+        header: t("settings.org_identifier"),
+        accessorKey: "identifier",
+        meta: { align: "left" },
       },
       {
-        name: "subscription_status",
-        field: "plan",
-        label: t("settings.subscription_status"),
-        align: "left",
+        id: "subscription_status",
+        header: t("settings.subscription_status"),
+        accessorKey: "plan",
         sortable: true,
-        style: "col-1",
+        meta: { align: "left" },
       },
       {
-        name: "billing_provider",
-        field: "billing_provider",
-        label: "Provider",
-        align: "left",
+        id: "billing_provider",
+        header: "Provider",
+        accessorKey: "billing_provider",
         sortable: true,
-        style: "col-1",
+        meta: { align: "left" },
       },
       {
-        name: "created_on",
-        field: "created_at",
-        label: t("settings.created_on"),
-        align: "left",
+        id: "created_on",
+        header: t("settings.created_on"),
+        accessorKey: "created_at",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "trial_expiry",
-        field: "trial_expires_at",
-        label: t("settings.trial_expiry"),
-        align: "left",
+        id: "trial_expiry",
+        header: t("settings.trial_expiry"),
+        accessorKey: "trial_expires_at",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "contract_end_date",
-        field: "contract_end_date_display",
-        label: "Contract End",
-        align: "left",
+        id: "contract_end_date",
+        header: "Contract End",
+        accessorKey: "contract_end_date_display",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("settings.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
-        style: "width: 220px",
+        id: "actions",
+        header: t("settings.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 220,
+        meta: { align: "center", actionCount: 3 },
       },
-    ]);
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
     ];
 
     const subscriptionPlans: any = {
@@ -411,12 +321,6 @@ export default defineComponent({
       "1": "Pay as you go",
       "2": "Enterprise",
       "3": "External Contract",
-    };
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
     };
 
     const formatMicrosToDate = (micros: number): string => {
@@ -433,8 +337,8 @@ export default defineComponent({
 
     const getData = () => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading data...",
       });
 
@@ -479,8 +383,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to fetch organization data. Please try again.",
@@ -510,7 +414,7 @@ export default defineComponent({
 
       if (contractMode.value === "create") {
         if (!contractEndDate.value) {
-          $q.notify({ type: "negative", message: "End date is required." });
+          toast({ variant: "error", message: "End date is required." });
           return;
         }
         const payload = {
@@ -519,14 +423,14 @@ export default defineComponent({
         };
 
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Creating external contract...",
         });
         OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "External contract created successfully.",
             });
             contractPrompt.value = false;
@@ -537,8 +441,8 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to create external contract.",
@@ -547,7 +451,7 @@ export default defineComponent({
           });
       } else {
         if (!contractEndDate.value) {
-          $q.notify({ type: "negative", message: "New end date is required." });
+          toast({ variant: "error", message: "New end date is required." });
           return;
         }
         const payload = {
@@ -556,14 +460,14 @@ export default defineComponent({
         };
 
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Extending external contract...",
         });
         OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "External contract extended successfully.",
             });
             contractPrompt.value = false;
@@ -574,8 +478,8 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to extend external contract.",
@@ -585,23 +489,22 @@ export default defineComponent({
       }
     };
 
-    const confirmRevokeContract = (row: any) => {
-      $q.dialog({
+    const confirmRevokeContract = async (row: any) => {
+      const ok = await confirm({
         title: "Revoke External Contract",
         message: `Are you sure you want to revoke the external contract for "${row.name}"? The organization will revert to the Free tier.`,
-        cancel: true,
-        persistent: true,
-      }).onOk(() => {
+      });
+      if (ok) {
         const metaOrg = store.state.selectedOrganization.identifier;
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Revoking external contract...",
         });
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "External contract revoked successfully.",
             });
             getData();
@@ -611,34 +514,33 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to revoke external contract.",
               timeout: 5000,
             });
           });
-      });
+      }
     };
 
-    const toggleOrgStorage = (row: any) => {
-      $q.dialog({
+    const toggleOrgStorage = async (row: any) => {
+      const ok = await confirm({
         title: "Enable Storage Settings",
         message: `Are you sure you want to enable storage settings for "${row.name}"?`,
-        cancel: true,
-        persistent: true,
-      }).onOk(() => {
+      });
+      if (ok) {
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "enabling storage settings...",
         });
         orgStorageService
           .enable(row.identifier)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Storage settings enabled successfully.",
             });
             getData();
@@ -648,15 +550,15 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to enable storage settings.",
               timeout: 5000,
             });
           });
-      });
+      }
     };
 
     const updateTrialPeriod = (org_id: string, extended_week: number) => {
@@ -666,8 +568,8 @@ export default defineComponent({
       };
 
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message:
           "Please wait while processing trial period extension request...",
       });
@@ -677,8 +579,8 @@ export default defineComponent({
       )
         .then((response) => {
           if (response.data) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Trial period extended successfully.",
             });
             extendTrialPrompt.value = false;
@@ -693,8 +595,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to extend trial period. Please try again.",
@@ -704,15 +606,31 @@ export default defineComponent({
         });
     };
 
+    const filterData = (rows: string | any[], terms: string) => {
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["name"].toLowerCase().includes(terms) ||
+          rows[i]["identifier"].toLowerCase().includes(terms) ||
+          rows[i]["plan"].toLowerCase().includes(terms)
+        ) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return tabledata.value || [];
+      return filterData(tabledata.value || [], filterQuery.value);
+    });
+
     return {
       t,
-      qTable,
       columns,
       getImageURL,
-      changePagination,
-      perPageOptions,
       resultTotal,
-      pagination,
       tabledata,
       loading,
       extendedTrial,
@@ -722,7 +640,6 @@ export default defineComponent({
       updateTrialPeriod,
       getData,
       getTimestampInMicroseconds,
-      selectedPerPage,
       contractPrompt,
       contractDataRow,
       contractMode,
@@ -732,27 +649,15 @@ export default defineComponent({
       confirmRevokeContract,
       toggleOrgStorage,
       formatMicrosToDate,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            rows[i]["identifier"].toLowerCase().includes(terms) ||
-            rows[i]["plan"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
+      visibleRows,
       store,
     };
   },
 });
 </script>
-<style scopped lang="scss">
+<style scoped lang="scss">
 .page-border {
   border: 1px solid lightgray;
 }

@@ -15,100 +15,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="llm-evaluation-node-section"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    style="width: 100%; height: 100%"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.llmEvaluation')"
+    :width="30"
+    :show-close="true"
+    @keydown.stop
+    :primaryButtonLabel="t('alerts.save')"
+    :secondaryButtonLabel="t('alerts.cancel')"
+    :neutralButtonLabel="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveLlmEvaluationNode"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="llm-evaluation-node-section"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
     >
-      {{ t("pipeline.llmEvaluation") }}
-      <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
 
-    <div class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md">
-      <q-form @submit="saveLlmEvaluationNode">
+
+    <div class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
         <!-- Node Name -->
-        <div class="o2-input full-width q-py-sm">
-          <q-input
-            v-model="nodeName"
-            :label="t('pipeline.nodeName') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val) => !!val || t('common.nameRequired')]"
-            data-test="llm-evaluation-node-name-input"
-          />
-        </div>
+        <OInput
+          v-model="nodeName"
+          :label="t('pipeline.nodeName') + ' *'"
+          :error="!!nodeNameError"
+          :error-message="nodeNameError"
+          @update:model-value="nodeNameError = ''"
+          data-test="llm-evaluation-node-name-input"
+        />
 
         <!-- LLM Span Identifier -->
-        <div class="o2-input full-width q-py-sm">
-          <q-select
-            v-model="llmSpanIdentifier"
-            :options="filteredStreamFields"
-            :label="t('pipeline.llmSpanIdentifierLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            outlined
-            filled
-            dense
-            use-input
-            input-debounce="300"
-            emit-value
-            map-options
-            :loading="loadingFields"
-            @filter="filterStreamFields"
-            data-test="llm-evaluation-span-identifier-select"
-          >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("pipeline.noFieldsFound") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
-        </div>
+        <OSelect
+          v-model="llmSpanIdentifier"
+          :options="streamFields"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          :label="t('pipeline.llmSpanIdentifierLabel')"
+          :loading="loadingFields"
+          data-test="llm-evaluation-span-identifier-select"
+        >
+          <template #empty>
+            <span>{{ t("pipeline.noFieldsFound") }}</span>
+          </template>
+        </OSelect>
 
         <!-- Evaluation Template Selection -->
-        <div class="o2-input full-width q-py-sm flex items-center gap-2">
-          <q-select
+        <div class="tw:flex tw:items-end tw:gap-2">
+          <OSelect
             v-model="selectedTemplate"
             :options="availableTemplates"
-            option-value="id"
-            option-label="name"
+            labelKey="name"
+            valueKey="id"
             :label="t('pipeline.evaluationTemplate')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            style="flex: 1"
-            stack-label
-            outlined
-            filled
-            dense
             :loading="loadingTemplates"
+            class="tw:flex-1"
             data-test="llm-evaluation-template-select"
           >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("pipeline.noTemplatesFound") }}
-                </q-item-section>
-              </q-item>
+            <template #empty>
+              <span>{{ t("pipeline.noTemplatesFound") }}</span>
             </template>
-          </q-select>
+          </OSelect>
           <OButton
             variant="ghost-muted"
             size="icon-xs-sq"
@@ -116,69 +86,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loadingTemplates"
             :title="t('common.refresh')"
             data-test="llm-evaluation-template-refresh-btn"
-            class="q-mt-md"
-          >
-            <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-          </OButton>
+            icon-left="refresh"
+          />
         </div>
 
         <!-- Enable Sampling Toggle -->
-        <q-toggle
+        <OSwitch
           v-model="enableSampling"
           :label="t('pipeline.enableSampling')"
-          class="q-mb-sm tw:h-[36px] o2-toggle-button-lg -tw:ml-4"
-          size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
           data-test="llm-evaluation-enable-sampling-toggle"
         />
 
         <!-- Sampling Rate -->
-        <div v-if="enableSampling" class="q-px-xs q-mb-sm">
-          <div class="text-body2 q-mb-sm">
+        <div v-if="enableSampling" class="tw:flex tw:flex-col tw:gap-2">
+          <div class="tw:text-sm">
             {{ t("pipeline.samplingRate") }}:
             {{ (samplingRate * 100).toFixed(0) }}%
           </div>
-          <q-slider
+          <OSlider
             v-model="samplingRate"
             :min="0"
             :max="1"
             :step="0.01"
-            color="primary"
-            label
-            :label-value="(samplingRate * 100).toFixed(0) + '%'"
             data-test="llm-evaluation-sampling-rate-slider"
           />
         </div>
 
-        <!-- Action Buttons -->
-        <div class="tw:flex tw:gap-2 q-mt-sm">
-          <OButton
-            v-if="pipelineObj.isEditNode"
-            data-test="llm-evaluation-delete-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            @click="openDeleteDialog"
-          >{{ t("pipeline.deleteNode") }}</OButton>
-          <OButton
-            data-test="llm-evaluation-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="openCancelDialog"
-          >{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            data-test="llm-evaluation-save-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-          >{{ t('alerts.save') }}</OButton>
-        </div>
-      </q-form>
+
     </div>
-  </div>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -189,25 +126,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { RefreshCw } from "lucide-vue-next";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSlider from "@/lib/forms/Slider/OSlider.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog, OButton },
+  components: { ConfirmDialog, OButton, ODrawer, OInput, OSelect, OSwitch, OSlider },
+  props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
+  },
   emits: ["cancel:hideform"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const q = useQuasar();
     const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+
+    const nodeNameError = ref("");
+    const internalOpen = ref(!!props.open);
+    watch(() => props.open, (v: boolean) => { internalOpen.value = !!v; });
+    function handleDrawerClose(v: boolean) {
+      internalOpen.value = v;
+      if (!v) {
+        setTimeout(() => emit("cancel:hideform"), 300);
+      }
+    }
     const { getStream } = useStreams();
 
     const nodeName = ref("");
@@ -217,7 +173,7 @@ export default defineComponent({
     const streamFields = ref<{ label: string; value: string }[]>([]);
     const filteredStreamFields = ref<{ label: string; value: string }[]>([]);
     const loadingFields = ref(false);
-    const selectedTemplate = ref<{ id: string; name: string } | null>(null);
+    const selectedTemplate = ref<string | undefined>(undefined);
     const availableTemplates = ref<any[]>([]);
     const loadingTemplates = ref(false);
 
@@ -296,8 +252,8 @@ export default defineComponent({
 
     const refreshTemplates = async () => {
       await fetchAvailableTemplates(true); // Force refresh by ignoring cache
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.evalTemplatesRefreshed"),
         timeout: 1500,
       });
@@ -346,17 +302,13 @@ export default defineComponent({
       await fetchAvailableTemplates();
 
       if (savedTemplate) {
-        // Editing: restore saved template by ID to get full object (needed to display name)
-        const match = availableTemplates.value.find(
-          (t: any) => t.id === savedTemplate,
-        );
-        selectedTemplate.value = match || null;
+        selectedTemplate.value = savedTemplate;
       } else if (
         !pipelineObj.isEditNode &&
         availableTemplates.value.length > 0
       ) {
-        // New node: default to first template
-        selectedTemplate.value = availableTemplates.value[0];
+        // New node: default to first template (only after templates have loaded)
+        selectedTemplate.value = availableTemplates.value[0]?.id || undefined;
       }
     });
 
@@ -383,8 +335,9 @@ export default defineComponent({
 
     const saveLlmEvaluationNode = () => {
       if (!nodeName.value || nodeName.value.trim() === "") {
-        q.notify({
-          type: "negative",
+        nodeNameError.value = t("common.nameRequired");
+        toast({
+          variant: "error",
           message: t("common.nameRequired"),
           timeout: 1500,
         });
@@ -399,17 +352,12 @@ export default defineComponent({
         sampling_rate: enableSampling.value ? samplingRate.value : 0.0,
       };
 
-      // Add template if selected, otherwise explicitly set to null (to clear any previously saved value)
-      if (selectedTemplate.value) {
-        nodeData.eval_template = selectedTemplate.value.id;
-      } else {
-        nodeData.eval_template = null;
-      }
+      nodeData.eval_template = selectedTemplate.value || null;
 
       addNode(nodeData);
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.llmEvaluationNodeSaved"),
         timeout: 1500,
       });
@@ -421,6 +369,7 @@ export default defineComponent({
       t,
       store,
       nodeName,
+      nodeNameError,
       enableSampling,
       samplingRate,
       llmSpanIdentifier,
@@ -437,6 +386,8 @@ export default defineComponent({
       deleteNode,
       dialog,
       pipelineObj,
+      internalOpen,
+      handleDrawerClose,
     };
   },
 });

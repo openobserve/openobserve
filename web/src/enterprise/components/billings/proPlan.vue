@@ -15,100 +15,116 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="col o2-card-wrapper">
-    <div class="row items-center justify-between q-px-md q-py-sm">
+  <OCard class="tw:flex tw:flex-col card-wrapper">
+    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
       <div>
-        <div class="o2-card-title q-pt-sm">{{ t("billing.proPlanLabel") }}</div>
-        <div class="o2-card-subtitle q-mt-sm">{{ t("billing.proPlanSubtitle") }}</div>
+        <h3 class="card-title tw:pt-2">{{ t("billing.proPlanLabel") }}</h3>
+        <p class="card-subtitle tw:mt-2">
+          {{ t("billing.proPlanSubtitle") }}
+        </p>
       </div>
-      <q-chip
+      <OBadge
         v-if="planType == planName"
-        color="indigo-1"
-        text-color="indigo-10"
-        :label="t('billing.subscribed')"
-        class="q-mt-sm text-caption q-px-sm q-py-md"
-        style="border-radius: 0px"
-        dense
-      />
+        variant="primary-soft"
+        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
+      >
+        {{ t("billing.subscribed") }}
+      </OBadge>
     </div>
 
-    <q-separator spaced />
+    <OSeparator class="tw:my-2" />
 
-    <div class="q-px-md q-py-sm">
-      <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
-      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
+    <div class="tw:px-3 tw:py-2">
+      <h4 class="feature-title">{{ t("billing.features") }}</h4>
+      <p class="feature-subtitle tw:mb-3 tw:mt-1">
+        {{ t("billing.included") }}
+      </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="row items-center q-mb-sm text-negative"
+        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
       >
-        <q-icon name="warning" size="16px" class="q-mr-sm" />
-        <span class="o2-page-subtitle3"
+        <OIcon name="warning" size="sm" class="tw:mr-2" />
+        <span class="feature-description"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
-      <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
-        <div class="row items-center">
-          <q-icon v-if="feature.is_parent" name="check_circle" color="green" size="16px" class="q-mr-sm" />
-          <q-icon v-else name="" color="green" size="16px" class="q-mr-sm" />
-          <div class="o2-page-subtitle3">{{ feature.name }}</div>
+      <div
+        v-for="(feature, index) in features"
+        :key="index"
+        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+      >
+        <div class="tw:flex tw:items-center">
+          <OIcon
+            v-if="feature.is_parent"
+            name="check-circle"
+            size="md"
+            class="tw:mr-2 tw:text-green-500 check-icon"
+          />
+          <div class="feature-description" :class="{ 'tw:ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
         <div
           v-if="feature.price !== ''"
-          class="q-mx-sm"
-          style="flex: 1; border-top: 1px dotted #454F5B; height: 0; opacity: 0.4;"
+          class="tw:mx-2"
+          style="
+            flex: 1;
+            border-top: 1px dotted #454f5b;
+            height: 0;
+            opacity: 0.4;
+          "
         ></div>
-        <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
+        <div class="feature-description tw:font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
-    <div class="o2-page-subtitle2 q-px-md q-pt-sm">
+    <p class="feature-note tw:px-3 tw:pt-2">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
-    </div>
+    </p>
 
-    <div class="row justify-between q-pa-md">
+    <div class="tw:flex tw:justify-between tw:p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
-      <div v-if="billingProvider === 'aws'" class="full-width text-center">
-        <q-chip
-          color="green-2"
-          text-color="green-10"
-          icon="check_circle"
-          label="Managed via AWS Marketplace"
-          class="q-px-md q-py-sm"
-        />
-        <div class="text-caption text-grey-7 q-mt-sm">
+      <div v-if="billingProvider === 'aws'" class="tw:w-full tw:text-center">
+        <OBadge
+          variant="success-soft"
+          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+        >
+          <OIcon name="check-circle" size="xs" />
+          Managed via AWS Marketplace
+        </OBadge>
+        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your AWS account
         </div>
       </div>
-      <div v-else-if="billingProvider === 'azure'" class="full-width text-center">
-        <q-chip
-          color="green-2"
-          text-color="green-10"
-          icon="check_circle"
-          label="Managed via Azure Marketplace"
-          class="q-px-md q-py-sm"
-        />
-        <div class="text-caption text-grey-7 q-mt-sm">
+      <div
+        v-else-if="billingProvider === 'azure'"
+        class="tw:w-full tw:text-center"
+      >
+        <OBadge
+          variant="success-soft"
+          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+        >
+          <OIcon name="check-circle" size="xs" />
+          Managed via Azure Marketplace
+        </OBadge>
+        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your Azure account
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
       <div
         v-else-if="subscriptionType === 'external-contract'"
-        class="full-width text-center"
+        class="tw:w-full tw:text-center"
       >
-        <q-chip
-          color="grey-3"
-          text-color="grey-8"
-          icon="description"
-          label="Managed via contract"
-          class="q-px-md q-py-sm"
-        />
-        <div class="text-caption text-grey-7 q-mt-sm">
-          Billing is handled through your contract — contact your account manager for changes
+        <OBadge variant="default" class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1">
+          <OIcon name="description" size="xs" />
+          Managed via contract
+        </OBadge>
+        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
+          Billing is handled through your contract — contact your account
+          manager for changes
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
@@ -131,39 +147,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ btnSubscribe }}
       </OButton>
     </div>
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "proPlan",
-  components: { OButton },
-  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
+  components: { OSeparator, OButton, OBadge, OIcon, OCard },
+  props: [
+    "planType",
+    "billingProvider",
+    "subscriptionType",
+    "features",
+    "pricingError",
+  ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";
-    const btnCancelSubscription = ref(t('billing.manageSubscription'));
-    const btnSubscribe = ref(t('billing.subscribe'));
+    const btnCancelSubscription = ref(t("billing.manageSubscription"));
+    const btnSubscribe = ref(t("billing.subscribe"));
 
     const cancelSubscription = () => {
       btnCancelSubscription.value = "Loading...";
-      setTimeout(function(){
-        btnCancelSubscription.value = t('billing.manageSubscription');
+      setTimeout(function () {
+        btnCancelSubscription.value = t("billing.manageSubscription");
       }, 1000);
       emit("update:cancelSubscription");
-    }
+    };
 
     const onSubscribe = () => {
       btnSubscribe.value = "Loading...";
-      setTimeout(function(){
-        btnSubscribe.value = t('billing.subscribe');
+      setTimeout(function () {
+        btnSubscribe.value = t("billing.subscribe");
       }, 1000);
       emit("update:proSubscription");
-    }
+    };
 
     return {
       t,
@@ -172,13 +198,79 @@ export default defineComponent({
       planName,
       btnSubscribe,
       btnCancelSubscription,
-    }
-  }
+    };
+  },
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .full-width {
   width: 100%;
+}
+
+.card-wrapper {
+  box-shadow: none;
+  border: 1px solid var(--o2-border-color);
+  background: var(--o2-card-bg);
+  border-radius: 0.5rem;
+  width: 100%;
+  height: 100%;
+}
+
+:deep(.card-wrapper) {
+  background: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.5rem;
+}
+
+.body--dark .card-wrapper {
+  background: var(--o2-card-background);
+  border-color: var(--o2-border);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  color: var(--o2-text-heading);
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  color: var(--o2-text-secondary);
+  margin: 0;
+}
+
+.feature-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 0.983rem;
+  color: var(--o2-text-heading);
+  margin: 0;
+}
+
+.feature-subtitle {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  color: var(--o2-text-secondary);
+  margin: 0;
+}
+
+.feature-description {
+  font-size: 0.938rem;
+  line-height: 1.375rem;
+  color: var(--o2-text-body);
+}
+
+.feature-note {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  color: var(--o2-text-secondary);
+  margin: 0;
 }
 </style>

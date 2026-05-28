@@ -15,10 +15,8 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { Quasar } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock the InvoiceTable component before import
 vi.mock("@/enterprise/components/billings/invoiceTable.vue", () => ({
@@ -30,7 +28,6 @@ vi.mock("@/enterprise/components/billings/invoiceTable.vue", () => ({
 
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 
-installQuasar();
 
 describe("InvoiceHistory", () => {
   let wrapper: any;
@@ -60,19 +57,18 @@ describe("InvoiceHistory", () => {
       expect(InvoiceHistory.name).toBe("Payment Details");
     });
 
-    it("should render the main container with proper class", () => {
-      const pageContainer = wrapper.find(".q-page");
+    it("should render the main container", () => {
+      const pageContainer = wrapper.find('[data-test="invoice-history-container"]');
       expect(pageContainer.exists()).toBe(true);
-      expect(pageContainer.classes()).toContain("q-py-md");
     });
 
-    it("should render the title row with correct classes", () => {
-      const titleRow = wrapper.find(".row.q-px-sm.q-table__title");
+    it("should render the title row", () => {
+      const titleRow = wrapper.find('[data-test="invoice-history-title"]');
       expect(titleRow.exists()).toBe(true);
     });
 
     it("should display the correct title text", () => {
-      const titleElement = wrapper.find(".row.q-px-sm.q-table__title");
+      const titleElement = wrapper.find('[data-test="invoice-history-title"]');
       expect(titleElement.exists()).toBe(true);
       // The text should be the translated text
       expect(titleElement.text()).toContain("Invoice History");
@@ -147,23 +143,23 @@ describe("InvoiceHistory", () => {
 
   describe("Template Structure and DOM Elements", () => {
     it("should have the correct template structure", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.exists()).toBe(true);
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
 
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
+      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
       expect(titleDiv.exists()).toBe(true);
 
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
       expect(invoiceTable.exists()).toBe(true);
     });
 
-    it("should contain exactly one q-page element", () => {
-      const qPages = wrapper.findAll(".q-page");
-      expect(qPages).toHaveLength(1);
+    it("should contain exactly one container element", () => {
+      const containers = wrapper.findAll('[data-test="invoice-history-container"]');
+      expect(containers).toHaveLength(1);
     });
 
     it("should contain exactly one title div", () => {
-      const titleDivs = wrapper.findAll(".row.q-px-sm.q-table__title");
+      const titleDivs = wrapper.findAll('[data-test="invoice-history-title"]');
       expect(titleDivs).toHaveLength(1);
     });
 
@@ -173,11 +169,11 @@ describe("InvoiceHistory", () => {
     });
 
     it("should have proper nesting structure", () => {
-      const qPage = wrapper.find(".q-page");
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
 
-      expect(qPage.exists()).toBe(true);
+      expect(container.exists()).toBe(true);
       expect(titleDiv.exists()).toBe(true);
       expect(invoiceTable.exists()).toBe(true);
     });
@@ -186,7 +182,7 @@ describe("InvoiceHistory", () => {
 
   describe("Internationalization (i18n)", () => {
     it("should use i18n for title text", () => {
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
+      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
       expect(titleDiv.text()).toBe("Invoice History");
     });
 
@@ -263,8 +259,7 @@ describe("InvoiceHistory", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-page': true
-            }
+                          }
           }
         });
       }).not.toThrow();
@@ -334,19 +329,19 @@ describe("InvoiceHistory", () => {
 
   describe("Accessibility", () => {
     it("should have proper semantic structure", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.exists()).toBe(true);
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
     });
 
     it("should not have accessibility violations in basic structure", () => {
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
+      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
       expect(titleDiv.exists()).toBe(true);
       expect(titleDiv.element.tagName).toBe("DIV");
     });
 
     it("should maintain proper DOM hierarchy", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.exists()).toBe(true);
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
       const allDivs = wrapper.findAll("div");
       expect(allDivs.length).toBeGreaterThan(0);
     });

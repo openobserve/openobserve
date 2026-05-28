@@ -15,10 +15,8 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
-installQuasar();
 
 // Mock the store
 const mockStore = {

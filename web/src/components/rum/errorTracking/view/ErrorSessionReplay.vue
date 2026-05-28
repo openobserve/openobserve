@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mt-lg">
-    <div class="tags-title text-bold q-mb-sm q-ml-xs">{{ t("rum.sessionReplay") }}</div>
-    <div class="row">
+  <div class="tw:mt-4">
+    <div class="tags-title tw:font-bold tw:mb-2 tw:ml-1">{{ t("rum.sessionReplay") }}</div>
+    <div class="tw:flex">
       <template v-for="(value, tag) in getSessionTags" :key="tag.tag">
         <ErrorTag :tag="{ key: tag, value }" />
       </template>
@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       variant="primary"
       size="sm-action"
-      class="tw:mt-[0.625rem] q-mt-sm"
+      class="tw:mt-[0.625rem] tw:mt-2"
+      icon-left="play-circle"
       :title="t('rum.viewSessionReplay')"
       @click="playSessionReplay"
     >
-      <PlayCircle class="tw:size-4 tw:mr-1" /> 
       {{ t("rum.playSessionReplay") }}
     </OButton>
   </div>
@@ -41,7 +41,6 @@ import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { PlayCircle } from 'lucide-vue-next';
 
 const { t } = useI18n();
 

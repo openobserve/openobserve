@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="menu-header tw:px-4 tw:py-2 tw:text-xs tw:font-semibold">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
-    <q-separator />
+    <OSeparator />
 
     <!-- Alert-specific actions (shown for Dedup and similar panels) -->
     <template v-if="isAlertNameContext">
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
-          <q-icon name="tune" size="18px" class="q-mr-sm" />
+          <OIcon name="tune" size="sm" class="tw:mr-2" />
           <span>Configure Dedup</span>
         </div>
         <div
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <q-icon name="edit" size="18px" class="q-mr-sm" />
+          <OIcon name="edit" size="sm" class="tw:mr-2" />
           <span>Edit Alert</span>
         </div>
         <div
@@ -51,18 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <q-icon name="history" size="18px" class="q-mr-sm" />
+          <OIcon name="history" size="sm" class="tw:mr-2" />
           <span>View Alert History</span>
         </div>
       </div>
-      <q-separator />
+      <OSeparator />
       <div class="menu-section">
         <div
           class="menu-item"
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <q-icon name="close" size="18px" class="q-mr-sm" />
+          <OIcon name="close" size="sm" class="tw:mr-2" />
           <span>Cancel</span>
         </div>
       </div>
@@ -73,6 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const props = defineProps<{
   x: number;

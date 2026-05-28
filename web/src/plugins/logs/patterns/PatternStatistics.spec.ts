@@ -15,14 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import PatternStatistics from "./PatternStatistics.vue";
 import store from "@/test/unit/helpers/store";
-
-installQuasar({
-  plugins: [quasar.Notify],
-});
 
 describe("PatternStatistics", () => {
   let wrapper: any;
@@ -68,9 +62,9 @@ describe("PatternStatistics", () => {
       const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
       const summaryText = summaryElement.text();
 
-      // Check the full format
-      expect(summaryText).toMatch(/Showing 1 to 50 out of \d+/);
-      expect(summaryText).toMatch(/\d+ patterns found in \d+/);
+      // Check the full format (locale-formatted numbers may contain commas)
+      expect(summaryText).toMatch(/Showing 1 to 50 out of [\d,]+/);
+      expect(summaryText).toMatch(/\d+ patterns found in [\d,]+/);
     });
 
     it("should handle totalEvents prop", async () => {

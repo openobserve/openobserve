@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { Quasar, Notify } from 'quasar';
 import MemberSubscription from './MemberSubscription.vue';
 import organizationsService from '@/services/organizations';
 import * as zincutils from '@/utils/zincutils';
@@ -29,6 +28,7 @@ vi.mock('@/components/SanitizedHtmlRenderer.vue', () => ({
 }));
 
 const mockOrganizationsService = organizationsService as any;
+
 
 describe('MemberSubscription.vue', () => {
   let wrapper: any;
@@ -77,11 +77,6 @@ describe('MemberSubscription.vue', () => {
         plugins: [
           store,
           router,
-          [Quasar, {
-            plugins: {
-              Notify,
-            },
-          }],
         ],
         mocks: {
           $q: mockQuasar,
@@ -93,10 +88,7 @@ describe('MemberSubscription.vue', () => {
           $store: store,
         },
         stubs: {
-          'q-page': {
-            template: '<div class="q-page"><slot /></div>',
-          },
-          'q-btn': {
+                    'q-btn': {
             template: '<button class="q-btn"><slot /></button>',
             props: ['label'],
           },
@@ -142,7 +134,7 @@ describe('MemberSubscription.vue', () => {
       wrapper = createWrapper('#token=test-token-123', true); // Prevent auto processing
       await wrapper.vm.$nextTick();
       
-      expect(wrapper.find('.q-page').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:rounded-md').exists()).toBe(true);
       expect(wrapper.text()).toContain('Member Subscription');
     });
 

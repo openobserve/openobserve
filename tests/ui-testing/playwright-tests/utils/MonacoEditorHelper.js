@@ -165,10 +165,10 @@ class MonacoEditorHelper {
     }
 
     /**
-     * Dismiss the suggestions widget by pressing Escape
+     * Dismiss the suggestions widget by clicking outside the editor
      */
     async dismissSuggestions() {
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 }
 

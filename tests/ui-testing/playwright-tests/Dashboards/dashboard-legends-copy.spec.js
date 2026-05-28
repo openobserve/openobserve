@@ -256,10 +256,12 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
       // Copy the first legend
       await pm.dashboardLegendsCopy.copyLegend(0);
 
-      // Verify the copy button changes to check icon
+      // Verify the copy button changes to "copied" state
+      // OIcon renders SVG (no text, no .OIcon class), so we check the data-copied attribute
+      // set by ShowLegendsPopup.vue on the OButton when isLegendCopied(index) is true.
       const legendItem = pm.dashboardLegendsCopy.getLegendItem(0);
-      const copyBtnIcon = legendItem.locator('[data-test="dashboard-legend-copy-btn"] .q-icon');
-      await expect(copyBtnIcon).toHaveText(/check/, { timeout: 3000 });
+      const copyBtn = legendItem.locator('[data-test="dashboard-legend-copy-btn"]');
+      await expect(copyBtn).toHaveAttribute('data-copied', 'true', { timeout: 3000 });
 
       // Verify clipboard contains the legend text
       const clipboardText = await page.evaluate(() =>
@@ -496,7 +498,8 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
       const isCopied = await pm.dashboardLegendsCopy.isTableCellCopied(0, 0);
       expect(isCopied).toBeTruthy();
 
-      // Poll for the icon to revert from "check" back to "content_copy" (3s timer in source)
+      // Poll for the copy button to revert from "check" back to default (3s timer in source)
+      // OIcon renders SVG (no text, no .OIcon class); use data-copied attribute instead.
       await expect(async () => {
         // Re-hover to reveal the copy button
         await pm.dashboardLegendsCopy.ensureTableDataVisible();
@@ -505,10 +508,10 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
         if (box) {
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         }
-        const copyBtn = cell.locator('.copy-btn');
+        const copyBtn = cell.locator('[data-test="dashboard-table-cell-copy-btn"]');
         await copyBtn.waitFor({ state: 'visible', timeout: 2000 });
-        const iconText = await copyBtn.locator('.q-icon').textContent();
-        expect(iconText).toContain("content_copy");
+        const copiedAttr = await copyBtn.getAttribute('data-copied');
+        expect(copiedAttr).not.toBe('true');
       }).toPass({ timeout: 10000, intervals: [1000, 1000, 1000, 1000] });
 
       testLogger.info("Table cell copy icon revert test completed");

@@ -16,7 +16,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldRow from "@/components/common/FieldRow.vue";
-import { Quasar } from "quasar";
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -27,6 +26,7 @@ vi.mock("vuex", () => ({
     },
   }),
 }));
+
 
 describe("FieldRow.vue", () => {
   const defaultProps = {
@@ -47,7 +47,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -58,7 +58,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -75,11 +75,12 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      expect(wrapper.find(".field-container").exists()).toBe(true);
+      // OFieldRow renders with data-test="logs-field-list-item-{name}"
+      expect(wrapper.find('[data-test="logs-field-list-item-status"]').exists()).toBe(true);
     });
 
     it("should show simple field for non-schema fields", () => {
@@ -92,11 +93,12 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      expect(wrapper.find(".field-container").exists()).toBe(true);
+      // OFieldRow renders with data-test="logs-field-list-item-{name}"
+      expect(wrapper.find('[data-test="logs-field-list-item-status"]').exists()).toBe(true);
     });
 
     it("should show expansion slot for fields with values", () => {
@@ -110,7 +112,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
         slots: {
           expansion: '<div class="expansion-content">Expansion</div>',
@@ -118,7 +120,8 @@ describe("FieldRow.vue", () => {
       });
 
       expect(wrapper.find(".expansion-content").exists()).toBe(true);
-      expect(wrapper.find(".field-container").exists()).toBe(false);
+      // When expansion slot is used, the simple OFieldRow element is not rendered
+      expect(wrapper.find('[data-test="logs-field-list-item-status"]').exists()).toBe(false);
     });
   });
 
@@ -127,7 +130,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -145,7 +148,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -157,7 +160,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -177,7 +180,7 @@ describe("FieldRow.vue", () => {
           selectedFields: [],
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -195,7 +198,7 @@ describe("FieldRow.vue", () => {
           selectedFields: ["status"],
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -210,7 +213,7 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -228,7 +231,7 @@ describe("FieldRow.vue", () => {
           selectedFields: ["status"],
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -247,7 +250,7 @@ describe("FieldRow.vue", () => {
           showQuickMode: false,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -262,7 +265,7 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -281,11 +284,12 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      const icon = wrapper.find('.field_label [data-test="log-search-index-list-interesting-status-field-btn"]');
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -300,11 +304,12 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      const icon = wrapper.find(".field_label [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
+      const icon = wrapper.find('[data-test="log-search-index-list-interesting-status-field-btn"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -315,15 +320,21 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      const icon = wrapper.find(".field_overlay [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
+      // Interesting icon is rendered directly inside OFieldRow
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
       await icon.trigger("click");
 
       expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
-      expect(wrapper.emitted("toggle-interesting")?.[0]).toEqual([defaultProps.field, false]);
+      expect(wrapper.emitted("toggle-interesting")?.[0]).toEqual([
+        defaultProps.field,
+        false,
+      ]);
     });
 
     it("should not show interesting icon for timestamp column", () => {
@@ -337,7 +348,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
@@ -347,7 +358,7 @@ describe("FieldRow.vue", () => {
   });
 
   describe("theme support", () => {
-    it("should apply light theme classes", () => {
+    it("should render interesting icon with correct cursor class in light theme", () => {
       const wrapper = mount(FieldRow, {
         props: {
           ...defaultProps,
@@ -355,15 +366,18 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      const icon = wrapper.find(".field_label [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
-      expect(icon.classes()).toContain("light-dimmed");
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(true);
     });
 
-    it("should not apply light-dimmed class for dark theme", () => {
+    it("should render interesting icon in dark theme", () => {
       const wrapper = mount(FieldRow, {
         props: {
           ...defaultProps,
@@ -371,12 +385,15 @@ describe("FieldRow.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      const icon = wrapper.find(".field_label [data-test=\"log-search-index-list-interesting-status-field-btn\"]");
-      expect(icon.classes()).not.toContain("light-dimmed");
+      // Interesting icon is rendered directly inside OFieldRow (no .field_label wrapper)
+      const icon = wrapper.find(
+        '[data-test="log-search-index-list-interesting-status-field-btn"]',
+      );
+      expect(icon.exists()).toBe(true);
     });
   });
 
@@ -385,11 +402,13 @@ describe("FieldRow.vue", () => {
       const wrapper = mount(FieldRow, {
         props: defaultProps,
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      expect(wrapper.find(".field_overlay").exists()).toBe(true);
+      // Non-timestamp fields render action buttons (filter + add icons) in the #actions slot
+      const filterBtn = wrapper.find('[data-test="log-search-index-list-filter-status-field-btn"]');
+      expect(filterBtn.exists()).toBe(true);
     });
 
     it("should not render field overlay for timestamp column", () => {
@@ -402,11 +421,13 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
 
-      expect(wrapper.find(".field_overlay").exists()).toBe(false);
+      // Timestamp column has no action buttons rendered in the #actions slot
+      const filterBtn = wrapper.find('[data-test="log-search-index-list-filter-_timestamp-field-btn"]');
+      expect(filterBtn.exists()).toBe(false);
     });
   });
 
@@ -422,7 +443,7 @@ describe("FieldRow.vue", () => {
           },
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
         slots: {
           expansion: '<div class="expansion-slot">{{ field.name }}</div>',

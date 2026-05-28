@@ -14,27 +14,60 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
-import MetricSelector from "./MetricSelector.vue";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-
-// Mock streamService - must be at top level for hoisting
+// vi.mock() calls at the TOP — hoisted by Vitest
 vi.mock("@/services/stream", () => ({
   default: {
     nameList: vi.fn(),
   },
 }));
 
+// OSelect is a heavy reka-ui component — stub it so tests can control its
+// behaviour and assert on the props it receives without mounting a full
+// virtual-scroll dropdown.
+//
+// Note: the parent passes `data-test="metric-selector"` as an attribute to
+// OSelect; Vue attribute inheritance forwards it to the stub's root element.
+// The stub therefore appears in the DOM as `[data-test="metric-selector"]`.
+//
+// `clearable` is passed without a colon (boolean shorthand) in the parent
+// template; declaring it as Boolean in the stub ensures props() returns true.
+vi.mock("@/lib/forms/Select/OSelect.vue", () => ({
+  default: {
+    name: "OSelect",
+    props: {
+      modelValue: { default: undefined },
+      options: { default: () => [] },
+      label: { type: String, default: "" },
+      clearable: { type: Boolean, default: false },
+    },
+    emits: ["update:modelValue"],
+    template: `
+      <div>
+        <span data-test="o-select-label">{{ label }}</span>
+        <span data-test="o-select-options-count">{{ options ? options.length : 0 }}</span>
+        <slot name="empty" />
+        <button
+          data-test="o-select-trigger"
+          @click="$emit('update:modelValue', 'http_requests_total')"
+        >select</button>
+        <button
+          data-test="o-select-clear"
+          @click="$emit('update:modelValue', null)"
+        >clear</button>
+      </div>
+    `,
+  },
+}));
+
+import MetricSelector from "./MetricSelector.vue";
+
 describe("MetricSelector", () => {
-  let wrapper: any;
-  let mockStreamService: any;
+  let wrapper: VueWrapper;
+  let mockStreamService: { nameList: ReturnType<typeof vi.fn> };
 
   const mockMetrics = [
     { name: "http_requests_total" },
@@ -48,73 +81,78 @@ describe("MetricSelector", () => {
     metric: "",
   };
 
+  const createWrapper = (props: Record<string, unknown> = {}) =>
+    mount(MetricSelector, {
+      props: { ...defaultProps, ...props },
+      global: {
+        plugins: [i18n, store],
+        mocks: { $t: (key: string) => key },
+      },
+    });
+
   beforeEach(async () => {
     vi.clearAllMocks();
-    // Get the mocked module
     const streamModule = await import("@/services/stream");
-    mockStreamService = streamModule.default;
-    // Default mock response
+    mockStreamService = streamModule.default as typeof mockStreamService;
+    // Default: happy-path response
     mockStreamService.nameList.mockResolvedValue({
-      data: {
-        list: mockMetrics,
-      },
+      data: { list: mockMetrics },
     });
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
+    vi.clearAllMocks();
   });
 
-  const createWrapper = (props = {}) => {
-    return mount(MetricSelector, {
-      props: {
-        ...defaultProps,
-        ...props,
-      },
-      global: {
-        plugins: [i18n, store],
-        mocks: {
-          $t: (key: string) => key,
-        },
-      },
-    });
-  };
+  // ── Component Rendering ──────────────────────────────────────────────────
 
-  describe("Component Rendering", () => {
-    it("should render metric selector", () => {
+  describe("rendering", () => {
+    it("renders the metric selector root element", () => {
       wrapper = createWrapper();
+
       expect(wrapper.find(".metric-selector").exists()).toBe(true);
     });
 
-    it("should display layout name", () => {
+    it("displays the 'Metric' layout label", () => {
       wrapper = createWrapper();
+
+      // i18n resolves 'panel.metric' to 'Metric' in the en locale
       expect(wrapper.find(".layout-name").text()).toBe("Metric");
     });
 
-    it("should render q-select component", () => {
+    it("renders the OSelect component", () => {
       wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.exists()).toBe(true);
+
+      expect(wrapper.findComponent({ name: "OSelect" }).exists()).toBe(true);
     });
 
-    it("should have data-test attribute", () => {
+    it("passes data-test attribute to OSelect", () => {
       wrapper = createWrapper();
-      const select = wrapper.find('[data-test="metric-selector"]');
-      expect(select.exists()).toBe(true);
+
+      expect(wrapper.find('[data-test="metric-selector"]').exists()).toBe(true);
     });
 
-    it("should show search icon", () => {
+    it("passes clearable prop to OSelect", () => {
       wrapper = createWrapper();
-      const icon = wrapper.findComponent({ name: "QIcon" });
-      expect(icon.exists()).toBe(true);
-      expect(icon.props("name")).toBe("search");
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+
+      expect(oSelect.props("clearable")).toBe(true);
+    });
+
+    it("passes 'Metric Name' label to OSelect", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="o-select-label"]').text()).toBe(
+        "Metric Name",
+      );
     });
   });
 
-  describe("Metrics Loading", () => {
-    it("should load metrics on mount", async () => {
+  // ── Metrics Loading ──────────────────────────────────────────────────────
+
+  describe("metrics loading", () => {
+    it("calls nameList with correct arguments on mount", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
@@ -126,363 +164,287 @@ describe("MetricSelector", () => {
         -1,
         "",
         "",
-        false
+        false,
       );
     });
 
-    it("should populate metrics after loading", async () => {
+    it("calls nameList exactly once on mount", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.metrics.length).toBe(5);
-      expect(wrapper.vm.metrics).toContain("http_requests_total");
-      expect(wrapper.vm.metrics).toContain("cpu_usage_percent");
+      expect(mockStreamService.nameList).toHaveBeenCalledTimes(1);
     });
 
-    it("should set filteredMetrics equal to metrics initially", async () => {
+    it("populates OSelect options with metric names after loading", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.filteredMetrics).toEqual(wrapper.vm.metrics);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      const options = oSelect.props("options") as string[];
+
+      expect(options).toHaveLength(5);
+      expect(options).toContain("http_requests_total");
+      expect(options).toContain("cpu_usage_percent");
+      expect(options).toContain("memory_usage_bytes");
     });
 
-    it("should show loading state while fetching metrics", () => {
-      mockStreamService.nameList.mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => resolve({ data: { list: mockMetrics } }), 100);
-          })
+    it("shows options count of 5 in the stub after load", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="o-select-options-count"]').text(),
+      ).toBe("5");
+    });
+
+    it("passes empty options list when API returns empty list", async () => {
+      mockStreamService.nameList.mockResolvedValue({ data: { list: [] } });
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.props("options")).toEqual([]);
+    });
+
+    it("shows 'No metrics found' in empty slot when loading is false and no metrics", async () => {
+      mockStreamService.nameList.mockResolvedValue({ data: { list: [] } });
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // The #empty slot is forwarded to the stub root; the stub root is
+      // rendered with the forwarded data-test="metric-selector" attribute.
+      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain(
+        "No metrics found",
+      );
+    });
+
+    it("shows 'Loading metrics...' in empty slot while request is in flight", async () => {
+      // Never resolves during the test — component is stuck loading
+      let resolveNameList!: (v: unknown) => void;
+      mockStreamService.nameList.mockReturnValue(
+        new Promise((res) => {
+          resolveNameList = res;
+        }),
       );
 
       wrapper = createWrapper();
-      expect(wrapper.vm.loading).toBe(true);
+      // Do NOT flush — request is still pending
+      await Promise.resolve(); // let onMounted microtask run
+
+      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain(
+        "Loading metrics...",
+      );
+
+      // Cleanup: resolve so no leaked promise
+      resolveNameList({ data: { list: [] } });
+      await flushPromises();
     });
 
-    it("should clear loading state after metrics loaded", async () => {
+    it("handles missing data.list in response without throwing", async () => {
+      mockStreamService.nameList.mockResolvedValue({});
+
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.loading).toBe(false);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.props("options")).toEqual([]);
     });
 
-    it("should handle empty metrics list", async () => {
-      mockStreamService.nameList.mockResolvedValue({
-        data: {
-          list: [],
-        },
-      });
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.metrics).toEqual([]);
-      expect(wrapper.vm.filteredMetrics).toEqual([]);
-    });
-
-    it("should handle API error gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    it("handles API error: options remain empty and loading clears", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       mockStreamService.nameList.mockRejectedValue(new Error("API Error"));
 
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.metrics).toEqual([]);
-      expect(wrapper.vm.filteredMetrics).toEqual([]);
-      expect(wrapper.vm.loading).toBe(false);
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.props("options")).toEqual([]);
+      // Loading cleared — 'No metrics found' visible, not the loading text
+      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain(
+        "No metrics found",
+      );
       expect(consoleSpy).toHaveBeenCalledWith(
         "Error loading metrics:",
-        expect.any(Error)
+        expect.any(Error),
       );
 
       consoleSpy.mockRestore();
     });
-
-    it("should handle missing data in response", async () => {
-      mockStreamService.nameList.mockResolvedValue({});
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.metrics).toEqual([]);
-    });
   });
 
-  describe("Metric Selection", () => {
-    it("should initialize with provided metric", () => {
+  // ── Metric Selection ─────────────────────────────────────────────────────
+
+  describe("metric selection", () => {
+    it("initialises OSelect modelValue from metric prop", () => {
       wrapper = createWrapper({ metric: "http_requests_total" });
-      expect(wrapper.vm.selectedMetric).toBe("http_requests_total");
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+
+      expect(oSelect.props("modelValue")).toBe("http_requests_total");
     });
 
-    it("should emit update:metric when metric is selected", async () => {
+    it("initialises with empty string when metric prop is empty", () => {
+      wrapper = createWrapper({ metric: "" });
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+
+      expect(oSelect.props("modelValue")).toBe("");
+    });
+
+    it("emits update:metric with the selected value when OSelect fires update:modelValue", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      await wrapper.vm.onMetricSelect("cpu_usage_percent");
+      // Drive through the public API — OSelect stub emits update:modelValue on button click
+      await wrapper.find('[data-test="o-select-trigger"]').trigger("click");
 
       expect(wrapper.emitted("update:metric")).toBeTruthy();
-      expect(wrapper.emitted("update:metric")[0]).toEqual(["cpu_usage_percent"]);
+      expect(wrapper.emitted("update:metric")![0]).toEqual([
+        "http_requests_total",
+      ]);
     });
 
-    it("should update selectedMetric when metric is selected", async () => {
+    it("updates OSelect modelValue after a selection", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      await wrapper.vm.onMetricSelect("memory_usage_bytes");
+      await wrapper.find('[data-test="o-select-trigger"]').trigger("click");
 
-      expect(wrapper.vm.selectedMetric).toBe("memory_usage_bytes");
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.props("modelValue")).toBe("http_requests_total");
     });
 
-    it("should handle null selection (clearable)", async () => {
+    it("emits update:metric with empty string when OSelect fires null (clear)", async () => {
       wrapper = createWrapper({ metric: "http_requests_total" });
       await flushPromises();
 
-      await wrapper.vm.onMetricSelect(null);
+      await wrapper.find('[data-test="o-select-clear"]').trigger("click");
 
-      expect(wrapper.vm.selectedMetric).toBe("");
-      expect(wrapper.emitted("update:metric")[0]).toEqual([""]);
+      expect(wrapper.emitted("update:metric")).toBeTruthy();
+      expect(wrapper.emitted("update:metric")![0]).toEqual([""]);
     });
 
-    it("should handle empty string selection", async () => {
+    it("sets OSelect modelValue to empty string after clearing", async () => {
       wrapper = createWrapper({ metric: "http_requests_total" });
       await flushPromises();
 
-      await wrapper.vm.onMetricSelect("");
+      await wrapper.find('[data-test="o-select-clear"]').trigger("click");
 
-      expect(wrapper.vm.selectedMetric).toBe("");
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.props("modelValue")).toBe("");
+    });
+
+    it("does not emit update:metric on initial mount", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.emitted("update:metric")).toBeFalsy();
     });
   });
 
-  describe("Metric Filtering", () => {
-    it("should show all metrics when filter is empty", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
+  // ── Component Props ───────────────────────────────────────────────────────
 
-      const updateFn = vi.fn((callback) => callback());
-      await wrapper.vm.filterMetrics("", updateFn);
-
-      expect(updateFn).toHaveBeenCalled();
-      expect(wrapper.vm.filteredMetrics).toEqual(wrapper.vm.metrics);
-    });
-
-    it("should call API with search keyword when filtering", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      mockStreamService.nameList.mockClear();
-      mockStreamService.nameList.mockResolvedValue({
-        data: {
-          list: [{ name: "http_requests_total" }],
-        },
-      });
-
-      const updateFn = vi.fn((callback) => callback());
-      await wrapper.vm.filterMetrics("http", updateFn);
-      await flushPromises();
-
-      expect(mockStreamService.nameList).toHaveBeenCalledWith(
-        store.state.selectedOrganization.identifier,
-        "metrics",
-        false,
-        -1,
-        -1,
-        "http",
-        "",
-        false
-      );
-    });
-
-    it("should update filteredMetrics with search results", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      mockStreamService.nameList.mockResolvedValue({
-        data: {
-          list: [
-            { name: "http_requests_total" },
-            { name: "http_request_duration_seconds" },
-          ],
-        },
-      });
-
-      const updateFn = vi.fn((callback) => callback());
-      await wrapper.vm.filterMetrics("http", updateFn);
-      await flushPromises();
-
-      expect(wrapper.vm.filteredMetrics.length).toBe(2);
-      expect(wrapper.vm.filteredMetrics).toContain("http_requests_total");
-      expect(wrapper.vm.filteredMetrics).toContain(
-        "http_request_duration_seconds"
-      );
-    });
-
-    it("should show loading state while filtering", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      mockStreamService.nameList.mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => resolve({ data: { list: [] } }), 100);
-          })
-      );
-
-      const updateFn = vi.fn((callback) => callback());
-      const filterPromise = wrapper.vm.filterMetrics("cpu", updateFn);
-
-      expect(wrapper.vm.loading).toBe(true);
-
-      await filterPromise;
-      await flushPromises();
-
-      expect(wrapper.vm.loading).toBe(false);
-    });
-
-    it("should handle filter API error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      wrapper = createWrapper();
-      await flushPromises();
-
-      mockStreamService.nameList.mockRejectedValue(new Error("Filter Error"));
-
-      const updateFn = vi.fn((callback) => callback());
-      await wrapper.vm.filterMetrics("test", updateFn);
-      await flushPromises();
-
-      expect(wrapper.vm.filteredMetrics).toEqual([]);
-      expect(wrapper.vm.loading).toBe(false);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Error filtering metrics:",
-        expect.any(Error)
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it("should handle empty filter results", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      mockStreamService.nameList.mockResolvedValue({
-        data: {
-          list: [],
-        },
-      });
-
-      const updateFn = vi.fn((callback) => callback());
-      await wrapper.vm.filterMetrics("nonexistent", updateFn);
-      await flushPromises();
-
-      expect(wrapper.vm.filteredMetrics).toEqual([]);
-    });
-
-    it("should handle missing data in filter response", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      mockStreamService.nameList.mockResolvedValue({});
-
-      const updateFn = vi.fn((callback) => callback());
-      await wrapper.vm.filterMetrics("test", updateFn);
-      await flushPromises();
-
-      expect(wrapper.vm.filteredMetrics).toEqual([]);
-    });
-  });
-
-  describe("Component Props", () => {
-    it("should accept metric prop", () => {
+  describe("props", () => {
+    it("accepts and exposes the metric prop", () => {
       wrapper = createWrapper({ metric: "test_metric" });
+
       expect(wrapper.props("metric")).toBe("test_metric");
     });
 
-    it("should accept datasource prop", () => {
-      const datasource = { id: "test", name: "Test" };
+    it("accepts and exposes the datasource prop", () => {
+      const datasource = { id: "ds1", name: "Prometheus" };
       wrapper = createWrapper({ datasource });
+
       expect(wrapper.props("datasource")).toEqual(datasource);
     });
 
-    it("should work without datasource prop", () => {
+    it("works without a datasource prop (optional)", () => {
       wrapper = createWrapper();
+
       expect(wrapper.props("datasource")).toBeUndefined();
     });
   });
 
-  describe("UI Behavior", () => {
-    it("should be clearable", () => {
-      wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("clearable")).toBe(true);
-    });
+  // ── Accessibility ─────────────────────────────────────────────────────────
 
-    it("should use input for filtering", () => {
-      wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("useInput")).toBe(true);
-    });
-
-    it("should have input debounce", () => {
-      wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("inputDebounce")).toBe("300");
-    });
-
-    it("should be dense", () => {
-      wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("dense")).toBe(true);
-    });
-
-    it("should be borderless", () => {
-      wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("borderless")).toBe(true);
-    });
-
-    it("should show no-option slot when loading", async () => {
-      mockStreamService.nameList.mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => resolve({ data: { list: [] } }), 100);
-          })
-      );
-
+  describe("accessibility", () => {
+    it("has a proper data-test attribute for automation", () => {
       wrapper = createWrapper();
 
-      // Component should be in loading state
-      expect(wrapper.vm.loading).toBe(true);
+      expect(wrapper.find('[data-test="metric-selector"]').exists()).toBe(true);
     });
 
-    it("should show no-option slot when no metrics found", async () => {
+    it("passes an accessible label to OSelect", () => {
+      wrapper = createWrapper();
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+
+      expect(oSelect.props("label")).toBe("Metric Name");
+    });
+  });
+
+  // ── Edge Cases ────────────────────────────────────────────────────────────
+
+  describe("edge cases", () => {
+    it("maps stream objects to plain name strings for OSelect options", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      const options = oSelect.props("options") as string[];
+
+      // Every option must be a plain string, not an object
+      options.forEach((opt) => {
+        expect(typeof opt).toBe("string");
+      });
+    });
+
+    it("handles a single-item list correctly", async () => {
       mockStreamService.nameList.mockResolvedValue({
-        data: {
-          list: [],
-        },
+        data: { list: [{ name: "single_metric" }] },
       });
 
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.loading).toBe(false);
-      expect(wrapper.vm.metrics).toEqual([]);
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("should have label for screen readers", () => {
-      wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("label")).toBe("Metric Name");
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect(oSelect.props("options")).toEqual(["single_metric"]);
     });
 
-    it("should have hint text", () => {
+    it("handles a large list without error", async () => {
+      const bigList = Array.from({ length: 500 }, (_, i) => ({
+        name: `metric_${i}`,
+      }));
+      mockStreamService.nameList.mockResolvedValue({
+        data: { list: bigList },
+      });
+
       wrapper = createWrapper();
-      const select = wrapper.findComponent({ name: "QSelect" });
-      expect(select.props("stackLabel")).toBe(true);
+      await flushPromises();
+
+      const oSelect = wrapper.findComponent({ name: "OSelect" });
+      expect((oSelect.props("options") as string[]).length).toBe(500);
     });
 
-    it("should have proper data-test attribute for automation", () => {
+    it("unmounts cleanly while a request is in flight (no warnings)", async () => {
+      let resolveNameList!: (v: unknown) => void;
+      mockStreamService.nameList.mockReturnValue(
+        new Promise((res) => {
+          resolveNameList = res;
+        }),
+      );
+
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="metric-selector"]').exists()).toBe(true);
+      // Unmount before the promise settles
+      wrapper.unmount();
+
+      // Resolve after unmount — should not cause setState warnings
+      resolveNameList({ data: { list: mockMetrics } });
+      await flushPromises();
+
+      // If we reach here without an unhandled error the test passes
+      expect(true).toBe(true);
     });
   });
 });

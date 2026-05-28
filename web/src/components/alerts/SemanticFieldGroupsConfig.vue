@@ -16,73 +16,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="semantic-field-groups-config">
-    <div class="section-header q-mb-md">
-      <div class="text-h6">
+    <div class="section-header tw:mb-3">
+      <div class="tw:text-xl tw:font-semibold">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
-      <div class="text-caption text-grey-7">
+      <div class="tw:text-xs tw:text-gray-400">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>
 
     <!-- Category Filter -->
-    <div class="row q-col-gutter-md q-mb-md">
-      <div class="col-12 col-md-4">
-        <q-select
+    <div class="tw:flex tw:gap-3 tw:mb-3">
+      <div class="tw:w-full col-md-4">
+        <OSelect
           data-test="semantic-group-category-select"
           v-model="selectedCategory"
           :options="categoryOptions"
           :label="t('correlation.category')"
           :hint="t('correlation.categoryHint')"
-          dense
-          borderless
-          stack-label
           class="showLabelOnTop"
-          emit-value
-          map-options
           style="max-width: 100%"
-        >
-          <template v-slot:option="scope">
-            <q-item v-bind="scope.itemProps">
-              <q-item-section>
-                <q-item-label>
-                  <span class="tw:font-medium">{{ scope.opt.label }}</span>
-                  <span class="tw:text-xs tw:text-gray-500 tw:ml-2"
-                    >({{ scope.opt.count }}
-                    {{ t("settings.correlation.groupsLabel") }})</span
-                  >
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
       </div>
-      <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
+      <div class="tw:w-full col-md-8 tw:flex tw:items-center tw:justify-end tw:gap-2">
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"
           size="sm"
           :disabled="localGroups.length === 0"
           @click="exportGroups"
-        >{{ t('correlation.exportToJson') }}</OButton>
+          >{{ t("correlation.exportToJson") }}</OButton
+        >
         <OButton
           data-test="correlation-semanticfieldgroup-import-json-btn"
           variant="outline"
           size="sm"
           @click="navigateToImport"
-        >{{ t('correlation.importFromJson') }}</OButton>
+          >{{ t("correlation.importFromJson") }}</OButton
+        >
         <OButton
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
           variant="primary"
           size="sm"
           @click="addGroup"
-        >{{ t('correlation.addCustomGroup') }}</OButton>
+          >{{ t("correlation.addCustomGroup") }}</OButton
+        >
         <slot name="header-actions" />
       </div>
     </div>
 
     <!-- Filtered Semantic Groups List -->
-    <div v-if="filteredGroups.length > 0" class="groups-list q-mb-md">
+    <div v-if="filteredGroups.length > 0" class="groups-list tw:mb-3">
       <SemanticGroupItem
         v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
@@ -92,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="removeGroupByFilter(index)"
       />
     </div>
-    <div v-else class="text-center q-pa-lg text-grey-7">
-      <q-icon name="info" size="md" class="q-mb-sm" />
+    <div v-else class="tw:text-center tw:p-4 tw:text-gray-400">
+      <OIcon name="info" size="md" class="tw:mb-2" />
       <div>
         {{
           t("correlation.noSemanticGroupsInCategory", {
@@ -104,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="text-caption text-grey-6 q-mt-sm">
+    <div v-if="localGroups.length > 0" class="tw:text-xs tw:text-gray-400 tw:mt-2">
       {{
         t("correlation.showingGroups", {
           filterGroupLength: filteredGroups.length,
@@ -116,22 +100,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div
       v-if="localGroups.length > 0 && showFingerprintFields"
-      class="fingerprint-section q-mt-lg"
+      class="fingerprint-section tw:mt-4"
     >
-      <div class="text-subtitle1 q-mb-sm">
+      <div class="tw:text-base tw:font-medium tw:mb-2">
         {{ t("correlation.deduplicateFields") }} *
-        <q-tooltip>{{ t("correlation.deduplicateFieldTooltip") }}</q-tooltip>
+        <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
-      <div class="text-caption text-grey-7 q-mb-md">
+      <div class="tw:text-xs tw:text-gray-400 tw:mb-3">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
       <div class="fingerprint-checkboxes">
-        <q-checkbox
+        <OCheckbox
           :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
           :key="group.id"
           v-model="localFingerprintFields"
-          :val="group.id"
+          :value="group.id"
           :label="group.display"
           class="fingerprint-checkbox"
           @update:model-value="emitUpdate"
@@ -139,23 +123,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="localFingerprintFields.length === 0"
-        class="text-negative text-caption q-mt-sm"
+        class="tw:text-red-500 tw:text-xs tw:mt-2"
       >
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
     </div>
 
-    <!-- Import Dialog -->
-    <q-dialog v-model="showImportDrawer" maximized position="right" full-height>
-      <q-card class="import-dialog-card">
-        <ImportSemanticGroupsDrawer
-          :current-groups="localGroups"
-          :org-id="store.state.selectedOrganization.identifier"
-          @apply="handleImportApply"
-          @close="showImportDrawer = false"
-        />
-      </q-card>
-    </q-dialog>
+    <!-- Import Drawer -->
+    <ImportSemanticGroupsDrawer
+      data-test="semantic-field-groups-config-import-drawer"
+      v-model:open="showImportDrawer"
+      :current-groups="localGroups"
+      :org-id="store.state.selectedOrganization.identifier"
+      @apply="handleImportApply"
+    />
   </div>
 </template>
 
@@ -166,7 +147,11 @@ import { useI18n } from "vue-i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const { t } = useI18n();
@@ -234,16 +219,16 @@ const normalizeCategoryName = (category: string): string => {
 
   // Map common variations to consistent names
   const categoryMap: Record<string, string> = {
-    'kubernetes': 'Kubernetes',
-    'k8s': 'Kubernetes',
-    'aws': 'AWS',
-    'amazon': 'AWS',
-    'azure': 'Azure',
-    'gcp': 'GCP',
-    'google': 'GCP',
-    'common': 'Common',
-    'generic': 'Common',
-    'other': 'Other'
+    kubernetes: "Kubernetes",
+    k8s: "Kubernetes",
+    aws: "AWS",
+    amazon: "AWS",
+    azure: "Azure",
+    gcp: "GCP",
+    google: "GCP",
+    common: "Common",
+    generic: "Common",
+    other: "Other",
   };
 
   return categoryMap[normalized] || category;
@@ -279,7 +264,8 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    (group) => normalizeCategoryName(group.group || "Other") === selectedCategory.value,
+    (group) =>
+      normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
 });
 
@@ -384,7 +370,9 @@ onMounted(async () => {
 
   if (props.scrollToGroupId) {
     // Find and switch to the category that contains the requested group
-    const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
+    const targetGroup = localGroups.value.find(
+      (g) => g.id === props.scrollToGroupId,
+    );
     if (targetGroup) {
       selectedCategory.value = targetGroup.group || "Other";
       await nextTick(); // wait for filteredGroups to re-render
@@ -396,17 +384,23 @@ onMounted(async () => {
   if (props.scrollToGroupId) {
     await nextTick();
     const el = document.querySelector(
-      `[data-group-id="${props.scrollToGroupId}"]`
+      `[data-group-id="${props.scrollToGroupId}"]`,
     ) as HTMLElement | null;
     if (el) {
       // Scroll within the nearest scrollable parent to avoid pushing
       // ancestor containers (main page layout) out of view
-      const scrollParent = el.closest('.tw\\:overflow-y-auto') as HTMLElement | null;
+      const scrollParent = el.closest(
+        ".tw\\:overflow-y-auto",
+      ) as HTMLElement | null;
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
-        const offset = elRect.top - parentRect.top - (parentRect.height / 2) + (elRect.height / 2);
-        scrollParent.scrollBy({ top: offset, behavior: 'smooth' });
+        const offset =
+          elRect.top -
+          parentRect.top -
+          parentRect.height / 2 +
+          elRect.height / 2;
+        scrollParent.scrollBy({ top: offset, behavior: "smooth" });
       } else {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
@@ -424,7 +418,7 @@ onMounted(async () => {
 }
 
 .section-header {
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
   padding-bottom: 12px;
 }
 
@@ -439,12 +433,18 @@ onMounted(async () => {
 }
 
 @keyframes group-border-blink {
-  0%, 100% { outline: 2px solid transparent; }
-  50%       { outline: 2px solid var(--q-primary); border-radius: 4px; }
+  0%,
+  100% {
+    outline: 2px solid transparent;
+  }
+  50% {
+    outline: 2px solid var(--q-primary);
+    border-radius: 4px;
+  }
 }
 
 .fingerprint-section {
-  border-top: 1px solid var(--q-separator-color);
+  border-top: 1px solid var(--color-separator);
   padding-top: 16px;
 }
 

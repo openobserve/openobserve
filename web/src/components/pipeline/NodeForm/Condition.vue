@@ -15,27 +15,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-condition-section"
-    class="stream-routing-section full-width"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.conditionTitle')"
+    :width="45"
+    :show-close="false"
+    data-test="add-condition-drawer"
+    primary-button-label="Save"
+    secondary-button-label="Cancel"
+    secondary-button-variant="outline"
+    :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutral-button-variant="outline-destructive"
+    @click:primary="saveCondition"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
+    @keydown.stop
+    :persistent="true"
   >
+    <template #header-right>
+      <button
+        type="button"
+        aria-label="Close drawer"
+        data-test="o-drawer-close-btn"
+        @mousedown.prevent
+        @click="openCancelDialog"
+        class="tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:h-7 tw:w-7 tw:rounded-md tw:text-dialog-close-text tw:hover:bg-dialog-close-hover-bg tw:active:bg-dialog-close-active-bg tw:transition-colors tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring tw:cursor-pointer"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </template>
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="add-condition-section"
+      class="stream-routing-section tw:w-full"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
     >
-      {{ t("pipeline.conditionTitle") }}
-      <div>
-        <OButton variant="ghost" size="icon" @click="openCancelDialog">
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
 
-    <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
-      <q-form ref="routeFormRef" @submit.prevent="saveCondition">
+
+    <div class="stream-routing-container tw:px-3">
+      <div>
         <div
-          class="q-pt-sm showLabelOnTop text-bold text-h7"
+          class="showLabelOnTop tw:font-bold text-h7"
           data-test="add-condition-query-input-title"
         >
           <div></div>
@@ -58,80 +81,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove-group="(groupId) => removeConditionGroup(groupId)"
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
-            <div v-else class="q-pa-md text-grey-7">Loading conditions...</div>
+            <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
           </div>
-          <q-card class="note-container">
-            <q-card-section class="q-pa-sm">
-              <div class="note-heading">Condition value Guidelines:</div>
-              <q-banner inline dense class="note-info">
-                <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span
-                    >To check for an empty value, use
-                    <span class="highlight">""</span>. Example:
-                    <span class="code">app_name != ""</span>
-                  </span>
-                </div>
-                <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span
-                    >To check for an Null value, use
-                    <span class="highlight">null</span>. Example:
-                    <span class="code">app_name != null</span>
-                  </span>
-                </div>
-                <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span
-                    >To add a custom column, type column name and press
-                    <span class="highlight">Enter</span>.</span
-                  >
-                </div>
-                <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
-                  <span
-                    >If conditions are not met, the record will be
-                    dropped.</span
-                  >
-                </div>
-                <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
-                  <span
-                    >If the record does not have the specified field, it will be
-                    dropped.</span
-                  >
-                </div>
-              </q-banner>
-            </q-card-section>
-          </q-card>
+          <div
+            class="note-container tw:rounded-md tw:p-3 tw:my-3 tw:flex tw:flex-col tw:gap-2"
+            data-test="add-condition-note-container"
+          >
+            <div
+              class="tw:text-sm tw:text-gray-800"
+              data-test="add-condition-note-heading"
+            >
+              Condition value Guidelines:
+            </div>
+            <div
+              class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800"
+              data-test="add-condition-note-info"
+            >
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  To check for an empty value, use
+                  <span class="highlight">""</span>. Example:
+                  <span class="code">app_name != ""</span>
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  To check for an Null value, use
+                  <span class="highlight">null</span>. Example:
+                  <span class="code">app_name != null</span>
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  To add a custom column, type column name and press
+                  <span class="highlight">Enter</span>.
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+                <span>If conditions are not met, the record will be dropped.</span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+                <span>If the record does not have the specified field, it will be dropped.</span>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <div class="tw:flex tw:gap-2">
-          <OButton
-            v-if="pipelineObj.isEditNode"
-            data-test="add-condition-delete-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            type="button"
-            @click="openDeleteDialog"
-          >{{ t("pipeline.deleteNode") }}</OButton>
-          <OButton
-            data-test="add-condition-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            type="button"
-            @click="openCancelDialog"
-          >{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            data-test="add-condition-save-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-          >{{ t('alerts.save') }}</OButton>
-        </div>
-      </q-form>
+      </div>
     </div>
   </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -152,6 +155,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import {
   getTimezoneOffset,
   getUUID,
@@ -159,14 +163,15 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -209,7 +214,6 @@ interface StreamRoute {
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const router = useRouter();
 
@@ -220,6 +224,19 @@ const { getStream, getStreams } = useStreams();
 const { buildQueryPayload } = useQuery();
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
+
+const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  if (!v) {
+    // Intercept any programmatic close (e.g. Escape key) with confirmation too
+    openCancelDialog();
+    return;
+  }
+  internalOpen.value = v;
+}
 
 const isUpdating = ref(false);
 
@@ -240,8 +257,6 @@ const originalStreamFields: Ref<any[]> = ref([]);
 const isValidName: Ref<boolean> = ref(true);
 
 const isAggregationEnabled = ref(false);
-
-const routeFormRef = ref<any>(null);
 
 const showTimezoneWarning = ref(false);
 
@@ -604,7 +619,8 @@ const closeDialog = () => {
   );
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
-  emit("cancel:hideform");
+  internalOpen.value = false;
+  setTimeout(() => emit("cancel:hideform"), 300);
 };
 
 const openCancelDialog = () => {
@@ -642,8 +658,8 @@ const saveCondition = async () => {
     });
 
     if (!hasValidConditions) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Please add at least one condition",
         timeout: 3000,
       });
@@ -683,8 +699,8 @@ const saveCondition = async () => {
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Error saving condition: " + (error as Error).message,
       timeout: 5000,
     });
@@ -745,8 +761,8 @@ const validateSqlQuery = () => {
       .catch((err: any) => {
         if (err.response.data.code === 500) {
           isValidSqlQuery.value = false;
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Invalid SQL Query : " + err.response.data.message,
             timeout: 3000,
           });
@@ -780,44 +796,24 @@ const validateSqlQuery = () => {
 
 .note-container {
   background-color: #f9f290;
-  border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+  color: #2d3748;
   width: 100%;
-  margin-bottom: 20px;
-  margin-top: 10px;
 }
 
 .note-container .highlight {
   font-weight: bold;
-  color: #007bff; /* Blue color to highlight key terms */
-}
-
-.note-container .emphasis {
-  font-style: italic;
-  color: #555; /* Subtle dark gray for emphasis */
+  color: #007bff;
 }
 
 .note-container .code {
   font-family: monospace;
-  padding: 2px 4px;
+  padding: 1px 4px;
   border-radius: 3px;
-  color: #d63384; /* Soft pinkish-red for code */
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #b30059;
 }
 
-.note-heading {
-  font-size: medium;
-}
 
-.note-info {
-  font-size: small;
-  color: #865300;
-  background-color: #f9f290;
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  justify-content: space-between;
-}
 
 /* Pipeline-specific FilterGroup styling for narrow sidepanel */
 .pipeline-filter-group-wrapper {
@@ -865,12 +861,6 @@ const validateSqlQuery = () => {
   max-width: calc(100% - 20px);
 }
 
-/* Ensure buttons are clickable and prevent form submission */
-.pipeline-filter-group-wrapper :deep(.q-btn) {
-  pointer-events: auto !important;
-  position: relative;
-  z-index: 1;
-}
 
 /* Prevent FilterGroup buttons from triggering form submit */
 .pipeline-filter-group-wrapper :deep(.q-btn:not([type="submit"])) {

@@ -16,20 +16,17 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div data-test="dashboard-join-pop-up" class="join-popup-container">
-    <div class="join-header">
+    <div class="join-header" data-test="dashboard-join-pop-up-header">
       <div class="join-section">
         <div class="join-section-header">
           <LeftJoinSvg class="tw:h-[21px]" />
           <label>Join</label>
         </div>
-        <q-select
-          dense
-          filled
+        <OSelect
           v-model="mainStream"
           :options="[]"
-          :disable="true"
+          disabled
           label="Joining Stream"
-          class="o2-custom-select-dashboard"
           data-test="dashboard-config-panel-join-from"
         />
       </div>
@@ -81,22 +78,12 @@
           <label>On</label>
         </div>
 
-        <q-select
-          filled
-          dense
+        <OSelect
           v-model="modelValue.stream"
-          :options="filteredStreamOptions"
-          emit-value
-          map-options
+          :options="streamOptions"
           label="On Stream"
-          class="o2-custom-select-dashboard"
+          searchable
           data-test="dashboard-config-panel-join-to"
-          use-input
-          input-debounce="0"
-          behavior="menu"
-          hide-selected
-          fill-input
-          @filter="filterStreamOptions"
         />
       </div>
     </div>
@@ -111,7 +98,10 @@
         v-if="showJoinSummary"
       >
         Performing
-        <span class="text-primary">{{ joinTypeLabel }} Join</span> between
+        <span
+          class="tw:inline-flex tw:items-center tw:rounded tw:px-1.5 tw:py-0.5 tw:text-xs tw:font-semibold"
+          style="background-color: color-mix(in srgb, var(--o2-primary-color) 15%, transparent); color: var(--o2-primary-color);"
+        >{{ joinTypeLabel }} Join</span> between
         <span class="tw:font-semibold">{{ mainStream }}</span> and
         <span class="tw:font-semibold">{{ modelValue.stream }}</span>
       </div>
@@ -143,14 +133,10 @@
           </div>
 
           <div class="field-container">
-            <q-select
-              behavior="menu"
-              borderless
+            <OSelect
+              :label-position="'inside'"
               v-model="modelValue.conditions[argIndex].operation"
-              :options="operationOptions"
-              dense
-              filled
-              class="o2-custom-select-dashboard"
+              :options="operationSelectOptions"
               label="Select Operation"
               :data-test="`dashboard-join-condition-operation-${argIndex}`"
             />
@@ -170,15 +156,10 @@
             :aria-label="t('panel.addClause')"
             :data-test="`dashboard-join-condition-add-${argIndex}`"
             @click="handleAddCondition(argIndex)"
+            icon-left="add"
           >
-            <template #icon-left><q-icon name="add" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              Add another clause
-            </q-tooltip>
+            <template #icon-left><OIcon name="add" size="sm" /></template>
+            <OTooltip content="Add another clause" />
           </OButton>
 
           <OButton
@@ -188,13 +169,10 @@
             :disabled="modelValue.conditions.length === 1"
             @click="handleRemoveCondition(argIndex)"
             :aria-label="t('panel.removeClause')"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >Remove clause</q-tooltip>
+            <template #icon-left><OIcon name="close" size="sm" /></template>
+            <OTooltip content="Remove clause" />
           </OButton>
         </div>
       </div>
@@ -204,6 +182,9 @@
 
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   defineComponent,
   watch,
@@ -274,6 +255,8 @@ export default defineComponent({
 
   components: {
     OButton,
+    OSelect,
+    OTooltip,
     StreamFieldSelect,
     LeftJoinSvg,
     LeftJoinTypeSvg,
@@ -282,6 +265,7 @@ export default defineComponent({
     RightJoinTypeSvg,
     RightJoinLineSvg,
     InnerJoinTypeSvg,
+    OIcon,
   },
 
   props: {
@@ -337,8 +321,11 @@ export default defineComponent({
     );
 
     const streamOptions = ref<StreamOption[]>([]);
-    const filteredStreamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
+    const operationSelectOptions = operationOptions.map((op) => ({
+      label: op,
+      value: op,
+    }));
 
     /**
      * Determines if join summary should be shown
@@ -499,28 +486,6 @@ export default defineComponent({
     }
 
     /**
-     * Filters stream options based on search input
-     */
-    function filterStreamOptions(
-      val: string,
-      update: (fn: () => void) => void,
-    ): void {
-      if (val === "") {
-        update(() => {
-          filteredStreamOptions.value = [...streamOptions.value];
-        });
-        return;
-      }
-
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredStreamOptions.value = streamOptions.value.filter((stream) =>
-          stream.label.toLowerCase().includes(needle),
-        );
-      });
-    }
-
-    /**
      * Handles join type change
      */
     function handleJoinTypeChange(type: "inner" | "left" | "right"): void {
@@ -568,7 +533,6 @@ export default defineComponent({
 
     onMounted(() => {
       loadStreamsListBasedOnType();
-      filteredStreamOptions.value = [...streamOptions.value];
     });
 
     /**
@@ -582,14 +546,14 @@ export default defineComponent({
       t,
       store,
       operationOptions,
-      filteredStreamOptions,
+      operationSelectOptions,
+      streamOptions,
       showJoinSummary,
       joinTypeLabel,
       localJoinType,
       rightFieldStreams,
       getJoinTypeLabelClass,
       getStreamsBasedJoinIndex,
-      filterStreamOptions,
       handleJoinTypeChange,
       handleAddCondition,
       handleRemoveCondition,

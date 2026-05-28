@@ -15,12 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="aws-integration-tile"
-    flat
-    bordered
+  <OCard
+    class="aws-integration-tile tw:border tw:border-border tw:h-full"
   >
-    <q-card-section class="tw:pb-2">
+    <OCardSection class="tw:p-4 tw:pb-2 tw:flex-1">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
@@ -33,16 +31,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="docs-btn"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
-          <q-icon name="description" />
-          <q-tooltip>View Documentation</q-tooltip>
+          <OIcon name="description" size="sm" />
+          <OTooltip content="View Documentation" />
         </OButton>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
         {{ integration.description }}
       </div>
-    </q-card-section>
+    </OCardSection>
 
-    <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
+    <OCardActions align="left" class="tw:px-4 tw:pb-4">
       <!-- Add Source Button -->
       <OButton
         v-if="hasCloudFormation"
@@ -73,104 +71,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`aws-${integration.id}-add-dashboard-btn`"
         >Add Dashboard</OButton
       >
-    </q-card-actions>
+    </OCardActions>
 
     <!-- Unified Integration Method Selection Dialog -->
-    <q-dialog v-model="showTemplateDialog">
-      <q-card style="min-width: 400px">
-        <q-card-section>
-          <div class="text-h6">Choose Integration Method</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="text-subtitle2 q-mb-md">
-            Select how you want to integrate {{ integration.displayName }}:
+    <ODialog data-test="aws-integration-tile-template-dialog" v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method"
+      secondary-button-label="Cancel"
+      @click:secondary="showTemplateDialog = false"
+    >
+      <div class="tw:text-sm tw:font-medium tw:mb-3">
+        Select how you want to integrate {{ integration.displayName }}:
+      </div>
+      <ul class="aws-integration-options-list tw:flex tw:flex-col">
+        <!-- CloudFormation Templates -->
+        <li
+          v-for="(template, index) in integration.cloudFormationTemplates"
+          :key="`cf-${index}`"
+          @click="handleTemplateSelection(template)"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border hover:tw:bg-muted/50"
+          :data-test="`aws-${integration.id}-template-option-${index}`"
+        >
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+            <span class="tw:text-sm tw:font-medium">
+              {{ template.name }}
+            </span>
+            <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-1">
+              {{ template.description }}
+            </span>
           </div>
-          <q-list>
-            <!-- CloudFormation Templates -->
-            <q-item
-              v-for="(template, index) in integration.cloudFormationTemplates"
-              :key="`cf-${index}`"
-              clickable
-              v-ripple
-              @click="handleTemplateSelection(template)"
-              class="q-mb-sm rounded-borders"
-              style="border: 1px solid rgba(0, 0, 0, 0.12)"
-            >
-              <q-item-section>
-                <q-item-label class="text-weight-medium">
-                  {{ template.name }}
-                </q-item-label>
-                <q-item-label caption class="q-mt-xs">
-                  {{ template.description }}
-                </q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-icon name="chevron_right" color="primary" />
-              </q-item-section>
-            </q-item>
+          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:ms-auto" />
+        </li>
 
-            <!-- Component Options -->
-            <q-item
-              v-for="(option, index) in integration.componentOptions"
-              :key="`comp-${index}`"
-              clickable
-              v-ripple
-              @click="handleComponentSelection(option)"
-              class="q-mb-sm rounded-borders"
-              style="border: 1px solid rgba(0, 0, 0, 0.12)"
-            >
-              <q-item-section>
-                <q-item-label class="text-weight-medium">
-                  {{ option.name }}
-                </q-item-label>
-                <q-item-label caption class="q-mt-xs">
-                  {{ option.description }}
-                </q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-icon name="chevron_right" color="primary" />
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup
-            >Cancel</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        <!-- Component Options -->
+        <li
+          v-for="(option, index) in integration.componentOptions"
+          :key="`comp-${index}`"
+          @click="handleComponentSelection(option)"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border hover:tw:bg-muted/50"
+          :data-test="`aws-${integration.id}-component-option-${index}`"
+        >
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+            <span class="tw:text-sm tw:font-medium">
+              {{ option.name }}
+            </span>
+            <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-1">
+              {{ option.description }}
+            </span>
+          </div>
+          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:ms-auto" />
+        </li>
+      </ul>
+    </ODialog>
 
     <!-- Component Display Dialog -->
-    <q-dialog v-model="showComponentContent" full-width>
-      <q-card>
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ selectedComponentTitle }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-circle-sm" v-close-popup>
-            <q-icon name="close" />
-          </OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <component
-            :is="selectedComponent"
-            :currOrgIdentifier="organizationId"
-            :currUserEmail="userEmail"
-          />
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-card>
+    <ODialog data-test="aws-integration-tile-content-dialog" v-model:open="showComponentContent" size="xl" :title="selectedComponentTitle">
+      <component
+        :is="selectedComponent"
+        :currOrgIdentifier="organizationId"
+        :currUserEmail="userEmail"
+      />
+    </ODialog>
+  </OCard>
 </template>
 
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OCardActions from "@/lib/core/Card/OCardActions.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import type {
   AWSIntegration,
@@ -186,10 +158,12 @@ import segment from "@/services/segment_analytics";
 import dashboardsService from "@/services/dashboards";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
-  components: { OButton },
+  components: { OButton, ODialog, OIcon, OTooltip, OCard, OCardSection, OCardActions },
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,
@@ -198,7 +172,7 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
-    const q = useQuasar();
+    const { confirm } = useConfirmDialog();
     const router = useRouter();
     const showTemplateDialog = ref(false);
     const showComponentContent = ref(false);
@@ -302,8 +276,8 @@ export default defineComponent({
         // Validate endpoint
         if (!endpoint?.url) {
           console.error("Invalid endpoint:", endpoint);
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Invalid ingestion endpoint. Please check configuration.",
             timeout: 3000,
           });
@@ -322,8 +296,8 @@ export default defineComponent({
             email,
             hasPasscode: !!passcode,
           });
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               "Missing organization credentials. Please refresh the page.",
             timeout: 3000,
@@ -349,8 +323,8 @@ export default defineComponent({
         );
 
         if (!cloudFormationURL) {
-          q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "CloudFormation template not available yet",
             timeout: 3000,
           });
@@ -367,15 +341,15 @@ export default defineComponent({
           integration_id: props.integration.id,
         });
 
-        q.notify({
-          type: "info",
+        toast({
+          variant: "info",
           message: `Opening AWS Console to set up ${props.integration.displayName}`,
           timeout: 3000,
         });
       } catch (error) {
         console.error("Error generating CloudFormation URL:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Error opening AWS Console: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });
@@ -500,92 +474,78 @@ export default defineComponent({
 
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
-          q.dialog({
+          const ok = await confirm({
             title: "Dashboard Already Exists",
             message: `A dashboard for ${props.integration.displayName} already exists. Do you wish to replace it?`,
-            cancel: {
-              label: "Cancel",
-              flat: true,
-              color: "primary",
-            },
-            ok: {
-              label: "Replace",
-              flat: true,
-              color: "negative",
-            },
-            persistent: true,
-          }).onOk(async () => {
-            // User chose to replace
-            const loadingNotif = q.notify({
-              type: "ongoing",
-              message: "Replacing dashboard...",
-              timeout: 0,
-              spinner: true,
+            confirmLabel: "Replace",
+            cancelLabel: "Cancel",
+          });
+          if (!ok) return;
+
+          // User chose to replace
+          const loadingNotif = toast({
+            type: "ongoing",
+            message: "Replacing dashboard...",
+            timeout: 0,
+            variant: "loading",
+          });
+
+          try {
+            await importDashboard(
+              dashboardJson,
+              folderId,
+              orgId,
+              existingDashboardId,
+            );
+
+            loadingNotif();
+            toast({
+              variant: "success",
+              message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
+              timeout: 5000,
+              action: {
+                label: "View Dashboard",
+                handler: () =>
+                  router.push(`/dashboards?org_identifier=${orgId}`),
+              },
             });
 
-            try {
-              await importDashboard(
-                dashboardJson,
-                folderId,
-                orgId,
-                existingDashboardId,
-              );
-
-              loadingNotif();
-              q.notify({
-                type: "positive",
-                message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
-                timeout: 5000,
-                actions: [
-                  {
-                    label: "View Dashboard",
-                    color: "white",
-                    handler: () =>
-                      router.push(`/dashboards?org_identifier=${orgId}`),
-                  },
-                ],
-              });
-
-              // Track analytics
-              segment.track("AWS Dashboard Replaced", {
-                service: props.integration.name,
-                integration_id: props.integration.id,
-              });
-            } catch (error) {
-              loadingNotif();
-              console.error("Error replacing dashboard:", error);
-              q.notify({
-                type: "negative",
-                message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
-                timeout: 5000,
-              });
-            }
-          });
+            // Track analytics
+            segment.track("AWS Dashboard Replaced", {
+              service: props.integration.name,
+              integration_id: props.integration.id,
+            });
+          } catch (error) {
+            loadingNotif();
+            console.error("Error replacing dashboard:", error);
+            toast({
+              variant: "error",
+              message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+              timeout: 5000,
+            });
+          }
           return;
         }
 
         // No existing dashboard, proceed with import
-        const loadingNotif = q.notify({
+        const loadingNotif = toast({
           type: "ongoing",
           message: "Importing dashboard...",
           timeout: 0,
-          spinner: true,
+          variant: "loading",
         });
 
         await importDashboard(dashboardJson, folderId, orgId);
 
         loadingNotif();
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Dashboard for ${props.integration.displayName} imported successfully!`,
           timeout: 5000,
-          actions: [
-            {
-              label: "View Dashboard",
-              color: "white",
-              handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
-            },
-          ],
+          action: {
+            label: "View Dashboard",
+            handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
+          },
         });
 
         // Track analytics
@@ -595,8 +555,8 @@ export default defineComponent({
         });
       } catch (error) {
         console.error("Error importing dashboard:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to import dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });
@@ -642,6 +602,12 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.aws-integration-options-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
 .aws-integration-tile {
   height: 100%;
   display: flex;
@@ -688,15 +654,6 @@ export default defineComponent({
   .tile-description {
     line-height: 1.5;
     min-height: 3em;
-  }
-
-  .q-card__section,
-  .q-card__actions {
-    flex-grow: 0;
-  }
-
-  .q-card__actions {
-    margin-top: auto;
   }
 
   .docs-btn {

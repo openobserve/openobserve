@@ -13,380 +13,369 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
-import CustomConfirmDialog from "./CustomConfirmDialog.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
+import CustomConfirmDialog from "./CustomConfirmDialog.vue";
 
-installQuasar();
+// ---------------------------------------------------------------------------
+// ODialog stub
+// Stubs the dialog so tests are deterministic — no Portal/Reka teleport — and
+// so we can assert on props forwarded by CustomConfirmDialog and synthesise the
+// click:primary / click:secondary events the component listens to.
+// ---------------------------------------------------------------------------
+
+const ODialogStub = {
+  name: "ODialog",
+  inheritAttrs: false,
+  props: {
+    open: { type: Boolean, default: false },
+    size: { type: String, default: "md" },
+    title: { type: String, default: "" },
+    persistent: { type: Boolean, default: false },
+    showClose: { type: Boolean, default: true },
+    primaryButtonLabel: { type: String, default: "" },
+    secondaryButtonLabel: { type: String, default: "" },
+  },
+  emits: ["update:open", "click:primary", "click:secondary"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-persistent="String(persistent)"
+      :data-show-close="String(showClose)"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+    >
+      <span data-test="o-dialog-stub-title">{{ title }}</span>
+      <slot />
+      <button data-test="o-dialog-stub-primary" @click="$emit('click:primary')">
+        {{ primaryButtonLabel }}
+      </button>
+      <button data-test="o-dialog-stub-secondary" @click="$emit('click:secondary')">
+        {{ secondaryButtonLabel }}
+      </button>
+    </div>
+  `,
+};
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+
+function buildWrapper(
+  props: Record<string, any> = {},
+  storeInstance?: any,
+): VueWrapper<any> {
+  const vuexStore =
+    storeInstance ??
+    createStore({ state: { theme: "light" } });
+
+  return mount(CustomConfirmDialog, {
+    props: {
+      modelValue: true,
+      ...props,
+    },
+    global: {
+      plugins: [vuexStore],
+      stubs: { ODialog: ODialogStub },
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// tests
+// ---------------------------------------------------------------------------
 
 describe("CustomConfirmDialog", () => {
-  let store: any;
   let wrapper: VueWrapper<any> | null = null;
 
-  beforeEach(() => {
-    store = createStore({
-      state: {
-        theme: "light",
-      },
-    });
-  });
-
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-      wrapper = null;
-    }
+    wrapper?.unmount();
+    wrapper = null;
+    vi.restoreAllMocks();
   });
 
-  it("should render the component", () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── Renders with minimum props ────────────────────────────────────────────
+
+  describe("renders with minimum props", () => {
+    it("mounts without error", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.exists()).toBe(true);
     });
 
-    expect(wrapper.exists()).toBe(true);
+    it("has the component name 'CustomConfirmDialog'", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.vm.$options.name).toBe("CustomConfirmDialog");
+    });
+
+    it("renders the ODialog stub", () => {
+      wrapper = buildWrapper({ modelValue: true });
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
+    });
+
+    it("renders the confirm-card container", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.find('[data-test="custom-confirm-card"]').exists()).toBe(true);
+    });
   });
 
-  it("should render dialog when modelValue is true", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── Edge cases — empty / null / undefined props ───────────────────────────
+
+  describe("edge cases", () => {
+    it("defaults modelValue to false when not provided", () => {
+      wrapper = mount(CustomConfirmDialog, {
+        global: {
+          plugins: [createStore({ state: { theme: "light" } })],
+          stubs: { ODialog: ODialogStub },
+        },
+      });
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(false);
     });
 
-    await nextTick();
-    await flushPromises();
+    it("renders an empty message paragraph when message prop is not provided", () => {
+      wrapper = buildWrapper();
 
-    const dialog = document.querySelector('[data-test="custom-confirm-dialog"]');
-    expect(dialog).toBeTruthy();
+      const msg = wrapper.find('[data-test="dialog-message"]');
+      expect(msg.exists()).toBe(true);
+      expect(msg.text()).toBe("");
+    });
+
+    it("uses default title 'Confirm Action' when title prop is omitted", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Confirm Action");
+    });
   });
 
-  it("should display custom title", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-        title: "Delete Item?",
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── Props forwarded to ODialog ────────────────────────────────────────────
+
+  describe("props forwarded to ODialog", () => {
+    it("forwards open=true when modelValue=true", () => {
+      wrapper = buildWrapper({ modelValue: true });
+
+      expect(wrapper.findComponent(ODialogStub).props("open")).toBe(true);
     });
 
-    await nextTick();
-    await flushPromises();
+    it("forwards open=false when modelValue=false", () => {
+      wrapper = buildWrapper({ modelValue: false });
 
-    const title = document.querySelector('[data-test="dialog-title"]');
-    expect(title?.textContent).toBe("Delete Item?");
+      expect(wrapper.findComponent(ODialogStub).props("open")).toBe(false);
+    });
+
+    it("forwards a custom title", () => {
+      wrapper = buildWrapper({ title: "Delete Item?" });
+
+      expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Delete Item?");
+    });
+
+    it("forwards the message to the dialog body paragraph", () => {
+      wrapper = buildWrapper({ message: "Are you sure?" });
+
+      expect(wrapper.find('[data-test="dialog-message"]').text()).toBe("Are you sure?");
+    });
+
+    it("forwards persistent=true", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.findComponent(ODialogStub).props("persistent")).toBe(true);
+    });
+
+    it("forwards showClose=false", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.findComponent(ODialogStub).props("showClose")).toBe(false);
+    });
+
+    it("forwards size='sm'", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.findComponent(ODialogStub).props("size")).toBe("sm");
+    });
+
+    it("forwards secondaryButtonLabel='Cancel'", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.findComponent(ODialogStub).props("secondaryButtonLabel")).toBe("Cancel");
+    });
+
+    it("forwards primaryButtonLabel='Clear & Continue'", () => {
+      wrapper = buildWrapper();
+
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonLabel")).toBe("Clear & Continue");
+    });
   });
 
-  it("should display default title when not provided", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── Interactive elements fire right events ────────────────────────────────
+
+  describe("interactive elements", () => {
+    it("emits 'cancel' when ODialog emits click:secondary", async () => {
+      wrapper = buildWrapper();
+
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
+
+      expect(wrapper.emitted("cancel")).toHaveLength(1);
     });
 
-    await nextTick();
-    await flushPromises();
+    it("emits 'confirm' when ODialog emits click:primary", async () => {
+      wrapper = buildWrapper();
 
-    const title = document.querySelector('[data-test="dialog-title"]');
-    expect(title?.textContent).toBe("Confirm Action");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("confirm")).toHaveLength(1);
+    });
+
+    it("does NOT emit 'confirm' when secondary is clicked", async () => {
+      wrapper = buildWrapper();
+
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
+
+      expect(wrapper.emitted("confirm")).toBeFalsy();
+    });
+
+    it("does NOT emit 'cancel' when primary is clicked", async () => {
+      wrapper = buildWrapper();
+
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("cancel")).toBeFalsy();
+    });
   });
 
-  it("should display custom message", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-        message: "Are you sure you want to proceed?",
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── update:modelValue emissions ───────────────────────────────────────────
+
+  describe("update:modelValue emissions", () => {
+    it("emits update:modelValue=false after cancel is triggered", async () => {
+      wrapper = buildWrapper();
+
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
+      await nextTick();
+
+      const events = wrapper.emitted("update:modelValue");
+      expect(events).toBeTruthy();
+      expect(events![events!.length - 1]).toEqual([false]);
     });
 
-    await nextTick();
-    await flushPromises();
+    it("emits update:modelValue=false after confirm is triggered", async () => {
+      wrapper = buildWrapper();
 
-    const message = document.querySelector('[data-test="dialog-message"]');
-    expect(message?.textContent).toBe("Are you sure you want to proceed?");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+      await nextTick();
+
+      const events = wrapper.emitted("update:modelValue");
+      expect(events).toBeTruthy();
+      expect(events![events!.length - 1]).toEqual([false]);
+    });
   });
 
-  it("should render cancel button", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── v-if / conditional branches ───────────────────────────────────────────
+
+  describe("internal state — isVisible", () => {
+    it("isVisible is initialised to modelValue", () => {
+      wrapper = buildWrapper({ modelValue: true });
+
+      expect((wrapper.vm as any).isVisible).toBe(true);
     });
 
-    await nextTick();
-    await flushPromises();
+    it("isVisible updates when modelValue prop changes to true", async () => {
+      wrapper = buildWrapper({ modelValue: false });
 
-    const cancelButton = document.querySelector('[data-test="custom-cancel-button"]');
-    expect(cancelButton).toBeTruthy();
-    expect(cancelButton?.textContent?.trim()).toBe("Cancel");
+      await wrapper.setProps({ modelValue: true });
+      await nextTick();
+
+      expect((wrapper.vm as any).isVisible).toBe(true);
+    });
+
+    it("isVisible updates when modelValue prop changes to false", async () => {
+      wrapper = buildWrapper({ modelValue: true });
+
+      await wrapper.setProps({ modelValue: false });
+      await nextTick();
+
+      expect((wrapper.vm as any).isVisible).toBe(false);
+    });
+
+    it("propagates prop change to ODialog open prop", async () => {
+      wrapper = buildWrapper({ modelValue: false });
+
+      await wrapper.setProps({ modelValue: true });
+      await nextTick();
+
+      expect(wrapper.findComponent(ODialogStub).props("open")).toBe(true);
+    });
+
+    it("sets isVisible to false after onCancel is called", () => {
+      wrapper = buildWrapper({ modelValue: true });
+
+      (wrapper.vm as any).onCancel();
+
+      expect((wrapper.vm as any).isVisible).toBe(false);
+    });
+
+    it("sets isVisible to false after onConfirm is called", () => {
+      wrapper = buildWrapper({ modelValue: true });
+
+      (wrapper.vm as any).onConfirm();
+
+      expect((wrapper.vm as any).isVisible).toBe(false);
+    });
   });
 
-  it("should render confirm button", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── Async paths ───────────────────────────────────────────────────────────
+
+  describe("async reactivity paths", () => {
+    it("ODialog open prop reflects true after modelValue changes from false to true", async () => {
+      wrapper = buildWrapper({ modelValue: false });
+
+      let dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(false);
+
+      await wrapper.setProps({ modelValue: true });
+      await nextTick();
+
+      dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(true);
     });
-
-    await nextTick();
-    await flushPromises();
-
-    const confirmButton = document.querySelector('[data-test="custom-confirm-button"]');
-    expect(confirmButton).toBeTruthy();
-    expect(confirmButton?.textContent?.trim()).toBe("Clear & Continue");
   });
 
-  it("should emit cancel event when cancel button is clicked", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+  // ── Exposed methods ───────────────────────────────────────────────────────
+
+  describe("exposed methods", () => {
+    it("exposes onCancel as a function", () => {
+      wrapper = buildWrapper();
+
+      expect(typeof (wrapper.vm as any).onCancel).toBe("function");
     });
 
-    await nextTick();
-    await flushPromises();
+    it("exposes onConfirm as a function", () => {
+      wrapper = buildWrapper();
 
-    const cancelButton = document.querySelector('[data-test="custom-cancel-button"]') as HTMLElement;
-    cancelButton?.click();
-    await nextTick();
-
-    expect(wrapper.emitted("cancel")).toBeTruthy();
-  });
-
-  it("should emit confirm event when confirm button is clicked", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+      expect(typeof (wrapper.vm as any).onConfirm).toBe("function");
     });
 
-    await nextTick();
-    await flushPromises();
+    it("onConfirm invocation emits 'confirm'", () => {
+      wrapper = buildWrapper();
 
-    const confirmButton = document.querySelector('[data-test="custom-confirm-button"]') as HTMLElement;
-    confirmButton?.click();
-    await nextTick();
+      (wrapper.vm as any).onConfirm();
 
-    expect(wrapper.emitted("confirm")).toBeTruthy();
-  });
-
-  it("should emit update:modelValue with false when cancel is clicked", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+      expect(wrapper.emitted("confirm")).toHaveLength(1);
     });
 
-    await nextTick();
-    await flushPromises();
+    it("onCancel invocation emits 'cancel'", () => {
+      wrapper = buildWrapper();
 
-    const cancelButton = document.querySelector('[data-test="custom-cancel-button"]') as HTMLElement;
-    cancelButton?.click();
-    await nextTick();
+      (wrapper.vm as any).onCancel();
 
-    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
-  });
-
-  it("should emit update:modelValue with false when confirm is clicked", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
+      expect(wrapper.emitted("cancel")).toHaveLength(1);
     });
-
-    await nextTick();
-    await flushPromises();
-
-    const confirmButton = document.querySelector('[data-test="custom-confirm-button"]') as HTMLElement;
-    confirmButton?.click();
-    await nextTick();
-
-    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
-  });
-
-  it("should apply dark mode class when theme is dark", async () => {
-    const darkStore = createStore({
-      state: {
-        theme: "dark",
-      },
-    });
-
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [darkStore],
-      },
-      attachTo: document.body,
-    });
-
-    await nextTick();
-    await flushPromises();
-
-    const card = document.querySelector('[data-test="custom-confirm-card"]');
-    expect(card?.classList.contains("dark-mode")).toBe(true);
-  });
-
-  it("should apply light mode class when theme is light", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
-    });
-
-    await nextTick();
-    await flushPromises();
-
-    const card = document.querySelector('[data-test="custom-confirm-card"]');
-    expect(card?.classList.contains("light-mode")).toBe(true);
-  });
-
-  it("should have persistent dialog attribute", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
-    });
-
-    await nextTick();
-    await flushPromises();
-
-    // The persistent prop prevents dialog from closing on backdrop click
-    // We verify the dialog component receives this prop in the template
-    const dialogComponent = wrapper.findComponent({ name: "QDialog" });
-    expect(dialogComponent.exists()).toBe(true);
-    expect(dialogComponent.props("persistent")).toBe(true);
-  });
-
-  it("should update isVisible when modelValue prop changes", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: false,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
-    });
-
-    await wrapper.setProps({ modelValue: true });
-    await nextTick();
-    expect(wrapper.vm.isVisible).toBe(true);
-
-    await wrapper.setProps({ modelValue: false });
-    await nextTick();
-    expect(wrapper.vm.isVisible).toBe(false);
-  });
-
-  it("should render dialog header section", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
-    });
-
-    await nextTick();
-    await flushPromises();
-
-    const header = document.querySelector('[data-test="dialog-header"]');
-    expect(header).toBeTruthy();
-  });
-
-  it("should render dialog content section", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
-    });
-
-    await nextTick();
-    await flushPromises();
-
-    const content = document.querySelector('[data-test="dialog-content"]');
-    expect(content).toBeTruthy();
-  });
-
-  it("should render dialog actions section", async () => {
-    wrapper = mount(CustomConfirmDialog, {
-      props: {
-        modelValue: true,
-      },
-      global: {
-        plugins: [store],
-      },
-      attachTo: document.body,
-    });
-
-    await nextTick();
-    await flushPromises();
-
-    const actions = document.querySelector('[data-test="dialog-actions"]');
-    expect(actions).toBeTruthy();
   });
 });

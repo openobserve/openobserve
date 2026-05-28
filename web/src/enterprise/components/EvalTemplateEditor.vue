@@ -25,13 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
         <OButton
           data-test="eval-template-editor-back-btn"
+          icon-left="chevron-left"
           variant="outline"
           size="icon-xs-sq"
           @click="cancel"
-        >
-          <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
-        </OButton>
-        <span class="q-table__title tw:font-[600]" data-test="eval-template-editor-title">
+        />
+        <span class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="eval-template-editor-title">
           {{ isEdit ? t("evalTemplate.editTemplate") : t("evalTemplate.createTemplate") }}
         </span>
       </div>
@@ -44,15 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.templateName") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipName") }}</q-tooltip>
-            </q-icon>
+            <OIcon name="info" size="xs" class="field-info-icon">
+              <OTooltip :content="t('evalTemplate.tooltipName')" side="top" />
+            </OIcon>
           </div>
           <div class="o2-input" :class="{ 'field-error': errors.name }">
-            <q-input
+            <OInput
               v-model="form.name"
-              borderless
-              dense
               @update:model-value="errors.name = false"
             />
           </div>
@@ -60,12 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("common.description") }}</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipDescription") }}</q-tooltip>
-            </q-icon>
+            <OIcon name="info" size="xs" class="field-info-icon">
+              <OTooltip :content="t('evalTemplate.tooltipDescription')" side="top" />
+            </OIcon>
           </div>
           <div class="o2-input">
-            <q-input v-model="form.description" borderless dense />
+            <OInput v-model="form.description" />
           </div>
         </div>
       </div>
@@ -75,53 +72,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 0 0 200px; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.responseType") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipResponseType") }}</q-tooltip>
-            </q-icon>
+            <OIcon name="info" size="xs" class="field-info-icon">
+              <OTooltip :content="t('evalTemplate.tooltipResponseType')" side="top" />
+            </OIcon>
           </div>
-          <div class="o2-input">
-            <q-select
+          <div class="o2-input" :class="{ 'field-error': errors.response_type }">
+            <OSelect
               v-model="form.response_type"
               :options="responseTypes"
-              emit-value
-              map-options
-              borderless
-              dense
-              :rules="[(val) => !!val || t('evalTemplate.responseTypeRequired')]"
+              labelKey="label"
+              valueKey="value"
+              @update:model-value="errors.response_type = false"
             />
           </div>
         </div>
         <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.dimensions") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipDimensions") }}</q-tooltip>
-            </q-icon>
+            <OIcon name="info" size="xs" class="field-info-icon">
+              <OTooltip :content="t('evalTemplate.tooltipDimensions')" side="top" />
+            </OIcon>
           </div>
-          <q-select
-            v-model="dimensionsInput"
-            :options="filteredDimensionOptions"
-            color="input-border"
-            bg-color="input-bg"
-            class="no-case dimensions-select tw:w-full"
-            dense
-            borderless
-            multiple
-            use-chips
-            use-input
-            input-debounce="300"
-            new-value-mode="add-unique"
-            no-error-icon
-            @filter="filterDimensions"
-            :rules="[
-              (val) =>
-                (val && val.length > 0) || t('evalTemplate.dimensionRequired'),
-            ]"
-          >
-            <q-tooltip v-if="dimensionsInput.length >= 5" anchor="top middle" self="bottom middle">
-              {{ dimensionsInput.join(", ") }}
-            </q-tooltip>
-          </q-select>
+          <div :class="{ 'field-error': errors.dimensions }">
+            <OSelect
+              v-model="dimensionsInput"
+              :options="defaultDimensionOptions"
+              class="no-case dimensions-select tw:w-full"
+              multiple
+              searchable
+              creatable
+              @update:model-value="errors.dimensions = false"
+            />
+          </div>
+          <OTooltip v-if="dimensionsInput.length >= 5" :content="dimensionsInput.join(', ')" side="top" />
         </div>
       </div>
 
@@ -129,22 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="display: flex; flex-direction: column; flex: 1; min-height: 0">
         <div class="field-label-row">
           <label class="textarea-label">{{ t("evalTemplate.promptTemplate") }} *</label>
-          <q-icon name="info" size="14px" class="field-info-icon">
-            <q-tooltip>{{ t("evalTemplate.tooltipPromptTemplate") }}</q-tooltip>
-          </q-icon>
+          <OIcon name="info" size="xs" class="field-info-icon">
+            <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
+          </OIcon>
         </div>
-        <div class="textarea-border" style="flex: 1; display: flex; flex-direction: column">
-          <q-input
+          <OTextarea
             v-model="form.content"
-            borderless
-            dense
-            type="textarea"
-            class="prompt-input"
-            no-error-icon
-            :rules="[(val) => !!val || t('evalTemplate.contentRequired')]"
-            input-style="resize: none; height: 100%"
+            fill
+            @update:model-value="errors.content = false"
           />
-        </div>
       </div>
     </div>
 
@@ -176,15 +152,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { ChevronLeft } from 'lucide-vue-next';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OTextarea from '@/lib/forms/Input/OTextarea.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
 
 const { t } = useI18n();
-const q = useQuasar();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -244,18 +224,23 @@ const cancel = () => {
 };
 
 const saveTemplate = async () => {
+  errors.value.name = !form.value.name;
+  errors.value.response_type = !form.value.response_type;
+  errors.value.content = !form.value.content;
+  errors.value.dimensions = !dimensionsInput.value.length;
+
   if (
-    !form.value.name ||
-    !form.value.response_type ||
-    !form.value.content ||
-    !dimensionsInput.value.length
+    errors.value.name ||
+    errors.value.response_type ||
+    errors.value.content ||
+    errors.value.dimensions
   ) {
-    q.notify({ type: "warning", message: t("evalTemplate.saveRequiredFields") });
+    toast({ variant: "warning", message: t("evalTemplate.saveRequiredFields") });
     return;
   }
 
   saving.value = true;
-  const dismiss = q.notify({ spinner: true, message: t("common.loading"), timeout: 0 });
+  const dismiss = toast({ variant: "loading", message: t("common.loading"), timeout: 0 });
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
@@ -263,16 +248,16 @@ const saveTemplate = async () => {
 
     if (isEdit.value) {
       await evalTemplateService.updateTemplate(orgId, route.params.id as string, payload);
-      q.notify({ type: "positive", message: t("evalTemplate.updateSuccess") });
+      toast({ variant: "success", message: t("evalTemplate.updateSuccess") });
     } else {
       await evalTemplateService.createTemplate(orgId, payload);
-      q.notify({ type: "positive", message: t("evalTemplate.createSuccess") });
+      toast({ variant: "success", message: t("evalTemplate.createSuccess") });
     }
 
     router.push({ name: "evalTemplates" });
   } catch (err: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         err?.response?.data?.message ||
         (isEdit.value ? t("evalTemplate.updateFailed") : t("evalTemplate.createFailed")),
@@ -303,8 +288,8 @@ onBeforeMount(async () => {
     dimensionsInput.value = [...(template.dimensions ?? [])];
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.loadFailed"),
         timeout: 3000,
       });
@@ -362,44 +347,15 @@ onBeforeMount(async () => {
     }
   }
 
-  .q-chip {
-    margin: 0 !important;
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-
   input {
     min-width: 80px !important;
     flex-shrink: 0 !important;
   }
-
-  .q-field__append {
-    padding-left: 8px;
-    height: 40px !important;
-  }
 }
 
-.body--dark :deep(.dimensions-select) .q-chip {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  color: #e0e0e0 !important;
-
-  .q-icon {
-    color: #e0e0e0 !important;
-    opacity: 0.8;
-    &:hover { opacity: 1; }
-  }
-}
-
-.body--light :deep(.dimensions-select) .q-chip {
-  background-color: rgba(0, 0, 0, 0.08) !important;
-  color: #424242 !important;
-
-  .q-icon {
-    color: #424242 !important;
-    opacity: 0.7;
-    &:hover { opacity: 1; }
-  }
-}
+// NOTE: Dark/light chip styling removed — `.q-chip` and `.body--dark/--light` selectors
+// no longer match post-Quasar removal. Chip-like visuals are now provided by OBadge
+// variants (use `<OBadge variant="default">` for the dimensions-select tag tokens).
 
 // ── Fields ────────────────────────────────────────────────────────────────────
 .field-label-row {
@@ -414,7 +370,6 @@ onBeforeMount(async () => {
 }
 
 .field-info-icon {
-  color: var(--q-color-text);
   opacity: 0.45;
   cursor: default;
   flex-shrink: 0;
@@ -427,11 +382,6 @@ onBeforeMount(async () => {
 .textarea-border {
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
-
-  :deep(.q-field__control) {
-    border: none !important;
-    box-shadow: none !important;
-  }
 }
 
 .textarea-label {
@@ -447,34 +397,7 @@ onBeforeMount(async () => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 
-  :deep(.q-field__inner) {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-  }
-
-  :deep(.q-field__control) {
-    flex: 1;
-    min-height: 0;
-    height: auto !important;
-    align-items: stretch;
-  }
-
-  :deep(.q-field__control-container) {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  :deep(textarea) {
-    flex: 1;
-    min-height: 0;
-    height: 100% !important;
-    resize: none !important;
-    padding: 8px 12px !important;
-  }
 }
 </style>

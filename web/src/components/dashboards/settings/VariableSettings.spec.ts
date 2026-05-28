@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import { nextTick } from "vue";
 import VariableSettings from "./VariableSettings.vue";
 
@@ -135,6 +134,7 @@ vi.mock("vue-draggable-next", () => ({
   }
 }));
 
+
 describe("VariableSettings", () => {
   let wrapper: VueWrapper;
   let mockGetDashboard: any;
@@ -196,7 +196,7 @@ describe("VariableSettings", () => {
     return mount(VariableSettings, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           'q-btn': {
             name: 'QBtn',
@@ -204,9 +204,9 @@ describe("VariableSettings", () => {
             props: ['icon', 'label', 'color', 'class'],
             emits: ['click']
           },
-          'q-icon': {
+          'OIcon': {
             name: 'QIcon',
-            template: '<span class="q-icon"><slot /></span>',
+            template: '<span class="OIcon"><slot /></span>',
             props: ['name', 'color']
           },
           'q-dialog': {
@@ -214,6 +214,13 @@ describe("VariableSettings", () => {
             template: '<div v-if="modelValue" class="q-dialog"><slot /></div>',
             props: ['modelValue'],
             emits: ['update:modelValue']
+          },
+          ODialog: {
+            name: 'ODialog',
+            inheritAttrs: false,
+            template: '<div v-if="open" data-test="o-dialog-stub" class="o-dialog"><div data-test="o-dialog-title">{{ title }}</div><slot /></div>',
+            props: ['open', 'width', 'title', 'subTitle', 'persistent', 'size', 'showClose'],
+            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']
           },
           'q-card': {
             name: 'QCard',
@@ -278,7 +285,7 @@ describe("VariableSettings", () => {
     });
 
     it("should display variables list header", () => {
-      expect(wrapper.find(".variables-list-header").exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-variables-list-header"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Name");
       expect(wrapper.text()).toContain("Type");
       expect(wrapper.text()).toContain("Actions");
@@ -295,7 +302,7 @@ describe("VariableSettings", () => {
     });
 
     it("should show add variable button", () => {
-      expect(wrapper.find('button').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-variable-btn"]').exists()).toBe(true);
     });
 
     it("should display variable type labels correctly", async () => {
@@ -546,8 +553,26 @@ describe("VariableSettings", () => {
       const vm = wrapper.vm as any;
       vm.showVariablesDependenciesGraphPopUp = true;
       await nextTick();
-      
-      expect(wrapper.html()).toContain("Variables Dependency Graph");
+
+      const odialog = wrapper.find('[data-test="o-dialog-stub"]');
+      expect(odialog.exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe(
+        "Variables Dependency Graph"
+      );
+    });
+
+    it("should close dependencies graph dialog when ODialog emits update:open false", async () => {
+      const vm = wrapper.vm as any;
+      vm.showVariablesDependenciesGraphPopUp = true;
+      await nextTick();
+
+      const odialog = wrapper.findComponent({ name: "ODialog" });
+      expect(odialog.exists()).toBe(true);
+
+      odialog.vm.$emit("update:open", false);
+      await nextTick();
+
+      expect(vm.showVariablesDependenciesGraphPopUp).toBe(false);
     });
 
     it("should close dependencies graph popup", async () => {

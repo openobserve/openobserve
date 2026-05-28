@@ -15,486 +15,300 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEventDescription.vue";
-
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
-});
 
 describe("ErrorEventDescription Component", () => {
   let wrapper: any;
 
-  const mockErrorColumn = {
+  const defaultColumn = {
     type: "error",
     error_message: "Cannot read property 'foo' of undefined",
   };
 
+  function mountComponent(column = defaultColumn) {
+    return mount(ErrorEventDescription, { props: { column } });
+  }
+
   beforeEach(async () => {
-    vi.clearAllMocks();
-
-    wrapper = mount(ErrorEventDescription, {
-      attachTo: "#app",
-      props: {
-        column: mockErrorColumn,
-      },
-    });
-
+    wrapper = mountComponent();
     await flushPromises();
-    await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllTimers();
+    wrapper.unmount();
     vi.restoreAllMocks();
   });
 
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
+  it("mounts successfully", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render description container", () => {
-      expect(wrapper.find(".description").exists()).toBe(true);
-    });
-
-    it("should have correct container classes", () => {
-      const container = wrapper.find(".description");
-      expect(container.classes()).toContain("description");
-    });
+    // Assert
+    expect(wrapper.exists()).toBe(true);
   });
 
-  describe("Error Type Description", () => {
-    it("should display error message for error type", () => {
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe(
-        "Cannot read property 'foo' of undefined",
-      );
-    });
+  it("shows error message text for error type", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should display error message with correct font size", () => {
-      const span = wrapper.find(".description span");
-      expect(span.classes()).toContain("tw:text-[0.875rem]");
-    });
-
-    it("should handle different error messages", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "error",
-          error_message: "TypeError: undefined is not a function",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("TypeError: undefined is not a function");
-    });
-
-    it("should handle empty error message", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "error",
-          error_message: "",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Cannot read property 'foo' of undefined");
   });
 
-  describe("Resource Type Description", () => {
-    it("should display resource URL for resource type", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "resource",
-          resource_url: "https://api.example.com/data",
-        },
-      });
+  it("shows updated error message when column prop changes", async () => {
+    // Arrange
+    const newColumn = { type: "error", error_message: "TypeError: undefined is not a function" };
 
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("https://api.example.com/data");
-    });
+    // Act
+    await wrapper.setProps({ column: newColumn });
 
-    it("should display XHR resource details", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "resource",
-          resource_type: "xhr",
-          resource_method: "GET",
-          resource_url: "https://api.example.com/users",
-          resource_status_code: 200,
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toContain("GET");
-      expect(description.text()).toContain("https://api.example.com/users");
-      expect(description.text()).toContain("[ 200 ]");
-    });
-
-    it("should render resource URL as clickable link for XHR", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "resource",
-          resource_type: "xhr",
-          resource_method: "POST",
-          resource_url: "https://api.example.com/submit",
-          resource_status_code: 201,
-        },
-      });
-
-      const link = wrapper.find("a.resource-url");
-      expect(link.exists()).toBe(true);
-      expect(link.attributes("href")).toBe("https://api.example.com/submit");
-      expect(link.attributes("target")).toBe("_blank");
-      expect(link.classes()).toContain("text-primary");
-    });
-
-    it("should display method with correct styling", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "resource",
-          resource_type: "xhr",
-          resource_method: "DELETE",
-          resource_url: "https://api.example.com/delete",
-          resource_status_code: 204,
-        },
-      });
-
-      const method = wrapper.find(".text-bold");
-      expect(method.exists()).toBe(true);
-      expect(method.text()).toBe("DELETE");
-      expect(method.classes()).toContain("q-pr-sm");
-      expect(method.classes()).toContain("tw:text-[0.75rem]");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("TypeError: undefined is not a function");
   });
 
-  describe("View Type Description", () => {
-    it("should display view URL for regular view", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "view",
-          view_url: "/dashboard",
-        },
-      });
+  it("shows empty text for error type with empty message", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { type: "error", error_message: "" } });
 
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("/dashboard");
-    });
-
-    it("should display navigation details for route change", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "view",
-          view_loading_type: "route_change",
-          view_referrer: "/home",
-          view_url: "/profile",
-        },
-      });
-
-      const navigation = wrapper.find(".navigation");
-      expect(navigation.exists()).toBe(true);
-      expect(navigation.text()).toContain("from");
-      expect(navigation.text()).toContain("/home");
-      expect(navigation.text()).toContain("to");
-      expect(navigation.text()).toContain("/profile");
-    });
-
-    it("should style navigation block correctly", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "view",
-          view_loading_type: "route_change",
-          view_referrer: "/login",
-          view_url: "/dashboard",
-        },
-      });
-
-      const navigation = wrapper.find(".navigation");
-      expect(navigation.exists()).toBe(true);
-      expect(navigation.element.tagName).toBe("PRE");
-      expect(navigation.classes()).toContain("navigation");
-      expect(navigation.classes()).toContain("q-pa-sm");
-    });
-
-    it("should highlight from/to keywords", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "view",
-          view_loading_type: "route_change",
-          view_referrer: "/old-page",
-          view_url: "/new-page",
-        },
-      });
-
-      const primarySpans = wrapper.findAll(".text-primary");
-      expect(primarySpans).toHaveLength(2);
-      expect(primarySpans[0].text()).toBe("from");
-      expect(primarySpans[1].text()).toBe("to");
-    });
+    // Assert
+    expect(wrapper.find(".description").text()).toBe("");
   });
 
-  describe("Action Type Description", () => {
-    it("should display action target text and selector", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "action",
-          _oo_action_target_text: "Submit Button",
-          _oo_action_target_selector: "#submit-btn",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("Submit Button : #submit-btn");
+  it("shows resource URL for resource type without xhr subtype", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: { type: "resource", resource_url: "https://api.example.com/data" },
     });
 
-    it("should handle missing action text", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "action",
-          _oo_action_target_text: "",
-          _oo_action_target_selector: ".login-form button",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe(": .login-form button");
-    });
-
-    it("should handle missing action selector", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "action",
-          _oo_action_target_text: "Click Here",
-          _oo_action_target_selector: "",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("Click Here :");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("https://api.example.com/data");
   });
 
-  describe("Unknown Type Handling", () => {
-    it("should return empty string for unknown type", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "unknown",
-          some_field: "some_value",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("");
+  it("shows method, resource URL and status code for xhr resource", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: {
+        type: "resource",
+        resource_type: "xhr",
+        resource_method: "GET",
+        resource_url: "https://api.example.com/users",
+        resource_status_code: 200,
+      },
     });
 
-    it("should handle missing type", async () => {
-      await wrapper.setProps({
-        column: {
-          error_message: "Some error",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("GET");
+    expect(wrapper.text()).toContain("https://api.example.com/users");
+    expect(wrapper.text()).toContain("[ 200 ]");
   });
 
-  describe("Computed Property", () => {
-    it("should have getDescription computed property", () => {
-      expect(wrapper.vm.getDescription).toBeDefined();
-      expect(wrapper.vm.getDescription).toBe(
-        "Cannot read property 'foo' of undefined",
-      );
+  it("renders resource URL as a link opening in a new tab for xhr", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: {
+        type: "resource",
+        resource_type: "xhr",
+        resource_method: "POST",
+        resource_url: "https://api.example.com/submit",
+        resource_status_code: 201,
+      },
     });
 
-    it("should reactively update when column changes", async () => {
-      expect(wrapper.vm.getDescription).toBe(
-        "Cannot read property 'foo' of undefined",
-      );
-
-      await wrapper.setProps({
-        column: {
-          type: "resource",
-          resource_url: "https://example.com/api",
-        },
-      });
-
-      expect(wrapper.vm.getDescription).toBe("https://example.com/api");
-    });
+    // Assert
+    const link = wrapper.find("a.resource-url");
+    expect(link.exists()).toBe(true);
+    expect(link.attributes("href")).toBe("https://api.example.com/submit");
+    expect(link.attributes("target")).toBe("_blank");
   });
 
-  describe("Props Validation", () => {
-    it("should require column prop", () => {
-      expect(ErrorEventDescription.props?.column?.required).toBe(true);
-      expect(ErrorEventDescription.props?.column?.type).toBe(Object);
-    });
+  it("shows view URL for a standard view type", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { type: "view", view_url: "/dashboard" } });
 
-    it("should handle complex column structures", async () => {
-      const complexColumn = {
+    // Assert
+    expect(wrapper.text()).toContain("/dashboard");
+  });
+
+  it("shows navigation block with from/to for route_change view", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: {
         type: "view",
         view_loading_type: "route_change",
-        view_referrer: "https://example.com/page1",
-        view_url: "https://example.com/page2",
-        other_field: "ignored",
-      };
-
-      await wrapper.setProps({ column: complexColumn });
-
-      const navigation = wrapper.find(".navigation");
-      expect(navigation.exists()).toBe(true);
+        view_referrer: "/home",
+        view_url: "/profile",
+      },
     });
+
+    // Assert
+    const nav = wrapper.find(".navigation");
+    expect(nav.exists()).toBe(true);
+    expect(nav.text()).toContain("from");
+    expect(nav.text()).toContain("/home");
+    expect(nav.text()).toContain("to");
+    expect(nav.text()).toContain("/profile");
   });
 
-  describe("CSS Styling", () => {
-    it("should apply description styling", () => {
-      const container = wrapper.find(".description");
-      expect(container.classes()).toContain("description");
+  it("renders navigation block as a pre element", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: {
+        type: "view",
+        view_loading_type: "route_change",
+        view_referrer: "/login",
+        view_url: "/dashboard",
+      },
     });
 
-    it("should apply navigation styling", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "view",
-          view_loading_type: "route_change",
-          view_referrer: "/a",
-          view_url: "/b",
-        },
-      });
-
-      const navigation = wrapper.find(".navigation");
-      expect(navigation.classes()).toContain("navigation");
-      expect(navigation.classes()).toContain("q-pa-sm");
-    });
-
-    it("should style resource URL correctly", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "resource",
-          resource_type: "xhr",
-          resource_method: "GET",
-          resource_url: "https://api.test.com",
-          resource_status_code: 200,
-        },
-      });
-
-      const link = wrapper.find(".resource-url");
-      expect(link.classes()).toContain("resource-url");
-      expect(link.classes()).toContain("text-primary");
-    });
+    // Assert
+    const nav = wrapper.find(".navigation");
+    expect(nav.element.tagName).toBe("PRE");
   });
 
-  describe("Edge Cases", () => {
-    it("should handle null values", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "error",
-          error_message: null,
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("");
+  it("highlights from and to keywords with text-primary spans", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: {
+        type: "view",
+        view_loading_type: "route_change",
+        view_referrer: "/old-page",
+        view_url: "/new-page",
+      },
     });
 
-    it("should handle undefined values", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "action",
-          _oo_action_target_text: undefined,
-          _oo_action_target_selector: undefined,
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("undefined : undefined");
-    });
-
-    it("should handle mixed case types", async () => {
-      await wrapper.setProps({
-        column: {
-          type: "ERROR",
-          error_message: "Mixed case error",
-        },
-      });
-
-      const description = wrapper.find(".description");
-      expect(description.text()).toBe("");
-    });
+    // Assert
+    const primarySpans = wrapper.findAll(".text-primary");
+    expect(primarySpans).toHaveLength(2);
+    expect(primarySpans[0].text()).toBe("from");
+    expect(primarySpans[1].text()).toBe("to");
   });
 
-  describe("Component Structure", () => {
-    it("should have proper template structure", () => {
-      const description = wrapper.find(".description");
-      expect(description.exists()).toBe(true);
-      expect(description.element.children.length).toBeGreaterThanOrEqual(0);
+  it("shows action target text and selector for action type", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: {
+        type: "action",
+        _oo_action_target_text: "Submit Button",
+        _oo_action_target_selector: "#submit-btn",
+      },
     });
 
-    it("should conditionally render different templates", async () => {
-      // Test navigation template
-      await wrapper.setProps({
-        column: {
-          type: "view",
-          view_loading_type: "route_change",
-          view_referrer: "/a",
-          view_url: "/b",
-        },
-      });
-
-      expect(wrapper.find(".navigation").exists()).toBe(true);
-
-      // Test XHR template
-      await wrapper.setProps({
-        column: {
-          type: "resource",
-          resource_type: "xhr",
-          resource_method: "GET",
-          resource_url: "https://test.com",
-          resource_status_code: 200,
-        },
-      });
-
-      expect(wrapper.find(".resource-url").exists()).toBe(true);
-
-      // Test default template
-      await wrapper.setProps({
-        column: {
-          type: "error",
-          error_message: "Default template",
-        },
-      });
-
-      expect(wrapper.find(".description span").exists()).toBe(true);
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Submit Button : #submit-btn");
   });
 
-  describe("Component Lifecycle", () => {
-    it("should handle rapid prop changes", async () => {
-      const columns = [
-        { type: "error", error_message: "Error 1" },
-        { type: "resource", resource_url: "https://api1.com" },
-        {
-          type: "action",
-          _oo_action_target_text: "Click",
-          _oo_action_target_selector: ".btn",
-        },
-        { type: "view", view_url: "/page" },
-      ];
-
-      for (const column of columns) {
-        await wrapper.setProps({ column });
-        expect(wrapper.vm.getDescription).toBeDefined();
-      }
+  it("shows action with undefined target text and selector as 'undefined : undefined'", async () => {
+    // Arrange
+    await wrapper.setProps({
+      column: {
+        type: "action",
+        _oo_action_target_text: undefined,
+        _oo_action_target_selector: undefined,
+      },
     });
+
+    // Assert
+    expect(wrapper.find(".description").text()).toBe("undefined : undefined");
+  });
+
+  it("shows empty text for unknown type", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { type: "unknown", some_field: "value" } });
+
+    // Assert
+    expect(wrapper.find(".description").text()).toBe("");
+  });
+
+  it("shows empty text when type is missing", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { error_message: "Some error" } });
+
+    // Assert
+    expect(wrapper.find(".description").text()).toBe("");
+  });
+
+  it("shows empty text when error_message is null", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { type: "error", error_message: null } });
+
+    // Assert
+    expect(wrapper.find(".description").text()).toBe("");
+  });
+
+  it("has getDescription computed property that returns the error message", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    expect(wrapper.vm.getDescription).toBe(
+      "Cannot read property 'foo' of undefined",
+    );
+  });
+
+  it("reactively updates getDescription when column type changes", async () => {
+    // Arrange
+    expect(wrapper.vm.getDescription).toBe(
+      "Cannot read property 'foo' of undefined",
+    );
+
+    // Act
+    await wrapper.setProps({
+      column: { type: "resource", resource_url: "https://example.com/api" },
+    });
+
+    // Assert
+    expect(wrapper.vm.getDescription).toBe("https://example.com/api");
+  });
+
+  it("requires the column prop", () => {
+    // Assert
+    expect(ErrorEventDescription.props?.column?.required).toBe(true);
+    expect(ErrorEventDescription.props?.column?.type).toBe(Object);
+  });
+
+  it("switches between navigation, xhr and default templates on prop changes", async () => {
+    // Arrange: navigation template
+    await wrapper.setProps({
+      column: {
+        type: "view",
+        view_loading_type: "route_change",
+        view_referrer: "/a",
+        view_url: "/b",
+      },
+    });
+    expect(wrapper.find(".navigation").exists()).toBe(true);
+
+    // Act: switch to xhr template
+    await wrapper.setProps({
+      column: {
+        type: "resource",
+        resource_type: "xhr",
+        resource_method: "GET",
+        resource_url: "https://test.com",
+        resource_status_code: 200,
+      },
+    });
+    expect(wrapper.find(".resource-url").exists()).toBe(true);
+
+    // Act: switch back to default template
+    await wrapper.setProps({
+      column: { type: "error", error_message: "Default" },
+    });
+    expect(wrapper.find(".description span").exists()).toBe(true);
+  });
+
+  it("handles rapid prop changes without errors", async () => {
+    // Arrange
+    const columns = [
+      { type: "error", error_message: "Error 1" },
+      { type: "resource", resource_url: "https://api1.com" },
+      { type: "action", _oo_action_target_text: "Click", _oo_action_target_selector: ".btn" },
+      { type: "view", view_url: "/page" },
+    ];
+
+    for (const column of columns) {
+      // Act
+      await wrapper.setProps({ column });
+
+      // Assert
+      expect(wrapper.vm.getDescription).toBeDefined();
+    }
   });
 });

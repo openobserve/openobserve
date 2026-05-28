@@ -15,24 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 55vw"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer data-test="alert-history-drawer"
+    :open="open"
+    :width="60"
+    :title="t('alert_list.alert_history')"
+    @update:open="emit('update:open', $event)"
   >
-    <!-- Header — matches Stream Detail (schema.vue) layout -->
-    <q-card-section class="q-ma-none">
-      <div class="row items-center no-wrap">
-        <div class="col">
+    <!-- #header override required: header contains alert name/type badges,
+         tab toggle, and datetime picker — too complex for title + sub-slots -->
+    <template #header-left>
           <div
-            class="tw:text-[18px] tw:flex tw:items-center"
+            class="tw:flex tw:items-center tw:gap-2"
             data-test="alert-details-title"
           >
-            {{ t("alert_list.alert_history") }}
             <!-- Alert Name Badge -->
             <span
               v-if="alertDetails"
               :class="[
-                'tw:font-bold tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                'tw:font-bold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-44 tw:truncate tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -40,12 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-name-badge"
             >
               {{ alertDetails.name }}
-              <q-tooltip
+              <OTooltip
                 v-if="alertDetails.name && alertDetails.name.length > 35"
-                class="tw:text-xs"
-              >
-                {{ alertDetails.name }}
-              </q-tooltip>
+                :content="alertDetails.name"
+              />
             </span>
             <!-- Alert Type Badge -->
             <div
@@ -57,15 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-50 tw:border-gray-200',
               ]"
             >
-              <q-icon
+              <OIcon
                 :name="
                   isAnomaly
-                    ? 'query_stats'
-                    : alertDetails.is_real_time
+                    ? 'query-stats'
+                    : alertDetails.is-real-time
                       ? 'bolt'
                       : 'schedule'
                 "
-                size="14px"
+                size="sm"
                 class="tw:opacity-70"
               />
               <span
@@ -87,9 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Tab toggle -->
             <OToggleGroup
-              class="tw:shrink-0 tw:ml-4"
               :model-value="activeTab"
-              @update:model-value="activeTab = ($event as string)"
+              @update:model-value="activeTab = $event as string"
             >
               <OToggleGroupItem
                 value="history"
@@ -97,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-history-tab-history"
               >
                 <template #icon-left>
-                  <History class="tw:size-3.5 tw:shrink-0" />
+                  <OIcon name="history" size="sm" />
                 </template>
                 History
               </OToggleGroupItem>
@@ -107,46 +104,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-history-tab-condition"
               >
                 <template #icon-left>
-                  <Code2 class="tw:size-3.5 tw:shrink-0" />
+                  <OIcon name="code" size="sm" />
                 </template>
                 Condition
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
-        </div>
-        <div class="col-auto tw:flex tw:items-center tw:gap-1">
-          <DateTime
-            :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
-            ref="dateTimeRef"
-            auto-apply
-            :default-type="dateTimeType"
-            :default-absolute-time="{
-              startTime: absoluteTime.startTime,
-              endTime: absoluteTime.endTime,
-            }"
-            :default-relative-time="relativeTime"
-            data-test="alert-history-drawer-date-picker"
-            @on:date-change="updateDateTime"
-          />
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle-sm"
-            data-test="alert-details-close-btn"
-          >
-            <q-icon name="cancel" />
-          </OButton>
-        </div>
+    </template>
+    <template #header-right>
+      <div class="col-auto tw:flex tw:items-center tw:gap-1">
+        <DateTime
+          :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
+          ref="dateTimeRef"
+          auto-apply
+          :default-type="dateTimeType"
+          :default-absolute-time="{
+            startTime: absoluteTime.startTime,
+            endTime: absoluteTime.endTime,
+          }"
+          :default-relative-time="relativeTime"
+          data-test="alert-history-drawer-date-picker"
+          @on:date-change="updateDateTime"
+        />
       </div>
-    </q-card-section>
-    <q-separator />
+    </template>
 
     <!-- Content -->
-    <div
-      class="tw:flex tw:flex-col"
-      style="height: calc(100vh - 60px); overflow: hidden"
-      v-if="alertDetails"
-    >
+    <div class="tw:flex tw:flex-col tw:h-[calc(100vh-4rem)]" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
@@ -157,32 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- History Panel -->
         <OTabPanel
           name="history"
-          class="tw:flex tw:flex-col tw:h-full tw:p-0 tw:overflow-hidden"
+          layout="flex-col"
+          stretch
         >
           <div
-            class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-1"
+            class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-1"
           >
-            <!-- Loading state -->
-            <div
-              v-if="isLoadingHistory"
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-3"
-            >
-              <q-spinner-hourglass size="32px" color="primary" />
-              <div
-                class="tw:text-sm"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:text-gray-400'
-                    : 'tw:text-gray-500'
-                "
-              >
-                {{ t("alerts.alertDetails.loadingHistory") }}
-              </div>
-            </div>
-
             <!-- Empty state -->
             <div
-              v-else-if="alertHistory.length === 0"
+              v-if="!isLoadingHistory && alertHistory.length === 0"
               class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-2"
             >
               <div
@@ -193,10 +160,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-gray-100'
                 "
               >
-                <q-icon
-                  name="history_toggle_off"
-                  size="28px"
-                  :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'"
+                <OIcon
+                  name="history-toggle-off"
+                  size="lg"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
                 />
               </div>
               <div
@@ -231,105 +198,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'code-block-light'
               "
             >
-              <q-table
-                ref="qTableRef"
-                :rows="alertHistory"
+              <OTable
+                :data="alertHistory"
                 :columns="historyTableColumns"
                 row-key="timestamp"
-                v-model:pagination="pagination"
-                @request="onRequest"
-                style="flex: 1; overflow: hidden"
-                class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky history-table"
+                pagination="server"
+                v-model:current-page="currentPage"
+                v-model:page-size="selectedPerPage"
+                :total-count="resultTotal"
+                :loading="isLoadingHistory"
+                :row-class="getRowClass"
+                :show-global-filter="false"
+                class="history-table tw:flex-1 tw:overflow-hidden"
                 data-test="alert-details-history-table"
+                @pagination-change="onPaginationChange"
               >
-                <template v-slot:body="props">
-                  <q-tr :props="props" :class="getRowClass(props.row.status)">
-                    <q-td
-                      v-for="col in historyTableColumns"
-                      :key="col.name"
-                      :props="props"
-                    >
-                      <template v-if="col.name === '#'">
-                        <span
-                          class="tw:text-[13px] tw:tabular-nums"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-500'
-                              : 'tw:text-gray-400'
-                          "
-                        >
-                          {{
-                            (currentPage - 1) * selectedPerPage +
-                            props.rowIndex +
-                            1
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'status'">
-                        <q-chip
-                          dense
-                          size="sm"
-                          :icon="getStatusChipIcon(props.row.status)"
-                          :label="formatStatus(props.row.status)"
-                          :color="getStatusChipColor(props.row.status)"
-                          :text-color="getStatusChipTextColor(props.row.status)"
-                          class="tw:cursor-default"
-                          data-test="alert-history-status-chip"
-                        >
-                          <q-tooltip
-                            v-if="props.row.error"
-                            max-width="300px"
-                            class="tw:text-xs tw:break-words"
-                          >
-                            {{ props.row.error }}
-                          </q-tooltip>
-                        </q-chip>
-                      </template>
-                      <template v-else-if="col.name === 'timestamp'">
-                        <span class="tw:text-[13px]">{{
-                          formatTimestamp(props.row.timestamp)
-                        }}</span>
-                        <q-tooltip class="tw:text-xs">
-                          {{ formatTimestampFull(props.row.timestamp) }}
-                        </q-tooltip>
-                      </template>
-                      <template v-else-if="col.name === 'evaluation_time'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{
-                            props.row.evaluation_took_in_secs
-                              ? props.row.evaluation_took_in_secs.toFixed(3) +
-                                "s"
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'query_time'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{
-                            props.row.query_took
-                              ? props.row.query_took + "ms"
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'anomaly_count'">
-                        <span
-                          class="tw:text-[13px] tw:tabular-nums"
-                          :class="
-                            props.row.anomaly_count > 0
-                              ? 'tw:text-red-500 tw:font-medium'
-                              : ''
-                          "
-                        >
-                          {{
-                            props.row.anomaly_count != null
-                              ? props.row.anomaly_count
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                    </q-td>
-                  </q-tr>
+                <template #[`cell-#`]="{ row }">
+                  <span
+                    class="tw:text-[13px] tw:tabular-nums"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-gray-500'
+                        : 'tw:text-gray-400'
+                    "
+                  >
+                    {{
+                      (currentPage - 1) * selectedPerPage +
+                      alertHistory.findIndex((r: any) => r.timestamp === row.timestamp) +
+                      1
+                    }}
+                  </span>
+                </template>
+                <template #cell-status="{ row }">
+                  <OBadge
+                    size="sm"
+                    :icon="getStatusChipIcon(row.status)"
+                    :variant="getStatusChipVariant(row.status)"
+                    class="tw:cursor-default"
+                    data-test="alert-history-status-chip"
+                  >
+                    {{ formatStatus(row.status) }}
+                    <OTooltip
+                      v-if="row.error"
+                      :max-width="'300px'"
+                      :content="row.error"
+                    />
+                  </OBadge>
+                </template>
+                <template #cell-timestamp="{ row }">
+                  <span class="tw:text-[13px]">{{
+                    formatTimestamp(row.timestamp)
+                  }}</span>
+                  <OTooltip :content="formatTimestampFull(row.timestamp)" />
+                </template>
+                <template #cell-evaluation_time="{ row }">
+                  <span class="tw:text-[13px] tw:tabular-nums">
+                    {{
+                      row.evaluation_took_in_secs
+                        ? row.evaluation_took_in_secs.toFixed(3) + "s"
+                        : "—"
+                    }}
+                  </span>
+                </template>
+                <template #cell-query_time="{ row }">
+                  <span class="tw:text-[13px] tw:tabular-nums">
+                    {{
+                      row.query_took ? row.query_took + "ms" : "—"
+                    }}
+                  </span>
+                </template>
+                <template #cell-anomaly_count="{ row }">
+                  <span
+                    class="tw:text-[13px] tw:tabular-nums"
+                    :class="
+                      row.anomaly_count > 0
+                        ? 'tw:text-red-500 tw:font-medium'
+                        : ''
+                    "
+                  >
+                    {{
+                      row.anomaly_count != null ? row.anomaly_count : "—"
+                    }}
+                  </span>
+                </template>
+                <template #cell-error="{ row }">
+                  <span class="tw:text-[13px]">{{ row.error || "—" }}</span>
                 </template>
 
                 <template #bottom="scope">
@@ -339,17 +292,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                     </div>
-                    <QTablePagination
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="resultTotal"
-                      :perPageOptions="perPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                      @update:changePagination="onPageChange"
-                    />
                   </div>
                 </template>
-              </q-table>
+              </OTable>
             </div>
           </div>
         </OTabPanel>
@@ -357,7 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Condition Panel -->
         <OTabPanel
           name="condition"
-          class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden tw:p-0"
+          layout="flex-col"
+          stretch
         >
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-2 tw:pb-2"
@@ -394,13 +340,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OButton
                     v-if="anomalySql"
-                    @click="copyToClipboard(anomalySql, 'SQL')"
+                    @click="copyToClipboard(anomalySql, { successMessage: 'SQL Copied Successfully!', timeout: 3000 })"
                     variant="ghost-muted"
                     size="icon-xs-sq"
                     data-test="anomaly-details-copy-sql-btn"
                   >
-                    <q-icon name="content_copy" />
-                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                    <OIcon name="content-copy" size="sm" />
+                    <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>
                 <pre
@@ -456,19 +402,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="
                       copyToClipboard(
                         alertDetails.conditions,
-                        alertDetails.type === 'sql'
-                          ? t('alerts.alertDetails.sqlQuery')
-                          : alertDetails.type === 'promql'
-                            ? t('alerts.alertDetails.promqlQuery')
-                            : t('alerts.alertDetails.conditions'),
+                        {
+                          successMessage: (alertDetails.type === 'sql'
+                            ? t('alerts.alertDetails.sqlQuery')
+                            : alertDetails.type === 'promql'
+                              ? t('alerts.alertDetails.promqlQuery')
+                              : t('alerts.alertDetails.conditions')) + ' Copied Successfully!',
+                          timeout: 3000
+                        },
                       )
                     "
                     variant="ghost-muted"
                     size="icon-xs-sq"
                     data-test="alert-details-copy-conditions-btn"
                   >
-                    <q-icon name="content_copy" />
-                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                    <OIcon name="content-copy" size="sm" />
+                    <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>
                 <!-- Code content — scrolls internally -->
@@ -499,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:text-gray-500'
                 "
               >
-                <q-icon name="info_outline" size="13px" />
+                <OIcon name="info-outline" size="xs" />
                 {{ t("common.description") }}
               </div>
               <div
@@ -517,37 +466,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
     </div>
-  </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar, date } from "quasar";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
-import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import { History, Code2 } from 'lucide-vue-next';
+import { formatToTimeCompact, formatTimestamp } from "@/utils/date";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import DateTime from "@/components/DateTime.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 // Composables
 const { t } = useI18n();
 const store = useStore();
-const $q = useQuasar();
 
 // Props & Emits
 interface Props {
   alertDetails: any;
   alertId: string;
   alertType?: string;
+  open?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -564,7 +518,9 @@ const anomalySql = computed(() => {
   return buildAnomalyPreviewSql(d);
 });
 
-const emit = defineEmits([]);
+const emit = defineEmits<{
+  "update:open": [value: boolean];
+}>();
 
 const resultTotal = ref(0);
 
@@ -574,7 +530,6 @@ const activeTab = ref("history");
 // Refs
 const alertHistory: Ref<any[]> = ref([]);
 const isLoadingHistory = ref(false);
-const qTableRef: Ref<any> = ref(null);
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -593,140 +548,108 @@ const dateTimeValues = ref({
   relativeTimePeriod: "15m",
 });
 
-// Pagination (server-side pagination)
+// Pagination (server-side)
 const selectedPerPage = ref<number>(50);
 const currentPage = ref<number>(1);
-const pagination: any = ref({
-  page: 1,
-  rowsPerPage: 50,
-  rowsNumber: 0,
-});
 
-const perPageOptions = [
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
-
-const onRequest = async (requestProps: any) => {
-  const { page, rowsPerPage } = requestProps.pagination;
-  currentPage.value = page;
-  selectedPerPage.value = rowsPerPage;
+const onPaginationChange = async (params: { page: number; size: number }) => {
+  currentPage.value = params.page;
+  selectedPerPage.value = params.size;
   isLoadingHistory.value = true;
   await fetchAlertHistory(props.alertId);
-  pagination.value.page = page;
-  pagination.value.rowsPerPage = rowsPerPage;
   isLoadingHistory.value = false;
-};
-
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  pagination.value.page = 1;
-  qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value,
-  });
-};
-
-const onPageChange = (page: number) => {
-  pagination.value.page = page;
-  qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value,
-  });
 };
 
 // Columns
 const alertHistoryColumns = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left" as const,
+    id: "#",
+    header: "#",
+    accessorFn: () => null,
     sortable: false,
-    style: "width: 48px;",
+    size: 48,
+    meta: { align: "left" as const },
   },
   {
-    name: "timestamp",
-    label: t("alerts.historyTable.timestamp"),
-    field: "timestamp",
-    align: "left" as const,
+    id: "timestamp",
+    header: t("alerts.historyTable.timestamp"),
+    accessorKey: "timestamp",
     sortable: true,
-    style: "width: 140px;",
+    size: 140,
+    meta: { align: "left" as const },
   },
   {
-    name: "status",
-    label: t("alerts.historyTable.status"),
-    field: "status",
-    align: "left" as const,
+    id: "status",
+    header: t("alerts.historyTable.status"),
+    accessorKey: "status",
     sortable: true,
-    style: "width: 110px;",
+    size: 200,
+    meta: { align: "left" as const },
   },
   {
-    name: "evaluation_time",
-    label: t("alerts.historyTable.evaluationTime"),
-    field: "evaluation_took_in_secs",
-    align: "right" as const,
+    id: "evaluation_time",
+    header: t("alerts.historyTable.evaluationTime"),
+    accessorKey: "evaluation_took_in_secs",
     sortable: true,
-    style: "width: 130px;",
+    size: 140,
+    meta: { align: "left" as const },
   },
   {
-    name: "query_time",
-    label: t("alerts.historyTable.queryTime"),
-    field: "query_took",
-    align: "right" as const,
+    id: "query_time",
+    header: t("alerts.historyTable.queryTime"),
+    accessorKey: "query_took",
     sortable: true,
-    style: "width: 120px;",
+    size: 100,
+    meta: { align: "left" as const },
   },
   {
-    name: "error",
-    label: t("alerts.historyTable.error"),
-    field: "error",
-    align: "left" as const,
+    id: "error",
+    header: t("alerts.historyTable.error"),
+    accessorKey: "true",
     sortable: false,
   },
 ];
 
 const anomalyHistoryColumns = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left" as const,
+    id: "#",
+    header: "#",
+    accessorFn: () => null,
     sortable: false,
-    style: "width: 48px;",
+    size: 48,
+    meta: { align: "left" as const },
   },
   {
-    name: "timestamp",
-    label: t("alerts.historyTable.timestamp"),
-    field: "timestamp",
-    align: "left" as const,
-    sortable: true,
-    style: "width: 140px;",
+    id: "timestamp",
+    header: t("alerts.historyTable.timestamp"),
+    accessorKey: "timestamp",
+    sortable: false,
+    size: 140,
+    meta: { align: "left" as const },
   },
   {
-    name: "status",
-    label: "Result",
-    field: "status",
-    align: "left" as const,
-    sortable: true,
-    style: "width: 120px;",
+    id: "status",
+    header: "Result",
+    accessorKey: "status",
+    sortable: false,
+    size: 120,
+    meta: { align: "left" as const },
   },
   {
-    name: "evaluation_time",
-    label: t("alerts.historyTable.evaluationTime"),
-    field: "evaluation_took_in_secs",
-    align: "right" as const,
-    sortable: true,
-    style: "width: 130px;",
+    id: "evaluation_time",
+    header: t("alerts.historyTable.evaluationTime"),
+    accessorKey: "evaluation_took_in_secs",
+    sortable: false,
+    size: 130,
+    meta: { align: "right" as const },
   },
   {
-    name: "anomaly_count",
-    label: "Anomalies",
-    field: "anomaly_count",
-    align: "right" as const,
-    sortable: true,
-    style: "width: 120px;",
+    id: "anomaly_count",
+    header: "Anomalies",
+    accessorKey: "anomaly_count",
+    sortable: false,
+    size: 120,
+    meta: { align: "right" as const },
   },
 ];
 
@@ -736,7 +659,8 @@ const historyTableColumns = computed(() =>
 
 // Helper Functions
 
-const getRowClass = (status: string) => {
+const getRowClass = (row: any) => {
+  const status = row?.status;
   if (store.state.theme === "dark") {
     switch (status?.toLowerCase()) {
       case "firing":
@@ -768,55 +692,36 @@ const getStatusChipIcon = (status: string) => {
     case "firing":
     case "error":
     case "anomaly":
-      return "error_outline";
+      return "error-outline";
     case "ok":
     case "success":
     case "normal":
-      return "check_circle_outline";
+      return "check-circle-outline";
     case "skipped":
       return "block";
     case "pending":
       return "schedule";
     default:
-      return "help_outline";
+      return "help-outline";
   }
 };
 
-const getStatusChipColor = (status: string) => {
+const getStatusChipVariant = (status: string) => {
   switch (status?.toLowerCase()) {
     case "firing":
     case "error":
     case "anomaly":
-      return "red-1";
+      return "error-soft";
     case "ok":
     case "success":
     case "normal":
-      return "green-1";
+      return "success-soft";
     case "skipped":
-      return "amber-1";
+      return "warning-soft";
     case "pending":
-      return "blue-1";
+      return "primary-soft";
     default:
-      return "grey-3";
-  }
-};
-
-const getStatusChipTextColor = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "red-9";
-    case "ok":
-    case "success":
-    case "normal":
-      return "green-9";
-    case "skipped":
-      return "amber-9";
-    case "pending":
-      return "blue-9";
-    default:
-      return "grey-8";
+      return "default-soft";
   }
 };
 
@@ -837,12 +742,12 @@ const formatTimestamp = (timestamp: number) => {
     const days = Math.floor(diff / 86400000000);
     return `${days}d ago`;
   }
-  return date.formatDate(timestamp / 1000, "MMM DD, HH:mm");
+  return formatToTimeCompact(timestamp);
 };
 
 const formatTimestampFull = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm:ss");
+  return formatTimestamp(timestamp, "MMM DD, YYYY HH:mm:ss");
 };
 
 // Main Functions
@@ -871,13 +776,11 @@ const fetchAlertHistory = async (alertId: string) => {
     );
     alertHistory.value = response.data?.hits || [];
     resultTotal.value = response.data?.total || 0;
-    pagination.value.rowsNumber = response.data?.total || 0;
   } catch (error: any) {
     alertHistory.value = [];
     resultTotal.value = 0;
-    pagination.value.rowsNumber = 0;
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         error.response?.data?.message ||
         error.message ||
@@ -906,7 +809,6 @@ const updateDateTime = (value: any) => {
     };
   }
 
-  pagination.value.page = 1;
   currentPage.value = 1;
   if (props.alertId) {
     isLoadingHistory.value = true;
@@ -916,41 +818,15 @@ const updateDateTime = (value: any) => {
   }
 };
 
-const copyToClipboard = (text: string, type: string) => {
-  navigator.clipboard
-    .writeText(text)
-    .then(() => {
-      $q.notify({
-        type: "positive",
-        message: `${type} Copied Successfully!`,
-        timeout: 3000,
-      });
-    })
-    .catch(() => {
-      $q.notify({
-        type: "negative",
-        message: "Error while copy content.",
-        timeout: 3000,
-      });
-    });
-};
-
 // Watchers
 watch(
   () => props.alertId,
   async (newVal) => {
     if (newVal) {
-      pagination.value.page = 1;
       currentPage.value = 1;
-      if (!qTableRef.value) {
-        isLoadingHistory.value = true;
-        await fetchAlertHistory(newVal);
-        isLoadingHistory.value = false;
-      } else {
-        qTableRef.value?.requestServerInteraction({
-          pagination: pagination.value,
-        });
-      }
+      isLoadingHistory.value = true;
+      await fetchAlertHistory(newVal);
+      isLoadingHistory.value = false;
       // Fetch full config for the Condition tab when this is an anomaly detection alert.
       if (isAnomaly.value) {
         try {

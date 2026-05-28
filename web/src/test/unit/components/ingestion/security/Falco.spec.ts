@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import Falco from "@/components/ingestion/security/Falco.vue";
 
 // Mock useIngestion composable
@@ -29,6 +28,7 @@ vi.mock("@/composables/useIngestion", () => ({
     },
   })),
 }));
+
 
 describe("Falco.vue", () => {
   let store: any;
@@ -46,7 +46,7 @@ describe("Falco.vue", () => {
   const mountComponent = () => {
     return mount(Falco, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: {
           CopyContent: {
             template: '<div data-test="copy-content-stub">{{ content }}</div>',

@@ -16,68 +16,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="alert-history-summary tw:h-full tw:w-full">
-    <q-table
+    <OTable
       data-test="alert-history-summary-table"
-      :rows="historyRows"
+      :data="historyRows"
       :columns="columns"
       row-key="alert_name"
-      :pagination="pagination"
+      pagination="client"
+      :page-size="100"
       :loading="loading"
-      @request="onRequest"
+      sorting="client"
+      filter-mode="client"
+      :default-columns="false"
+      :show-global-filter="false"
       class="tw:h-full"
-      flat
-      bordered
     >
-      <template #body-cell-alert_name="props">
-        <q-td :props="props" class="cursor-pointer hover:tw:bg-gray-100 dark:hover:tw:bg-gray-700">
-          <div class="tw:flex tw:items-center" @click="openDrawer(props.row)">
-            <span class="tw:font-medium">{{ props.row.alert_name }}</span>
-          </div>
-        </q-td>
+      <template #cell-alert_name="{ row }">
+        <div
+          class="tw:flex tw:items-center tw:cursor-pointer"
+          @click="openDrawer(row)"
+        >
+          <span class="tw:font-medium">{{ row.alert_name }}</span>
+        </div>
       </template>
 
-      <template #body-cell-current_state="props">
-        <q-td :props="props">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-icon
-              :name="getStateIcon(props.row.current_state)"
-              :color="getStateColor(props.row.current_state)"
-              size="18px"
-            />
-            <span>{{ props.row.current_state }}</span>
-          </div>
-        </q-td>
+      <template #cell-current_state="{ row }">
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <OIcon
+            :name="getStateIcon(row.current_state)"
+            :class="getStateColorClass(row.current_state)"
+            size="sm"
+          />
+          <span>{{ row.current_state }}</span>
+        </div>
       </template>
 
-      <template #body-cell-frequency="props">
-        <q-td :props="props">
-          <span>{{ formatFrequency(props.row.frequency) }}</span>
-        </q-td>
+      <template #cell-frequency="{ row }">
+        <span>{{ formatFrequency(row.frequency) }}</span>
       </template>
 
-      <template #no-data>
+      <template #cell-last_evaluation="{ row }">
+        {{ formatTimestamp(row.last_evaluation) }}
+      </template>
+
+      <template #empty>
         <div class="tw:w-full tw:text-center tw:py-8">
-          <q-icon name="history" size="48px" class="tw:text-gray-400" />
+          <OIcon name="history" size="xl" class="tw:text-gray-400" />
           <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
             {{ t("alerts.noHistoryData") }}
           </div>
         </div>
       </template>
-    </q-table>
+    </OTable>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
-import { date } from "quasar";
+import { formatToReadable } from "@/utils/date";
 
 const { t } = useI18n();
 const store = useStore();
-const router = useRouter();
 
 interface AlertHistorySummary {
   alert_name: string;
@@ -94,59 +98,51 @@ const emit = defineEmits<{
 
 const loading = ref(false);
 const historyRows = ref<AlertHistorySummary[]>([]);
-const pagination = ref({
-  sortBy: "last_evaluation",
-  descending: true,
-  page: 1,
-  rowsPerPage: 100,
-  rowsNumber: 0,
-});
 
-const columns = computed(() => [
+const columns: OTableColumnDef[] = [
   {
-    name: "alert_name",
-    label: t("alerts.name"),
-    field: "alert_name",
-    align: "left",
+    id: "alert_name",
+    header: t("alerts.name"),
+    accessorKey: "alert_name",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "total_evaluations",
-    label: t("alerts.totalEvaluations"),
-    field: "total_evaluations",
-    align: "center",
+    id: "total_evaluations",
+    header: t("alerts.totalEvaluations"),
+    accessorKey: "total_evaluations",
     sortable: true,
+    meta: { align: "center" },
   },
   {
-    name: "firing_count",
-    label: t("alerts.firingCount"),
-    field: "firing_count",
-    align: "center",
+    id: "firing_count",
+    header: t("alerts.firingCount"),
+    accessorKey: "firing_count",
     sortable: true,
+    meta: { align: "center" },
   },
   {
-    name: "current_state",
-    label: t("alerts.currentState"),
-    field: "current_state",
-    align: "center",
+    id: "current_state",
+    header: t("alerts.currentState"),
+    accessorKey: "current_state",
     sortable: true,
+    meta: { align: "center" },
   },
   {
-    name: "frequency",
-    label: t("alerts.frequency"),
-    field: "frequency",
-    align: "center",
+    id: "frequency",
+    header: t("alerts.frequency"),
+    accessorKey: "frequency",
     sortable: true,
+    meta: { align: "center" },
   },
   {
-    name: "last_evaluation",
-    label: t("alerts.lastEvaluation"),
-    field: "last_evaluation",
-    align: "center",
+    id: "last_evaluation",
+    header: t("alerts.lastEvaluation"),
+    accessorKey: "last_evaluation",
     sortable: true,
-    format: (val: number) => formatTimestamp(val),
+    meta: { align: "center" },
   },
-]);
+];
 
 const getStateIcon = (state: string) => {
   switch (state.toLowerCase()) {
@@ -155,22 +151,22 @@ const getStateIcon = (state: string) => {
       return "error";
     case "ok":
     case "completed":
-      return "check_circle";
+      return "check-circle";
     default:
       return "info";
   }
 };
 
-const getStateColor = (state: string) => {
+const getStateColorClass = (state: string) => {
   switch (state.toLowerCase()) {
     case "firing":
     case "error":
-      return "negative";
+      return "tw:text-[var(--o2-negative)]";
     case "ok":
     case "completed":
-      return "positive";
+      return "tw:text-[var(--o2-positive)]";
     default:
-      return "grey";
+      return "tw:text-gray-500";
   }
 };
 
@@ -185,7 +181,7 @@ const formatFrequency = (seconds: number | null) => {
 
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+  return formatToReadable(timestamp);
 };
 
 const fetchHistorySummary = async () => {
@@ -241,7 +237,6 @@ const fetchHistorySummary = async () => {
       });
 
       historyRows.value = Array.from(aggregated.values());
-      pagination.value.rowsNumber = historyRows.value.length;
     }
   } catch (error) {
     console.error("Failed to fetch alert history summary:", error);
@@ -252,24 +247,6 @@ const fetchHistorySummary = async () => {
   } finally {
     loading.value = false;
   }
-};
-
-const onRequest = async (props: any) => {
-  const { page, rowsPerPage, sortBy, descending } = props.pagination;
-  pagination.value.page = page;
-  pagination.value.rowsPerPage = rowsPerPage;
-  pagination.value.sortBy = sortBy;
-  pagination.value.descending = descending;
-
-  // Sort locally since we have all data
-  historyRows.value.sort((a: any, b: any) => {
-    const fieldA = a[sortBy];
-    const fieldB = b[sortBy];
-
-    if (fieldA < fieldB) return descending ? 1 : -1;
-    if (fieldA > fieldB) return descending ? -1 : 1;
-    return 0;
-  });
 };
 
 const openDrawer = (row: AlertHistorySummary) => {
@@ -294,17 +271,4 @@ defineExpose({
 </script>
 
 <style scoped lang="scss">
-.alert-history-summary {
-  :deep(.q-table__top) {
-    padding: 8px 16px;
-  }
-
-  :deep(.q-table tbody td) {
-    cursor: pointer;
-  }
-
-  :deep(.q-table tbody tr:hover) {
-    background-color: rgba(0, 0, 0, 0.03);
-  }
-}
 </style>

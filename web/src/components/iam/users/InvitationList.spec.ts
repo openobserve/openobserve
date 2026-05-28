@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Dialog, Notify } from 'quasar';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 
-installQuasar({ plugins: [Dialog, Notify] });
+const dismissToastMock = vi.fn();
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: vi.fn(() => dismissToastMock),
+}));
 
 vi.mock('@/aws-exports', () => ({
   default: { isCloud: 'false', isEnterprise: 'true' },
@@ -54,6 +55,57 @@ import InvitationList from '@/components/iam/users/InvitationList.vue';
 import usersService from '@/services/users';
 import organizationsService from '@/services/organizations';
 
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport).
+// Exposes the props the component forwards and emits the click events
+// the component listens to.
+const ODialogStub = {
+  name: 'ODialog',
+  props: [
+    'open',
+    'size',
+    'title',
+    'subTitle',
+    'persistent',
+    'showClose',
+    'width',
+    'primaryButtonLabel',
+    'secondaryButtonLabel',
+    'neutralButtonLabel',
+    'primaryButtonVariant',
+    'secondaryButtonVariant',
+    'neutralButtonVariant',
+    'primaryButtonDisabled',
+    'secondaryButtonDisabled',
+    'neutralButtonDisabled',
+    'primaryButtonLoading',
+    'secondaryButtonLoading',
+    'neutralButtonLoading',
+  ],
+  emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-secondary"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+    </div>
+  `,
+};
+
 const node = document.createElement('div');
 node.setAttribute('id', 'invitation-list-test');
 document.body.appendChild(node);
@@ -70,6 +122,7 @@ async function mountInvitationList(props = {}) {
           emits: ['update:changeRecordPerPage'],
           template: '<div data-test="q-table-pagination-stub" />',
         },
+        ODialog: ODialogStub,
       },
     },
     props: {
@@ -95,6 +148,26 @@ describe('InvitationList - rendering', () => {
   it('renders the pending invitations title', async () => {
     const wrapper = await mountInvitationList();
     expect(wrapper.find('[data-test="invitation-title-text"]').exists()).toBe(true);
+  });
+
+  it('renders both ODialog instances (accept + reject confirmations)', async () => {
+    const wrapper = await mountInvitationList();
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    expect(dialogs.length).toBe(2);
+  });
+
+  it('keeps both confirmation dialogs closed by default', async () => {
+    const wrapper = await mountInvitationList();
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    expect(dialogs[0].props('open')).toBe(false);
+    expect(dialogs[1].props('open')).toBe(false);
+  });
+
+  it('forwards size="xs" to both confirmation dialogs', async () => {
+    const wrapper = await mountInvitationList();
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    expect(dialogs[0].props('size')).toBe('xs');
+    expect(dialogs[1].props('size')).toBe('xs');
   });
 });
 
@@ -191,6 +264,16 @@ describe('InvitationList - acceptInvitation', () => {
     (wrapper.vm as any).acceptInvitation(inv);
     expect((wrapper.vm as any).confirmAccept).toBe(true);
   });
+
+  it('propagates confirmAccept=true to the accept ODialog open prop', async () => {
+    const wrapper = await mountInvitationList();
+    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    (wrapper.vm as any).acceptInvitation(inv);
+    await flushPromises();
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    // The first dialog is the accept dialog
+    expect(dialogs[0].props('open')).toBe(true);
+  });
 });
 
 // 5. rejectInvitation
@@ -207,6 +290,16 @@ describe('InvitationList - rejectInvitation', () => {
     const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
     (wrapper.vm as any).rejectInvitation(inv);
     expect((wrapper.vm as any).confirmReject).toBe(true);
+  });
+
+  it('propagates confirmReject=true to the reject ODialog open prop', async () => {
+    const wrapper = await mountInvitationList();
+    const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
+    (wrapper.vm as any).rejectInvitation(inv);
+    await flushPromises();
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    // The second dialog is the reject dialog
+    expect(dialogs[1].props('open')).toBe(true);
   });
 });
 
@@ -229,6 +322,15 @@ describe('InvitationList - confirmAcceptInvitation', () => {
       'confirm',
       'org-1',
     );
+  });
+
+  it('closes the confirmAccept dialog after invoking confirm', async () => {
+    const wrapper = await mountInvitationList();
+    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    (wrapper.vm as any).selectedInvitation = inv;
+    (wrapper.vm as any).confirmAccept = true;
+    await (wrapper.vm as any).confirmAcceptInvitation();
+    expect((wrapper.vm as any).confirmAccept).toBe(false);
   });
 
   it('refreshes organizations list after accepting', async () => {
@@ -254,11 +356,44 @@ describe('InvitationList - confirmAcceptInvitation', () => {
       new Error('server error'),
     );
     const wrapper = await mountInvitationList();
-    const notifySpy = vi.spyOn((wrapper.vm as any).$q, 'notify');
+    const { toast } = await import('@/lib/feedback/Toast/useToast');
+    vi.mocked(toast).mockClear();
     const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmAcceptInvitation();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'negative' }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to accept invitation' }));
+  });
+
+  it('triggers confirmAcceptInvitation when the accept ODialog emits click:primary', async () => {
+    const wrapper = await mountInvitationList();
+    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    (wrapper.vm as any).selectedInvitation = inv;
+    (wrapper.vm as any).confirmAccept = true;
+    await flushPromises();
+
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    // First dialog is the accept dialog
+    await dialogs[0].vm.$emit('click:primary');
+    await flushPromises();
+
+    expect(organizationsService.process_subscription).toHaveBeenCalledWith(
+      'tok-1',
+      'confirm',
+      'org-1',
+    );
+  });
+
+  it('closes the accept dialog when ODialog emits click:secondary (cancel)', async () => {
+    const wrapper = await mountInvitationList();
+    (wrapper.vm as any).confirmAccept = true;
+    await flushPromises();
+
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    await dialogs[0].vm.$emit('click:secondary');
+    await flushPromises();
+
+    expect((wrapper.vm as any).confirmAccept).toBe(false);
+    expect(organizationsService.process_subscription).not.toHaveBeenCalled();
   });
 });
 
@@ -277,6 +412,15 @@ describe('InvitationList - confirmRejectInvitation', () => {
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmRejectInvitation();
     expect(organizationsService.decline_subscription).toHaveBeenCalledWith('tok-2');
+  });
+
+  it('closes the confirmReject dialog after invoking confirm', async () => {
+    const wrapper = await mountInvitationList();
+    const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
+    (wrapper.vm as any).selectedInvitation = inv;
+    (wrapper.vm as any).confirmReject = true;
+    await (wrapper.vm as any).confirmRejectInvitation();
+    expect((wrapper.vm as any).confirmReject).toBe(false);
   });
 
   it('removes the rejected invitation from the list', async () => {
@@ -308,28 +452,42 @@ describe('InvitationList - confirmRejectInvitation', () => {
       new Error('server error'),
     );
     const wrapper = await mountInvitationList();
-    const notifySpy = vi.spyOn((wrapper.vm as any).$q, 'notify');
+    const { toast } = await import('@/lib/feedback/Toast/useToast');
+    vi.mocked(toast).mockClear();
     const inv = (wrapper.vm as any).invitations[0];
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmRejectInvitation();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ color: 'negative' }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to reject invitation' }));
+  });
+
+  it('triggers confirmRejectInvitation when the reject ODialog emits click:primary', async () => {
+    const wrapper = await mountInvitationList();
+    const inv = (wrapper.vm as any).invitations[0];
+    (wrapper.vm as any).selectedInvitation = inv;
+    (wrapper.vm as any).confirmReject = true;
+    await flushPromises();
+
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    // Second dialog is the reject dialog
+    await dialogs[1].vm.$emit('click:primary');
+    await flushPromises();
+
+    expect(organizationsService.decline_subscription).toHaveBeenCalledWith(inv.token);
+  });
+
+  it('closes the reject dialog when ODialog emits click:secondary (cancel)', async () => {
+    const wrapper = await mountInvitationList();
+    (wrapper.vm as any).confirmReject = true;
+    await flushPromises();
+
+    const dialogs = wrapper.findAllComponents(ODialogStub);
+    await dialogs[1].vm.$emit('click:secondary');
+    await flushPromises();
+
+    expect((wrapper.vm as any).confirmReject).toBe(false);
+    expect(organizationsService.decline_subscription).not.toHaveBeenCalled();
   });
 });
 
-// 8. changePagination
-describe('InvitationList - changePagination', () => {
-  it('updates selectedPerPage', async () => {
-    const wrapper = await mountInvitationList();
-    // Provide a mock qTable to avoid setPagination error
-    (wrapper.vm as any).qTable = { setPagination: vi.fn() };
-    (wrapper.vm as any).changePagination({ label: '50', value: 50 });
-    expect((wrapper.vm as any).selectedPerPage).toBe(50);
-  });
-
-  it('updates pagination.rowsPerPage', async () => {
-    const wrapper = await mountInvitationList();
-    (wrapper.vm as any).qTable = { setPagination: vi.fn() };
-    (wrapper.vm as any).changePagination({ label: '100', value: 100 });
-    expect((wrapper.vm as any).pagination.rowsPerPage).toBe(100);
-  });
-});
+// 8. changePagination — removed: component uses OTable client-side pagination,
+// no longer exposes changePagination / selectedPerPage / pagination.rowsPerPage.

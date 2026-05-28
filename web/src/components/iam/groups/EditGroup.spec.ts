@@ -16,15 +16,10 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import EditGroup from "@/components/iam/groups/EditGroup.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-installQuasar({
-  plugins: [Notify],
-});
 
 vi.mock("@/services/iam", () => ({
   getGroup: vi.fn(() => Promise.resolve({ data: {} })),
@@ -39,13 +34,18 @@ vi.mock("@/composables/iam/usePermissions", () => ({
   })),
 }));
 
-const mockNotify = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
+
+import { toast } from "@/lib/feedback/Toast/useToast";
+
 vi.mock("quasar", async () => {
   const actual = await vi.importActual("quasar");
   return {
     ...actual,
     useQuasar: () => ({
-      notify: mockNotify,
+      notify: vi.fn(),
     }),
   };
 });
@@ -313,14 +313,14 @@ describe("EditGroup Component", () => {
 
   describe("Save Changes", () => {
     beforeEach(() => {
-      mockNotify.mockClear();
+      vi.mocked(toast).mockClear();
     });
 
     it("shows info notification when no changes detected", async () => {
       await wrapper.vm.saveGroupChanges();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "info",
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
+        variant: "info",
         message: "No updates detected.",
         timeout: 3000,
       });
@@ -347,8 +347,8 @@ describe("EditGroup Component", () => {
         },
       });
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
+        variant: "success",
         message: "Updated group successfully!",
         timeout: 3000,
       });
@@ -408,8 +408,8 @@ describe("EditGroup Component", () => {
       // Give time for async operations
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
+        variant: "error",
         message: "Error while updating group!",
         timeout: 3000,
       });
@@ -424,7 +424,7 @@ describe("EditGroup Component", () => {
 
       await wrapper.vm.saveGroupChanges();
 
-      expect(mockNotify).not.toHaveBeenCalled();
+      expect(vi.mocked(toast)).not.toHaveBeenCalled();
     });
   });
 
@@ -458,10 +458,8 @@ describe("EditGroup Component", () => {
 
   describe("Theme Support", () => {
     it("applies correct theme classes to sticky footer", () => {
-      // Footer classes have been updated to use Tailwind CSS
-      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
+      const footer = wrapper.find('[data-test="edit-group-footer"]');
       expect(footer.exists()).toBe(true);
-      // Test that theme classes are applied correctly
     });
 
     it("switches to dark theme classes when theme is dark", async () => {
@@ -480,9 +478,9 @@ describe("EditGroup Component", () => {
         },
       });
 
-      // Footer classes have been updated, theme classes are no longer applied to footer
-      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
+      const footer = wrapper.find('[data-test="edit-group-footer"]');
       expect(footer.exists()).toBe(true);
+      wrapper.unmount();
     });
   });
 
@@ -559,8 +557,8 @@ describe("EditGroup Component", () => {
       // This should still trigger the "no changes" path
       await wrapper.vm.saveGroupChanges();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "info",
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
+        variant: "info",
         message: "No updates detected.",
         timeout: 3000,
       });

@@ -55,29 +55,22 @@ test.describe("dashboard UI testcases", () => {
     );
 
     // Apply the changes
-    await page.locator('[data-test="dashboard-apply"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardPanelActions.waitForApplyVisible();
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForDateTimeButtonToBeEnabled(page);
 
     // Save the chart image
-    await page
-      .locator('[data-test="chart-renderer"]')
-      .waitFor({ state: "visible" });
-    await page.screenshot({
-      path: `playwright-tests/Dashboards/dashboard-snaps/areachart-screenshot.png`,
-      selector: '[data-test="chart-renderer"]',
-    });
+    await pm.dashboardPanelActions.waitForChartRendererVisible();
+    await pm.dashboardPanelActions.takeChartRendererScreenshot(
+      `playwright-tests/Dashboards/dashboard-snaps/areachart-screenshot.png`
+    );
 
     // Save the panel
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForDefaultFolderTabVisible();
     await deleteDashboard(page, dashboardName);
   });
 });

@@ -13,19 +13,20 @@
           variant="ghost"
           aria-label="Add icon"
         >
-          <q-icon :name="isDropdownOpen ? 'expand_less' : 'expand_more'" size="14px" />
+          <OIcon :name="isDropdownOpen ? 'expand-less' : 'expand-more'" size="xs" />
         </OButton>
       </template>
       <div class="logs-table-list tw:min-w-[180px]">
         <slot name="dropdown" :field="field" :value="value" />
       </div>
     </ODropdown>
-    <span class="q-pl-xs tw:truncate">{{ value }}</span>
+    <span class="tw:pl-1 tw:truncate">{{ value }}</span>
   </div>
 </template>
 
 <script lang="ts">
 import { computed, ref, useSlots } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -35,6 +36,7 @@ export default {
   components: {
     OButton,
     ODropdown,
+    OIcon,
   },
   props: {
     field: {

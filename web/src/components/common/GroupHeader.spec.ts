@@ -22,7 +22,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 const stubs = {
-  "q-separator": { template: "<hr class='q-separator-stub' />" },
+  OSeparator: { template: "<hr class='o-separator-stub' />" },
 };
 
 describe("GroupHeader.vue", () => {
@@ -153,9 +153,9 @@ describe("GroupHeader.vue", () => {
   // ─── Separator ────────────────────────────────────────────────────────────────
 
   describe("Separator", () => {
-    it("renders a q-separator", () => {
+    it("renders an OSeparator", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find(".q-separator-stub").exists()).toBe(true);
+      expect(wrapper.find(".o-separator-stub").exists()).toBe(true);
     });
   });
 

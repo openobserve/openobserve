@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { reactive, onBeforeMount, nextTick } from "vue";
 import { useStore } from "vuex";
@@ -38,11 +37,11 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useStreamingSearch from "@/composables/useStreamingSearch";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
-  const $q = useQuasar();
 
   let {
     searchObj,
@@ -158,17 +157,14 @@ const useLogs = () => {
             "ui",
           )
           .then((res: any) => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Job Added Succesfully",
               timeout: 2000,
-              actions: [
-                {
-                  label: "Go To Job Scheduler",
-                  color: "white",
-                  handler: () => routeToSearchSchedule(),
-                },
-              ],
+              action: {
+                label: "Go To Job Scheduler",
+                handler: () => routeToSearchSchedule(),
+              },
             });
           });
       } else {
@@ -233,10 +229,8 @@ const useLogs = () => {
 
         // only notify if user is in logs page
         if (searchObj.meta.logsVisualizeToggle == "logs") {
-          $q.notify({
+          toast({
             message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-            color: "positive",
-            position: "top",
             timeout: 1000,
           });
         }
@@ -801,7 +795,6 @@ const useLogs = () => {
     routeToSearchSchedule,
     processPostPaginationData,
     router,
-    $q,
     clearSearchObj,
     loadVisualizeData,
     loadPatternsData,

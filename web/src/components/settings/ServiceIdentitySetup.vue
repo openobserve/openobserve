@@ -16,19 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:w-full service-identity-setup q-mt-sm"
+    class="tw:w-full service-identity-setup tw:mt-2"
     :class="{ 'sis-dark': store.state.theme === 'dark' }"
   >
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="tw:flex tw:flex-col tw:gap-4 tw:py-4">
-      <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
-      <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
-      <q-skeleton
-        type="rect"
-        height="40px"
-        width="160px"
-        class="tw:rounded-lg"
-      />
+      <OSkeleton class="tw:rounded-lg tw:h-14 tw:w-full" />
+      <OSkeleton class="tw:rounded-lg tw:h-14 tw:w-full" />
+      <OSkeleton class="tw:rounded-lg tw:h-10 tw:w-40" />
     </div>
 
     <div v-else>
@@ -57,11 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
-              <q-icon
-                :name="serviceNameDetected ? 'check_circle' : 'warning'"
-                size="18px"
-                :color="serviceNameDetected ? 'positive' : undefined"
-                :class="serviceNameDetected ? '' : 'tw:text-amber-500'"
+              <OIcon
+                :name="serviceNameDetected ? 'check-circle' : 'warning'"
+                size="sm"
+                :class="serviceNameDetected ? 'tw:text-[var(--o2-positive)]' : 'tw:text-amber-500'"
               />
               <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
                 <template v-if="serviceNameDetected">
@@ -80,13 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </template>
               </div>
-              <q-icon
+              <OIcon
                 :name="
                   serviceNameExpanded
-                    ? 'keyboard_arrow_up'
-                    : 'keyboard_arrow_down'
+                    ? 'keyboard-arrow-up'
+                    : 'keyboard-arrow-down'
                 "
-                size="18px"
+                size="sm"
                 class="tw:opacity-40 tw:shrink-0"
               />
             </div>
@@ -110,16 +104,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:rounded-lg tw:p-2.5"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:bg-grey-9/60'
-                    : 'tw:bg-grey-1'
+                    ? 'tw:bg-gray-700/60'
+                    : 'tw:bg-gray-50'
                 "
               >
                 <div
                   class="tw:text-xs tw:font-medium tw:mb-2"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-grey-4'
-                      : 'tw:text-grey-7'
+                      ? 'tw:text-gray-300'
+                      : 'tw:text-gray-400'
                   "
                 >
                   {{ t("settings.correlation.serviceNameExpandedHelp") }}
@@ -135,8 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="border: 1px solid var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:bg-grey-8 tw:text-grey-2'
-                        : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                        ? 'tw:bg-gray-600 tw:text-gray-100'
+                        : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
                     "
                   >
                     <div class="tw:flex tw:items-center tw:gap-0.5 tw:mr-0.5">
@@ -163,8 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="border: 1px dashed var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-6'
-                        : 'tw:text-grey-5'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                     :title="
                       t('settings.correlation.serviceNameConfiguredNotSeen')
@@ -182,8 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:flex-wrap tw:items-center tw:gap-3 tw:text-[10px]"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-6'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                   >
                     <div class="tw:flex tw:items-center tw:gap-1">
@@ -230,83 +224,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Field Mapping Dialog -->
-          <q-dialog v-model="showFieldMappingDialog">
-            <q-card
-              style="min-width: 480px; max-width: 600px"
-              class="tw:rounded-xl"
-            >
-              <q-card-section
-                class="tw:flex tw:items-center tw:justify-between tw:pb-2"
-              >
-                <div>
-                  <div class="text-h6">
-                    {{ t("settings.correlation.customizeFieldMappings") }}
-                  </div>
-                  <div
-                    class="tw:text-xs tw:mt-1"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-6'
-                    "
-                  >
-                    {{ t("settings.correlation.fieldMappingDialogHelp") }}
-                  </div>
-                </div>
-                <OButton variant="ghost" size="icon" v-close-popup>
-                  <q-icon name="close" size="14px" />
-                </OButton>
-              </q-card-section>
-
-              <q-separator />
-
-              <q-card-section class="tw:pt-4">
-                <TagInput
-                  :model-value="editableServiceFields"
-                  @update:model-value="editableServiceFields = $event"
-                  :placeholder="
-                    t('settings.correlation.fieldMappingPlaceholder')
-                  "
-                  label=""
-                />
-              </q-card-section>
-
-              <q-separator />
-
-              <q-card-actions align="right" class="tw:px-4 tw:py-3">
-                <div class="tw:flex tw:gap-2">
-                  <OButton variant="outline" size="sm-action" v-close-popup>
-                    {{ t("common.cancel") }}
-                  </OButton>
-                  <OButton
-                    variant="primary"
-                    size="sm-action"
-                    :loading="savingFieldMappings"
-                    @click="saveFieldMappings"
-                  >
-                    {{ t("common.save") }}
-                  </OButton>
-                </div>
-              </q-card-actions>
-            </q-card>
-          </q-dialog>
+          <ODialog
+            data-test="service-identity-setup-field-mapping-dialog"
+            v-model:open="showFieldMappingDialog"
+            size="sm"
+            :title="t('settings.correlation.customizeFieldMappings')"
+            :sub-title="t('settings.correlation.fieldMappingDialogHelp')"
+            :secondary-button-label="t('common.cancel')"
+            :primary-button-label="t('common.save')"
+            :primary-button-loading="savingFieldMappings"
+            @click:secondary="showFieldMappingDialog = false"
+            @click:primary="saveFieldMappings"
+          >
+            <TagInput
+              :model-value="editableServiceFields"
+              @update:model-value="editableServiceFields = $event"
+              :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
+              label=""
+            />
+          </ODialog>
 
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="tw:mb-3">
-            <q-toggle
+            <OSwitch
               data-test="service-identity-service-optional-btn"
               v-model="serviceOptional"
               :label="t('settings.correlation.serviceOptionalLabel')"
-              size="sm"
-              dense
-              class="tw:text-[13px] tw:font-semibold"
+              size="md"
             />
             <div
               class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-6'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               {{ t("settings.correlation.serviceOptionalHelp") }}
@@ -319,14 +270,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:font-bold tw:text-sm">{{
                 t("settings.correlation.distinguishByLabel")
               }}</span>
-              <span class="tw:flex-1"><q-separator /></span>
+              <span class="tw:flex-1"><OSeparator /></span>
             </div>
             <div
               class="tw:text-xs tw:mb-3"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-6'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               {{ t("settings.correlation.distinguishByHelp") }}
@@ -338,17 +289,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-3 tw:px-4 tw:rounded-md tw:border tw:border-dashed"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:border-grey-7 tw:bg-grey-9/40'
-                  : 'tw:border-grey-4 tw:bg-grey-1'
+                  ? 'tw:border-grey-7 tw:bg-gray-700/40'
+                  : 'tw:border-grey-4 tw:bg-gray-50'
               "
             >
-              <q-icon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
+              <OIcon name="tune" size="lg" class="tw:text-gray-400 tw:mb-1" />
               <span
                 class="tw:text-sm tw:font-medium"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-grey-4'
-                    : 'tw:text-grey-7'
+                    ? 'tw:text-gray-300'
+                    : 'tw:text-gray-400'
                 "
               >
                 No fields configured yet
@@ -360,9 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-identity-add-distinguish-btn"
                 @click="addingToEnv = activeEnvironment"
               >
-                <template #icon-left
-                  ><q-icon name="add" size="14px"
-                /></template>
+                <template #icon-left><OIcon name="add" size="xs" /></template>
                 {{ t("settings.correlation.addField") }}
               </OButton>
             </div>
@@ -379,9 +328,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-blue-50 tw:text-blue-700'
                 "
               >
-                <q-icon
-                  name="auto_awesome"
-                  size="14px"
+                <OIcon
+                  name="auto-awesome"
+                  size="xs"
                   class="tw:shrink-0 tw:mt-0.5"
                 />
                 <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
@@ -402,8 +351,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-[10px] tw:font-bold"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-6'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                   >
                     {{ getIdentitySetLabel(envKey) }}
@@ -421,97 +370,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="border: 1px solid var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
-                        : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                        ? 'tw:bg-gray-700 tw:text-gray-100 tw:shadow-sm'
+                        : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
                     "
                   >
                     <span>{{
                       getGroupByValue(fieldId)?.display ?? fieldId
                     }}</span>
-                    <q-tooltip
+                    <OTooltip
                       v-if="getFieldCardinalityTooltip(fieldId)"
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs"
-                    >
-                      {{ getFieldCardinalityTooltip(fieldId) }}
-                    </q-tooltip>
+                      :content="getFieldCardinalityTooltip(fieldId) ?? ''"
+                      side="top"
+                    />
                     <OButton
                       variant="ghost"
-                      size="icon-xs-circle"
+                      size="icon-xs-sq"
                       @click="removeFieldByIdFromEnv(envKey, fieldId)"
                     >
-                      <q-icon name="cancel" size="12px" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
                     </OButton>
                   </div>
 
                   <!-- Inline add select for this group -->
                   <template v-if="addingToEnv === envKey">
-                    <q-select
+                    <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
                       :options="getAddFieldOptionsForEnv(envKey)"
-                      option-label="label"
-                      option-value="value"
-                      emit-value
-                      map-options
-                      use-input
-                      input-debounce="0"
-                      dense
-                      borderless
+                      labelKey="label"
+                      valueKey="value"
+                      searchable
                       :placeholder="t('settings.correlation.selectField')"
-                      style="min-width: 220px"
+                      style="width: 13.75rem"
+                      :dropdown-style="{ minWidth: '18.75rem' }"
                       data-test="service-identity-add-distinguish-btn"
-                      @filter="onAddFieldFilter"
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
-                    >
-                      <template #option="scope">
-                        <q-item v-bind="scope.itemProps">
-                          <q-item-section>
-                            <q-item-label
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              {{ scope.opt.label }}
-                              <q-badge
-                                v-if="scope.opt.cardinalityLabel"
-                                :color="scope.opt.cardinalityColor"
-                                outline
-                                :label="scope.opt.cardinalityLabel"
-                                class="tw:text-[10px]"
-                              />
-                              <q-badge
-                                v-if="scope.opt.recommended"
-                                color="positive"
-                                outline
-                                label="recommended"
-                                class="tw:text-[10px]"
-                              />
-                            </q-item-label>
-                            <q-item-label
-                              caption
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              <span v-if="scope.opt.uniqueValues"
-                                >{{ scope.opt.uniqueValues }} unique
-                                values</span
-                              >
-                              <span v-if="scope.opt.streamTypes">{{
-                                scope.opt.streamTypes.join(", ")
-                              }}</span>
-                            </q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
+                    />
                     <OButton
                       variant="ghost"
-                      size="icon"
+                      size="icon-xs-sq"
                       @click="
                         addingToEnv = '';
-                        addFieldValue = '';
+                        addFieldValue = undefined;
                       "
                     >
-                      <q-icon name="close" size="14px" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
                     </OButton>
                   </template>
 
@@ -524,16 +455,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm"
                     @click="addingToEnv = envKey"
+                    icon-left="add"
                   >
-                    <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                     {{ t("settings.correlation.addField") }}
-                    <q-tooltip
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs tw:max-w-[240px]"
-                    >
-                      {{ t("settings.correlation.addFieldTooltip") }}
-                    </q-tooltip>
+                    <OTooltip
+                      side="top"
+                      :content="t('settings.correlation.addFieldTooltip')"
+                      max-width="240px"
+                    />
                   </OButton>
                 </div>
               </template>
@@ -546,70 +475,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:pt-2"
                   style="border-top: 1px solid var(--o2-border-color)"
                 >
-                  <q-select
+                  <OSelect
                     ref="addFieldSelectRef"
                     v-model="addFieldValue"
                     :options="getAddFieldOptionsForEnv(addingToEnv)"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     :placeholder="t('settings.correlation.selectField')"
-                    style="min-width: 220px"
+                    style="width: 13.75rem"
+                    :dropdown-style="{ minWidth: '18.75rem' }"
                     data-test="service-identity-add-distinguish-btn"
-                    @filter="onAddFieldFilter"
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
-                  >
-                    <template #option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section>
-                          <q-item-label
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            {{ scope.opt.label }}
-                            <q-badge
-                              v-if="scope.opt.cardinalityLabel"
-                              :color="scope.opt.cardinalityColor"
-                              outline
-                              :label="scope.opt.cardinalityLabel"
-                              class="tw:text-[10px]"
-                            />
-                            <q-badge
-                              v-if="scope.opt.recommended"
-                              color="positive"
-                              outline
-                              label="recommended"
-                              class="tw:text-[10px]"
-                            />
-                          </q-item-label>
-                          <q-item-label
-                            caption
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            <span v-if="scope.opt.uniqueValues"
-                              >{{ scope.opt.uniqueValues }} unique values</span
-                            >
-                            <span v-if="scope.opt.streamTypes">{{
-                              scope.opt.streamTypes.join(", ")
-                            }}</span>
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
+                  />
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs-sq"
                     @click="
                       addingToEnv = '';
-                      addFieldValue = '';
+                      addFieldValue = undefined;
                     "
                   >
-                    <q-icon name="close" size="14px" />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </OButton>
                 </div>
               </template>
@@ -623,16 +524,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   @click="addingToEnv = generateGroupId()"
+                  icon-left="add"
                 >
-                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   {{ t("settings.correlation.addGroup") }}
-                  <q-tooltip
-                    anchor="top middle"
-                    self="bottom middle"
-                    class="tw:text-xs tw:max-w-[240px]"
-                  >
-                    {{ t("settings.correlation.addGroupTooltip") }}
-                  </q-tooltip>
+                  <OTooltip
+                    side="top"
+                    :content="t('settings.correlation.addGroupTooltip')"
+                    max-width="240px"
+                  />
                 </OButton>
                 <OButton
                   variant="primary"
@@ -663,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:px-4 tw:py-3 tw:flex tw:items-center tw:gap-2"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
-          <q-icon name="radar" size="18px" class="tw:text-teal-6" />
+          <OIcon name="radar" size="sm" class="tw:text-teal-6" />
           <span class="tw:font-bold tw:text-sm">Workload Detection</span>
         </div>
 
@@ -680,20 +579,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
-            <q-icon name="check_circle" size="18px" color="positive" />
+            <OIcon name="check-circle" size="sm" />
             <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
               Workload detected using fields
               <span class="tw:text-xs tw:opacity-60"
                 >({{ trackedAliasIds.length }})</span
               >
             </div>
-            <q-icon
+            <OIcon
               :name="
                 trackedAliasExpanded
-                  ? 'keyboard_arrow_up'
-                  : 'keyboard_arrow_down'
+                  ? 'keyboard-arrow-up'
+                  : 'keyboard-arrow-down'
               "
-              size="18px"
+              size="sm"
               class="tw:opacity-40 tw:shrink-0"
             />
           </div>
@@ -711,16 +610,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:rounded-lg tw:p-2.5"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:bg-grey-9/60'
-                  : 'tw:bg-grey-1'
+                  ? 'tw:bg-gray-700/60'
+                  : 'tw:bg-gray-50'
               "
             >
               <div
                 class="tw:text-xs tw:mb-3"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-grey-5'
-                    : 'tw:text-grey-6'
+                    ? 'tw:text-gray-400'
+                    : 'tw:text-gray-400'
                 "
               >
                 Only these field alias groups are used for workload detection
@@ -742,50 +641,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="border: 1px solid var(--o2-border-color)"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
-                      : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                      ? 'tw:bg-gray-700 tw:text-gray-100 tw:shadow-sm'
+                      : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
                   "
                 >
                   <span>{{ alias.label }}</span>
                   <OButton
                     variant="ghost"
-                    size="icon-xs-circle"
+                    size="icon-xs-sq"
                     @click="
                       trackedAliasIds = trackedAliasIds.filter(
                         (id) => id !== alias.id,
                       )
                     "
                   >
-                    <q-icon name="cancel" size="12px" />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </OButton>
                 </div>
                 <!-- Inline add select -->
                 <template v-if="addingTrackedAlias">
-                  <q-select
+                  <OSelect
                     ref="addTrackedAliasSelectRef"
                     v-model="addTrackedAliasValue"
                     :options="trackedAliasAddOptions"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     placeholder="Select alias group"
-                    style="min-width: 220px"
+                    style="width: 13.75rem"
+                    :dropdown-style="{ minWidth: '18.75rem' }"
                     @update:model-value="onAddTrackedAlias($event)"
                   />
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs-sq"
                     @click="
                       addingTrackedAlias = false;
-                      addTrackedAliasValue = '';
+                      addTrackedAliasValue = undefined;
                     "
                   >
-                    <q-icon name="close" size="14px" />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </OButton>
                 </template>
                 <!-- Add field button -->
@@ -794,8 +717,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   @click="addingTrackedAlias = true"
+                  icon-left="add"
                 >
-                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   Add field
                 </OButton>
               </div>
@@ -818,7 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:text-xs"
             :class="
-              store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'
+              store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
             "
           >
             We discovered these deployment patterns in your streams. Use them to
@@ -844,11 +767,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               activeEnvironment === env.key
                 ? store.state.theme === 'dark'
-                  ? 'tw:text-grey-1'
-                  : 'tw:text-grey-9'
+                  ? 'tw:text-gray-500-1'
+                  : 'tw:text-gray-600'
                 : store.state.theme === 'dark'
-                  ? 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-3'
-                  : 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-7'
+                  ? 'tw:bg-transparent tw:text-gray-400 tw:border-transparent hover:tw:text-gray-200'
+                  : 'tw:bg-transparent tw:text-gray-400 tw:border-transparent hover:tw:text-gray-400'
             "
             :style="
               activeEnvironment === env.key
@@ -862,7 +785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 (setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0
               "
-              class="tw:absolute tw:top-1 tw:right-1 tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-positive"
+              class="tw:absolute tw:top-1 tw:right-1 tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-green-500"
               :title="`${(setDistinguishBy[env.key] ?? []).filter(Boolean).length} field(s) configured`"
             />
           </div>
@@ -878,7 +801,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
               <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
-                <q-icon name="add" size="16px" class="tw:text-grey-5" />
+                <OIcon name="add" size="sm" class="tw:text-gray-400" />
               </div>
 
               <!-- Dim card -->
@@ -891,17 +814,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                  <q-icon
+                  <OIcon
                     :name="card.theme.icon"
-                    size="14px"
+                    size="sm"
                     :class="card.theme.iconClass"
                   />
                   <span
                     class="tw:text-[11px] tw:font-medium"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-4'
-                        : 'tw:text-grey-6'
+                        ? 'tw:text-gray-300'
+                        : 'tw:text-gray-400'
                     "
                     >{{ card.label }}</span
                   >
@@ -940,54 +863,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'tw:bg-green-500': st === 'metrics',
                         }" /></span
                   ></span>
-                  <span
+                  <ODropdown
                     v-if="card.values.length > 5"
-                    class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-grey-4'
-                        : 'tw:text-grey-6'
-                    "
-                    >+{{ card.values.length - 5 }}
-                    <q-menu anchor="bottom left" self="top left">
-                      <div
-                        class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
+                    v-model:open="dimCardMoreMenuOpen[idx]"
+                    side="bottom"
+                    align="start"
+                  >
+                    <template #trigger>
+                      <span
+                        class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
                         :class="
-                          store.state.theme === 'dark' ? 'tw:bg-grey-10' : ''
+                          store.state.theme === 'dark'
+                            ? 'tw:text-gray-300'
+                            : 'tw:text-gray-400'
                         "
+                        >+{{ card.values.length - 5 }}</span
                       >
-                        <span
-                          v-for="val in card.values.slice(5)"
-                          :key="val"
-                          class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? card.theme.pillDark
-                              : card.theme.pillLight
-                          "
-                          :title="val"
-                          v-close-popup
-                          @click.stop="openInsightDialogByIdx(val, idx)"
-                          ><span class="tw:truncate">{{ val }}</span
+                    </template>
+                    <div
+                      class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
+                      :class="
+                        store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''
+                      "
+                    >
+                      <span
+                        v-for="val in card.values.slice(5)"
+                        :key="val"
+                        class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? card.theme.pillDark
+                            : card.theme.pillLight
+                        "
+                        :title="val"
+                        @click.stop="openInsightDialogByIdx(val, idx); dimCardMoreMenuOpen[idx] = false"
+                        ><span class="tw:truncate">{{ val }}</span
+                        ><span
+                          v-if="card.dim"
+                          class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
                           ><span
-                            v-if="card.dim"
-                            class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
-                            ><span
-                              v-for="st in getValueStreamTypes(
-                                card.dim.group_id,
-                                val,
-                              )"
-                              :key="st"
-                              class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
-                              :class="{
-                                'tw:bg-blue-500': st === 'logs',
-                                'tw:bg-orange-500': st === 'traces',
-                                'tw:bg-green-500': st === 'metrics',
-                              }" /></span
-                        ></span>
-                      </div>
-                    </q-menu>
-                  </span>
+                            v-for="st in getValueStreamTypes(
+                              card.dim.group_id,
+                              val,
+                            )"
+                            :key="st"
+                            class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
+                            :class="{
+                              'tw:bg-blue-500': st === 'logs',
+                              'tw:bg-orange-500': st === 'traces',
+                              'tw:bg-green-500': st === 'metrics',
+                            }" /></span
+                      ></span>
+                    </div>
+                  </ODropdown>
                 </div>
               </div>
             </template>
@@ -999,8 +927,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-5'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               <span
@@ -1012,8 +940,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-5'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               <span
@@ -1025,8 +953,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-5'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               <span
@@ -1047,21 +975,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2.5"
           :class="
-            store.state.theme === 'dark' ? 'tw:bg-grey-9/30' : 'tw:bg-grey-1/30'
+            store.state.theme === 'dark' ? 'tw:bg-gray-700/30' : 'tw:bg-gray-50/30'
           "
         >
           <div
             class="tw:flex-1 tw:min-w-0 tw:text-xs tw:truncate"
             :class="
-              store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-7'
+              store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-400'
             "
           >
             <span
               class="tw:font-bold"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-2'
-                  : 'tw:text-grey-8'
+                  ? 'tw:text-gray-100'
+                  : 'tw:text-gray-500'
               "
               >Recommended:</span
             >
@@ -1083,592 +1011,535 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:opacity-40 hover:tw:opacity-100"
               @click="dismissSuggestion"
             >
-              <q-icon name="cancel" size="14px" />
+              <OIcon name="cancel" size="xs" />
             </OButton>
           </div>
         </div>
 
         <!-- Workload Insight Sidebar -->
-        <q-dialog
-          v-model="insightDialogOpen"
-          position="right"
-          full-height
-          maximized
+        <ODrawer
+          data-test="service-identity-setup-insight-drawer"
+          v-model:open="insightDialogOpen"
+          :width="insightPanelWidthPct"
         >
-          <q-card
-            :style="{ width: insightPanelWidth, maxWidth: '90vw' }"
-            class="tw:flex tw:flex-col tw:h-full"
-            :class="
-              store.state.theme === 'dark' ? 'tw:!bg-grey-10' : 'tw:!bg-white'
+          <!-- #header kept: first line combines plain subtitle text with an tw:inline theme-colored badge
+               containing the title + tooltip; second line is a conditional coverage tw:flex with icon.
+               Cannot be expressed cleanly with title + sub-title props alone. -->
+          <template #header>
+            <div class="tw:flex-1 tw:min-w-0">
+              <div class="tw:text-[16px] tw:flex tw:items-center">
+                {{ insightData.subtitle }}
+                <span
+                  :class="[
+                    'tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                    store.state.theme === 'dark'
+                      ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                      : 'tw:text-blue-600 tw:bg-blue-50',
+                  ]"
+                >
+                  {{ insightData.title }}
+                  <OTooltip
+                    v-if="insightData.title.length > 25"
+                    :content="insightData.title"
+                    side="top"
+                  />
+                </span>
+              </div>
+              <div
+                v-if="
+                  !(insightData as any).isCardLevel &&
+                  insightData.coverage !== null
+                "
+                class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:mt-1"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-300'
+                    : 'tw:text-gray-400'
+                "
+              >
+                <OIcon name="verified" size="xs" class="tw:text-green-500" />
+                <span
+                  >{{ insightData.coverage }}% of services
+                  <span
+                    v-if="
+                      insightData.count !== null && insightData.total !== null
+                    "
+                    >({{ insightData.count }}/{{ insightData.total }})</span
+                  >
+                </span>
+              </div>
+            </div>
+          </template>
+          <!-- Stream contribution chart (single-value only) -->
+          <div class="tw:px-5 tw:py-4 tw:flex tw:flex-col tw:h-full">
+          <template
+            v-if="
+              !(insightData as any).isCardLevel &&
+              (insightData as any).streamDetails?.length > 0
             "
           >
-            <!-- Header -->
-            <q-card-section
-              class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b tw:shrink-0 q-ma-none"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tw:border-grey-8'
-                  : 'tw:border-grey-3'
-              "
-            >
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[16px] tw:flex tw:items-center">
-                  {{ insightData.subtitle }}
-                  <span
-                    :class="[
-                      'tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
-                      store.state.theme === 'dark'
-                        ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                        : 'tw:text-blue-600 tw:bg-blue-50',
-                    ]"
-                  >
-                    {{ insightData.title }}
-                    <q-tooltip
-                      v-if="insightData.title.length > 25"
-                      class="tw:text-xs"
-                    >
-                      {{ insightData.title }}
-                    </q-tooltip>
-                  </span>
-                </div>
+            <div class="tw:mb-3 tw:shrink-0">
+              <div
+                class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
+                style="color: var(--color-text-primary)"
+              >
+                Stream Sources
+              </div>
+              <div style="height: 40vh; min-height: 180px">
+                <CustomChartRenderer :data="insightChartData.options" />
+              </div>
+              <!-- Legend -->
+              <div
+                class="tw:flex tw:items-center tw:justify-center tw:gap-4 tw:mt-2"
+              >
                 <div
-                  v-if="
-                    !(insightData as any).isCardLevel &&
-                    insightData.coverage !== null
-                  "
-                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:mt-1"
+                  v-for="sd in (insightData as any).streamDetails"
+                  :key="sd.streamType"
+                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px]"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-grey-4'
-                      : 'tw:text-grey-6'
+                      ? 'tw:text-gray-300'
+                      : 'tw:text-gray-400'
                   "
                 >
-                  <q-icon
-                    name="verified"
-                    size="14px"
-                    class="tw:text-positive"
-                  />
                   <span
-                    >{{ insightData.coverage }}% of services
-                    <span
-                      v-if="
-                        insightData.count !== null && insightData.total !== null
-                      "
-                      >({{ insightData.count }}/{{ insightData.total }})</span
-                    >
-                  </span>
+                    class="tw:w-2 tw:h-2 tw:rounded-full"
+                    :class="{
+                      'tw:bg-blue-500': sd.streamType === 'logs',
+                      'tw:bg-orange-500': sd.streamType === 'traces',
+                      'tw:bg-green-500': sd.streamType === 'metrics',
+                    }"
+                  />
+                  <span class="tw:capitalize">{{ sd.streamType }}</span>
+                  <span class="tw:font-medium">{{
+                    sd.streamNames.length
+                  }}</span>
                 </div>
               </div>
-              <OButton variant="ghost" size="icon" v-close-popup>
-                <q-icon name="cancel" size="14px" />
-              </OButton>
-            </q-card-section>
+            </div>
+          </template>
 
-            <!-- Content area — flex column so dimension columns fill remaining height -->
-            <q-card-section
-              class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:px-4 tw:py-3 q-ma-none"
+          <OSeparator class="tw:mb-3 tw:shrink-0" />
+
+          <!-- Card-level: all values with bars -->
+          <template
+            v-if="
+              (insightData as any).isCardLevel &&
+              insightData.children.length > 0
+            "
+          >
+            <div
+              class="tw:text-[11px] tw:font-medium tw:mb-3"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
+              "
             >
-              <!-- Stream contribution chart (single-value only) -->
-              <template
-                v-if="
-                  !(insightData as any).isCardLevel &&
-                  (insightData as any).streamDetails?.length > 0
-                "
+              All values ({{ insightData.children.length }})
+            </div>
+            <div class="tw:flex tw:flex-col tw:gap-2.5">
+              <div
+                v-for="child in insightData.children"
+                :key="child.name"
+                class="tw:flex tw:flex-col tw:gap-1"
               >
-                <div class="tw:mb-3 tw:shrink-0">
-                  <div
-                    class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
+                <div
+                  class="tw:flex tw:items-center tw:justify-between tw:text-xs"
+                >
+                  <span class="tw:truncate tw:min-w-0 tw:font-medium">{{
+                    child.name
+                  }}</span>
+                  <span
+                    class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-5'
+                        ? 'tw:text-gray-300'
+                        : 'tw:text-gray-400'
                     "
+                    >{{ child.count }} {{ insightData.childCountLabel }}</span
                   >
-                    Stream Sources
-                  </div>
-                  <div style="height: 40vh; min-height: 180px">
-                    <CustomChartRenderer :data="insightChartData.options" />
-                  </div>
-                  <!-- Legend -->
-                  <div
-                    class="tw:flex tw:items-center tw:justify-center tw:gap-4 tw:mt-2"
-                  >
-                    <div
-                      v-for="sd in (insightData as any).streamDetails"
-                      :key="sd.streamType"
-                      class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'tw:text-grey-4'
-                          : 'tw:text-grey-6'
-                      "
-                    >
-                      <span
-                        class="tw:w-2 tw:h-2 tw:rounded-full"
-                        :class="{
-                          'tw:bg-blue-500': sd.streamType === 'logs',
-                          'tw:bg-orange-500': sd.streamType === 'traces',
-                          'tw:bg-green-500': sd.streamType === 'metrics',
-                        }"
-                      />
-                      <span class="tw:capitalize">{{ sd.streamType }}</span>
-                      <span class="tw:font-medium">{{
-                        sd.streamNames.length
-                      }}</span>
-                    </div>
-                  </div>
                 </div>
-              </template>
-
-              <q-separator
-                :class="store.state.theme === 'dark' ? 'tw:!bg-grey-8' : ''"
-                class="tw:mb-3 tw:shrink-0"
-              />
-
-              <!-- Card-level: all values with bars -->
-              <template
-                v-if="
-                  (insightData as any).isCardLevel &&
-                  insightData.children.length > 0
-                "
-              >
                 <div
-                  class="tw:text-[11px] tw:font-medium tw:mb-3"
+                  class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-grey-5'
-                      : 'tw:text-grey-5'
+                      ? 'tw:bg-gray-600'
+                      : 'tw:bg-gray-100'
                   "
                 >
-                  All values ({{ insightData.children.length }})
-                </div>
-                <div class="tw:flex tw:flex-col tw:gap-2.5">
                   <div
-                    v-for="child in insightData.children"
-                    :key="child.name"
-                    class="tw:flex tw:flex-col tw:gap-1"
-                  >
-                    <div
-                      class="tw:flex tw:items-center tw:justify-between tw:text-xs"
-                    >
-                      <span class="tw:truncate tw:min-w-0 tw:font-medium">{{
-                        child.name
-                      }}</span>
-                      <span
-                        class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'tw:text-grey-4'
-                            : 'tw:text-grey-6'
-                        "
-                        >{{ child.count }}
-                        {{ insightData.childCountLabel }}</span
-                      >
-                    </div>
-                    <div
-                      class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'tw:bg-grey-8'
-                          : 'tw:bg-grey-2'
-                      "
-                    >
-                      <div
-                        class="tw:h-full tw:rounded-full tw:transition-all"
-                        :class="
-                          insightDialogLevel === 'primary'
-                            ? 'tw:bg-blue-5'
-                            : insightDialogLevel === 'secondary'
-                              ? 'tw:bg-teal-5'
-                              : 'tw:bg-purple-5'
-                        "
-                        :style="{
-                          width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
-                        }"
-                      />
-                    </div>
-                  </div>
+                    class="tw:h-full tw:rounded-full tw:transition-all"
+                    :class="
+                      insightDialogLevel === 'primary'
+                        ? 'tw:bg-blue-5'
+                        : insightDialogLevel === 'secondary'
+                          ? 'tw:bg-teal-5'
+                          : 'tw:bg-purple-5'
+                    "
+                    :style="{
+                      width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
+                    }"
+                  />
                 </div>
-              </template>
+              </div>
+            </div>
+          </template>
 
-              <!-- Single-value: related dimension columns (read-only) -->
-              <template
-                v-if="
-                  !(insightData as any).isCardLevel &&
-                  (insightData as any).relatedDimensions?.length > 0
-                "
+          <!-- Single-value: related dimension columns (read-only) -->
+          <template
+            v-if="
+              !(insightData as any).isCardLevel &&
+              (insightData as any).relatedDimensions?.length > 0
+            "
+          >
+            <!-- Explanation -->
+            <div
+              class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:bg-gray-700 tw:text-gray-400'
+                  : 'tw:bg-blue-1/40 tw:text-gray-400'
+              "
+            >
+              <OIcon name="info" size="xs" />
+              <span
+                >These are the related
+                <strong>{{
+                  formatDimLabels((insightData as any).relatedDimensions)
+                }}</strong>
+                values co-occurring with
+                <strong>{{ insightData.title }}</strong
+                >.</span
               >
-                <!-- Explanation -->
+            </div>
+            <div class="tw:flex tw:flex-1 tw:min-h-0 tw:py-3">
+              <div
+                v-for="(dim, dimIdx) in (insightData as any).relatedDimensions"
+                :key="dim.label + dimIdx"
+                class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:px-3"
+                :class="[
+                  dimIdx > 0
+                    ? store.state.theme === 'dark'
+                      ? 'tw:border-l tw:border-grey-8'
+                      : 'tw:border-l tw:border-grey-3'
+                    : '',
+                ]"
+              >
                 <div
-                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
+                  class="tw:text-[13px] tw:font-bold tw:mb-2"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-grey-9 tw:text-grey-5'
-                      : 'tw:bg-blue-1/40 tw:text-grey-6'
+                      ? 'tw:text-gray-200'
+                      : 'tw:text-gray-500'
                   "
                 >
-                  <q-icon name="info" size="14px" />
+                  {{ dim.label }}
                   <span
-                    >These are the related
-                    <strong>{{
-                      formatDimLabels((insightData as any).relatedDimensions)
-                    }}</strong>
-                    values co-occurring with
-                    <strong>{{ insightData.title }}</strong
-                    >.</span
+                    class="tw:font-normal"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
+                    "
+                    >({{ dim.values.length }})</span
                   >
                 </div>
-                <div class="tw:flex tw:flex-1 tw:min-h-0 tw:py-3">
-                  <div
-                    v-for="(dim, dimIdx) in (insightData as any)
-                      .relatedDimensions"
-                    :key="dim.label + dimIdx"
-                    class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:px-3"
-                    :class="[
-                      dimIdx > 0
-                        ? store.state.theme === 'dark'
-                          ? 'tw:border-l tw:border-grey-8'
-                          : 'tw:border-l tw:border-grey-3'
-                        : '',
-                    ]"
+                <div
+                  class="tw:flex tw:flex-col tw:gap-1 tw:flex-1 tw:overflow-y-auto tw:min-h-0"
+                >
+                  <span
+                    v-for="dVal in dim.values"
+                    :key="dVal"
+                    class="tw:text-[13px] tw:py-1 tw:px-2.5 tw:rounded-md tw:border tw:truncate tw:shrink-0"
+                    :class="{
+                      'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3':
+                        dim.color === 'teal' && store.state.theme === 'dark',
+                      'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8':
+                        dim.color === 'teal' && store.state.theme !== 'dark',
+                      'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3':
+                        dim.color === 'purple' && store.state.theme === 'dark',
+                      'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8':
+                        dim.color === 'purple' && store.state.theme !== 'dark',
+                      'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3':
+                        dim.color === 'blue' && store.state.theme === 'dark',
+                      'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8':
+                        dim.color === 'blue' && store.state.theme !== 'dark',
+                    }"
+                    :title="dVal"
+                    >{{ dVal }}</span
                   >
-                    <div
-                      class="tw:text-[13px] tw:font-bold tw:mb-2"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'tw:text-grey-3'
-                          : 'tw:text-grey-8'
-                      "
-                    >
-                      {{ dim.label }}
-                      <span
-                        class="tw:font-normal"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'tw:text-grey-5'
-                            : 'tw:text-grey-5'
-                        "
-                        >({{ dim.values.length }})</span
-                      >
-                    </div>
-                    <div
-                      class="tw:flex tw:flex-col tw:gap-1 tw:flex-1 tw:overflow-y-auto tw:min-h-0"
-                    >
-                      <span
-                        v-for="dVal in dim.values"
-                        :key="dVal"
-                        class="tw:text-[13px] tw:py-1 tw:px-2.5 tw:rounded-md tw:border tw:truncate tw:shrink-0"
-                        :class="{
-                          'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3':
-                            dim.color === 'teal' &&
-                            store.state.theme === 'dark',
-                          'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8':
-                            dim.color === 'teal' &&
-                            store.state.theme !== 'dark',
-                          'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3':
-                            dim.color === 'purple' &&
-                            store.state.theme === 'dark',
-                          'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8':
-                            dim.color === 'purple' &&
-                            store.state.theme !== 'dark',
-                          'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3':
-                            dim.color === 'blue' &&
-                            store.state.theme === 'dark',
-                          'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8':
-                            dim.color === 'blue' &&
-                            store.state.theme !== 'dark',
-                        }"
-                        :title="dVal"
-                        >{{ dVal }}</span
-                      >
-                      <span
-                        v-if="dim.values.length === 0"
-                        class="tw:text-xs tw:italic"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'tw:text-grey-6'
-                            : 'tw:text-grey-5'
-                        "
-                        >No values</span
-                      >
-                    </div>
-                  </div>
+                  <span
+                    v-if="dim.values.length === 0"
+                    class="tw:text-xs tw:italic"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
+                    "
+                    >No values</span
+                  >
                 </div>
-              </template>
-            </q-card-section>
-          </q-card>
-        </q-dialog>
+              </div>
+            </div>
+          </template>
+          </div>
+        </ODrawer>
       </div>
 
       <!-- Section 3: Warnings -->
       <div v-if="warnings.length > 0" class="tw:mb-6">
-        <q-banner
-          rounded
-          class="tw:bg-amber-50 dark:tw:bg-amber-900/20 tw:border tw:border-amber-300 dark:tw:border-amber-700"
+        <OBanner
+          variant="warning"
+          icon="warning"
           data-test="service-identity-warnings-banner"
         >
-          <template #avatar>
-            <q-icon name="warning" color="warning" />
-          </template>
           <div class="tw:flex tw:flex-col tw:gap-1">
             <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
               {{ warn }}
             </div>
           </div>
-        </q-banner>
+        </OBanner>
       </div>
 
       <!-- Field Details Dialog -->
-      <q-dialog
-        v-model="detailsDialogVisible"
-        @hide="
-          preselectedValue = '';
-          popupPrimaryValue = '';
-          popupColumnSelections = [];
+      <ODialog
+        data-test="service-identity-setup-details-dialog"
+        v-model:open="detailsDialogVisible"
+        @update:open="
+          (v) => {
+            if (!v) {
+              preselectedValue = '';
+              popupPrimaryValue = '';
+              popupColumnSelections = [];
+            }
+          }
         "
+        size="md"
+        :title="primaryDim?.display"
+        :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
       >
-        <q-card style="width: 760px; max-width: 95vw">
-          <q-card-section class="row items-center q-pb-none">
-            <div class="text-h6 tw:flex tw:items-center tw:gap-2">
-              {{ primaryDim?.display }}
-              <span v-if="popupPrimaryValue" class="text-subtitle2 text-grey"
-                >: {{ popupPrimaryValue }}</span
-              >
-            </div>
-            <q-space />
-            <OButton variant="ghost" size="icon" v-close-popup>
-              <q-icon name="close" size="14px" />
-            </OButton>
-          </q-card-section>
-
-          <q-card-section
-            class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t"
-          >
-            <!-- Header section with cardinality details -->
-            <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
-              <span class="tw:font-medium">Cardinality:</span>
-              <q-badge
-                :color="
-                  cardinalityColor(
-                    dimensionAnalytics[primaryDim?.group_id]
-                      ?.cardinality_class || 'Unknown',
-                  )
-                "
-                rounded
-                class="tw:px-2"
-              >
-                {{
-                  dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0
-                }}
-                unique values
-              </q-badge>
-              <q-badge
-                outline
-                :color="
-                  cardinalityColor(
-                    dimensionAnalytics[primaryDim?.group_id]
-                      ?.cardinality_class || 'Unknown',
-                  )
-                "
-              >
-                {{
+        <OCardSection class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t">
+          <!-- Header section with cardinality details -->
+          <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
+            <span class="tw:font-medium">Cardinality:</span>
+            <OBadge
+              :variant="
+                cardinalityColor(
                   dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
-                  "Unknown"
-                }}
-              </q-badge>
+                    'Unknown',
+                )
+              "
+              class="tw:px-2"
+            >
+              {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }}
+              unique values
+            </OBadge>
+            <OBadge
+              :variant="`${cardinalityColor(
+                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                  'Unknown',
+              )}-outline`"
+            >
+              {{
+                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                "Unknown"
+              }}
+            </OBadge>
+          </div>
+
+          <!-- Two-pane Layout for Streams and Values -->
+          <div
+            v-if="
+              selectedFieldAnalytics?.sample_values &&
+              Object.keys(selectedFieldAnalytics.sample_values).length
+            "
+            class="tw:flex tw:h-[300px]"
+          >
+            <!-- Left Pane: Streams List -->
+            <div
+              class="tw:w-1/3 tw:border-r tw:bg-gray-50 dark:tw:bg-dark tw:flex tw:flex-col"
+            >
+              <!-- Static column header — never scrolls, never gets covered -->
+              <div
+                class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-gray-400 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
+                :style="{
+                  backgroundColor:
+                    store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
+                }"
+              >
+                <span>{{
+                  selectedStreamType ||
+                  ["logs", "metrics", "traces"].find(
+                    (t) => selectedFieldAnalytics.sample_values[t],
+                  )
+                }}</span>
+                <span class="tw:text-gray-400">Streams</span>
+              </div>
+
+              <!-- Scrollable content -->
+              <div class="tw:overflow-y-auto tw:flex-1">
+                <!-- Filtered to one type: no section header needed -->
+                <template
+                  v-if="
+                    selectedStreamType &&
+                    selectedFieldAnalytics.sample_values[selectedStreamType]
+                  "
+                >
+                  <div
+                    v-for="streamName in Object.keys(
+                      selectedFieldAnalytics.sample_values[selectedStreamType],
+                    )"
+                    :key="streamName"
+                    class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
+                    :class="{
+                      'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                        activeStreamId === streamName,
+                    }"
+                    @click="activeStreamId = streamName"
+                  >
+                    {{ streamName }}
+                  </div>
+                </template>
+
+                <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
+                <template v-else>
+                  <template
+                    v-for="(typeName, typeIdx) in [
+                      'logs',
+                      'metrics',
+                      'traces',
+                    ].filter((t) => selectedFieldAnalytics.sample_values[t])"
+                    :key="typeName"
+                  >
+                    <div
+                      v-if="typeIdx > 0"
+                      class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-gray-400 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
+                      :style="{
+                        backgroundColor:
+                          store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
+                      }"
+                    >
+                      {{ typeName }}
+                    </div>
+                    <div
+                      v-for="streamName in Object.keys(
+                        selectedFieldAnalytics.sample_values[typeName],
+                      )"
+                      :key="typeName + '-' + streamName"
+                      class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
+                      :class="{
+                        'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                          activeStreamId === streamName &&
+                          activeStreamType === typeName,
+                      }"
+                      @click="
+                        activeStreamId = streamName;
+                        activeStreamType = typeName;
+                      "
+                    >
+                      {{ streamName }}
+                    </div>
+                  </template>
+                </template>
+              </div>
             </div>
 
-            <!-- Two-pane Layout for Streams and Values -->
+            <!-- Right Pane: N-1 hierarchy columns -->
             <div
-              v-if="
-                selectedFieldAnalytics?.sample_values &&
-                Object.keys(selectedFieldAnalytics.sample_values).length
-              "
-              class="tw:flex tw:h-[300px]"
+              class="tw:flex-1 tw:flex tw:overflow-x-auto"
+              :style="{
+                backgroundColor:
+                  store.state.theme === 'dark' ? '#1d1d1d' : '#ffffff',
+              }"
             >
-              <!-- Left Pane: Streams List -->
               <div
-                class="tw:w-1/3 tw:border-r tw:bg-grey-1 dark:tw:bg-dark tw:flex tw:flex-col"
+                v-for="(col, colIdx) in popupColumns"
+                :key="col.group_id"
+                class="tw:min-w-[160px] tw:flex-1 tw:overflow-y-auto"
+                :class="{ 'tw:border-l': colIdx > 0 }"
               >
-                <!-- Static column header — never scrolls, never gets covered -->
                 <div
-                  class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
+                  class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-gray-400 tw:sticky tw:top-0 tw:z-10 tw:border-b"
                   :style="{
                     backgroundColor:
                       store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
                   }"
                 >
-                  <span>{{
-                    selectedStreamType ||
-                    ["logs", "metrics", "traces"].find(
-                      (t) => selectedFieldAnalytics.sample_values[t],
-                    )
-                  }}</span>
-                  <span class="tw:text-grey-5">Streams</span>
+                  {{ col.display }}
                 </div>
-
-                <!-- Scrollable content -->
-                <div class="tw:overflow-y-auto tw:flex-1">
-                  <!-- Filtered to one type: no section header needed -->
-                  <template
-                    v-if="
-                      selectedStreamType &&
-                      selectedFieldAnalytics.sample_values[selectedStreamType]
-                    "
-                  >
-                    <div
-                      v-for="streamName in Object.keys(
-                        selectedFieldAnalytics.sample_values[
-                          selectedStreamType
-                        ],
-                      )"
-                      :key="streamName"
-                      class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
-                      :class="{
-                        'tw:bg-primary/20 tw:text-primary tw:font-medium':
-                          activeStreamId === streamName,
-                      }"
-                      @click="activeStreamId = streamName"
-                    >
-                      {{ streamName }}
-                    </div>
-                  </template>
-
-                  <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
-                  <template v-else>
-                    <template
-                      v-for="(typeName, typeIdx) in [
-                        'logs',
-                        'metrics',
-                        'traces',
-                      ].filter((t) => selectedFieldAnalytics.sample_values[t])"
-                      :key="typeName"
-                    >
-                      <div
-                        v-if="typeIdx > 0"
-                        class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-grey-5 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
-                        :style="{
-                          backgroundColor:
-                            store.state.theme === 'dark'
-                              ? '#1d1d1d'
-                              : '#eeeeee',
-                        }"
-                      >
-                        {{ typeName }}
-                      </div>
-                      <div
-                        v-for="streamName in Object.keys(
-                          selectedFieldAnalytics.sample_values[typeName],
-                        )"
-                        :key="typeName + '-' + streamName"
-                        class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
-                        :class="{
-                          'tw:bg-primary/20 tw:text-primary tw:font-medium':
-                            activeStreamId === streamName &&
-                            activeStreamType === typeName,
-                        }"
-                        @click="
-                          activeStreamId = streamName;
-                          activeStreamType = typeName;
-                        "
-                      >
-                        {{ streamName }}
-                      </div>
-                    </template>
-                  </template>
-                </div>
-              </div>
-
-              <!-- Right Pane: N-1 hierarchy columns -->
-              <div
-                class="tw:flex-1 tw:flex tw:overflow-x-auto"
-                :style="{
-                  backgroundColor:
-                    store.state.theme === 'dark' ? '#1d1d1d' : '#ffffff',
-                }"
-              >
-                <div
-                  v-for="(col, colIdx) in popupColumns"
-                  :key="col.group_id"
-                  class="tw:min-w-[160px] tw:flex-1 tw:overflow-y-auto"
-                  :class="{ 'tw:border-l': colIdx > 0 }"
-                >
+                <div class="tw:p-4 tw:flex tw:flex-col tw:gap-2">
                   <div
-                    class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:sticky tw:top-0 tw:z-10 tw:border-b"
-                    :style="{
-                      backgroundColor:
-                        store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
-                    }"
+                    v-for="val in getPopupColumnValues(colIdx)"
+                    :key="val"
+                    class="tw:px-3 tw:py-2 tw:rounded tw:border tw:transition-colors tw:cursor-pointer tw:font-mono tw:truncate"
+                    :style="
+                      popupColumnSelections[colIdx] === val
+                        ? {}
+                        : {
+                            backgroundColor:
+                              store.state.theme === 'dark'
+                                ? '#2d2d2d'
+                                : '#f5f5f5',
+                            borderColor:
+                              store.state.theme === 'dark' ? '#444' : '#e0e0e0',
+                          }
+                    "
+                    :class="
+                      popupColumnSelections[colIdx] === val
+                        ? 'tw:bg-primary/15 tw:border-primary/40 tw:text-primary tw:ring-1 tw:ring-primary/30'
+                        : ''
+                    "
+                    @click="selectPopupColumnValue(colIdx, val)"
                   >
-                    {{ col.display }}
+                    {{ val }}
                   </div>
-                  <div class="tw:p-4 tw:flex tw:flex-col tw:gap-2">
-                    <div
-                      v-for="val in getPopupColumnValues(colIdx)"
-                      :key="val"
-                      class="tw:px-3 tw:py-2 tw:rounded tw:border tw:transition-colors tw:cursor-pointer tw:font-mono tw:truncate"
-                      :style="
-                        popupColumnSelections[colIdx] === val
-                          ? {}
-                          : {
-                              backgroundColor:
-                                store.state.theme === 'dark'
-                                  ? '#2d2d2d'
-                                  : '#f5f5f5',
-                              borderColor:
-                                store.state.theme === 'dark'
-                                  ? '#444'
-                                  : '#e0e0e0',
-                            }
-                      "
-                      :class="
-                        popupColumnSelections[colIdx] === val
-                          ? 'tw:bg-primary/15 tw:border-primary/40 tw:text-primary tw:ring-1 tw:ring-primary/30'
-                          : ''
-                      "
-                      @click="selectPopupColumnValue(colIdx, val)"
-                    >
-                      {{ val }}
-                    </div>
-                    <div
-                      v-if="getPopupColumnValues(colIdx).length === 0"
-                      class="tw:text-grey-5 tw:text-xs tw:italic tw:p-2"
-                    >
-                      No values
-                    </div>
+                  <div
+                    v-if="getPopupColumnValues(colIdx).length === 0"
+                    class="tw:text-gray-400 tw:text-xs tw:italic tw:p-2"
+                  >
+                    No values
                   </div>
-                </div>
-                <!-- Fallback when no ranked dims beyond the selected field -->
-                <div
-                  v-if="popupColumns.length === 0"
-                  class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-grey-5 tw:text-sm tw:italic"
-                >
-                  No additional dimensions detected.
                 </div>
               </div>
+              <!-- Fallback when no ranked dims beyond the selected field -->
+              <div
+                v-if="popupColumns.length === 0"
+                class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-gray-400 tw:text-sm tw:italic"
+              >
+                No additional dimensions detected.
+              </div>
             </div>
+          </div>
 
-            <div v-else class="text-grey tw:italic tw:p-4 tw:text-center">
-              No sample data available for this field.
-            </div>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
+          <div v-else class="tw:text-gray-500 tw:italic tw:p-4 tw:text-center">
+            No sample data available for this field.
+          </div>
+        </OCardSection>
+      </ODialog>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Plus } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
@@ -1679,6 +1550,10 @@ import type {
   ServiceFieldSource,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1703,13 +1578,13 @@ const props = defineProps<{
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
 const loading = ref(true);
 const saving = ref(false);
+const dimCardMoreMenuOpen = ref<Record<number, boolean>>({});
 const activeStreamId = ref<string>("");
 const activeStreamType = ref<string>("");
 const selectedStreamType = ref<string>("");
@@ -1725,11 +1600,10 @@ const dimensionAnalytics = ref<Record<string, DimensionAnalytics>>({});
 
 /** Section 2: pill-based field configuration */
 const addingToEnv = ref<string>("");
-const addFieldValue = ref("");
+const addFieldValue = ref<string | undefined>(undefined);
 const addingTrackedAlias = ref(false);
-const addTrackedAliasValue = ref("");
+const addTrackedAliasValue = ref<string | undefined>(undefined);
 const addTrackedAliasSelectRef = ref<any>(null);
-const addFieldFilter = ref("");
 
 /** All env keys that have at least one configured field, ordered by detected env order */
 const allConfiguredEnvs = computed(() => {
@@ -1943,7 +1817,7 @@ watch(
 watch(activeEnvironment, () => {
   suggestionDismissed.value = false;
   addingToEnv.value = "";
-  addFieldValue.value = "";
+  addFieldValue.value = undefined;
 });
 
 /** Re-show recommendation when user changes fields away from the suggested config */
@@ -2039,7 +1913,7 @@ const DIM_CARD_THEMES = [
   },
   {
     // teal
-    icon: "folder_open",
+    icon: "folder-open",
     iconClass: "tw:text-teal-5",
     countClass: "tw:text-teal-6",
     borderDark:
@@ -2262,7 +2136,7 @@ function formatDimLabels(dims: any[]): string {
   return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
 }
 
-/** Returns inline style for selected dimension pill — subtle primary highlight */
+/** Returns tw:inline style for selected dimension pill — subtle primary highlight */
 function getDimSelectedStyle(_color: string): Record<string, string> {
   const isDark = store.state.theme === "dark";
   return {
@@ -2576,6 +2450,14 @@ const insightPanelWidth = computed(() => {
   if (colCount <= 2) return "480px";
   if (colCount === 3) return "640px";
   return "800px"; // 4+
+});
+
+const insightPanelWidthPct = computed(() => {
+  const dims = (insightData.value as any)?.relatedDimensions;
+  const colCount = dims?.length ?? 0;
+  if (colCount <= 2) return 37;
+  if (colCount === 3) return 50;
+  return 63; // 4+
 });
 
 const STREAM_TYPE_COLORS: Record<string, string> = {
@@ -3131,11 +3013,11 @@ const trackedAliasAddOptions = computed(() =>
   ),
 );
 
-function onAddTrackedAlias(value: string) {
-  if (value && !trackedAliasIds.value.includes(value)) {
+function onAddTrackedAlias(value: unknown) {
+  if (value && typeof value === "string" && !trackedAliasIds.value.includes(value)) {
     trackedAliasIds.value = [...trackedAliasIds.value, value];
   }
-  addTrackedAliasValue.value = "";
+  addTrackedAliasValue.value = undefined;
   addingTrackedAlias.value = false;
 }
 
@@ -3260,16 +3142,16 @@ function pluralize(val: string): string {
   return val + "s";
 }
 
-/** Returns a Quasar color token for a cardinality class */
-function cardinalityColor(cardClass: string): string {
-  const map: Record<string, string> = {
-    VeryLow: "positive",
-    Low: "positive",
+/** Returns a BadgeVariant token for a cardinality class */
+function cardinalityColor(cardClass: string): BadgeVariant {
+  const map: Record<string, BadgeVariant> = {
+    VeryLow: "success",
+    Low: "success",
     Medium: "warning",
-    High: "negative",
-    VeryHigh: "negative",
+    High: "error",
+    VeryHigh: "error",
   };
-  return map[cardClass] ?? "grey";
+  return map[cardClass] ?? "default";
 }
 
 /** Get the best available cardinality class for a group */
@@ -3420,7 +3302,7 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
 
 /**
  * Whether the current fields are from auto-suggestion (no saved config existed).
- * We track this so we can show an inline hint only on first setup.
+ * We track this so we can show an tw:inline hint only on first setup.
  */
 const isAutoSuggested = computed(() => {
   return (
@@ -3429,22 +3311,15 @@ const isAutoSuggested = computed(() => {
   );
 });
 
-/** Options for the inline "add field" select for a specific env */
+/** Options for the tw:inline "add field" select for a specific env */
 function getAddFieldOptionsForEnv(envKey: string) {
   // Exclude fields already added in the current env AND all other envs
   const allUsedFields = Object.values(setDistinguishBy.value)
     .flat()
     .filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
-  const needle = addFieldFilter.value.toLowerCase();
   return availableGroups.value
     .filter((g) => !used.has(g.group_id))
-    .filter(
-      (g) =>
-        !needle ||
-        g.display.toLowerCase().includes(needle) ||
-        g.group_id.toLowerCase().includes(needle),
-    )
     .map((g) => {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
@@ -3452,30 +3327,25 @@ function getAddFieldOptionsForEnv(envKey: string) {
         label: g.display,
         value: g.group_id,
         streamTypes: g.stream_types,
+        subLabel: g.stream_types?.join(", ") || undefined,
+        badge: g.recommended ? "recommended" : undefined,
         recommended: g.recommended,
         uniqueValues: dim?.cardinality ?? g.unique_values ?? null,
         cardinalityLabel: cardClass,
-        cardinalityColor: cardClass ? cardinalityColor(cardClass) : "grey",
+        cardinalityColor: cardClass ? cardinalityColor(cardClass) : "default",
       };
     });
 }
 
-function onAddFieldFilter(val: string, update: (fn: () => void) => void) {
-  update(() => {
-    addFieldFilter.value = val;
-  });
-}
-
-/** Called when user picks a field in the inline select for a specific env */
-function onAddFieldToEnv(envKey: string, val: string) {
-  if (!val) return;
-  addFieldFilter.value = "";
+/** Called when user picks a field in the tw:inline select for a specific env */
+function onAddFieldToEnv(envKey: string, val: unknown) {
+  if (!val || typeof val !== "string") return;
   const current = setDistinguishBy.value[envKey] ?? [];
   setDistinguishBy.value = {
     ...setDistinguishBy.value,
     [envKey]: [...current.filter(Boolean), val],
   };
-  addFieldValue.value = "";
+  addFieldValue.value = undefined;
   addingToEnv.value = "";
 }
 
@@ -3485,8 +3355,8 @@ function applySuggestion() {
   }
   addingToEnv.value = "";
   suggestionDismissed.value = true;
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message:
       'Recommended configuration applied. Click "Save Configuration" to save.',
     timeout: 3000,
@@ -3689,8 +3559,8 @@ async function loadData() {
     }
   } catch (err: any) {
     console.error("Failed to load workload detection data:", err);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.correlation.loadRecommendationsFailed"),
       timeout: 3000,
     });
@@ -3737,8 +3607,8 @@ async function saveConfig() {
       }));
 
     if (sets.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: t(
           "settings.correlation.identityConfigNoSets",
           "Configure at least one identity set before saving.",
@@ -3749,8 +3619,8 @@ async function saveConfig() {
     }
 
     if (trackedAliasIds.value.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: "Select at least one tracked alias group.",
         timeout: 3000,
       });
@@ -3761,11 +3631,11 @@ async function saveConfig() {
     // Also drop orphan ids that no longer correspond to any known group (e.g. the
     // group was deleted from Field Mappings after being added to tracked aliases).
     const knownGroupIds = new Set([
-      ...availableGroups.value.map(g => g.group_id),
-      ...trackedAliasOptions.value.map(o => o.value),
+      ...availableGroups.value.map((g) => g.group_id),
+      ...trackedAliasOptions.value.map((o) => o.value),
     ]);
-    const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(id =>
-      id !== "service" && knownGroupIds.has(id)
+    const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(
+      (id) => id !== "service" && knownGroupIds.has(id),
     );
     const payload: ServiceIdentityConfig = {
       sets,
@@ -3786,14 +3656,14 @@ async function saveConfig() {
     // Sync baseline so isDirty resets to false
     currentIdentityConfig.value = payload;
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.correlation.identityConfigSaved"),
       timeout: 2000,
     });
   } catch (err: any) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         err?.response?.data?.message ||
         err?.message ||

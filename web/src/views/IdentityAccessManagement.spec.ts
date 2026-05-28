@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import IdentityAccessManagement from "@/views/IdentityAccessManagement.vue";
 import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
@@ -25,9 +23,6 @@ import router from "@/test/unit/helpers/router";
 import { nextTick, ref, computed } from "vue";
 import config from "@/aws-exports";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock the useIsMetaOrg composable
 vi.mock("@/composables/useIsMetaOrg", () => ({
@@ -60,6 +55,7 @@ describe("IdentityAccessManagement.vue Component", () => {
             template: "<div>Router View</div>",
           },
           RouteTabs: true,
+                    OButton: true,
         },
       },
     });
@@ -80,7 +76,7 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
 
     it("should have the correct component structure", () => {
-      expect(wrapper.element.tagName).toBe("MAIN");
+      expect(wrapper.element.tagName).toBe("DIV");
     });
 
     it("should have RouteTabs component available", () => {
@@ -470,12 +466,12 @@ describe("IdentityAccessManagement.vue Component", () => {
   });
 
   describe("Template Rendering Tests", () => {
-    it("should render q-page element", () => {
+    it("should render page div", () => {
       expect(wrapper.find('[data-test="iam-page"]').exists()).toBe(true);
     });
 
-    it("should render q-splitter", () => {
-      expect(wrapper.find(".q-splitter").exists()).toBe(true);
+    it("should render page content", () => {
+      expect(wrapper.find('[data-test="iam-page"]').exists()).toBe(true);
     });
 
     it("should conditionally render sidebar based on showSidebar", async () => {

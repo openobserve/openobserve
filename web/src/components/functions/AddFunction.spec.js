@@ -1,8 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import AddFunction, { defaultValue } from "./AddFunction.vue"; // Import defaultValue for prop tests
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { nextTick } from 'vue';
@@ -21,6 +19,21 @@ vi.mock("@/services/segment_analytics", () => ({
   default: {
     track: vi.fn()
   }
+}));
+
+// Mock reodotdev analytics
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({
+    track: vi.fn(),
+    reoInit: vi.fn(),
+    identify: vi.fn(),
+    isLoaded: false
+  })
+}));
+
+// Mock toast
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn())
 }));
 
 // Mock vue-i18n
@@ -66,16 +79,6 @@ vi.mock('quasar', async (importOriginal) => {
   };
 });
 
-installQuasar({
-  plugins: [Dialog, Notify],
-  config: {
-    notify: {},
-    platform: {
-      is: { desktop: true },
-      has: { touch: false }
-    }
-  }
-});
 
 describe("AddFunction Component", () => {
   let wrapper;
@@ -94,7 +97,10 @@ describe("AddFunction Component", () => {
           email: "test@example.com"
         },
         theme: 'light',
-        isAiChatEnabled: false
+        isAiChatEnabled: false,
+        zoConfig: {
+          ai_enabled: false
+        }
       },
       dispatch: vi.fn()
     };
