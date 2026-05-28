@@ -653,13 +653,11 @@ export default defineComponent({
         toast({
           variant: "success",
           message: t("settings.organizationSettingsUpdated"),
-          timeout: 2000,
         });
       } catch (err: any) {
         toast({
           variant: "error",
           message: err?.message || t("settings.somethingWentWrong"),
-          timeout: 2000,
         });
       }
     });
@@ -703,7 +701,6 @@ export default defineComponent({
                       ? t("settings.darkMode")
                       : t("settings.lightMode"),
                 }),
-                timeout: 2000,
               });
 
               await configService.get_config().then((res: any) => {
@@ -721,7 +718,6 @@ export default defineComponent({
               toast({
                 variant: "error",
                 message: t("settings.somethingWentWrong"),
-                timeout: 2000,
               });
             }
           })
@@ -729,7 +725,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: e?.message || t("settings.errorUploadingImage"),
-              timeout: 2000,
             });
           })
           .finally(() => {
@@ -739,13 +734,11 @@ export default defineComponent({
         toast({
           variant: "error",
           message: t("settings.notAllowedAction"),
-          timeout: 2000,
         });
       } else {
         toast({
           variant: "error",
           message: t("settings.selectFileToUpload"),
-          timeout: 2000,
         });
       }
     };
@@ -773,7 +766,6 @@ export default defineComponent({
                     ? t("settings.darkMode")
                     : t("settings.lightMode"),
               }),
-              timeout: 2000,
             });
 
             await configService.get_config().then((res: any) => {
@@ -783,7 +775,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: res?.message || t("settings.errorDeletingImage"),
-              timeout: 2000,
             });
           }
         })
@@ -791,7 +782,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: t("settings.somethingWentWrong"),
-            timeout: 2000,
           });
         })
         .finally(() => {
@@ -900,7 +890,6 @@ export default defineComponent({
       toast({
         variant: "success",
         message: t("settings.themeColorsResetSuccess"),
-        timeout: 2000,
       });
     };
 
@@ -951,7 +940,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: t("settings.textMaxCharacters"),
-          timeout: 2000,
         });
         loadingState.value = false;
         return;
@@ -968,7 +956,6 @@ export default defineComponent({
             toast({
               variant: "success",
               message: t("settings.logoTextUpdatedSuccessfully"),
-              timeout: 2000,
             });
 
             let stateConfig = JSON.parse(JSON.stringify(store.state.zoConfig));
@@ -979,7 +966,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: res?.message || t("settings.errorUpdatingImage"),
-              timeout: 2000,
             });
           }
         })
@@ -987,7 +973,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: err?.message || t("settings.somethingWentWrong"),
-            timeout: 2000,
           });
         })
         .finally(() => {

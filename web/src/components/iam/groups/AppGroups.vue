@@ -276,7 +276,7 @@ const deleteUserGroup = (group: any) => {
     .then(() => {
       toast({
         message: "Group deleted successfully!",
-        position: "bottom-right",
+        variant: "success",
       });
       setupGroups();
     })
@@ -284,7 +284,7 @@ const deleteUserGroup = (group: any) => {
       if (error.response.status != 403) {
         toast({
           message: "Error while deleting group!",
-          position: "bottom-right",
+          variant: "error",
         });
       }
     });
@@ -321,17 +321,17 @@ const bulkDeleteUserGroups = async () => {
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
         message: `Successfully deleted ${successful.length} group(s)`,
-        position: "bottom-right",
+        variant: "success",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
         message: `Deleted ${successful.length} group(s). Failed to delete ${unsuccessful.length} group(s)`,
-        position: "bottom-right",
+        variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
       toast({
         message: `Failed to delete ${unsuccessful.length} group(s)`,
-        position: "bottom-right",
+        variant: "error",
       });
     }
 
@@ -342,7 +342,7 @@ const bulkDeleteUserGroups = async () => {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
         message: error.response?.data?.message || error?.message || "Error while deleting groups",
-        position: "bottom-right",
+        variant: "error",
       });
     }
     confirmBulkDelete.value = false;

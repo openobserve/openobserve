@@ -534,7 +534,6 @@ describe("AddStream", () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Internal Server Error",
-          timeout: 4000,
         }),
       );
     });
@@ -759,7 +758,6 @@ describe("AddStream", () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringContaining("Invalid Data Retention"),
-          timeout: 4000,
         }),
       );
     });

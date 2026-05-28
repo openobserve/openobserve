@@ -279,7 +279,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "Invalid ingestion endpoint. Please check configuration.",
-            timeout: 3000,
           });
           return;
         }
@@ -300,7 +299,6 @@ export default defineComponent({
             variant: "error",
             message:
               "Missing organization credentials. Please refresh the page.",
-            timeout: 3000,
           });
           return;
         }
@@ -326,7 +324,6 @@ export default defineComponent({
           toast({
             variant: "warning",
             message: "CloudFormation template not available yet",
-            timeout: 3000,
           });
           return;
         }
@@ -344,7 +341,6 @@ export default defineComponent({
         toast({
           variant: "info",
           message: `Opening AWS Console to set up ${props.integration.displayName}`,
-          timeout: 3000,
         });
       } catch (error) {
         console.error("Error generating CloudFormation URL:", error);

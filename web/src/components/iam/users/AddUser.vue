@@ -494,20 +494,20 @@ export default defineComponent({
           this.store.state.userInfo.email === this.modelValue?.email;
         if (needsOldPwd) {
           if (!this.formData.old_password) {
-            toast({ message: 'Current password is required.', timeout: 3000 });
+            toast({ variant: "error", message: 'Current password is required.' });
             return;
           }
           if (this.formData.old_password.length < pwdMinLen) {
-            toast({ message: 'Password must be at least 8 characters long.', timeout: 3000 });
+            toast({ variant: "error", message: 'Password must be at least 8 characters long.' });
             return;
           }
         }
         if (!this.formData.new_password) {
-          toast({ message: 'New password is required.', timeout: 3000 });
+          toast({ variant: "error", message: 'New password is required.' });
           return;
         }
         if (this.formData.new_password.length < pwdMinLen) {
-          toast({ message: 'New password must be at least 8 characters long.', timeout: 3000 });
+          toast({ variant: "error", message: 'New password must be at least 8 characters long.' });
           return;
         }
       }
@@ -518,14 +518,14 @@ export default defineComponent({
         this.formData.organization === 'other' &&
         !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(this.formData.other_organization)
       ) {
-        toast({ message: 'Organization name must start with a letter and be alphanumeric, _ or -.', timeout: 3000 });
+        toast({ variant: "error", message: 'Organization name must start with a letter and be alphanumeric, _ or -.' });
         return;
       }
 
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
+        timeout: 0,
       });
 
       let selectedOrg = this.formData.organization;
@@ -557,8 +557,8 @@ export default defineComponent({
           })
           .catch((err: any) => {
             toast({
+              variant: "error",
               message: err.response.data.message,
-              timeout: 2000,
             });
             dismiss();
             this.formData.email = userEmail;
@@ -600,8 +600,8 @@ export default defineComponent({
               } else {
               if (err.response?.status != 403 || err?.status != 403) {
                 toast({
+                  variant: "error",
                   message: err.response.data.message,
-                  timeout: 2000,
                 });
                 dismiss();
               }
@@ -622,8 +622,8 @@ export default defineComponent({
             })
             .catch((err: any) => {
               toast({
+                variant: "error",
                 message: err.response.data.message,
-                timeout: 2000,
               });
               dismiss();
             });

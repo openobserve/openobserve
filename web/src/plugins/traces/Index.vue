@@ -613,7 +613,6 @@ async function getStreamList() {
           variant: "error",
           message:
             "Error while pulling index for selected organization" + e.message,
-          timeout: 2000,
         });
       })
       .finally(() => {

@@ -983,6 +983,7 @@ describe("Login.vue", () => {
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while creating new user...",
+        timeout: 0,
       });
       expect(usersService.addNewUser).toHaveBeenCalledWith(wrapper.vm.user);
       expect(store.dispatch).toHaveBeenCalledWith(

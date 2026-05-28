@@ -58,7 +58,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Error while pulling destinations.",
-          timeout: 2000,
         });
       }
     };
@@ -97,7 +96,6 @@ export default defineComponent({
           variant: "warning",
           message:
             "No destinations found. Please create a destination first.",
-          timeout: 3000,
         });
         router.push({
           name: "alertList",

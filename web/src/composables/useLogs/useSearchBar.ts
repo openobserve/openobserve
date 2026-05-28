@@ -896,19 +896,17 @@ export const useSearchBar = () => {
             if (isCancelled) {
               searchObj.data.isOperationCancelled = false;
               toast({
+                variant: "info",
                 message: "Running query cancelled successfully",
-                position: "bottom-right",
-                timeout: 4000,
               });
             }
           })
           .catch((error: any) => {
             toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to cancel running query",
-              position: "bottom-right",
-              timeout: 1500,
             });
           })
           .finally(() => {
@@ -920,9 +918,8 @@ export const useSearchBar = () => {
           });
       } catch (error) {
         toast({
+          variant: "error",
           message: "Failed to cancel running query",
-          position: "bottom-right",
-          timeout: 1500,
         });
         resolve(true);
       }

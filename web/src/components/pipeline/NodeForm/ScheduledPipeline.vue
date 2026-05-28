@@ -1885,7 +1885,6 @@ const validateInputs = (notify: boolean = true) => {
       toast({
         variant: "error",
         message: cronJobError.value,
-        timeout: 2000,
       });
     return false;
   }

@@ -170,8 +170,7 @@ const getGroupDetails = () => {
       console.log(err);
       toast({
         message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "error",
       });
       router.push({
         name: "groups",
@@ -206,7 +205,6 @@ const saveGroupChanges = () => {
     toast({
       variant: "info",
       message: `No updates detected.`,
-      timeout: 3000,
     });
 
     return;
@@ -221,7 +219,6 @@ const saveGroupChanges = () => {
       toast({
         variant: "success",
         message: `Updated group successfully!`,
-        timeout: 3000,
       });
 
       // Reset Roles
@@ -255,7 +252,6 @@ const saveGroupChanges = () => {
         toast({
           variant: "error",
           message: "Error while updating group!",
-          timeout: 3000,
         });
       }
     });

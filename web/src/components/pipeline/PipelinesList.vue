@@ -633,8 +633,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         : `${row.name} state paused successfully`;
       toast({
         message: message,
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "success",
       });
       await getPipelines();
     })
@@ -644,8 +643,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
           message:
             error.response?.data?.message ||
             "Error while updating pipeline state",
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "error",
         });
       }
     });
@@ -858,9 +856,9 @@ const openDeleteDialog = (pipeline: any) => {
 const savePipeline = (data: any) => {
   const dismiss = toast({
     message: "saving pipeline...",
-    position: "bottom-right",
     variant: "loading",
-  });
+      timeout: 0,
+});
 
   pipelineService
     .createPipeline({
@@ -873,8 +871,7 @@ const savePipeline = (data: any) => {
       showCreatePipeline.value = false;
       toast({
         message: "Pipeline created successfully",
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "success",
       });
     })
     .catch((error) => {
@@ -883,8 +880,7 @@ const savePipeline = (data: any) => {
         toast({
           message:
             error.response?.data?.message || "Error while saving pipeline",
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "error",
         });
       }
     });
@@ -893,9 +889,9 @@ const savePipeline = (data: any) => {
 const deletePipeline = async () => {
   const dismiss = toast({
     message: "deleting pipeline...",
-    position: "bottom-right",
     variant: "loading",
-  });
+      timeout: 0,
+});
   const { pipeline_id } = confirmDialogMeta.value.data;
   const org_id = store.state.selectedOrganization.identifier;
   pipelineService
@@ -906,8 +902,7 @@ const deletePipeline = async () => {
     .then(async () => {
       toast({
         message: "Pipeline deleted successfully",
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "success",
       });
     })
     .catch((error) => {
@@ -915,8 +910,7 @@ const deletePipeline = async () => {
         toast({
           message:
             error.response?.data?.message || "Error while deleting pipeline",
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "error",
         });
       }
     })
@@ -1000,8 +994,7 @@ const exportBulkPipelines = () => {
   selectedPipelineIds.value = [];
   toast({
     message: `${pipelinesToExport.length} pipelines exported successfully`,
-    position: "bottom-right",
-    timeout: 3000,
+    variant: "success",
   });
 };
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
@@ -1063,7 +1056,6 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       toast({
         variant: "error",
         message: `No pipelines to ${action}`,
-        timeout: 2000,
       });
       dismiss();
       return;
@@ -1086,7 +1078,6 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       toast({
         variant: "success",
         message: `Pipelines ${action}d successfully`,
-        timeout: 2000,
       });
     }
 
@@ -1099,7 +1090,6 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     toast({
       variant: "error",
       message: `Error ${action}ing pipelines. Please try again.`,
-      timeout: 2000,
     });
   }
 };
@@ -1124,7 +1114,6 @@ const bulkDeletePipelines = async () => {
       toast({
         variant: "error",
         message: "No pipelines selected for deletion",
-        timeout: 2000,
       });
       dismiss();
       return;
@@ -1160,14 +1149,12 @@ const bulkDeletePipelines = async () => {
         toast({
           variant: "error",
           message: `Failed to delete ${failCount} pipeline(s)`,
-          timeout: 3000,
         });
       } else {
         // All successful
         toast({
           variant: "success",
           message: `${successCount} pipeline(s) deleted successfully`,
-          timeout: 2000,
         });
       }
     } else {
@@ -1175,7 +1162,6 @@ const bulkDeletePipelines = async () => {
       toast({
         variant: "success",
         message: `${selectedPipelines.value.length} pipeline(s) deleted successfully`,
-        timeout: 2000,
       });
     }
 
@@ -1193,7 +1179,6 @@ const bulkDeletePipelines = async () => {
       toast({
         variant: "error",
         message: errorMessage,
-        timeout: 3000,
       });
     }
   }

@@ -68,7 +68,6 @@ export const usePatternActions = () => {
       toast({
         variant: "warning",
         message: "No strings longer than 10 characters found in pattern",
-        timeout: 2000,
       });
       return;
     }
@@ -112,7 +111,6 @@ export const usePatternActions = () => {
         variant: "warning",
         message:
           "No stream selected. Please select a stream before creating an alert.",
-        timeout: 2000,
       });
       return;
     }

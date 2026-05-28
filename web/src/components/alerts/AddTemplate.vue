@@ -343,8 +343,8 @@ const saveTemplate = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
 
   if (isUpdatingTemplate.value) {
     templateService

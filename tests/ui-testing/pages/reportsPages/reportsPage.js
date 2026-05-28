@@ -73,8 +73,8 @@ export class ReportsPage {
     this.cancelButton = page.locator('[data-test="add-report-cancel-btn"]');
 
     // Toasts (OToast variants)
-    this.toastSuccess = page.locator('[data-test="o-toast-success"]');
-    this.toastError = page.locator('[data-test="o-toast-error"]');
+    this.toastSuccess = page.locator('[data-test-variant="success"]');
+    this.toastError = page.locator('[data-test-variant="error"]');
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
     // Common time-range locators (used by Logs/Reports/Dashboards screens, exported as data-test)

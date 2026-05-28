@@ -1050,7 +1050,6 @@ const showPreview = async () => {
     toast({
       variant: "error",
       message: "Failed to generate preview",
-      timeout: 2000,
     });
   }
 };
@@ -1122,8 +1121,8 @@ const saveDestination = async () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
   const headers: Headers = {};
   apiHeaders.value.forEach((header) => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;

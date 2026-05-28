@@ -460,7 +460,7 @@ describe("MemberInvitation Component", () => {
         expect.objectContaining({
           variant: "loading",
           message: "Please wait...",
-          timeout: 2000
+          timeout: 0
         })
       );
     });

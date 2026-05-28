@@ -834,7 +834,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading data...",
-      });
+              timeout: 0,
+});
 
       CommonService.list_nodes(store.state.selectedOrganization.identifier)
         .then((response) => {

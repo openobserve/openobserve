@@ -365,8 +365,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
-      });
+              timeout: 0,
+});
 
       // Handle URL-based enrichment table creation
       if (formData.value.source === 'url') {

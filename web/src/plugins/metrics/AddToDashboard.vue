@@ -133,8 +133,8 @@ export default defineComponent({
       try {
         dismiss = toast({
           message: "Please wait while we add the panel to the dashboard",
-          type: "ongoing",
-          position: "bottom-right",
+          variant: "loading",
+          timeout: 0,
         });
         props.dashboardPanelData.data.id = getPanelId();
         // panel name will come from add to dashboard component
@@ -150,8 +150,6 @@ export default defineComponent({
         toast({
           message: "Panel added to dashboard",
           variant: "success",
-          position: "bottom-right",
-          timeout: 3000,
         });
         router.push({
           name: "viewDashboard",
@@ -179,15 +177,11 @@ export default defineComponent({
         toast({
           message: "Please select a dashboard",
           variant: "error",
-          position: "bottom-right",
-          timeout: 2000,
         });
       } else if (activeTabId.value == null) {
         toast({
           message: "Please select a tab",
           variant: "error",
-          position: "bottom-right",
-          timeout: 2000,
         });
       } else {
         await addPanelToDashboard(

@@ -534,7 +534,6 @@ export function usePrebuiltDestinations() {
       toast({
         variant: "success",
         message: t('alerts.destinations.saved'),
-        timeout: 2000
       });
 
     } catch (error: any) {
@@ -643,7 +642,6 @@ export function usePrebuiltDestinations() {
       toast({
         variant: "success",
         message: t('alerts.destinations.saved'),
-        timeout: 2000
       });
 
     } catch (error: any) {
@@ -739,7 +737,6 @@ export function usePrebuiltDestinations() {
       toast({
         variant: "success",
         message: t('alerts.prebuilt.conversionSuccess'),
-        timeout: 2000
       });
 
     } catch (error: any) {

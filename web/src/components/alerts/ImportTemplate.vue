@@ -334,8 +334,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: e.message || "Invalid JSON format",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -359,8 +358,7 @@ export default defineComponent({
       if (successCount === totalCount) {
         toast({
           message: `Successfully imported template(s)`,
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "success",
         });
 
         setTimeout(() => {
@@ -392,8 +390,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: "Error importing Template please check the JSON",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "error",
         });
         return false;
       }

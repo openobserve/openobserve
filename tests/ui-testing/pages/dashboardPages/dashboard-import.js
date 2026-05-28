@@ -45,7 +45,7 @@ export default class DashboardImport {
       '[data-test="dashboard-import-file-rejected"]'
     );
     this.toastErrorMessage = page.locator(
-      '[data-test="o-toast-error"] [data-test="o-toast-message"]'
+      '[data-test-variant="error"] [data-test="o-toast-message"]'
     );
     this.dashboardTable = page.locator('[data-test="dashboard-table"]');
     this.confirmDialog = page.locator(

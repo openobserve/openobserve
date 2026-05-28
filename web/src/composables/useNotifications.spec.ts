@@ -31,12 +31,12 @@ describe("useNotifications composable", () => {
   });
 
   describe("showErrorNotification", () => {
-    it("should add an error toast with default timeout 5000", () => {
+    it("should add an error toast with default timeout 30000", () => {
       notifications.showErrorNotification("Test error message");
       expect(toastRecords).toHaveLength(1);
       expect(toastRecords[0].variant).toBe("error");
       expect(toastRecords[0].message).toBe("Test error message");
-      expect(toastRecords[0].timeout).toBe(5000);
+      expect(toastRecords[0].timeout).toBe(30000);
     });
 
     it("should respect custom timeout option", () => {

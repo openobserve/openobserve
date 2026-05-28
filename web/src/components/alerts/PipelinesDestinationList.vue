@@ -306,7 +306,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading destinations...",
-      });
+              timeout: 0,
+});
       loading.value = true;
       destinationService
         .list({
@@ -330,7 +331,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: "Error while pulling destinations.",
-              timeout: 2000,
             });
           }
           dismiss();
@@ -403,7 +403,6 @@ export default defineComponent({
             toast({
               variant: "success",
               message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
-              timeout: 2000,
             });
             getDestinations();
           })
@@ -416,7 +415,6 @@ export default defineComponent({
               toast({
                 variant: "error",
                 message,
-                timeout: 2000,
               });
             }
           });
@@ -529,7 +527,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "No destinations selected for deletion",
-            timeout: 2000,
           });
           dismiss();
           return;
@@ -561,20 +558,17 @@ export default defineComponent({
             toast({
               variant: "error",
               message: `Failed to delete ${failCount} destination(s)`,
-              timeout: 3000,
             });
           } else {
             toast({
               variant: "success",
               message: `${successCount} destination(s) deleted successfully`,
-              timeout: 2000,
             });
           }
         } else {
           toast({
             variant: "success",
             message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
-            timeout: 2000,
           });
         }
 
@@ -592,7 +586,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: errorMessage,
-            timeout: 3000,
           });
         }
       }

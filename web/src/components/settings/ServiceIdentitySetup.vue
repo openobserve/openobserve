@@ -3359,7 +3359,6 @@ function applySuggestion() {
     variant: "success",
     message:
       'Recommended configuration applied. Click "Save Configuration" to save.',
-    timeout: 3000,
   });
 }
 
@@ -3562,7 +3561,6 @@ async function loadData() {
     toast({
       variant: "error",
       message: t("settings.correlation.loadRecommendationsFailed"),
-      timeout: 3000,
     });
   } finally {
     loading.value = false;
@@ -3613,7 +3611,6 @@ async function saveConfig() {
           "settings.correlation.identityConfigNoSets",
           "Configure at least one identity set before saving.",
         ),
-        timeout: 3000,
       });
       return;
     }
@@ -3622,7 +3619,6 @@ async function saveConfig() {
       toast({
         variant: "warning",
         message: "Select at least one tracked alias group.",
-        timeout: 3000,
       });
       return;
     }
@@ -3659,7 +3655,6 @@ async function saveConfig() {
     toast({
       variant: "success",
       message: t("settings.correlation.identityConfigSaved"),
-      timeout: 2000,
     });
   } catch (err: any) {
     toast({
@@ -3668,7 +3663,6 @@ async function saveConfig() {
         err?.response?.data?.message ||
         err?.message ||
         t("settings.correlation.identityConfigSaveFailed"),
-      timeout: 3000,
     });
   } finally {
     saving.value = false;

@@ -282,7 +282,6 @@ const viewTraceDetails = () => {
   toast({
     variant: "info",
     message: "Trace detail view coming soon",
-    timeout: 2000,
   });
 };
 

@@ -476,8 +476,7 @@ const getRoleDetails = () => {
         message: error?.response?.status === 404
           ? "Role not found or has been deleted. Redirecting to roles list."
           : error?.message || "Failed to load role details. Redirecting to roles list.",
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "error",
       });
       router.push({
         name: "roles",
@@ -2224,7 +2223,6 @@ const saveRole = () => {
     toast({
       variant: "info",
       message: `No updates detected.`,
-      timeout: 3000,
     });
 
     return;
@@ -2241,7 +2239,6 @@ const saveRole = () => {
       toast({
         variant: "success",
         message: `Updated role successfully!`,
-        timeout: 3000,
       });
 
       // Resetting permissions state on save
@@ -2282,7 +2279,6 @@ const saveRole = () => {
         toast({
           variant: "error",
           message: `Error while updating role!`,
-          timeout: 3000,
         });
       }
       console.log(err);

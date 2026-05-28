@@ -233,7 +233,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading organizations...",
-      });
+              timeout: 0,
+});
       loading.value = true;
       organizationsService.list(0, 1000000, "name", false, "").then((res) => {
         // Updating store so that organizations in navbar also gets updated

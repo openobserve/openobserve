@@ -69,7 +69,7 @@ const useStreams = () => {
             ? toast({
                 variant: "loading",
                 message: "Please wait while loading streams...",
-                timeout: 5000,
+                timeout: 0,
               })
             : () => {};
           if (streamName === "all") {

@@ -54,7 +54,7 @@ async searchSchedulerSubmit() {
 
 async validateAddJob(jobId) {
   // Wait for the notification — it fires only after the job creation API call succeeds
-  await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Job Added Succesfully', { timeout: 15000 });
+  await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Job Added Succesfully', { timeout: 15000 });
 
   // Navigate to the scheduler list
   await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
@@ -146,7 +146,7 @@ async searchSchedulerInvalid() {
 
 
 async validateInvalidData() {
-  await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Job Scheduler should be between 1 and 100000');
+  await expect(this.page.locator('[data-test-variant="error"]')).toContainText('Job Scheduler should be between 1 and 100000');
   
   
 }

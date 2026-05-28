@@ -730,7 +730,8 @@ const getSummary = (org_id: any) => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while loading summary...",
-  });
+      timeout: 0,
+});
   orgService
     .get_organization_summary(org_id)
     .then((res) => {
@@ -841,7 +842,6 @@ const getSummary = (org_id: any) => {
       toast({
         variant: "error",
         message: "Error while pulling summary.",
-        timeout: 2000,
       });
     })
     .finally(() => {

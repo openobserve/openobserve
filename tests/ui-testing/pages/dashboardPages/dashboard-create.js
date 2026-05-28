@@ -90,7 +90,7 @@ export default class DashboardCreate {
     // Wait for the success notification to confirm dashboard was created
     // OToast root carries both data-test="o-toast-success" and data-test-message="<text>"
     // so we can assert type + content in one selector (getByText is banned per selector policy)
-    await this.page.locator('[data-test="o-toast-success"][data-test-message="Dashboard added successfully."]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+    await this.page.locator('[data-test-variant="success"][data-test-message="Dashboard added successfully."]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
       // Toast may have appeared and disappeared before waitFor evaluated — the
       // waitForURL check below is the real gate for whether creation succeeded.
     });

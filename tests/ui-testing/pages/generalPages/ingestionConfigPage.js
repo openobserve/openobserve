@@ -20,8 +20,8 @@ export class IngestionConfigPage {
 
         // Notification selector — OToast variant=success carries the data-test we target.
         // 'o-toast-success' fires for both the Fluentd and Prometheus copy paths.
-        this.successToast = page.locator('[data-test="o-toast-success"]');
-        this.successToastMessage = page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]');
+        this.successToast = page.locator('[data-test-variant="success"]');
+        this.successToastMessage = page.locator('[data-test-variant="success"] [data-test="o-toast-message"]');
 
         // Top-level Custom-page tabs (Logs / Metrics / Traces)
         this.customMetricsTab = page.locator('[data-test="ingestion-custom-tab-ingestMetrics"]');

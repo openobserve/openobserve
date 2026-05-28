@@ -127,8 +127,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
-      });
+              timeout: 0,
+});
 
       this.updateUserForm.validate().then((valid: any) => {
         if (!valid) {
@@ -157,7 +157,6 @@ export default defineComponent({
             toast({
               variant: "success",
               message: "Organization member updated successfully.",
-              timeout: 3000,
             });
           }
 
