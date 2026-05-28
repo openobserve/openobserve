@@ -140,10 +140,43 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  warm_cache:
+    timeout-minutes: 30
+    name: warm_cache
+    runs-on:
+      labels: repo-openobserve-standard-4
+    continue-on-error: true
+    steps:
+      - name: Clone the current repo (shallow)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-
+
+      - uses: actions/setup-node@v5
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        with:
+          node-version: 22
+
+      - name: Install Playwright browser (cache miss only)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          cd tests/ui-testing && npm ci
+          npx playwright install --with-deps chromium
+
   ui_integration_tests:
     timeout-minutes: 180
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary]
+    needs: [build_binary, warm_cache]
+    if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
       labels: repo-openobserve-standard-16
     permissions:
