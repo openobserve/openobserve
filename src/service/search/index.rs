@@ -1175,7 +1175,7 @@ mod tests {
         let condition = Condition::MatchAll("search_term".to_string());
         assert_eq!(
             condition.to_query(),
-            "_all:search_term [\"search\", \"term\"]"
+            "(_all:search_term):([\"search\", \"term\"])"
         );
     }
 
