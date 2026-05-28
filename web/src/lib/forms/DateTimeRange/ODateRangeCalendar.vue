@@ -5,7 +5,7 @@ import type {
   DateRangeCalendarProps,
   DateRangeCalendarEmits,
 } from "./ODateRangeCalendar.types";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   RangeCalendarRoot,
   RangeCalendarGrid,
@@ -20,7 +20,7 @@ import {
   RangeCalendarNext,
   RangeCalendarPrev,
 } from "reka-ui";
-import type { DateRange } from "reka-ui";
+import type { DateRange, DateValue } from "reka-ui";
 import { parseDate } from "@internationalized/date";
 
 const props = defineProps<DateRangeCalendarProps>();
@@ -44,11 +44,37 @@ function fromIso(s: string) {
   return s.replace(/-/g, "/");
 }
 
+// Internal calendar state. We do NOT commit to parent until both ends are
+// picked, so the parent's startDate/endDate stay valid (avoiding "[object
+// Object]" display artifacts from formatters that assume both are non-empty).
+const internalStart = ref<DateValue | undefined>(undefined);
+const internalEnd = ref<DateValue | undefined>(undefined);
+// Tracks the hovered cell while awaiting the second click — used to render
+// the dashed preview range only between start and hover (not all valid-to-pick
+// cells, which is what reka-ui's data-highlighted alone would give us).
+const hoverDate = ref<DateValue | undefined>(undefined);
+
+// Resync internal state when parent provides new dates (initial load, external
+// changes, or after a committed range round-trip).
+// NOTE: use the array-of-getters form `[() => …, () => …]` rather than
+// `() => [props.startDate, props.endDate]` — the latter returns a fresh array
+// on every render and fires the watcher every tick, which would clobber the
+// in-progress preview state.
+watch(
+  [() => props.startDate, () => props.endDate],
+  ([newStart, newEnd]) => {
+    internalStart.value = newStart ? tryParseDate(toIso(newStart)) : undefined;
+    internalEnd.value = newEnd ? tryParseDate(toIso(newEnd)) : undefined;
+    hoverDate.value = undefined;
+  },
+  { immediate: true },
+);
+
 const calendarRange = computed(
   (): DateRange =>
     ({
-      start: props.startDate ? tryParseDate(toIso(props.startDate)) : undefined,
-      end: props.endDate ? tryParseDate(toIso(props.endDate)) : undefined,
+      start: internalStart.value,
+      end: internalEnd.value,
     }) as DateRange,
 );
 
@@ -60,10 +86,56 @@ const calendarMaxDate = computed(() =>
   props.maxDate ? tryParseDate(toIso(props.maxDate)) : undefined,
 );
 
+// "Awaiting second click" — start is picked but end isn't. While in this
+// state, cells get a dashed-outline preview based on hover position.
+const isAwaitingEndClick = computed(
+  () => !!internalStart.value && !internalEnd.value,
+);
+
+function isCellInPreview(d: DateValue): boolean {
+  if (
+    !isAwaitingEndClick.value ||
+    !hoverDate.value ||
+    !internalStart.value
+  ) {
+    return false;
+  }
+  const start = internalStart.value;
+  const hover = hoverDate.value;
+  const lo = hover.compare(start) < 0 ? hover : start;
+  const hi = hover.compare(start) < 0 ? start : hover;
+  return d.compare(lo) >= 0 && d.compare(hi) <= 0;
+}
+
+function handleCellMouseEnter(d: DateValue) {
+  if (isAwaitingEndClick.value) {
+    hoverDate.value = d;
+  }
+}
+
 function handleRangeChange(value: DateRange | undefined) {
   if (!value) return;
-  if (value.start) emit("update:startDate", fromIso(value.start.toString()));
-  if (value.end) emit("update:endDate", fromIso(value.end.toString()));
+  let start = value.start;
+  let end = value.end;
+
+  // Auto-swap when user picks end-before-start (e.g., clicked May 15 first,
+  // then May 10) — they're picking a range in reverse direction.
+  if (start && end && end.compare(start) < 0) {
+    [start, end] = [end, start];
+  }
+
+  internalStart.value = start;
+  internalEnd.value = end;
+  // Reset hover state on any click — it's stale by definition.
+  hoverDate.value = undefined;
+
+  // Only commit to parent when we have a complete range. While only start is
+  // picked, we keep the parent's old (valid) range in place so the trigger's
+  // display string doesn't break.
+  if (start && end) {
+    emit("update:startDate", fromIso(start.toString()));
+    emit("update:endDate", fromIso(end.toString()));
+  }
 }
 </script>
 
@@ -74,6 +146,10 @@ function handleRangeChange(value: DateRange | undefined) {
     :max-value="calendarMaxDate"
     :disabled="disabled"
     week-start-on="0"
+    :class="[
+      'o-range-cal',
+      isAwaitingEndClick ? 'o-range-cal--awaiting' : 'o-range-cal--complete',
+    ]"
     data-test="daterangecalendar-root"
     @update:model-value="handleRangeChange"
   >
@@ -149,6 +225,8 @@ function handleRangeChange(value: DateRange | undefined) {
                 :day="d"
                 :month="month.value"
                 :data-test="`daterangecalendar-cell-${d.toString()}`"
+                :data-preview="isCellInPreview(d) ? '' : undefined"
+                @mouseenter="handleCellMouseEnter(d)"
                 class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-unavailable:pointer-events-none tw:data-disabled:text-datepicker-day-disabled-text tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none tw:data-highlighted:bg-datepicker-day-range-bg tw:data-highlighted:text-datepicker-day-range-text tw:data-selection-start:bg-datepicker-day-selected-bg tw:data-selection-start:text-datepicker-day-selected-text tw:data-selection-end:bg-datepicker-day-selected-bg tw:data-selection-end:text-datepicker-day-selected-text"
                 >{{ d.day }}</RangeCalendarCellTrigger
               >
@@ -159,3 +237,27 @@ function handleRangeChange(value: DateRange | undefined) {
     </template>
   </RangeCalendarRoot>
 </template>
+
+<style scoped>
+/*
+  While awaiting the second click, reka-ui flags every still-pickable cell
+  with [data-highlighted] (start → max-date), which would visually wash out
+  the whole future calendar. Strip that styling in awaiting mode and rely on
+  our own [data-preview] flag, which we set only on cells between start and
+  the user's current hover position.
+
+  The :not([data-selected]) guards keep the chosen start cell (which carries
+  BOTH data-selected and data-highlighted) from being affected — it should
+  continue to show the solid "selected" background.
+*/
+.o-range-cal--awaiting :deep([data-highlighted]:not([data-selected])) {
+  background-color: transparent;
+  color: inherit;
+}
+.o-range-cal--awaiting :deep([data-preview]:not([data-selected])) {
+  background-color: var(--color-datepicker-day-range-bg);
+  color: var(--color-datepicker-day-range-text);
+  outline: 1px dashed currentColor;
+  outline-offset: -2px;
+}
+</style>

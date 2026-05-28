@@ -2429,7 +2429,14 @@ export default defineComponent({
     }, 2500);
 
     let ignoreAutoTrigger = false;
+    // Guard against the cascade that happens when we auto-clamp an absolute
+    // range that exceeds queryRangeRestrictionInHour. The clamp path calls
+    // dateTimeRef.setAbsoluteTime + setDateType, each of which re-triggers
+    // DateTime.vue's selectedDate watcher → saveDate → on:date-change, so
+    // without this flag updateDateTime would re-enter twice.
+    let suppressUpdateDateTime = false;
     const updateDateTime = async (value: object) => {
+      if (suppressUpdateDateTime) return;
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
         value.valueType == "absolute" &&
@@ -2449,6 +2456,12 @@ export default defineComponent({
             1000000;
 
         if (parseInt(newStartTime) > parseInt(value.startTime)) {
+          // User-visible warning so the silent rewrite isn't invisible.
+          toast({
+            variant: "warning",
+            message: `Selected range exceeds the ${searchObj.data.datetime.queryRangeRestrictionInHour}-hour limit. Start time was adjusted to fit.`,
+          });
+
           value.startTime = newStartTime;
 
           value.selectedDate.from = timestampToTimezoneDate(
@@ -2462,8 +2475,19 @@ export default defineComponent({
             "HH:mm",
           );
 
-          dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
-          dateTimeRef.value.setDateType("absolute");
+          // Suppress the re-entrant cascade: setAbsoluteTime + setDateType
+          // each fire DateTime.vue's auto-apply watchers, which would call
+          // updateDateTime again twice with the already-clamped values.
+          suppressUpdateDateTime = true;
+          try {
+            dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
+            dateTimeRef.value.setDateType("absolute");
+          } finally {
+            // Release on the next microtask so all queued watchers see the
+            // suppress flag.
+            await nextTick();
+            suppressUpdateDateTime = false;
+          }
         }
       }
       searchObj.data.datetime = {
