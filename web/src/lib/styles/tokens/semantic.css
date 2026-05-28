@@ -27,9 +27,8 @@
   --color-surface-subtle-hover: var(--color-grey-200);
   /* App chrome (top nav + side nav + the gutter behind the content card) — a
      flat, single soft-primary tint (no gradient) so the white content card
-     reads as floating on a subtly branded backdrop, not plain neutral grey.
-     Kept light: the primary-50 palette tint — the lightest branded backdrop. */
-  --color-surface-chrome:  var(--color-primary-50);
+     reads as floating on a subtly branded backdrop, not plain neutral grey. */
+  --color-surface-chrome:  color-mix(in srgb, var(--color-primary-50) 50%, var(--color-primary-100));
 
   /* Borders */
   --color-border-default: var(--color-grey-200);

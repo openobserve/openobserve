@@ -18,15 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="tw:bg-[var(--color-surface-chrome)] tw:flex tw:flex-col tw:pt-0.5 tw:pl-0.5 tw:pr-2 tw:pb-2"
     :key="store.state.selectedOrganization.identifier"
-    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
+    class="tw:flex tw:flex-col tw:h-full"
   >
-    <!-- ── Single floating content card on the unified chrome ──── -->
-    <div
-      class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:border tw:border-border-default tw:rounded-xl tw:overflow-hidden"
-    >
-      <!-- ── Page header band ────────────────────────────────────── -->
+      <!-- ── Page header section ──────────────────────────────────── -->
       <div class="tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default">
         <AppPageHeader
           icon="dashboard"
@@ -84,15 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </div>
 
-      <!-- ── Body: folder rail + table share one card ────────────── -->
-      <div class="tw:flex-1 tw:flex tw:min-h-0">
-        <!-- ── Left: Folder rail (flush panel, divider only) ─────── -->
+      <!-- ── Body: folder rail + table, each as an internal section ─ -->
+      <div class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2 tw:pb-2 tw:pt-1 tw:gap-2">
+        <!-- ── Left: Folder rail section ───────────────────────── -->
         <aside
-          class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-default"
+          class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border tw:border-border-default tw:rounded-lg"
           :style="{ width: splitterModel + 'px' }"
         >
         <div
-          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-3 tw:pb-2"
+          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-2 tw:pb-2"
         >
           <h2
             class="tw:text-sm! tw:font-semibold! tw:leading-tight! tw:text-text-primary"
@@ -194,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </nav>
       </aside>
 
-        <!-- ── Right: Table (flush inside the card — no own frame) ── -->
-        <section class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <!-- ── Right: Table section ──────────────────────────────── -->
+        <section class="tw:flex-1 tw:min-w-0 tw:h-full tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden">
           <div class="tw:h-full tw:overflow-hidden">
           <OTable
             ref="oTableRef"
@@ -528,7 +523,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </section>
       </div>
-    </div>
   </div>
 </template>
 

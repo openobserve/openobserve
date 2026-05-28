@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome)]"
+          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome)] tw:pr-2 tw:pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -78,14 +78,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <div
-            v-if="isLoading"
-            :key="store.state.selectedOrganization?.identifier"
-            class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
-          >
-            <router-view v-slot="{ Component }">
-              <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
-            </router-view>
+          <!-- White content card — rounded, bordered, no shadow. All pages render inside this. -->
+          <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:border tw:border-border-default tw:rounded-xl tw:overflow-hidden">
+            <div
+              v-if="isLoading"
+              :key="store.state.selectedOrganization?.identifier"
+              class="o2-content-scroll tw:flex-1 tw:overflow-y-auto tw:h-full"
+            >
+              <router-view v-slot="{ Component }">
+                <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+              </router-view>
+            </div>
           </div>
         </main>
 

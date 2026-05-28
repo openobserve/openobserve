@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:h-full" :key="store.state.selectedOrganization.identifier">
+  <div :key="store.state.selectedOrganization.identifier" class="tw:h-full">
     <div
       ref="fullscreenDiv"
       :class="[
@@ -25,36 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
-        store.state.printMode === true
-          ? 'tw:px-6 tw:pb-6'
-          : !isFullscreen
-            ? 'tw:pt-0.5 tw:pl-0.5 tw:pr-2 tw:pb-2'
-            : '',
+        store.state.printMode === true ? 'tw:px-6 tw:pb-6' : '',
       ]"
-      :style="
-        !store.state.printMode && !isFullscreen
-          ? { height: 'calc(100vh - var(--navbar-height))' }
-          : {}
-      "
-      class="tw:bg-[var(--color-surface-chrome)] tw:flex tw:flex-col tw:overflow-hidden"
+      class="tw:flex tw:flex-col tw:h-full"
     >
-      <!-- ── Single floating content card on the unified chrome ──── -->
-      <div
-        :class="
-          store.state.printMode === true
-            ? 'tw:contents'
-            : !isFullscreen
-              ? 'tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden tw:bg-surface-base tw:border tw:border-border-default tw:rounded-xl'
-              : 'tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden'
-        "
-      >
-        <!-- ── Page header band ─────────────────────────────────── -->
+        <!-- ── Page header section ──────────────────────────────── -->
         <div
           class="stickyHeader"
           :class="
             isFullscreen || store.state.printMode === true
               ? 'fullscreenHeader tw:bg-surface-panel'
-              : 'tw:shrink-0 tw:bg-surface-base tw:px-3 tw:border-b tw:border-border-default'
+              : 'tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default'
           "
         >
           <AppPageHeader icon="dashboard">
@@ -294,9 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :runId="runId"
         @update:runId="updateRunId"
       />
-      </div>
-      <!-- ── /Single floating content card ──────────────────────── -->
-
       <DashboardSettings
         v-model:open="showDashboardSettingsDialog"
         @refresh="loadDashboard"
