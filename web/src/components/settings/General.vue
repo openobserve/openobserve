@@ -994,6 +994,7 @@ export default defineComponent({
      * when the user switches theme modes on other pages.
      */
     onBeforeUnmount(() => {
+      if (!store || !store.state) return;
       const hasTempColors =
         store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
       if (hasTempColors) {
