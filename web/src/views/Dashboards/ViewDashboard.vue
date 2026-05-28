@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               @click="addPanelData"
               data-test="dashboard-panel-add"
               icon-left="add"
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               v-show="store.state.printMode !== true"
               variant="ghost-destructive"
-              size="icon-sm"
+              size="icon-toolbar"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"
               icon-left="cancel"
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               v-show="store.state.printMode !== true"
               :variant="isVariablesChanged ? 'warning' : 'outline'"
-              size="icon-sm"
+              size="icon-toolbar"
               @click="refreshData"
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
@@ -188,14 +188,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="store.state.printMode !== true"
               :url="dashboardShareURL"
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               data-test="dashboard-share-btn"
             />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
               icon-left="settings"
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
             >
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-sm"
+              size="icon-toolbar"
               data-test="dashboard-json-edit-btn"
               @click="openJsonEditor"
               icon-left="code"
