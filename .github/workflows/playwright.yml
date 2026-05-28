@@ -169,7 +169,9 @@ jobs:
       - name: Install Playwright browser (cache miss only)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: |
-          cd tests/ui-testing && npm ci
+          cd tests/ui-testing
+          PW_VERSION=$(node -pe "require('./package.json').devDependencies['@playwright/test']")
+          npm install --no-save "@playwright/test@${PW_VERSION}"
           npx playwright install --with-deps chromium
 
   ui_integration_tests:
