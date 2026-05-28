@@ -67,11 +67,11 @@
   }
 
   &--active {
-    background: var(--o2-primary-color) !important;
+    background: var(--q-primary) !important;
     color: white;
 
     &:hover {
-      background: var(--o2-primary-color) !important;
+      background: var(--q-primary) !important;
       opacity: 0.85;
     }
   }

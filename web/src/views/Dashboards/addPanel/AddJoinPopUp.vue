@@ -653,7 +653,7 @@ export default defineComponent({
 .condition-item {
   margin-bottom: 10px;
   padding: 10px;
-  border: 1px solid #eee;
+  border: 1px solid var(--color-border-default);
   border-radius: 4px;
 }
 
