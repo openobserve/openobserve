@@ -22,7 +22,9 @@ async function globalSetup() {
   const authFile = path.join(authDir, 'user.json');
   
   // Launch browser and create context
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    args: process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : []
+  });
   const context = await browser.newContext({
     viewport: { width: 1500, height: 1024 }
   });
