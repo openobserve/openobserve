@@ -152,8 +152,7 @@ export default function useDragAndDrop() {
     ) {
       toast({
         message: "Only 1 source node is allowed",
-        position: "bottom-right",
-        timeout: 2000, 
+        variant: "warning",
     });
       return;
     }
@@ -220,9 +219,7 @@ export default function useDragAndDrop() {
     if(connection.sourceHandle === "input" && connection.targetHandle === "input" || connection.sourceHandle === "output" && connection.targetHandle === "output"){
       toast({
         message: "Same type of edges / nodes cannot be connected",
-        position: "bottom-right",
-        timeout: 3000,
-      
+        variant: "warning",
     });
       return;
     }
@@ -230,9 +227,7 @@ export default function useDragAndDrop() {
     if(isConnectionAlreadyAvailable){
       toast({
         message: "Only one Incoming Edge to the node is allowed",
-        position: "bottom-right",
-        timeout: 3000,
-      
+        variant: "warning",
     });
       return;
     }
@@ -241,9 +236,7 @@ export default function useDragAndDrop() {
     if(isCycle){
       toast({
         message: "Adding this edge will create a cycle in the pipeline",
-        position: "bottom-right",
-        timeout: 3000,
-      
+        variant: "warning",
     });
     return;
     }
@@ -406,11 +399,9 @@ export default function useDragAndDrop() {
       const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
       if(isCycle){
         toast({
+          variant: "warning",
           message: "Adding this edge will create a cycle in the pipeline",
-          position: "bottom-right",
-          timeout: 3000,
-        
-      });
+        });
       return;
       }
       const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);

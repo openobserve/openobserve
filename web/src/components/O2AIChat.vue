@@ -1970,8 +1970,7 @@ export default defineComponent({
         // Show user notification about successful cancellation
         toast({
           message: "Response generation stopped",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "info",
         });
 
         // Update UI state to reflect cancellation
@@ -5512,7 +5511,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: "Thanks for your feedback!",
-          timeout: 1500,
         });
       }
     };
@@ -5536,7 +5534,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: "Thanks for your feedback!",
-          timeout: 1500,
         });
       }
     };

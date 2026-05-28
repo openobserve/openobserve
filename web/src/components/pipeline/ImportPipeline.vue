@@ -657,8 +657,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: e.message || "Invalid JSON format",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -681,8 +680,7 @@ export default defineComponent({
       if (allPipelinesCreated) {
         toast({
           message: "Pipeline(s) imported successfully",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "success",
         });
 
         // Delay navigation to allow Monaco editor to complete all debounced operations
@@ -718,8 +716,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: "Error importing Pipeline(s) please check the JSON",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "error",
         });
         return false;
       }

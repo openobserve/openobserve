@@ -9,7 +9,7 @@ const useNotifications = () => {
     message: string,
     options?: NotificationOptions,
   ) => {
-    return toast({ variant: "error", message, timeout: 5000, ...options });
+    return toast({ variant: "error", message, timeout: 10000, ...options });
   };
 
   const showConfictErrorNotificationWithRefreshBtn = (

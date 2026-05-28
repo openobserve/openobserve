@@ -452,7 +452,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading enrichment tables...",
-      });
+              timeout: 0,
+});
 
       try {
         // Fetch both streams and URL job statuses in parallel
@@ -566,7 +567,6 @@ export default defineComponent({
             message:
               err.response?.data?.message ||
               "Error while fetching functions.",
-            timeout: 2000,
           });
         }
       } finally {
@@ -669,6 +669,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             toast({
               message: `${selectedDelete.value.name} deleted successfully.`,
+              variant: "success",
             });
             resetStreamType("enrichment_tables");
             getLookupTables(true);
@@ -679,6 +680,7 @@ export default defineComponent({
             toast({
               message:
                 err.response?.data?.message || "Error while deleting stream.",
+              variant: "error",
             });
           }
         });
@@ -737,14 +739,17 @@ export default defineComponent({
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
               message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
+              variant: "success",
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
             toast({
               message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
+              variant: "warning",
             });
           } else if (failedDeletions > 0) {
             toast({
               message: `Failed to delete ${failedDeletions} enrichment table(s).`,
+              variant: "error",
             });
           }
 
@@ -770,7 +775,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Redirecting to explorer...",
-      });
+              timeout: 0,
+});
 
       try {
         await getStream(stream.name, stream.stream_type, true)

@@ -1770,16 +1770,14 @@ export default defineComponent({
       if (initNumber < 0) {
         toast({
           message: "Initial number must be positive number.",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "warning",
         });
         return;
       }
       if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
         toast({
           message: "Please run a query first before downloading.",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "warning",
         });
         return;
       }
@@ -1804,16 +1802,14 @@ export default defineComponent({
           } else {
             toast({
               message: "No data found to download.",
-              position: "bottom-right",
-              timeout: 2000,
+              variant: "warning",
             });
           }
         })
         .catch((err) => {
           toast({
             message: err.message,
-            position: "bottom-right",
-            timeout: 2000,
+            variant: "error",
           });
         });
     },
@@ -2091,8 +2087,7 @@ export default defineComponent({
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
             toast({
               message: "Job Context have been removed",
-              position: "bottom-right",
-              timeout: 2000,
+              variant: "info",
             });
             searchObj.meta.jobId = "";
             searchObj.data.queryResults.hits = [];
@@ -2108,8 +2103,7 @@ export default defineComponent({
         if (val == true && searchObj.meta.jobId != "") {
           toast({
             message: "Histogram is not available for scheduled search",
-            position: "bottom-right",
-            timeout: 2000,
+            variant: "info",
           });
           searchObj.meta.showHistogram = false;
           searchObj.loadingHistogram = false;
@@ -2404,8 +2398,7 @@ export default defineComponent({
           if (!checkQuery(value)) {
             toast({
               message: "Job Context have been removed",
-              position: "bottom-right",
-              timeout: 2000,
+              variant: "info",
             });
             searchObj.meta.jobId = "";
             searchObj.data.queryResults.hits = [];
@@ -2551,8 +2544,7 @@ export default defineComponent({
       if (!data || data.length === 0) {
         toast({
           message: "No data found to download.",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "warning",
         });
         return;
       }
@@ -2593,7 +2585,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Error downloading logs",
-          timeout: 2000,
         });
       }
     };
@@ -2822,7 +2813,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: `${fnValue.name} function applied successfully.`,
-          timeout: 3000,
         });
       }
 
@@ -3347,8 +3337,7 @@ export default defineComponent({
 
             toast({
               message: `${item.view_name} view applied successfully.`,
-              position: "bottom-right",
-              timeout: 1000,
+              variant: "success",
             });
             setTimeout(async () => {
               try {
@@ -3405,8 +3394,7 @@ export default defineComponent({
             store.dispatch("setSavedViewFlag", false);
             toast({
               message: err.message || `Error while applying saved view.`,
-              position: "bottom-right",
-              timeout: 3000,
+              variant: "error",
             });
           }
         })
@@ -3415,8 +3403,7 @@ export default defineComponent({
           store.dispatch("setSavedViewFlag", false);
           toast({
             message: `Error while applying saved view.`,
-            position: "bottom-right",
-            timeout: 1000,
+            variant: "error",
           });
           console.log("Error while applying saved view", err);
         });
@@ -3495,23 +3482,20 @@ export default defineComponent({
             if (res.status == 200) {
               toast({
                 message: t("search.viewDeletedSuccessfully"),
-                position: "bottom-right",
-                timeout: 1000,
+                variant: "success",
               });
               getSavedViews();
             } else {
               toast({
                 message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
-                position: "bottom-right",
-                timeout: 1000,
+                variant: "error",
               });
             }
           })
           .catch((err) => {
             toast({
               message: t("search.errorDeletingSavedView"),
-              position: "bottom-right",
-              timeout: 1000,
+              variant: "error",
             });
             console.log("Error while deleting saved view", err);
           });
@@ -3572,8 +3556,7 @@ export default defineComponent({
         if (viewName.trim() == "") {
           toast({
             message: `Please provide valid view name.`,
-            position: "bottom-right",
-            timeout: 1000,
+            variant: "warning",
           });
           saveViewLoader.value = false;
           return;
@@ -3600,8 +3583,7 @@ export default defineComponent({
               });
               toast({
                 message: t("search.viewCreatedSuccessfully"),
-                position: "bottom-right",
-                timeout: 1000,
+                variant: "success",
               });
               getSavedViews();
               isSavedViewAction.value = "create";
@@ -3611,8 +3593,7 @@ export default defineComponent({
               saveViewLoader.value = false;
               toast({
                 message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
-                position: "bottom-right",
-                timeout: 1000,
+                variant: "error",
               });
             }
           })
@@ -3620,8 +3601,7 @@ export default defineComponent({
             saveViewLoader.value = false;
             toast({
               message: t("search.errorCreatingSavedView"),
-              position: "bottom-right",
-              timeout: 1000,
+              variant: "error",
             });
             console.log("Error while creating saved view", err);
           });
@@ -3631,8 +3611,7 @@ export default defineComponent({
         saveViewLoader.value = false;
         toast({
           message: `Error while saving view: ${e}`,
-          position: "bottom-right",
-          timeout: 1000,
+          variant: "error",
         });
         console.log("Error while saving view", e);
       }
@@ -3647,7 +3626,7 @@ export default defineComponent({
 
         const dismiss = toast({
           message: "Updating saved view...",
-          position: "bottom-right",
+          variant: "loading",
           timeout: 0,
         });
 
@@ -3669,8 +3648,7 @@ export default defineComponent({
 
               toast({
                 message: t("search.viewUpdatedSuccessfully"),
-                position: "bottom-right",
-                timeout: 1000,
+                variant: "success",
               });
               isSavedViewAction.value = "create";
               savedViewSelectedName.value = "";
@@ -3680,8 +3658,7 @@ export default defineComponent({
               saveViewLoader.value = false;
               toast({
                 message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
-                position: "bottom-right",
-                timeout: 1000,
+                variant: "error",
               });
             }
           })
@@ -3690,8 +3667,7 @@ export default defineComponent({
             saveViewLoader.value = false;
             toast({
               message: t("search.errorUpdatingSavedView"),
-              position: "bottom-right",
-              timeout: 1000,
+              variant: "error",
             });
             console.log("Error while updating saved view", err);
           });
@@ -3701,8 +3677,7 @@ export default defineComponent({
         saveViewLoader.value = false;
         toast({
           message: `Error while saving view: ${e}`,
-          position: "bottom-right",
-          timeout: 1000,
+          variant: "error",
         });
         console.log("Error while saving view", e);
       }
@@ -3927,8 +3902,7 @@ export default defineComponent({
         if (favoriteViews.value.length >= 10) {
           toast({
             message: "You can only save 10 views.",
-            position: "bottom-right",
-            timeout: 2000,
+            variant: "warning",
           });
           return;
         }
@@ -3941,16 +3915,14 @@ export default defineComponent({
         useLocalSavedView(localSavedView);
         toast({
           message: "View added to favorites.",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "success",
         });
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
         toast({
           message: "View removed from favorites.",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "success",
         });
       }
     };
@@ -4325,7 +4297,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "Please select a stream before scheduling a job",
-            timeout: 3000,
           });
           return;
         }
@@ -4333,7 +4304,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: t("search.jobAlreadyScheduled"),
-            timeout: 3000,
           });
           return;
         }
@@ -4345,7 +4315,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: t("search.jobSchedulerRange"),
-            timeout: 3000,
           });
           return;
         }
@@ -4358,7 +4327,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: t("search.errorAddingJob"),
-            timeout: 3000,
           });
           return;
         }
@@ -4426,7 +4394,7 @@ export default defineComponent({
     const updateActionSelection = (item: any) => {
       toast({
         message: `${item?.name} action applied successfully`,
-        timeout: 3000,
+        variant: "success",
       });
     };
 

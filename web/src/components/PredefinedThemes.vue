@@ -653,7 +653,7 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
   // Show success notification
   toast({
     variant: "success",
-    message: `${theme.name} applied to ${mode} mode successfully!`,    timeout: 2000,
+    message: `${theme.name} applied to ${mode} mode successfully!`,
   });
 };
 
@@ -726,7 +726,7 @@ const applyCustomTheme = (mode: "light" | "dark") => {
   // Show success notification
   toast({
     variant: "success",
-    message: `Custom color applied to ${mode} mode successfully!`,    timeout: 2000,
+    message: `Custom color applied to ${mode} mode successfully!`,
   });
 };
 
@@ -766,7 +766,7 @@ const resetToDefaultTheme = () => {
     message:
       orgLightColor || orgDarkColor
         ? "Theme reset to organization settings!"
-        : "Theme reset to default colors!",    timeout: 2000,
+        : "Theme reset to default colors!",
   });
 };
 </script>

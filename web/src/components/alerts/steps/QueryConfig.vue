@@ -2056,7 +2056,7 @@ export default defineComponent({
             : props.inputData?.aggregation?.having?.column;
           if (!col || col.trim() === '') {
             columnSelectError.value = true;
-            toast({ variant: "error", message: 'Column is required when using an aggregate function.', timeout: 2000 });
+            toast({ variant: "error", message: 'Column is required when using an aggregate function.' });
             return false;
           }
         }
@@ -2068,13 +2068,13 @@ export default defineComponent({
       if (localTab.value === 'sql') {
         const sqlQuery = props.sqlQuery;
         if (!sqlQuery || sqlQuery.trim() === '') {
-          toast({ variant: "error", message: 'SQL query cannot be empty.', timeout: 2000 });
+          toast({ variant: "error", message: 'SQL query cannot be empty.' });
           await nextTick();
           inlineQueryEditorRef.value?.focus?.();
           return false;
         }
         if (props.sqlQueryErrorMsg && props.sqlQueryErrorMsg.trim() !== '') {
-          toast({ variant: "error", message: 'Please fix the SQL error before saving.', timeout: 2000 });
+          toast({ variant: "error", message: 'Please fix the SQL error before saving.' });
           await nextTick();
           inlineQueryEditorRef.value?.focus?.();
           return false;
@@ -2086,7 +2086,7 @@ export default defineComponent({
       if (localTab.value === 'promql') {
         const promqlQuery = localPromqlQuery.value;
         if (!promqlQuery || promqlQuery.trim() === '') {
-          toast({ variant: "error", message: 'PromQL query cannot be empty.', timeout: 2000 });
+          toast({ variant: "error", message: 'PromQL query cannot be empty.' });
           await nextTick();
           inlineQueryEditorRef.value?.focus?.();
           return false;

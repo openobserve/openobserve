@@ -307,7 +307,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         const dismiss = toast({
           variant: "loading",
           message: "Please wait while loading usage data...",
-        });
+                  timeout: 0,
+});
         dataLoading.value = true;
         BillingService.get_data_usage(
           store.state.selectedOrganization.identifier,

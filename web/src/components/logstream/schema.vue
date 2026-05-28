@@ -1387,7 +1387,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             toast({
               message: "Field(s) deleted successfully.",
-              timeout: 2000,
+              variant: "success",
             });
             confirmQueryModeChangeDialog.value = false;
             selectedFields.value = [];
@@ -1401,7 +1401,7 @@ export default defineComponent({
           } else {
             toast({
               message: res.data.message,
-              timeout: 2000,
+              variant: "error",
             });
           }
         })
@@ -1410,7 +1410,7 @@ export default defineComponent({
           console.log(err);
           toast({
             message: err.message,
-            timeout: 2000,
+            variant: "error",
           });
         });
     };
@@ -1605,7 +1605,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading stats...",
-      });
+              timeout: 0,
+});
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
@@ -1645,7 +1646,7 @@ export default defineComponent({
         toast({
           message:
             "Invalid Data Retention Period: Retention period must be at least 1 day.",
-          timeout: 4000,
+          variant: "error",
         });
         return;
       }
@@ -1846,7 +1847,6 @@ export default defineComponent({
             toast({
               variant: "success",
               message: "Stream settings updated successfully.",
-              timeout: 2000,
             });
           });
 
@@ -1863,7 +1863,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: err.response.data.message,
-            timeout: 2000,
           });
         });
     };
@@ -2263,7 +2262,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
-            timeout: 3000,
           });
           selectedFields.value = [];
           return;

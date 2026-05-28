@@ -296,8 +296,7 @@ export default defineComponent({
           loading.value = false;
           toast({
             message: `${models.value.length} models loaded`,
-            position: "bottom-right",
-            timeout: 2000,
+            variant: "success",
           });
           return;
         }
@@ -313,8 +312,7 @@ export default defineComponent({
         }));
         toast({
           message: `${models.value.length} models loaded`,
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "success",
         });
       } catch (e: any) {
         error.value =
@@ -322,8 +320,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: error.value,
-          position: "bottom-right",
-          timeout: 4000,
         });
       } finally {
         loading.value = false;
@@ -337,8 +333,7 @@ export default defineComponent({
       if (selected.length === 0) {
         toast({
           message: "No models selected. Please select at least one model.",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "warning",
         });
         return;
       }

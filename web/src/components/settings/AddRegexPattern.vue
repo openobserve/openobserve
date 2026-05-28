@@ -519,7 +519,7 @@ export default defineComponent({
             message: props.isEdit
               ? "Regex pattern updated successfully"
               : "Regex pattern created successfully",
-            timeout: 4000,
+            variant: "success",
           });
           emit("close");
           emit("update:list");
@@ -532,7 +532,7 @@ export default defineComponent({
               (props.isEdit
                 ? "Failed to update regex pattern"
                 : "Failed to create regex pattern"),
-            timeout: 4000,
+            variant: "error",
           });
         }
       } finally {
@@ -559,7 +559,7 @@ export default defineComponent({
       } catch (error) {
         toast({
           message: error.response?.data?.message || "Failed to test string",
-          timeout: 4000,
+          variant: "error",
         });
       } finally {
         testLoading.value = false;

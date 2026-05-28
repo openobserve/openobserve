@@ -473,7 +473,6 @@ export default defineComponent({
             message:
               err?.response?.data?.message ||
               "Failed to load custom roles.",
-            timeout: 3000,
           });
         }
       }
@@ -483,7 +482,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading users...",
-      });
+              timeout: 0,
+});
 
       return new Promise((resolve, reject) => {
         usersService
@@ -574,7 +574,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading users...",
-      });
+              timeout: 0,
+});
 
       loading.value = true;
       return new Promise((resolve, reject) => {
@@ -912,6 +913,7 @@ export default defineComponent({
         } catch (error) {
           toast({
             message: "Failed to refresh user list",
+            variant: "error",
           });
         }
         updateUserActions();
@@ -943,6 +945,7 @@ export default defineComponent({
         if (operationType == "created") {
           toast({
             message: "User added successfully.",
+            variant: "success",
           });
           // if (
           //   store.state.selectedOrganization.identifier == data.organization
@@ -971,6 +974,7 @@ export default defineComponent({
         } else {
           toast({
             message: "User updated successfully.",
+            variant: "success",
           });
           // usersState.users.forEach((member: any, key: number) => {
           //   if (member.email == data.email) {
@@ -1003,6 +1007,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             toast({
               message: "User deleted successfully.",
+              variant: "success",
             });
             await getOrgMembers();
             updateUserActions();
@@ -1012,6 +1017,7 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               message: "Error while deleting user.",
+              variant: "error",
             });
           }
         });
@@ -1028,7 +1034,7 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
+        timeout: 0,
       });
 
       organizationsService
@@ -1037,7 +1043,7 @@ export default defineComponent({
           dismiss();
           toast({
             message: "Invitation revoked successfully.",
-            timeout: 3000,
+            variant: "success",
           });
           await getOrgMembers();
           updateUserActions();
@@ -1053,7 +1059,7 @@ export default defineComponent({
           dismiss();
           toast({
             message: err?.response?.data?.message || "Error while revoking invitation.",
-            timeout: 5000,
+            variant: "error",
           });
         });
     };
@@ -1080,17 +1086,17 @@ export default defineComponent({
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
             message: `Successfully deleted ${successful.length} user(s)`,
-            timeout: 2000,
+            variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: `Deleted ${successful.length} user(s), but ${unsuccessful.length} failed`,
-            timeout: 3000,
+            variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
             message: `Failed to delete ${unsuccessful.length} user(s)`,
-            timeout: 2000,
+            variant: "error",
           });
         }
 
@@ -1102,7 +1108,7 @@ export default defineComponent({
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
             message: err.response?.data?.message || err?.message || "Error while deleting users",
-            timeout: 2000,
+            variant: "error",
           });
         }
       }
@@ -1112,7 +1118,7 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
+        timeout: 0,
       });
 
       organizationsService
@@ -1137,7 +1143,6 @@ export default defineComponent({
             toast({
               variant: "success",
               message: "Organization member updated successfully.",
-              timeout: 3000,
             });
           }
           dismiss();

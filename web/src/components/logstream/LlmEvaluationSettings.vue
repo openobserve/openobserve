@@ -467,7 +467,6 @@ export default defineComponent({
         toast({
           variant: "warning",
           message: t("pipeline.llmEvaluationRemoveWarning"),
-          timeout: 4000,
         });
         return;
       }
@@ -585,7 +584,6 @@ export default defineComponent({
       toast({
         variant: "success",
         message: t("pipeline.llmEvaluationCreatedSuccess", { streamName }),
-        timeout: 3000,
       });
     };
 

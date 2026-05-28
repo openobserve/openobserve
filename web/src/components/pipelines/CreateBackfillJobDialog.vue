@@ -366,7 +366,6 @@ const onSubmit = async () => {
     toast({
       variant: "error",
       message: "Please select a valid time range",
-      timeout: 3000,
     });
     return;
   }
@@ -375,7 +374,6 @@ const onSubmit = async () => {
     toast({
       variant: "error",
       message: "Start time must be before end time",
-      timeout: 3000,
     });
     return;
   }
@@ -419,7 +417,6 @@ const createBackfillJobRequest = async () => {
     toast({
       variant: "success",
       message: "Backfill job created successfully",
-      timeout: 3000,
     });
 
     emit("success", response.job_id);
