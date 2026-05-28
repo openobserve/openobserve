@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "使用可能な値はありません",
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
-    "functionEditorLabel": "関数エディター"
+    "functionEditorLabel": "関数エディター",
+    "loadingStream": "ストリームをロード中..."
   },
   "menu": {
     "home": "ホーム",
@@ -3421,7 +3422,8 @@
     "serviceGroupProtected": "サービスグループは削除できません。変更できるのはマップされたフィールドだけです。",
     "noDataFound": "データが見つかりません",
     "isWorkloadType": "サービス識別子",
-    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。"
+    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。",
+    "loadingCorrelation": "相関データを読み込んでいます..."
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
