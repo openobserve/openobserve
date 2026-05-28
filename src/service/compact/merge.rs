@@ -630,6 +630,7 @@ pub async fn merge_by_stream(
         stream_type,
         stream_name,
         &date_start,
+        is_incremental,
         orphan_blooms,
     )
     .await

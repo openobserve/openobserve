@@ -70,11 +70,12 @@ use crate::service::{
 /// target fields, nothing at `bloom_ver = 0`); `Ok(true)` when a build ran.
 /// Recoverable per-file/per-chunk errors are logged, not propagated — never
 /// surfaces a build failure to user requests.
-pub async fn build_for_stream(
+pub(crate) async fn build_for_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_key: &str,
+    is_incremental: bool,
     orphan_blooms: Vec<i64>,
 ) -> Result<bool> {
     let cfg = get_config();
@@ -87,6 +88,11 @@ pub async fn build_for_stream(
         cleanup_orphan_blooms(org_id, stream_type, stream_name, date_key, orphan_blooms).await
     {
         log::warn!("[BLOOM_BUILD] cleanup orphan blooms failed: {e}");
+    }
+
+    // don't build bloom for incremental round
+    if is_incremental {
+        return Ok(false);
     }
 
     // Resolve target fields from current stream settings: a field is bloomed
