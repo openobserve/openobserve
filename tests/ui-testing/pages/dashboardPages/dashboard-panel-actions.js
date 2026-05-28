@@ -16,7 +16,7 @@ export default class DashboardactionPage {
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
-    this.errorToast = page.locator('[data-test="o-toast-error"]');
+    this.errorToast = page.locator('[data-test-variant="error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
     this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-data-row"]');
   }

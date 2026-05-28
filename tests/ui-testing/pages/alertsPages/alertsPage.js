@@ -313,8 +313,8 @@ export class AlertsPage {
             dedupTimeWindowInputField: '[data-test="alert-dedup-time-window-field"]',
 
             // OToast (alerts module - success / error variants)
-            oToastSuccess: '[data-test="o-toast-success"]',
-            oToastError: '[data-test="o-toast-error"]'
+            oToastSuccess: '[data-test-variant="success"]',
+            oToastError: '[data-test-variant="error"]'
         };
     }
 
@@ -957,7 +957,7 @@ export class AlertsPage {
         // from its parent, which via Vue 3 attr fallthrough overrides the inner
         // ODialog's data-test="confirm-dialog". Use the outer data-test to match.
         await this.page.locator('[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]').click({ timeout: 10000 });
-        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.folderDeletedMessage })).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.folderDeletedMessage })).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Successfully deleted folder', { folderName });
     }
@@ -1109,7 +1109,7 @@ export class AlertsPage {
         // Wait for any of these outcomes within the timeout window.
         const errorFields = this.page.locator('.q-field--error');
         const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
-        const successMsg = this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertSuccessMessage });
+        const successMsg = this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertSuccessMessage });
 
         const outcomes = await Promise.race([
             errorFields.first().waitFor({ state: 'visible', timeout: 10000 }).then(() => 'validation'),
@@ -2130,7 +2130,7 @@ export class AlertsPage {
         });
 
         await this.page.locator(this.locators.alertExportButton).click();
-        await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
+        await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 
         // Wait for the blob data to be captured (blob.text() is async)
@@ -2163,7 +2163,7 @@ export class AlertsPage {
         // ImportAlert throws internally for structurally invalid JSON — the only signal is a
         // default-variant toast (data-test="o-toast-default"). It auto-dismisses in 2s so use
         // waitFor({ state: 'visible' }) which resolves the moment the element appears.
-        await this.page.locator('[data-test="o-toast-default"]').waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.locator('[data-test-variant="default"]').waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Invalid file import error shown as expected');
     }
 
@@ -3395,7 +3395,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getNotification() {
-        return this.page.locator('[data-test="o-toast-success"], [data-test="o-toast-default"], [data-test="o-toast-message"]').first();
+        return this.page.locator('[data-test-variant="success"], [data-test-variant="default"], [data-test="o-toast-message"]').first();
     }
 
     /**

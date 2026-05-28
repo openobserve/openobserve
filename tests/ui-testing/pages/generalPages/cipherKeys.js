@@ -15,7 +15,7 @@ export class CipherKeys {
         this.secretInput = page.locator('[data-test="add-cipher-key-openobserve-secret-input"]');
         this.continueButton = page.locator('[data-test="add-report-step1-continue-btn"]');
         this.saveButton = page.locator('[data-test="add-cipher-key-save-btn"]');
-        this.alert = page.locator('[data-test="o-toast"]').first();
+        this.alert = page.locator('[data-test^="o-toast-"]').first();
 
          // this.deleteButton = cipherName => `//td[contains(text(),'${cipherName}')]/following-sibling::td/button[@title='Delete Service Account']`;
          this.deleteButton = cipherName => `[data-test="cipherkey-list-${cipherName}-delete"]`;
