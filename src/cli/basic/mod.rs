@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod cli;
+mod gc;
 mod http;
 mod load;
 mod query_optimiser;
+mod stream;
 mod test;

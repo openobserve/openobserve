@@ -16,12 +16,8 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar({ plugins: [Dialog, Notify] });
 
 // Must be hoisted before any imports that reference the mocked modules
 const mockRouterPush = vi.fn();
@@ -93,11 +89,104 @@ vi.mock("@/components/DateTime.vue", () => ({
     methods: {
       setCustomDate: vi.fn(),
     },
+    mounted() {
+      // Simulate DateTime's auto-fire on mount so PipelineHistory calls fetchPipelineHistory
+      this.$emit("on:date-change", {
+        startTime: 1700000000000000,
+        endTime: 1700003600000000,
+        relativeTimePeriod: "15m",
+      });
+    },
   },
 }));
 
 import pipelinesService from "@/services/pipelines";
 import PipelineHistory from "./PipelineHistory.vue";
+
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport)
+// and so we can assert on the props the component forwards + emit
+// the click events the component listens to.
+const ODialogStub = {
+  name: "ODialog",
+  inheritAttrs: false,
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-sub-title="subTitle"
+      :data-primary-label="primaryButtonLabel"
+    >
+      <slot name="header-left" />
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-close"
+        @click="$emit('update:open', false)"
+      >close</button>
+    </div>
+  `,
+};
+
+// Stub OTable — renders slots for empty/bottom to keep tests functional
+const OTableStub = {
+  name: "OTable",
+  inheritAttrs: false,
+  props: [
+    "data",
+    "columns",
+    "rowKey",
+    "pagination",
+    "currentPage",
+    "pageSize",
+    "totalCount",
+    "pageSizeOptions",
+    "sorting",
+    "sortBy",
+    "sortOrder",
+    "loading",
+    "showGlobalFilter",
+    "dense",
+    "bordered",
+    "stickyHeader",
+    "maxHeight",
+  ],
+  emits: ["pagination-change", "sort-change"],
+  template: `
+    <div data-test="o2-table-stub">
+      <slot name="empty" />
+      <slot name="bottom" :total-rows="totalCount" />
+    </div>
+  `,
+};
 
 function createWrapper(props: Record<string, unknown> = {}) {
   return mount(PipelineHistory, {
@@ -105,11 +194,8 @@ function createWrapper(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        QTablePagination: {
-          template: '<div data-test="q-table-pagination-stub"></div>',
-          props: ["scope", "position", "resultTotal", "perPageOptions"],
-          emits: ["update:changeRecordPerPage"],
-        },
+        ODialog: ODialogStub,
+        OTable: OTableStub,
         NoData: {
           template: '<div data-test="no-data-stub">No Data</div>',
         },
@@ -365,7 +451,9 @@ describe("PipelineHistory", () => {
       });
 
       const vm = wrapper.vm as any;
-      vm.onPipelineSelected({ label: "Alpha Pipeline", value: "pid-alpha" });
+      // OSelect with valueKey="value" emits the primitive value string (the pipeline_id).
+      // Call onPipelineSelected with the primitive value as the component receives it.
+      vm.onPipelineSelected("pid-alpha");
       await flushPromises();
 
       expect(vm.searchQuery).toBe("pid-alpha");
@@ -378,23 +466,30 @@ describe("PipelineHistory", () => {
 
       const vm = wrapper.vm as any;
       vm.pagination.page = 3;
-      vm.onPipelineSelected({ label: "Alpha Pipeline", value: "pid-alpha" });
+      // OSelect emits the primitive value (pipeline_id string) when valueKey is set
+      vm.onPipelineSelected("pid-alpha");
       await nextTick();
 
       expect(vm.pagination.page).toBe(1);
     });
 
-    it("does not trigger fetch when selected value has no pipeline_id", async () => {
+    it("clears searchQuery and still fetches (no filter) when null is selected", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       vi.clearAllMocks();
+      mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
 
       const vm = wrapper.vm as any;
+      // Selecting null (clearing the select) always triggers a fetch without a pipeline_id filter.
       vm.onPipelineSelected(null);
       await flushPromises();
 
-      // http get should not have been called for history after null selection
-      expect(mockHttpGet).not.toHaveBeenCalled();
+      // searchQuery is cleared to empty string
+      expect(vm.searchQuery).toBe("");
+      // A fetch is still issued (without pipeline_id param) to show unfiltered history
+      expect(mockHttpGet).toHaveBeenCalledTimes(1);
+      const callParams = mockHttpGet.mock.calls[0][1]?.params ?? {};
+      expect(callParams.pipeline_id).toBeUndefined();
     });
   });
 
@@ -414,7 +509,7 @@ describe("PipelineHistory", () => {
       await nextTick();
 
       expect(vm.searchQuery).toBe("");
-      expect(vm.selectedPipeline).toBeNull();
+      expect(vm.selectedPipeline).toBeUndefined();
     });
   });
 
@@ -550,51 +645,50 @@ describe("PipelineHistory", () => {
       });
     });
 
-    describe("getStatusColor", () => {
-      it("returns 'positive' for 'success'", async () => {
+    describe("getStatusVariant", () => {
+      it("returns 'success-outline' for 'success'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("success")).toBe("positive");
+        expect(vm.getStatusVariant("success")).toBe("success-outline");
       });
 
-      it("returns 'positive' for 'ok' and 'completed'", async () => {
+      it("returns 'success-outline' for 'ok' and 'completed'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("ok")).toBe("positive");
-        expect(vm.getStatusColor("completed")).toBe("positive");
+        expect(vm.getStatusVariant("ok")).toBe("success-outline");
+        expect(vm.getStatusVariant("completed")).toBe("success-outline");
       });
 
-      it("returns 'negative' for 'error' and 'failed'", async () => {
+      it("returns 'error-outline' for 'error' and 'failed'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("error")).toBe("negative");
-        expect(vm.getStatusColor("failed")).toBe("negative");
+        expect(vm.getStatusVariant("error")).toBe("error-outline");
+        expect(vm.getStatusVariant("failed")).toBe("error-outline");
       });
 
-      it("returns 'warning' for 'warning'", async () => {
+      it("returns 'warning-outline' for 'warning'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("warning")).toBe("warning");
+        expect(vm.getStatusVariant("warning")).toBe("warning-outline");
       });
 
-      it("returns 'info' for 'pending' and 'running'", async () => {
+      it("returns 'primary-outline' for 'pending' and 'running'", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        expect(vm.getStatusColor("pending")).toBe("info");
-        expect(vm.getStatusColor("running")).toBe("info");
+        expect(vm.getStatusVariant("pending")).toBe("primary-outline");
+        expect(vm.getStatusVariant("running")).toBe("primary-outline");
       });
 
-      it("returns theme-based fallback for unknown status", async () => {
+      it("returns 'default-outline' for unknown status", async () => {
         const wrapper = createWrapper();
         await flushPromises();
         const vm = wrapper.vm as any;
-        const color = vm.getStatusColor("some-unknown-status");
-        expect(["white", "black"]).toContain(color);
+        expect(vm.getStatusVariant("some-unknown-status")).toBe("default-outline");
       });
     });
   });
@@ -633,7 +727,7 @@ describe("PipelineHistory", () => {
     it("selectedPipeline is null initially", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.selectedPipeline).toBeNull();
+      expect(vm.selectedPipeline).toBeUndefined();
     });
 
     it("pagination has correct default values", () => {
@@ -657,8 +751,9 @@ describe("PipelineHistory", () => {
       expect(vm.relativeTime).toBe("15m");
     });
 
-    it("loading is false initially", () => {
+    it("loading is false initially", async () => {
       const wrapper = createWrapper();
+      await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.loading).toBe(false);
     });
@@ -674,16 +769,15 @@ describe("PipelineHistory", () => {
     it("filteredPipelineOptions is empty when no match, which triggers no-option slot", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      // Quasar renders the no-option slot only when the dropdown is open and
-      // filteredPipelineOptions is empty. In jsdom the slot is not injected into
-      // the static DOM without dropdown focus. We verify the state condition
+      // Empty filter drives no-option slot. In jsdom the slot is not injected
+      // into the static DOM without dropdown focus. We verify the state condition
       // that drives the no-option slot display.
       const vm = wrapper.vm as any;
       const updateFn = vi.fn((cb: () => void) => cb());
       vm.filterPipelineOptions("zzz-no-match", updateFn);
       await nextTick();
-      // Empty filtered options is the condition that causes Quasar to render
-      // the no-option slot with "No pipelines found"
+      // Empty filtered options is the condition that causes the no-option slot
+      // to render with "No pipelines found"
       expect(vm.filteredPipelineOptions).toHaveLength(0);
     });
   });
@@ -736,6 +830,350 @@ describe("PipelineHistory", () => {
       await flushPromises();
 
       expect(mockHttpGet).toHaveBeenCalled();
+    });
+  });
+
+  describe("OTable pagination and sort handlers", () => {
+    it("onPaginationChange updates pagination state and fetches history", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
+
+      const vm = wrapper.vm as any;
+      vm.onPaginationChange({ page: 3, size: 50 });
+      await flushPromises();
+
+      expect(vm.pagination.page).toBe(3);
+      expect(vm.pagination.rowsPerPage).toBe(50);
+      expect(mockHttpGet).toHaveBeenCalled();
+    });
+
+    it("onSortChange updates sort state, resets page to 1, and fetches history", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
+
+      const vm = wrapper.vm as any;
+      vm.pagination.page = 5;
+      vm.onSortChange({ column: "status", order: "asc" });
+      await flushPromises();
+
+      expect(vm.pagination.sortBy).toBe("status");
+      expect(vm.pagination.descending).toBe(false);
+      expect(vm.pagination.page).toBe(1);
+      expect(mockHttpGet).toHaveBeenCalled();
+    });
+  });
+
+  describe("Details ODialog", () => {
+    it("details dialog is closed initially", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(vm.detailsDialog).toBe(false);
+    });
+
+    it("showDetailsDialog opens dialog and sets selectedRow", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      const row = { pipeline_name: "Alpha", status: "success" };
+
+      vm.showDetailsDialog(row);
+      await nextTick();
+
+      expect(vm.detailsDialog).toBe(true);
+      expect(vm.selectedRow).toEqual(row);
+    });
+
+    it("renders ODialog with details props when open", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showDetailsDialog({
+        pipeline_name: "Alpha Pipeline",
+        status: "success",
+        timestamp: 1700000000000000,
+        start_time: 1700000000000000,
+        end_time: 1700003600000000,
+        is_realtime: false,
+        is_silenced: false,
+        retries: 0,
+      });
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')[0];
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.attributes("data-title")).toBe(
+        "Pipeline Execution Details",
+      );
+      expect(dialog.attributes("data-size")).toBe("lg");
+      expect(dialog.attributes("data-primary-label")).toBe("Close");
+      expect(dialog.attributes("data-open")).toBe("true");
+    });
+
+    it("clicking primary button on details dialog closes it", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showDetailsDialog({ pipeline_name: "Alpha", status: "success" });
+      await nextTick();
+      expect(vm.detailsDialog).toBe(true);
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')[0];
+      await dialog
+        .find('[data-test="o-dialog-stub-primary"]')
+        .trigger("click");
+      await nextTick();
+
+      expect(vm.detailsDialog).toBe(false);
+    });
+
+    it("renders selected row details inside dialog slot", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showDetailsDialog({
+        pipeline_name: "My Test Pipeline",
+        status: "success",
+        timestamp: 1700000000000000,
+        start_time: 1700000000000000,
+        end_time: 1700003600000000,
+        is_realtime: true,
+        is_silenced: false,
+        retries: 0,
+      });
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')[0];
+      expect(dialog.text()).toContain("My Test Pipeline");
+      expect(dialog.text()).toContain("success");
+    });
+
+    it("renders error details section when selectedRow has error", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showDetailsDialog({
+        pipeline_name: "Alpha",
+        status: "error",
+        timestamp: 1700000000000000,
+        start_time: 1700000000000000,
+        end_time: 1700003600000000,
+        is_realtime: false,
+        is_silenced: false,
+        retries: 0,
+        error: "Something went wrong",
+      });
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')[0];
+      expect(dialog.text()).toContain("Error Details");
+      expect(dialog.text()).toContain("Something went wrong");
+    });
+
+    it("renders success response section when selectedRow has success_response", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showDetailsDialog({
+        pipeline_name: "Alpha",
+        status: "success",
+        timestamp: 1700000000000000,
+        start_time: 1700000000000000,
+        end_time: 1700003600000000,
+        is_realtime: false,
+        is_silenced: false,
+        retries: 0,
+        success_response: '{"ok":true}',
+      });
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')[0];
+      expect(dialog.text()).toContain("Response");
+      expect(dialog.text()).toContain('{"ok":true}');
+    });
+
+    it("renders source_node section when selectedRow has source_node", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showDetailsDialog({
+        pipeline_name: "Alpha",
+        status: "success",
+        timestamp: 1700000000000000,
+        start_time: 1700000000000000,
+        end_time: 1700003600000000,
+        is_realtime: false,
+        is_silenced: false,
+        retries: 0,
+        source_node: "node-01",
+      });
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')[0];
+      expect(dialog.text()).toContain("Source Node");
+      expect(dialog.text()).toContain("node-01");
+    });
+  });
+
+  describe("Error ODialog", () => {
+    it("error dialog is closed initially", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(vm.errorDialog).toBe(false);
+      expect(vm.errorMessage).toBeNull();
+    });
+
+    it("showErrorDialog opens dialog and sets errorMessage", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      const err = {
+        pipeline_name: "Failing Pipeline",
+        error: "Some failure",
+        last_error_timestamp: 1700000000000000,
+      };
+
+      vm.showErrorDialog(err);
+      await nextTick();
+
+      expect(vm.errorDialog).toBe(true);
+      expect(vm.errorMessage).toEqual(err);
+    });
+
+    it("renders error ODialog with title from errorMessage.pipeline_name", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        pipeline_name: "Failing Pipeline",
+        error: "Some failure",
+        last_error_timestamp: 1700000000000000,
+      });
+      await nextTick();
+
+      // The error dialog is the second ODialog stub in the template
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const errorDialog = dialogs[1];
+      expect(errorDialog.exists()).toBe(true);
+      expect(errorDialog.attributes("data-title")).toBe("Failing Pipeline");
+      expect(errorDialog.attributes("data-size")).toBe("sm");
+      expect(errorDialog.attributes("data-primary-label")).toBe("Close");
+      expect(errorDialog.attributes("data-open")).toBe("true");
+    });
+
+    it("renders subTitle when last_error_timestamp is provided", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        pipeline_name: "Failing Pipeline",
+        error: "Some failure",
+        last_error_timestamp: 1700000000000000,
+      });
+      await nextTick();
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const errorDialog = dialogs[1];
+      expect(errorDialog.attributes("data-sub-title")).toContain("Last error:");
+    });
+
+    it("subTitle is undefined when last_error_timestamp is missing", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        pipeline_name: "Failing Pipeline",
+        error: "Some failure",
+      });
+      await nextTick();
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const errorDialog = dialogs[1];
+      // attribute is omitted or empty when sub-title is undefined
+      const subTitle = errorDialog.attributes("data-sub-title");
+      expect(subTitle === undefined || subTitle === "").toBe(true);
+    });
+
+    it("renders error summary text in dialog slot", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        pipeline_name: "Failing Pipeline",
+        error: "Detailed failure message here",
+        last_error_timestamp: 1700000000000000,
+      });
+      await nextTick();
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const errorDialog = dialogs[1];
+      expect(errorDialog.text()).toContain("Error Summary");
+      expect(errorDialog.text()).toContain("Detailed failure message here");
+    });
+
+    it("clicking primary button on error dialog closes it via closeErrorDialog", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        pipeline_name: "Failing Pipeline",
+        error: "Some failure",
+        last_error_timestamp: 1700000000000000,
+      });
+      await nextTick();
+      expect(vm.errorDialog).toBe(true);
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const errorDialog = dialogs[1];
+      await errorDialog
+        .find('[data-test="o-dialog-stub-primary"]')
+        .trigger("click");
+      await nextTick();
+
+      expect(vm.errorDialog).toBe(false);
+      expect(vm.errorMessage).toBeNull();
+    });
+
+    it("emitting update:open=false on error dialog closes it via closeErrorDialog", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        pipeline_name: "Failing Pipeline",
+        error: "Some failure",
+        last_error_timestamp: 1700000000000000,
+      });
+      await nextTick();
+      expect(vm.errorDialog).toBe(true);
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const errorDialog = dialogs[1];
+      await errorDialog
+        .find('[data-test="o-dialog-stub-close"]')
+        .trigger("click");
+      await nextTick();
+
+      expect(vm.errorDialog).toBe(false);
+      expect(vm.errorMessage).toBeNull();
+    });
+
+    it("closeErrorDialog clears errorDialog and errorMessage", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.errorDialog = true;
+      vm.errorMessage = { pipeline_name: "x", error: "y" };
+
+      vm.closeErrorDialog();
+      await nextTick();
+
+      expect(vm.errorDialog).toBe(false);
+      expect(vm.errorMessage).toBeNull();
     });
   });
 });

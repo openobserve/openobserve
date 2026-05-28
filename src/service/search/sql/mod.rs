@@ -26,7 +26,7 @@ use config::{
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
-    utils::query_select_utils::replace_o2_custom_patterns,
+    utils::{query_select_utils::replace_o2_custom_patterns, sql::is_complex_query_stmt},
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
@@ -50,7 +50,6 @@ use crate::service::search::sql::{
         histogram_interval::{HistogramIntervalVisitor, validate_and_adjust_histogram_interval},
         match_all::MatchVisitor,
         partition_column::PartitionColumnVisitor,
-        utils::is_complex_query,
     },
 };
 
@@ -79,7 +78,7 @@ pub struct Sql {
     pub schemas: HashMap<TableReference, Arc<SchemaCache>>,
     pub limit: i64,
     pub offset: i64,
-    pub time_range: Option<(i64, i64)>,
+    pub time_range: (i64, i64),
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
@@ -103,23 +102,6 @@ impl Sql {
         search_event_type: Option<SearchEventType>,
     ) -> Result<Sql, Error> {
         Self::new_with_options(query, org_id, stream_type, search_event_type, false).await
-    }
-
-    pub fn get_first_stream_key(&self) -> String {
-        self.stream_names
-            .first()
-            .map(|s| {
-                format!(
-                    "{}/{}",
-                    s.get_stream_type(self.stream_type),
-                    s.stream_name()
-                )
-            })
-            // For multi-stream / cross-index queries there is no single stream
-            // name.  Fall back to the stream-type prefix so select_nodes always
-            // receives a non-empty, deterministic key (rather than "" which
-            // would silently select all nodes and defeat org/stream affinity).
-            .unwrap_or_else(|| format!("{}/", self.stream_type))
     }
 
     pub async fn new_with_options(
@@ -252,26 +234,28 @@ impl Sql {
 
         // 10. pick up histogram interval
         let mut histogram_interval_visitor =
-            HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
+            HistogramIntervalVisitor::new((query.start_time, query.end_time));
         let _ = statement.visit(&mut histogram_interval_visitor);
         if let Some(error) = histogram_interval_visitor.error {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)));
         }
-        let mut histogram_interval = if query.histogram_interval > 0 {
-            Some(validate_and_adjust_histogram_interval(
-                query.histogram_interval,
-                Some((query.start_time, query.end_time)),
-            ))
-        } else {
-            histogram_interval_visitor.interval
-        };
-        if !histogram_interval_visitor.is_histogram {
-            histogram_interval = None;
-        }
+        let histogram_interval = histogram_interval_visitor
+            .is_histogram
+            .then(|| {
+                if query.histogram_interval > 0 {
+                    Some(validate_and_adjust_histogram_interval(
+                        query.histogram_interval,
+                        (query.start_time, query.end_time),
+                    ))
+                } else {
+                    histogram_interval_visitor.interval
+                }
+            })
+            .flatten();
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
-        if !is_complex_query(&mut statement) {
+        if !is_complex_query_stmt(&statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
             if o2_id_is_needed(&used_schemas, &search_event_type) {
@@ -284,7 +268,7 @@ impl Sql {
         // 13. replace the Utf8 to Utf8View type
         let final_schemas = finalize_schemas(&used_schemas);
 
-        let is_complex = is_complex_query(&mut statement);
+        let is_complex = is_complex_query_stmt(&statement);
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -299,7 +283,7 @@ impl Sql {
             schemas: final_schemas,
             limit,
             offset,
-            time_range: Some((query.start_time, query.end_time)),
+            time_range: (query.start_time, query.end_time),
             group_by,
             order_by,
             histogram_interval,
@@ -311,6 +295,23 @@ impl Sql {
                 extract_patterns,
             ),
         })
+    }
+
+    pub fn get_first_stream_key(&self) -> String {
+        self.stream_names
+            .first()
+            .map(|s| {
+                format!(
+                    "{}/{}",
+                    s.get_stream_type(self.stream_type),
+                    s.stream_name()
+                )
+            })
+            // For multi-stream / cross-index queries there is no single stream
+            // name.  Fall back to the stream-type prefix so select_nodes always
+            // receives a non-empty, deterministic key (rather than "" which
+            // would silently select all nodes and defeat org/stream affinity).
+            .unwrap_or_else(|| format!("{}/", self.stream_type))
     }
 }
 

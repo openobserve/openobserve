@@ -16,16 +16,18 @@
 import PipelineEditor from "./PipelineEditor.vue";
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { reactive } from "vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 import pipelineService from "@/services/pipelines";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Dialog, Notify] });
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
+
 
 const mockAddNode = vi.fn();
 
@@ -84,25 +86,80 @@ vi.mock("@/composables/contextProviders", () => ({
   createPipelinesContextProvider: vi.fn(() => ({})),
 }));
 
+// Lightweight stub for ODrawer so tests can assert on the props the component
+// forwards (open / size / persistent / showClose) and drive button behaviour
+// via emits — without rendering reka-ui portals.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: {
+    open: { type: Boolean, default: false },
+    size: { type: String, default: undefined },
+    title: { type: String, default: undefined },
+    subTitle: { type: String, default: undefined },
+    persistent: { type: Boolean, default: false },
+    showClose: { type: Boolean, default: true },
+    width: { type: [String, Number], default: undefined },
+    primaryButtonLabel: { type: String, default: undefined },
+    secondaryButtonLabel: { type: String, default: undefined },
+    neutralButtonLabel: { type: String, default: undefined },
+    primaryButtonVariant: { type: String, default: undefined },
+    secondaryButtonVariant: { type: String, default: undefined },
+    neutralButtonVariant: { type: String, default: undefined },
+    primaryButtonDisabled: { type: Boolean, default: false },
+    secondaryButtonDisabled: { type: Boolean, default: false },
+    neutralButtonDisabled: { type: Boolean, default: false },
+    primaryButtonLoading: { type: Boolean, default: false },
+    secondaryButtonLoading: { type: Boolean, default: false },
+    neutralButtonLoading: { type: Boolean, default: false },
+  },
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-drawer-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-persistent="String(!!persistent)"
+      :data-show-close="String(!!showClose)"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-drawer-stub-primary"
+        @click="$emit('click:primary')"
+      >primary</button>
+      <button
+        data-test="o-drawer-stub-secondary"
+        @click="$emit('click:secondary')"
+      >secondary</button>
+      <button
+        data-test="o-drawer-stub-close"
+        @click="$emit('update:open', false)"
+      >close</button>
+    </div>
+  `,
+};
+
 describe("PipelineEditor", () => {
   let wrapper;
   let mockPipelineObj;
 
-  const buildMockPipelineObj = (overrides = {}) => ({
-    currentSelectedPipeline: {
-      nodes: [],
-      edges: [],
-      source: { source_type: "realtime" },
-      name: "test-pipeline",
-    },
-    isEditPipeline: false,
-    dirtyFlag: false,
-    dialog: { show: false, name: "" },
-    nodeTypes: [],
-    functions: { value: {} },
-    currentSelectedNodeData: null,
-    ...overrides,
-  });
+  const buildMockPipelineObj = (overrides = {}) =>
+    reactive({
+      currentSelectedPipeline: {
+        nodes: [],
+        edges: [],
+        source: { source_type: "realtime" },
+        name: "test-pipeline",
+      },
+      isEditPipeline: false,
+      dirtyFlag: false,
+      dialog: { show: false, name: "" },
+      nodeTypes: [],
+      functions: { value: {} },
+      currentSelectedNodeData: null,
+      ...overrides,
+    });
 
   beforeEach(() => {
     mockPipelineObj = buildMockPipelineObj();
@@ -129,6 +186,9 @@ describe("PipelineEditor", () => {
       global: {
         provide: { store },
         plugins: [i18n, router],
+        stubs: {
+          ODrawer: ODrawerStub,
+        },
       },
     });
   });
@@ -451,16 +511,18 @@ describe("PipelineEditor", () => {
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("savePipeline Validations", () => {
-    beforeEach(() => {
-      const dismissMock = vi.fn();
-      wrapper.vm.q.notify = vi.fn().mockReturnValue(dismissMock);
+    beforeEach(async () => {
       wrapper.vm.onSubmitPipeline = vi.fn().mockResolvedValue(true);
+      wrapper.vm.pipelineNameInputRef = { focus: vi.fn() };
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(toast).mockClear();
     });
 
     it("shows error notification when pipeline name is empty", async () => {
       mockPipelineObj.currentSelectedPipeline.name = "";
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.stringContaining("required") })
       );
     });
@@ -477,7 +539,8 @@ describe("PipelineEditor", () => {
         { io_type: "output", data: { node_type: "stream" } },
       ];
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.any(String) })
       );
     });
@@ -488,7 +551,8 @@ describe("PipelineEditor", () => {
         { io_type: "input", data: { node_type: "stream" } },
       ];
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.any(String) })
       );
     });
@@ -501,7 +565,8 @@ describe("PipelineEditor", () => {
       ];
       mockPipelineObj.currentSelectedPipeline.edges = [];
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.any(String) })
       );
     });
@@ -632,6 +697,54 @@ describe("PipelineEditor", () => {
       await wrapper.vm.savePipelineJson(validJson);
 
       expect(wrapper.vm.validationErrors).toEqual([]);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("ODrawer Migration", () => {
+    it("renders the JSON-editor ODrawer instance", () => {
+      const drawers = wrapper.findAllComponents(ODrawerStub);
+      expect(drawers.length).toBe(1);
+    });
+
+    it("JSON-editor ODrawer is closed by default and uses width 70, persistent=true", () => {
+      const drawers = wrapper.findAllComponents(ODrawerStub);
+      const jsonDrawer = drawers[0];
+
+      expect(jsonDrawer.props("open")).toBe(false);
+      expect(jsonDrawer.props("width")).toBe(70);
+      expect(jsonDrawer.props("persistent")).toBe(true);
+      // showClose is not explicitly set on the ODrawer, defaults to true
+      expect(jsonDrawer.props("showClose")).toBe(true);
+    });
+
+    it("JSON-editor ODrawer opens when openJsonEditor() is invoked", async () => {
+      wrapper.vm.openJsonEditor();
+      await flushPromises();
+
+      const drawers = wrapper.findAllComponents(ODrawerStub);
+      expect(drawers[0].props("open")).toBe(true);
+    });
+
+    it("JSON-editor ODrawer update:open=false closes the JSON editor", async () => {
+      wrapper.vm.showJsonEditorDialog = true;
+      await flushPromises();
+
+      const drawers = wrapper.findAllComponents(ODrawerStub);
+      await drawers[0].vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.showJsonEditorDialog).toBe(false);
+    });
+
+    it("clicking pipeline-json-edit-btn opens the JSON-editor ODrawer", async () => {
+      const btn = wrapper.find('[data-test="pipeline-json-edit-btn"]');
+      await btn.trigger("click");
+      await flushPromises();
+
+      const drawers = wrapper.findAllComponents(ODrawerStub);
+      expect(drawers[0].props("open")).toBe(true);
+      expect(wrapper.vm.showJsonEditorDialog).toBe(true);
     });
   });
 

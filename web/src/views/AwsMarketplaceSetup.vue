@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="aws-marketplace-setup">
-    <div class="flex relative-position tw-px-3 tw-pt-2">
+    <div class="tw:flex relative-position tw-px-3 tw-pt-2">
       <img
         class="appLogo"
         loading="lazy"
@@ -28,57 +28,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="setup-container q-pa-xl">
+    <div class="setup-container tw:p-6">
       <!-- No Token Error -->
-      <div v-if="state === 'no_token'" class="text-center">
-        <q-icon name="warning" size="80px" color="warning" />
-        <h5 class="q-mt-md">No Marketplace Token Found</h5>
-        <p class="text-grey-7">
+      <div v-if="state === 'no_token'" class="tw:text-center">
+        <OIcon name="warning" style="width: 80px; height: 80px;" />
+        <h5 class="tw:mt-3">No Marketplace Token Found</h5>
+        <p class="tw:text-gray-400">
           Please start the registration process from AWS Marketplace.
         </p>
         <OButton
           variant="primary"
           size="sm-action"
-          class="q-mt-lg"
+          class="tw:mt-4"
           @click="goToDashboard"
         >Go to Dashboard</OButton>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="state === 'error'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
-        <h5 class="q-mt-md">{{ errorMessage }}</h5>
+      <div v-else-if="state === 'error'" class="tw:text-center">
+        <OIcon name="error" style="width: 80px; height: 80px;" />
+        <h5 class="tw:mt-3">{{ errorMessage }}</h5>
         <OButton
           variant="primary"
           size="sm-action"
-          class="q-mt-lg"
+          class="tw:mt-4"
           @click="resetAndRetry"
         >Try Again</OButton>
       </div>
 
       <!-- Org Selection/Creation -->
-      <div v-else-if="state === 'select_org'" class="text-center">
-        <q-icon name="cloud" size="60px" color="primary" />
-        <h4 class="q-mt-md">Complete AWS Marketplace Setup</h4>
-        <p class="text-grey-7 q-mb-lg">
+      <div v-else-if="state === 'select_org'" class="tw:text-center">
+        <OIcon name="cloud" style="width: 60px; height: 60px;" />
+        <h4 class="tw:mt-3">Complete AWS Marketplace Setup</h4>
+        <p class="tw:text-gray-400 tw:mb-4">
           Link your AWS Marketplace subscription to an organization
         </p>
 
         <div class="options-container">
           <!-- Create New Org -->
-          <q-card flat bordered class="option-card q-mb-md">
-            <q-card-section>
-              <div class="text-h6">Create New Organization</div>
-              <p class="text-grey-7">
+          <OCard class="option-card tw:mb-4">
+            <OCardSection role="body">
+              <div class="tw:text-xl tw:font-semibold">Create New Organization</div>
+              <p class="tw:text-gray-400">
                 Create a new organization with AWS Marketplace billing
               </p>
-              <q-input
+              <OInput
                 v-model="newOrgName"
                 label="Organization Name"
-                outlined
-                dense
-                class="q-mb-md"
-                :rules="[(val) => !!val || 'Organization name is required']"
+                class="tw:mb-3"
+                :error="!!orgNameError"
+                :error-message="orgNameError"
+                @update:model-value="orgNameError = ''"
               />
               <OButton
                 variant="primary"
@@ -88,30 +88,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isProcessing"
                 :disabled="!newOrgName"
               >Create &amp; Link</OButton>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
 
           <!-- Link to Existing Org (only show orgs without billing) -->
-          <q-card
+          <OCard
             v-if="eligibleOrganizations.length > 0"
-            flat
-            bordered
             class="option-card"
           >
-            <q-card-section>
-              <div class="text-h6">Link to Existing Organization</div>
-              <p class="text-grey-7">
+            <OCardSection role="body">
+              <div class="tw:text-xl tw:font-semibold">Link to Existing Organization</div>
+              <p class="tw:text-gray-400">
                 Link AWS billing to an existing organization
               </p>
-              <q-select
+              <OSelect
                 v-model="selectedOrg"
                 :options="eligibleOrganizations"
-                option-label="name"
-                option-value="identifier"
+                labelKey="name"
+                valueKey="identifier"
                 label="Select Organization"
-                outlined
-                dense
-                class="q-mb-md"
+                class="tw:mb-3"
               />
               <OButton
                 variant="primary"
@@ -121,49 +117,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isProcessing"
                 :disabled="!selectedOrg"
               >Link AWS Billing</OButton>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
       </div>
 
       <!-- Processing State -->
-      <div v-else-if="state === 'processing'" class="text-center">
-        <q-spinner-dots size="60px" color="primary" />
-        <h5 class="q-mt-md">Setting up your subscription...</h5>
-        <p class="text-grey-7">Please wait while we configure your account.</p>
+      <div v-else-if="state === 'processing'" class="tw:text-center">
+        <OSpinner variant="dots" size="xl" />
+        <h5 class="tw:mt-3">Setting up your subscription...</h5>
+        <p class="tw:text-gray-400">Please wait while we configure your account.</p>
       </div>
 
       <!-- Pending Activation State -->
-      <div v-else-if="state === 'pending_activation'" class="text-center">
-        <h5 class="q-mb-lg">Waiting for AWS Confirmation</h5>
-        <div class="flex justify-center">
-          <q-spinner-gears size="80px" color="primary" />
+      <div v-else-if="state === 'pending_activation'" class="tw:text-center">
+        <h5 class="tw:mb-4">Waiting for AWS Confirmation</h5>
+        <div class="tw:flex tw:justify-center">
+          <OSpinner size="xl" />
         </div>
-        <p class="text-grey-7 q-mt-lg">
+        <p class="tw:text-gray-400 tw:mt-4">
           Please wait while we confirm activation with AWS and set up your account.
         </p>
       </div>
 
       <!-- Success State -->
-      <div v-else-if="state === 'success'" class="text-center">
-        <q-icon name="check_circle" size="80px" color="positive" />
-        <h4 class="q-mt-md">Subscription Activated!</h4>
-        <p class="text-grey-7">
+      <div v-else-if="state === 'success'" class="tw:text-center">
+        <OIcon name="check-circle" style="width: 80px; height: 80px;" />
+        <h4 class="tw:mt-3">Subscription Activated!</h4>
+        <p class="tw:text-gray-400">
           Your AWS Marketplace subscription is now active.
         </p>
         <OButton
           variant="primary"
           size="sm-action"
-          class="q-mt-lg"
+          class="tw:mt-4"
           @click="goToDashboard"
         >Go to Dashboard</OButton>
       </div>
 
       <!-- Payment Failed State -->
-      <div v-else-if="state === 'payment_failed'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
-        <h5 class="q-mt-md">Payment Failed</h5>
-        <p class="text-grey-7">
+      <div v-else-if="state === 'payment_failed'" class="tw:text-center">
+        <OIcon name="error" style="width: 80px; height: 80px;" />
+        <h5 class="tw:mt-3">Payment Failed</h5>
+        <p class="tw:text-gray-400">
           There was an issue with your AWS Marketplace payment. Please check
           your AWS account or contact AWS support.
         </p>
@@ -172,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           href="mailto:support@openobserve.ai"
           variant="primary"
           size="sm-action"
-          class="q-mt-lg"
+          class="tw:mt-4"
         >Contact Support</OButton>
       </div>
     </div>
@@ -181,13 +177,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 type SetupState =
   | "select_org"
@@ -200,16 +202,18 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
-  components: { OButton },
+  components: { OButton, OSpinner, OInput, OSelect,
+    OIcon, OCard, OCardSection,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");
     const isProcessing = ref(false);
     const newOrgName = ref("");
+    const orgNameError = ref("");
     const selectedOrg = ref<{ identifier: string; name: string } | null>(null);
     const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
       []
@@ -263,10 +267,7 @@ export default defineComponent({
 
     const createNewOrgWithAws = async () => {
       if (!newOrgName.value) {
-        q.notify({
-          type: "negative",
-          message: "Please enter an organization name",
-        });
+        orgNameError.value = "Please enter an organization name";
         return;
       }
 
@@ -294,8 +295,8 @@ export default defineComponent({
 
     const linkToExistingOrg = async () => {
       if (!selectedOrg.value) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Please select an organization",
         });
         return;
@@ -403,6 +404,7 @@ export default defineComponent({
       errorMessage,
       isProcessing,
       newOrgName,
+      orgNameError,
       selectedOrg,
       eligibleOrganizations,
       getImageURL,

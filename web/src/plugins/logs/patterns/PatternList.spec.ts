@@ -15,15 +15,9 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import PatternList from "./PatternList.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar({
-  plugins: [quasar.Notify],
-});
 
 describe("PatternList", () => {
   let wrapper: any;
@@ -54,6 +48,17 @@ describe("PatternList", () => {
     },
   ];
 
+  const OVirtualScrollStub = {
+    name: "OVirtualScroll",
+    props: ["items", "overscan", "scrollTarget"],
+    template: '<div data-test-stub="o-virtual-scroll"><slot v-for="(item, index) in items" :key="index" :item="item" :index="index" /></div>',
+  };
+  const OSpinnerStub = {
+    name: "OSpinner",
+    props: ["size"],
+    template: '<div data-test-stub="o-spinner" :data-test="$attrs[\'data-test\']" />',
+  };
+
   beforeEach(() => {
     wrapper = mount(PatternList, {
       props: {
@@ -70,6 +75,8 @@ describe("PatternList", () => {
               '<div :data-test="`pattern-card-stub-${index}`"><slot></slot></div>',
             props: ["pattern", "index"],
           },
+          OVirtualScroll: OVirtualScrollStub,
+          OSpinner: OSpinnerStub,
         },
       },
     });
@@ -81,19 +88,19 @@ describe("PatternList", () => {
 
   describe("Pattern Display", () => {
     it("should render q-virtual-scroll when patterns are available", () => {
-      const virtualScroll = wrapper.findComponent({ name: "QVirtualScroll" });
+      const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.exists()).toBe(true);
     });
 
     it("should pass patterns to virtual scroll", () => {
-      const virtualScroll = wrapper.findComponent({ name: "QVirtualScroll" });
+      const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.props("items")).toEqual(mockPatterns);
       expect(virtualScroll.props("items").length).toBe(mockPatterns.length);
     });
 
     it("should emit open-details event when PatternCard is clicked", async () => {
       // Trigger click on first pattern card
-      const card = wrapper.findComponent({ name: "QVirtualScroll" });
+      const card = wrapper.findComponent({ name: "OVirtualScroll" });
 
       // Since we're using virtual scroll, we need to check if the component
       // would emit the event properly
@@ -145,7 +152,7 @@ describe("PatternList", () => {
     });
 
     it("should display loading spinner when loading is true", () => {
-      const spinner = wrapper.findComponent({ name: "QSpinnerHourglass" });
+      const spinner = wrapper.find('[data-test="pattern-list-loading-indicator"]');
       expect(spinner.exists()).toBe(true);
     });
 
@@ -155,7 +162,7 @@ describe("PatternList", () => {
     });
 
     it("should not display virtual scroll when loading", () => {
-      const virtualScroll = wrapper.findComponent({ name: "QVirtualScroll" });
+      const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.exists()).toBe(false);
     });
   });
@@ -227,7 +234,7 @@ describe("PatternList", () => {
       });
 
       expect(wrapper.exists()).toBe(true);
-      const virtualScroll = wrapper.findComponent({ name: "QVirtualScroll" });
+      const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.exists()).toBe(false);
     });
 
@@ -248,13 +255,13 @@ describe("PatternList", () => {
   });
 
   describe("Virtual Scroll Configuration", () => {
-    it("should configure virtual scroll with correct slice size", () => {
-      const virtualScroll = wrapper.findComponent({ name: "QVirtualScroll" });
-      expect(virtualScroll.props("virtualScrollSliceSize")).toBe("5");
+    it("should configure virtual scroll with correct overscan", () => {
+      const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
+      expect(virtualScroll.props("overscan")).toBe(5);
     });
 
     it("should pass patterns to virtual scroll items", () => {
-      const virtualScroll = wrapper.findComponent({ name: "QVirtualScroll" });
+      const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.props("items")).toEqual(mockPatterns);
     });
   });
@@ -272,7 +279,7 @@ describe("PatternList", () => {
     it("should render the Occurrence column header text via i18n", () => {
       // The headers are rendered via t() – verify the header container exists
       // when patterns are present
-      const virtualScroll = wrapper.findComponent({ name: "QVirtualScroll" });
+      const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.exists()).toBe(true);
     });
 
@@ -287,7 +294,7 @@ describe("PatternList", () => {
           provide: { store },
         },
       });
-      const virtualScroll = emptyWrapper.findComponent({ name: "QVirtualScroll" });
+      const virtualScroll = emptyWrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.exists()).toBe(false);
     });
   });

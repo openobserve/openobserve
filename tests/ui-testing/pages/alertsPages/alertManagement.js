@@ -166,8 +166,8 @@ export class AlertManagement {
 
         await this.page.getByText('Delete', { exact: true }).click();
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.alertDeletedMessage)).toBeVisible();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(`[data-test-message="${this.locators.alertDeletedMessage}"]`)).toBeVisible();
+        await this.page.locator(`[data-test-message="${this.locators.alertDeletedMessage}"]`).waitFor({ state: 'hidden' });
     }
 
     /**
@@ -175,9 +175,12 @@ export class AlertManagement {
      * @param {string} alertName - Name of the alert to search for
      */
     async searchAlert(alertName) {
-        await this.page.locator(this.locators.alertSearchInput).click();
-        await this.page.locator(this.locators.alertSearchInput).fill('');
-        await this.page.locator(this.locators.alertSearchInput).fill(alertName.toLowerCase());
+        // OInput renders data-test on a wrapper div; the native <input> gets data-test="{parent}-field".
+        // Playwright can't fill a div — target the inner input and force to bypass hidden-input check.
+        const inputField = this.page.locator(this.locators.alertSearchInputField);
+        await inputField.waitFor({ state: 'attached', timeout: 10000 });
+        await inputField.fill('', { force: true });
+        await inputField.fill(alertName.toLowerCase(), { force: true });
         await this.page.waitForTimeout(2000);
 
         // Wait for either search results or no data message
@@ -211,9 +214,10 @@ export class AlertManagement {
         await this.page.locator(this.locators.searchAcrossFoldersToggle).locator('div').nth(1).click({ force: true });
         await this.page.waitForTimeout(500);
 
-        await this.page.locator(this.locators.alertSearchInput).click();
-        await this.page.locator(this.locators.alertSearchInput).fill('');
-        await this.page.locator(this.locators.alertSearchInput).fill(alertName);
+        const inputField = this.page.locator(this.locators.alertSearchInputField);
+        await inputField.waitFor({ state: 'attached', timeout: 10000 });
+        await inputField.fill('', { force: true });
+        await inputField.fill(alertName, { force: true });
         await this.page.waitForTimeout(2000);
 
         let deletedCount = 0;
@@ -267,8 +271,8 @@ export class AlertManagement {
 
                 await this.page.getByText('Delete').click();
                 await this.page.waitForTimeout(1000);
-                await this.page.locator('[data-test="confirm-button"]').click();
-                await expect(this.page.getByText('Alert deleted')).toBeVisible();
+                await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
+                await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: 'Alert deleted' })).toBeVisible();
 
                 await this.page.waitForTimeout(3000);
                 attempts++;
@@ -443,9 +447,14 @@ export class AlertManagement {
             testLogger.info('Closed alert history drawer (legacy)');
             return;
         }
-        // Last resort: Escape key
-        await this.page.keyboard.press('Escape');
-        testLogger.info('Closed dialog via Escape key');
+        // Last resort: close button fallback
+        const lastResortClose = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+        if (await lastResortClose.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await lastResortClose.click();
+        } else {
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        }
+        testLogger.info('Closed dialog via close button fallback');
     }
 
     /**
@@ -537,9 +546,9 @@ export class AlertManagement {
             });
             // Try to clean up UI state, but don't fail if browser is closed
             try {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
             } catch (cleanupError) {
                 // Browser may already be closed due to timeout - ignore
@@ -585,5 +594,114 @@ export class AlertManagement {
         }
 
         return { found: alertFound, logText: foundLogText };
+    }
+
+    // =========================================================================
+    // ALERT EDIT — DEDUPLICATION REGRESSION HELPERS
+    // =========================================================================
+
+    /**
+     * Wait for the alert list page to be ready (canonical landmark).
+     * @param {number} timeout
+     */
+    async waitForAlertListReady(timeout = 30000) {
+        await this.page.locator(this.locators.alertListPage).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Open the alert edit screen by clicking the alert's update (pencil) button.
+     * The list row exposes `[data-test="alert-list-{name}-update-alert"]` (AlertList.vue:312).
+     * @param {string} alertName
+     */
+    async openAlertEditByName(alertName) {
+        const updateBtn = this.page.locator(`[data-test="alert-list-${alertName}-update-alert"]`).first();
+        await expect(updateBtn).toBeVisible({ timeout: 10000 });
+        await updateBtn.click();
+        // Wait for the AddAlert form to render — `add-alert-submit-btn` is the canonical landmark.
+        await this.page.locator(this.locators.alertSubmitButton).waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Opened alert edit view', { alertName });
+    }
+
+    /**
+     * Activate the Advanced tab in the AddAlert v3 wizard.
+     * Deduplication lives in this tab (AddAlert.vue line ~273).
+     */
+    async openAdvancedTab() {
+        const advancedTab = this.page.locator(this.locators.addAlertTabAdvanced);
+        await expect(advancedTab).toBeVisible({ timeout: 10000 });
+        await advancedTab.click();
+        // Wait for the dedup fingerprint OSelect wrapper to mount in the Advanced tab.
+        await this.page.locator(this.locators.dedupFingerprintFieldsSelect).waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Switched to Advanced tab — deduplication panel visible');
+    }
+
+    /**
+     * Read currently selected fingerprint field values from the OSelect trigger.
+     * OSelect exposes `data-test-selected-value` (comma-joined for multiple).
+     * @returns {Promise<string[]>}
+     */
+    async getSelectedFingerprintFields() {
+        const trigger = this.page.locator(this.locators.dedupFingerprintFieldsTrigger);
+        await expect(trigger).toBeVisible({ timeout: 5000 });
+        const raw = await trigger.getAttribute('data-test-selected-value');
+        if (!raw) return [];
+        return raw.split(',').map(v => v.trim()).filter(Boolean);
+    }
+
+    /**
+     * Remove all currently selected fingerprint fields by opening the OSelect popover
+     * and clicking each previously selected option to toggle it OFF (multi-select).
+     * Returns the number of fields removed.
+     */
+    async removeAllFingerprintFields() {
+        const trigger = this.page.locator(this.locators.dedupFingerprintFieldsTrigger);
+        await expect(trigger).toBeVisible({ timeout: 5000 });
+
+        const selectedBefore = await this.getSelectedFingerprintFields();
+        testLogger.info('Removing fingerprint fields — initial selection', { selected: selectedBefore });
+
+        if (selectedBefore.length === 0) {
+            testLogger.warn('No fingerprint fields selected to remove');
+            return 0;
+        }
+
+        await trigger.click();
+        const popover = this.page.locator(this.locators.dedupFingerprintFieldsPopover);
+        await expect(popover).toBeVisible({ timeout: 5000 });
+
+        let removed = 0;
+        for (const value of selectedBefore) {
+            // Per-value option uses `data-test-value="<value>"`
+            const option = popover.locator(`[data-test="alert-dedup-fingerprint-fields-option"][data-test-value="${value}"]`).first();
+            await expect(option).toBeVisible({ timeout: 5000 });
+            await option.click();
+            removed += 1;
+            // Wait for the trigger's selected-value attribute to no longer include this value.
+            await expect.poll(async () => {
+                const current = await trigger.getAttribute('data-test-selected-value');
+                if (!current) return [];
+                return current.split(',').map(v => v.trim()).filter(Boolean);
+            }, { timeout: 5000 }).not.toContain(value);
+            testLogger.info('Deselected fingerprint option', { value, removed });
+        }
+
+        // Close the popover via keyboard — Escape is the canonical dismissal.
+        await this.page.keyboard.press('Escape');
+        await popover.waitFor({ state: 'hidden', timeout: 5000 });
+
+        return removed;
+    }
+
+    /**
+     * Submit the AddAlert form (Save button) and wait for the success toast.
+     * @returns {Promise<void>}
+     */
+    async submitAlertEdit() {
+        const submitBtn = this.page.locator(this.locators.alertSubmitButton);
+        await expect(submitBtn).toBeEnabled({ timeout: 10000 });
+        await submitBtn.click();
+        // OToast variant=success carries data-test="o-toast-success"; data-test-message holds the text.
+        await this.page.locator(this.locators.oToastSuccess).first().waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Alert update submitted — success toast visible');
     }
 }

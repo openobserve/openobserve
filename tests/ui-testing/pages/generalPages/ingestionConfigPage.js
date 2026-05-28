@@ -4,81 +4,93 @@ export class IngestionConfigPage {
     constructor(page) {
         this.page = page;
 
-        // Global ingestion search (moved from Recommended page to Ingestion parent)
-        this.globalSearchInput = '[data-test="ingestion-global-search"]';
+        // Global ingestion search (moved from Recommended page to Ingestion parent — Ingestion.vue carries this attr)
+        this.globalSearchInputSelector = '[data-test="recommended-list-search-input"]';
+        this.globalSearchInput = page.locator(this.globalSearchInputSelector);
+        // The OInput wrapper renders an inner native input with the -field suffix
+        this.globalSearchInputField = page.locator('[data-test="recommended-list-search-input-field"]');
+
         // Recommended page tabs container
-        this.recommendedTabsContainer = '[data-test="data-sources-recommended-tabs"]';
+        this.recommendedTabsContainerSelector = '[data-test="data-sources-recommended-tabs"]';
+        this.recommendedTabsContainer = page.locator(this.recommendedTabsContainerSelector);
 
         // Configuration content selectors
-        this.copyButton = '[data-test="rum-copy-btn"]';
-        this.contentText = '[data-test="rum-content-text"]';
+        this.copyButton = page.locator('[data-test="rum-copy-btn"]').first();
+        this.contentText = page.locator('[data-test="rum-content-text"]').first();
 
-        // Notification selector
-        this.notification = '.q-notification__message';
+        // Notification selector — OToast variant=success carries the data-test we target.
+        // 'o-toast-success' fires for both the Fluentd and Prometheus copy paths.
+        this.successToast = page.locator('[data-test="o-toast-success"]');
+        this.successToastMessage = page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]');
 
-        // Route tab selector (for search filtering)
-        this.routeTab = '.q-route-tab';
+        // Top-level Custom-page tabs (Logs / Metrics / Traces)
+        this.customMetricsTab = page.locator('[data-test="ingestion-custom-tab-ingestMetrics"]');
+        this.customLogsTab = page.locator('[data-test="ingestion-custom-tab-ingestLogs"]');
+
+        // Inner tabs used as page-loaded markers
+        this.logsCurlTab = page.locator('[data-test="ingestion-logs-tab-curl"]');
+        this.logsFluentdTab = page.locator('[data-test="ingestion-logs-tab-fluentd"]');
+        this.metricsPrometheusTab = page.locator('[data-test="ingestion-metrics-tab-prometheus"]');
+
+        // Recommended Kubernetes tab marker (default tab on Recommended page)
+        this.recommendedKubernetesTab = page.locator('[data-test="ingestion-recommended-tab-ingestFromKubernetes"]');
+
+        // Count of integration route tabs in Recommended view (scoped to its container)
+        this.recommendedRouteTabs = page.locator('[data-test="data-sources-recommended-tabs"] [data-test^="ingestion-recommended-tab-"]');
     }
 
     // ==================== Navigation ====================
 
     async navigateToRecommended(orgId) {
-        await this.page.goto(`${process.env.INGESTION_URL}/web/ingestion/recommended?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/ingestion/recommended?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     }
 
     async navigateToCustom(orgId) {
-        await this.page.goto(`${process.env.INGESTION_URL}/web/ingestion/custom?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/ingestion/custom?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
         // Wait for Curl tab to be visible (custom page auto-loads logs/curl)
-        await this.page.getByRole('tab', { name: 'Curl' }).waitFor({ state: 'visible', timeout: 5000 });
+        await this.logsCurlTab.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async navigateToIntegration(integrationPath, orgId) {
-        await this.page.goto(`${process.env.INGESTION_URL}/web${integrationPath}?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web${integrationPath}?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     }
 
     // ==================== Tab Interactions ====================
 
     async clickMetricsTab() {
-        const metricsTab = this.page.getByRole('tab', { name: 'Metrics' });
-        await expect(metricsTab).toBeVisible({ timeout: 10000 });
-        await metricsTab.click();
+        await expect(this.customMetricsTab).toBeVisible({ timeout: 10000 });
+        await this.customMetricsTab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for Prometheus tab to be visible (first metrics integration)
-        await this.page.getByRole('tab', { name: 'Prometheus' }).waitFor({ state: 'visible', timeout: 5000 });
-    }
-
-    async verifyIntegrationTabVisible(integrationName, timeout = 10000) {
-        const tab = this.page.getByRole('tab', { name: integrationName });
-        await expect(tab).toBeVisible({ timeout });
+        await this.metricsPrometheusTab.waitFor({ state: 'visible', timeout: 5000 });
     }
 
     // ==================== Copy Functionality ====================
 
     async clickCopyButton() {
-        await this.page.locator(this.copyButton).first().click();
+        await this.copyButton.click();
     }
 
     async getContentText() {
-        return await this.page.locator(this.contentText).first().textContent();
+        return await this.contentText.textContent();
     }
 
     async verifyCopyButtonVisible(timeout = 10000) {
-        await expect(this.page.locator(this.copyButton).first()).toBeVisible({ timeout });
+        await expect(this.copyButton).toBeVisible({ timeout });
     }
 
     async verifyContentVisible() {
-        await expect(this.page.locator(this.contentText).first()).toBeVisible();
+        await expect(this.contentText).toBeVisible();
     }
 
     async verifyNotificationVisible(expectedText = null, timeout = 5000) {
-        const notification = this.page.locator(this.notification);
-        await expect(notification).toBeVisible({ timeout });
+        await expect(this.successToast.first()).toBeVisible({ timeout });
 
         if (expectedText) {
-            const text = await notification.textContent();
+            const text = await this.successToastMessage.first().textContent();
             expect(text).toContain(expectedText);
         }
     }
@@ -86,23 +98,21 @@ export class IngestionConfigPage {
     // ==================== Search Functionality ====================
 
     async getSearchInput() {
-        return this.page.locator(this.globalSearchInput);
+        return this.globalSearchInput;
     }
 
     async verifySearchInputVisible() {
-        await expect(this.page.locator(this.globalSearchInput)).toBeVisible();
+        await expect(this.globalSearchInput).toBeVisible();
     }
 
     async fillSearchInput(searchText) {
-        const searchInput = this.page.locator(this.globalSearchInput);
-        await searchInput.fill(searchText);
+        await this.globalSearchInputField.fill(searchText);
         // Wait for search/navigation to complete
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     async clearSearchInput() {
-        const searchInput = this.page.locator(this.globalSearchInput);
-        await searchInput.clear();
+        await this.globalSearchInputField.clear();
         // Wait for search reset/navigation to complete
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
@@ -110,32 +120,31 @@ export class IngestionConfigPage {
     async waitForRecommendedTabs() {
         // Wait for the first integration tab (Kubernetes) to be visible
         // This ensures the redirect and tab rendering is complete
-        await this.page.getByRole('tab', { name: /kubernetes/i }).waitFor({ state: 'visible', timeout: 10000 });
+        await this.recommendedKubernetesTab.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async getRouteTabCount() {
         // Ensure tabs are rendered before counting
         await this.waitForRecommendedTabs();
         // Count only the integration tabs within the data-sources-recommended-tabs container
-        // This excludes the top-level navigation tabs
-        return await this.page.locator('[data-test="data-sources-recommended-tabs"] [role="tab"]').count();
+        return await this.recommendedRouteTabs.count();
     }
 
     // ==================== Assertions ====================
 
     async expectRecommendedPageLoaded() {
         // Recommended page loads with the sidebar tabs container and Kubernetes as the default tab
-        await expect(this.page.locator(this.recommendedTabsContainer)).toBeVisible({ timeout: 10000 });
-        await this.page.getByRole('tab', { name: /kubernetes/i }).waitFor({ state: 'visible', timeout: 10000 });
+        await expect(this.recommendedTabsContainer).toBeVisible({ timeout: 10000 });
+        await this.recommendedKubernetesTab.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async expectLogsPageLoaded() {
-        await expect(this.page.getByRole('tab', { name: 'Fluentd' })).toBeVisible({ timeout: 10000 });
-        await expect(this.page.getByRole('tab', { name: 'Curl' })).toBeVisible({ timeout: 5000 });
+        await expect(this.logsFluentdTab).toBeVisible({ timeout: 10000 });
+        await expect(this.logsCurlTab).toBeVisible({ timeout: 5000 });
     }
 
     async expectMetricsPageLoaded() {
-        await expect(this.page.getByRole('tab', { name: 'Prometheus' })).toBeVisible({ timeout: 10000 });
+        await expect(this.metricsPrometheusTab).toBeVisible({ timeout: 10000 });
     }
 
     async expectContentLength(minLength) {
@@ -152,18 +161,15 @@ export class IngestionConfigPage {
     // ==================== Scrolling and Content Display ====================
 
     async scrollContentToBottom() {
-        const contentElement = this.page.locator(this.contentText).first();
-        await contentElement.evaluate(el => el.scrollTop = el.scrollHeight);
+        await this.contentText.evaluate(el => el.scrollTop = el.scrollHeight);
     }
 
     async getContentScrollHeight() {
-        const contentElement = this.page.locator(this.contentText).first();
-        return await contentElement.evaluate(el => el.scrollHeight);
+        return await this.contentText.evaluate(el => el.scrollHeight);
     }
 
     async getContentClientHeight() {
-        const contentElement = this.page.locator(this.contentText).first();
-        return await contentElement.evaluate(el => el.clientHeight);
+        return await this.contentText.evaluate(el => el.clientHeight);
     }
 
     async isContentScrollable() {
@@ -174,14 +180,23 @@ export class IngestionConfigPage {
 
     // ==================== Link Verification ====================
 
-    async getDocumentationLinks() {
-        // Find all external links with target="_blank"
-        return await this.page.locator('a[target="_blank"]').all();
+    /**
+     * Returns hrefs from all external documentation links via in-page evaluate.
+     * Using evaluate(...) is the approved pattern for scraping content the spec needs
+     * without exposing element-only Playwright locators ($('a[target="_blank"]')).
+     */
+    async getDocumentationLinkHrefs() {
+        return await this.page.evaluate(() => {
+            const anchors = document.querySelectorAll('a[target="_blank"]');
+            return Array.from(anchors)
+                .map(a => a.getAttribute('href'))
+                .filter(h => !!h);
+        });
     }
 
     async getDocumentationLinkCount() {
-        const links = await this.getDocumentationLinks();
-        return links.length;
+        const hrefs = await this.getDocumentationLinkHrefs();
+        return hrefs.length;
     }
 
     async verifyDocumentationLinksExist() {
@@ -191,9 +206,9 @@ export class IngestionConfigPage {
     }
 
     async verifyDocumentationLinkHref(index = 0) {
-        const links = await this.getDocumentationLinks();
-        if (links.length > index) {
-            const href = await links[index].getAttribute('href');
+        const hrefs = await this.getDocumentationLinkHrefs();
+        if (hrefs.length > index) {
+            const href = hrefs[index];
             expect(href).toBeTruthy();
             expect(href).toMatch(/^https?:\/\//); // Verify it's a valid URL
             return href;
@@ -201,17 +216,10 @@ export class IngestionConfigPage {
         return null;
     }
 
-    async clickDocumentationLink(index = 0) {
-        const links = await this.getDocumentationLinks();
-        if (links.length > index) {
-            await links[index].click();
-        }
-    }
-
     async verifyDocumentationLinkAccessible(index = 0) {
-        const links = await this.getDocumentationLinks();
-        if (links.length > index) {
-            const href = await links[index].getAttribute('href');
+        const hrefs = await this.getDocumentationLinkHrefs();
+        if (hrefs.length > index) {
+            const href = hrefs[index];
 
             // Make HEAD request to check if link is accessible (5s timeout)
             const response = await this.page.request.head(href, { timeout: 5000 });
@@ -227,11 +235,11 @@ export class IngestionConfigPage {
     }
 
     async getAllDocumentationLinksStatus(skipUrls = []) {
-        const links = await this.getDocumentationLinks();
+        const hrefs = await this.getDocumentationLinkHrefs();
         const results = [];
 
-        for (let i = 0; i < links.length; i++) {
-            const href = await links[i].getAttribute('href');
+        for (let i = 0; i < hrefs.length; i++) {
+            const href = hrefs[i];
 
             // Skip URLs that are known to work but cause timeouts
             if (skipUrls.some(skipUrl => href.includes(skipUrl))) {

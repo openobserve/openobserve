@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-4">
         <div class="tw:flex tw:items-start tw:gap-4">
           <div class="tw:flex-shrink-0">
-            <q-icon name="cloud" size="2.5rem" color="primary" />
+            <OIcon name="cloud" size="xl" />
           </div>
           <div class="tw:flex-1">
             <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-2 title">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-deploy-btn"
               >
                 <template #icon-left
-                  ><q-icon name="open_in_new" size="sm"
+                  ><OIcon name="open-in-new" size="sm"
                 /></template>
                 View Setup Guide
               </OButton>
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-add-dashboard-btn"
               >
                 <template #icon-left
-                  ><q-icon name="dashboard" size="sm"
+                  ><OIcon name="dashboard" size="sm"
                 /></template>
                 Add Dashboard
               </OButton>
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-details-btn"
               >
                 <template #icon-left
-                  ><q-icon
-                    :name="showDetails ? 'expand_less' : 'expand_more'"
+                  ><OIcon
+                    :name="showDetails ? 'expand-less' : 'expand-more'"
                     size="sm"
                 /></template>
                 {{ showDetails ? "Hide" : "View" }} Details
@@ -73,10 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-slide-transition>
-        <div v-show="showDetails">
-          <q-separator />
-          <q-card-section class="tw:pt-4">
+      <div
+        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+        :class="showDetails ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+      >
+        <div class="tw:overflow-hidden tw:min-h-0">
+        <div>
+          <OSeparator />
+          <OCardSection class="tw:pt-4">
             <div class="tw:text-sm details-section">
               <h6
                 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title"
@@ -85,15 +89,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </h6>
 
               <div class="tw:mb-4">
-                <div class="row q-col-gutter-sm">
+                <div class="tw:flex tw:gap-2">
                   <div
                     v-for="service in includedServices"
                     :key="service.name"
-                    class="col-12 col-sm-6"
+                    class="tw:w-full col-sm-6"
                   >
                     <div class="service-item tw:p-2 tw:rounded tw:border">
                       <div class="tw:flex tw:items-start tw:gap-2">
-                        <q-icon
+                        <OIcon
                           :name="getCategoryIcon(service.category)"
                           size="sm"
                           class="tw:mt-0.5"
@@ -170,9 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </q-card-section>
+          </OCardSection>
         </div>
-      </q-slide-transition>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -180,18 +185,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "AzureQuickSetup",
-  components: { OButton },
+  components: { OSeparator, OButton, OCardSection,
+    OIcon,
+},
   setup() {
     const store = useStore();
-    const q = useQuasar();
+    const { confirm } = useConfirmDialog();
     const showDetails = ref(false);
     const addingDashboard = ref(false);
 
@@ -293,15 +304,9 @@ export default defineComponent({
         let shouldReplace = false;
         if (existingDashboard) {
           // Ask user if they want to replace
-          shouldReplace = await new Promise<boolean>((resolve) => {
-            q.dialog({
-              title: "Dashboard Already Exists",
-              message: `A dashboard named "${dashboardTitle}" already exists in the Microsoft folder. Do you want to replace it?`,
-              cancel: true,
-              persistent: true,
-            })
-              .onOk(() => resolve(true))
-              .onCancel(() => resolve(false));
+          shouldReplace = await confirm({
+            title: "Dashboard Already Exists",
+            message: `A dashboard named "${dashboardTitle}" already exists in the Microsoft folder. Do you want to replace it?`,
           });
 
           if (!shouldReplace) {
@@ -340,8 +345,8 @@ export default defineComponent({
           replaced: shouldReplace,
         });
 
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: shouldReplace
             ? "Microsoft O365 dashboard replaced successfully"
             : "Microsoft O365 dashboard added successfully to Microsoft folder",
@@ -349,8 +354,8 @@ export default defineComponent({
         });
       } catch (error) {
         console.error("Error adding dashboard:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to add dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });

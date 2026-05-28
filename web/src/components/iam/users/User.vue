@@ -17,40 +17,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none">
-    <div>
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
       <div
-          class="q-table__title tw:font-[600]"
+          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
           data-test="user-title-text"
         >
           {{ t("iam.basicUsers") }}
         </div>
-        <div class="full-width tw:flex tw:justify-end tw:gap-3">
-          <q-input
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
+          <OInput
               v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              class="tw:w-[12.5rem]"
               :placeholder="t('user.search')"
+              data-test="iam-users-search-input"
             >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
-            </q-input>
-          <div class="col-6" v-if="config.isCloud == 'true'">
+            </OInput>
+          <div class="tw:w-1/2" v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
               v-model:currentrole="currentUserRole"
               @invite-sent="handleInviteSent"
             />
           </div>
-          <div class="col-6" v-else>
+          <div class="tw:w-1/2" v-else>
             <OButton
               variant="primary"
               size="sm"
+              class="tw:!h-8"
               @click="addRoutePush({})"
               data-test="add-basic-user"
             >
@@ -60,243 +59,182 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
     </div>
-    <div class="tw:w-full">
-      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
-        <q-table
-          ref="qTable"
-          :rows="visibleRows"
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container tw:h-full">
+        <OTable
+          :key="tableKey"
+          :data="rows"
           :columns="columns"
           row-key="email"
+          :loading="loading"
+          :selected-ids="selectedUserIds"
+          :global-filter="filterQuery"
+          pagination="client"
+          :page-size="500"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('iam.basicUsers')"
+          sorting="client"
           selection="multiple"
-          v-model:selected="selectedUsers"
-          :pagination="pagination"
-          :filter="filterQuery"
-          :style="hasVisibleRows ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' : ''"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+          :is-row-selectable="(row: any) => row.enableDelete"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <template #no-data>
-            <NoData></NoData>
+          <template #empty>
+            <NoData />
           </template>
-          <template v-slot:body-selection="scope">
-            <q-td auto-width>
-              <q-checkbox
-                v-model="scope.selected"
-                size="sm"
-                class="o2-table-checkbox"
-                :disable="!scope.row.enableDelete"
-              />
-            </q-td>
-          </template>
-          <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-               <q-th v-if="columns.length > 0" auto-width>
-                
-                <q-checkbox
-                  v-model="headerCheckboxValue"
-                  size="sm"
-                  toggle-indeterminate
-                  :disable="selectableRows.length === 0"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-table-checkbox-dark'
-                      : 'o2-table-checkbox-light'
-                  "
-                  class="o2-table-checkbox"
-                />
-              </q-th>
 
-              <q-th v-for="col in props.cols"
-              :class="col.classes"
-              :style="col.style"
-              :key="col.name" :props="props">
-                <span>{{ col.label }}</span>
-              </q-th>
-            </q-tr>
+          <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
+          <template #cell-auth="{ row }">
+            <OBadge
+              v-if="row.auth_type"
+              :variant="row.auth_type === 'SSO' ? 'primary-outline' : 'default-outline'"
+              size="sm"
+              class="o2-role-chip"
+            >
+              {{ row.auth_type }}
+            </OBadge>
           </template>
-          <template #body-cell-actions="props">
-            <q-td :props="props" side>
-              <OButton
-                v-if="props.row.enableDelete && props.row.status != 'pending'"
-                :title="t('user.delete')"
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="confirmDeleteAction(props)"
-                :data-test="`delete-basic-user-${props.row.email}`"
+
+          <!-- Roles badges — yellow outline for built-in, red outline for custom.
+               Built-in role names are displayed capitalised (Admin/Viewer/User),
+               custom role names keep their original casing (nmcdev/admin/etc.). -->
+          <template #cell-roles="{ row }">
+            <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-1">
+              <OBadge
+                v-for="(roleName, idx) in (row.roles || [])"
+                :key="`${roleName}-${idx}`"
+                :variant="isBuiltinRole(roleName) ? 'warning-outline' : 'error-outline'"
+                size="md"
+                class="o2-role-chip"
               >
-                <q-icon :name="outlinedDelete" />
-              </OButton>
-              <OButton
-                v-if="props.row.status == 'pending' && props.row.token"
-                :title="t('user.revoke_invite')"
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="confirmRevokeAction(props)"
-                :data-test="`revoke-invite-${props.row.email}`"
-              >
-                <q-icon name="cancel" />
-              </OButton>
-              <OButton
-                v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
-                :title="t('user.update')"
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="addRoutePush(props)"
-                :data-test="`edit-basic-user-${props.row.email}`"
-              >
-                <q-icon name="edit" />
-              </OButton>
-            </q-td>
-          </template>
-          <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-              <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                {{ resultTotal }}
-                {{
-                  resultTotal === 1
-                    ? t("user.header")
-                    : t("user.header") + "s"
-                }}
-              </div>
-              <OButton
-                v-if="selectedUsers.length > 0"
-                data-test="users-list-delete-users-btn"
-                variant="outline"
-                size="sm"
-                class="tw:mr-2"
-                @click="openBulkDeleteDialog"
-              >
-                <template #icon-left><q-icon name="delete" /></template>
-                Delete
-              </OButton>
-              <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
+                {{ isBuiltinRole(roleName) ? toCamelCase(roleName) : roleName }}
+              </OBadge>
             </div>
-
           </template>
-        </q-table>
+
+          <template #cell-actions="{ row }">
+            <OButton
+              v-if="row.enableDelete && row.status != 'pending'"
+              :title="t('user.delete')"
+              variant="ghost"
+              size="icon-sm"
+              :data-test="`delete-basic-user-${row.email}`"
+              @click="confirmDeleteAction(row)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+            <OButton
+              v-if="row.status == 'pending' && row.token"
+              :title="t('user.revoke_invite')"
+              variant="ghost"
+              size="icon-sm"
+              :data-test="`revoke-invite-${row.email}`"
+              @click="confirmRevokeAction(row)"
+            >
+              <OIcon name="cancel" size="sm" />
+            </OButton>
+            <OButton
+              v-if="row.enableEdit && row.status != 'pending' && config.isCloud == 'false'"
+              :title="t('user.update')"
+              variant="ghost"
+              size="icon-sm"
+              :data-test="`edit-basic-user-${row.email}`"
+              @click="addRoutePush(row)"
+            >
+              <OIcon name="edit" size="sm" />
+            </OButton>
+          </template>
+          <template #bottom>
+            <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <OButton
+              v-if="selectedUsers.length > 0"
+              data-test="users-list-delete-users-btn"
+              variant="outline-destructive"
+              size="sm"
+              icon-left="delete"
+              @click="openBulkDeleteDialog"
+            >
+              Delete
+            </OButton>
+          </template>
+        </OTable>
         </div>
     </div>
-    </div>
-
-    <q-dialog
+    
+    <update-user-role
       v-if="config.isCloud == 'false'"
-      v-model="showUpdateUserDialog"
-      position="right"
-      full-height
-      maximized
+      v-model:open="showUpdateUserDialog"
+      v-model="selectedUser"
+      @updated="updateMember"
+    />
+
+    <add-user
+      v-model:open="showAddUserDialog"
+      v-if="config.isCloud == 'false'"
+      v-model="selectedUser"
+      :isUpdated="isUpdated"
+      :userRole="currentUserRole"
+      :roles="options"
+      :customRoles="customRoles"
+      @updated="addMember"
+    />
+
+    <ODialog data-test="user-delete-dialog"
+      v-model:open="confirmDelete"
+      size="sm"
+      :title="t('user.confirmDeleteHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmDelete = false"
+      @click:primary="deleteUser"
     >
-      <update-user-role v-model="selectedUser" @updated="updateMember" />
-    </q-dialog>
+      <p>{{ t('user.confirmDeleteMsg') }}</p>
+    </ODialog>
 
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
+    <ODialog data-test="user-revoke-dialog"
+      v-model:open="confirmRevoke"
+      size="xs"
+      title="Revoke Invitation"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmRevoke = false"
+      @click:primary="revokeInvite"
     >
-      <add-user
-        v-if="config.isCloud == 'false'"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        :userRole="currentUserRole"
-        :roles="options"
-        :customRoles="customRoles"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
-    </q-dialog>
+      <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
+    </ODialog>
 
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("user.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("user.confirmDeleteMsg") }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="deleteUser"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmRevoke">
-      <q-card style="width: 400px">
-        <q-card-section class="confirmBody">
-          <div class="head">Revoke Invitation</div>
-          <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="revokeInvite"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
-        <q-card-section class="confirmBody">
-          <div class="head">Delete Users</div>
-          <div class="para">Are you sure you want to delete {{ selectedUsers.length }} user(s)?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            Cancel
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="bulkDeleteUsers"
-          >
-            OK
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-page>
+    <ODialog data-test="user-bulk-delete-dialog"
+      v-model:open="confirmBulkDelete"
+      size="sm"
+      title="Delete Users"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="confirmBulkDelete = false"
+      @click:primary="bulkDeleteUsers"
+    >
+      <p>Are you sure you want to delete {{ selectedUsers.length }} user(s)?</p>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps, date } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
 import AddUser from "@/components/iam/users/AddUser.vue";
-import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
@@ -305,36 +243,38 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
-import { getRoles } from "@/services/iam";
+import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
-    QTablePagination,
+    OTable,
     UpdateUserRole,
-    NoData,
     AddUser,
     MemberInvitation,
     OButton,
+    OBadge,
+    OIcon,
+    ODialog,
+    OInput,
+    NoData,
   },
   emits: [
     "updated:fields",
     "deleted:fields",
     "updated:dates",
-    "update:changeRecordPerPage",
-    "update:maxRecordToReturn",
   ],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
-    const resultTotal = ref<number>(0);
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -342,7 +282,6 @@ export default defineComponent({
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
-    const qTable: any = ref(null);
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
@@ -353,6 +292,8 @@ export default defineComponent({
     };
     const selectedUsers: any = ref([]);
     const confirmBulkDelete = ref(false);
+    const rows = ref<any[]>([]);
+    const tableKey = ref(0);
 
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
@@ -371,6 +312,7 @@ export default defineComponent({
       await getOrgMembers();
       updateUserActions();
       await getRoles();
+      await getCustomRoles();
 
       // if (config.isCloud == "true") {
         // columns.value.push({
@@ -394,56 +336,110 @@ export default defineComponent({
       // }
 
       updateUserActions();
+
+      // Handle deep-linked / refreshed URL.
+      // Only `action=update&email=…` auto-opens the dialog so a shared edit
+      // link still lands directly on the user's edit form. `action=add` is
+      // intentionally NOT handled here — the dialog only opens via the
+      // "New user" button click; refreshing on an `action=add` URL should
+      // leave the user on the list view, not pop a dialog on load.
+      const query = router.currentRoute.value.query;
+      if (query.action === "update" && query.email) {
+        const match = usersState.users.find(
+          (m: any) => m.email === query.email,
+        );
+        if (match) addUser({ row: match }, true);
+      }
     });
 
-    const columns: any = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
-      },
-      {
-        name: "email",
-        field: "email",
-        label: t("user.email"),
-        align: "left",
+    const isEnterpriseOrCloud =
+      config.isEnterprise === "true" || config.isCloud === "true";
+
+    const columns = computed<OTableColumnDef[]>(() => {
+      const cols: OTableColumnDef[] = [
+        {
+          id: "#",
+          header: "#",
+          accessorFn: (row: any) => row["#"],
+          size: 40,
+          minSize: 32,
+          maxSize: 50,
+          meta: { compactPadding: true, align: "left" },
+        },
+        {
+          id: "email",
+          header: t("user.email"),
+          accessorKey: "email",
+          sortable: true,
+          meta: { align: "left", autoWidth: true },
+        },
+        {
+          id: "first_name",
+          header: t("user.firstName"),
+          accessorKey: "first_name",
+          sortable: true,
+          size: 150,
+          meta: { align: "left" },
+        },
+        {
+          id: "last_name",
+          header: t("user.lastName"),
+          accessorKey: "last_name",
+          sortable: true,
+          size: 150,
+          meta: { align: "left" },
+        },
+      ];
+
+      // Auth column — only meaningful in enterprise/cloud where SSO/LDAP is in play
+      if (isEnterpriseOrCloud) {
+        cols.push({
+          id: "auth",
+          header: "Auth",
+          accessorKey: "auth_type",
+          sortable: true,
+          size: 120,
+          meta: { align: "left" },
+        });
+      }
+
+      // Roles column — array of role chips in enterprise/cloud, single role string otherwise
+      cols.push({
+        id: isEnterpriseOrCloud ? "roles" : "role",
+        header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
+        accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
-      },
-      {
-        name: "first_name",
-        field: "first_name",
-        label: t("user.firstName"),
-        align: "left",
-        sortable: true,
-        style: "width: 150px",
-      },
-      {
-        name: "last_name",
-        field: "last_name",
-        label: t("user.lastName"),
-        align: "left",
-        sortable: true,
-        style: "width: 150px",
-      },
-      {
-        name: "role",
-        field: "role",
-        label: t("user.role"),
-        align: "left",
-        sortable: true,
-        style: "width: 150px",
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "center",
-        classes: 'actions-column',
-        style: "width: 100px"
-      },
+        size: 220,
+        meta: { align: "left" },
+      });
+
+      cols.push({
+        id: "actions",
+        header: t("user.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 120,
+        minSize: 80,
+        maxSize: 140,
+        meta: { align: "center", actionCount: 2 },
+      });
+
+      return cols;
+    });
+
+    // Built-in role names get the muted (yellow) outline badge; anything else
+    // is treated as a custom role and gets the destructive (red) outline badge.
+    const BUILTIN_ROLES = new Set([
+      "admin",
+      "viewer",
+      "user",
+      "root",
+      "member",
+      "editor",
+      "serviceaccount",
     ]);
+    const isBuiltinRole = (r: string) =>
+      BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
     const options = ref([]);
     const customRoles = ref([]);
@@ -463,19 +459,29 @@ export default defineComponent({
           .finally(() => resolve(true));
       });
     };
-    const getCustomRoles = async () => {
-      await getRoles(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          customRoles.value = res.data;
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+    const getCustomRoles = async (options: { silent?: boolean } = {}) => {
+      if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+      try {
+        const res = await getCustomRolesApi(
+          store.state.selectedOrganization.identifier,
+        );
+        customRoles.value = Array.isArray(res.data) ? res.data : [];
+      } catch (err: any) {
+        if (!options.silent && err?.response?.status !== 403) {
+          toast({
+            variant: "error",
+            message:
+              err?.response?.data?.message ||
+              "Failed to load custom roles.",
+            timeout: 3000,
+          });
+        }
+      }
     };
 
     const getInvitedMembers = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading users...",
       });
 
@@ -498,22 +504,87 @@ export default defineComponent({
       });
     }
 
+    let hydrateGeneration = 0;
+
+    const clearLoading = (targets: any[]) => {
+      for (const u of targets) {
+        u.custom_roles_loading = false;
+      }
+    };
+
+    // Inverts OFGA per-role memberships into per-user role lists.
+    // Cost: O(R) HTTP calls where R is the number of custom roles,
+    // independent of the user count.
+    const hydrateCustomRoles = async () => {
+      const myGen = ++hydrateGeneration;
+      const orgId = store.state.selectedOrganization.identifier;
+      const targets = usersState.users.filter(
+        (u: any) => (u.rawEmail || u.email) && u.status !== "pending",
+      );
+      if (targets.length === 0) return;
+
+      const byEmail = new Map<string, any>();
+      for (const u of targets) {
+        byEmail.set(String(u.rawEmail || u.email).toLowerCase(), u);
+      }
+
+      try {
+        // Always fetch a fresh role list scoped to this hydration run so we
+        // don't race with concurrent picker loads mutating the shared ref.
+        // Silent mode: hydration is a background operation; surface fetch
+        // errors via the per-row loading state, not a toast.
+        let roleNames: string[] = [];
+        try {
+          const res = await getCustomRolesApi(orgId);
+          roleNames = Array.isArray(res.data) ? res.data : [];
+        } catch {
+          roleNames = [];
+        }
+        if (myGen !== hydrateGeneration) return;
+        if (roleNames.length === 0) return;
+
+        const results = await Promise.all(
+          roleNames.map((role) =>
+            getRoleUsers(role, orgId)
+              .then((r) => ({ role, emails: Array.isArray(r.data) ? r.data : [] }))
+              .catch(() => ({ role, emails: [] as string[] })),
+          ),
+        );
+        if (myGen !== hydrateGeneration) return;
+
+        for (const { role, emails } of results) {
+          for (const email of emails) {
+            const row = byEmail.get(String(email).toLowerCase());
+            if (!row) continue;
+            const next = Array.isArray(row.custom_roles)
+              ? row.custom_roles
+              : [];
+            if (next.indexOf(role) === -1) {
+              row.custom_roles = [...next, role];
+            }
+          }
+        }
+      } finally {
+        clearLoading(targets);
+      }
+    };
+
+    const loading = ref(false);
     const getOrgMembers = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading users...",
       });
 
+      loading.value = true;
       return new Promise((resolve, reject) => {
         usersService
           .orgUsers(store.state.selectedOrganization.identifier)
           .then(async (res) => {
-            resultTotal.value = res.data.data.length;
             let users = [...res.data.data];
 
             if (config.isCloud == "true") {
               const invitedMembers: any = await getInvitedMembers();
-              resultTotal.value += invitedMembers.length;
               users = [...res.data.data, ...invitedMembers];
             }
             
@@ -529,12 +600,40 @@ export default defineComponent({
                 addUser({ row: data }, true);
               }
 
+              // Normalise roles to an array. Enterprise APIs surface roles in
+              // various shapes — pull from every plausible field and dedupe.
+              const rolesSet = new Set<string>();
+              if (data?.role) rolesSet.add(String(data.role));
+              if (Array.isArray(data?.roles)) {
+                data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
+              }
+              if (Array.isArray(data?.custom_roles)) {
+                data.custom_roles.forEach(
+                  (r: any) => r && rolesSet.add(String(r)),
+                );
+              }
+              if (Array.isArray(data?.assigned_roles)) {
+                data.assigned_roles.forEach(
+                  (r: any) => r && rolesSet.add(String(r)),
+                );
+              }
+              const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
+
+
               return {
                 "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: maskText(data.email),
+                rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                roles: rolesArr,
+                auth_type: data?.auth_type
+                  ? data.auth_type
+                  : data?.is_external
+                    ? "SSO"
+                    : "Native",
+                is_external: !!data?.is_external,
                 enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
@@ -542,39 +641,70 @@ export default defineComponent({
                 token: data?.token || null,
               };
             });
-
+            rows.value = usersState.users;
+            tableKey.value++;
             dismiss();
 
+            // Resolve immediately so the caller (onBeforeMount) can run
+            // updateUserActions() and surface the row action buttons without
+            // waiting on the per-user role fetch below.
             resolve(true);
+
+            // Enterprise/cloud: the org-members API only returns a single
+            // `role` per user, so users with multiple role assignments
+            // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
+            // full per-user role list in the background — fire-and-forget —
+            // and re-render the rows when each fetch completes. This keeps
+            // the table responsive instead of blocking the whole UI on the
+            // role API.
+            if (isEnterpriseOrCloud) {
+              const orgId = store.state.selectedOrganization.identifier;
+              const realUsers = usersState.users.filter(
+                (u: any) => u.email && u.status !== "pending",
+              );
+              // Don't await — let the role fetches run in the background.
+              Promise.allSettled(
+                realUsers.map(async (u: any) => {
+                  try {
+                    const resp: any = await usersService.getUserRoles(
+                      orgId,
+                      u.email,
+                    );
+                    const fetched: string[] = Array.isArray(resp?.data)
+                      ? resp.data.filter(Boolean).map(String)
+                      : [];
+                    if (fetched.length) {
+                      const merged = new Set<string>([
+                        ...(u.roles || []),
+                        ...fetched,
+                      ]);
+                      u.roles = Array.from(merged);
+                    }
+                  } catch {
+                    // Per-user role fetch failures are non-fatal — fall back
+                    // to whatever role string came with the org-members row.
+                  }
+                }),
+              ).then(() => {
+                rows.value = [...usersState.users];
+                tableKey.value++;
+              });
+            }
           })
-          .catch(() => {
+          .catch((err: any) => {
+            console.error("Failed to fetch org members:", err);
             dismiss();
+            toast({
+              variant: "error",
+              message: "Failed to load users: " + (err?.response?.data?.message || err?.message || "Unknown error"),
+              timeout: 5000,
+            });
             reject(false);
+          })
+          .finally(() => {
+            loading.value = false;
           });
       });
-    };
-
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-    const maxRecordToReturn = ref<number>(500);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
     };
 
     // const showAddUserBtn = computed(() => {
@@ -675,10 +805,6 @@ export default defineComponent({
       }
     };
 
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
-
     const updateUser = (props: any) => {
       selectedUser.value = props.row;
       showUpdateUserDialog.value = true;
@@ -706,22 +832,17 @@ export default defineComponent({
       }, 100);
     };
 
-    const addRoutePush = (props: any) => {
-      if (props.row != undefined) {
+    const addRoutePush = (row: any) => {
+      if (row?.email) {
         router.push({
           name: "users",
           query: {
             action: "update",
             org_identifier: store.state.selectedOrganization.identifier,
-            email: props.row.email,
+            email: row.email,
           },
         });
-        addUser(
-          {
-            row: props.row,
-          },
-          true,
-        );
+        addUser({ row }, true);
       } else {
         addUser({}, false);
         router.push({
@@ -762,6 +883,7 @@ export default defineComponent({
           return user;
         });
         usersState.users = updatedUsers;
+        rows.value = usersState.users;
       });
     };
     const fetchUserRoles = (userEmail: any) => {
@@ -779,6 +901,7 @@ export default defineComponent({
           return user;
         });
         usersState.users = updatedUsers;
+        rows.value = usersState.users;
       });
     };
 
@@ -787,8 +910,7 @@ export default defineComponent({
         try {
           await getOrgMembers();
         } catch (error) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: "Failed to refresh user list",
           });
         }
@@ -819,8 +941,7 @@ export default defineComponent({
         await getOrgMembers();
         updateUserActions();
         if (operationType == "created") {
-          $q.notify({
-            color: "positive",
+          toast({
             message: "User added successfully.",
           });
           // if (
@@ -848,8 +969,7 @@ export default defineComponent({
           //   usersState.users.push(user);
           // }
         } else {
-          $q.notify({
-            color: "positive",
+          toast({
             message: "User updated successfully.",
           });
           // usersState.users.forEach((member: any, key: number) => {
@@ -870,18 +990,18 @@ export default defineComponent({
       });
     };
 
-    const confirmDeleteAction = (props: any) => {
+    const confirmDeleteAction = (row: any) => {
       confirmDelete.value = true;
-      deleteUserEmail = props.row.email;
+      deleteUserEmail = row.email;
     };
 
     const deleteUser = async () => {
+      confirmDelete.value = false;
       usersService
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "User deleted successfully.",
             });
             await getOrgMembers();
@@ -890,23 +1010,23 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: "Error while deleting user.",
             });
           }
         });
     };
 
-    const confirmRevokeAction = (props: any) => {
+    const confirmRevokeAction = (row: any) => {
       confirmRevoke.value = true;
-      revokeInviteToken = props.row.token;
-      revokeInviteEmail.value = props.row.email;
+      revokeInviteToken = row.token;
+      revokeInviteEmail.value = row.email;
     };
 
     const revokeInvite = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      confirmRevoke.value = false;
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -915,8 +1035,7 @@ export default defineComponent({
         .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
         .then(async (res: any) => {
           dismiss();
-          $q.notify({
-            color: "positive",
+          toast({
             message: "Invitation revoked successfully.",
             timeout: 3000,
           });
@@ -932,8 +1051,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           dismiss();
-          $q.notify({
-            color: "negative",
+          toast({
             message: err?.response?.data?.message || "Error while revoking invitation.",
             timeout: 5000,
           });
@@ -960,20 +1078,17 @@ export default defineComponent({
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
-          $q.notify({
-            color: "positive",
+          toast({
             message: `Successfully deleted ${successful.length} user(s)`,
             timeout: 2000,
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
-          $q.notify({
-            color: "warning",
+          toast({
             message: `Deleted ${successful.length} user(s), but ${unsuccessful.length} failed`,
             timeout: 3000,
           });
         } else if (unsuccessful.length > 0) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: `Failed to delete ${unsuccessful.length} user(s)`,
             timeout: 2000,
           });
@@ -985,8 +1100,7 @@ export default defineComponent({
         updateUserActions();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: err.response?.data?.message || err?.message || "Error while deleting users",
             timeout: 2000,
           });
@@ -995,8 +1109,8 @@ export default defineComponent({
     };
 
     const updateUserRole = (row: any) => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -1014,14 +1128,14 @@ export default defineComponent({
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
             const message = `Error while updating organization member`;
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: message,
               timeout: 15000,
             });
           } else {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Organization member updated successfully.",
               timeout: 3000,
             });
@@ -1042,62 +1156,22 @@ export default defineComponent({
       });
     };
 
-    const filterData = (rows: any, terms: any) => {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) ||
-            rows[i]["role"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      };
-
-      const visibleRows = computed(() => {
-      if (!filterQuery.value) return usersState.users || []
-      return filterData(usersState.users || [], filterQuery.value)
-    });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-    const selectableRows = computed(() =>
-      visibleRows.value.filter((row: any) => row.enableDelete)
+    const selectedUserIds = computed(() =>
+      selectedUsers.value.map((u: any) => u.email),
     );
 
-    const headerCheckboxValue = computed({
-      get() {
-        if (selectableRows.value.length === 0) return false;
-        const selectedCount = selectableRows.value.filter((row: any) =>
-          selectedUsers.value.some((u: any) => u.email === row.email)
-        ).length;
-        if (selectedCount === 0) return false;
-        if (selectedCount === selectableRows.value.length) return true;
-        return null; // indeterminate: some but not all selectable rows selected
-      },
-      set(val: boolean | null) {
-        if (val) {
-          selectedUsers.value = [...selectableRows.value];
-        } else {
-          selectedUsers.value = [];
-        }
-      },
-    });
-
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const usersMap = new Map(
+        usersState.users
+          .filter((u: any) => u.enableDelete)
+          .map((u: any) => [u.email, u]),
+      );
+      selectedUsers.value = ids.map((id) => usersMap.get(id)).filter(Boolean);
+    };
 
     // Watch selectedUsers to filter out disabled rows
     watch(selectedUsers, (newSelectedUsers) => {
-      // Filter out any disabled rows (those with enableDelete = false)
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
-
-      // If any disabled rows were selected, update to only include enabled ones
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
         selectedUsers.value = onlyEnabledSelected;
       }
@@ -1105,12 +1179,15 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
       router,
       store,
       config,
+      isEnterpriseOrCloud,
+      isBuiltinRole,
+      toCamelCase,
       usersState,
       columns,
+      loading,
       orgData,
       confirmDelete,
       deleteUser,
@@ -1129,21 +1206,12 @@ export default defineComponent({
       hideForm,
       isUpdated,
       showAddUserDialog,
-      pagination,
-      resultTotal,
       selectedUser,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
-      maxRecordToReturn,
       showUpdateUserDialog,
-      changeMaxRecordToReturn,
-      outlinedDelete,
       filterQuery,
       fetchUserGroups,
       toggleExpand,
       forceCloseRow,
-      filterData,
       userEmail,
       selectedRole,
       options,
@@ -1162,14 +1230,14 @@ export default defineComponent({
       shouldAllowChangeRole,
       shouldAllowDelete,
       fetchUserRoles,
-      visibleRows,
-      hasVisibleRows,
-      selectableRows,
-      headerCheckboxValue,
       selectedUsers,
+      selectedUserIds,
+      handleSelectedIdsUpdate,
       confirmBulkDelete,
       openBulkDeleteDialog,
       bulkDeleteUsers,
+      rows,
+      tableKey,
       // showAddUserBtn,
     };
   },
@@ -1177,6 +1245,16 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+
+/* Role chip — matches the incident "dimension-badge" sizing so role pills
+   read consistently across the app (2px 8px padding, 11px font, weight 600). */
+:deep(.o2-role-chip) {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  line-height: 1.4;
+}
 
 .iconHoverBtn {
   cursor: pointer !important;
@@ -1203,11 +1281,6 @@ export default defineComponent({
   justify-content: center;
   padding: 1.25rem 1.375rem 1.625rem;
   display: flex;
-
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
 }
 
 .non-selectable {
@@ -1226,5 +1299,44 @@ export default defineComponent({
 .inputHint {
   font-size: 11px;
   color: $light-text;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: transparent;
+  white-space: nowrap;
+}
+
+.role-badge-system {
+  color: #8a6a1f;
+  border: 1px solid #8a6a1f;
+}
+
+.role-badge-custom {
+  color: #a04545;
+  border: 1px solid #a04545;
+  font-weight: 700;
+}
+
+.role-badge-more {
+  color: #a04545;
+  border: 1px solid #a04545;
+  cursor: pointer;
+}
+
+.role-badge-sso {
+  color: #1f6f8b;
+  border: 1px solid #1f6f8b;
+}
+
+.role-badge-local {
+  color: #4a4a4a;
+  border: 1px solid #4a4a4a;
 }
 </style>

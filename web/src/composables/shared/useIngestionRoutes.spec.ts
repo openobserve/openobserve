@@ -55,6 +55,7 @@ vi.mock("@/components/ingestion/recommended/WindowsConfig.vue", () => ({ default
 vi.mock("@/components/ingestion/Database.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/databases/SqlServer.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/databases/Postgres.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/databases/Oracle.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/databases/MongoDB.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/databases/Redis.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/databases/CouchDB.vue", () => ({ default: {} }));
@@ -106,6 +107,7 @@ vi.mock("@/components/ingestion/others/Cribl.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/others/Vercel.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/others/Heroku.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/AIIntegrations.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/ai/AIIntegrationDetail.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/ai/data", () => ({
   aiCategories: [
     {

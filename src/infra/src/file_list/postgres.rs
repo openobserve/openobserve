@@ -1298,7 +1298,12 @@ DO UPDATE SET
         Ok(id)
     }
 
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<super::MergeJobRecord>> {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";
@@ -1316,23 +1321,28 @@ DO UPDATE SET
             }
             return Err(e.into());
         }
-        // get pending jobs group by stream and order by num desc
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
-        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
+
+        // get pending jobs group by stream and order by num desc
+        let sql = if fast_mode {
+            r#"SELECT stream, id, 0 as num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
+        } else {
             r#"
-SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
-    FROM file_list_jobs
-    WHERE status = $1
-    GROUP BY stream
-    ORDER BY num DESC
-    LIMIT $2;"#,
-        )
-        .bind(super::FileListJobStatus::Pending)
-        .bind(limit)
-        .fetch_all(&mut *tx)
-        .await
+    SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
+        FROM file_list_jobs
+        WHERE status = $1
+        GROUP BY stream
+        ORDER BY num DESC
+        LIMIT $2;"#
+        };
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(sql)
+            .bind(super::FileListJobStatus::Pending)
+            .bind(limit)
+            .fetch_all(&mut *tx)
+            .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -2246,7 +2256,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2265,7 +2275,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2434,7 +2444,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2456,7 +2466,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2647,7 +2657,7 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
                         "[POSTGRES] Table {table} is a regular table and needs to be converted to a partitioned table. \
                         Since ZO_PG_PARTITION_MODE is set to 'manual', auto-migration is skipped. \
                         Please migrate the table manually and then restart the node. \
-                        Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+                        Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
                     );
                     loop {
                         log::warn!(
@@ -3384,6 +3394,7 @@ mod tests {
             deleted,
             id: 0,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 

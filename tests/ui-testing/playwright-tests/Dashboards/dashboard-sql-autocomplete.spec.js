@@ -14,11 +14,14 @@
  * - After "FROM stream WHERE ", field + keyword suggestions are restored
  * - Fields come from dashboardPanelData.meta.streamFields.groupedFields
  *
- * DASHBOARD QUERY EDITOR SELECTORS:
- * - [data-test="dashboard-sql-query-type"]   — SQL query type tab
- * - [data-test="dashboard-custom-query-type"] — Custom (Monaco) mode button
- * - [data-test="dashboard-panel-query-editor"] — Monaco editor container
- * - .monaco-editor .suggest-widget            — Autocomplete dropdown
+ * DASHBOARD QUERY EDITOR data-test selectors used by the page object:
+ *   [data-test="dashboard-sql-query-type"]    — SQL query type tab
+ *   [data-test="dashboard-custom-query-type"] — Custom (Monaco) mode button
+ *   [data-test="dashboard-panel-query-editor"] — Monaco editor wrapper
+ *   [data-test="dashboard-panel-discard"]      — Discard panel edit
+ *
+ * Suggestions are NEVER read from the suggest-widget DOM. The page object
+ * inspects Monaco's editor model + suggest controller via page.evaluate.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -33,62 +36,10 @@ const { waitForDashboardPage, deleteDashboard } = require('./utils/dashCreation.
 const generateDashboardName = () =>
     'SQL_Autocomplete_' + Math.random().toString(36).slice(2, 9) + '_' + Date.now();
 
-const QUERY_EDITOR = '[data-test="dashboard-panel-query-editor"]';
-const SUGGEST_WIDGET = '.monaco-editor .suggest-widget';
-const SUGGESTION_ROWS = '.monaco-editor .suggest-widget .monaco-list-row';
-
-/**
- * Wait for Monaco suggest widget to appear and stabilize (at least one row visible).
- */
-async function waitForSuggestionsStable(page, timeout = 10000) {
-    const widget = page.locator(SUGGEST_WIDGET);
-    await widget.waitFor({ state: 'visible', timeout });
-    const firstRow = page.locator(SUGGESTION_ROWS).first();
-    await firstRow.waitFor({ state: 'visible', timeout: 5000 });
-}
-
-/**
- * Get all suggestion labels currently visible in the Monaco dropdown.
- */
-async function getSuggestionLabels(page, timeout = 8000) {
-    await waitForSuggestionsStable(page, timeout);
-    const rows = page.locator(SUGGESTION_ROWS);
-    const count = await rows.count();
-    const labels = [];
-    for (let i = 0; i < Math.min(count, 20); i++) {
-        const text = await rows.nth(i).textContent().catch(() => '');
-        const trimmed = text.trim();
-        if (trimmed) labels.push(trimmed);
-    }
-    return labels;
-}
-
-/**
- * Clear the Monaco editor content (Ctrl+A → Backspace, cross-platform safe).
- */
-async function clearEditor(page) {
-    const code = page.locator(QUERY_EDITOR).getByRole('code');
-    await code.click({ force: true });
-    await page.keyboard.press('Control+a');
-    await page.keyboard.press('Backspace');
-    await page.waitForTimeout(300);
-}
-
-/**
- * Type text into the Monaco editor and trigger autocomplete.
- * Optionally waits a moment before triggering to allow Monaco to process.
- */
-async function typeAndTrigger(page, text, delayBeforeTrigger = 400) {
-    await clearEditor(page);
-    await page.keyboard.type(text, { delay: 30 });
-    await page.waitForTimeout(delayBeforeTrigger);
-    await page.keyboard.press('Control+Space');
-    await page.waitForTimeout(400);
-}
-
 /**
  * Open a dashboard, create an SQL custom query panel, and return the panel name.
- * Leaves the caller on the add-panel page with the SQL Monaco editor open.
+ * Leaves the caller on the add-panel page with the SQL Monaco editor open and
+ * focused so subsequent keyboard input is routed to it.
  */
 async function openSqlPanel(page, pm, dashboardName) {
     const panelName = pm.dashboardPanelActions.generateUniquePanelName('sql-autocomplete');
@@ -107,14 +58,8 @@ async function openSqlPanel(page, pm, dashboardName) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(300);
 
-    // Switch to SQL custom query mode
-    await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();
-
-    // Wait for the Monaco SQL editor to be ready
-    await page.locator(QUERY_EDITOR).waitFor({ state: 'visible', timeout: 10000 });
-    await page.locator(QUERY_EDITOR).getByRole('code').click();
-    await page.waitForTimeout(500);
+    // Switch to SQL custom query mode through the page object and focus the editor.
+    await pm.dashboardSqlAutocomplete.switchToSqlCustomQueryMode();
 
     testLogger.info(`Opened SQL panel: ${panelName}`);
     return panelName;
@@ -124,16 +69,9 @@ async function openSqlPanel(page, pm, dashboardName) {
  * Discard the current panel edit and delete the dashboard — clean up after each test.
  */
 async function cleanupDashboard(page, pm, dashboardName) {
-    // Dismiss any autocomplete dropdown first
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.waitForTimeout(300);
-
-    // Discard panel edits
-    const discardBtn = page.locator('[data-test="dashboard-panel-discard"]');
-    if (await discardBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await discardBtn.click();
-        await page.waitForTimeout(500);
-    }
+    // Dismiss any autocomplete dropdown first via the page object (Escape only).
+    await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
+    await pm.dashboardSqlAutocomplete.discardPanelIfVisible();
 
     await deleteDashboard(page, dashboardName).catch((e) =>
         testLogger.warn(`cleanupDashboard: delete failed — ${e.message}`)
@@ -164,9 +102,11 @@ test.describe('Dashboard SQL Autocomplete', () => {
         await openSqlPanel(page, pm, dashboardName);
 
         // Type a partial WHERE clause — should show base field+keyword suggestions
-        await typeAndTrigger(page, 'SELECT * FROM "e2e_automate" WHERE ');
+        await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete(
+            'SELECT * FROM "e2e_automate" WHERE '
+        );
 
-        const labels = await getSuggestionLabels(page).catch(() => []);
+        const labels = await pm.dashboardSqlAutocomplete.getSuggestionLabelsAtCursor();
         testLogger.info(`WHERE clause suggestions (${labels.length}): ${labels.slice(0, 10).join(', ')}`);
 
         expect(labels.length).toBeGreaterThan(0);
@@ -175,14 +115,11 @@ test.describe('Dashboard SQL Autocomplete', () => {
         // so stream names like 'e2e_automate' appear in the suggestion list.
         // In WHERE context: effectiveKeywords = autoCompleteKeywords (fields/functions/keywords),
         // so stream names do NOT appear.
-        // This assertion is environment-independent: it does not rely on specific
-        // field names being present (which vary by CI vs local), only that the
-        // FROM context has been cleared and we are back to the normal suggestion list.
         const hasStreamName = labels.some((l) => l.toLowerCase().trim() === 'e2e_automate');
         expect(hasStreamName).toBe(false);
         testLogger.info('Stream name absent from WHERE context — FROM context cleared, confirmed');
 
-        await page.keyboard.press('Escape');
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: SQL keywords after WHERE');
     });
@@ -200,9 +137,9 @@ test.describe('Dashboard SQL Autocomplete', () => {
         await openSqlPanel(page, pm, dashboardName);
 
         // Type up to FROM (with trailing space) — FROM context activates
-        await typeAndTrigger(page, 'SELECT * FROM ');
+        await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete('SELECT * FROM ');
 
-        const labels = await getSuggestionLabels(page).catch(() => []);
+        const labels = await pm.dashboardSqlAutocomplete.getSuggestionLabelsAtCursor();
         testLogger.info(`FROM context suggestions (${labels.length}): ${labels.slice(0, 10).join(', ')}`);
 
         expect(labels.length).toBeGreaterThan(0);
@@ -216,14 +153,13 @@ test.describe('Dashboard SQL Autocomplete', () => {
         testLogger.info('SQL keywords absent from FROM context — confirmed');
 
         // At least one suggestion should look like a stream name (not an SQL keyword)
-        // Stream names appear because we loaded the stream list into FROM suggestions
         const nonKeywordSuggestions = labels.filter((l) =>
             !sqlKeywords.includes(l.toLowerCase().trim())
         );
         expect(nonKeywordSuggestions.length).toBeGreaterThan(0);
         testLogger.info(`Non-keyword suggestions present: ${nonKeywordSuggestions.slice(0, 5).join(', ')}`);
 
-        await page.keyboard.press('Escape');
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: Stream suggestions after FROM');
     });
@@ -241,25 +177,21 @@ test.describe('Dashboard SQL Autocomplete', () => {
         await openSqlPanel(page, pm, dashboardName);
 
         // Complete full FROM clause then type WHERE — FROM context must be cleared
-        await typeAndTrigger(page, 'SELECT * FROM "e2e_automate" WHERE ');
+        await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete(
+            'SELECT * FROM "e2e_automate" WHERE '
+        );
 
-        const labels = await getSuggestionLabels(page).catch(() => []);
+        const labels = await pm.dashboardSqlAutocomplete.getSuggestionLabelsAtCursor();
         testLogger.info(`Post-FROM WHERE suggestions (${labels.length}): ${labels.slice(0, 10).join(', ')}`);
 
         expect(labels.length).toBeGreaterThan(0);
 
-        // In FROM context: effectiveKeywords = contextKeywords = streamKeywords,
-        // so stream names like 'e2e_automate' appear in the suggestion list.
-        // In WHERE context: effectiveKeywords = autoCompleteKeywords (fields/functions/keywords),
-        // so stream names do NOT appear.
-        // This assertion is environment-independent: it does not rely on specific
-        // field names being present (which vary by CI vs local), only that the
-        // FROM context has been cleared and we are back to the normal suggestion list.
+        // In WHERE context: stream names like 'e2e_automate' must NOT appear.
         const hasStreamName = labels.some((l) => l.toLowerCase().trim() === 'e2e_automate');
         expect(hasStreamName).toBe(false);
         testLogger.info('Stream name absent from WHERE context — FROM context cleared, confirmed');
 
-        await page.keyboard.press('Escape');
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: Keywords restored after leaving FROM context');
     });
@@ -277,16 +209,12 @@ test.describe('Dashboard SQL Autocomplete', () => {
         await openSqlPanel(page, pm, dashboardName);
 
         // Type FROM " — Monaco may auto-close the quote; the feature handles both cases
-        await clearEditor(page);
-        await page.keyboard.type('SELECT * FROM "e2e', { delay: 30 });
-        await page.waitForTimeout(400);
-        await page.keyboard.press('Control+Space');
-        await page.waitForTimeout(500);
+        await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete('SELECT * FROM "e2e');
 
-        const isVisible = await page.locator(SUGGEST_WIDGET).isVisible().catch(() => false);
+        const isOpen = await pm.dashboardSqlAutocomplete.isAutocompleteOpen();
 
-        if (isVisible) {
-            const labels = await getSuggestionLabels(page).catch(() => []);
+        if (isOpen) {
+            const labels = await pm.dashboardSqlAutocomplete.getSuggestionLabelsAtCursor();
             testLogger.info(`FROM "partial suggestions (${labels.length}): ${labels.slice(0, 8).join(', ')}`);
 
             // Stream suggestions should appear (contextKeywords is active)
@@ -298,12 +226,11 @@ test.describe('Dashboard SQL Autocomplete', () => {
             expect(hasSqlKeyword).toBe(false);
             testLogger.info('FROM "partial — SQL keywords absent in stream context: confirmed');
         } else {
-            // Monaco widget did not open — Monaco may have auto-completed or the
-            // suggestions did not trigger; log and skip the assertion gracefully
-            testLogger.warn('Suggest widget not visible for FROM "partial — skipping assertion');
+            // Monaco did not open the suggestion list — accept gracefully (env dependent).
+            testLogger.warn('Suggest controller not open for FROM "partial — skipping assertion');
         }
 
-        await page.keyboard.press('Escape');
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: FROM "partial stream suggestions');
     });
@@ -321,19 +248,18 @@ test.describe('Dashboard SQL Autocomplete', () => {
         await openSqlPanel(page, pm, dashboardName);
 
         // Type a WHERE clause — base suggestion list (fields + keywords)
-        // For the dashboard to have fields, a stream must be known.
-        // We write the full query with the stream already named so groupedFields loads.
-        await typeAndTrigger(page, 'SELECT * FROM "e2e_automate" WHERE ');
+        await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete(
+            'SELECT * FROM "e2e_automate" WHERE '
+        );
 
-        const labels = await getSuggestionLabels(page).catch(() => []);
+        const labels = await pm.dashboardSqlAutocomplete.getSuggestionLabelsAtCursor();
         testLogger.info(`Sort order suggestions (${labels.length}): ${labels.slice(0, 12).join(', ')}`);
 
         expect(labels.length).toBeGreaterThan(0);
 
-        // Verify that suggestions list contains something (fields or keywords)
-        // The key invariant: SQL keywords appear last (they have sortText "\x02" + label)
-        // Fields appear first (sortText "\x00" + name)
-        // If there are any field suggestions, they must be before the first SQL keyword
+        // Verify sort order: SQL keywords appear last (sortText "\x02" + label),
+        // fields first (sortText "\x00" + name). If field suggestions exist they
+        // must precede the first SQL keyword.
         const sqlKeywords = ['and', 'or', 'like', 'in', 'between', 'is null'];
         const firstKeywordIdx = labels.findIndex((l) =>
             sqlKeywords.some((kw) => l.toLowerCase().trim() === kw)
@@ -346,14 +272,12 @@ test.describe('Dashboard SQL Autocomplete', () => {
             );
             expect(beforeKeywords.length).toBeGreaterThan(0);
         } else if (firstKeywordIdx === 0) {
-            // All suggestions are SQL keywords — this is valid when no stream fields are loaded
             testLogger.info('Only SQL keywords in suggestions (no stream fields loaded yet) — sort order not verifiable');
         } else {
-            // No SQL keywords at all — only field/function suggestions appeared
             testLogger.info('No SQL keywords in list — only field/function suggestions');
         }
 
-        await page.keyboard.press('Escape');
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: Fields sort above keywords');
     });
@@ -370,15 +294,12 @@ test.describe('Dashboard SQL Autocomplete', () => {
 
         await openSqlPanel(page, pm, dashboardName);
 
-        // Click elsewhere to blur the editor
-        await page.locator('[data-test="dashboard-panel-query-editor"]').blur().catch(() => {});
-        await page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
-        await page.waitForTimeout(300);
+        // Send Escape to drop focus from the Monaco editor — no body click required.
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
 
-        // Suggest widget should not be visible when editor is not focused
-        const isVisible = await page.locator(SUGGEST_WIDGET).isVisible().catch(() => false);
-        expect(isVisible).toBe(false);
-        testLogger.info('Autocomplete not visible when editor is blurred — confirmed');
+        const isOpen = await pm.dashboardSqlAutocomplete.isAutocompleteOpen();
+        expect(isOpen).toBe(false);
+        testLogger.info('Autocomplete not open when editor is blurred — confirmed');
 
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: No suggestions without focus');
@@ -397,19 +318,15 @@ test.describe('Dashboard SQL Autocomplete', () => {
         await openSqlPanel(page, pm, dashboardName);
 
         // Type 'SELECT ' — base keyword list should appear
-        await typeAndTrigger(page, 'SELECT ');
+        await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete('SELECT ');
 
-        const labels = await getSuggestionLabels(page).catch(() => []);
+        const labels = await pm.dashboardSqlAutocomplete.getSuggestionLabelsAtCursor();
         testLogger.info(`SELECT suggestions (${labels.length}): ${labels.slice(0, 10).join(', ')}`);
 
         expect(labels.length).toBeGreaterThan(0);
-
-        // Base suggestions include SQL keywords and operators
-        // Should NOT be in FROM context (contextKeywords should be empty)
-        // Verify we get items (fields, functions, or keywords)
         testLogger.info('Suggestions appeared after SELECT — confirmed');
 
-        await page.keyboard.press('Escape');
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: Suggestions on SELECT');
     });
@@ -426,41 +343,24 @@ test.describe('Dashboard SQL Autocomplete', () => {
 
         await openSqlPanel(page, pm, dashboardName);
 
-        // Trigger FROM context
-        await clearEditor(page);
-        await page.keyboard.type('SELECT * FROM ', { delay: 30 });
-        await page.waitForTimeout(400);
-        await page.keyboard.press('Control+Space');
-        await page.waitForTimeout(500);
+        // Trigger FROM context via the page object.
+        await pm.dashboardSqlAutocomplete.typeAndTriggerAutocomplete('SELECT * FROM ');
 
-        const isVisible = await page.locator(SUGGEST_WIDGET).isVisible().catch(() => false);
+        const isOpen = await pm.dashboardSqlAutocomplete.isAutocompleteOpen();
 
-        if (isVisible) {
-            // Select the first available stream suggestion
-            const firstRow = page.locator(SUGGESTION_ROWS).first();
-            const firstLabel = await firstRow.textContent().catch(() => '');
-            testLogger.info(`First FROM suggestion: "${firstLabel.trim()}"`);
-
-            await firstRow.click();
-            await page.waitForTimeout(300);
-
-            // Read the editor content after selection
-            const editorContent = await page
-                .locator(QUERY_EDITOR)
-                .locator('.view-lines')
-                .textContent()
-                .catch(() => '');
-
+        if (isOpen) {
+            // Accept the first suggestion via Enter and read the model value.
+            const editorContent = await pm.dashboardSqlAutocomplete.acceptFirstSuggestionAndReadValue();
             testLogger.info(`Editor content after selection: "${editorContent}"`);
 
             // The inserted stream name must NOT end with "" (double closing quote)
             expect(editorContent).not.toMatch(/""/);
             testLogger.info('No double-quote inserted — confirmed');
         } else {
-            testLogger.warn('FROM suggestion widget did not open — skipping insertion assertion');
+            testLogger.warn('FROM suggestion controller did not open — skipping insertion assertion');
         }
 
-        await page.keyboard.press('Escape');
+        await pm.dashboardSqlAutocomplete.dismissAutocompleteAndBlur();
         await cleanupDashboard(page, pm, dashboardName);
         testLogger.info('Test PASSED: Stream insertion without double-quote');
     });

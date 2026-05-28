@@ -15,14 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col">
+  <div class="tw:flex tw:flex-col tw:h-full">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start q-px-md q-py-sm card-container"
-      style="position: sticky; top: 0px; z-index: 2"
+      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
     >
-      <div data-test="iam-users-selection-show-toggle" class="q-mr-md">
-        <div class="flex items-center">
+      <div data-test="iam-users-selection-show-toggle" class="tw:mr-3">
+        <div class="tw:flex tw:items-center">
           <span
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
@@ -30,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Show
           </span>
           <OToggleGroup
-            class="q-ml-xs"
+            class="tw:ml-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -48,124 +47,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-users-selection-search-input"
-        class="q-mr-md"
-        style="width: 400px"
+        class="tw:mr-3"
       >
-        <q-input
+        <OInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          borderless
-          dense
           class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
           placeholder="Search User"
         >
-          <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon"/>
+          <template #icon-left>
+            <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon"/>
           </template>
-        </q-input>
+        </OInput>
       </div>
 
       <div
-          class="q-mx-sm current-organization"
+          class="tw:mx-2 current-organization"
         >
-        <q-select
+        <OSelect
           v-if="
             store.state.selectedOrganization.identifier ===
               store.state.zoConfig.meta_org &&
             usersDisplay == 'all'
           "
           v-model="selectedOrg"
-          borderless
-          use-input
-          input-debounce="300"
-          :options="orgList"
-          option-label="label"
-          option-value="value"
-          class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
-          @filter="filterOrganizations"
+          :options="orgOptions"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          class="organizationlist"
           @update:model-value="updateOrganization"
           placeholder="Select Organization"
-          virtual-scroll
         />
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px);" class="card-container">
-      <template v-if="rows.length">
-        <app-table
-          :rows="visibleRows"
-          :columns="columns"
-          :dense="true"
-          :virtual-scroll="false"
-          style="height: fit-content"
-          :filter="{
-            value: userSearchKey,
-            method: filterUsers,
-          }"
-          :title="t('iam.users')"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
-          :hideTopPagination="true"
-          :showBottomPaginationWithTitle="true"
-        >
-          <template v-slot:select="slotProps: any">
-            <q-checkbox
-              :data-test="`iam-users-selection-table-body-row-${slotProps.column.row.email}-checkbox`"
-              size="xs"
-              v-model="slotProps.column.row.isInGroup"
-              class="filter-check-box cursor-pointer"
-              @click="toggleUserSelection(slotProps.column.row)"
-            />
-          </template>
-          <template v-slot:email="slotProps: any">
-            <div class="flex items-center">
-              <span>{{ slotProps.column.row.email }}</span>
-              <q-icon
-                v-if="shouldShowWarning(slotProps.column.row)"
-                name="info"
-                color="warning"
-                size="16px"
-                class="q-ml-xs cursor-pointer"
-                :data-test="`iam-external-user-warning-icon-${slotProps.column.row.email}`"
-              >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  :offset="[10, 0]"
-                  max-width="300px"
-                >
-                  <div style="font-size: 12px; line-height: 1.5;">
-                    <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
-                    <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
-                  </div>
-                </q-tooltip>
-              </q-icon>
-            </div>
-          </template>
-        </app-table>
-      </template>
-      <div
-        data-test="iam-users-selection-table-no-users-text"
-        v-if="!rows.length"
-        class="text-bold q-pl-md q-py-md"
+    <div data-test="iam-users-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
+      <OTable
+        :data="rows"
+        :columns="columns"
+        row-key="email"
+        :loading="props.loading"
+        :global-filter="userSearchKey"
+        pagination="client"
+        :page-size="100"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        :footer-title="t('iam.basicUsers')"
+        dense
       >
-        No users added
-      </div>
+        <template #cell-select="{ row }">
+          <OCheckbox
+            :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
+            :model-value="row.isInGroup"
+            class="filter-check-box tw:cursor-pointer"
+            @update:model-value="toggleUserSelection(row)"
+          />
+        </template>
+        <template #cell-email="{ row }">
+          <div class="tw:flex tw:items-center">
+            <span>{{ row.email }}</span>
+            <OTooltip v-if="shouldShowWarning(row)" side="right">
+              <OIcon
+                name="info"
+                size="sm"
+                class="tw:ml-1 tw:cursor-pointer"
+                :data-test="`iam-external-user-warning-icon-${row.email}`"
+              />
+              <template #content>
+                <div style="font-size: 12px; line-height: 1.5;">
+                  <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
+                  <div class="tw:mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
+                </div>
+              </template>
+            </OTooltip>
+          </div>
+        </template>
+        <template #empty>
+          <NoData />
+        </template>
+      </OTable>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import AppTable from "@/components/AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { watch, computed } from "vue";
+import { computed, watch } from "vue";
 import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -188,6 +173,10 @@ const props = defineProps({
   context: {
     type: String,
     default: "group", // "group" or "role"
+  },
+  loading: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -232,37 +221,35 @@ const { usersState } = usePermissions();
 
 
 
-const columns = computed(() => {
-  const baseColumns = [
+const columns = computed<OTableColumnDef[]>(() => {
+  const baseColumns: OTableColumnDef[] = [
     {
-      name: "select",
-      field: "",
-      label: "",
-      align: "left",
-      sortable: false,
-      slot: true,
-      slotName: "select",
-      style: "width: 67px"
+      id: "select",
+      header: "",
+      accessorKey: "isInGroup",
+    cell: (info: any) => info.getValue(),
+    size: 36,
+      minSize: 32,
+      maxSize: 40,
+      meta: { align: "center", compactPadding: true },
     },
     {
-      name: "email",
-      field: "email",
-      label: t("iam.userName"),
-      align: "left",
+      id: "email",
+      header: t("iam.userName"),
+      accessorKey: "email",
       sortable: true,
-      slot: true,
-      slotName: "email",
+      meta: { align: "left" , autoWidth: true},
     },
   ];
 
   // Add "Organizations" column only if the selected organization is "meta"
   if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
     baseColumns.push({
-      name: "organization",
-      field: "org",
-      label: "Organizations",
-      align: "left",
+      id: "organization",
+      header: "Organizations",
+      accessorKey: "org",
       sortable: true,
+      meta: { align: "left" },
     });
   }
 
@@ -381,18 +368,26 @@ const getchOrgUsers = async () => {
 };
 
 const toggleUserSelection = (user: any) => {
-  if (user.isInGroup && !groupUsersMap.value.has(user.email)) {
-    props.addedUsers.add(user.email);
-  } else if (!user.isInGroup && groupUsersMap.value.has(user.email)) {
-    props.removedUsers.add(user.email);
-  }
+  user.isInGroup = !user.isInGroup;
 
-  if (!user.isInGroup && props.addedUsers.has(user.email)) {
-    props.addedUsers.delete(user.email);
-  }
-
-  if (!user.isInGroup && props.addedUsers.has(user.email)) {
-    props.removedUsers.delete(user.email);
+  if (user.isInGroup) {
+    // Newly selected
+    if (!groupUsersMap.value.has(user.email)) {
+      // Not originally in group — stage for addition
+      props.addedUsers.add(user.email);
+    } else {
+      // Was originally in group — undo pending removal
+      props.removedUsers.delete(user.email);
+    }
+  } else {
+    // Newly deselected
+    if (groupUsersMap.value.has(user.email)) {
+      // Was originally in group — stage for removal
+      props.removedUsers.add(user.email);
+    } else {
+      // Was not originally in group — undo pending addition
+      props.addedUsers.delete(user.email);
+    }
   }
 };
 
@@ -414,23 +409,6 @@ const shouldShowWarning = (user: any) => {
   );
 };
 
-const filterUsers = (rows: any[], term: string) => {
-  var filtered = [];
-  for (var i = 0; i < rows.length; i++) {
-    var user = rows[i];
-    if (user.email.toLowerCase().indexOf(term.toLowerCase()) > -1) {
-      filtered.push(user);
-    }
-  }
-  return filtered;
-};
-
-const visibleRows = computed(() => {
-  if (!userSearchKey.value) return rows.value || [];
-  return filterUsers(rows.value || [], userSearchKey.value);
-});
-
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 </script>
 
 <style scoped></style>

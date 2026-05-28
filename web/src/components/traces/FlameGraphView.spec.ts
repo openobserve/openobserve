@@ -15,10 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, config } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import FlameGraphView from "@/components/traces/FlameGraphView.vue";
 
-installQuasar();
 
 // Stub ChartRenderer globally so defineAsyncComponent resolves synchronously
 const ChartRendererStub = {

@@ -157,7 +157,11 @@ if (rows.length > 0) {
       await pm.functionsPage.enterFunctionCode(jsCode);
 
       // Test the function with sample data
-      const testEvent = '{"name": "test", "value": 100}';
+      // Backend `test_run_function` deserializes `events: Vec<Value>`, so a single
+      // object literal causes the POST to fail with "Error in testing function"
+      // before the JS code ever executes. Wrap the event in an array so `rows[0]`
+      // sees the row and the #ResultArray# expansion runs end-to-end.
+      const testEvent = '[{"name": "test", "value": 100}]';
       await pm.functionsPage.clickTestButton();
       await pm.functionsPage.enterTestEvent(testEvent);
 

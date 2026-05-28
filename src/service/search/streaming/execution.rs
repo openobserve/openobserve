@@ -118,11 +118,14 @@ pub async fn do_partitioned_search(
 
     // Incremental top-k heap for non-ts ORDER BY: fed one partition at a time so the
     // heap never holds more than k = (from + size) elements regardless of partition count.
+    // When size == -1 (unlimited) fall back to the configured default limit.
+    let heap_k = if req.query.size > 0 {
+        original_from + original_size
+    } else {
+        config::get_config().limit.query_default_limit as usize
+    };
     let mut topk_heap = if is_non_ts_order_by {
-        Some(TopKHeap::new(
-            original_from + original_size,
-            &non_ts_order_by_cols,
-        ))
+        Some(TopKHeap::new(heap_k, &non_ts_order_by_cols))
     } else {
         None
     };
@@ -158,8 +161,10 @@ pub async fn do_partitioned_search(
 
         if is_non_ts_order_by {
             // each partition fetches local top-(from+size); leader merges globally after all
-            // partitions
-            req.query.size = (original_from + original_size) as i64;
+            // partitions. When size==-1 (unlimited) keep it as -1 so partition returns all data.
+            if req.query.size > 0 {
+                req.query.size = (original_from + original_size) as i64;
+            }
             req.query.from = 0;
         } else {
             if req_size != -1 && !is_streaming_aggs {
@@ -467,7 +472,6 @@ pub async fn get_partitions(
         Some(user_id),
         stream_type,
         &search_partition_req,
-        false,
         false,
         false,
         req.use_cache,

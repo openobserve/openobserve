@@ -2,34 +2,33 @@
   <div v-if="show" class="correlation-panel">
     <div class="correlation-header">
       <div class="header-content">
-        <q-icon name="link" size="sm" />
+        <OIcon name="link" size="sm" />
         <span class="header-title">Related Telemetry</span>
       </div>
       <OButton
         variant="ghost"
         size="icon"
+        icon-left="close"
         @click="$emit('close')"
-      >
-        <q-icon name="close" size="16px" />
-      </OButton>
+      />
     </div>
 
     <div class="correlation-body">
       <!-- Loading State -->
       <div v-if="loading" class="correlation-loading">
-        <q-spinner color="primary" size="md" />
+        <OSpinner size="sm" />
         <span class="loading-text">Finding related data...</span>
       </div>
 
       <!-- Error State -->
       <div v-else-if="error" class="correlation-error">
-        <q-icon name="error_outline" color="negative" size="md" />
+        <OIcon name="error-outline" size="md" />
         <span class="error-text">{{ error }}</span>
       </div>
 
       <!-- No Correlation Available -->
       <div v-else-if="!correlationResult" class="correlation-empty">
-        <q-icon name="info_outline" color="grey-6" size="md" />
+        <OIcon name="info-outline" size="md" />
         <span class="empty-text">No related telemetry found</span>
       </div>
 
@@ -38,7 +37,7 @@
         <!-- Service Info -->
         <div class="service-info">
           <div class="service-name">
-            <q-icon name="cloud" size="xs" />
+            <OIcon name="cloud" size="xs" />
             {{ correlationResult.service.service_name }}
           </div>
 
@@ -49,23 +48,20 @@
             class="dimension-section"
           >
             <div class="dimension-section-header">
-              <q-icon name="link" size="xs" color="positive" />
+              <OIcon name="link" size="xs" />
               <span class="dimension-section-title">Matched Dimensions</span>
-              <q-tooltip>These stable dimensions were used to find related telemetry</q-tooltip>
+              <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
             <div class="service-dimensions">
-              <q-chip
+              <OBadge
                 v-for="(value, key) in correlationResult.correlationData.matched_dimensions"
                 :key="`matched-${key}`"
                 size="sm"
-                dense
-                square
-                color="positive"
-                text-color="white"
+                variant="success"
               >
                 <span class="dimension-key">{{ key }}:</span>
                 <span class="dimension-value">{{ value }}</span>
-              </q-chip>
+              </OBadge>
             </div>
           </div>
 
@@ -76,23 +72,20 @@
             class="dimension-section"
           >
             <div class="dimension-section-header">
-              <q-icon name="tune" size="xs" color="grey-7" />
+              <OIcon name="tune" size="xs" />
               <span class="dimension-section-title">Additional Filters Available</span>
-              <q-tooltip>These additional dimensions can be used for more specific filtering</q-tooltip>
+              <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
             <div class="service-dimensions">
-              <q-chip
+              <OBadge
                 v-for="(value, key) in correlationResult.correlationData.additional_dimensions"
                 :key="`additional-${key}`"
                 size="sm"
-                dense
-                square
-                outline
-                color="grey-7"
+                variant="default-outline"
               >
                 <span class="dimension-key">{{ key }}:</span>
                 <span class="dimension-value">{{ value }}</span>
-              </q-chip>
+              </OBadge>
             </div>
           </div>
 
@@ -101,20 +94,18 @@
             v-if="!correlationResult.correlationData"
             class="service-dimensions"
           >
-            <q-chip
+            <OBadge
               v-for="(value, key) in correlationResult.service.dimensions"
               :key="key"
               size="sm"
-              dense
-              square
             >
               <span class="dimension-key">{{ key }}:</span>
               <span class="dimension-value">{{ value }}</span>
-            </q-chip>
+            </OBadge>
           </div>
         </div>
 
-        <q-separator />
+        <OSeparator />
 
         <!-- Correlation Queries -->
         <div class="correlation-queries">
@@ -124,7 +115,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <q-icon name="timeline" color="primary" />
+              <OIcon name="timeline" size="sm" />
               <span class="section-title">Traces ({{ traceQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -149,7 +140,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <q-icon name="show_chart" color="secondary" />
+              <OIcon name="show-chart" size="sm" />
               <span class="section-title">Metrics ({{ metricQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -174,7 +165,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <q-icon name="article" color="accent" />
+              <OIcon name="article" size="sm" />
               <span class="section-title">Logs ({{ logQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -206,6 +197,10 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrelation";
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface Props {
   show: boolean;

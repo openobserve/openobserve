@@ -15,53 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="flex justify-center items-end">
+    <div class="tw:flex tw:justify-start tw:items-end">
       <!-- select new folder -->
-      <q-select
+      <OSelect
         v-model="selectedFolder"
-        :label="t('dashboard.selectFolderLabel') + ' *'"
-        :options="store.state.organizationData.foldersByType[type]?.map((item: any)=> {return {label: item.name, value: item.folderId}})"
+        :label="t('dashboard.selectFolderLabel')"
+        :options="store.state.organizationData.foldersByType[type]?.map((item: any) => ({ label: item.name, value: item.folderId })) ?? []"
         :data-test="`${type}-index-dropdown-stream_type`"
-        input-debounce="0"
-        behavior="menu"
-        borderless
-        dense
-        class="showLabelOnTop no-case tw:mr-1"
-        style="width: calc(100% - 44px)"
-        :disable="disableDropdown"
+        labelKey="label"
+        valueKey="value"
+        class="tw:mr-1 tw:flex-1"
+        :disabled="disableDropdown"
       >
-        <template #no-option>
-          <q-item>
-            <q-item-section> {{ t("search.noResult") }}</q-item-section>
-          </q-item>
-        </template>
-      </q-select>
+        <template #empty>{{ t("search.noResult") }}</template>
+      </OSelect>
 
-      <div style="width: 40px; margin-bottom: -4px;" :style="computedStyle">
+      <div :style="computedStyle">
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-sm"
+          class="tw:h-9 tw:w-9"
           :data-test="`${type}-folder-move-new-add`"
           title="Add Folder"
           :disabled="disableDropdown"
           @click="() => { showAddFolderDialog = true; }"
         >
-          <q-icon name="add" size="xs" />
+          <OIcon name="add" size="xs" />
         </OButton>
       </div>
     </div>
     <!-- add folder -->
-    <q-dialog
+    <AddFolder
       v-if="!disableDropdown"
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
-      
+      v-model:open="showAddFolderDialog"
       :data-test="`${type}-folder-move-dialog`"
-    >
-      <AddFolder style="width: 30vw;" :type="type" @update:modelValue="updateFolderList" :edit-mode="false" />
-    </q-dialog>
+      :type="type"
+      @update:modelValue="updateFolderList"
+      :edit-mode="false"
+    />
   </template>
 
   <script lang="ts">
@@ -73,10 +64,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
-    components: { AddFolder, OButton },
+    components: { AddFolder, OButton, OIcon, OSelect },
     emits: ["folder-selected"],
     props: {
       activeFolderId: {
@@ -107,42 +100,30 @@ import OButton from "@/lib/core/Button/OButton.vue";
       const route = useRoute();
       const showAddFolderDialog: any = ref(false);
 
-      const getInitialFolderValue = () => {
+      const getInitialFolderId = () => {
         // priority: activeFolderId > query.folder > default
-        // use activeFolderId if available
-        // else use router query if available
-        // else use default
-        const activeFolderData = store.state.organizationData.foldersByType[props.type]?.find(
+        return store.state.organizationData.foldersByType[props.type]?.find(
           (item: any) =>
             item.folderId === (props.activeFolderId ?? route.query.folder ?? "default")
-        );
-
-        return {
-          label: activeFolderData?.name ?? "default",
-          value: activeFolderData?.folderId ?? "default",
-        };
+        )?.folderId ?? "default";
       };
 
-      //dropdown selected folder index
-      const selectedFolder = ref(getInitialFolderValue());
+      //dropdown selected folder index (holds primitive folderId string)
+      const selectedFolder = ref<string>(getInitialFolderId());
       const { t } = useI18n();
 
       const updateFolderList = async (newFolder: any) => {
         showAddFolderDialog.value = false;
-        selectedFolder.value = {
-          label: newFolder.data.name,
-          value: newFolder.data.folderId,
-        };
+        selectedFolder.value = newFolder.data.folderId;
       };
 
       const computedStyle = computed (() => {
-        const baseStyle = props.style ? props.style : 'height: 35px';
-        return `${baseStyle}; margin-top: 23px`;
+        return props.style ? props.style : '';
       });
 
       onActivated(async () => {
         // refresh selected folder
-        selectedFolder.value = getInitialFolderValue();
+        selectedFolder.value = getInitialFolderId();
         await getFoldersListByType(store, props.type);
       });
 
@@ -150,14 +131,20 @@ import OButton from "@/lib/core/Button/OButton.vue";
         () => store.state.organizationData.foldersByType[props.type],
         () => {
           // refresh selected folder, on folders list change
-          selectedFolder.value = getInitialFolderValue();
+          selectedFolder.value = getInitialFolderId();
         }
       );
 
       watch(
         () => selectedFolder.value,
-        () => {
-          emit("folder-selected", selectedFolder.value);
+        (folderId) => {
+          const folderItem = store.state.organizationData.foldersByType[props.type]?.find(
+            (item: any) => item.folderId === folderId
+          );
+          emit("folder-selected", {
+            label: folderItem?.name ?? folderId,
+            value: folderId,
+          });
         }
       );
 

@@ -15,11 +15,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import { createI18n } from "vue-i18n";
 
-installQuasar();
 
 // ==================== TEST DATA FACTORIES ====================
 
@@ -199,7 +197,7 @@ describe("PrebuiltDestinationSelector", () => {
     it("should render icon for custom destination", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const icon = customCard.findComponent({ name: "QIcon" });
+      const icon = customCard.findComponent({ name: "OIcon" });
 
       expect(icon.exists()).toBe(true);
       expect(icon.props("name")).toBe("settings");
@@ -229,8 +227,8 @@ describe("PrebuiltDestinationSelector", () => {
       const checkIcon = customCard.find(".check-icon");
 
       expect(checkIcon.exists()).toBe(true);
-      const qIcon = checkIcon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("check_circle");
+      const qIcon = checkIcon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("check");
     });
 
     it("should not show check icon on unselected cards", () => {
@@ -240,7 +238,7 @@ describe("PrebuiltDestinationSelector", () => {
       cards.forEach((card) => {
         const typeAttr = card.attributes("data-type");
         if (typeAttr !== "custom") {
-          const checkIcons = card.findAll('[name="check_circle"]');
+          const checkIcons = card.findAll('[name="check-circle"]');
           expect(checkIcons.length).toBe(0);
         }
       });
@@ -333,28 +331,31 @@ describe("PrebuiltDestinationSelector", () => {
     it("should render settings icon for custom destination", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const icon = customCard.findComponent({ name: "QIcon" });
+      const icon = customCard.findComponent({ name: "OIcon" });
 
       expect(icon.props("name")).toBe("settings");
     });
 
-    it("should render icons with correct size", () => {
+    it("should render icons with a size prop", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const icon = customCard.findComponent({ name: "QIcon" });
+      const icon = customCard.findComponent({ name: "OIcon" });
 
-      expect(icon.props("size")).toBe("1.5rem");
+      // The OIcon size prop is set to "md" in the template
+      expect(icon.props("size")).toBe("md");
     });
 
     it("should render check icon with positive color when selected", () => {
       wrapper = mountComponent({ modelValue: "custom" });
       const customCard = findCardByType(wrapper, "custom");
       const checkIcon = customCard
-        .findAllComponents({ name: "QIcon" })
-        .find((icon) => icon.props("name") === "check_circle");
+        .findAllComponents({ name: "OIcon" })
+        .find((icon) => icon.props("name") === "check");
 
       expect(checkIcon).toBeDefined();
-      expect(checkIcon?.props("color")).toBe("positive");
+      // OIcon no longer has a `color` prop — color comes from the `.check-icon` parent class
+      const wrapperDiv = checkIcon?.element.parentElement;
+      expect(wrapperDiv?.classList.contains("check-icon")).toBe(true);
     });
   });
 

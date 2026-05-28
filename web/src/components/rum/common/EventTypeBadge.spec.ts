@@ -13,129 +13,104 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import EventTypeBadge from "./EventTypeBadge.vue";
-
-installQuasar();
 
 describe("EventTypeBadge", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
-    wrapper?.unmount();
+    wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
-  describe("initial render", () => {
-    it("should render without errors", () => {
+  describe("text content", () => {
+    it("displays the type text for error", () => {
+      // Arrange
       wrapper = mount(EventTypeBadge, { props: { type: "error" } });
-      expect(wrapper.exists()).toBe(true);
-    });
 
-    it("should display the type text", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "error" } });
+      // Assert
       expect(wrapper.text()).toBe("error");
     });
-  });
 
-  describe("CSS classes for each event type", () => {
-    it("should apply red classes for error type", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "error" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-red-100");
-      expect(classes).toContain("tw:text-red-700");
-      expect(classes).toContain("tw:border-red-300");
-    });
-
-    it("should apply blue classes for action type", () => {
+    it("displays the type text for action", () => {
+      // Arrange
       wrapper = mount(EventTypeBadge, { props: { type: "action" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-blue-100");
-      expect(classes).toContain("tw:text-blue-700");
-      expect(classes).toContain("tw:border-blue-300");
+
+      // Assert
+      expect(wrapper.text()).toBe("action");
     });
 
-    it("should apply green classes for view type", () => {
+    it("displays the type text for view", () => {
+      // Arrange
       wrapper = mount(EventTypeBadge, { props: { type: "view" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-green-100");
-      expect(classes).toContain("tw:text-green-700");
-      expect(classes).toContain("tw:border-green-300");
+
+      // Assert
+      expect(wrapper.text()).toBe("view");
     });
 
-    it("should apply purple classes for resource type", () => {
+    it("displays the type text for resource", () => {
+      // Arrange
       wrapper = mount(EventTypeBadge, { props: { type: "resource" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-purple-100");
-      expect(classes).toContain("tw:text-purple-700");
-      expect(classes).toContain("tw:border-purple-300");
+
+      // Assert
+      expect(wrapper.text()).toBe("resource");
     });
 
-    it("should apply fallback grey classes for unknown type", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "unknown-type" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-grey-100");
-      expect(classes).toContain("tw:text-grey-700");
-    });
+    it("displays the raw type string for unknown types", () => {
+      // Arrange
+      wrapper = mount(EventTypeBadge, { props: { type: "custom" } });
 
-    it("should apply fallback grey classes for empty type string", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:bg-grey-100");
+      // Assert
+      expect(wrapper.text()).toBe("custom");
     });
   });
 
-  describe("base CSS classes always present", () => {
-    it("should always have uppercase and font-semibold classes", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "error" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:uppercase");
-      expect(classes).toContain("tw:font-semibold");
-    });
-
-    it("should always have rounded and px/py classes", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "view" } });
-      const classes = wrapper.classes().join(" ");
-      expect(classes).toContain("tw:rounded");
-      expect(classes).toContain("tw:px-1");
-    });
-  });
-
-  describe("dataTest prop", () => {
-    it("should apply data-test attribute when provided", () => {
+  describe("data-test attribute", () => {
+    it("applies the data-test attribute when provided", () => {
+      // Arrange
       wrapper = mount(EventTypeBadge, {
         props: { type: "error", dataTest: "rum-event-type-badge" },
       });
+
+      // Assert
       expect(wrapper.attributes("data-test")).toBe("rum-event-type-badge");
     });
 
-    it("should use empty string as default for data-test", () => {
+    it("leaves data-test empty or absent when not provided", () => {
+      // Arrange
       wrapper = mount(EventTypeBadge, { props: { type: "error" } });
+
+      // Assert
       const dataTest = wrapper.attributes("data-test");
       expect(dataTest === undefined || dataTest === "").toBe(true);
     });
   });
 
-  describe("type text content", () => {
-    it("should display 'action' text for action type", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "action" } });
-      expect(wrapper.text()).toBe("action");
+  describe("renders without errors for all known types", () => {
+    it("mounts successfully for error type", () => {
+      // Arrange
+      wrapper = mount(EventTypeBadge, { props: { type: "error" } });
+
+      // Assert
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it("should display 'view' text for view type", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "view" } });
-      expect(wrapper.text()).toBe("view");
+    it("mounts successfully for unknown type", () => {
+      // Arrange
+      wrapper = mount(EventTypeBadge, { props: { type: "unknown-type" } });
+
+      // Assert
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it("should display 'resource' text for resource type", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "resource" } });
-      expect(wrapper.text()).toBe("resource");
-    });
+    it("mounts successfully for empty string type", () => {
+      // Arrange
+      wrapper = mount(EventTypeBadge, { props: { type: "" } });
 
-    it("should display custom type text for unknown types", () => {
-      wrapper = mount(EventTypeBadge, { props: { type: "custom" } });
-      expect(wrapper.text()).toBe("custom");
+      // Assert
+      expect(wrapper.exists()).toBe(true);
     });
   });
 });

@@ -15,14 +15,49 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
-import { Notify } from "quasar";
-import { nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive } from "vue";
 import ServiceGraph from "./ServiceGraph.vue";
 
-installQuasar({
-  plugins: [Notify],
+// Stub for the in-house ODialog that mirrors its public surface
+// (v-model:open + click:primary/secondary emits). Renders default slot when
+// open so we can assert dialog body content without exercising reka-ui.
+const ODialogStub = defineComponent({
+  name: "ODialog",
+  inheritAttrs: false,
+  props: {
+    open: { type: Boolean, default: false },
+    title: String,
+    subTitle: String,
+    size: String,
+    persistent: Boolean,
+    showClose: { type: Boolean, default: true },
+    width: [String, Number],
+    primaryButtonLabel: String,
+    secondaryButtonLabel: String,
+    neutralButtonLabel: String,
+    primaryButtonVariant: String,
+    secondaryButtonVariant: String,
+    neutralButtonVariant: String,
+    primaryButtonDisabled: Boolean,
+    secondaryButtonDisabled: Boolean,
+    neutralButtonDisabled: Boolean,
+    primaryButtonLoading: Boolean,
+    secondaryButtonLoading: Boolean,
+    neutralButtonLoading: Boolean,
+  },
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  setup(props, { slots }) {
+    return () =>
+      props.open
+        ? h(
+            "div",
+            { "data-test": "o-dialog-stub", "data-title": props.title },
+            slots.default?.(),
+          )
+        : null;
+  },
 });
+
 
 // Create a persistent mock for router push
 const mockRouterPush = vi.fn();
@@ -72,17 +107,13 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("quasar", async () => {
-  const actual: any = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      dark: {
-        isActive: false,
-      },
-    }),
-  };
-});
+vi.mock("quasar", () => ({
+  useQuasar: () => ({
+    dark: {
+      isActive: false,
+    },
+  }),
+}));
 
 import serviceGraphService from "@/services/service_graph";
 
@@ -161,8 +192,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           QBtn: false,
           QIcon: false,
           QTooltip: false,
-          QSpinner: false,
-          QDialog: false,
+          ODialog: ODialogStub,
         },
       },
     });
@@ -1247,6 +1277,72 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       wrapper.vm.showSettings = true;
       wrapper.vm.resetSettings();
+
+      expect(wrapper.vm.showSettings).toBe(false);
+    });
+
+    it("should render the ODialog stub only when showSettings is true", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Dialog closed by default — stub renders nothing
+      expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(false);
+
+      wrapper.vm.showSettings = true;
+      await nextTick();
+
+      const dialog = wrapper.find('[data-test="o-dialog-stub"]');
+      expect(dialog.exists()).toBe(true);
+      // Title prop is forwarded to the in-house ODialog
+      expect(dialog.attributes("data-title")).toBe("Service Graph Settings");
+    });
+
+    it("should close the dialog when ODialog emits click:secondary (Close)", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.showSettings = true;
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.exists()).toBe(true);
+
+      // Migrated handler: @click:secondary="showSettings = false"
+      dialog.vm.$emit("click:secondary");
+      await nextTick();
+
+      expect(wrapper.vm.showSettings).toBe(false);
+    });
+
+    it("should reset settings when ODialog emits click:primary (Reset)", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.showSettings = true;
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.exists()).toBe(true);
+
+      // Migrated handler: @click:primary="resetSettings"
+      dialog.vm.$emit("click:primary");
+      await nextTick();
+
+      // resetSettings closes the dialog
+      expect(wrapper.vm.showSettings).toBe(false);
+    });
+
+    it("should sync showSettings when ODialog emits update:open via v-model:open", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.showSettings = true;
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      // v-model:open wires update:open back to showSettings
+      dialog.vm.$emit("update:open", false);
+      await nextTick();
 
       expect(wrapper.vm.showSettings).toBe(false);
     });

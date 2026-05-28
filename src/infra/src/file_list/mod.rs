@@ -176,7 +176,12 @@ pub trait FileList: Sync + Send + 'static {
         stream: &str,
         offset: i64,
     ) -> Result<i64>;
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
     -> Result<u64>;
@@ -515,8 +520,12 @@ pub async fn add_job(
 }
 
 #[inline]
-pub async fn get_pending_jobs(node: &str, limit: i64) -> Result<Vec<MergeJobRecord>> {
-    CLIENT.get_pending_jobs(node, limit).await
+pub async fn get_pending_jobs(
+    node: &str,
+    limit: i64,
+    fast_mode: bool,
+) -> Result<Vec<MergeJobRecord>> {
+    CLIENT.get_pending_jobs(node, limit, fast_mode).await
 }
 
 #[inline]
@@ -682,6 +691,7 @@ impl From<&FileRecord> for FileKey {
             meta: r.into(),
             deleted: r.deleted,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 }

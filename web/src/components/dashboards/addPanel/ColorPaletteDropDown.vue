@@ -12,65 +12,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div style="display: flex; align-items: center">
+  <div data-test="dashboard-color-palette-root">
+    <div
+      data-test="dashboard-color-palette-flex-container"
+      style="display: flex; align-items: center"
+    >
       <!-- dropdown to select color palette type/mode -->
-      <q-select
+      <OSelect
+        data-test="dashboard-color-palette-select"
         v-model="dashboardPanelData.data.config.color.mode"
         :options="colorOptions"
-        dense
         :label="t('dashboard.colorPalette')"
         class="showLabelOnTop"
-        stack-label
-        :display-value="selectedOptionLabel"
         @update:model-value="onColorModeChange"
         style="width: 100%"
-        :popup-content-style="{ height: '300px', width: '200px' }"
-        borderless
-        hide-bottom-space
-      >
-        <template v-slot:option="props">
-          <!-- label -->
-          <!-- sublabel -->
-          <!-- color palette as gradient -->
-          <q-item v-if="!props.opt.isGroup" v-bind="props.itemProps">
-            <q-item-section style="padding: 2px">
-              <q-item-label>{{ props.opt.label }}</q-item-label>
-              <q-item-label caption>
-                <div v-if="props.opt.subLabel">
-                  <div style="font-weight: 200">
-                    {{ props.opt.subLabel }}
-                  </div>
-                </div>
-                <div
-                  v-if="Array.isArray(props.opt.colorPalette)"
-                  class="color-container"
-                >
-                  <div
-                    :style="{
-                      background: `linear-gradient(to right, ${props.opt.colorPalette.join(
-                        ', ',
-                      )})`,
-                      width: '100%',
-                      height: '8px',
-                      borderRadius: '3px',
-                    }"
-                  ></div>
-                </div>
-              </q-item-label>
-            </q-item-section>
-          </q-item>
-          <!-- Render non-selectable group headers -->
-          <q-item v-else>
-            <q-item-section>
-              <q-item-label>{{ props.opt.label }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </template>
-      </q-select>
+        :dropdownStyle="{ width: '240px' }"
+      />
 
       <!-- color picker for fixed and shades typed color mode -->
       <div
+        data-test="dashboard-color-palette-color-input-wrapper"
         class="color-input-wrapper"
         v-if="
           ['fixed', 'shades'].includes(
@@ -80,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="margin-top: 30px; margin-left: 5px"
       >
         <input
+          data-test="dashboard-color-palette-color-input"
           type="color"
           v-model="dashboardPanelData.data.config.color.fixedColor[0]"
         />
@@ -88,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- color by button group -->
     <div
-      class="q-pt-md"
+      class="tw:pt-3"
       v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
     >
       {{ t("dashboard.colorSeriesBy") }}
@@ -110,10 +72,11 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "ColorPaletteDropdown",
-  components: { OToggleGroup, OToggleGroupItem },
+  components: { OToggleGroup, OToggleGroupItem, OSelect },
   setup() {
     const { t } = useI18n();
 
@@ -140,7 +103,7 @@ export default defineComponent({
     const colorOptions = [
       {
         label: t("dashboard.colorBySeries"),
-        isGroup: true,
+        header: true,
       },
       {
         label: t("dashboard.colorDefaultPaletteBySeries"),
@@ -180,7 +143,7 @@ export default defineComponent({
       },
       {
         label: t("dashboard.colorByValue"),
-        isGroup: true,
+        header: true,
       },
       {
         label: t("dashboard.colorGreenYellowRed"),
@@ -226,21 +189,22 @@ export default defineComponent({
         : t("dashboard.colorPaletteClassicBySeries");
     });
 
-    const onColorModeChange = (value: any) => {
-      // if value.value is fixed or shades, assign ["#53ca53"] to fixedcolor as a default
-      if (["fixed", "shades"].includes(value.value)) {
+    const onColorModeChange = (value: string) => {
+      const selectedOption = colorOptions.find((opt: any) => opt.value === value);
+      // if value is fixed or shades, assign ["#53ca53"] to fixedcolor as a default
+      if (["fixed", "shades"].includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
         dashboardPanelData.data.config.color.seriesBy = "last";
       } else if (
-        ["palette-classic-by-series", "palette-classic"].includes(value.value)
+        ["palette-classic-by-series", "palette-classic"].includes(value)
       ) {
         // do not store fixedcolor in config for palette-classic-by-series and palette-classic
         dashboardPanelData.data.config.color.fixedColor = [];
       } else {
         // else assign sublabel to fixedcolor
-        dashboardPanelData.data.config.color.fixedColor = value.colorPalette;
+        dashboardPanelData.data.config.color.fixedColor = selectedOption?.colorPalette ?? [];
       }
-      dashboardPanelData.data.config.color.mode = value.value;
+      dashboardPanelData.data.config.color.mode = value;
     };
     return {
       t,

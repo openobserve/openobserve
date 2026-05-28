@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
-    <div class="row flex justify-end align-center">
-      <div class="col-auto q-my-xs">
+    <div class="tw:flex tw:flex tw:justify-end align-center">
+      <div class="col-auto tw:my-1">
         <OButton
-          class="q-mr-sm"
+          class="tw:mr-2"
           variant="ghost"
           size="sm"
           :disabled="
@@ -28,9 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-        >
-          <Download class="tw:size-4" />
-        </OButton>
+          icon-left="download"
+        />
         <div
           class="float-left"
           v-show="queryData.streamType !== 'enrichment_tables'"
@@ -47,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="search-time q-pl-sm float-left q-mr-sm">
+        <div class="search-time tw:pl-2 float-left tw:mr-2">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -60,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="row query-editor-container">
-      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
+    <div class="tw:flex query-editor-container">
+      <div class="tw:flex tw:flex-col" style="border-top: 1px solid #dbdbdb; height: 100px">
         <b>Query Editor:</b>
         <code-query-editor
           editor-id="logsStreamQueryEditor"
@@ -84,7 +83,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Download } from 'lucide-vue-next';
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
 
@@ -114,7 +112,6 @@ export default defineComponent({
   components: {
     DateTime,
     OButton,
-    Download,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -372,8 +369,7 @@ export default defineComponent({
         height: 0;
       }
 
-      &,
-      .q-list {
+      & {
         border-radius: 3px;
       }
     }

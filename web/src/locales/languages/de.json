@@ -396,7 +396,9 @@
     "traces": "Spuren",
     "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
     "patternNoValuesAvailable": "Keine Werte verfügbar",
-    "selectLogStream": "Logs-Stream auswählen"
+    "selectLogStream": "Logs-Stream auswählen",
+    "noData": "Keine Daten verfügbar",
+    "functionEditorLabel": "Funktionseditor"
   },
   "menu": {
     "home": "Startseite",
@@ -790,7 +792,8 @@
     "no_keep_current": "Nein, auf dem Laufenden bleiben",
     "feature_correlation_management": "Korrelationsmanagement",
     "feature_log_patterns": "Muster protokollieren",
-    "environment_type": "Art der Umgebung"
+    "environment_type": "Art der Umgebung",
+    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme."
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -856,7 +859,12 @@
     "groups": "Gruppen",
     "customRole": "Benutzerdefinierte Rollen",
     "description": "Beschreibung",
-    "revoke_invite": "Einladung widerrufen"
+    "revoke_invite": "Einladung widerrufen",
+    "authType": "Auth",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Einheimisch",
+    "noCustomRolesHint": "Keine benutzerdefinierten Rollen definiert — erstellen Sie eine in IAM → Rollen",
+    "externalUserCustomRoleHint": "Externe Benutzer können nur über das Quellsystem geändert werden"
   },
   "ticket": {
     "header": "Tickets für den Support",
@@ -1411,7 +1419,7 @@
     "markLineYAxis": "Y-Achse",
     "colorPalette": "Farbpalette",
     "colorSeriesBy": "Farbserie von:",
-    "colorBySeries": "<b>Nach Serien</b>",
+    "colorBySeries": "Nach Serien",
     "colorDefaultPaletteBySeries": "Standardpalette (nach Serie)",
     "colorDefaultPaletteBySeriesSubLabel": "Serien mit demselben Namen verwenden dieselbe Farbe",
     "colorPaletteClassic": "Palette-Klassiker",
@@ -1420,7 +1428,7 @@
     "colorSingleColorSubLabel": "Stellen Sie eine bestimmte Farbe für alle Serien ein",
     "colorShadesOfSpecificColor": "Schattierungen bestimmter Farben",
     "colorShadesOfSpecificColorSubLabel": "Verschiedene Farbtöne bestimmter Farben",
-    "colorByValue": "<b>Von Value</b>",
+    "colorByValue": "Von Value",
     "colorGreenYellowRed": "Grün-Gelb-Rot (nach Wert)",
     "colorRedYellowGreen": "Rot-Gelb-Grün (nach Wert)",
     "colorTemperature": "Temperatur (nach Wert)",
@@ -1590,7 +1598,9 @@
     "axisLabelRotateTooltipText": "Drehen Sie den Beschriftungstext auf der X-Achse um einen bestimmten Winkel (in Grad), um die Lesbarkeit zu verbessern, wenn Beschriftungen lang oder überfüllt sind.",
     "axisLabelTruncateTooltipText": "Kürzt die Beschriftungen der X-Achse auf die angegebene Breite (in Pixeln).",
     "axisLabelTooltipNotePrefix": "Hinweis:",
-    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt."
+    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
+    "allFolders": "Alle Ordner",
+    "selectFile": "Wählen Sie Datei"
   },
   "panel": {
     "header": "Panel",
@@ -2619,6 +2629,7 @@
     "serviceAccounts": "Dienstkonten",
     "serviceAccountsName": "Name des Dienstkontos",
     "basicUsers": "Nutzer",
+    "organizationMembers": "Organisationsmitglieder",
     "quota": "Kontingente",
     "externalUserWarningTitle": "Warnung für externe Benutzer",
     "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu.",
@@ -2935,7 +2946,75 @@
     "copyStacktrace": "Stacktrace kopieren",
     "noStacktraceAvailable": "Kein Stacktrace verfügbar",
     "stacktraceCopied": "Stacktrace wurde in die Zwischenablage kopiert",
-    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden"
+    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden",
+    "sessionsList": {
+      "noStreamsTooltip": "Keine LLM-Streams verfügbar.",
+      "session": "Sitzung",
+      "sessions": "Sitzungen",
+      "countPill": "{Anzahl} von {total} {unit}",
+      "noStreamsFound": "Keine LLM-Streams gefunden",
+      "noStreamsDescription1": "Die Sitzungsgruppe umfasst",
+      "noStreamsDescription2": "across verfolgt Streams, die als LLM-Streams gekennzeichnet sind. Entweder existiert kein solcher Stream, oder es wurden noch keine Spans aufgenommen.",
+      "failedToLoad": "Sitzungen konnten nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "noSessionsFound": "Keine Sessions gefunden",
+      "noSessionsDescription": "In diesem Zeitraum wurden keine LLM-Sitzungen auf {stream} aufgezeichnet. Versuchen Sie, den Zeitbereich zu erweitern oder zu einem anderen Stream zu wechseln.",
+      "loading": "Sitzungen werden geladen...",
+      "tokenTooltip": "Eingabe: {input} · Ausgabe: {output} · Summe: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Zeitstempel",
+        "sessionId": "Sitzungs-ID",
+        "turns": "Dreht sich",
+        "duration": "Dauer",
+        "tokens": "Tokens",
+        "cost": "Kosten",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Zurück zu Sessions",
+      "pageTitle": "Einzelheiten der Sitzung",
+      "failedToLoad": "Sitzung konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "sessionNotFound": "Sitzung nicht gefunden",
+      "noSpansFound": "Im aktuellen Zeitraum wurden keine Zeitspannen für {id} gefunden.",
+      "searchPlaceholder": "Suchen Sie in dieser Sitzung nach Spuren...",
+      "turn": "Wende",
+      "turns": "wendet sich",
+      "turnsShown": "{gefiltert} von {total} {unit} angezeigt",
+      "userBadge": "Nutzer",
+      "sessionPrefix": "Sitzung",
+      "copySessionId": "Sitzungs-ID kopieren",
+      "openInTraceExplorer": "Im Trace Explorer öffnen",
+      "unknownUser": "Unbekannter Benutzer",
+      "kpi": {
+        "turns": "Dreht sich",
+        "duration": "Dauer",
+        "inputTokens": "Eingabe-Token",
+        "outputTokens": "Ausgabetokens",
+        "cost": "Kosten"
+      },
+      "conversation": "Konversation",
+      "turnLabel": "Wende",
+      "openTrace": "Trace öffnen",
+      "noUserMessage": "Für diesen Spielzug wurde keine Benutzernachricht erfasst.",
+      "noAssistantMessage": "Für diesen Zug wurde keine Reaktion des Assistenten erfasst.",
+      "roles": {
+        "user": "Nutzer",
+        "assistant": "Assistentin"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "Modell",
+        "tokens": "Tokens",
+        "input": "Eingabe",
+        "output": "Ausgang",
+        "total": "Insgesamt",
+        "cost": "Kosten",
+        "spans": "Spannweiten"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3019,7 +3098,10 @@
     "algorithm": "Algorithmus",
     "storeType": "Typ speichern",
     "mechanismType": "Art des Mechanismus",
-    "actions": "Aktionen"
+    "actions": "Aktionen",
+    "providerTypeRequired": "Anbietertyp ist erforderlich",
+    "algorithmRequired": "Algorithmus ist erforderlich",
+    "secretRequired": "Geheimnis ist erforderlich"
   },
   "quota": {
     "header": "Kontingente",
@@ -3676,7 +3758,8 @@
     "errSave": "konnte nicht gespeichert werden",
     "errLoadModel": "Modell konnte nicht geladen werden",
     "tierDefaultName": "Standard",
-    "tierConditionalName": "Bedingte Stufe"
+    "tierConditionalName": "Bedingte Stufe",
+    "shadowedWarningBanner": "Die folgenden Regeln werden von „{name}“ überschattet — sie werden durch eine Regel mit höherer Priorität außer Kraft gesetzt und werden nicht für Kostenberechnungen verwendet."
   },
   "overview": {
     "title": "Überblick über das System",

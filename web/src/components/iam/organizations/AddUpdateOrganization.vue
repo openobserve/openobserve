@@ -15,94 +15,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div
-            v-if="beingUpdated"
-            data-test="update-org"
-            style="font-size: 18px"
-          >
-            {{ t("organization.updateOrganization") }}
-          </div>
-          <div v-else style="font-size: 18px" data-test="create-org">
-            {{ t("organization.createOrganization") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-org-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="$emit('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
+  <ODrawer data-test="add-update-organization-dialog"
+    :open="open"
+    :width="30"
+    :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
+    :primaryButtonLabel="t('organization.save')"
+    :secondaryButtonLabel="t('organization.cancel')"
+    :primaryButtonDisabled="(!organizationData.name || !isValidOrgName) && !proPlanRequired"
+    @click:primary="onSubmit"
+    @click:secondary="$emit('update:open', false)"
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4">
       <div>
-        <q-form ref="addOrganizationForm" @submit="onSubmit">
-          <q-input
+          <OInput
             v-if="beingUpdated"
             v-model="organizationData.id"
             :readonly="beingUpdated"
             :disabled="beingUpdated"
-            stack-label
-            borderless
-            hide-bottom-space
-            dense
             :label="t('organization.id')"
             class="showLabelOnTop tw:mt-2"
           />
 
-          <q-input
+          <OInput
             v-model.trim="organizationData.name"
             :label="t('organization.name') + '*'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) =>
-                !!val
-                  ? isValidOrgName ||
-                    'Use alphanumeric characters, space and underscore only.'
-                  : t('organization.nameRequired'),
-            ]"
+            :error="showNameError"
+            :error-message="nameErrorMessage"
+            :help-text="!showNameError ? 'Use alphanumeric characters, space and underscore only.' : undefined"
+            @update:model-value="showNameError = !!organizationData.name && !isValidOrgName"
             data-test="org-name"
             maxlength="100"
-            hide-bottom-space
-          >
-            <template v-slot:hint>
-              Use alphanumeric characters, space and underscore only.
-            </template>
-          </q-input>
+          />
 
-          <div class="flex justify-start tw:mt-6 tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="router.replace({ name: 'organizations' })"
-              data-test="cancel-organizations-modal"
-            >
-              {{ t('organization.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              :disabled="organizationData.name === '' && !proPlanRequired"
-              data-test="add-org"
-            >
-              {{ t('organization.save') }}
-            </OButton>
-          </div>
-
-          <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
+          <div class="tw:flex tw:justify-center tw:mt-4" v-if="proPlanRequired">
             <OButton
               variant="secondary"
               size="md"
@@ -112,22 +59,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('organization.proceed_subscription') }}
             </OButton>
           </div>
-        </q-form>
-      </div>
-    </q-card-section>
-  </q-card>
+        </div>
+    </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
-import { useQuasar } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue = () => {
   return {
@@ -140,8 +88,12 @@ let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton },
+  components: { OButton, ODrawer, OInput },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -149,13 +101,14 @@ export default defineComponent({
   },
   data() {
     return {
+      showNameError: false as boolean,
       proPlanRequired: false,
       proPlanMsg: "",
       newOrgIdentifier: "",
     };
   },
-  emits: ["update:modelValue", "updated", "finish", "cancel:hideform"],
-  setup() {
+  emits: ["update:modelValue", "updated", "finish", "update:open"],
+  setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
     const beingUpdated: any = ref(false);
@@ -165,13 +118,36 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
 
     const isValidOrgName = computed(() => {
       const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;
       return orgNameRegex.test(organizationData.value.name);
     });
 
+    const nameErrorMessage = computed(() =>
+      !organizationData.value.name
+        ? t('organization.nameRequired')
+        : `Use alphanumeric characters, space and underscore only.`
+    );
+
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        if (newVal && newVal.id) {
+          beingUpdated.value = true;
+          disableColor.value = "grey-5";
+          organizationData.value = {
+            id: newVal.id,
+            name: newVal.name,
+          };
+        } else {
+          beingUpdated.value = false;
+          disableColor.value = "";
+          organizationData.value = defaultValue();
+        }
+      },
+      { deep: true, immediate: true },
+    );
 
     return {
       t,
@@ -185,33 +161,14 @@ export default defineComponent({
       isValidIdentifier,
       track,
       isValidOrgName,
+      nameErrorMessage,
     };
   },
-  created() {
-    if (this.modelValue && this.modelValue.id) {
-      this.beingUpdated = true;
-      this.disableColor = "grey-5";
-      this.organizationData = {
-        id: this.modelValue.id,
-        name: this.modelValue.name,
-      };
-    }
 
-    // this.store.state.organizations.forEach((organization: any) => {
-    //   if (
-    //     (organization.hasOwnProperty("CustomerBillingObj") &&
-    //       organization.CustomerBillingObj.subscription_type ==
-    //         config.freePlan) ||
-    //     !organization.hasOwnProperty("CustomerBillingObj")
-    //   ) {
-    //     this.proPlanRequired = true;
-    //   }
-    // });
-  },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
-      this.$q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },
@@ -223,20 +180,17 @@ export default defineComponent({
     },
     onSubmit() {
       this.organizationData.name = this.organizationData.name.trim();
-      if(!this.isValidOrgName){
+      if (!this.organizationData.name || !this.isValidOrgName) {
+        this.showNameError = true;
         return;
       }
-      const dismiss = this.$q.notify({
-        spinner: true,
+      this.showNameError = false;
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
-      this.addOrganizationForm.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        const organizationId = this.organizationData.id;
+      const organizationId = this.organizationData.id;
         //here we will check if organizationId is there or not because we only get org id when we are updating the organization
         //if organizationId is not there we will create a new organization else we will update the existing organization
         if (!organizationId) {
@@ -261,7 +215,7 @@ export default defineComponent({
 
               // this.$emit("update:modelValue", data);
               this.$emit("updated");
-              this.addOrganizationForm.resetValidation();
+              this.$emit("update:open", false);
               dismiss();
             } else {
               this.proPlanRequired = true;
@@ -289,8 +243,8 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: JSON.stringify(
                 err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
               ),
@@ -301,7 +255,6 @@ export default defineComponent({
             button: "Save Organization",
             page: "Add Organization"
           });
-      });
     },
   },
 });

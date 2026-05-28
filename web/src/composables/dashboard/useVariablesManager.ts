@@ -1012,7 +1012,7 @@ export const useVariablesManager = () => {
     // Helper to check if value is valid for URL
     const hasValidValue = (value: any): boolean => {
       if (value === null || value === undefined) return false;
-      if (value === "null") return false;
+      if (value === "" || value === "null") return false;
       if (Array.isArray(value) && value.length === 0) return false;
       if (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === "")) return false;
       return true;

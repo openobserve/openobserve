@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         column.type === 'view' && column.view_loading_type === 'route_change'
       "
     >
-      <pre class="navigation q-pa-sm">
+      <pre class="navigation tw:p-2">
 {
   <span class="text-primary">from</span> : {{ column.view_referrer }},
   <span class="text-primary">to</span> : {{ column.view_url }}
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template
       v-else-if="column.type === 'resource' && column.resource_type === 'xhr'"
     >
-      <span class="text-bold q-pr-sm tw:text-[0.75rem]">{{
+      <span class="tw:font-bold tw:pr-2 tw:text-[0.75rem]">{{
         column.resource_method
       }}</span>
       <a
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="resource-url text-primary"
         >{{ column.resource_url }}</a
       >
-      <span class="q-pl-sm">[ {{ column.resource_status_code }} ]</span>
+      <span class="tw:pl-2">[ {{ column.resource_status_code }} ]</span>
     </template>
     <template v-else>
       <span class="tw:text-[0.875rem]">{{ getDescription }}</span>

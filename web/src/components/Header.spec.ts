@@ -15,11 +15,10 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
+
 
 // Mock the cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -33,10 +32,6 @@ vi.mock("@/utils/cookies", () => ({
   setToken: vi.fn(),
   removeToken: vi.fn(),
 }));
-
-installQuasar({
-  plugins: [Notify],
-});
 
 describe("Header Component", () => {
   let wrapper: any;
@@ -156,18 +151,19 @@ describe("Header Component", () => {
       slackIcon: {},
       zoBackendUrl: "http://localhost:5080",
       langList: [
-        { code: "en-gb", label: "English", icon: "flag-icon flag-icon-gb" },
-        { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" },
+        { code: "en-gb", label: "English" },
+        { code: "fr", label: "Français" },
       ],
       selectedLanguage: { code: "en-gb", label: "English" },
       selectedOrg: { identifier: "test-org", label: "Test Organization" },
       userClickedOrg: { identifier: "test-org", label: "Test Organization" },
-      filteredOrganizations: [
+      // Header.vue migration replaced filteredOrganizations/searchQuery/rowsPerPage
+      // with a single 'organizations' prop; the search/pagination state moved
+      // inside the component once it switched to OSelect.
+      organizations: [
         { identifier: "test-org", label: "Test Organization" },
         { identifier: "another-org", label: "Another Organization" },
       ],
-      searchQuery: "",
-      rowsPerPage: 10,
       isHovered: false,
       getBtnLogo: "mock-logo.svg",
     };
@@ -204,7 +200,7 @@ describe("Header Component", () => {
       await logoWrapper.vm.$nextTick();
 
       // Verify the OpenObserve logo is rendered
-      const openobserveLogo = logoWrapper.find('.openobserve-logo');
+      const openobserveLogo = logoWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(true);
 
       logoWrapper.unmount();
@@ -264,7 +260,7 @@ describe("Header Component", () => {
       await darkWrapper.vm.$nextTick();
 
       // Verify the logo exists and check that dark theme is applied
-      const openobserveLogo = darkWrapper.find('.openobserve-logo');
+      const openobserveLogo = darkWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(true);
 
       // The logo src should contain 'dark' in the path
@@ -296,7 +292,7 @@ describe("Header Component", () => {
       await customWrapper.vm.$nextTick();
 
       // Check that the OpenObserve logo is NOT in the HTML
-      const openobserveLogo = customWrapper.find('.openobserve-logo');
+      const openobserveLogo = customWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(false);
 
       // Verify the custom logo text IS displayed
@@ -328,7 +324,7 @@ describe("Header Component", () => {
       await customWrapper.vm.$nextTick();
 
       // Check that the OpenObserve logo IS in the HTML
-      const openobserveLogo = customWrapper.find('.openobserve-logo');
+      const openobserveLogo = customWrapper.find('[data-test="header-openobserve-logo"]');
       expect(openobserveLogo.exists()).toBe(true);
 
       // Verify the custom logo text is also displayed
@@ -722,6 +718,9 @@ describe("Header Component", () => {
     });
 
     it("should emit update:searchQuery when search input changes", async () => {
+      // After the OSelect migration, search/filter state is internal to the
+      // component. The test is reduced to verifying the manual emit pathway
+      // still works for backward-compat consumers that listen on the event.
       await wrapper.vm.$emit("update:searchQuery", "test");
 
       expect(wrapper.emitted("update:searchQuery")).toBeTruthy();
@@ -731,6 +730,14 @@ describe("Header Component", () => {
     it("should emit updateOrganization when organization is selected", async () => {
       const newOrg = { identifier: "new-org", label: "New Organization" };
 
+      // handleOrgSelection takes the org object directly (matching the
+      // OTable row-click contract used by the org dropdown).
+      await wrapper.setProps({
+        organizations: [
+          { identifier: "test-org", label: "Test Organization" },
+          newOrg,
+        ],
+      });
       await wrapper.vm.handleOrgSelection(newOrg);
 
       expect(wrapper.emitted("update:selectedOrg")).toBeTruthy();
@@ -739,20 +746,19 @@ describe("Header Component", () => {
     });
 
     it("should filter organizations based on search query", () => {
-      const filteredOrgs = [
-        { identifier: "test-org", label: "Test Organization" },
-      ];
+      // The 'organizations' prop now drives the OSelect options directly;
+      // filtering happens inside the OSelect popup, not via props.
+      const orgs = [{ identifier: "test-org", label: "Test Organization" }];
 
       wrapper = shallowMount(Header, {
         global: { plugins: [i18n] },
         props: {
           ...wrapper.props(),
-          filteredOrganizations: filteredOrgs,
-          searchQuery: "test",
+          organizations: orgs,
         },
       });
 
-      expect(wrapper.props("filteredOrganizations")).toHaveLength(1);
+      expect(wrapper.props("organizations")).toHaveLength(1);
     });
 
     it("should display empty state when no organizations match search", () => {
@@ -760,12 +766,11 @@ describe("Header Component", () => {
         global: { plugins: [i18n] },
         props: {
           ...wrapper.props(),
-          filteredOrganizations: [],
-          searchQuery: "nonexistent",
+          organizations: [],
         },
       });
 
-      expect(wrapper.props("filteredOrganizations")).toHaveLength(0);
+      expect(wrapper.props("organizations")).toHaveLength(0);
     });
   });
 
@@ -886,7 +891,10 @@ describe("Header Component", () => {
       expect(wrapper.props("user").email).toBe("john@test.com");
     });
 
-    it("should apply header-user-tooltip class to profile button tooltip", () => {
+    it("should attach an OTooltip to the profile button", () => {
+      // The QTooltip with class="header-user-tooltip" was replaced by OTooltip
+      // (no class needed — OTooltip styles itself via Tailwind tokens).
+      // The test now verifies the OTooltip is co-located with the profile btn.
       const tooltipWrapper = createWrapper({
         mountType: "mount",
         stubsOverrides: {
@@ -898,9 +906,10 @@ describe("Header Component", () => {
       const profileBtn = tooltipWrapper.find(
         '[data-test="header-my-account-profile-icon"]',
       );
-      const profileBtnHtml = profileBtn.html();
-
-      expect(profileBtnHtml).toContain("header-user-tooltip");
+      expect(profileBtn.exists()).toBe(true);
+      // OTooltip lives as a sibling/descendant of the button; verify present.
+      const tooltip = tooltipWrapper.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
 
       tooltipWrapper.unmount();
     });
@@ -920,7 +929,7 @@ describe("Header Component", () => {
     });
 
     it("should emit changeLanguage event with correct language data", () => {
-      const newLang = { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" };
+      const newLang = { code: "fr", label: "Français" };
       wrapper.vm.changeLanguage(newLang);
 
       // Verify the event was emitted with the correct language object
@@ -940,9 +949,9 @@ describe("Header Component", () => {
 
     it("should emit changeLanguage for each language in langList", () => {
       const languages = [
-        { code: "en-gb", label: "English", icon: "flag-icon flag-icon-gb" },
-        { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" },
-        { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" },
+        { code: "en-gb", label: "English" },
+        { code: "fr", label: "Français" },
+        { code: "de", label: "Deutsch" },
       ];
 
       const langWrapper = createWrapper({
@@ -965,7 +974,7 @@ describe("Header Component", () => {
       // Clear previous mock calls
       vi.clearAllMocks();
 
-      const frenchLang = { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" };
+      const frenchLang = { code: "fr", label: "Français" };
 
       // User changes language in Header component
       wrapper.vm.changeLanguage(frenchLang);
@@ -995,7 +1004,7 @@ describe("Header Component", () => {
       // Clear previous mock calls
       vi.clearAllMocks();
 
-      const germanLang = { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" };
+      const germanLang = { code: "de", label: "Deutsch" };
 
       // User changes language
       wrapper.vm.changeLanguage(germanLang);
@@ -1029,7 +1038,7 @@ describe("Header Component", () => {
       await lightWrapper.vm.$nextTick();
 
       // Verify light theme logo is used
-      const logo = lightWrapper.find('.openobserve-logo');
+      const logo = lightWrapper.find('[data-test="header-openobserve-logo"]');
       expect(logo.exists()).toBe(true);
 
       const logoSrc = logo.attributes('src');
@@ -1054,7 +1063,7 @@ describe("Header Component", () => {
       await darkWrapper.vm.$nextTick();
 
       // Verify dark theme logo is used
-      const logo = darkWrapper.find('.openobserve-logo');
+      const logo = darkWrapper.find('[data-test="header-openobserve-logo"]');
       expect(logo.exists()).toBe(true);
 
       const logoSrc = logo.attributes('src');
@@ -1084,6 +1093,8 @@ describe("Header Component", () => {
 
   describe("Props Validation", () => {
     it("should accept all required props", () => {
+      // Migration: filteredOrganizations/searchQuery/rowsPerPage merged into
+      // a single 'organizations' prop (OSelect owns search/pagination state).
       expect(wrapper.props("store")).toBeDefined();
       expect(wrapper.props("router")).toBeDefined();
       expect(wrapper.props("config")).toBeDefined();
@@ -1092,9 +1103,7 @@ describe("Header Component", () => {
       expect(wrapper.props("langList")).toHaveLength(2);
       expect(wrapper.props("selectedLanguage")).toBeDefined();
       expect(wrapper.props("selectedOrg")).toBeDefined();
-      expect(wrapper.props("filteredOrganizations")).toHaveLength(2);
-      expect(wrapper.props("searchQuery")).toBe("");
-      expect(wrapper.props("rowsPerPage")).toBe(10);
+      expect(wrapper.props("organizations")).toHaveLength(2);
       expect(wrapper.props("isHovered")).toBe(false);
       expect(wrapper.props("getBtnLogo")).toBe("mock-logo.svg");
     });
@@ -1121,15 +1130,17 @@ describe("Header Component", () => {
       const wrapper = createWrapper({
         mountType: 'mount',
         propsOverrides: {
-          filteredOrganizations: [],
+          organizations: [],
         },
         stubsOverrides: {
-          QSelect: false
+          // QSelect was replaced by OSelect during the OSelect migration; keep
+          // the OSelect stub off so we can probe its options.
+          OSelect: false
         }
       });
 
-      // Verify the organization selector doesn't show options when list is empty
-      const orgSelect = wrapper.findComponent({ name: 'QSelect' });
+      // Verify the organization selector doesn't show options when list is empty.
+      const orgSelect = wrapper.findComponent({ name: 'OSelect' });
       if (orgSelect.exists()) {
         expect(orgSelect.props('options')).toHaveLength(0);
       }
@@ -1159,7 +1170,7 @@ describe("Header Component", () => {
 
       // Verify default OpenObserve logo is rendered instead
       expect(html).toContain('openobserve-logo');
-      const imgs = wrapper.findAll('img');
+      const imgs = wrapper.findAll('[data-test="header-openobserve-logo"]');
       expect(imgs.length).toBeGreaterThan(0);
       expect(imgs[0].attributes('src')).toContain('openobserve');
     });

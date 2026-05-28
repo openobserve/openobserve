@@ -15,39 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div
-      class="col-12 flex tw:ml-2"
+      class="tw:w-full tw:flex tw:ml-2"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
 
 
       <div
-        class="row invite-user"
+        class="tw:flex invite-user"
         style="width: calc(100% - 110px); display: inline-flex"
       >
-        <q-input
+        <OInput
           v-model="userEmail"
-          borderless
-          filled
-          dense
           :placeholder="t('user.inviteByEmail')"
           style="width: calc(100% - 120px)"
-          class="q-pr-sm"
+          class="tw:pr-2"
         />
-        <div class="flex justify-center">
-          <q-select
-            dense
-            filled
-            borderless
+        <div class="tw:flex tw:justify-center">
+          <OSelect
             v-model="selectedRole"
-            option-label="label"
-            option-value="value"
-            emit-value
-            map-options
             :options="options"
+            labelKey="label"
+            valueKey="value"
             style="width: 120px"
-            class="q-pr-sm"
+            class="tw:pr-2"
           />
         </div>
       </div>
@@ -55,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="xs"
+          class="tw:!h-8"
           :disabled="userEmail == ''"
           @click="inviteUser()"
         >
@@ -62,24 +55,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { validateEmail } from "@/utils/zincutils";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MemberInvitationPage",
-  components: { OButton },
+  components: { OButton, OInput, OSelect },
   props: {
     currentrole: {
       type: String,
@@ -90,7 +85,6 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const userEmail: any = ref("");
     const options = ref();
@@ -117,8 +111,8 @@ export default defineComponent({
       );
 
       if (!validationArray.includes(false)) {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait...",
           timeout: 2000,
         });
@@ -134,14 +128,14 @@ export default defineComponent({
             if (data.data.invalid_members != null) {
               const message = `Error while member invitation: ${data.data.invalid_members.toString()}`;
 
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: message,
                 timeout: 15000,
               });
             } else {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: data.message,
                 timeout: 5000,
               });
@@ -153,8 +147,8 @@ export default defineComponent({
           })
           .catch((error) => {
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: error?.response?.data?.message || error.message,
               timeout: 5000,
             });
@@ -169,8 +163,8 @@ export default defineComponent({
           page: "Users",
         });
       } else {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Please enter correct email id.`,
         });
       }
@@ -194,7 +188,6 @@ export default defineComponent({
       options,
       inviteUser,
       currentUserRole,
-      $q
     };
   },
 });

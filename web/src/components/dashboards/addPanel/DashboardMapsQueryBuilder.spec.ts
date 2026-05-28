@@ -15,14 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import DashboardMapsQueryBuilder from "@/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock the composables
 const mockDashboardPanelData = {
@@ -74,17 +69,19 @@ const mockQuasar = {
   notify: vi.fn(),
 };
 
+const mockShowErrorNotification = vi.fn();
+
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => mockUseDashboardPanelData,
 }));
 
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-  };
-});
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showErrorNotification: mockShowErrorNotification,
+    showPositiveNotification: vi.fn(),
+    showConfictErrorNotificationWithRefreshBtn: vi.fn(),
+  }),
+}));
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mocked-image-url"),
@@ -135,7 +132,7 @@ describe("DashboardMapsQueryBuilder", () => {
           SanitizedHtmlRenderer: true,
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
-          "q-icon": true,
+          "OIcon": true,
           "q-tooltip": true,
           "q-btn-group": true,
           "q-btn": true,
@@ -224,7 +221,7 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.$options.components.SortByBtnGrp).toBeDefined();
-      expect(wrapper.vm.$options.components.CommonAutoComplete).toBeDefined();
+      expect(wrapper.vm.$options.components.DynamicFunctionPopUp).toBeDefined();
       expect(
         wrapper.vm.$options.components.SanitizedHtmlRenderer,
       ).toBeDefined();
@@ -613,12 +610,8 @@ describe("DashboardMapsQueryBuilder", () => {
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
         wrapper.vm.onDrop(mockEvent, "name");
 
-        expect(mockQuasar.notify).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: "negative",
-            message: "Max 1 field in NAME is allowed.",
-            timeout: 5000,
-          }),
+        expect(mockShowErrorNotification).toHaveBeenCalledWith(
+          "Max 1 field in NAME is allowed.",
         );
         expect(
           mockUseDashboardPanelData.cleanupDraggingFields,
@@ -645,12 +638,8 @@ describe("DashboardMapsQueryBuilder", () => {
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
         wrapper.vm.onDrop(mockEvent, "value_for_maps");
 
-        expect(mockQuasar.notify).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: "negative",
-            message: "Max 1 field in VALUE_FOR_MAPS is allowed.",
-            timeout: 5000,
-          }),
+        expect(mockShowErrorNotification).toHaveBeenCalledWith(
+          "Max 1 field in VALUE_FOR_MAPS is allowed.",
         );
         expect(
           mockUseDashboardPanelData.cleanupDraggingFields,

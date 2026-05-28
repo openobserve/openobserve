@@ -15,15 +15,10 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -51,9 +46,13 @@ describe("SyntaxGuide", () => {
 
   afterEach(() => {
     wrapper.unmount();
-    // Clean up any menus that might be attached to document body
-    const menus = document.querySelectorAll(".q-menu");
-    menus.forEach((menu) => menu.remove());
+    // Clean up any portaled ODropdown content attached to document body.
+    document
+      .querySelectorAll('[data-test="syntax-guide-menu"]')
+      .forEach((menu) => menu.remove());
+    document
+      .querySelectorAll('[data-reka-popper-content-wrapper]')
+      .forEach((menu) => menu.remove());
   });
 
   describe("Component Rendering", () => {
@@ -107,8 +106,9 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      // Menu is attached to document body, so we need to search in document
-      const menu = document.querySelector(".q-menu");
+      // ODropdown content is portaled to document.body; the migrated component
+      // wraps the panel in a div with data-test="syntax-guide-menu".
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
       expect(menu).toBeTruthy();
 
       const title = document.querySelector(".syntax-guide-title .label");
@@ -206,7 +206,9 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const menu = document.querySelector(".q-menu");
+      // ODropdown portals content to document.body; the wrapper div is tagged
+      // with data-test="syntax-guide-menu" in the migrated source.
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
       expect(menu).toBeTruthy();
     });
   });
@@ -229,7 +231,7 @@ describe("SyntaxGuide", () => {
     it("should have tooltip component for accessibility", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
       // Check that QTooltip component is present as a child
-      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });
   });
@@ -238,7 +240,7 @@ describe("SyntaxGuide", () => {
     it("should work with i18n translations", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
       // Check that QTooltip component is present
-      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });
 
@@ -275,8 +277,12 @@ describe("SyntaxGuide", () => {
   describe("Menu theme class", () => {
     afterEach(() => {
       store.state.theme = "dark"; // restore shared store default
-      const menus = document.querySelectorAll(".q-menu");
-      menus.forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-test="syntax-guide-menu"]')
+        .forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-reka-popper-content-wrapper]')
+        .forEach((m) => m.remove());
     });
 
     it("should apply theme-light class to menu when store theme is light", async () => {
@@ -338,8 +344,12 @@ describe("SyntaxGuide", () => {
 
   describe("extract_ip query function example only in SQL mode", () => {
     afterEach(() => {
-      const menus = document.querySelectorAll(".q-menu");
-      menus.forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-test="syntax-guide-menu"]')
+        .forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-reka-popper-content-wrapper]')
+        .forEach((m) => m.remove());
     });
 
     it("should contain extract_ip example in SQL mode", async () => {
@@ -365,8 +375,12 @@ describe("SyntaxGuide", () => {
 
   describe("sqlmode prop toggle between modes", () => {
     afterEach(() => {
-      const menus = document.querySelectorAll(".q-menu");
-      menus.forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-test="syntax-guide-menu"]')
+        .forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-reka-popper-content-wrapper]')
+        .forEach((m) => m.remove());
     });
 
     it("should switch button class from normal-mode to sql-mode dynamically", async () => {
@@ -390,8 +404,12 @@ describe("SyntaxGuide", () => {
 
   describe("Documentation link present in both modes", () => {
     afterEach(() => {
-      const menus = document.querySelectorAll(".q-menu");
-      menus.forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-test="syntax-guide-menu"]')
+        .forEach((m) => m.remove());
+      document
+        .querySelectorAll('[data-reka-popper-content-wrapper]')
+        .forEach((m) => m.remove());
     });
 
     it("normal mode: docs link opens in new tab", async () => {

@@ -16,23 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="trace-dag-container">
-    <div v-if="isLoading" class="flex items-center justify-center column q-pa-xl loading-container">
-      <q-spinner color="primary" size="50px" />
-      <div class="q-mt-md text-grey-7">Loading trace DAG...</div>
+    <div v-if="isLoading" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 loading-container">
+      <OSpinner size="lg" />
+      <div class="tw:mt-3 tw:text-gray-400">Loading trace DAG...</div>
     </div>
 
-    <div v-else-if="error" class="error-message q-pa-md">
-      <q-banner class="bg-negative text-white">
-        <template #avatar>
-          <q-icon name="error" color="white" />
-        </template>
-        Failed to load DAG: {{ error }}
-      </q-banner>
+    <div v-else-if="error" class="error-message tw:p-3">
+      <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
-      <q-icon name="info" size="48px" color="grey-5" />
-      <div class="q-mt-md text-grey-7">No DAG data available</div>
+    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 empty-container">
+      <OIcon name="info" style="width: 48px; height: 48px;" />
+      <div class="tw:mt-3 tw:text-gray-400">No DAG data available</div>
     </div>
 
     <div v-else class="dag-wrapper">
@@ -63,16 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleNodeClick(data.span_id)"
           >
             <div class="node-operation" :class="getObservationTypeTextClass(data.gen_ai_operation_name)">{{ data.operation_name }}</div>
-            <q-chip
+            <OBadge
               v-if="data.span_status === 'ERROR'"
-              dense
-              size="xs"
-              color="negative"
-              text-color="white"
+              size="sm"
+              variant="error"
               class="error-chip"
             >
               ERR
-            </q-chip>
+            </OBadge>
           </div>
           <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom" class="dag-handle" />
         </template>
@@ -93,6 +86,10 @@ import searchService from "@/services/search";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 interface SpanNode {
   span_id: string;
@@ -123,7 +120,10 @@ export default defineComponent({
     Background,
     Controls,
     Handle,
-  },
+    OSpinner,
+    OIcon,
+    OBadge,
+},
   props: {
     traceId: {
       type: String,

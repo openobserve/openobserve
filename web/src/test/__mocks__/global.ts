@@ -34,9 +34,39 @@ vi.stubGlobal(
 );
 
 class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  private callback: ResizeObserverCallback;
+  private elements: Set<Element> = new Set();
+
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback;
+  }
+
+  observe(element: Element, _options?: ResizeObserverOptions) {
+    this.elements.add(element);
+    const rect = element.getBoundingClientRect();
+    this.callback(
+      [
+        {
+          target: element,
+          contentRect: rect,
+          borderBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
+          contentBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
+          devicePixelContentBoxSize: [
+            { inlineSize: rect.width, blockSize: rect.height },
+          ],
+        },
+      ] as any,
+      this,
+    );
+  }
+
+  unobserve(element: Element) {
+    this.elements.delete(element);
+  }
+
+  disconnect() {
+    this.elements.clear();
+  }
 }
 
 vi.stubGlobal("ResizeObserver", ResizeObserver);

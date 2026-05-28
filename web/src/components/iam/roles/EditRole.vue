@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative-position full-height" data-test="edit-role-page">
+  <div class="tw:flex tw:flex-col tw:pb-[0.625rem] tw:h-full" data-test="edit-role-page">
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw:pb-[0.625rem]"
+      class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
-    <div class="card-container q-py-sm">
-          <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
+    <div class="card-container tw:py-2 tw:flex tw:flex-col">
+          <span style="font-size: 18px;" class="tw:px-3 tw:mb-2">{{ editingRole }}</span>
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -33,20 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </div>
 
 
-    <template v-if="isFetchingInitialRoles">
-      <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
-        <q-spinner-hourglass
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
-        />
-        <div class="text-center full-width">
-          Hold on tight, we're fetching your role details...
-        </div>
-      </div>
-    </template>
-    <template v-else>
-      <div style="min-height: calc(100% - (39px + 55px + 49px))">
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
@@ -69,21 +56,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container tw:h-[calc(100vh-200px)]"
+          class="card-container tw:flex tw:flex-col tw:h-full"
         >
           <div
-            class="flex justify-between items-center"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            class="tw:flex tw:justify-between tw:items-center tw:flex-shrink-0"
+            :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
           >
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class=" flex items-start q-px-md q-py-sm justify-start"
+              class="tw:flex tw:items-start tw:px-3 tw:py-2 tw:justify-start tw:gap-3"
               style="position: sticky; top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
-                class="flex items-center q-mr-md"
+                class="tw:flex tw:items-center"
               >
                 <span
                   data-test="edit-role-permissions-show-text"
@@ -92,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Show
                 </span>
                 <OToggleGroup
-                  class="q-ml-xs"
+                  class="tw:ml-1"
                   :model-value="filter.permissions"
                   @update:model-value="(v) => updateTableData(v as string)"
                 >
@@ -108,63 +95,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroup>
               </div>
               <div data-test="edit-role-permissions-search-input">
-                <q-input
+                <OInput
                   v-model="filter.value"
-                  borderless
                   :debounce="500"
-                  dense
-                  class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
+                  class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
                 >
-                  <template #prepend>
-                    <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <template #icon-left>
+                    <OIcon name="search" size="sm" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <div data-test="edit-role-permissions-resource-select-input">
-                <q-select
+                <OSelect
                   v-model="filter.resource"
-                  :options="filteredResources"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-mr-sm"
+                  :options="resourceOptions"
                   placeholder="Select Resource"
-                  map-options
-                  use-input
-                  emit-value
-                  fill-input
-                  hide-selected
-                  borderless
-                  dense
                   clearable
+                  searchable
                   style="width: 200px"
-                  @filter="filterResourceOptions"
                   @update:model-value="onResourceChange"
                 />
               </div>
             </div>
             <div></div>
-            <OToggleGroup
-              data-test="edit-role-permissions-ui-type-toggle"
-              class="q-mr-md q-my-xs"
-              :model-value="permissionsUiType"
-              @update:model-value="(v) => updatePermissionsUi(v as string)"
-            >
-              <OToggleGroupItem
-                v-for="visual in permissionUiOptions"
-                :key="visual.value"
-                :value="visual.value"
-                size="sm"
-                :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <span
+                data-test="edit-role-permissions-count"
+                class="tw:font-bold tw:text-[14px]"
               >
-                {{ visual.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
+                {{ selectedPermissionsHash.size }} Permissions
+              </span>
+              <OToggleGroup
+                data-test="edit-role-permissions-ui-type-toggle"
+                class="tw:mr-3 tw:my-1"
+              :model-value="permissionsUiType"
+                @update:model-value="(v) => updatePermissionsUi(v as string)"
+              >
+                <OToggleGroupItem
+                  v-for="visual in permissionUiOptions"
+                  :key="visual.value"
+                  :value="visual.value"
+                  size="sm"
+                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                >
+                  {{ visual.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
           </div>
 
-          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
+          <div
+            data-test="edit-role-permissions-table-section"
+            class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
+            style="scrollbar-gutter: stable;"
+          >
+            <div
+              v-if="isFetchingInitialRoles"
+              data-test="edit-role-page-loading-spinner"
+              class="tw:flex tw:items-center tw:justify-center tw:py-8"
+            />
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -173,26 +165,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :filter="filter"
                 :visibleResourceCount="countOfVisibleResources"
                 :selected-permissions-hash="selectedPermissionsHash"
+                :loading="isFetchingInitialRoles"
                 @updated:permission="handlePermissionChange"
                 @updated:permission-batch="handlePermissionBatchChange"
                 @expand:row="expandPermission"
               />
             </div>
             <div v-show="permissionsUiType === 'json'">
-              <div class="flex items-center justify-between">
-                <div class="q-mb-md text-bold">
+              <div class="tw:flex tw:items-center tw:justify-between">
+                <div class="tw:mb-3 tw:font-bold">
                   {{ selectedPermissionsHash.size }} Permission
                 </div>
                 <div
-                  class="flex items-center cursor-pointer"
+                  class="tw:flex tw:items-center tw:cursor-pointer"
                   :title="t('menu.help')"
                   @click="toggleHelpSection"
                 >
-                  <q-icon name="help" size="17px" />
-                  <span class="q-ml-xs"> Help </span>
+                  <OIcon name="help" size="sm" />
+                  <span class="tw:ml-1"> Help </span>
                 </div>
               </div>
-              <div class="flex no-wrap">
+              <div class="tw:flex tw:flex-nowrap">
                 <div
                   :style="
                     isHelpOpen
@@ -203,26 +196,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <query-editor
                     data-test="logs-vrl-function-editor"
                     editor-id="add-function-editor"
-                    class="monaco-editor q-mt-sm"
+                    class="monaco-editor tw:mt-2"
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
-                    style="height: calc(100vh - 295px)"
+                    style="height: calc(100vh - var(--navbar-height) - 295px)"
                   />
                 </div>
-                <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
-                  <div class="flex justify-between items-center q-px-sm">
+                <div v-if="isHelpOpen" style="width: 350px" class="tw:p-2">
+                  <div class="tw:flex tw:justify-between tw:items-center tw:px-2">
                     <div style="font-size: 16px">Quick Reference</div>
-                    <q-icon
-                      class="cursor-pointer"
+                    <OIcon
+                      class="tw:cursor-pointer"
                       name="close"
-                      size="14px"
+                      size="xs"
                       :title="t('common.close')"
                       @click="toggleHelpSection"
                     />
                   </div>
-                  <q-separator class="q-mt-sm q-mb-md" />
-                  <div class="q-mt-sm q-px-sm">
+                  <OSeparator class="tw:mt-2 tw:mb-4" />
+                  <div class="tw:mt-2 tw:px-2">
                     <div>
                       Configure access with JSON objects specifying "object"
                       (resource) and "permission" (access level).
@@ -234,9 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }</pre
                     >
                     <div>
-                      <span class="text-bold">Child Resource:</span> <br />
+                      <span class="tw:font-bold">Child Resource:</span> <br />
                       Specific instance or
-                      <span class="text-bold">organizationID</span> for all
+                      <span class="tw:font-bold">organizationID</span> for all
                       instances within a main resource.
                     </div>
                   </div>
@@ -247,8 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end tw:w-full"
-        style="position: sticky; bottom: 0.45rem; z-index: 2"
+        class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
+        style="z-index: 2"
       >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
         <OButton
@@ -268,16 +261,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('alerts.save') }}
         </OButton>
       </div>
-        
+
       </div>
-    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { defineAsyncComponent, ref, type Ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18n } from "vue-i18n";
@@ -293,7 +288,6 @@ import {
   getResourcePermission,
   getRoleUsers,
 } from "@/services/iam";
-import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
@@ -309,15 +303,16 @@ import dashboardService from "@/services/dashboards";
 import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
-import AppTabs from "@/components/common/AppTabs.vue";
-import { Shield, Users, Bot, LayoutList, CheckSquare, Table2, Braces } from "lucide-vue-next";
 import GroupUsers from "../groups/GroupUsers.vue";
-import { nextTick } from "vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -337,7 +332,6 @@ const { permissionsState } = usePermissions();
 
 const router = useRouter();
 
-const q = useQuasar();
 
 const store = useStore();
 
@@ -379,37 +373,41 @@ const permissionsUiType = ref("table");
 
 const { getStreams } = useStreams();
 
-const tabs = [
-  {
-    value: "permissions",
-    label: "Permissions",
-    icon: Shield,
-  },
-  {
-    value: "users",
-    label: "Users",
-    icon: Users,
-  },
-];
+const tabs = computed(() => {
+  const baseTabs = [
+    {
+      value: "permissions",
+      label: "Permissions",
+      icon: "shield",
+    },
+    {
+      value: "users",
+      label: "Users",
+      icon: "group",
+    },
+  ];
 
-if (store.state.zoConfig.service_account_enabled) {
-  tabs.push({
-    value: "serviceAccounts",
-    label: "Service Accounts",
-    icon: Bot,
-  });
-}
+  if (store.state.zoConfig.service_account_enabled) {
+    baseTabs.push({
+      value: "serviceAccounts",
+      label: "Service Accounts",
+      icon: "smart-toy",
+    });
+  }
+
+  return baseTabs;
+});
 
 const permissionDisplayOptions = [
   {
     label: "All",
     value: "all",
-    icon: LayoutList,
+    icon: "format-list-bulleted",
   },
   {
     label: "Selected",
     value: "selected",
-    icon: CheckSquare,
+    icon: "check-box",
   },
 ];
 
@@ -417,12 +415,12 @@ const permissionUiOptions = [
   {
     label: "Table",
     value: "table",
-    icon: Table2,
+    icon: "table-chart",
   },
   {
     label: "JSON",
     value: "json",
-    icon: Braces,
+    icon: "data-object",
   },
 ];
 
@@ -474,12 +472,11 @@ const getRoleDetails = () => {
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
-      q.notify({
+      toast({
         message: error?.response?.status === 404
           ? "Role not found or has been deleted. Redirecting to roles list."
           : error?.message || "Failed to load role details. Redirecting to roles list.",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-right",
         timeout: 3000,
       });
       router.push({
@@ -1154,8 +1151,8 @@ const countVisibleResources = (permissions: (Resource | Entity)[]): number => {
       count += 1;
     }
 
-    // Recursively count in nested entities
-    if (permission.entities?.length) {
+    // Recursively count in nested entities only when the parent row is expanded
+    if (permission.entities?.length && permission.expand) {
       count += countVisibleResources(permission.entities);
     }
   });
@@ -2224,8 +2221,8 @@ const saveRole = () => {
       payload.remove_users.length
     )
   ) {
-    q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `No updates detected.`,
       timeout: 3000,
     });
@@ -2241,8 +2238,8 @@ const saveRole = () => {
     .then(async (res) => {
       // combine permissionsHash and selectedPermissionsHash
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Updated role successfully!`,
         timeout: 3000,
       });
@@ -2282,8 +2279,8 @@ const saveRole = () => {
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Error while updating role!`,
           timeout: 3000,
         });

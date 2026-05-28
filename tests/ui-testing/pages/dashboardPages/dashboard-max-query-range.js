@@ -10,7 +10,7 @@ export default class DashboardMaxQueryRange {
   constructor(page) {
     this.page = page;
     this.warningIcon = page.locator('[data-test="panel-max-duration-warning"]');
-    this.tooltip = page.locator(".q-tooltip");
+    this.tooltip = page.locator('[data-test="o-tooltip-content"]');
   }
 
   // ---------------------------------------------------------------------------
@@ -149,4 +149,5 @@ export default class DashboardMaxQueryRange {
     const text = await this.tooltip.textContent();
     testLogger.info("Warning tooltip text", { text });
     return text;
-  }}
+  }
+}

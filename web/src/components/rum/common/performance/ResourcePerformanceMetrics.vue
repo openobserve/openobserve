@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label="Time to First Byte"
       :value="metrics.resource.first_byte.duration"
       unit="ns"
-      icon="network_check"
+      icon="network-check"
       description="Server processing and response time"
       data-test="metric-ttfb"
     />
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label="Download Time"
       :value="metrics.resource.download.duration"
       unit="ns"
-      icon="cloud_download"
+      icon="cloud-download"
       description="Resource download time"
       data-test="metric-download"
     />

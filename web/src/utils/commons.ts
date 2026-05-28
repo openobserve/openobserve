@@ -17,7 +17,7 @@
 
 import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
-import { date } from "quasar";
+import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import commonService from "../services/common";
 
@@ -90,7 +90,7 @@ export function getConsumableDateTime(dateObj: any) {
     //   searchObj.data.resultGrid.currentDateTime = endTimeStamp;
     // }
 
-    const startTimeStamp = date.subtractFromDate(
+    const startTimeStamp = subtractRelativeTime(
       endTimeStamp,
       JSON.parse(subtractObject),
     );

@@ -1,7 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import SearchSchedulersList from "./SearchSchedulersList.vue";
@@ -71,10 +69,6 @@ vi.mock('vue-i18n', async (importOriginal) => {
       t: (key) => key
     })
   };
-});
-
-installQuasar({
-  plugins: [Dialog, Notify],
 });
 
 describe("SearchSchedulersList Component", () => {
@@ -158,7 +152,6 @@ describe("SearchSchedulersList Component", () => {
           },
           AppTabs: true,
           QueryEditor: true,
-          QSpinnerHourglass: true,
           ConfirmDialog: true,
           NoData: true
         },
@@ -192,7 +185,7 @@ describe("SearchSchedulersList Component", () => {
     it("initializes with correct default state", () => {
       expect(wrapper.vm.columnsToBeRendered).toEqual([]);
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
-      expect(wrapper.vm.expandedRow).toEqual([]);
+      expect(wrapper.vm.expandedIds).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
       expect(wrapper.vm.showSearchResults).toBe(false);
     });
@@ -302,9 +295,9 @@ describe("SearchSchedulersList Component", () => {
         trace_id: "test-uuid",
         sql: "SELECT * FROM logs"
       };
-      
-      await wrapper.vm.triggerExpand({ row: testRow });
-      expect(wrapper.vm.expandedRow).toBe(testRow.trace_id);
+
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
     });
 
     it("shows correct status text and icons", () => {
@@ -313,9 +306,9 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.getStatusText(2)).toBe("search_scheduler_job.status_finished");
       expect(wrapper.vm.getStatusText(3)).toBe("search_scheduler_job.status_cancelled");
 
-      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass_empty");
-      expect(wrapper.vm.getStatusIcon(1)).toBe("pause_circle");
-      expect(wrapper.vm.getStatusIcon(2)).toBe("check_circle");
+      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass-empty");
+      expect(wrapper.vm.getStatusIcon(1)).toBe("pause");
+      expect(wrapper.vm.getStatusIcon(2)).toBe("check-circle");
       expect(wrapper.vm.getStatusIcon(3)).toBe("cancel");
 
       expect(wrapper.vm.getStatusColor(0)).toBe("orange");

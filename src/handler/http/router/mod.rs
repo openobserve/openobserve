@@ -552,8 +552,6 @@ pub fn config_routes() -> Router {
     Router::new()
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
-        .route("/runtime", get(status::config_runtime))
-        .route("/reload", get(status::config_reload))
 }
 
 #[cfg(feature = "enterprise")]
@@ -561,8 +559,6 @@ pub fn config_routes() -> Router {
     Router::new()
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
-        .route("/runtime", get(status::config_runtime))
-        .route("/reload", get(status::config_reload))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
         .route("/dex_refresh", get(status::refresh_token_with_dex))
@@ -786,7 +782,8 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
             .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
-            .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history));
+            .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
     }
 
     router = router

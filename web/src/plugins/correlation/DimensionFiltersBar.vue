@@ -35,24 +35,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ key }}:
         </span>
-        <q-select
+        <OSelect
           :model-value="value"
           :options="getDimensionOptions(key, value)"
-          dense
-          outlined
-          emit-value
-          map-options
-          @update:model-value="
-            (newValue) => handleDimensionChange(key, newValue)
-          "
+          labelKey="label"
+          valueKey="value"
+          @update:model-value="(newValue) => handleDimensionChange(key, newValue)"
           class="dimension-dropdown"
-          borderless
           style="min-width: 120px"
           :data-test="`dimension-filter-${key}`"
         />
-        <q-tooltip v-if="unstableDimensionKeys.has(key)">
-          {{ unstableDimensionTooltipComputed }}
-        </q-tooltip>
+        <OTooltip v-if="unstableDimensionKeys.has(key)" :content="unstableDimensionTooltipComputed" side="top" />
       </div>
       <!-- Apply Button -->
       <OButton
@@ -74,6 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   dimensions: Record<string, string>;

@@ -18,21 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="aws-quick-setup">
     <div class="setup-card">
       <!-- Header -->
-      <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
-        <q-icon
-          name="rocket_launch"
-          size="2.5rem"
-          color="primary"
-          class="tw:flex-shrink-0"
-        />
-        <div>
-          <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-1 title">
-            Complete AWS Integration
-          </h5>
-          <p class="tw:text-sm tw:m-0 description">
-            Deploy all selected AWS services in one click using a single
-            CloudFormation stack.
-          </p>
+      <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
+        <div class="tw:flex tw:items-start tw:gap-3">
+          <OIcon
+            name="rocket-launch"
+            size="xl"
+            class="tw:text-[var(--q-primary)]"
+          />
+          <div>
+            <h6 class="tw:text-xl! tw:font-bold tw:m-0 tw:mb-2!">
+              Complete AWS Integration
+            </h6>
+            <p class="tw:text-sm tw:mt-0 tw:mb-0" :class="descriptionClass">
+              Deploy all selected AWS services in one click using a single
+              CloudFormation stack.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -68,15 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showServices = !showServices"
         >
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-icon
-              :name="showServices ? 'expand_less' : 'expand_more'"
+            <OIcon
+              :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
               color="primary"
             />
             <div class="step-label">Select services to monitor</div>
-            <q-chip dense color="primary" text-color="white" size="sm">
+            <OBadge variant="primary" size="sm">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
-            </q-chip>
+            </OBadge>
           </div>
           <div class="tw:flex tw:gap-2" @click.stop>
             <OButton variant="ghost-primary" size="xs" @click="selectAll"
@@ -88,39 +89,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-slide-transition>
-          <div v-show="showServices" class="tw:mt-3">
-            <div class="row q-col-gutter-sm">
-              <div
-                v-for="service in QUICK_SETUP_SERVICES"
-                :key="service.flag"
-                class="col-6 col-sm-4 col-md-3"
-              >
-                <q-checkbox
-                  v-model="enabledServices"
-                  :val="service.flag"
-                  :label="service.label"
-                  dense
-                  color="primary"
-                />
+        <div
+          class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+          :class="showServices ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+        >
+          <div class="tw:overflow-hidden tw:min-h-0">
+            <div class="tw:mt-3">
+              <div class="tw:grid tw:grid-cols-4 tw:gap-x-4 tw:gap-y-2">
+                <div
+                  v-for="service in QUICK_SETUP_SERVICES"
+                  :key="service.flag"
+                >
+                  <OCheckbox
+                    v-model="enabledServices"
+                    :value="service.flag"
+                    :label="service.label"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </q-slide-transition>
+        </div>
       </div>
 
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="tw:mb-6">
         <div class="step-label tw:mb-3">Deployment region</div>
-        <q-select
+        <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
-          option-value="value"
-          option-label="label"
-          emit-value
-          map-options
-          outlined
-          dense
+          valueKey="value"
+          labelKey="label"
           style="max-width: 320px"
           data-test="aws-region-select"
         />
@@ -135,15 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >(where the StackSet is managed)</span
             >
           </div>
-          <q-select
+          <OSelect
             v-model="selectedRegion"
             :options="AWS_REGIONS"
-            option-value="value"
-            option-label="label"
-            emit-value
-            map-options
-            outlined
-            dense
+            valueKey="value"
+            labelKey="label"
             style="max-width: 320px"
             data-test="aws-admin-region-select"
           />
@@ -155,8 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showTargetRegions = !showTargetRegions"
           >
             <div class="tw:flex tw:items-center tw:gap-2">
-              <q-icon
-                :name="showTargetRegions ? 'expand_less' : 'expand_more'"
+              <OIcon
+                :name="showTargetRegions ? 'expand-less' : 'expand-more'" size="sm"
                 color="primary"
               />
               <div class="step-label">
@@ -165,13 +160,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >(where stacks will be deployed)</span
                 >
               </div>
-              <q-chip
+              <OBadge
                 v-if="targetRegions.length > 0"
-                dense
-                color="primary"
-                text-color="white"
+                variant="primary"
                 size="sm"
-                >{{ targetRegions.length }} selected</q-chip
+                >{{ targetRegions.length }} selected</OBadge
               >
             </div>
             <div class="tw:flex tw:gap-2" @click.stop>
@@ -190,25 +183,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <q-slide-transition>
-            <div v-show="showTargetRegions" class="tw:mt-3">
-              <div class="row q-col-gutter-sm">
-                <div
-                  v-for="region in AWS_REGIONS"
-                  :key="region.value"
-                  class="col-12 col-sm-6 col-md-4"
-                >
-                  <q-checkbox
-                    v-model="targetRegions"
-                    :val="region.value"
-                    :label="`${region.label} (${region.value})`"
-                    dense
-                    color="primary"
-                  />
+          <div
+            class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+            :class="showTargetRegions ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+          >
+            <div class="tw:overflow-hidden tw:min-h-0">
+              <div class="tw:mt-3">
+                <div class="tw:grid tw:grid-cols-3 tw:gap-x-4 tw:gap-y-2">
+                  <div
+                    v-for="region in AWS_REGIONS"
+                    :key="region.value"
+                  >
+                    <OCheckbox
+                      v-model="targetRegions"
+                      :value="region.value"
+                      :label="`${region.label} (${region.value})`"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </q-slide-transition>
+          </div>
         </div>
 
         <div class="tw:mb-6">
@@ -254,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template #icon-left
-            ><q-icon name="cloud_upload" size="sm"
+            ><OIcon name="cloud-upload" size="sm"
           /></template>
           {{
             deploymentMode === "single"
@@ -264,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <span
           v-if="enabledServices.length === 0"
-          class="tw:text-sm text-negative"
+          class="tw:text-sm tw:text-red-500"
         >
           Select at least one service
         </span>
@@ -272,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             deploymentMode === 'stackset' && targetRegions.length === 0
           "
-          class="tw:text-sm text-negative"
+          class="tw:text-sm tw:text-red-500"
         >
           Select at least one target region
         </span>
@@ -290,9 +285,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- StackSets Parameter Helper -->
-      <q-slide-transition>
-        <div v-if="showParamHelper && deploymentMode === 'stackset'">
-          <q-separator class="tw:mb-4" />
+      <div
+        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+        :class="(showParamHelper && deploymentMode === 'stackset') ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+      >
+        <div class="tw:overflow-hidden tw:min-h-0">
+        <div>
+          <OSeparator class="tw:mb-4" />
           <div class="param-helper">
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
               <div class="tw:font-semibold step-label">
@@ -303,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-circle-sm"
                 @click="showParamHelper = false"
               >
-                <q-icon name="close" />
+                <OIcon name="close" size="sm" />
               </OButton>
             </div>
             <p class="tw:text-xs tw:mb-3 mode-hint">
@@ -324,8 +323,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-circle"
                     @click="copyParam(param.value)"
                   >
-                    <q-icon name="content_copy" />
-                    <q-tooltip>Copy</q-tooltip>
+                    <OIcon name="content-copy" size="sm" />
+                    <OTooltip content="Copy" />
                   </OButton>
                 </div>
               </div>
@@ -335,20 +334,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Target regions to enter in "Deployment targets":
               </div>
               <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
-                <q-chip
+                <OBadge
                   v-for="r in targetRegions"
                   :key="r"
-                  dense
-                  color="primary"
-                  text-color="white"
+                  variant="primary"
                   size="sm"
-                  >{{ r }}</q-chip
+                  >{{ r }}</OBadge
                 >
               </div>
             </div>
           </div>
         </div>
-      </q-slide-transition>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -356,7 +354,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -366,17 +363,27 @@ import {
   QUICK_SETUP_SERVICES,
 } from "@/utils/awsIntegrations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const COMPLETE_TEMPLATE_URL =
   "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OToggleGroup, OToggleGroupItem, OButton },
+  components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
+    OIcon,
+    OBadge,
+},
   setup() {
     const store = useStore();
-    const q = useQuasar();
 
     const deploymentMode = ref<"single" | "stackset">("single");
     const stackSetModel = ref<"self" | "service">("self");
@@ -388,6 +395,16 @@ export default defineComponent({
     const showParamHelper = ref(false);
     const showTargetRegions = ref(false);
     const showServices = ref(false);
+
+    const quickInstallBgClass = computed(() => {
+      return store.state.theme === 'dark'
+        ? 'tw:bg-gray-800 tw:border tw:border-gray-700'
+        : 'tw:bg-blue-50 tw:border tw:border-blue-200';
+    });
+
+    const descriptionClass = computed(() => {
+      return store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700';
+    });
 
     let endpoint: any = null;
     try {
@@ -445,18 +462,16 @@ export default defineComponent({
     });
 
     const copyParam = (value: string) => {
-      navigator.clipboard.writeText(value);
-      q.notify({
-        type: "positive",
-        message: "Copied to clipboard",
+      copyToClipboard(value, {
+        successMessage: "Copied to clipboard",
         timeout: 1500,
       });
     };
 
     const handleLaunch = () => {
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
           timeout: 3000,
         });
@@ -465,8 +480,8 @@ export default defineComponent({
 
       const { organizationId, email, passcode } = getCredentials();
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
           timeout: 3000,
         });
@@ -477,8 +492,8 @@ export default defineComponent({
         launchSingleRegion(organizationId, email, passcode);
       } else {
         if (targetRegions.value.length === 0) {
-          q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "Select at least one target region.",
             timeout: 3000,
           });
@@ -515,8 +530,8 @@ export default defineComponent({
       );
 
       if (!url) {
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "CloudFormation template not available yet",
           timeout: 3000,
         });
@@ -529,8 +544,8 @@ export default defineComponent({
         region: selectedRegion.value,
         services: enabledServices.value,
       });
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: "Opening AWS Console to deploy complete integration stack",
         timeout: 3000,
       });
@@ -550,8 +565,8 @@ export default defineComponent({
         services: enabledServices.value,
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message:
           "AWS StackSets console opened. Use the parameter values below to complete setup.",
         timeout: 5000,
@@ -559,6 +574,8 @@ export default defineComponent({
     };
 
     return {
+      quickInstallBgClass,
+      descriptionClass,
       deploymentMode,
       stackSetModel,
       selectedRegion,
@@ -634,44 +651,45 @@ export default defineComponent({
     flex: 1;
   }
 
-  .body--light & {
-    .title {
-      color: #1a1a1a;
-    }
-    .description,
-    .detail-value,
-    .mode-hint {
-      color: #666;
-    }
-    .step-label {
-      color: #333;
-    }
-    .region-hint {
-      color: #888;
-    }
-    .param-helper {
-      background: #f5f5f5;
-    }
-    .param-row {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-    }
-    .param-key {
-      color: #333;
-    }
-    .param-val-text {
-      color: #555;
-    }
-    .region-collapsible-header {
-      background: #f0f4ff;
-      border: 1px solid #d0d9f0;
-      &:hover {
-        background: #e8eeff;
-      }
+  // Light mode defaults (body--light OR no .dark class)
+  .title {
+    color: #1a1a1a;
+  }
+  .description,
+  .detail-value,
+  .mode-hint {
+    color: #666;
+  }
+  .step-label {
+    color: #333;
+  }
+  .region-hint {
+    color: #888;
+  }
+  .param-helper {
+    background: #f5f5f5;
+  }
+  .param-row {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+  }
+  .param-key {
+    color: #333;
+  }
+  .param-val-text {
+    color: #555;
+  }
+  .region-collapsible-header {
+    background: #f0f4ff;
+    border: 1px solid #d0d9f0;
+    &:hover {
+      background: #e8eeff;
     }
   }
 
-  .body--dark & {
+  // Dark mode overrides (both .dark class system and legacy body--dark)
+  .dark &,
+  body.body--dark & {
     .title {
       color: #e0e0e0;
     }

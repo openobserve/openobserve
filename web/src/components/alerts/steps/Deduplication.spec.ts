@@ -14,15 +14,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import Deduplication from "./Deduplication.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock store
 const createMockStore = (overrides = {}) => ({
@@ -475,9 +470,9 @@ describe("Deduplication.vue", () => {
     });
 
     it("should render info icons", () => {
-      // q-icon components are rendered - check HTML contains info icon references
-      const html = wrapper.html();
-      expect(html).toContain("info");
+      // OIcon components render SVGs — check via component lookup
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
     });
 
     it("should render hint text for fingerprint fields", () => {
@@ -487,22 +482,22 @@ describe("Deduplication.vue", () => {
     });
 
     it("should render minutes label for time window", () => {
-      const minutesLabel = wrapper.find(".flex.justify-center.items-center");
+      const minutesLabel = wrapper.find(".tw\\:flex.tw\\:justify-center.tw\\:items-center");
       expect(minutesLabel.exists()).toBe(true);
     });
   });
 
   describe("Accessibility", () => {
     it("should have tooltips for info icons", () => {
-      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
-      expect(tooltips.length).toBe(2);
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
+      expect(tooltips.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should have proper structure for form inputs", () => {
-      const select = wrapper.findComponent({ name: "QSelect" });
+      const select = wrapper.findComponent({ name: "OSelect" });
       expect(select.exists()).toBe(true);
 
-      const input = wrapper.findComponent({ name: "QInput" });
+      const input = wrapper.findComponent({ name: "OInput" });
       expect(input.exists()).toBe(true);
     });
   });

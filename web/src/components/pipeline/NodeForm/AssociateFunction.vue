@@ -15,97 +15,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-function-node-routing-section"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    :style="computedStyleForFunction"
+  <ODrawer
+    data-test="associate-function-drawer"
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.associateFunction')"
+    :width="createNewFunction ? 97 : 30"
+    @keydown.stop
+    :primaryButtonLabel="!createNewFunction ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!createNewFunction ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!createNewFunction && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveFunction"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="add-function-node-routing-section"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
     >
-      {{ t("pipeline.associateFunction") }}
-      <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
+
 
     <div v-if="loading">
-      <q-spinner
+      <OSpinner
         v-if="loading"
-        color="primary"
-        size="40px"
-        style="
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-        "
+        size="md"
+        class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+        data-test="associate-function-loading-indicator"
       />
     </div>
     <div
       v-else
-      class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md"
+      class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4"
     >
-      <div class="tw:flex tw:items-center">
-        <q-toggle
+      <div class="tw:flex tw:items-center tw:gap-3">
+        <OSwitch
           data-test="create-function-toggle"
-          class="q-mb-sm tw:inline-block tw:h-[36px] o2-toggle-button-lg"
-          size="lg"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light',
-            !createNewFunction ? '-tw:ml-4' : '',
-          ]"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
           v-model="createNewFunction"
         />
         <div
           v-if="createNewFunction"
-          class="q-pb-sm container text-body2 tw:inline-block tw:pl-4 tw:text-gray-600"
+          class="tw:text-sm tw:text-gray-600"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <q-form @submit="saveFunction">
+      <div class="tw:flex tw:flex-col tw:gap-4">
         <div
           v-if="!createNewFunction"
-          class="flex justify-start items-center full-width"
-          style="padding-top: 0px"
+          class="tw:w-full"
         >
-          <div
+          <OSelect
+            v-model="selectedFunction"
+            :options="props.functions"
+            :label="t('function.selectFunction') + ' *'"
+            searchable
+            :readonly="isUpdating"
+            :disabled="isUpdating"
+            :error="functionExists || (showFunctionRequiredError && !selectedFunction)"
+            :error-message="
+              functionExists
+                ? 'Function is already associated'
+                : (showFunctionRequiredError && !selectedFunction)
+                  ? 'Field is required'
+                  : ''
+            "
             data-test="associate-function-select-function-input"
-            class="alert-stream-type o2-input q-mr-sm full-width"
-            style="padding-top: 0"
-          >
-            <q-select
-              v-model="selectedFunction"
-              :options="filteredFunctions"
-              :label="t('function.selectFunction') + ' *'"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              input-debounce="300"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              style="min-width: 220px"
-              v-bind:readonly="isUpdating"
-              v-bind:disable="isUpdating"
-              :error-message="
-                selectedFunction ? 'Function is already associated' : ''
-              "
-              @filter="filterFunctions"
-              :error="functionExists"
-            />
-          </div>
+          />
         </div>
 
         <!-- Function Definition Display -->
@@ -117,22 +94,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="function-definition-section"
         >
-          <q-card class="function-definition-card">
-            <q-card-section class="function-definition-header q-pb-sm">
-              <div class="text-body1 text-weight-medium text-primary">
+          <OCard class="function-definition-card">
+            <OCardSection role="header" class="function-definition-header">
+              <div class="tw:text-base text-weight-medium text-primary">
                 {{ t("function.function_definition") }}
               </div>
-            </q-card-section>
-            <q-separator />
-            <q-card-section class="function-definition-content q-pa-none">
+            </OCardSection>
+            <OSeparator />
+            <OCardSection class="tw:p-0 function-definition-content">
               <div class="function-code-container">
                 <pre class="function-code">{{
                   pipelineObj.functions[selectedFunction]?.function ||
                   "No definition available"
                 }}</pre>
               </div>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
 
         <div v-if="createNewFunction" class="pipeline-add-function tw:w-[95vw]">
@@ -146,73 +123,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="o2-input full-width"
-          style="padding-top: 12px"
+          class="tw:w-full tw:flex tw:flex-col tw:gap-3"
           v-if="!createNewFunction"
         >
-          <q-toggle
+          <OSwitch
             data-test="associate-function-after-flattening-toggle"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-            size="lg"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-lg-dark'
-                : 'o2-toggle-button-lg-light'
-            "
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
           />
 
           <!-- Info note explaining RAF/RBF -->
-          <q-card class="note-container">
-            <q-card-section class="q-pa-sm">
-              <div class="note-heading">Function Execution Guidelines:</div>
-              <q-banner inline dense class="note-info">
-                <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span
-                    ><span class="highlight">RBF (Run Before Flattening):</span>
-                    Function executes before data structure is flattened</span
-                  >
-                </div>
-                <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span
-                    ><span class="highlight">RAF (Run After Flattening):</span>
-                    Function executes after data structure is flattened</span
-                  >
-                </div>
-              </q-banner>
-            </q-card-section>
-          </q-card>
+          <div class="note-container tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
+            <div class="tw:text-sm tw:text-gray-800">
+              Function Execution Guidelines:
+            </div>
+            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                />
+                <span>
+                  <span class="highlight">RBF (Run Before Flattening):</span>
+                  Function executes before data structure is flattened
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                />
+                <span>
+                  <span class="highlight">RAF (Run After Flattening):</span>
+                  Function executes after data structure is flattened
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="tw:flex tw:gap-2">
-          <OButton
-            v-if="pipelineObj.isEditNode && !createNewFunction"
-            data-test="associate-function-delete-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            @click="openDeleteDialog"
-          >{{ t("pipeline.deleteNode") }}</OButton>
-          <OButton
-            v-if="!createNewFunction"
-            data-test="associate-function-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="openCancelDialog"
-          >{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            v-if="!createNewFunction"
-            data-test="associate-function-save-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-          >{{ createNewFunction ? t('alerts.createFunction') : t('alerts.save') }}</OButton>
-        </div>
-      </q-form>
+
+      </div>
     </div>
-  </div>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -235,9 +191,15 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import OButton from "@/lib/core/Button/OButton.vue";
-import { useQuasar } from "quasar";
-import { getImageURL } from "@/utils/zincutils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 interface RouteCondition {
   column: string;
@@ -259,6 +221,10 @@ const AddFunction = defineAsyncComponent(
 );
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   functions: {
     type: Array,
     required: true,
@@ -282,6 +248,16 @@ const emit = defineEmits([
   "add:function",
 ]);
 
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
+
 const { t } = useI18n();
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
@@ -304,11 +280,17 @@ const afterFlattening = ref(
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
-const q = useQuasar();
 
 const store = useStore();
 
 const functionExists = ref(false);
+// Toggle for "Field is required" — flipped on save when no function is selected.
+const showFunctionRequiredError = ref(false);
+
+// Clear the "Field is required" error as soon as the user picks a function.
+watch(selectedFunction, (next) => {
+  if (next) showFunctionRequiredError.value = false;
+});
 
 const nodeLink = ref({
   from: "",
@@ -379,16 +361,22 @@ const saveFunction = () => {
 
   if (createNewFunction.value) {
     if (addFunctionRef.value.formData.name == "") {
-      q.notify({
+      toast({
         message: "Function Name is required",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-right",
         timeout: 2000,
       });
       return;
     }
     return;
   }
+
+  // Validate that a function has been selected before allowing save.
+  if (!selectedFunction.value) {
+    showFunctionRequiredError.value = true;
+    return;
+  }
+  showFunctionRequiredError.value = false;
 
   if (
     !isUpdating.value &&
@@ -463,44 +451,16 @@ const filterFunctions = (val: any, update: any) => {
 
 .note-container {
   background-color: #f9f290;
-  border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+  color: #2d3748;
   width: 100%;
-  margin-bottom: 20px;
-  margin-top: 10px;
 }
 
 .note-container .highlight {
   font-weight: bold;
-  color: #007bff; /* Blue color to highlight key terms */
+  color: #007bff;
 }
 
-.note-container .emphasis {
-  font-style: italic;
-  color: #555; /* Subtle dark gray for emphasis */
-}
 
-.note-container .code {
-  font-family: monospace;
-  padding: 2px 4px;
-  border-radius: 3px;
-  color: #d63384; /* Soft pinkish-red for code */
-}
-
-.note-heading {
-  font-size: medium;
-}
-
-.note-info {
-  font-size: small;
-  color: #865300;
-  background-color: #f9f290;
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  justify-content: space-between;
-}
 
 /* Function definition display - OpenObserve style */
 .function-definition-section {

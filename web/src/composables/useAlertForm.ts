@@ -25,9 +25,8 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar, debounce } from "quasar";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
@@ -38,6 +37,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import useStreams from "@/composables/useStreams";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 import {
   getUUID,
@@ -84,11 +84,12 @@ import {
   createAlertsContextProvider,
   contextRegistry,
 } from "@/composables/contextProviders";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
 
@@ -197,7 +198,6 @@ export interface AlertFormEmit {
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
   const { t } = useI18n();
-  const q = useQuasar();
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
@@ -236,16 +236,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyRetraining = ref(false);
   const anomalySaving = ref(false);
 
-  const anomalyStatusColor = computed(() => {
+  const anomalyStatusVariant = computed<BadgeVariant>(() => {
     switch (anomalyConfig.value.status) {
       case "active":
-        return "positive";
+        return "success";
       case "training":
-        return "info";
+        return "primary";
       case "failed":
-        return "negative";
+        return "error";
       default:
-        return "grey";
+        return "default";
     }
   });
 
@@ -266,10 +266,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         store.state.selectedOrganization.identifier,
         anomalyId,
       );
-      q.notify({ type: "positive", message: "Training triggered." });
+      toast({ variant: "success", message: "Training triggered." });
     } catch {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Failed to trigger training.",
       });
     } finally {
@@ -302,10 +302,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
     const stream = c.stream_name || "<stream>";
     const interval = anomalyHistogramInterval.value || "5m";
-    const fn =
-      c.detection_function === "count"
-        ? "count(*)"
-        : `${c.detection_function}(${c.detection_function_field || "<field>"})`;
+    const fn = toDetectionFunctionSql(
+      c.detection_function,
+      c.detection_function_field || "<field>",
+    );
     const filterLines = (c.filters || [])
       .filter(
         (f: any) =>
@@ -867,7 +867,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const validateInputs = (input: any, notify: boolean = true) => {
     const validationContext: ValidationContext = {
-      q,
       store,
       validateSqlQueryPromise,
       sqlQueryErrorMsg,
@@ -880,7 +879,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const validateSqlQuery = async () => {
     const validationContext: ValidationContext = {
-      q,
       store,
       validateSqlQueryPromise,
       sqlQueryErrorMsg,
@@ -1027,8 +1025,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             } else {
               errorMsg = "Please provide a valid SQL query.";
             }
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: errorMsg,
               timeout: 2000,
             });
@@ -1052,8 +1050,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
         if (!isValid) {
           if (errorMessage) {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: errorMessage,
               timeout: 1500,
             });
@@ -1102,15 +1100,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // 1. Alert name — empty check
     if (!formData.value.name?.trim()) {
       alertNameError.value = true;
-      q.notify({ type: "negative", message: t("alerts.nameRequired"), timeout: 2000 });
+      toast({ variant: "error", message: t("alerts.nameRequired"), timeout: 2000 });
       focusTopbarField(step1Ref);
       return false;
     }
     // 1b. Alert name — unsupported characters (:#?\s'"%&)
     if (ALERT_NAME_UNSUPPORTED_CHARS.test(formData.value.name)) {
       alertNameError.value = true;
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: t("alerts.nameNoSpecialChars"),
         timeout: 4000,
       });
@@ -1122,7 +1120,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // 2. Stream Type
     if (!formData.value.stream_type) {
       streamTypeError.value = true;
-      q.notify({ type: "negative", message: "Stream type is required.", timeout: 2000 });
+      toast({ variant: "error", message: "Stream type is required.", timeout: 2000 });
       focusTopbarField(streamTypeRef);
       return false;
     }
@@ -1131,7 +1129,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // 3. Stream Name
     if (!formData.value.stream_name) {
       streamNameError.value = true;
-      q.notify({ type: "negative", message: "Stream name is required.", timeout: 2000 });
+      toast({ variant: "error", message: "Stream name is required.", timeout: 2000 });
       focusTopbarField(streamNameRef);
       return false;
     }
@@ -1157,7 +1155,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       if (!isValid) {
         activeTab.value = "condition";
         await nextTick();
-        if (message) q.notify({ type: "negative", message, timeout: 2000 });
+        if (message) toast({ variant: "error", message, timeout: 2000 });
         if (shouldFocusDestination && (step4Ref.value as any).focusDestination) {
           (step4Ref.value as any).focusDestination();
         } else {
@@ -1346,8 +1344,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const HTTP_FORBIDDEN = 403;
   const handleAlertError = (err: any) => {
     if (err.response?.status !== HTTP_FORBIDDEN) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message:
           err.response?.data?.message ||
           err.response?.data?.error ||
@@ -1378,7 +1376,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const saveAlertJson = async (json: any) => {
     const saveContext: SaveAlertContext = {
-      q,
       store,
       props,
       emit,
@@ -1396,7 +1393,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       prepareAndSaveAlertUtil(data, saveContext);
 
     const jsonValidationContext: JsonValidationContext = {
-      q,
       store,
       streams,
       getStreams,
@@ -1450,8 +1446,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
           formData.value.name = `Alert_from_${sanitizePanelTitle(panelData.panelTitle)}`;
 
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t("alerts.importedFromPanel", {
               panelTitle: panelData.panelTitle,
             }),
@@ -1648,8 +1644,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         }
       } catch (error) {
         console.error("Error loading panel data:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to load panel data",
           timeout: 2000,
         });
@@ -1731,8 +1727,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const saveAnomalyDetection = async () => {
     if (!anomalyConfig.value.name?.trim()) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Anomaly name is required.",
         timeout: 2000,
       });
@@ -1761,8 +1757,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     if (c.query_mode === "custom_sql") {
       if (!c.custom_sql?.trim()) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Custom SQL is required in custom SQL mode.",
         });
         wizardStep.value = 2;
@@ -1786,8 +1782,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       } catch (sqlErr: any) {
         const msg =
           sqlErr?.response?.data?.message || "Invalid SQL query";
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `SQL validation error: ${msg}`,
         });
         wizardStep.value = 2;
@@ -1832,14 +1828,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         .anomaly_id as string | undefined;
       if (routeAnomalyId) {
         await anomalyDetectionService.update(orgId, routeAnomalyId, payload);
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Anomaly detection config updated.",
         });
       } else {
         await anomalyDetectionService.create(orgId, payload);
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message:
             t("alerts.anomalyCreated") ||
             "Anomaly detection config created. Training will start shortly.",
@@ -1848,8 +1844,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       emit("update:list", (activeFolderId.value as string) || "default");
     } catch (err: any) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message:
           err?.response?.data?.message || "Failed to save anomaly config.",
       });
@@ -1880,8 +1876,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     } else {
       // Anomaly wizard validation — validate name from topbar ref
       if (!anomalyConfig.value.name?.trim()) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Anomaly detection name is required.",
           timeout: 2000,
         });
@@ -1896,8 +1892,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       !getParser(formData.value.query_condition.sql)
     ) {
       activeTab.value = "condition";
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Selecting all Columns in SQL query is not allowed.",
         timeout: 1500,
       });
@@ -1944,8 +1940,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         message = `${invalidCount} fields are not available (${firstThree} and ${remaining} more). Please use only the available fields in your conditions.`;
       }
 
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: message,
         timeout: 6000,
       });
@@ -1956,8 +1952,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     const payload = getAlertPayload();
 
-    const dismiss = q.notify({
-      spinner: true,
+    const dismiss = toast({
+      variant: "loading",
       message: "Please wait...",
       timeout: 2000,
     });
@@ -1970,8 +1966,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         await validateSqlQueryPromise.value;
       } catch (error) {
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             "Error while validating sql query. Please check the query and try again.",
           timeout: 1500,
@@ -2001,8 +1997,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
           dismiss();
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Alert updated successfully.`,
           });
         })
@@ -2037,8 +2033,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
           dismiss();
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Alert saved successfully.`,
           });
         })
@@ -2624,8 +2620,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         anomalyEditMode.value = true;
         lastValidStep.value = 6;
       } catch {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to load anomaly detection config.",
         });
       }
@@ -2682,7 +2678,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   return {
     // Dependencies
     t,
-    q,
     store,
     router,
     track,
@@ -2716,7 +2711,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     anomalyEditMode,
     anomalyRetraining,
     anomalySaving,
-    anomalyStatusColor,
+    anomalyStatusVariant,
     anomalyFormatTs,
     anomalyTriggerRetrain,
     isAnomalyMode,
@@ -2840,7 +2835,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     initializeFormData,
 
     // Constants/utils
-    outlinedInfo,
+    "info": "info",
     getTimezoneOffset,
     isValidResourceName,
     convertDateToTimestamp,

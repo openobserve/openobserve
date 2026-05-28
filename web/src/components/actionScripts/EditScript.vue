@@ -16,28 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="add-action-script-section">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]"
         >
           <div
             data-test="add-action-script-back-btn"
-            class="flex justify-center items-center q-mr-md cursor-pointer"
+            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
             title="Go Back"
             @click="router.back()"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
             <div
               v-if="isEditingActionScript"
-              class="text-h6 q-pl-sm"
+              class="tw:text-xl tw:font-semibold tw:pl-2"
               data-test="add-action-script-title"
             >
               {{ t("actions.update") }}
             </div>
             <div
               v-else
-              class="text-h6 q-pl-sm"
+              class="tw:text-xl tw:font-semibold tw:pl-2"
               data-test="add-action-script-title"
             >
               {{ t("actions.add") }}
@@ -54,126 +54,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           ref="addAlertFormRef"
-          class="q-px-lg q-pb-md"
+          class="tw:px-4 tw:pb-3"
           style="width: 1024px"
         >
-          <q-form
+          <div
             class="create-report-form"
-            ref="addActionScriptFormRef"
-            @submit="onSubmit"
           >
             <div
               data-test="add-action-script-name-input"
               class="report-name-input"
               style="padding-top: 12px"
             >
-              <q-input
+              <OInput
                 v-model.trim="formData.name"
                 :label="t('alerts.name') + ' *'"
                 class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
-                :rules="[
-                  (val: any) =>
-                    !!val
-                      ? isValidResourceName(val) ||
-                        `Characters like :, ?, /, #, and spaces are not allowed.`
-                      : t('common.nameRequired'),
-                ]"
+                :error="!!nameError"
+                :error-message="nameError"
                 tabindex="0"
                 style="width: 400px"
+                @update:model-value="(v: string) => {
+                  if (!v) { nameError = t('common.nameRequired'); }
+                  else if (!isValidResourceName(v)) { nameError = 'Characters like :, ?, /, #, and spaces are not allowed.'; }
+                  else { nameError = ''; }
+                }"
               >
-                <template v-slot:hint>
+                <template #hint>
                   Characters like :, ?, /, #, and spaces are not allowed.
                 </template>
-              </q-input>
+              </OInput>
             </div>
-            <div
-              data-test="add-action-script-description-input"
-              class="report-name-input q-pb-sm"
-            >
-              <q-input
+            <div data-test="add-action-script-description-input" class="report-name-input tw:pb-2">
+              <OInput
                 v-model="formData.description"
                 :label="t('reports.description')"
                 class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
                 tabindex="0"
                 style="width: 800px"
               />
             </div>
 
-            <div data-test="add-action-script-type" class="report-name-input">
-              <q-select
+            <div data-test="add-action-script-type" class="report-name-input tw:mb-3">
+              <OSelect
                 data-test="add-action-script-type-select"
                 v-model="formData.type"
                 :label="t('common.type') + ' *'"
                 :options="actionTypes"
+                labelKey="label"
+                valueKey="value"
                 class="showLabelOnTop no-case tw:w-[400px]"
-                stack-label
-                map-options
-                emit-value
-                borderless
-                dense
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                :disable="isEditingActionScript"
-                :readonly="isEditingActionScript"
+                :error="!!typeError"
+                :error-message="typeError"
+                :disabled="isEditingActionScript"
+                @update:model-value="(v: any) => { typeError = v ? '' : 'Field is required!'; }"
               />
             </div>
 
-            <q-stepper
+            <OStepper
               v-model="step"
-              vertical
-              color="primary"
+              orientation="vertical"
               animated
-              class="q-mb-md"
-              header-nav
+              navigable
+              class="tw:mb-3"
             >
-              <q-step
+              <OStep
                 data-test="add-action-script-step-1"
                 :name="1"
                 :title="t('actions.uploadCodeZip')"
-                :icon="outlinedDashboard"
+                icon="edit"
                 :done="step > 1"
               >
                 <div
                   data-test="add-action-script-file-input"
-                  class="flex items-center"
+                  class="tw:flex tw:items-center"
                 >
-                  <q-file
+                  <OFile
                     v-if="
                       !isEditingActionScript || formData.fileNameToShow == ''
                     "
                     ref="fileInput"
-                    color="primary"
-                    filled
                     v-model="formData.codeZip"
                     :label="t('actions.zipFile') + ' *'"
-                    bg-color="input-bg"
-                    class="tw:w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
-                    stack-label
-                    outlined
-                    dense
                     accept=".zip"
-                    :rules="[
-                      (val: any) => {
-                        if (!isEditingActionScript) {
-                          return !!val || 'ZIP File is required!';
-                        }
-                        return true;
-                      },
-                    ]"
+                    data-test="add-action-script-file-input"
+                    :error-message="!isEditingActionScript && !formData.codeZip ? 'ZIP File is required!' : undefined"
+                    :error="!isEditingActionScript && !formData.codeZip && step > 1"
                   >
-                    <template v-slot:prepend>
-                      <q-icon name="attachment" />
-                    </template>
-                    <template v-slot:hint>
+                    <template #hint>
                       Note: Only .zip files are accepted and it may contain
                       various resources such as .py, .txt and main.py file etc.
                     </template>
-                  </q-file>
+                  </OFile>
 
                   <div
                     v-else-if="
@@ -186,14 +157,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon-sm"
                       @click="editFileToUpload"
-                      ><q-icon name="edit" size="16px"
+                      ><OIcon name="edit" size="sm"
                     /></OButton>
                   </div>
                   <div
                     v-if="
                       isEditingActionScript && formData.fileNameToShow == ''
                     "
-                    class="q-pt-md q-mt-xs q-pl-md"
+                    class="tw:pt-3 tw:mt-1 tw:pl-3"
                   >
                     <OButton
                       data-test="cancel-upload-new-btn-file"
@@ -204,38 +175,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </div>
                 </div>
+                <div class="tw:flex tw:gap-2 tw:mt-8">
+                  <OButton
+                    data-test="add-action-script-step1-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
 
-                <q-stepper-navigation>
-                  <div class="q-mt-sm">
-                    <OButton
-                      data-test="add-action-script-step1-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 2"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-
-              <q-step
+              <OStep
                 v-if="formData.type === 'scheduled'"
                 data-test="add-action-script-step-2"
                 :name="2"
                 title="Schedule"
                 icon="schedule"
                 :done="step > 2"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="q-my-sm q-px-sm">
+                <div class="tw:my-2 tw:px-2">
                   <div
                     style="font-size: 14px"
-                    class="text-bold text-grey-8 q-mb-sm"
+                    class="tw:font-bold tw:text-gray-500 tw:mb-2"
                     data-test="add-action-script-frequency-title"
                   >
                     {{ t("actions.frequency") }} *
                   </div>
-                  <div class="q-pa-xs el-border-radius el-border tw:w-fit">
+                  <div class="tw:p-1 el-border-radius el-border tw:w-fit">
                     <template
                       v-for="visual in frequencyTabs"
                       :key="visual.value"
@@ -254,249 +222,207 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     v-if="frequency.type === 'once'"
-                    class="flex justify-start items-center q-mt-md"
+                    class="tw:flex tw:justify-start tw:items-center tw:mt-3"
                     data-test="add-action-script-frequency-info"
                   >
-                    <q-icon name="event" class="q-mr-sm" />
+                    <OIcon name="event" size="sm" class="tw:mr-2" />
                     <div style="font-size: 14px">
                       The script will be triggered immediately after it is saved
                     </div>
                   </div>
 
                   <template v-if="frequency.type === 'repeat'">
-                    <div class="flex">
+                    <div class="tw:flex">
                       <div
                         data-test="add-action-script-cron-input"
-                        class="q-mr-sm"
+                        class="tw:mr-2"
                         style="padding-top: 8px; width: 320px"
                       >
                         <div
-                          class="q-mb-xs text-bold text-grey-8"
+                          class="tw:mb-1 tw:font-bold tw:text-gray-500"
                           data-test="add-action-script-cron-expression-title"
                         >
                           {{ t("reports.cronExpression") + " *" }}
-                          <q-icon
+                          <OIcon
                             data-test="add-action-script-cron-info"
-                            :name="outlinedInfo"
-                            size="17px"
-                            class="q-ml-xs cursor-pointer"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'text-grey-5'
-                                : 'text-grey-7'
-                            "
+                            name="info"
+                            size="sm"
+                            class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
                           >
-                            <q-tooltip anchor="center right" self="center left">
-                              <span style="font-size: 14px">
-                                Pattern: * * * * * means every minute .
-                                <br />
-                                Format: [Minute 0-59] [Hour 0-23] [Day of Month
-                                1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
-                                '1L-7L', 0 and 7 for Sunday].
-                                <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday. <br />
-                                Example: 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies minute, hour, day of month,
-                                month, and day of week, respectively.</span
-                              >
-                            </q-tooltip>
-                          </q-icon>
+                            <OTooltip side="right" align="center">
+                              <template #content>
+                                <span style="font-size: 14px">
+                                  Pattern: * * * * * means every minute .
+                                  <br />
+                                  Format: [Minute 0-59] [Hour 0-23] [Day of Month
+                                  1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
+                                  '1L-7L', 0 and 7 for Sunday].
+                                  <br />
+                                  Use '*' to represent any value, 'L' for the last
+                                  day/weekday. <br />
+                                  Example: 0 12 * * ? - Triggers at 12:00 PM
+                                  daily. It specifies minute, hour, day of month,
+                                  month, and day of week, respectively.
+                                </span>
+                              </template>
+                            </OTooltip>
+                          </OIcon>
                         </div>
 
-                        <q-input
+                        <OInput
                           v-model="frequency.cron"
                           class="showLabelOnTop"
                           type="text"
-                          borderless
-                          :rules="[
-                            (val: any) =>
-                              !!val.length
-                                ? cronError.length
-                                  ? cronError
-                                  : true
-                                : 'Field is required!',
-                          ]"
-                          dense
+                          :error="!!cronFieldError"
+                          :error-message="cronFieldError"
                           debounce="300"
                           style="width: 100%"
-                          @update:model-value="
-                            validateFrequency(frequency.cron)
-                          "
-                          :disable="isEditingActionScript"
+                          @update:model-value="(v: string) => {
+                            cronFieldError = !v?.length ? 'Field is required!' : (cronError.length ? cronError : '');
+                            validateFrequency(frequency.cron);
+                          }"
+                          :disabled="isEditingActionScript"
                           :readonly="isEditingActionScript"
                         />
                       </div>
-                      <div class="flex">
-                        <q-select
+                      <div class="tw:flex">
+                        <OSelect
                           data-test="add-action-script-timezone-select"
                           v-model="formData.timezone"
                           :options="['UTC']"
                           :label="t('actions.timezone') + ' *'"
                           :loading="isFetchingServiceAccounts"
-                          :popup-content-style="{ textTransform: 'lowercase' }"
                           class="showLabelOnTop no-case tw:mb-[2.4rem]"
-                          borderless
-                          stack-label
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
-                          behavior="menu"
-                          disable
-                          :rules="[(val: any) => !!val || 'Field is required!']"
-                          style="
-                            min-width: 250px !important;
-                            width: 250px !important;
-                          "
+                          disabled
+                          style="min-width: 250px !important; width: 250px !important;"
                         />
                       </div>
                     </div>
                   </template>
                 </div>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
+                  <OButton
+                    data-test="add-action-script-step2-back-btn"
+                    variant="outline"
+                    size="sm"
+                    @click="step--"
+                    >Back</OButton
+                  >
+                  <OButton
+                    data-test="add-action-script-step2-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
 
-                <q-stepper-navigation>
-                  <div class="tw:flex tw:gap-2">
-                    <OButton
-                      data-test="add-action-script-step2-back-btn"
-                      variant="outline"
-                      size="sm"
-                      @click="step = 1"
-                      >Back</OButton
-                    >
-                    <OButton
-                      data-test="add-action-script-step2-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 3"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-
-              <q-step
+              <OStep
                 data-test="add-action-script-step-3"
                 :name="3"
                 title="Select Service Account"
-                :icon="outlinedDashboard"
+                icon="dashboard"
                 :done="step > 3"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="flex items-center">
+                <div class="tw:flex tw:items-center">
                   <div class="service-account-selector">
                     <div
                       data-test="add-action-script-service-account-title"
-                      class="q-mb-xs text-bold text-grey-8"
+                      class="tw:mb-1 tw:font-bold tw:text-gray-500"
                     >
                       {{ t("actions.serviceAccount") + " *" }}
-                      <q-icon
-                        :name="outlinedInfo"
-                        size="17px"
-                        class="q-ml-xs cursor-pointer"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-grey-5'
-                            : 'text-grey-7'
-                        "
+                      <OIcon
+                        name="info"
+                        size="sm"
+                        class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
                       >
-                        <q-tooltip anchor="center right" self="center left">
-                          <span style="font-size: 14px">
-                            Make sure service account has permissions to access
-                            Actions.
-                          </span>
-                        </q-tooltip>
-                      </q-icon>
+                        <OTooltip side="right" align="center">
+                          <template #content>
+                            <span style="font-size: 14px">
+                              Make sure service account has permissions to access
+                              Actions.
+                            </span>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
                     </div>
-                    <q-select
+                    <OSelect
                       data-test="add-action-script-service-account-select"
                       v-model="formData.service_account"
                       :options="filteredServiceAccounts"
                       :loading="isFetchingServiceAccounts"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
-                      class="q-py-sm no-case"
-                      borderless
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      @filter="filterServiceAccounts"
-                      behavior="menu"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      style="
-                        min-width: 250px !important;
-                        width: 250px !important;
-                      "
+                      class="tw:py-2 no-case"
+                      labelKey="label"
+                      valueKey="value"
+                      :error="!!serviceAccountError"
+                      :error-message="serviceAccountError"
+                      @update:model-value="(v: any) => { serviceAccountError = v ? '' : 'Field is required!'; }"
+                      @search="(val: string) => {
+                        filteredServiceAccounts.value = val
+                          ? serviceAccountsOptions.filter((s: any) => s.label.toLowerCase().includes(val.toLowerCase()))
+                          : [...serviceAccountsOptions];
+                      }"
+                      style="min-width: 250px !important; width: 250px !important;"
                     />
                   </div>
                 </div>
-
-                <q-stepper-navigation>
-                  <div class="tw:flex tw:gap-2">
-                    <OButton
-                      data-test="add-action-script-step3-back-btn"
-                      variant="outline"
-                      size="sm"
-                      @click="step = formData.type === 'scheduled' ? 2 : 1"
-                      >Back</OButton
-                    >
-                    <OButton
-                      data-test="add-action-script-step3-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 4"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-              <q-step
+                <div class="tw:flex tw:gap-2 tw:mt-4">
+                  <OButton
+                    data-test="add-action-script-step3-back-btn"
+                    variant="outline"
+                    size="sm"
+                    @click="step === 3 ? (step = formData.type === 'scheduled' ? 2 : 1) : step--"
+                    >Back</OButton
+                  >
+                  <OButton
+                    data-test="add-action-script-step3-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
+              <OStep
                 data-test="add-action-script-step-4"
                 :name="4"
                 title="Environmental Variables"
                 icon="lock"
                 :done="step > 4"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
                 <div
                   v-for="(header, index) in environmentalVariables"
                   :key="header.uuid"
-                  class="row q-col-gutter-sm"
+                  class="tw:flex tw:gap-2"
                   data-test="add-action-script-env-variable"
                 >
-                  <div class="col-5 q-ml-none">
-                    <q-input
+                  <div class="tw:w-5/12 tw:ml-0">
+                    <OInput
                       :data-test="`add-action-script-header-${header['key']}-key-input`"
                       v-model="header.key"
-                      stack-label
-                      borderless
                       :placeholder="'Key'"
-                      dense
                       tabindex="0"
                     />
                   </div>
-                  <div class="col-5 q-ml-none q-mb-sm">
-                    <q-input
+                  <div class="tw:w-5/12 tw:ml-0 tw:mb-2">
+                    <OInput
                       :data-test="`add-action-script-header-${header['key']}-value-input`"
                       v-model="header.value"
                       :placeholder="t('alert_destinations.api_header_value')"
-                      stack-label
-                      borderless
-                      dense
-                      isUpdatingDestination
                       tabindex="0"
                     />
                   </div>
-                  <div class="col-2 q-ml-none">
+                  <div class="tw:w-1/6 tw:ml-0">
                     <OButton
                       :data-test="`add-action-script-header-${header['key']}-delete-btn`"
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alert_templates.delete')"
                       @click="deleteApiHeader(header)"
-                      ><q-icon name="delete" size="16px"
+                      ><OIcon name="delete" size="sm"
                     /></OButton>
                     <OButton
                       data-test="add-action-script-add-header-btn"
@@ -505,28 +431,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
                       @click="addApiHeader()"
-                      ><q-icon name="add" size="16px"
+                      ><OIcon name="add" size="sm"
                     /></OButton>
                   </div>
                 </div>
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-action-script-step4-back-btn"
                     variant="outline"
                     size="sm"
-                    @click="step = 3"
+                    @click="step--"
                     >Back</OButton
                   >
-                </q-stepper-navigation>
-              </q-step>
-            </q-stepper>
-          </q-form>
+                </div>
+              </OStep>
+            </OStepper>
+
+          </div>
         </div>
       </div>
     </div>
     <div class="tw:mx-2">
       <div
-        class="tw:flex tw:justify-end tw:gap-2 q-px-md full-width tw:py-[0.625rem] card-container"
+        class="tw:flex tw:justify-end tw:gap-2 tw:px-3 tw:w-full tw:py-[0.625rem] card-container"
         style="position: sticky; bottom: 0px; z-index: 2"
       >
         <OButton
@@ -571,19 +498,24 @@ import {
 } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
-import { outlinedDashboard } from "@quasar/extras/material-icons-outlined";
 import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineProps({
   report: {
@@ -627,13 +559,10 @@ const fileInput = ref(null);
 
 const originalActionScriptData: Ref<string> = ref("");
 
-const addActionScriptFormRef: Ref<any> = ref(null);
-
 const step = ref(1);
 
 const formData = ref(defaultActionScript);
 
-const q = useQuasar();
 
 const actionTypes = [
   {
@@ -699,6 +628,10 @@ const isFetchingActionScript = ref(false);
 
 const environmentalVariables = ref([{ key: "", value: "", uuid: getUUID() }]);
 const cronError = ref("");
+const nameError = ref("");
+const typeError = ref("");
+const cronFieldError = ref("");
+const serviceAccountError = ref("");
 
 const frequency = ref({
   type: "once",
@@ -719,8 +652,6 @@ watch(
 onBeforeMount(async () => {
   await handleActionScript();
 });
-
-const onSubmit = () => {};
 
 const scheduling = ref({
   date: "",
@@ -882,9 +813,18 @@ const saveActionScript = async () => {
   try {
     validateActionScriptData();
     await nextTick();
-    await nextTick();
-    const isValidForm = await addActionScriptFormRef.value.validate();
-    if (!isValidForm) return;
+    // Inline validation for migrated O2 fields
+    nameError.value = !formData.value.name
+      ? t('common.nameRequired')
+      : !isValidResourceName(formData.value.name)
+        ? 'Characters like :, ?, /, #, and spaces are not allowed.'
+        : '';
+    typeError.value = formData.value.type ? '' : 'Field is required!';
+    serviceAccountError.value = formData.value.service_account ? '' : 'Field is required!';
+    if (formData.value.execution_details === 'repeat') {
+      cronFieldError.value = !frequency.value.cron?.length ? 'Field is required!' : (cronError.value.length ? cronError.value : '');
+    }
+    if (nameError.value || typeError.value || serviceAccountError.value || cronFieldError.value) return;
   } catch (err) {
     console.log(err);
   }
@@ -894,8 +834,8 @@ const saveActionScript = async () => {
       ? actions.update
       : actions.create;
 
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -904,8 +844,8 @@ const saveActionScript = async () => {
 
   updateAction(store.state.selectedOrganization.identifier, actionId, form)
     .then(() => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Action ${
           isEditingActionScript.value ? "updated" : "saved"
         } successfully.`,
@@ -917,8 +857,8 @@ const saveActionScript = async () => {
     .catch((error) => {
       step.value = 3;
       if (error.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error?.response?.data?.message ||
             `Error while ${
@@ -1129,8 +1069,8 @@ const handleActionScript = async () => {
       })
       .catch((err) => {
         if (err.response.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.data?.message || "Error while fetching Action!",
             timeout: 4000,
           });
@@ -1171,8 +1111,8 @@ const getServiceAccounts = async () => {
     filteredServiceAccounts.value = [...serviceAccountsOptions];
   } catch (err: any) {
     if (err.response?.status != 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message:
           err.response?.data?.message ||
           "Error while fetching service accounts.",
@@ -1188,14 +1128,6 @@ onMounted(async () => {
   await getServiceAccounts();
 });
 </script>
-
-<style lang="scss">
-.create-report-page {
-  .q-expansion-item .q-item {
-    padding: 0 8px;
-  }
-}
-</style>
 
 <style scoped lang="scss">
 .lookup-table-file-uploader {

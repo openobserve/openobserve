@@ -24,7 +24,7 @@
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
-import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { computed, ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 
@@ -52,15 +52,11 @@ export function useLogsHighlighter() {
     }
   };
 
-  // Cleanup on component unmount (if used in a component context)
-  // Note: This only works if called within a component setup
-  try {
+  // Cleanup on component unmount (only register when in a component context)
+  if (getCurrentInstance()) {
     onBeforeUnmount(() => {
       cleanup();
     });
-  } catch (e) {
-    // onBeforeUnmount not available (not in component context)
-    // This is fine - cleanup will still happen on abort
   }
 
   watch(

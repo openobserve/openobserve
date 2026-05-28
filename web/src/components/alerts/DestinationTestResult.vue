@@ -21,7 +21,7 @@ limitations under the License. -->
       class="o2-test-success"
     >
       <div class="result-icon">
-        <q-icon name="check_circle" size="20px" />
+        <OIcon name="check-circle" size="md" />
       </div>
       <div class="result-content">
         <div data-test="test-success-message" class="result-title">
@@ -46,7 +46,7 @@ limitations under the License. -->
       class="o2-test-failure"
     >
       <div class="result-icon">
-        <q-icon name="error" size="20px" />
+        <OIcon name="error" size="md" />
       </div>
       <div class="result-content">
         <div data-test="test-failure-message" class="result-title">
@@ -64,22 +64,21 @@ limitations under the License. -->
 
         <!-- Suggested Fix -->
         <div v-if="getSuggestedFix(result)" class="result-suggestion">
-          <q-icon name="lightbulb" size="16px" />
+          <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
         </div>
 
         <!-- Error Details Expansion -->
-        <q-expansion-item
+        <OCollapsible
           v-if="result.error || result.responseBody"
+          v-model="errorDetailsOpen"
           data-test="test-failure-details-expansion"
           class="error-expansion"
-          dense
-          expand-icon-class="text-grey-7"
         >
-          <template #header>
+          <template #trigger>
             <div class="expansion-header">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
-              <span class="text-caption">{{ t('alerts.viewDetails') }}</span>
+              <OIcon name="info" size="xs" class="tw:mr-1" />
+              <span class="tw:text-xs">{{ t('alerts.viewDetails') }}</span>
             </div>
           </template>
 
@@ -99,7 +98,7 @@ limitations under the License. -->
               <pre class="error-code">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
-        </q-expansion-item>
+        </OCollapsible>
 
         <!-- Retry Button -->
         <div class="result-actions">
@@ -108,8 +107,8 @@ limitations under the License. -->
             variant="ghost-primary"
             size="xs"
             @click="$emit('retry')"
+            icon-left="refresh"
           >
-            <template #icon-left><q-icon name="refresh" /></template>
             {{ t('alerts.retry') }}
           </OButton>
         </div>
@@ -123,7 +122,7 @@ limitations under the License. -->
       class="o2-test-loading"
     >
       <div class="result-icon">
-        <q-spinner color="primary" size="20px" />
+        <OSpinner size="xs" />
       </div>
       <div class="result-content">
         <div class="result-title">
@@ -141,7 +140,7 @@ limitations under the License. -->
       data-test="test-result-idle"
       class="o2-test-idle"
     >
-      <q-icon name="info" size="16px" />
+      <OIcon name="info" size="sm" />
       <span class="idle-text">
         {{ t('alerts.testIdleMessage') }}
       </span>
@@ -153,8 +152,12 @@ limitations under the License. -->
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
-import { date } from 'quasar';
+import { formatTimestamp } from "@/utils/date";
 import type { TestResult } from '@/utils/prebuilt-templates/types';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { ref } from 'vue';
 
 // Define component props
 interface Props {
@@ -177,12 +180,14 @@ const emit = defineEmits<Emits>();
 // Composables
 const { t } = useI18n();
 
+const errorDetailsOpen = ref(false);
+
 // Methods
 function formatTimestamp(timestamp?: number | string): string {
   if (!timestamp) return '';
 
   const ts = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
-  return date.formatDate(ts, 'MMM DD, HH:mm:ss');
+  return formatTimestamp(ts, "MMM DD, HH:mm:ss");
 }
 
 function getFailureMessage(result: TestResult): string {
@@ -414,13 +419,7 @@ function getSuggestedFix(result: TestResult): string | null {
       font-size: 11px;
       color: var(--q-text);
       line-height: 1.4;
-
-      .q-icon {
-        color: var(--q-warning);
-        flex-shrink: 0;
-        margin-top: 1px;
-      }
-    }
+}
 
     .error-expansion {
       margin-top: 8px;
@@ -492,13 +491,7 @@ function getSuggestedFix(result: TestResult): string | null {
     border-radius: 4px;
     background-color: rgba(0, 0, 0, 0.02);
     border: 1px solid rgba(0, 0, 0, 0.08);
-
-    .q-icon {
-      color: var(--q-text-secondary);
-      opacity: 0.7;
-    }
-
-    .idle-text {
+.idle-text {
       font-size: 11px;
       color: var(--q-text-secondary);
       line-height: 1.4;

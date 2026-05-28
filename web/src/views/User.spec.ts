@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import User from "@/views/User.vue";
 import Users from "@/components/iam/users/User.vue";
 import i18n from "@/locales";
@@ -24,22 +22,24 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 describe("User.vue Component", () => {
   let wrapper: any;
 
-  beforeEach(async () => {
-    wrapper = mount(User, {
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
+  const mountOptions = {
+    global: {
+      provide: {
+        store: store,
       },
-    });
+      plugins: [i18n, router],
+      stubs: {
+        Users: { template: '<div data-test="users-stub" />' },
+      },
+    },
+  };
+
+  beforeEach(async () => {
+    wrapper = mount(User, mountOptions);
     await flushPromises();
   });
 
@@ -180,26 +180,16 @@ describe("User.vue Component", () => {
     });
 
     it("should initialize componentName as empty string", async () => {
-      const newWrapper = mount(User, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-        },
-      });
-      
+      const newWrapper = mount(User, mountOptions);
+
       await nextTick();
       expect(newWrapper.vm.componentName).toBe("Users");
       newWrapper.unmount();
     });
 
     it("should initialize loadComponent as false initially", async () => {
-      const newWrapper = mount(User, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-        },
-      });
-      
+      const newWrapper = mount(User, mountOptions);
+
       await nextTick();
       expect(newWrapper.vm.loadComponent).toBe(true);
       newWrapper.unmount();
@@ -269,13 +259,8 @@ describe("User.vue Component", () => {
     });
 
     it("should handle mount sequence correctly", async () => {
-      const newWrapper = mount(User, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-        },
-      });
-      
+      const newWrapper = mount(User, mountOptions);
+
       await flushPromises();
       expect(newWrapper.vm.componentName).toBe("Users");
       expect(newWrapper.vm.loadComponent).toBe(true);
@@ -309,7 +294,7 @@ describe("User.vue Component", () => {
 
     it("should have correct template structure", () => {
       const html = wrapper.html();
-      expect(html).toContain('<div>');
+      expect(html).toContain('<div');
     });
 
     it("should render Users component when loaded", async () => {
@@ -446,12 +431,7 @@ describe("User.vue Component", () => {
 
     it("should handle component without config errors", async () => {
       expect(() => {
-        mount(User, {
-          global: {
-            provide: { store: store },
-            plugins: [i18n, router],
-          },
-        });
+        mount(User, mountOptions);
       }).not.toThrow();
     });
   });
@@ -459,12 +439,7 @@ describe("User.vue Component", () => {
   describe("Performance and Memory Tests", () => {
     it("should not create memory leaks on mount/unmount", () => {
       for (let i = 0; i < 5; i++) {
-        const testWrapper = mount(User, {
-          global: {
-            provide: { store: store },
-            plugins: [i18n, router],
-          },
-        });
+        const testWrapper = mount(User, mountOptions);
         testWrapper.unmount();
       }
       expect(true).toBe(true);
@@ -473,12 +448,7 @@ describe("User.vue Component", () => {
     it("should handle multiple instances", () => {
       const wrappers = [];
       for (let i = 0; i < 3; i++) {
-        wrappers.push(mount(User, {
-          global: {
-            provide: { store: store },
-            plugins: [i18n, router],
-          },
-        }));
+        wrappers.push(mount(User, mountOptions));
       }
       
       expect(wrappers.length).toBe(3);

@@ -37,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full" style="min-width: 400px;">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
         >
           {{ templateErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
         <!-- Template Errors Section -->
         <div
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-input
+                    <OInput
                       data-test="template-import-name-input"
                       :model-value="userSelectedTemplateNames[index] || ''"
                       @update:model-value="(val) => {
@@ -80,13 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         updateTemplateName(val, index);
                       }"
                       :label="'Template Name *'"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
                       tabindex="0"
                     />
                   </div>
@@ -100,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-input
+                    <OInput
                       data-test="template-import-body-input"
                       :model-value="userSelectedTemplateBodies[index] || ''"
                       @update:model-value="(val) => {
@@ -108,13 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         updateTemplateBody(val, index);
                       }"
                       :label="'Template Body *'"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
                       tabindex="0"
                     />
                   </div>
@@ -129,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-select
+                    <OSelect
                       data-test="template-import-type-input"
                       :model-value="userSelectedTemplateTypes[index] || ''"
                       @update:model-value="(val) => {
@@ -138,20 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       :options="destinationTypes"
                       :label="'Template Type *'"
-                      :popup-content-style="{
-                        textTransform: 'lowercase',
-                      }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      behavior="menu"
+                      class="tw:py-2 showLabelOnTop no-case"
                     />
                   </div>
                 </span>
@@ -164,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-input
+                    <OInput
                       data-test="template-import-title-input"
                       :model-value="userSelectedTemplateTitles[index] || ''"
                       @update:model-value="(val) => {
@@ -172,13 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         updateTemplateTitle(val, index);
                       }"
                       :label="'Template Title *'"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
                       tabindex="0"
                     />
                   </div>
@@ -204,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               :class="{
-                'error-item text-bold': true,
+                'error-item tw:font-bold': true,
                 'text-green ': val.success,
                 'text-red': !val.success,
               }"
@@ -229,9 +198,12 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import templateService from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import {
   validateTemplateBody,
   getTemplateValidationErrorMessage,
@@ -239,6 +211,7 @@ import {
 
 export default defineComponent({
   name: "ImportTemplate",
+  components: { OSeparator, OInput, OSelect, BaseImport },
   props: {
     destinations: {
       type: Array,
@@ -268,7 +241,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
 
     const baseImportRef = ref<any>(null);
     const templateErrorsToDisplay = ref<templateErrors>([]);
@@ -360,10 +332,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-right",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -386,10 +357,9 @@ export default defineComponent({
 
       // Only redirect and show success message if ALL templates were imported successfully
       if (successCount === totalCount) {
-        q.notify({
+        toast({
           message: `Successfully imported template(s)`,
-          color: "positive",
-          position: "bottom",
+          position: "bottom-right",
           timeout: 2000,
         });
 
@@ -420,10 +390,9 @@ export default defineComponent({
         const hasCreatedTemplate = await createTemplate(jsonObj, index);
         return hasCreatedTemplate;
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Template please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-right",
           timeout: 2000,
         });
         return false;
@@ -551,7 +520,6 @@ export default defineComponent({
       t,
       importJson,
       router,
-      q,
       baseImportRef,
       templateErrorsToDisplay,
       tempalteCreators,
@@ -575,9 +543,6 @@ export default defineComponent({
       createTemplate,
       processJsonObject,
     };
-  },
-  components: {
-    BaseImport,
   },
 });
 </script>

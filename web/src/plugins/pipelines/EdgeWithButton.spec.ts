@@ -15,10 +15,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import EdgeWithButton from "./EdgeWithButton.vue";
 
-installQuasar({});
 
 // ---------------------------------------------------------------------------
 // Mocks

@@ -106,16 +106,20 @@ export function useLLMStreamQuery() {
           },
           error: (response: any, _traceId: any) => {
             activeTraceIds.delete(traceId);
-            // Streaming endpoint passes the parsed error body as the first
-            // argument (e.g. { status, code, message, error_detail }).
+            // useStreamingSearch wraps the server error body as
+            // `{ content: { ...errorBody, trace_id }, type: "error" }`.
+            // Unwrap so the real fields (message / error_detail / status)
+            // are visible without forcing every caller to know the shape.
+            const body = response?.content ?? response ?? {};
             const message =
+              body.message ||
+              body.error ||
+              body.error_detail ||
               response?.message ||
-              response?.error ||
-              response?.error_detail ||
               "Failed to fetch query data";
             const err: any = new Error(message);
-            err.status = response?.status;
-            err.code = response?.code;
+            err.status = body.status ?? response?.status;
+            err.code = body.code ?? response?.code;
             err.raw = response;
             reject(err);
           },

@@ -15,11 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-toolbar>
+  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-surface-panel tw:border-b tw:border-border-default tw:shrink-0">
+    <!-- LEFT SIDE: Logo -->
+    <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0 tw:pl-3">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
-      class="flex relative-position q-mr-sm"
+      class="tw:flex relative-position tw:mr-2"
       v-if="
         (config.isEnterprise == 'true' &&
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -38,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
           store.state.zoConfig?.custom_logo_text != ''
         "
-        class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm tw:flex tw:items-center"
+        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:flex tw:items-center"
         @click="goToHome"
         >{{ store.state.zoConfig.custom_logo_text }}</span
       >
@@ -91,10 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="logo-container"
+        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10 tw:min-w-[150px]"
       >
         <img
-          class="openobserve-logo cursor-pointer"
+          data-test="header-openobserve-logo"
+          class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -109,9 +112,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="flex relative-position q-mr-sm logo-container">
+    <div v-else class="tw:flex relative-position tw:mr-2 logo-container">
       <img
-        class="openobserve-logo cursor-pointer"
+        data-test="header-openobserve-logo"
+        class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
         :src="
           getImageURL(
             store.state.theme === 'dark'
@@ -123,12 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         alt="OpenObserve"
       />
     </div>
+    </div><!-- end left side -->
 
-    <q-toolbar-title></q-toolbar-title>
-
+    <!-- RIGHT SIDE: Controls -->
+    <div class="tw:flex tw:items-center tw:justify-end tw:flex-1 tw:min-w-0 tw:pr-3 tw:gap-1">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
-      class="headerMenu float-left"
+      class="headerMenu tw:flex tw:items-center tw:gap-1"
       v-if="store.state.organizationData.quotaThresholdMsg"
     >
       <div
@@ -137,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="warning-msg"
         style="display: inline"
       >
-        <q-icon name="warning"
+        <OIcon name="warning"
 size="xs" class="warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
@@ -145,7 +150,7 @@ size="xs" class="warning" />{{
       <OButton
         variant="secondary"
         size="sm"
-        class="q-ma-xs"
+        class="tw:m-1"
         @click="router.replace('/billings/plans')"
       >
         Upgrade to PRO Plan
@@ -153,17 +158,18 @@ size="xs" class="warning" />{{
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
-    <div class="header-menu">
-      <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
+    <div class="header-menu tw:flex tw:items-center tw:gap-2">
+      <!-- EDITION BADGE / UPGRADE BUTTON -->
+      <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
+      <!-- Open Source: primary CTA to drive upgrades -->
       <OButton
-        variant="primary"
+        :variant="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'outline-primary' : 'primary'"
         size="xs"
-        class="q-mx-xs"
         data-test="upgrade-to-enterprise-btn"
         @click="openEnterpriseDialog"
       >
         <template #icon-left>
-          <q-icon name="card_giftcard" size="16px" />
+          <OIcon :name="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'verified' : 'card-giftcard'" size="sm" />
         </template>
         {{ enterpriseButtonText }}
       </OButton>
@@ -175,18 +181,16 @@ size="xs" class="warning" />{{
           store.state.zoConfig.ingestion_quota_used >= 85
         "
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-toolbar"
         data-test="ingestion-quota-warning-icon"
       >
-        <q-icon
+        <OIcon
           name="warning"
-          size="24px"
-          class="header-icon"
+          size="md"
+          class="tw:opacity-70"
           :style="{ color: ingestionQuotaColor }"
         />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          Warning: {{ ingestionQuotaPercentage }}% of ingestion limit used
-        </q-tooltip>
+        <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
       </OButton>
 
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
@@ -201,132 +205,120 @@ size="xs" class="warning" />{{
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >
-        <img :src="getBtnLogo" class="header-icon ai-icon" style="width: 18px; height: 18px;" />
+        <img :src="getBtnLogo" class="ai-icon tw:w-4.5 tw:h-4.5 tw:shrink-0" />
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select" class="q-mx-sm row">
-        <OButton
-          variant="ghost"
-          size="sm"
-          style="max-width: 250px"
-          class="tw:text-ellipsis tw:overflow-hidden"
+      <div data-test="navbar-organizations-select">
+        <ODropdown
+          v-model:open="orgMenuOpen"
+          side="bottom"
+          align="center"
         >
-          <div class="row items-center no-wrap full-width">
-            <div class="col tw:truncate">
-              {{ userClickedOrg?.label || "" }}
-            </div>
-            <q-icon name="arrow_drop_down" class="q-ml-xs" />
-          </div>
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="sm-toolbar"
+              data-test="navbar-organizations-select-trigger"
+              class="tw:max-w-50"
+            >
+              <span class="tw:truncate tw:max-w-35">{{ userClickedOrg?.label || "" }}</span>
+              <template #icon-right>
+                <OIcon name="arrow-drop-down" size="sm" class="tw:opacity-70 tw:shrink-0" />
+              </template>
+            </OButton>
+          </template>
 
-          <!-- Organization selection menu -->
-          <q-menu
-            anchor="bottom middle"
-            self="top middle"
-            class="organization-menu-o2"
-          >
-            <q-list data-test="organization-menu-list" style="width: 100%">
-              <q-item data-test="organization-menu-item" style="padding: 0">
-                <q-item-section
-                  data-test="organization-menu-item-section"
-                  class="column"
-                  style="padding: 0px"
-                >
-                  <!-- Organization table with search functionality -->
-                  <q-table
-                    data-test="organization-menu-table"
-                    :rows="filteredOrganizations"
-                    :row-key="(row) => 'org_' + row.identifier"
-                    :columns="[
-                      {
-                        name: 'label',
-                        label: 'Organization',
-                        field: 'label',
-                        align: 'left',
-                      },
-                    ]"
-                    :visible-columns="['label']"
-                    hide-header
-                    :pagination="{ rowsPerPage }"
-                    :rows-per-page-options="[]"
-                    class="org-table"
-                    style="width: 470px; min-height: 420px; height: 420px"
+          <!-- Organization table with search functionality -->
+          <div data-test="organization-menu-list" class="tw:p-0">
+            <OTable
+              data-test="organization-menu-table"
+              :data="filteredOrganizations"
+              row-key="identifier"
+              :columns="[
+                {
+                  id: 'label',
+                  header: 'Organization',
+                  accessorKey: 'label',
+                  meta: { align: 'left' },
+                },
+              ]"
+              :show-header="false"
+              :show-global-filter="false"
+              pagination="client"
+              :page-size="rowsPerPage"
+              :page-size-options="[]"
+              class="org-table"
+              row-class="tw:cursor-pointer"
+              style="width: 470px; min-height: 420px; height: 420px"
+              @row-click="(row) => handleOrgSelection(row)"
+            >
+              <!-- Search input for filtering organizations -->
+              <template #top>
+                <div class="tw:w-full">
+                  <OInput
+                    data-test="organization-search-input"
+                    v-model="searchQuery"
+                    clearable
+                    :debounce="1"
+                    autofocus
+                    placeholder="Search Organization"
                   >
-                    <!-- Search input for filtering organizations -->
-                    <template #top>
-                      <div class="full-width">
-                        <q-input
-                          data-test="organization-search-input"
-                          :model-value="searchQuery"
-                          @update:model-value="
-                            (val) => $emit('update:searchQuery', val)
-                          "
-                          data-cy="index-field-search-input"
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          autofocus
-                          :placeholder="'Search Organization'"
-                        >
-                          <template #prepend>
-                            <q-icon name="search" />
-                          </template>
-                        </q-input>
-                      </div>
+                    <template #icon-left>
+                      <OIcon name="search" size="sm" />
                     </template>
+                  </OInput>
+                </div>
+              </template>
 
-                    <!-- Organization list item -->
-                    <template v-slot:body-cell-label="props">
-                      <q-td
-                        :props="props"
-                        class="org-list-item-cell"
-                        @click="handleOrgSelection(props.row)"
-                      >
-                        <div
-                          class="org-menu-item"
-                          v-close-popup
-                          data-test="organization-menu-item-label-item-label"
-                          :class="{
-                            'org-menu-item--active':
-                              props.row.identifier ===
-                              userClickedOrg?.identifier,
-                          }"
-                        >
-                          {{
-                            props.row.label.length > 30
-                              ? props.row.label.substring(0, 30) +
-                                "... | " +
-                                props.row.identifier
-                              : props.row.label + " | " + props.row.identifier
-                          }}
-                          <q-tooltip
-                            v-if="props.row.label.length > 30"
-                            anchor="bottom middle"
-                            self="top start"
-                          >
-                            {{ props.row.label }}
-                          </q-tooltip>
-                        </div>
-                      </q-td>
-                    </template>
+              <!-- Organization list item — both a generic data-test (kept for
+                   legacy specs) and a per-identifier data-test so e2e can pick
+                   an exact org without text/role matching. -->
+              <template #cell-label="{ row, value }">
+                <div
+                  class="org-menu-item"
+                  data-test="organization-menu-item-label-item-label"
+                  :data-test-org-identifier="row.identifier"
+                  :class="{
+                    'org-menu-item--active':
+                      row.identifier === userClickedOrg?.identifier,
+                  }"
+                >
+                  {{
+                    row.label.length > 30
+                      ? row.label.substring(0, 30) +
+                        "... | " +
+                        row.identifier
+                      : row.label + " | " + row.identifier
+                  }}
+                  <OTooltip
+                    v-if="row.label.length > 30"
+                    side="bottom"
+                    align="start"
+                    :content="row.label"
+                  />
+                </div>
+              </template>
 
-                    <!-- No data message -->
-                    <template v-slot:no-data>
-                      <div
-                        data-test="organization-menu-no-data"
-                        class="text-center q-pa-sm tw:w-full tw:flex tw:justify-center"
-                      >
-                        No organizations found
-                      </div>
-                    </template>
-                  </q-table>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-        </OButton>
+              <!-- No data message -->
+              <template #empty>
+                <div
+                  data-test="organization-menu-no-data"
+                  class="tw:text-center tw:p-2 tw:w-full tw:flex tw:justify-center"
+                >
+                  No organizations found
+                </div>
+              </template>
+
+              <!-- Custom pagination: suppress left-side total count -->
+              <template #bottom></template>
+            </OTable>
+          </div>
+        </ODropdown>
       </div>
+
+      <!-- Visual separator: org context from utility icons -->
+      <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0 tw:mx-2" aria-hidden="true" />
 
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
@@ -334,260 +326,216 @@ size="xs" class="warning" />{{
       <!-- SLACK COMMUNITY LINK -->
       <OButton
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-toolbar"
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" size="20px" class="header-icon" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          {{ t("menu.slack") }}
-        </q-tooltip>
+        <component :is="slackIcon" class="tw:opacity-70 tw:size-6 tw:shrink-0" />
+        <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-        <q-icon name="help_outline" size="20px" class="header-icon" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          {{ t("menu.help") }}
-        </q-tooltip>
-
-        <q-menu
-          fit
-          anchor="bottom right"
-          self="top right"
-          transition-show="jump-down"
-          transition-hide="jump-up"
-          class="header-menu-bar"
-        >
-          <q-list style="min-width: 250px">
-            <!-- OpenAPI link (only for non-cloud deployments) -->
-            <div
-              v-if="
-                config.isCloud !== 'true' &&
-                !store.state.zoConfig?.custom_hide_menus
-                  ?.split(',')
-                  ?.includes('openapi')
-              "
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
+            <OIcon name="help-outline" size="md" class="tw:opacity-70" />
+            <OTooltip side="top" align="center" :content="t('menu.help')" />
+          </OButton>
+        </template>
+        <div class="header-menu-bar tw:min-w-[250px]">
+          <!-- OpenAPI link (only for non-cloud deployments) -->
+          <template
+            v-if="
+              config.isCloud !== 'true' &&
+              !store.state.zoConfig?.custom_hide_menus
+                ?.split(',')
+                ?.includes('openapi')
+            "
+          >
+            <ODropdownItem
+              data-test="menu-link-openapi-item"
+              @select="navigateToOpenAPI(zoBackendUrl)"
             >
-              <q-item clickable @click="navigateToOpenAPI(zoBackendUrl)">
-                <q-item-section>
-                  <q-item-label>
-                    {{ t(`menu.openapi`) }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-              <q-separator />
-            </div>
+              {{ t(`menu.openapi`) }}
+            </ODropdownItem>
+            <ODropdownSeparator />
+          </template>
 
-            <!-- Documentation link -->
-            <q-item clickable @click="navigateToDocs()">
-              <q-item-section>
-                <q-item-label>
-                  {{ t(`menu.docs`) }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-separator />
+          <!-- Documentation link -->
+          <ODropdownItem
+            data-test="menu-link-docs-item"
+            @select="navigateToDocs()"
+          >
+            {{ t(`menu.docs`) }}
+          </ODropdownItem>
+          <ODropdownSeparator />
 
-            <!-- About page link -->
-            <q-item
-              clickable
-              @click="goToAbout"
-              data-test="menu-link-about-item"
-            >
-              <q-item-section>
-                <q-item-label>
-                  {{ t(`menu.about`) }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </OButton>
+          <!-- About page link -->
+          <ODropdownItem
+            data-test="menu-link-about-item"
+            @select="goToAbout"
+          >
+            {{ t(`menu.about`) }}
+          </ODropdownItem>
+        </div>
+      </ODropdown>
 
       <!-- SETTINGS BUTTON -->
       <OButton
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-toolbar"
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <q-icon :name="outlinedSettings" size="20px" class="header-icon" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          {{ t("menu.settings") }}
-        </q-tooltip>
+        <OIcon name="settings" size="md" class="tw:opacity-70" />
+        <OTooltip side="top" align="center" :content="t('menu.settings')" />
       </OButton>
 
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
-      <OButton
-        variant="ghost"
-        size="icon-circle-sm"
-        data-test="header-my-account-profile-icon"
+      <ODropdown
+        side="bottom"
+        align="end"
+        @update:open="(open) => { if (!open) showLanguageSubmenu = false; }"
       >
-        <q-icon
-          :name="user.picture ? user.picture : 'person'"
-          size="20px"
-          class="header-icon"
-        />
-        <q-tooltip
-          anchor="top middle"
-          self="bottom middle"
-          class="header-user-tooltip"
-        >
-          {{
-            user.given_name
-              ? user.given_name + " " + user.family_name
-              : user.email
-          }}</q-tooltip
-        >
+        <template #trigger>
+          <OButton
+            variant="ghost"
+            size="icon-toolbar"
+            data-test="header-my-account-profile-icon"
+          >
+            <OIcon
+              :name="user.picture ? user.picture : 'person'"
+              size="md"
+              class="tw:opacity-70"
+            />
+            <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
+          </OButton>
+        </template>
+        <div class="header-menu-bar tw:min-w-[250px]">
+          <!-- User information (non-clickable info row) -->
+          <div class="tw:flex tw:items-center tw:gap-3 tw:px-3 tw:py-2">
+            <OIcon
+              :name="user.picture ? user.picture : 'person'"
+              size="xs"
+            />
+            <span class="tw:text-sm tw:truncate">{{
+              user.given_name
+                ? user.given_name + " " + user.family_name
+                : user.email
+            }}</span>
+          </div>
+          <ODropdownSeparator />
 
-        <q-menu
-          fit
-          anchor="bottom right"
-          self="top right"
-          transition-show="jump-down"
-          transition-hide="jump-up"
-          class="header-menu-bar"
-        >
-          <q-list style="min-width: 250px">
-            <!-- User information -->
-            <q-item>
-              <q-item-section avatar>
-                <q-icon
-                  :name="user.picture ? user.picture : 'person'"
-                  size="xs"
-                ></q-icon>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{
-                  user.given_name
-                    ? user.given_name + " " + user.family_name
-                    : user.email
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-separator />
+          <!-- Language selector — nested sub-dropdown (click to open) -->
+          <div
+            data-test="header-language-submenu-trigger"
+            class="header-language-item"
+            @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
+          >
+            <OIcon size="xs" name="language" class="padding-none" />
+            <span class="header-language-label">{{ t("menu.language") }}</span>
+            <span class="header-language-current">
+              <img
+                v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
+                :src="selectedLanguage.icon.slice(4)"
+                :alt="selectedLanguage.label"
+                class="header-language-flag"
+              />
+              <OIcon
+                v-else-if="selectedLanguage.icon"
+                size="xs"
+                :name="selectedLanguage.icon"
+                class="padding-none"
+              />
+              <span>{{ selectedLanguage.label }}</span>
+            </span>
+            <OIcon size="xs" name="chevron-right" />
 
-            <!-- Language selector -->
-            <q-item clickable>
-              <q-item-section avatar>
-                <q-icon size="xs"
-name="language" class="padding-none" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="tw:w-[180px]">{{
-                  t("menu.language")
-                }}</q-item-label>
-              </q-item-section>
-              <q-item-section></q-item-section>
-              <q-item-section side>
-                <div class="q-gutter-xs">
-                  <q-icon
-                    size="xs"
-                    :name="selectedLanguage.icon"
-                    class="padding-none"
-                  />
-                  <span
-                    class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label"
-                    >{{ selectedLanguage.label }}</span
-                  >
-                </div>
-              </q-item-section>
-              <q-item-section side style="padding-left: 0px">
-                <q-icon
-                  class="icon-ley-arrow-right"
-                  name="keyboard_arrow_right"
-                />
-              </q-item-section>
-
-              <!-- Language selection submenu -->
-              <q-menu
-                auto-close
-                anchor="top end"
-                self="top start"
-                data-test="language-dropdown-item"
-                class="header-menu-bar"
+            <!-- Submenu — absolutely positioned to the left of parent dropdown -->
+            <div
+              v-if="showLanguageSubmenu"
+              class="language-submenu"
+              data-test="language-dropdown-item"
+              @click.stop
+            >
+              <button
+                v-for="lang in langList"
+                :key="lang.code"
+                type="button"
+                :data-test="`language-dropdown-item-${lang.code}`"
+                class="language-submenu-item"
+                :class="{
+                  'is-selected': selectedLanguage.code === lang.code,
+                }"
+                @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
-                <q-list>
-                  <q-item
-                    v-for="lang in langList"
-                    :key="lang.code"
-                    v-bind="lang"
-                    dense
-                    clickable
-                    @click="changeLanguage(lang)"
-                  >
-                    <q-item-section avatar>
-                      <q-icon
-                        size="xs"
-                        :name="lang.icon"
-                        class="padding-none"
-                      />
-                    </q-item-section>
+                <img
+                  v-if="lang.icon && lang.icon.startsWith('img:')"
+                  :src="lang.icon.slice(4)"
+                  :alt="lang.label"
+                  class="header-language-flag"
+                />
+                <OIcon v-else size="xs" :name="lang.icon" />
+                <span class="tw:flex-1">{{ lang.label }}</span>
+                <OIcon
+                  v-if="selectedLanguage.code === lang.code"
+                  size="xs"
+                  name="check"
+                />
+              </button>
+            </div>
+          </div>
+          <ODropdownSeparator />
 
-                    <q-item-section
-                      :data-test="`language-dropdown-item-${lang.code}`"
-                    >
-                      <q-item-label>{{ lang.label }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </q-item>
-            <q-separator />
+          <!-- Theme management -->
+          <ODropdownItem
+            data-test="menu-link-predefined-themes-item"
+            @select="openPredefinedThemes"
+          >
+            <template #icon-left>
+              <OIcon size="xs" name="color-lens" class="padding-none" />
+            </template>
+            {{ t("common.manageTheme") }}
+          </ODropdownItem>
+          <ODropdownSeparator />
 
-            <!-- Theme management -->
-            <q-item
-              data-test="menu-link-predefined-themes-item"
-              v-ripple="true"
-              v-close-popup="true"
-              clickable
-              @click="openPredefinedThemes"
-            >
-              <q-item-section avatar>
-                <q-icon size="xs"
-name="color_lens" class="padding-none" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-separator />
-
-            <!-- Logout -->
-            <q-item
-              data-test="menu-link-logout-item"
-              v-ripple="true"
-              v-close-popup="true"
-              clickable
-              @click="signout"
-            >
-              <q-item-section avatar>
-                <q-icon size="xs"
-name="exit_to_app" class="padding-none" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ t("menu.signOut") }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </OButton>
+          <!-- Logout -->
+          <ODropdownItem
+            data-test="menu-link-logout-item"
+            variant="destructive"
+            @select="signout"
+          >
+            <template #icon-left>
+              <OIcon size="xs" name="exit-to-app" class="padding-none" />
+            </template>
+            {{ t("menu.signOut") }}
+          </ODropdownItem>
+        </div>
+      </ODropdown>
     </div>
+    </div><!-- end right side -->
 
     <!-- Enterprise Upgrade Dialog -->
     <EnterpriseUpgradeDialog v-model="showEnterpriseDialog" />
-  </q-toolbar>
+  </div>
 </template>
 
 <script lang="ts">
 
-import { defineComponent, PropType, computed, ref } from "vue";
+import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -596,6 +544,14 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OButton,
+    OIcon,
+    OTooltip,
+    OInput,
+    ODropdown,
+    OTable,
+    ODropdownItem,
+    ODropdownSeparator,
+    ODropdownGroup,
   },
   props: {
     // Store instance
@@ -648,19 +604,9 @@ export default defineComponent({
       type: Object as PropType<any>,
       required: true,
     },
-    // Filtered list of organizations based on search
-    filteredOrganizations: {
+    // Full list of organizations for the selector
+    organizations: {
       type: Array as PropType<any[]>,
-      required: true,
-    },
-    // Search query for organization filter
-    searchQuery: {
-      type: String,
-      required: true,
-    },
-    // Rows per page for organization table
-    rowsPerPage: {
-      type: Number,
       required: true,
     },
     // AI button hover state
@@ -676,7 +622,6 @@ export default defineComponent({
   },
   emits: [
     "update:selectedOrg",
-    "update:searchQuery",
     "update:isHovered",
     "updateOrganization",
     "goToHome",
@@ -694,6 +639,9 @@ export default defineComponent({
 
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
+
+    // Language sub-menu state (nested submenu pattern matching original UX)
+    const showLanguageSubmenu = ref(false);
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
@@ -774,8 +722,34 @@ export default defineComponent({
       emit("update:isHovered", false);
     };
 
-    // Handle organization selection from dropdown
+    // Internal search state for the org table
+    const searchQuery = ref("");
+    const rowsPerPage = 10;
+    const orgMenuOpen = ref(false);
+
+    watch(orgMenuOpen, async (isOpen) => {
+      if (isOpen) {
+        await nextTick();
+        const input = document.querySelector(
+          '[data-test="organization-search-input"] input',
+        ) as HTMLInputElement | null;
+        input?.focus();
+      }
+    });
+
+    const filteredOrganizations = computed(() => {
+      if (!searchQuery.value) return props.organizations;
+      const q = searchQuery.value.toLowerCase();
+      return props.organizations.filter(
+        (org: any) =>
+          org.label?.toLowerCase().includes(q) ||
+          org.identifier?.toLowerCase().includes(q),
+      );
+    });
+
+    // Handle organization selection from the table
     const handleOrgSelection = (org: any) => {
+      orgMenuOpen.value = false;
       emit("update:selectedOrg", org);
       emit("updateOrganization");
     };
@@ -787,12 +761,12 @@ export default defineComponent({
 
     return {
       t,
-      outlinedSettings,
       getImageURL,
       enterpriseButtonText,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
+      showLanguageSubmenu,
       updateOrganization,
       goToHome,
       goToAbout,
@@ -805,6 +779,10 @@ export default defineComponent({
       signout,
       handleMouseEnter,
       handleMouseLeave,
+      searchQuery,
+      rowsPerPage,
+      orgMenuOpen,
+      filteredOrganizations,
       handleOrgSelection,
       openEnterpriseDialog,
     };
@@ -817,5 +795,129 @@ export default defineComponent({
   width: auto;
   max-width: none;
   white-space: nowrap;
+}
+
+/* Language sub-menu trigger row inside the user-profile dropdown */
+.header-language-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+.header-language-label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.header-language-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.header-language-flag {
+  width: 16px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* The nested popover */
+.language-submenu {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 4px;
+  min-width: 200px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 9999;
+
+  body.body--dark & {
+    background-color: #1f2937;
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.language-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  &.is-selected {
+    font-weight: 600;
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+.logo-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  min-width: 9.375rem;
+}
+
+.openobserve-logo {
+  height: 2rem;
+  width: auto;
+  max-width: 9.375rem;
+  display: block;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.headerMenu {
+  margin-right: 1rem;
+
+  .block {
+    font-weight: 700;
+    color: var(--o2-text-primary);
+  }
 }
 </style>

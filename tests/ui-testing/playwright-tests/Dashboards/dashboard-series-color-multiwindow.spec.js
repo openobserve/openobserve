@@ -46,7 +46,16 @@ async function applyAndWaitForMultiWindowRender(page, pm) {
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     { timeout: 5000 }
   ).catch(() => {});
-  await page.waitForTimeout(2000);
+  // Wait for ECharts canvas to have painted pixels before pixel-level color assertions
+  await page.waitForFunction(() => {
+    const canvases = document.querySelectorAll('canvas');
+    return Array.from(canvases).some(c => {
+      const ctx = c.getContext('2d');
+      if (!ctx || c.width === 0 || c.height === 0) return false;
+      const d = ctx.getImageData(0, 0, Math.min(c.width, 50), Math.min(c.height, 50));
+      return d.data.some(v => v > 0);
+    });
+  }, { timeout: 15000 }).catch(() => {});
 }
 
 test.describe("Dashboard series color with multi-window (time shift)", () => {
@@ -169,9 +178,9 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Verify the series name is still the comparison series
     const popup = pm.dashboardPanelConfigs.colorBySeriesPopup;
-    const savedSeriesInput = popup
-      .locator('[data-test="common-auto-complete"]')
-      .first();
+    const savedSeriesInput = popup.locator(
+      '[data-test="dashboard-addpanel-config-color-by-series-series-select-0-input"]'
+    );
     const savedSeriesValue = await savedSeriesInput.inputValue();
     testLogger.info("Verifying saved series name", { savedSeriesValue });
     // The stored config value is the base field name (e.g., "Kubernetes Container Name").
@@ -179,12 +188,13 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     // autocomplete may or may not include it when re-editing depending on timing.
     expect(savedSeriesValue.toLowerCase()).toContain("kubernetes container name");
 
-    // Verify the color is still #1a2cf0
-    const savedColorInput = popup
-      .locator(".color-section input")
-      .first();
-    await savedColorInput.waitFor({ state: "visible", timeout: 5000 });
-    const savedColor = await savedColorInput.inputValue();
+    // Verify the color is still #1a2cf0 — read from the OColor text input in row 0
+    const colorSection = popup.locator('[data-test="dashboard-addpanel-config-color-by-series-color-section-0"]');
+    await colorSection.waitFor({ state: "visible", timeout: 5000 });
+    const savedColor = await colorSection.evaluate((el) => {
+      const input = el.querySelector('input');
+      return input ? input.value : '';
+    });
 
     testLogger.info("Verifying saved color persists", { savedColor });
 

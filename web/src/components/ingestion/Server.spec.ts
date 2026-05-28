@@ -1,12 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Server from "@/components/ingestion/Server.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { useQuasar } from "quasar";
 
-installQuasar();
 
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
@@ -84,7 +82,7 @@ describe("Server Component", () => {
           'q-route-tab': true,
           'router-view': true,
           'q-input': true,
-          'q-icon': true
+          'OIcon': true
         }
       },
     });
@@ -147,7 +145,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -207,7 +205,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -233,7 +231,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -259,7 +257,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -285,7 +283,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -314,7 +312,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -347,7 +345,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -596,7 +594,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -617,7 +615,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });

@@ -140,6 +140,12 @@ const store = createStore({
       filterQuery: "",
       searchAcrossFolders: false,
     },
+    githubDashboardGallery: {
+      dashboards: [] as any[],
+      lastFetched: null as number | null,
+      cacheExpiry: 300000,
+      dashboardJsonCache: {} as Record<string, any>,
+    },
   },
   mutations: {
     login(state, payload) {
@@ -295,6 +301,15 @@ const store = createStore({
     },
     setAlertListFilters(state, payload) {
       state.alertListFilters = { ...state.alertListFilters, ...payload };
+    },
+    setGithubDashboardGallery(state, payload) {
+      state.githubDashboardGallery = { ...state.githubDashboardGallery, dashboards: payload, lastFetched: Date.now() };
+    },
+    setDashboardJsonCache(state, payload) {
+      state.githubDashboardGallery.dashboardJsonCache = {
+        ...state.githubDashboardGallery.dashboardJsonCache,
+        [payload.key]: payload.json,
+      };
     },
   },
   modules: {

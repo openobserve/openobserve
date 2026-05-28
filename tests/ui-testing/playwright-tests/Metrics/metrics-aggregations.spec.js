@@ -81,7 +81,6 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         testLogger.info(`Executing: ${query}`);
 
         await pm.metricsPage.executeQuery(query);
-        await page.waitForTimeout(1500);
 
         // Verify no errors - if error found, test fails immediately
         const hasError = await pm.metricsPage.expectQueryError();
@@ -146,10 +145,9 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         testLogger.info(`Executing: ${query}`);
 
         await pm.metricsPage.executeQuery(query);
-        await page.waitForTimeout(2000);
 
         // Check for inline errors below the chart
-        const inlineError = page.locator('[data-test="dashboard-error"]');
+        const inlineError = pm.metricsPage.getInlineError();
         const hasInlineError = await inlineError.isVisible({ timeout: 1000 }).catch(() => false);
         if (hasInlineError) {
           testLogger.warn(`Query may have produced an error: ${await inlineError.textContent().catch(() => '')}`);
@@ -212,7 +210,6 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         testLogger.info(`Executing: ${query}`);
 
         await pm.metricsPage.executeQuery(query);
-        await page.waitForTimeout(2500);
 
         // Verify no errors - if error found, test fails immediately
         const hasError = await pm.metricsPage.expectQueryError();
