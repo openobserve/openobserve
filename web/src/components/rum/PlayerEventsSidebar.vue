@@ -16,31 +16,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="events-container relative-position">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b" />
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b tw:px-2 tw:py-2" />
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
-        class="row q-pa-sm event-metadata tw:px-[0.375rem]"
+        class="tw:flex tw:p-2 event-metadata tw:px-[0.375rem]"
       >
-        <div class="col-12 row">
-          <div class="col-12 q-pb-sm text-caption">
-            <q-icon name="mail" size="1rem" class="q-pr-xs" />
+        <div class="tw:w-full tw:flex tw:flex-col">
+          <div class="tw:w-full tw:pb-2 tw:text-xs">
+            <OIcon name="mail" size="sm" class="tw:pr-1" />
             {{ sessionDetails.user_email || "Unknown User" }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="schedule" size="1rem" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
+            <OIcon name="schedule" size="sm" class="tw:pr-1" />
             {{ sessionDetails.date }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="settings" size="1rem" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
+            <OIcon name="settings" size="sm" class="tw:pr-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="language" size="1rem" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
+            <OIcon name="language" size="sm" class="tw:pr-1" />
             {{ sessionDetails.ip }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="location_on" size="1rem" class="q-pr-xs" />
+          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
+            <OIcon name="location-on" size="sm" class="tw:pr-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
@@ -48,79 +48,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        class="flex items-center justify-between col-12 q-pt-sm tw:px-[0.375rem]"
+        class="tw:flex tw:items-center tw:justify-between tw:w-full tw:pt-2 tw:px-[0.375rem]"
       >
-        <div class="q-pr-xs tw:w-[60%]">
-          <q-input
+        <div class="tw:pr-1 tw:w-[60%]">
+          <OInput
             v-model="searchEvent"
-            size="xs"
-            filled
-            borderless
-            dense
             clearable
-            debounce="1"
             :placeholder="t('rum.searchEvents')"
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="q-pl-xs event-type-selector tw:w-[40%] relative-position">
-          <q-select
+        <div class="tw:pl-1 event-type-selector tw:w-[40%] relative-position">
+          <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
-            behavior="menu"
             multiple
-            filled
-            borderless
-            dense
-            emit-value
-            size="xs"
+            labelKey="label"
+            valueKey="value"
             data-test="player-events-filter-select"
             @update:model-value="searchEvents(searchEvent)"
-          >
-            <template
-              v-slot:option="{ itemProps, opt, selected, toggleOption }"
-            >
-              <q-item v-bind="itemProps">
-                <q-item-section side class="tw:pr-0!">
-                  <q-checkbox
-                    :model-value="selected"
-                    @update:model-value="toggleOption(opt)"
-                    class="tw:mr-0! tw:pr-0!"
-                    size="xs"
-                  />
-                </q-item-section>
-                <q-item-section class="tw:ml-0! tw-pl-0!">
-                  <q-item-label class="tw:ml-0! tw-pl-0!">{{
-                    opt.label
-                  }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
         </div>
       </div>
-      <q-separator class="q-mt-sm" />
+      <OSeparator class="tw:mt-2" />
       <div class="events-list">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
+            class="tw:mt-1 tw:px-2 event-container tw:py-2 tw:cursor-pointer tw:rounded"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="ellipsis">
-              <div class="q-mr-md inline" data-test="event-display-time">
+            <div class="tw:truncate">
+              <div class="tw:mr-3 tw:inline" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
-              <div
-                class="q-mr-md inline event-type q-px-xs tw:rounded-[0.25rem]"
-                :class="filteredEvent.type === 'error' ? 'bg-red-3' : ''"
+              <OBadge
+                :variant="filteredEvent.type === 'error' ? 'error' : 'default'"
+                size="sm"
+                class="tw:mr-3"
                 data-test="event-type-badge"
               >
                 {{ filteredEvent.type }}
-              </div>
+              </OBadge>
               <template
                 v-if="
                   filteredEvent.frustration_types &&
@@ -129,11 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="q-mr-xs inline"
+                  class="tw:mr-1 tw:inline"
                 />
               </template>
               <div
-                class="inline"
+                class="tw:inline"
                 :title="filteredEvent.name"
                 data-test="event-name"
               >
@@ -149,10 +121,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, watch } from "vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
-import { Navigation, Tag } from "lucide-vue-next";
+
 import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 const { t } = useI18n();
 
@@ -172,7 +149,7 @@ const tabs = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
-    icon: Navigation,
+    icon: "send",
     style: {
       width: "fit-content",
       padding: "0.5rem 0.625rem",
@@ -182,7 +159,7 @@ const tabs = [
   {
     label: t("rum.tags"),
     value: "tags",
-    icon: Tag,
+    icon: "tag",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];

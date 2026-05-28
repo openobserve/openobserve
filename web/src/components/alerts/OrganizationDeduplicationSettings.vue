@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
       <div class="tw:mb-6">
         <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
-        <div class="text-body2 text-grey-7">
+        <div class="tw:text-sm tw:text-gray-400">
           {{ t('alerts.correlation.description') }}
         </div>
-        <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
+        <div class="tw:text-sm tw:text-gray-400 tw:mt-2 tw:italic">
           {{ t('alerts.correlation.semanticFieldNote') }}
         </div>
         <OButton
@@ -34,70 +34,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t('common.refresh') }}</OButton>
       </div>
 
-      <q-separator class="tw:mb-6" />
+      <OSeparator class="tw:mb-6" />
 
       <!-- Enable Deduplication -->
       <div class="tw:mb-6">
-        <q-checkbox
+        <OCheckbox
           data-test="organization-deduplication-enable-checkbox"
           v-model="localConfig.enabled"
           :label="t('alerts.correlation.enableOrgLevel')"
-          dense
           @update:model-value="emitUpdate"
         >
-          <q-tooltip>
-            {{ t('alerts.correlation.enableOrgLevelTooltip') }}
-          </q-tooltip>
-        </q-checkbox>
+          <OTooltip :content="t('alerts.correlation.enableOrgLevelTooltip')" />
+        </OCheckbox>
       </div>
 
       <!-- Cross-Alert Deduplication -->
       <div class="tw:mb-6" v-if="localConfig.enabled">
-        <q-checkbox
+        <OCheckbox
           data-test="organizationdeduplication-enable-cross-alert-checkbox"
           v-model="localConfig.alert_dedup_enabled"
           :label="t('alerts.correlation.enableCrossAlert')"
-          dense
           @update:model-value="emitUpdate"
         >
-          <q-tooltip>
-            {{ t('alerts.correlation.enableCrossAlertTooltip') }}
-          </q-tooltip>
-        </q-checkbox>
+          <OTooltip :content="t('alerts.correlation.enableCrossAlertTooltip')" />
+        </OCheckbox>
       </div>
 
       <!-- Cross-Alert Fingerprint Groups -->
       <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
-          <q-icon
-            :name="outlinedInfo"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          <OIcon
+            name="info"
+            size="sm"
+            class="tw:ml-1 tw:cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              style="font-size: 12px"
-            >
-              {{ t('alerts.correlation.fingerprintGroupsTooltip') }}
-            </q-tooltip>
-          </q-icon>
+            <OTooltip
+              side="right"
+              align="center"
+              :content="t('alerts.correlation.fingerprintGroupsTooltip')"
+            />
+          </OIcon>
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
         </div>
         <div class="tw:flex tw:flex-col tw:gap-2">
-          <q-checkbox
+          <OCheckbox
             v-for="group in localSemanticGroups"
             :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
             :key="group.id"
             :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
             @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
             :label="`${group.display} (${group.id})`"
-            dense
           />
           <div
             v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
@@ -112,32 +102,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:mb-6">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t('alerts.correlation.defaultWindow') }}
-          <q-icon
-            :name="outlinedInfo"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              style="font-size: 12px"
-            >
-              {{ t('alerts.correlation.defaultWindowTooltip') }}
-            </q-tooltip>
-          </q-icon>
+          <OIcon
+            name="info"
+            size="sm"
+            class="tw:ml-1 tw:cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+           />
+            <OTooltip
+              side="right"
+              align="center"
+              :content="t('alerts.correlation.defaultWindowTooltip')"
+            />
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}
         </div>
-        <q-input
+        <OInput
           data-test="organizationdeduplication-default-window-input"
           v-model.number="localConfig.time_window_minutes"
           type="number"
-          dense
-          borderless
           min="1"
+          width="md"
           :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
           :class="
             store.state.theme === 'dark'
@@ -165,15 +150,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 interface FieldAlias {
@@ -241,8 +229,8 @@ const saveSettings = async () => {
   if (localConfig.value.alert_dedup_enabled) {
     if (!localConfig.value.alert_fingerprint_groups ||
         localConfig.value.alert_fingerprint_groups.length === 0) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Please select at least one semantic group for cross-alert deduplication",
         timeout: 3000,
       });
@@ -266,8 +254,8 @@ const saveSettings = async () => {
       configToSave,
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message:
         "Organization deduplication settings saved successfully",
       timeout: 2000,
@@ -276,8 +264,8 @@ const saveSettings = async () => {
     emit("saved");
   } catch (error: any) {
     console.error("Error saving deduplication settings:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || "Failed to save settings",
       timeout: 3000,
     });

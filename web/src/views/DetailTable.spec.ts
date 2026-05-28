@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
-import { Quasar } from 'quasar';
 import DetailTable from './DetailTable.vue';
+
 
 describe('DetailTable.vue', () => {
   const mockRowData = {
@@ -38,7 +38,7 @@ describe('DetailTable.vue', () => {
   it('should render with default props', () => {
     const wrapper = mount(DetailTable, {
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: true,
           QCardSection: true,
@@ -61,7 +61,7 @@ describe('DetailTable.vue', () => {
   it('should display row detail title', () => {
     const wrapper = mount(DetailTable, {
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: false,
           QCardSection: false,
@@ -84,7 +84,7 @@ describe('DetailTable.vue', () => {
   it('should initialize with table tab', () => {
     const wrapper = mount(DetailTable, {
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: true,
           QCardSection: true,
@@ -107,7 +107,7 @@ describe('DetailTable.vue', () => {
         modelValue: {},
       },
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: false,
           QCardSection: false,
@@ -135,7 +135,7 @@ describe('DetailTable.vue', () => {
         modelValue: mockRowData,
       },
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: false,
           QCardSection: false,
@@ -158,7 +158,7 @@ describe('DetailTable.vue', () => {
   it('should have both table and json tabs', () => {
     const wrapper = mount(DetailTable, {
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: true,
           QCardSection: true,
@@ -182,7 +182,7 @@ describe('DetailTable.vue', () => {
         modelValue: mockRowData,
       },
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: true,
           QCardSection: true,
@@ -202,7 +202,7 @@ describe('DetailTable.vue', () => {
   it('should have getImageURL function available', () => {
     const wrapper = mount(DetailTable, {
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: true,
           QCardSection: true,
@@ -234,7 +234,7 @@ describe('DetailTable.vue', () => {
         modelValue: complexData,
       },
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: true,
           QCardSection: true,
@@ -254,7 +254,7 @@ describe('DetailTable.vue', () => {
   it('should render close button', () => {
     const wrapper = mount(DetailTable, {
       global: {
-        plugins: [i18n, [Quasar, {}]],
+        plugins: [i18n, ],
         stubs: {
           QCard: false,
           QCardSection: false,

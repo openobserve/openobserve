@@ -396,7 +396,9 @@
     "traces": "Sporen",
     "switchToLogs": "klik om terug te schakelen naar de logboeken",
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
-    "selectLogStream": "Stream van logboeken selecteren"
+    "selectLogStream": "Stream van logboeken selecteren",
+    "noData": "Geen gegevens beschikbaar",
+    "functionEditorLabel": "Functie-editor"
   },
   "menu": {
     "home": "Home",
@@ -1417,7 +1419,7 @@
     "markLineYAxis": "Y-as",
     "colorPalette": "Kleurenpalet",
     "colorSeriesBy": "Kleurenserie van:",
-    "colorBySeries": "<b>Per serie</b>",
+    "colorBySeries": "Per serie",
     "colorDefaultPaletteBySeries": "Standaardpalet (per serie)",
     "colorDefaultPaletteBySeriesSubLabel": "Series met dezelfde naam zullen dezelfde kleur gebruiken",
     "colorPaletteClassic": "Palette-Klassiek",
@@ -1426,7 +1428,7 @@
     "colorSingleColorSubLabel": "Stel een specifieke kleur in voor alle series",
     "colorShadesOfSpecificColor": "Tinten van specifieke kleur",
     "colorShadesOfSpecificColorSubLabel": "Verschillende tinten van specifieke kleur",
-    "colorByValue": "<b>Door Value</b>",
+    "colorByValue": "Door Value",
     "colorGreenYellowRed": "Groen-geel-rood (per waarde)",
     "colorRedYellowGreen": "Rood-geel-groen (per waarde)",
     "colorTemperature": "Temperatuur (per waarde)",
@@ -1594,7 +1596,9 @@
     "configSectionDrilldown": "Inzoomen",
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
-    "configSectionBackground": "Achtergrond"
+    "configSectionBackground": "Achtergrond",
+    "allFolders": "Alle mappen",
+    "selectFile": "Bestand selecteren"
   },
   "panel": {
     "header": "Paneel",
@@ -2636,6 +2640,7 @@
     "serviceAccounts": "Serviceaccounts",
     "serviceAccountsName": "Naam van serviceaccounts",
     "basicUsers": "Gebruikers",
+    "organizationMembers": "Organisatieleden",
     "quota": "Quota",
     "externalUserWarningTitle": "Waarschuwing voor externe gebruikers",
     "externalUserWarningMessage": "Als u externe gebruikers rechtstreeks aan rollen toevoegt, worden geen machtigingen verleend. Voeg ze in plaats daarvan toe aan gebruikersgroepen.",
@@ -3104,7 +3109,10 @@
     "algorithm": "Algoritme",
     "storeType": "Soort winkel",
     "mechanismType": "Soort mechanisme",
-    "actions": "Acties"
+    "actions": "Acties",
+    "providerTypeRequired": "Het type provider is vereist",
+    "algorithmRequired": "Algoritme is vereist",
+    "secretRequired": "Geheim is vereist"
   },
   "quota": {
     "header": "Quota",
@@ -3761,7 +3769,8 @@
     "errSave": "Opslaan is mislukt",
     "errLoadModel": "Het laden van het model is mislukt",
     "tierDefaultName": "Standaard",
-    "tierConditionalName": "Voorwaardelijke laag"
+    "tierConditionalName": "Voorwaardelijke laag",
+    "shadowedWarningBanner": "De onderstaande regels worden overschaduwd door „{name}” — vervangen door een regel met een hogere prioriteit en worden niet gebruikt voor kostenberekeningen."
   },
   "overview": {
     "title": "Overzicht van het systeem",

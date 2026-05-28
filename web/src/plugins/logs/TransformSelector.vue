@@ -17,28 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs transform-selector element-box-shadow tw:border tw:border-button-outline-border"
+    class="tw:p-0 float-left tw:mr-1 transform-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="tw:flex tw:items-center">
-      <div class="tw:flex tw:items-center">
-        <q-toggle
+      <div v-if="!hideToggle" class="tw:flex tw:items-center">
+        <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.showTransformEditor"
-          class="o2-toggle-button-xs"
-          size="xs"
-          flat
-          :disable="!searchObj.data.transformType"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-xs-dark'
-              : 'o2-toggle-button-xs-light'
-          "
-        >
-          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-            {{ getTransformLabelTooltip }}
-          </q-tooltip>
-        </q-toggle>
+          size="sm"
+          :disabled="!searchObj.data.transformType"
+        />
+        <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
       </div>
       <ODropdown v-model:open="functionModel" side="bottom" align="start">
         <template #trigger>
@@ -53,85 +43,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               alt="Transform"
               class="tw:size-4"
             />
-            <q-icon v-else :name="transformIcon" size="16px" />
-            <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
-            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-              transformsLabel
-            }}</q-tooltip>
+            <OIcon v-else :name="transformIcon" size="sm" />
+            <OIcon name="arrow-drop-down" size="sm" class="tw:ms-0.5" />
+            <OTooltip :content="transformsLabel" :side-offset="2" />
           </OButton>
         </template>
-        <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
+        <div data-test="logs-search-saved-function-list" class="tw:py-0">
           <!-- Search Input -->
           <div
             data-test="logs-search-bar-transform-type-select"
-            class="logs-transform-type o2-input q-mx-sm"
+            class="logs-transform-type o2-input tw:mx-2"
             style="padding-top: 0"
           >
-            <q-select
+            <OSelect
               v-if="isActionsEnabled"
               v-model="searchObj.data.transformType"
               :options="transformTypes"
               :label="t('search.transformType')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case"
-              stack-label
-              outlined
-              emit-value
-              filled
-              dense
+              class="tw:py-1"
               clearable
               @update:model-value="updateTransforms()"
             />
           </div>
           <div>
-            <q-input
+            <OInput
               v-model="searchTerm"
-              dense
-              filled
-              borderless
               clearable
-              debounce="300"
+              :debounce="300"
               :placeholder="t('search.searchSavedFunction')"
               data-test="function-search-input"
             >
-              <template #prepend>
-                <q-icon name="search" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           </div>
 
-          <div v-if="filteredTransformOptions.length">
-            <q-item
-              class="tw:border-b saved-view-item"
-              clickable
-              v-for="(item, i) in filteredTransformOptions"
-              :key="'transform-' + item?.name"
-              @click="selectTransform(item, true)"
-            >
-              <q-item-section>
-                <q-item-label>{{ item.name }}</q-item-label>
-              </q-item-section>
-            </q-item>
+          <div v-if="filteredTransformOptions.length" class="tw:max-h-72 tw:overflow-y-auto">
+            <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+              <li
+                v-for="(item, i) in filteredTransformOptions"
+                :key="'transform-' + item?.name"
+                :data-test="`logs-search-saved-transform-item-${item?.name}`"
+                class="tw:border-b saved-view-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                @click="selectTransform(item, true)"
+              >
+                <span class="tw:text-sm tw:flex-1 tw:min-w-0">{{ item.name }}</span>
+              </li>
+            </ul>
           </div>
           <div v-else>
-            <q-item>
-              <q-item-section>
-                <q-item-label
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span
                   v-if="searchObj.data.transformType === 'function'"
-                  >{{ t("search.savedFunctionNotFound") }}</q-item-label
+                  class="tw:text-sm"
+                  >{{ t("search.savedFunctionNotFound") }}</span
                 >
-                <q-item-label
+                <span
                   v-if="searchObj.data.transformType === 'action'"
-                  >{{ t("search.actionsNotFound") }}</q-item-label
+                  class="tw:text-sm"
+                  >{{ t("search.actionsNotFound") }}</span
                 >
-                <q-item-label v-if="!searchObj.data.transformType">{{
+                <span v-if="!searchObj.data.transformType" class="tw:text-sm">{{
                   t("search.selectTransformType")
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
+                }}</span>
+              </div>
+            </div>
           </div>
-        </q-list>
+        </div>
       </ODropdown>
     </div>
     <OButton
@@ -141,14 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :disabled="searchObj.data.transformType !== 'function'"
       @click="fnSavedFunctionDialog"
     >
-      <q-icon name="save" size="16px" />
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
-        {{
-          searchObj.data.transformType === "action"
-            ? t("search.saveActionDisabled")
-            : t("common.save")
-        }}
-      </q-tooltip>
+      <OIcon name="save" size="sm" />
+      <OTooltip
+        :content="searchObj.data.transformType === 'action' ? t('search.saveActionDisabled') : t('common.save')"
+        :side-offset="6"
+      />
     </OButton>
   </OButtonGroup>
 </template>
@@ -157,17 +134,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   functionOptions: { name: string; function: string }[];
-}>();
+  hideToggle?: boolean;
+}>(), {
+  hideToggle: false,
+});
 
 const emit = defineEmits(["select:function", "save:function"]);
 
@@ -181,7 +166,6 @@ const store = useStore();
 
 const functionModel = ref(false);
 
-const $q = useQuasar();
 
 const transformTypes = computed(() => {
   return [
@@ -329,10 +313,9 @@ const selectTransform = (item: any, isSelected: boolean) => {
 };
 
 const updateActionSelection = (item: any) => {
-  $q.notify({
+  toast({
     message: `${item?.name} action applied successfully`,
     timeout: 3000,
-    color: "secondary",
   });
 };
 

@@ -15,162 +15,118 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-stream-input-stream-routing-section"
-    class="full-height"
-    :style="{
-      width: selectedNodeType == 'output' ? '40vw' : '',
-    }"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.streamTitle')"
+    size="md"
+    :show-close="true"
+    @keydown.stop
+    :primaryButtonLabel="!createNewStream ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!createNewStream ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!createNewStream && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    data-test="input-node-stream-drawer"
+    @click:primary="saveStream"
+    @click:secondary="openCancelDialog"
+    @click:neutral="openDeleteDialog"
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="add-stream-input-stream-routing-section"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
     >
-      {{ t("pipeline.streamTitle") }}
-      <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
 
-    <q-separator />
 
-    <div class="stream-routing-container full-width q-py-md">
-      <q-toggle
+    <div class="stream-routing-container tw:w-full tw:py-3">
+      <OSwitch
         v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
-        class="q-mb-sm tw:mr-3 tw:h-[36px] o2-toggle-button-lg q-ml-md"
-        size="lg"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-lg-dark'
-            : 'o2-toggle-button-lg-light'
-        "
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
+        class="tw:px-3 tw:mb-3"
       />
 
-      <q-form @submit="saveStream">
-        <div v-if="!createNewStream" class="q-px-md">
-          <div class="flex justify-start items-center" style="padding-top: 0px">
-            <div
+      <div>
+        <div v-if="!createNewStream" class="tw:p-4 tw:flex tw:flex-col tw:gap-3">
+          <div data-test="input-node-stream-type-select" class="tw:w-full">
+            <OSelect
+              v-model="stream_type"
+              :options="(filteredStreamTypes as any)"
+              :label="t('alerts.streamType') + ' *'"
+              :searchable="false"
+              @update:model-value="updateStreams()"
               data-test="input-node-stream-type-select"
-              class="alert-stream-type o2-input q-mr-sm full-width"
-              style="padding-top: 0"
-            >
-              <q-select
-                v-model="stream_type"
-                :options="filteredStreamTypes"
-                :label="t('alerts.streamType') + ' *'"
-                :popup-content-style="{ textTransform: 'none' }"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-sm showLabelOnTop no-case full-width"
-                stack-label
-                outlined
-                filled
-                dense
-                @update:model-value="updateStreams()"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-              />
-            </div>
-            <div
-              data-test="input-node-stream-type-select"
-              class="alert-stream-type o2-input q-mr-sm full-width"
-              style="padding-top: 0"
-            >
-              <q-select
-                v-model="stream_name"
-                :options="filteredStreams"
-                option-label="label"
-                option-value="value"
-                :label="t('alerts.stream_name') + ' *'"
-                :loading="isFetchingStreams"
-                :popup-content-style="{ textTransform: 'lowercase' }"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-sm showLabelOnTop no-case full-width"
-                filled
-                stack-label
-                dense
-                use-input
-                hide-selected
-                fill-input
-                @filter="filterStreams"
-                behavior="menu"
-                @input-debounce="100"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                :option-disable="(option: any) => option.isDisable"
-                @input-value="handleDynamicStreamName"
-              />
+            />
+          </div>
 
-              <q-toggle
-                v-if="
-                  stream_type == 'enrichment_tables' &&
-                  selectedNodeType == 'output'
-                "
-                class="col-12 q-py-md text-grey-8 text-bold"
-                v-model="appendData"
-                :label="t('function.appendData')"
-              />
-            </div>
-            <div
-              v-if="selectedNodeType == 'output'"
-              style="font-size: 14px"
-              class="note-message"
-            >
-              <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Select an existing stream
-                from the list or enter the name to create a new one</span
-              >
-              <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Enrichment_tables as
-                destination stream is only available for scheduled
-                pipelines</span
-              >
+          <div class="tw:w-full">
+            <OSelect
+              v-model="stream_name"
+              :options="indexOptions"
+              :label="t('alerts.stream_name') + ' *'"
+              :loading="isFetchingStreams"
+              searchable
+              :creatable="selectedNodeType === 'output'"
+              :error="!!streamNameError"
+              :error-message="streamNameError"
+              @update:model-value="streamNameError = ''"
+              @create="handleCreateStreamName"
+              data-test="input-node-stream-name-select"
+            />
 
-              <span class="tw:flex">
-                <q-icon name="info" class="q-pr-xs q-pt-xs" /> Use curly braces
-                '{}' to configure stream name dynamically. e.g.
-                static_text_{fieldname}_postfix. Static text before/after {} is
-                optional</span
-              >
+            <OSwitch
+              v-if="
+                stream_type == 'enrichment_tables' &&
+                selectedNodeType == 'output'
+              "
+              v-model="appendData"
+              :label="t('function.appendData')"
+              class="tw:mt-2"
+            />
+          </div>
+
+          <div
+            v-if="selectedNodeType == 'output'"
+            class="note-message tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2"
+          >
+            <div class="tw:text-sm tw:text-gray-800">Guidelines:</div>
+            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  Select an existing stream from the list or enter the name to create a new one
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  <span class="highlight">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
+                </span>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-2">
+                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <span>
+                  Use curly braces <span class="code">{}</span> to configure stream name dynamically. e.g.
+                  <span class="code">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code">{}</span> is optional
+                </span>
+              </div>
             </div>
           </div>
 
-          <div class="tw:flex tw:gap-2 q-mt-sm">
-            <OButton
-              v-if="pipelineObj.isEditNode"
-              data-test="input-node-stream-delete-btn"
-              variant="outline-destructive"
-              size="sm-action"
-              @click="openDeleteDialog"
-            >{{ t("pipeline.deleteNode") }}</OButton>
-            <OButton
-              data-test="input-node-stream-cancel-btn"
-              variant="outline"
-              size="sm-action"
-              @click="openCancelDialog"
-            >{{ t('alerts.cancel') }}</OButton>
-            <OButton
-              data-test="input-node-stream-save-btn"
-              variant="primary"
-              size="sm-action"
-              type="submit"
-            >{{ t('alerts.save') }}</OButton>
-          </div>
+
         </div>
         <div v-else class="pipeline-add-stream">
           <AddStream
             ref="addStreamRef"
             @added:stream-added="getLogStream"
+            @close="createNewStream = false"
             :is-in-pipeline="true"
           />
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -186,20 +142,32 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
 import AddStream from "@/components/logstream/AddStream.vue";
 
-import { useQuasar } from "quasar";
 
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
+const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["cancel:hideform"]);
 
-const $q = useQuasar();
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
+
 
 const { t } = useI18n();
 
@@ -215,23 +183,25 @@ const { getUsedStreamsList } = usePipelines();
 
 const { getStreams } = useStreams();
 
-const filteredStreams: Ref<string[]> = ref([]);
 const createNewStream = ref(false);
 const isUpdating = ref(false);
 const isFetchingStreams = ref(false);
-const indexOptions = ref([]);
+const streamNameError = ref("");
+const indexOptions = ref<{ label: string; value: string; disabled: boolean }[]>([]);
 const schemaList = ref([]);
 const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 const outputStreamTypes = ["logs", "metrics", "traces", "enrichment_tables"];
-const stream_name = ref(
-  (pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })
-    ?.stream_name || { label: "", value: "", isDisable: false },
-);
-const dynamic_stream_name = ref(
-  (pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })
-    ?.stream_name || { label: "", value: "", isDisable: false },
+
+// Normalize any legacy object-shaped stream_name to a plain string
+const _existingStreamName = (pipelineObj.currentSelectedNodeData?.data as any)?.stream_name;
+const stream_name = ref<string>(
+  typeof _existingStreamName === "string"
+    ? _existingStreamName
+    : (typeof _existingStreamName === "object" && _existingStreamName
+        ? (_existingStreamName.value ?? _existingStreamName.label ?? "")
+        : ""),
 );
 
 const appendData = ref(
@@ -262,17 +232,16 @@ watch(
   ) => {
     if (newStreamType && newCreateNewStream == oldCreateNewStream) {
       // Only reset if createNewStream has changed
-      stream_name.value = { label: "", value: "", isDisable: false };
+      stream_name.value = "";
     }
     getStreamList();
   },
 );
 function sanitizeStreamName(input: string): string {
   if (input.length > 100) {
-    $q.notify({
+    toast({
       message: "Stream name should be less than 100 characters",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-right",
       timeout: 2000,
     });
     //return empty string so that stream name is not saved and user will be notifid and
@@ -312,27 +281,7 @@ function sanitizeStaticPart(str: string): string[] {
   return str.split("").map((char) => (/[a-zA-Z0-9]/.test(char) ? char : "_"));
 }
 
-watch(
-  () => dynamic_stream_name.value,
-  () => {
-    if (
-      dynamic_stream_name.value !== null &&
-      dynamic_stream_name.value !== "" &&
-      selectedNodeType.value === "output"
-    ) {
-      const rawValue =
-        typeof dynamic_stream_name.value === "object" &&
-        dynamic_stream_name.value.hasOwnProperty("value")
-          ? dynamic_stream_name.value.value
-          : dynamic_stream_name.value;
 
-      const sanitized = sanitizeStreamName(rawValue as string);
-
-      dynamic_stream_name.value = sanitized;
-      saveDynamicStream();
-    }
-  },
-);
 async function getStreamList() {
   const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty(
     "stream_type",
@@ -360,7 +309,11 @@ async function getStreamList() {
     }
     streams.value[streamType] = res.list;
     schemaList.value = res.list;
-    indexOptions.value = res.list.map((data: any) => data.name);
+    indexOptions.value = res.list.map((stream: any) => ({
+      label: stream.name,
+      value: stream.name,
+      disabled: stream.isDisable || false,
+    }));
   } finally {
     isFetchingStreams.value = false;
   }
@@ -369,24 +322,10 @@ const updateStreams = () => {
   getStreamList();
 };
 
-const handleDynamicStreamName = (val: any) => {
+const handleCreateStreamName = (val: string) => {
   val = val.replace(/-/g, "_");
-  dynamic_stream_name.value = { label: val, value: val, isDisable: false };
-};
-
-const saveDynamicStream = () => {
-  if (
-    typeof dynamic_stream_name.value == "object" &&
-    dynamic_stream_name.value.hasOwnProperty("value") &&
-    dynamic_stream_name.value.hasOwnProperty("label")
-  ) {
-    const { label, value } = dynamic_stream_name.value;
-    stream_name.value = { label: label, value: value, isDisable: false };
-  }
-  //this condition will never be true but we are keeping it for future reference
-  else {
-    stream_name.value = dynamic_stream_name.value;
-  }
+  const sanitized = sanitizeStreamName(val);
+  if (sanitized) stream_name.value = sanitized;
 };
 
 const filteredStreamTypes = computed(() => {
@@ -396,12 +335,11 @@ const filteredStreamTypes = computed(() => {
 const getLogStream = async (data: any) => {
   data.name = data.name.replace(/-/g, "_");
 
-  stream_name.value = { label: data.name, value: data.name, isDisable: false };
+  stream_name.value = data.name;
   stream_type.value = data.stream_type;
-  if (createNewStream.value) {
-    createNewStream.value = false;
-    return;
-  }
+  createNewStream.value = false;
+  // Auto-associate the newly created stream and close the node form
+  saveStream();
 };
 
 const dialog = ref({
@@ -448,8 +386,8 @@ const saveStream = () => {
   // Validate pipeline configuration
 
   const streamNodeData: any = {
-    stream_type: stream_type,
-    stream_name: stream_name,
+    stream_type: stream_type.value,
+    stream_name: stream_name.value,
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
@@ -458,56 +396,16 @@ const saveStream = () => {
     streamNodeData.meta = { append_data: appendData.value.toString() };
   }
 
-  if (
-    typeof stream_name.value === "object" &&
-    stream_name.value !== null &&
-    stream_name.value.hasOwnProperty("value") &&
-    stream_name.value.value === ""
-  ) {
-    $q.notify({
-      message: "Please select Stream from the list",
-      color: "negative",
-      position: "bottom",
-      timeout: 2000,
-    });
+  if (!stream_name.value) {
+    streamNameError.value = t('validation.required');
     return;
   }
+  streamNameError.value = '';
   addNode(streamNodeData);
   emit("cancel:hideform");
 };
 
-const filterStreams = (val: string, update: any) => {
-  const streamType =
-    pipelineObj.currentSelectedNodeData.data.stream_type || "logs";
-  if (
-    pipelineObj.currentSelectedNodeData.hasOwnProperty("type") &&
-    pipelineObj.currentSelectedNodeData.type === "input"
-  ) {
-    const filtered = streams.value[streamType]
-      ?.filter((stream: any) => {
-        return stream.name.toLowerCase().includes(val.toLowerCase());
-      })
-      .map((stream: any) => ({
-        label: stream.name,
-        value: stream.name, // Use a unique identifier if needed
-        isDisable: stream.isDisable,
-      }));
-    filteredStreams.value = filtered;
-  } else {
-    const filtered = streams.value[streamType]
-      .filter((stream: any) => {
-        return stream.name.toLowerCase().includes(val.toLowerCase());
-      })
-      .map((stream: any) => ({
-        label: stream.name,
-        value: stream.name, // Use a unique identifier if needed
-        isDisable: false,
-      }));
-    filteredStreams.value = filtered;
-  }
 
-  update();
-};
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -532,26 +430,23 @@ defineExpose({
   sanitizeStaticPart,
   getStreamList,
   updateStreams,
-  handleDynamicStreamName,
-  saveDynamicStream,
+  handleCreateStreamName,
   getLogStream,
   openCancelDialog,
   openDeleteDialog,
   deleteNode,
   saveStream,
-  filterStreams,
   filterColumns,
   // Expose reactive variables for testing
-  filteredStreams,
   createNewStream,
   isUpdating,
   isFetchingStreams,
+  streamNameError,
   indexOptions,
   schemaList,
   streams,
   usedStreams,
   stream_name,
-  dynamic_stream_name,
   appendData,
   stream_type,
   selectedNodeType,
@@ -574,7 +469,7 @@ defineExpose({
     justify-content: flex-start;
   }
 
-  .q-separator {
+  [role="separator"] {
     display: none !important;
   }
 }
@@ -589,11 +484,20 @@ defineExpose({
 
 .note-message {
   background-color: #f9f290;
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+  color: #2d3748;
   width: 100%;
-  margin-bottom: 20px;
+}
+
+.note-message .highlight {
+  font-weight: bold;
+  color: #007bff;
+}
+
+.note-message .code {
+  font-family: monospace;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #b30059;
 }
 </style>

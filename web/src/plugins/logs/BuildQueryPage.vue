@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="build-query-page">
+  <div class="build-query-page" data-test="logs-build-query-page">
     <!-- PanelEditor with BUILD_PRESET -->
     <PanelEditor
       ref="panelEditorRef"
@@ -31,18 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <q-dialog
-      v-model="showAddToDashboardDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-to-dashboard
-        @save="addPanelToDashboard"
-        @cancel="showAddToDashboardDialog = false"
-        :dashboardPanelData="dashboardPanelData"
-      />
-    </q-dialog>
+    <add-to-dashboard
+      v-model:open="showAddToDashboardDialog"
+      :dashboardPanelData="dashboardPanelData"
+      @save="addPanelToDashboard"
+    />
   </div>
 </template>
 
@@ -498,8 +491,10 @@ const addPanelToDashboard = () => {
 
 // NOTE: URL sync for build mode fields is handled by explicit actions (runQuery, apply)
 // rather than a deep watcher. A deep watcher here would call router.push on every
-// field/filter mutation, which causes Quasar q-menu popups to auto-close
-// (QMenu watches $route.fullPath and dismisses on any route change).
+// field/filter mutation, which historically caused Quasar QMenu popups to
+// auto-close (QMenu watches $route.fullPath and dismisses on any route change).
+// We've migrated off QMenu but keep the explicit-action pattern to avoid
+// excessive history pushes.
 
 // NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue
 // PanelEditor emits 'queryGenerated' and 'customQueryModeChanged' which we forward to parent

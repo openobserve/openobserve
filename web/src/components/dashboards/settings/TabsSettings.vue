@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <div class="column full-height" data-test="dashboard-tab-settings">
+  <div class="tw:flex tw:flex-col tw:h-full" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
         <OButton
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </DashboardHeader>
-    <div class="table-header flex justify-between text-bold">
+    <div class="table-header tw:flex tw:justify-between tw:font-bold">
       <div class="header-content">
         <div class="spacer"></div>
         <div class="name-column" data-test="dashboard-tab-settings-name">
@@ -54,12 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           class="draggable-row"
           data-test="dashboard-tab-settings-draggable-row"
+          :data-test-tab-name="tab.name"
         >
           <div class="draggable-handle">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              class="'q-mr-xs"
+            <OIcon
+              name="drag-indicator" size="sm"
+              class="tw:mr-1"
               data-test="dashboard-tab-settings-drag-handle"
             />
           </div>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <div v-else class="edit-container">
               <input
-                :class="store.state.theme === 'dark' ? 'bg-grey-10' : ''"
+                :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''"
                 v-model="editTabObj.data.name"
                 class="edit-input"
                 data-test="dashboard-tab-settings-tab-name-edit"
@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="saveEdit"
                 :disabled="!editTabObj.data.name.trim()"
                 data-test="dashboard-tab-settings-tab-name-edit-save"
+                icon-left="check"
               >
-                <template #icon-left><q-icon name="check" /></template>
               </OButton>
               <OButton
                 variant="ghost"
@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.cancel')"
                 @click.stop="cancelEdit"
                 data-test="dashboard-tab-settings-tab-name-edit-cancel"
+                icon-left="close"
               >
-                <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </div>
             <div class="actions">
@@ -105,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.edit')"
                 @click.stop="editItem(tab.tabId)"
                 data-test="dashboard-tab-settings-tab-edit-btn"
+                icon-left="edit"
               >
-                <template #icon-left><q-icon name="edit" /></template>
               </OButton>
               <OButton
                 v-if="currentDashboardData.data.tabs.length !== 1"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-settings-tab-delete-btn"
               >
                 <template #icon-left
-                  ><q-icon :name="outlinedDelete"
+                  ><OIcon name="delete" size="sm"
                 /></template>
               </OButton>
             </div>
@@ -126,20 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </draggable>
     </div>
 
-    <q-dialog
-      v-model="showAddTabDialog"
-      position="right"
-      full-height
-      maximized
+    <AddTab
+      v-model:open="showAddTabDialog"
+      :edit-mode="isTabEditMode"
+      :tabId="selectedTabIdToEdit"
+      :dashboard-id="currentDashboardData.data.dashboardId"
       data-test="dashboard-tab-settings-add-tab-dialog"
-    >
-      <AddTab
-        :edit-mode="isTabEditMode"
-        :tabId="selectedTabIdToEdit"
-        :dashboard-id="currentDashboardData.data.dashboardId"
-        @refresh="refreshRequired"
-      />
-    </q-dialog>
+      @refresh="refreshRequired"
+    />
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"
@@ -160,14 +154,13 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { deleteTab, editTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { reactive } from "vue";
 import { onMounted } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
-import { updateDashboard } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -177,8 +170,8 @@ export default defineComponent({
     AddTab,
     TabsDeletePopUp,
     OButton,
+    OIcon,
   },
-  emits: ["refresh"],
   setup(props, { emit }) {
     const store = useStore();
     const route = useRoute();
@@ -233,9 +226,7 @@ export default defineComponent({
         // emit refresh to rerender
         emit("refresh");
 
-        showPositiveNotification("Dashboard updated successfully.", {
-          timeout: 2000,
-        });
+        showPositiveNotification("Dashboard updated successfully.");
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
@@ -279,9 +270,7 @@ export default defineComponent({
           emit("refresh");
           await getDashboardData();
 
-          showPositiveNotification("Tab updated successfully", {
-            timeout: 2000,
-          });
+          showPositiveNotification("Tab updated successfully");
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
@@ -339,9 +328,7 @@ export default defineComponent({
         tabIdToBeDeleted.value = null;
         deletePopupVisible.value = false;
 
-        showPositiveNotification("Tab deleted successfully", {
-          timeout: 2000,
-        });
+        showPositiveNotification("Tab deleted successfully");
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
@@ -377,7 +364,6 @@ export default defineComponent({
       deletePopupVisible,
       tabIdToBeDeleted,
       handleDragEnd,
-      outlinedDelete,
       addNewItem,
       showAddTabDialog,
       isTabEditMode,

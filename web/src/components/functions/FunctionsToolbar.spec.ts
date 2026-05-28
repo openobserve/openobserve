@@ -16,12 +16,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionsToolbar from "./FunctionsToolbar.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-installQuasar();
 
 describe("FunctionsToolbar", () => {
   let store: any;
@@ -91,7 +89,8 @@ describe("FunctionsToolbar", () => {
       },
     });
 
-    const input = wrapper.find('[data-test="add-function-name-input"]');
+    const inputWrapper = wrapper.find('[data-test="add-function-name-input"]');
+    const input = inputWrapper.find('input');
     await input.setValue("newName");
 
     expect(wrapper.emitted("update:name")).toBeTruthy();
@@ -110,8 +109,9 @@ describe("FunctionsToolbar", () => {
       },
     });
 
-    const input = wrapper.findComponent({ name: "QInput" });
-    expect(input.props("disable")).toBe(true);
+    const inputWrapper = wrapper.find('[data-test="add-function-name-input"]');
+    const input = inputWrapper.find('input');
+    expect(input.attributes("disabled")).toBeDefined();
   });
 
   it("should validate function name format", async () => {
@@ -286,9 +286,8 @@ describe("FunctionsToolbar", () => {
       },
     });
 
-    const radios = wrapper.findAllComponents({ name: "QRadio" });
-    const jsRadio = radios[1];
-    await jsRadio.vm.$emit("update:model-value", "1");
+    const radioGroup = wrapper.findComponent({ name: "ORadioGroup" });
+    await radioGroup.vm.$emit("update:model-value", "1");
 
     await flushPromises();
 

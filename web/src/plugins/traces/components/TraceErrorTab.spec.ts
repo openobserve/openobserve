@@ -14,25 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { ref } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
-
-// ─── Quasar mock — override useQuasar with a notify spy ────────────────────
-const { mockNotify } = vi.hoisted(() => ({
-  mockNotify: vi.fn(),
+// ─── Toast mocks ────────────────────────────────────────────────────────────
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify, dialog: vi.fn() }),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+  toastRecords: [],
+  useToast: () => ({ toast: mockToast, toasts: [] }),
+}));
 
 // ─── useTraceDetails mock — tests control return values per test ───────────
 const { mockUseTraceDetails } = vi.hoisted(() => ({
@@ -48,7 +44,7 @@ import TraceErrorTab from "./TraceErrorTab.vue";
 // ─── Default mock helpers ──────────────────────────────────────────────────
 
 function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
-  return {
+  const merged = {
     hasSpanError: false,
     hasExceptionEvents: [] as any[],
     spanStatusCode: null as string | null,
@@ -60,6 +56,19 @@ function defaultTraceDetails(overrides: Record<string, unknown> = {}) {
     errorBannerMessage: "" as string,
     statusCodeTitle: "" as string,
     ...overrides,
+  };
+
+  return {
+    hasSpanError: ref(merged.hasSpanError),
+    hasExceptionEvents: ref(merged.hasExceptionEvents),
+    spanStatusCode: ref(merged.spanStatusCode),
+    spanGrpcStatusCode: ref(merged.spanGrpcStatusCode),
+    spanErrorType: ref(merged.spanErrorType),
+    spanDbResponseStatusCode: ref(merged.spanDbResponseStatusCode),
+    spanProcessExitCode: ref(merged.spanProcessExitCode),
+    errorBannerTitle: ref(merged.errorBannerTitle),
+    errorBannerMessage: ref(merged.errorBannerMessage),
+    statusCodeTitle: ref(merged.statusCodeTitle),
   };
 }
 
@@ -86,6 +95,27 @@ function mountTraceErrorTab(props: Record<string, unknown> = {}) {
     },
     global: {
       plugins: [i18n, store],
+      stubs: {
+        OTable: {
+          name: "OTable",
+          template: `<div :data-test="$attrs['data-test']">
+            <template v-for="(row, idx) in data" :key="row[rowKey] ?? idx">
+              <div :data-test="'trace-event-detail-' + row._timestamp">
+                <slot name="cell-@timestamp" :row="row" />
+                <slot name="cell-type" :row="row" />
+              </div>
+              <div :data-test="'trace-details-sidebar-exceptions-table-expand-btn-' + idx" @click="$emit('update:expanded-ids', expandedIds.includes(String(idx)) ? [] : [String(idx)])">
+                <slot name="expand-button" :row="row" :index="idx" />
+              </div>
+              <div v-if="expandedIds.includes(String(idx))" :data-test="'trace-details-sidebar-exceptions-table-expanded-row-' + idx">
+                <slot name="expansion" :row="row" />
+              </div>
+            </template>
+          </div>`,
+          props: ["data", "columns", "rowKey", "expandedIds", "loading", "pagination", "showGlobalFilter", "expansion"],
+          emits: ["update:expanded-ids"],
+        },
+      },
     },
   });
 }
@@ -384,9 +414,9 @@ describe("TraceErrorTab", () => {
     it("should show an error icon in the generic banner", () => {
       wrapper = mountTraceErrorTab();
 
-      // The generic banner includes a q-icon with name="error"
+      // The generic banner includes a OIcon with name="error"
       const errorIcons = wrapper
-        .findAllComponents({ name: "QIcon" })
+        .findAllComponents({ name: "OIcon" })
         .filter((c) => c.props("name") === "error");
       expect(errorIcons.length).toBeGreaterThanOrEqual(1);
     });
@@ -615,7 +645,7 @@ describe("TraceErrorTab", () => {
         );
         expect(expandedRow.text()).toContain("Stacktrace:");
         // Python-specific formatting
-        expect(expandedRow.find(".stacktrace-content").html()).toContain(
+        expect(expandedRow.find('[data-test="exception-stacktrace-container"]').html()).toContain(
           "stack-file",
         );
       });
@@ -650,7 +680,7 @@ describe("TraceErrorTab", () => {
           const expandedRow = wrapper.find(
             '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
           );
-          expect(expandedRow.find(".copy-btn").exists()).toBe(false);
+          expect(expandedRow.find('[data-test="exception-copy-stacktrace-btn"]').exists()).toBe(false);
         });
       });
     });
@@ -669,7 +699,7 @@ describe("TraceErrorTab", () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
-        const copyBtn = wrapper.find(".copy-btn");
+        const copyBtn = wrapper.find('[data-test="exception-copy-stacktrace-btn"]');
         expect(copyBtn.exists()).toBe(true);
 
         await copyBtn.trigger("click");
@@ -684,14 +714,14 @@ describe("TraceErrorTab", () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
-        const copyBtn = wrapper.find(".copy-btn");
+        const copyBtn = wrapper.find('[data-test="exception-copy-stacktrace-btn"]');
         await copyBtn.trigger("click");
         await flushPromises();
 
-        expect(mockNotify).toHaveBeenCalledWith(
+        expect(mockToast).toHaveBeenCalledWith(
           expect.objectContaining({
             message: "Stacktrace copied to clipboard",
-            color: "positive",
+            variant: "success",
           }),
         );
       });

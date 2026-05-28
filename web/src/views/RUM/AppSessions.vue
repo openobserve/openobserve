@@ -17,38 +17,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page">
     <template v-if="isSessionReplayEnabled">
-      <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+      <div class="tw:pb-[0.625rem]">
         <div class="card-container">
           <div
-            class="text-right tw:p-[0.375rem] flex align-center justify-between"
+            class="tw:text-right tw:p-[0.375rem] tw:flex tw:gap-x-2 align-center tw:justify-end metrics-date-time"
           >
-            <syntax-guide />
-            <div class="flex align-center justify-end metrics-date-time">
-              <date-time
-                auto-apply
-                :default-type="sessionState.data.datetime.valueType"
-                :default-absolute-time="{
-                  startTime: sessionState.data.datetime.startTime,
-                  endTime: sessionState.data.datetime.endTime,
-                }"
-                :default-relative-time="
-                  sessionState.data.datetime.relativeTimePeriod
-                "
-                data-test="logs-search-bar-date-time-dropdown"
-                class="q-mr-sm"
-                @on:date-change="updateDateChange"
-              />
-              <OButton
-                data-test="metrics-explorer-run-query-button"
-                data-cy="metrics-explorer-run-query-button"
-                variant="primary"
-                size="sm-toolbar"
-                :title="t('metrics.runQuery')"
-                @click="runQuery"
-              >
-                {{ t("metrics.runQuery") }}
-              </OButton>
-            </div>
+           <syntax-guide />
+            <date-time
+              auto-apply
+              menu-align="end"
+              :default-type="sessionState.data.datetime.valueType"
+              :default-absolute-time="{
+                startTime: sessionState.data.datetime.startTime,
+                endTime: sessionState.data.datetime.endTime,
+              }"
+              :default-relative-time="
+                sessionState.data.datetime.relativeTimePeriod
+              "
+              data-test="logs-search-bar-date-time-dropdown"
+              @on:date-change="updateDateChange"
+            />
+            <OButton
+              data-test="metrics-explorer-run-query-button"
+              data-cy="metrics-explorer-run-query-button"
+              variant="primary"
+              size="sm-toolbar"
+              :title="t('metrics.runQuery')"
+              @click="runQuery"
+            >
+              {{ t("metrics.runQuery") }}
+            </OButton>
           </div>
           <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
             <query-editor
@@ -60,15 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <q-splitter
-        class="tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]"
+      <OSplitter
+        class="tw:h-[calc(100%-8.125rem)]"
         v-model="splitterModel"
         unit="px"
-        vertical
+        :horizontal="false"
       >
         <template #before>
           <div class="card-container tw:p-[0.325rem] tw:h-full">
-            <FieldList
+            <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
                 startTime: dateTime.startTime,
@@ -82,72 +80,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="tw:pr-[0.625rem] tw:h-full">
+          <div class="tw:h-full">
             <div class="card-container tw:h-full">
-              <template v-if="isLoading.length">
-                <div
-                  class="q-pb-lg flex items-center justify-center text-center tw:h-full"
-                >
-                  <div>
-                    <q-spinner-hourglass
-                      color="primary"
-                      size="2.5rem"
-                      class="tw:mx-auto tw:block"
-                    />
-                    <div class="text-center full-width">
-                      {{ t("rum.loadingSessions") }}
-                    </div>
-                  </div>
-                </div>
-              </template>
-              <template v-else>
-                <AppTable
-                  :columns="columns"
-                  :rows="rows"
-                  class="app-table-container tw:h-full"
-                  :bordered="false"
-                  @event-emitted="handleTableEvents"
+                <OTable
+                  :data="tableRows"
+                  :columns="tableColumns"
+                  :loading="isLoading.length > 0"
+                  row-key="session_id"
+                  pagination="none"
+                  virtual-scroll
+                  :dense="false"
+                  :row-height="54"
+                  class="tw:h-full"
                   data-test="rum-sessions-table"
+                  row-class="tw:cursor-pointer"
+                  @row-click="handleRowClick"
+                  @scroll-end="handleScrollEnd"
+                  :show-global-filter="false"
                 >
-                  <template v-slot:frustration_count_column="slotProps">
-                    <FrustrationBadge
-                      :count="slotProps.column.row.frustration_count || 0"
+                  <template #empty>
+                    <NoData />
+                  </template>
+                  <template #cell-action_play="{ row }">
+                    <OIcon
+                      name="play-circle-filled"
+                      size="md"
+                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
-                  <template v-slot:session_location_column="slotProps">
-                    <SessionLocationColumn :column="slotProps.column.row" />
+                  <template #cell-frustration_count="{ row }">
+                    <FrustrationBadge
+                      :count="row.frustration_count || 0"
+                    />
                   </template>
-                </AppTable>
-              </template>
+                  <template #cell-location="{ row }">
+                    <SessionLocationColumn :column="row" />
+                  </template>
+                </OTable>
             </div>
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </template>
     <template v-else>
-      <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
-        <div class="card-container">
-          <div class="q-pa-lg enable-rum tw:max-w-[64rem]">
-            <div class="q-pb-lg">
-              <div class="text-left text-h6 text-bold q-pb-md">
-                {{ t("rum.discoverSessionTitle") }}
-              </div>
-              <div class="text-subtitle1">
-                {{ t("rum.discoverSessionMessage") }}
-              </div>
-              <div>
-                <div></div>
-              </div>
+      <div class="card-container">
+        <div class="tw:p-4 enable-rum tw:max-w-[64rem]">
+          <div class="tw:pb-4">
+            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
+              {{ t("rum.discoverSessionTitle") }}
             </div>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              :title="t('common.getStartedRUM')"
-              @click="getStarted"
-            >
-              {{ t("common.getStarted") }}
-            </OButton>
+            <div class="tw:text-base tw:font-medium">
+              {{ t("rum.discoverSessionMessage") }}
+            </div>
+            <div>
+              <div></div>
+            </div>
           </div>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :title="t('common.getStartedRUM')"
+            @click="getStarted"
+          >
+            {{ t("common.getStarted") }}
+          </OButton>
         </div>
       </div>
     </template>
@@ -164,23 +160,26 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import AppTable from "@/components/rum/AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   formatDuration,
   b64DecodeUnicode,
   b64EncodeUnicode,
 } from "@/utils/zincutils";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { date, useQuasar } from "quasar";
+import { formatDate } from "@/utils/date";
 import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import {
@@ -188,6 +187,8 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Session {
   timestamp: string;
@@ -213,7 +214,6 @@ const props = defineProps({
 const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
-const q = useQuasar();
 
 const { sessionState } = useSession();
 const store = useStore();
@@ -274,77 +274,60 @@ const userDataSet = new Set([
   "resource_url",
 ]);
 
-const columns = ref([
+const tableColumns = [
   {
-    name: "action_play",
-    field: "",
-    label: "",
-    type: "action",
-    icon: "play_circle_filled",
-    class: "session-play-icon",
-    style: { width: "3.5rem" },
+    id: "action_play",
+    header: "",
+    accessorKey: "action_play",
+    sortable: false,
+    size: 56,
+    meta: { align: "center" },
   },
   {
-    name: "timestamp",
-    field: (row: any) => getFormattedDate(row["timestamp"] / 1000),
-    label: t("rum.timestamp"),
-    align: "left",
+    id: "timestamp",
+    header: t("rum.timestamp"),
+    accessorFn: (row: any) => getFormattedDate(row["timestamp"] / 1000),
     sortable: true,
+    size: 240,
+    meta: { align: "left" },
   },
   {
-    name: "user_email",
-    field: (row: any) => row["user_email"] || "Unknown",
-    label: t("login.userEmail"),
-    align: "left",
+    id: "user_email",
+    header: t("login.userEmail"),
+    accessorFn: (row: any) => row["user_email"] || "Unknown",
     sortable: true,
+    meta: { align: "left", autoWidth: true },
   },
   {
-    name: "time_spent",
-    field: (row: any) => formatDuration(row["time_spent"]),
-    label: t("rum.timeSpent"),
-    align: "left",
+    id: "time_spent",
+    header: t("rum.timeSpent"),
+    accessorFn: (row: any) => formatDuration(row["time_spent"]),
     sortable: true,
-    sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return (
-        parseInt(rowA.time_spent.toString()) -
-        parseInt(rowB.time_spent.toString())
-      );
-    },
+    meta: { align: "left" },
   },
   {
-    name: "error_count",
-    field: (row: any) => row["error_count"],
-    prop: (row: any) => row["error_count"],
-    label: t("rum.errorCount"),
-    align: "left",
+    id: "error_count",
+    header: t("rum.errorCount"),
+    accessorKey: "error_count",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "frustration_count",
-    field: (row: any) => row["frustration_count"] || 0,
-    prop: (row: any) => row["frustration_count"] || 0,
-    label: t("rum.frustrationCount"),
-    align: "left",
+    id: "frustration_count",
+    header: t("rum.frustrationCount"),
+    accessorFn: (row: any) => row["frustration_count"] || 0,
     sortable: true,
-    slot: true,
-    slotName: "frustration_count_column",
+    meta: { align: "left" },
   },
   {
-    name: "location",
-    field: (row: any) => formatDuration(row["time_spent"]),
-    label: t("rum.location"),
-    align: "left",
-    slot: true,
-    slotName: "session_location_column",
+    id: "location",
+    header: t("rum.location"),
+    accessorFn: (row: any) => formatDuration(row["time_spent"]),
     sortable: true,
-    sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return (
-        parseInt(rowA.time_spent.toString()) -
-        parseInt(rowB.time_spent.toString())
-      );
-    },
+    size: 360,
+    meta: { align: "left" },
   },
-]);
+];
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -538,10 +521,9 @@ const getSessions = () => {
     })
     .catch((err) => {
       rows.value = [];
-      q.notify({
+      toast({
         message: err.response?.data?.message || "Error while fetching sessions",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-right",
       });
     })
     .finally(() => {
@@ -613,12 +595,11 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message ||
           "Error while fetching session replay data",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-right",
         timeout: 4000,
       });
     })
@@ -642,20 +623,20 @@ const updateDateChange = (date: any) => {
 const splitterModel = ref(250);
 
 const rows = ref<Session[]>([]);
+
+const tableRows = computed(() => rows.value);
+
 const router = useRouter();
 
-const handleTableEvents = (event: string, payload: any) => {
-  const eventMapping: { [key: string]: (payload: any) => void } = {
-    "cell-click": handleCellClick,
-    scroll: handleScroll,
-  };
-  eventMapping[event](payload);
+const handleRowClick = (row: any) => {
+  if (!row.session_id) return;
+  handleCellClick({ columnName: "action_play", row });
 };
 
-const handleScroll = (scrollData: any) => {
+const handleScrollEnd = () => {
   if (!isLoading.value.length) {
     const totalFetchedSessions = Object.keys(sessionState.data.sessions).length;
-    if (totalFetchedSessions / scrollData.to < 1.3) {
+    if (totalFetchedSessions > 0 && totalFetchedSessions % sessionState.data.resultGrid.size === 0) {
       sessionState.data.resultGrid.currentPage++;
       // getSessions();
     }
@@ -691,7 +672,7 @@ const handleSidebarEvent = (event: string, value: any) => {
 };
 
 const getFormattedDate = (timestamp: number) =>
-  date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
+  formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
 const runQuery = () => {
   sessionState.data.resultGrid.currentPage = 0;
@@ -773,10 +754,6 @@ const getStarted = () => {
     height: 100%;
   }
 
-  .q-item__label span {
-    /* text-transform: capitalize; */
-  }
-
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
     height: 0.8125rem;
@@ -817,17 +794,12 @@ const getStarted = () => {
 
     .q-btn__content {
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-
-      .q-icon {
-        font-size: 0.9375rem;
-        color: #ffffff;
-      }
-    }
+}
   }
 
   .app-table-container {
     .session-play-icon {
-      .q-icon {
+      .OIcon {
         &:hover {
           color: var(--q-primary);
         }

@@ -41,6 +41,14 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
       panelTimeRange: "1-h"
     });
 
+    // Wait for initial pt-period URL param to land before interacting — ensures
+    // panelsInitializing guard in RenderDashboardCharts has cleared (500ms timeout).
+    await page.waitForFunction(
+      (pid) => window.location.href.includes(`pt-period.${pid}`),
+      panelId,
+      { timeout: 10000 }
+    );
+
     // Step 2: Change Panel time to "Last 6d" and Apply
     await pm.dashboardPanelTime.changePanelTimeInView(panelId, "6-d", true);
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -88,6 +96,13 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
 
     const panelAId = panelIds[0];
     const panelBId = panelIds[1];
+
+    // Wait for URL to be populated with panel time params before asserting
+    await page.waitForFunction(
+      (ids) => ids.every(pid => window.location.href.includes(`pt-period.${pid}`)),
+      [panelAId, panelBId],
+      { timeout: 10000 }
+    );
 
     // Step 2: Verify initial URL contains both panel times
     await assertPanelTimeInURL(page, panelAId, "1h");

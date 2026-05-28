@@ -17,14 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
     <!-- latitude container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ t("panel.latitude") }}
-        <q-icon name="info_outline" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
-        </q-icon>
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+          <OTooltip :content="Hint" />
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -42,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-latitude-layout"
       >
         <OButtonGroup
-          class="axis-field q-mr-sm q-my-xs"
+          class="axis-field tw:mr-2 tw:my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -67,18 +64,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-latitude-item-${latitudeLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="xs" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-latitude-item-${latitudeLabel}`"
-          >
-            {{ latitudeLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-latitude-item-${latitudeLabel}`"
+              >
+                {{ latitudeLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
             >
               <div
@@ -110,39 +113,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :chartType="dashboardPanelData.data.type"
                 />
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
             :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
             @click="removeLatitude()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.latitude == null
           "
         >
-          <div class="q-mt-xs">{{ Hint }}</div>
+          <div class="tw:mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- longitude container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ t("panel.longitude") }}
-        <q-icon name="info_outline" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
-        </q-icon>
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+          <OTooltip :content="Hint" />
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-longitude-layout"
       >
         <OButtonGroup
-          class="axis-field q-mr-sm q-my-xs"
+          class="axis-field tw:mr-2 tw:my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -185,18 +185,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-longitude-item-${longitudeLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="xs" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-longitude-item-${longitudeLabel}`"
-          >
-            {{ longitudeLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-longitude-item-${longitudeLabel}`"
+              >
+                {{ longitudeLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
             >
               <div
@@ -228,39 +234,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :chartType="dashboardPanelData.data.type"
                 />
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
             :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
             @click="removeLongitude()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.longitude == null
           "
         >
-          <div class="q-mt-xs">{{ Hint }}</div>
+          <div class="tw:mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- weight container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ t("panel.weight") }}
-        <q-icon name="info_outline" class="q-ml-xs">
-          <q-tooltip>
-            {{ WeightHint }}
-          </q-tooltip>
-        </q-icon>
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+          <OTooltip :content="WeightHint" />
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -278,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-weight-layout"
       >
         <OButtonGroup
-          class="axis-field q-mr-sm q-my-xs"
+          class="axis-field tw:mr-2 tw:my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -303,18 +306,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-weight-item-${weightLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="xs" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-weight-item-${weightLabel}`"
-          >
-            {{ weightLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-weight-item-${weightLabel}`"
+              >
+                {{ weightLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown"
               :data-test="`dashboard-weight-item-${weightLabel}-menu`"
             >
               <div
@@ -346,32 +355,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :chartType="dashboardPanelData.data.type"
                 />
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
             :data-test="`dashboard-weight-item-${weightLabel}-remove`"
             @click="removeWeight()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.weight == null
           "
         >
-          <div class="q-mt-xs">{{ WeightHint }}</div>
+          <div class="tw:mt-1">{{ WeightHint }}</div>
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <q-separator />
+    <OSeparator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -383,6 +392,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -393,15 +405,20 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
+    ODropdown,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
+    OIcon,
+    OTooltip,
   },
   props: ["dashboardData"],
   setup(props) {
@@ -705,7 +722,8 @@ export default defineComponent({
   flex: 1;
   width: 100%;
   // white-space: nowrap;
-  overflow-x: auto;
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .layout-separator {
@@ -763,12 +781,12 @@ export default defineComponent({
   padding: 0;
 }
 
-.q-menu {
+.dashboard-geo-maps-query-builder-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
 
-  .q-virtual-scroll__content {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
 }
@@ -868,11 +886,7 @@ export default defineComponent({
         z-index: 3;
         opacity: 0;
         right: 0;
-
-        .q-icon {
-          cursor: pointer;
-        }
-      }
+}
 
       .field_label {
         pointer-events: none;
@@ -915,31 +929,6 @@ export default defineComponent({
         }
       }
     }
-  }
-}
-
-.q-item {
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
   }
 }
 

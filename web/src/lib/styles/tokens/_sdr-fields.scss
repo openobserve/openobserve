@@ -1,0 +1,44 @@
+/* ============================================================
+   SDR FIELD TOKENS — data-type label chip colors
+   Named by data type. Reusable for any typed field label chip.
+   ============================================================
+   Token values live in styles/_variables.scss as --o2-label-chip-*
+   (light in :root, dark in .body--dark).
+   This file re-registers them for Tailwind utility generation.
+   ============================================================ */
+
+/* ── Register ALL tokens for Tailwind utility generation ── */
+@theme inline {
+  --color-label-chip-ip-bg:        var(--o2-label-chip-ip-bg);
+  --color-label-chip-ip-text:      var(--o2-label-chip-ip-text);
+  --color-label-chip-ipv4-bg:      var(--o2-label-chip-ipv4-bg);
+  --color-label-chip-ipv4-text:    var(--o2-label-chip-ipv4-text);
+  --color-label-chip-ipv6-bg:      var(--o2-label-chip-ipv6-bg);
+  --color-label-chip-ipv6-text:    var(--o2-label-chip-ipv6-text);
+  --color-label-chip-method-bg:    var(--o2-label-chip-method-bg);
+  --color-label-chip-method-text:  var(--o2-label-chip-method-text);
+  --color-label-chip-url-bg:       var(--o2-label-chip-url-bg);
+  --color-label-chip-url-text:     var(--o2-label-chip-url-text);
+  --color-label-chip-num-bg:       var(--o2-label-chip-num-bg);
+  --color-label-chip-num-text:     var(--o2-label-chip-num-text);
+  --color-label-chip-float-bg:     var(--o2-label-chip-float-bg);
+  --color-label-chip-float-text:   var(--o2-label-chip-float-text);
+  --color-label-chip-hex-bg:       var(--o2-label-chip-hex-bg);
+  --color-label-chip-hex-text:     var(--o2-label-chip-hex-text);
+  --color-label-chip-ts-bg:        var(--o2-label-chip-ts-bg);
+  --color-label-chip-ts-text:      var(--o2-label-chip-ts-text);
+  --color-label-chip-date-bg:      var(--o2-label-chip-date-bg);
+  --color-label-chip-date-text:    var(--o2-label-chip-date-text);
+  --color-label-chip-time-bg:      var(--o2-label-chip-time-bg);
+  --color-label-chip-time-text:    var(--o2-label-chip-time-text);
+  --color-label-chip-id-bg:        var(--o2-label-chip-id-bg);
+  --color-label-chip-id-text:      var(--o2-label-chip-id-text);
+  --color-label-chip-email-bg:     var(--o2-label-chip-email-bg);
+  --color-label-chip-email-text:   var(--o2-label-chip-email-text);
+  --color-label-chip-str-bg:       var(--o2-label-chip-str-bg);
+  --color-label-chip-str-text:     var(--o2-label-chip-str-text);
+  --color-label-chip-default-bg:   var(--o2-label-chip-default-bg);
+  --color-label-chip-default-text: var(--o2-label-chip-default-text);
+  --color-label-chip-pattern-bg:   var(--o2-label-chip-pattern-bg);
+  --color-label-chip-pattern-text: var(--o2-label-chip-pattern-text);
+}

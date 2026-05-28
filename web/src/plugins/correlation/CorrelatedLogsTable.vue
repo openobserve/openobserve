@@ -58,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!hasResults"
                 >
                   <template v-if="true">
-                    <q-icon name="view_column"
-size="16px"
+                    <OIcon name="view-column"
+size="sm"
 class="tw:mr-1" />
                     {{ t('search.showHideColumns') }}
                   </template>
@@ -67,63 +67,56 @@ class="tw:mr-1" />
               </template>
               <div class="column-visibility-list tw:min-w-[220px] tw:max-h-[320px] tw:overflow-y-auto">
                 <!-- Select All / Deselect All -->
-                <q-item
-                  dense
-                  clickable
-                  @click="toggleSelectAll"
+                <ODropdownItem
                   class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                   data-test="select-all-columns"
+                  @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
                 >
-                  <q-item-section avatar>
-                    <q-checkbox
-                      :model-value="areAllColumnsSelected"
-                      :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
-                      @update:model-value="toggleSelectAll"
-                      dense
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="tw:font-semibold">
-                      {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
+                  <template #icon-left>
+                    <span @click.stop>
+                      <OCheckbox
+                        :model-value="areAllColumnsSelected"
+                        :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
+                        @update:model-value="toggleSelectAll"
+                      />
+                    </span>
+                  </template>
+                  <span class="tw:font-semibold">
+                    {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
+                  </span>
+                </ODropdownItem>
 
                 <!-- Draggable Column Items -->
-                <q-item
+                <ODropdownItem
                   v-for="(field, index) in orderedFields"
                   :key="field"
-                  dense
-                  clickable
-                  @click="toggleColumnVisibility(field)"
-                  :disable="field === '_timestamp'"
+                  :disabled="field === '_timestamp'"
                   draggable="true"
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="{ 'dragging': draggedIndex === index }"
+                  :class="['column-item', { 'dragging': draggedIndex === index }]"
                   :data-test="`column-item-${field}`"
-                  class="column-item"
+                  @select="(e) => { e.preventDefault(); toggleColumnVisibility(field); }"
                 >
-                  <q-item-section avatar>
-                    <q-checkbox
-                      :model-value="visibleColumns.has(field)"
-                      @update:model-value="toggleColumnVisibility(field)"
-                      :disable="field === '_timestamp'"
-                      dense
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ field }}</q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-icon
-                      name="drag_indicator"
+                  <template #icon-left>
+                    <span @click.stop>
+                      <OCheckbox
+                        :model-value="visibleColumns.has(field)"
+                        @update:model-value="toggleColumnVisibility(field)"
+                        :disabled="field === '_timestamp'"
+                      />
+                    </span>
+                  </template>
+                  <span class="tw:flex-1">{{ field }}</span>
+                  <template #icon-right>
+                    <OIcon
+                      name="drag-indicator"
                       size="xs"
                       class="drag-handle tw:cursor-move"
                     />
-                  </q-item-section>
-                </q-item>
+                  </template>
+                </ODropdownItem>
               </div>
             </ODropdown>
           </div>
@@ -132,15 +125,9 @@ class="tw:mr-1" />
 
       <!-- Show skeleton while loading -->
       <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
       </div>
 
       <!-- Results Summary Row -->
@@ -155,11 +142,9 @@ height="32px" />
               })
             }}
           </template>
-          <q-skeleton
+          <OSkeleton
             v-else-if="isLoading"
-            type="text"
-            width="200px"
-            height="14px"
+            class="tw:w-[200px] tw:h-[14px]"
           />
         </div>
       </div> -->
@@ -211,7 +196,7 @@ height="32px" />
           <div
             class="tw:flex tw:items-center tw:justify-center tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <span class="tw:text-sm tw:opacity-70">
               {{ t("correlation.logs.loading") }}
             </span>
@@ -255,17 +240,24 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
-import { date, copyToClipboard, useQuasar } from "quasar";
+import { formatDate } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -284,7 +276,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 const { searchObj } = searchState();
 const { loadKeyFields } = useServiceCorrelation();
 
@@ -657,7 +648,7 @@ watch(defaultLogFields, (keyFields) => {
 
 // Generate table columns dynamically from visible fields in custom order
 const tableColumns = computed<ColumnDef<any>[]>(() => {
-  // Filter out hidden columns, respecting custom order
+  // Filter out tw:hidden columns, respecting custom order
   const visibleFields = orderedFields.value.filter((field) =>
     visibleColumns.value.has(field),
   );
@@ -760,7 +751,7 @@ const showingDefaultColumns = computed(() => {
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return date.formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
 };
 
 /**
@@ -817,13 +808,10 @@ const handleRowClick = (row: any) => {
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData).then(() =>
-    $q.notify({
-      type: "positive",
-      message: "Content Copied Successfully!",
-      timeout: 1000,
-    })
-  );
+  copyToClipboard(copyData, {
+    successMessage: "Content Copied Successfully!",
+    timeout: 1000,
+  });
 };
 
 const handleSendToAiChat = (value: any) => {
@@ -852,15 +840,15 @@ const handleAddFieldToTable = (field: string) => {
     visibleColumns.value = new Set(visibleColumns.value);
 
     // Show success notification
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: `Column "${field}" added to table`,
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
-    $q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `Column "${field}" is already visible`,
       timeout: 1500,
     });
@@ -1068,11 +1056,6 @@ watch(
   :deep(.q-field__append) {
     padding-left: 0.25rem;
   }
-}
-
-// Skeleton loading styles
-:deep(.q-skeleton) {
-  opacity: 0.7;
 }
 
 // Table skeleton container

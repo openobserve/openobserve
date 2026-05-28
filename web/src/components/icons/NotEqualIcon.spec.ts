@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import NotEqualIcon from '@/components/icons/NotEqualIcon.vue';
-import { Quasar } from 'quasar';
+
 
 describe('NotEqualIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +10,7 @@ describe('NotEqualIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(NotEqualIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(NotEqualIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

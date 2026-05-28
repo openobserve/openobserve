@@ -50,8 +50,8 @@ export async function startPanelCreation(page, pm, config) {
     timeout: 10000
   });
 
-  // Set panel name
-  await page.locator('[data-test="dashboard-panel-name"]').fill(panelName);
+  // Set panel name — OInput inner native <input> uses data-test="<name>-field"
+  await page.locator('[data-test="dashboard-panel-name-field"]').fill(panelName);
   await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
   // Select stream type and stream
@@ -148,7 +148,13 @@ export async function addPanelWithPanelTime(page, pm, config) {
   const noPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
   const addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
 
-  // Try to click the button for existing panels first, otherwise click the no-panel button
+  // Wait for one of the two buttons to become visible (dashboard may still be loading after save)
+  await Promise.race([
+    addPanelBtn.waitFor({ state: "visible", timeout: 15000 }),
+    noPanelBtn.waitFor({ state: "visible", timeout: 15000 })
+  ]);
+
+  // Now check which one is actually visible and click it
   if (await addPanelBtn.isVisible().catch(() => false)) {
     await addPanelBtn.click();
   } else {
@@ -162,8 +168,8 @@ export async function addPanelWithPanelTime(page, pm, config) {
     timeout: 10000
   });
 
-  // Set panel name
-  await page.locator('[data-test="dashboard-panel-name"]').fill(panelName);
+  // Set panel name — OInput inner native <input> uses data-test="<name>-field"
+  await page.locator('[data-test="dashboard-panel-name-field"]').fill(panelName);
 
   // Wait for UI to settle after filling panel name
   await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
@@ -196,7 +202,7 @@ export async function addPanelWithPanelTime(page, pm, config) {
 
       // Click the global Apply button (required for config time changes in v4.0)
       await page.locator('[data-test="dashboard-apply"]').click();
-      await page.waitForTimeout(500); // Wait for Apply to process
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     }
     // If panelTimeRange is null: toggle is ON but no time set, follows global time
   }
@@ -266,10 +272,10 @@ export async function createDashboardWithMultiplePanels(page, pm, config) {
 export async function openDashboard(page, dashboardName) {
   testLogger.info('Opening dashboard', { dashboardName });
 
-  // Find and click the dashboard row
-  const dashboardRow = page.locator(`//tr[.//div[@title="${dashboardName}"]]`).first();
-  await dashboardRow.waitFor({ state: "visible", timeout: 10000 });
-  await dashboardRow.click();
+  // Find and click the dashboard name cell — XPath with element-tag predicates is forbidden
+  const dashboardNameCell = page.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`).first();
+  await dashboardNameCell.waitFor({ state: "visible", timeout: 10000 });
+  await dashboardNameCell.click();
 
   // Wait for dashboard to load
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
@@ -309,20 +315,29 @@ export async function savePanel(page) {
 
   // Ensure any open menus/dropdowns are closed before clicking save
   // This prevents the save button from being intercepted by overlays
-  // Wait for both .q-menu and portal menus to be hidden
-  await page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+  // Wait for ODropdown date-time menu and portal menus to be hidden
+  await page.locator('#date-time-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
   // Also wait for any date picker portal menus to close (they use q-portal--menu--* IDs)
   await page.locator('[id^="q-portal--menu--"]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
   // Click somewhere neutral to dismiss any remaining overlays (like date picker)
   await page.locator('[data-test="dashboard-panel-name"]').click().catch(() => {});
-  await page.waitForTimeout(200);
 
   await page.locator('[data-test="dashboard-panel-save"]').click();
+
+  // Wait for AddPanel form to be dismissed — confirms we've left edit mode
+  // Without this, the broad [data-test^="dashboard-panel-"] selector below would
+  // immediately match "dashboard-panel-save" (still visible in AddPanel) and return
+  // before the transition to dashboard view is complete.
+  await page.locator('[data-test="dashboard-panel-name"]').waitFor({
+    state: "hidden",
+    timeout: 10000
+  }).catch(() => {});
+
   await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-  // Wait for panel to appear back in dashboard
+  // Wait for at least one dashboard panel to be visible (confirms dashboard view)
   await page.locator('[data-test^="dashboard-panel-"]').first().waitFor({
     state: "visible",
     timeout: 15000

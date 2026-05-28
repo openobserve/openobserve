@@ -138,8 +138,8 @@ test.describe(
         await autoCompleteInputs.last().fill(drilldownVarValue);
         testLogger.info(`Variable mapping: ${variableName} → ${drilldownVarValue}`);
 
-        await page.locator('[data-test="confirm-button"]').waitFor({ state: "visible", timeout: 5000 });
-        await page.locator('[data-test="confirm-button"]').click();
+        await page.locator('[data-test="o-dialog-primary-btn"]').waitFor({ state: "visible", timeout: 5000 });
+        await page.locator('[data-test="o-dialog-primary-btn"]').click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         // ── 5. Save panel ────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ test.describe(
         await passAllToggle.click();
         testLogger.info("passAllVariables enabled");
 
-        await page.locator('[data-test="confirm-button"]').click();
+        await page.locator('[data-test="o-dialog-primary-btn"]').click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -390,7 +390,7 @@ test.describe(
         await passAllToggle.waitFor({ state: "visible", timeout: 5000 });
         await passAllToggle.click();
 
-        await page.locator('[data-test="confirm-button"]').click();
+        await page.locator('[data-test="o-dialog-primary-btn"]').click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         await pm.dashboardPanelActions.applyDashboardBtn();

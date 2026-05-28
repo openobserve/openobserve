@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding: 5px; height: 100%; width: 100%">
+  <div
+    data-test="dashboard-geomap-renderer"
+    style="padding: 5px; height: 100%; width: 100%"
+  >
     <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
   </div>
 </template>

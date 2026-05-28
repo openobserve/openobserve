@@ -39,10 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >
-        <ArrowDown class="tw:size-4" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          Scroll to bottom
-        </q-tooltip>
+        <OIcon name="arrow-downward" size="sm" />
+        <OTooltip content="Scroll to bottom" side="top" align="center" />
       </OButton>
     </div>
   </div>
@@ -52,7 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, nextTick, watch, onMounted } from 'vue';
 import { generateAnomalySummary } from '@/utils/alerts/anomalySummaryGenerator';
 import OButton from '@/lib/core/Button/OButton.vue';
-import { ArrowDown } from 'lucide-vue-next';
+import OIcon from '@/lib/core/Icon/OIcon.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 
 const props = defineProps<{
   config: any;

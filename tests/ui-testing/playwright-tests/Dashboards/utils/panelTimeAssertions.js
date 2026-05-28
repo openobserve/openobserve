@@ -58,10 +58,14 @@ export async function assertPanelTimeDisplay(page, panelId, expectedText) {
 export async function assertPanelTimeInURL(page, panelId, expectedValue) {
   testLogger.info('Asserting panel time in URL', { panelId, expectedValue });
 
-  const url = page.url();
   const expectedParam = `pt-period.${panelId}=${expectedValue}`;
 
-  expect(url).toContain(expectedParam);
+  // Vue Router uses history.replaceState() which doesn't trigger networkidle.
+  // Poll until the URL reflects the reactive write from onPanelTimeApply.
+  await expect.poll(
+    async () => page.url(),
+    { intervals: [100, 200, 500, 1000], timeout: 5000 }
+  ).toContain(expectedParam);
 
   testLogger.info('Panel time parameter found in URL', { panelId, expectedValue });
 }
@@ -110,23 +114,10 @@ export async function assertPanelTimeAbsoluteInURL(page, panelId) {
 export async function assertPanelDataRefreshed(page, timeout = 5000) {
   testLogger.info('Asserting panel data refreshed');
 
-  let apiCallDetected = false;
-
-  const responseHandler = async (response) => {
-    const url = response.url();
-    if (url.includes('/query') || url.includes('/_search')) {
-      apiCallDetected = true;
-      testLogger.debug('Panel data API call detected', { url, status: response.status() });
-    }
-  };
-
-  page.on('response', responseHandler);
-
-  await new Promise(resolve => setTimeout(resolve, timeout));
-
-  page.off('response', responseHandler);
-
-  expect(apiCallDetected).toBe(true);
+  await page.waitForResponse(
+    response => response.url().includes('/query') || response.url().includes('/_search'),
+    { timeout }
+  );
 
   testLogger.info('Panel data refresh verified');
   return true;
@@ -143,19 +134,15 @@ export async function assertPanelDataNotRefreshed(page, waitTime = 2000) {
 
   let apiCallDetected = false;
 
-  const responseHandler = async (response) => {
-    const url = response.url();
-    if (url.includes('/query') || url.includes('/_search')) {
-      apiCallDetected = true;
-      testLogger.debug('Unexpected API call detected', { url });
-    }
-  };
-
-  page.on('response', responseHandler);
-
-  await new Promise(resolve => setTimeout(resolve, waitTime));
-
-  page.off('response', responseHandler);
+  await page.waitForResponse(
+    response => response.url().includes('/query') || response.url().includes('/_search'),
+    { timeout: waitTime }
+  ).then(() => {
+    apiCallDetected = true;
+    testLogger.debug('Unexpected API call detected');
+  }).catch(() => {
+    // Timeout — no calls made within waitTime, as expected
+  });
 
   expect(apiCallDetected).toBe(false);
 
@@ -200,7 +187,8 @@ export async function assertPanelTimeToggleState(page, expectedEnabled) {
   testLogger.info('Asserting panel time toggle state', { expectedEnabled });
 
   const toggle = page.locator('[data-test="dashboard-config-allow-panel-time"]');
-  const isChecked = await toggle.getAttribute('aria-checked');
+  // OSwitch: aria-checked is on the inner <button> with data-test="<parent>-btn", not the wrapper
+  const isChecked = await toggle.locator('[data-test$="-btn"]').getAttribute('aria-checked');
 
   expect(isChecked).toBe(expectedEnabled ? 'true' : 'false');
 
@@ -348,37 +336,31 @@ export async function assertPanelVariableUsesPanelTime(page, panelId, expectedTi
   let apiCallFound = false;
   let timeRangeInAPI = null;
 
-  const responseHandler = async (response) => {
-    const url = response.url();
+  const response = await page.waitForResponse(
+    response => response.url().includes('_values') || response.url().includes('/values'),
+    { timeout: 5000 }
+  ).catch(() => null);
 
-    if (url.includes('_values') || url.includes('/values')) {
-      try {
-        const request = response.request();
-        const postData = request.postData();
+  if (response) {
+    try {
+      const request = response.request();
+      const postData = request.postData();
 
-        if (postData) {
-          const data = JSON.parse(postData);
-          // Check if the time range in API matches expected panel time
-          if (data.query && data.query.start_time && data.query.end_time) {
-            apiCallFound = true;
-            // Calculate time range from start/end
-            const duration = data.query.end_time - data.query.start_time;
-            testLogger.debug('Variable API time range', { duration, data: data.query });
-            timeRangeInAPI = duration;
-          }
+      if (postData) {
+        const data = JSON.parse(postData);
+        // Check if the time range in API matches expected panel time
+        if (data.query && data.query.start_time && data.query.end_time) {
+          apiCallFound = true;
+          // Calculate time range from start/end
+          const duration = data.query.end_time - data.query.start_time;
+          testLogger.debug('Variable API time range', { duration, data: data.query });
+          timeRangeInAPI = duration;
         }
-      } catch (error) {
-        testLogger.debug('Error parsing API request', { error: error.message });
       }
+    } catch (error) {
+      testLogger.debug('Error parsing API request', { error: error.message });
     }
-  };
-
-  page.on('response', responseHandler);
-
-  // Wait for API call
-  await new Promise(resolve => setTimeout(resolve, 3000));
-
-  page.off('response', responseHandler);
+  }
 
   expect(apiCallFound).toBe(true);
 

@@ -6,11 +6,13 @@ const { ingestTestData } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 async function applyQuery(pm) {
-  const search = pm.page.waitForResponse(logData.applyQuery, { timeout: 90000 });
   // CRITICAL: Search preparation wait - allows histogram query partitioning to initialize
-  await pm.page.waitForTimeout(3000);
-  await pm.logsPage.clickRefreshButton();
-  await expect.poll(async () => (await search).status()).toBe(200);
+  // Wait for query button to be visible, then run query and wait for the
+  // execution to complete. runQueryAndWaitForResults keys off the button's
+  // UI state (Run -> Cancel -> Run) so it correctly waits for any in-flight
+  // auto-search to settle before clicking, then waits for the new search.
+  await pm.logsPage.expectRefreshButtonVisible();
+  await pm.logsPage.runQueryAndWaitForResults();
 }
 
 test.describe("Search Partition Tests", () => {
@@ -26,15 +28,16 @@ test.describe("Search Partition Tests", () => {
     pm = new PageManager(page);
     
     // CRITICAL: Post-authentication stabilization wait
-    await page.waitForTimeout(2000);
-    
+    await page.waitForLoadState('domcontentloaded');
+
     // Ingest test data for partition testing (preserve exact logic)
     await ingestTestData(page);
-    
+
     // Navigate to logs page and setup for partition testing
     await page.goto(
       `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
+    await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.selectStream("e2e_automate");
     await applyQuery(pm);
     

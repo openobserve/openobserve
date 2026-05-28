@@ -15,81 +15,162 @@ export class PipelinesPage {
         this.pipelineMenuLink = page.locator(
           '[data-test="menu-link-\\/pipeline-item"]'
         );
-        this.pipelineTab = page.locator('[data-test="stream-pipelines-tab"]');
+        this.pipelineTab = page.locator('button[data-test="stream-pipelines-tab"]');
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
         );
-        this.streamButton = page.getByRole("button", { name: "Stream" }).first();
-        this.queryButton = page.getByRole("button", { name: "Query" });
+        this.streamButton = page.locator('[data-test="pipeline-node-sidebar-stream-input-btn"]');
+        this.queryButton = page.locator('[data-test="pipeline-node-sidebar-query-input-btn"]');
         this.vueFlowPane = page.locator(".vue-flow__pane");
+        // Stream-type OSelect inside the input-node form (Stream.vue). Clicking
+        // the wrapper opens the OSelect popover with `*-option` items.
+        this.inputNodeStreamTypeSelect = page.locator('[data-test="input-node-stream-type-select"]').first();
+        // OSelect popover for the input-node stream-type select. Per the OSelect
+        // convention (§4) the popover/options pick up `<parentDataTest>-popover`
+        // and `<parentDataTest>-option` data-test attributes.
+        this.inputNodeStreamTypePopover = page.locator('[data-test="input-node-stream-type-select-popover"]');
+        // Per-value `logs` option inside the stream-type OSelect popover.
+        this.inputNodeStreamTypeLogsOption = page.locator(
+          '[data-test="input-node-stream-type-select-option"][data-test-value="logs"]'
+        );
         this.logsDropdown = page.locator("div").filter({ hasText: /^logs$/ });
         this.logsOption = page
           .getByRole("option", { name: "logs" })
           .locator("div")
           .nth(2);
-        this.saveButton = page.locator('[data-test="input-node-stream-save-btn"]');
-        this.selectStreamError = page.getByText("Please select Stream from the");
+        this.saveButton = page.locator(
+          '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
+        );
+        // Error message shown when saving the input/output stream node without
+        // selecting a stream. The OSelect on Stream.vue exposes the
+        // `:error-message="streamNameError"` via its auto-derived
+        // `${parent}-error` data-test (set on the wrapper `data-test`).
+        this.selectStreamError = page.locator(
+          '[data-test="input-node-stream-name-select-error"]'
+        ).first();
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        // Target the form field error inside q-field__bottom, not the notification
-        this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
-          "Pipeline name is required"
+        // Pipeline name required error — PipelineEditor's OInput. OInput
+        // renders the error inside the auto-derived `${parent}-error` element.
+        this.pipelineNameRequiredMessage = page.locator(
+          '[data-test="pipeline-editor-name-input-error"]'
+        ).first();
+        // Pipeline name OInput - auto-derived `-field` for the native input.
+        this.pipelineNameInput = page.locator('[data-test="pipeline-editor-name-input-field"]');
+        // Source/destination node required errors are toasts in PipelineEditor.
+        // OToast emits `data-test="o-toast-default"` (no variant) with the
+        // message on `data-test-message`. Match the message attribute prefix.
+        this.sourceNodeRequiredMessage = page.locator(
+          '[data-test-message="Source node is required"]'
         );
-        // Updated selector to use placeholder since aria-label doesn't exist
-        this.pipelineNameInput = page.locator('input[placeholder="Enter Pipeline Name"]');
-        this.sourceNodeRequiredMessage = page.getByText("Source node is required");
-        this.streamNameInput = page.getByLabel("Stream Name *");
-        this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
+        // Stream-name OSelect search input — auto-derived `-search` data-test
+        // when searchable=true (see OSelect.vue listbox branch).
+        this.streamNameInput = page.locator('[data-test="input-node-stream-name-select-search"]');
+        // Stream-name OSelect option for `e2e_automate` — auto-derived from
+        // parent data-test as `<parent>-option` + per-value `data-test-value`.
+        this.e2eAutomateOption = page.locator(
+          '[data-test="input-node-stream-name-select-option"][data-test-value="e2e_automate"]'
+        );
         this.inputNodeStreamSaveButton = page.locator(
-          '[data-test="input-node-stream-save-btn"]'
+          '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
         );
-        this.destinationNodeRequiredMessage = page.getByText(
-          "Destination node is required"
+        this.destinationNodeRequiredMessage = page.locator(
+          '[data-test-message="Destination node is required"]'
         );
         this.deleteButton = page.locator("button").filter({ hasText: "delete" });
-        this.confirmDeleteButton = page.locator('[data-test="confirm-button"]');
-        this.secondStreamButton = page.getByRole('button', { name: 'Stream' }).nth(1);
-        this.functionButton =  page.getByRole('button', { name: 'Function' })
-        this.conditionButton =  page.getByRole('button', { name: 'Condition' })
+        this.confirmDeleteButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.secondStreamButton = page.locator('[data-test="pipeline-node-sidebar-stream-output-btn"]');
+        this.functionButton = page.locator('[data-test="pipeline-node-sidebar-function-default-btn"]');
+        this.conditionButton = page.locator('[data-test="pipeline-node-sidebar-condition-default-btn"]');
        this.selectPreviousNodeDropdown = page.getByLabel('Select Previous Node');
        this.previousNodeDropdown = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]');
        this.previousNodeDropdownSecond = page.locator('[data-test="previous-node-dropdown-input-stream-node-option"]:last-child');
-        this.createStreamToggle = page.locator('[data-test="create-stream-toggle"] div').nth(2);
+        this.createStreamToggle = page.locator('[data-test="create-stream-toggle"]');
         this.saveStreamButton = page.locator('[data-test="save-stream-btn"]');
-        this.inputNodeStreamSaveButton = page.locator('[data-test="input-node-stream-save-btn"]')
+        this.inputNodeStreamSaveButton = page.locator(
+          '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
+        );
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
-        this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
+        // OInput inner native input — `.fill()` MUST target the `-field`
+        // variant per §4 (the wrapper isn't the input).
+        this.pipelineSearchInputField = page.locator('[data-test="pipeline-list-search-input-field"]');
+        this.deletionSuccessMessage = page.locator('[data-test-message="Pipeline deleted successfully"]')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
         this.sqlQueryInput = page.locator('.monaco-editor').last();
         this.frequencyUnit = page.locator('[data-test="scheduled-pipeline-frequency-unit"]');
         this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
-        this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
+        this.createFunctionToggle = page.locator('[data-test="create-function-toggle"]');
         this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
-        this.associateFunctionSaveButton = page.locator('[data-test="associate-function-save-btn"]');
+        this.associateFunctionSaveButton = page.locator('[data-test="associate-function-drawer"] [data-test="o-drawer-primary-btn"]');
         this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
-        this.functionNameRequiredError = page.getByText('Function Name is required')
-        this.functionRequiredError = page.getByText('Function is required')
-        this.streamSelectionError = page.getByText('Please select Stream from the')
-        // FilterGroup selectors for new condition UI
+        // AddFunction's name field is an OInput — when the form is submitted
+        // empty, OInput renders the "Field is required!" message inside the
+        // auto-derived `${parent}-error` element with `data-test-error-text`.
+        this.functionNameRequiredError = page.locator(
+          '[data-test="add-function-name-input-error"]'
+        );
+        this.functionRequiredError = page.locator(
+          '[data-test-message="Function is required"]'
+        );
+        // Stream-selection error — `selectStreamError` (above) already covers
+        // the OSelect-error case via the routing-section role=alert. Keep
+        // `streamSelectionError` as an alias of that for backwards-compat
+        // with existing PO callers.
+        this.streamSelectionError = this.selectStreamError;
+        // FilterGroup selectors for new condition UI.
+        // Post-OSelect migration the inner OSelect/OInput emits its OWN data-test
+        // (forwarded from the wrapper) so auto-derived `-trigger`, `-popover`,
+        // `-search`, `-option`, and `-field` data-tests exist alongside the wrapper.
         this.columnSelect = page.locator('[data-test="alert-conditions-select-column"]');
+        this.columnSelectTrigger = page.locator('[data-test="alert-conditions-select-column-trigger"]');
+        this.columnSelectPopover = page.locator('[data-test="alert-conditions-select-column-popover"]');
+        this.columnSelectSearch = page.locator('[data-test="alert-conditions-select-column-search"]');
+        this.columnSelectFirstOption = page.locator('[data-test="alert-conditions-select-column-option"]').first();
         this.operatorSelect = page.locator('[data-test="alert-conditions-operator-select"]');
+        this.operatorSelectTrigger = page.locator('[data-test="alert-conditions-operator-select-trigger"]');
+        this.operatorSelectPopover = page.locator('[data-test="alert-conditions-operator-select-popover"]');
         this.valueInput = page.locator('[data-test="alert-conditions-value-input"]');
+        // OInput inner native input (-field) — must `.fill()` the field variant per §4.
+        this.valueInputField = page.locator('[data-test="alert-conditions-value-input-field"]');
         this.addConditionButton = page.locator('[data-test="alert-conditions-add-condition-btn"]');
+        // Per-name OSelect option (works across both FilterCondition.vue and FieldsInput.vue
+        // because the inner OSelect now emits the parent data-test, so options stamp
+        // `alert-conditions-select-column-option` with `data-test-value="<col>"`).
+        this.columnOptionByName = (name) => page.locator(
+            `[data-test="alert-conditions-select-column-option"][data-test-value="${name}"]`,
+        ).first();
         this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
-        this.fieldRequiredError = page.getByText('Field is required!')
+        // OSelect renders its `:error-message` inside a `<span>` with
+        // `data-test="${parent}-error"` (auto-derived from the wrapper data-test).
+        this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input-error"]');
+        // Condition node's "Please add at least one condition" toast — OToast
+        // exposes the message via `data-test-message`.
+        this.conditionRequiredToast = page.locator(
+          '[data-test-message="Please add at least one condition"]'
+        );
         this.tableRowsLocator = page.locator("tbody tr");
-        this.confirmButton = page.locator('[data-test="confirm-button"]');
+        this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
-        this.pipelineDestinationsTab = page.locator('[data-test="pipeline-destinations-tab"]');
+        this.pipelineDestinationsTab = page.locator('button[data-test="pipeline-destinations-tab"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
-        this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
+        this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
+        this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
-        this.enrichmentTableTab =
-          '[data-test="function-enrichment-table-tab"] .o-tab__label';
-        this.addEnrichmentTableButton = page.getByRole('button', { name: 'New enrichment table' });
+        this.enrichmentTableTab = 'button[data-test="function-enrichment-table-tab"]';
+        // Added data-test "enrichment-tables-add-btn" on the New Enrichment
+        // Table OButton — prefer the data-test locator; fall back to the
+        // legacy getByRole locator for older specs still using the old PO copy.
+        this.addEnrichmentTableButton = page.locator('[data-test="enrichment-tables-add-btn"]');
+        // Enrichment tables list — OInput search field (auto-derived `-field` data-test)
+        this.enrichmentSearchField = page.locator('[data-test="enrichment-tables-search-input-field"]');
+        // Add / Update Enrichment Table form root
+        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
+        // Enrichment table tab locator (data-test prefix; the tab is rendered by
+        // OToggleGroup under the Functions section).
+        this.enrichmentTableTabLocator = page.locator('button[data-test="function-enrichment-table-tab"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -117,9 +198,9 @@ export class PipelinesPage {
         this.containsOption = page.getByText("Contains", { exact: true });
         this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
         this.conditionText = page.getByText('kubernetes_container_name');
-        this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
-        this.addEnrichmentTableText = page.getByRole('button', { name: 'New enrichment table' });
-        this.deletedSuccessfullyText = page.getByText('deleted successfully');
+        this.pipelineSavedMessage = page.locator('[data-test-message="Pipeline saved successfully"]');
+        this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
+        this.deletedSuccessfullyText = page.locator('[data-test-message*="deleted successfully"]');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
 
@@ -129,19 +210,19 @@ export class PipelinesPage {
         this.toggleOperatorBtn = page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
         this.deleteConditionBtn = page.locator('[data-test="alert-conditions-delete-condition-btn"]');
         this.reorderBtn = page.locator('[data-test="alert-conditions-reorder-btn"]');
-        this.addConditionCancelBtn = page.locator('[data-test="add-condition-cancel-btn"]');
-        this.addConditionDeleteBtn = page.locator('[data-test="add-condition-delete-btn"]');
+        this.addConditionCancelBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-secondary-btn"]');
+        this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
         this.nestedGroups = page.locator('.el-border');
         this.operatorLabels = page.locator('span.tw\\:lowercase');
         this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
-        this.noteContainer = page.locator('.note-container');
-        this.noteHeading = page.locator('.note-heading');
-        this.noteInfo = page.locator('.note-info');
-        this.qDialog = page.locator('.q-dialog');
-        this.qDialogBackdrop = page.locator('.q-dialog__backdrop');
-        this.qNotificationMessage = page.locator('.q-notification__message');
-        this.qMenu = page.locator('.q-menu');
+        this.noteContainer = page.locator('[data-test="add-condition-note-container"]');
+        this.noteHeading = page.locator('[data-test="add-condition-note-heading"]');
+        this.noteInfo = page.locator('[data-test="add-condition-note-info"]');
+        this.qDialog = page.locator('[data-test*="dialog"]');
+        this.qDialogBackdrop = page.locator('[role="dialog"]');
+        this.qNotificationMessage = page.locator('[role="alert"]');
+        this.qMenu = page.locator('[data-test$="-popover"], [role="menu"]');
 
         // Pipeline node locators
         this.pipelineNodeOutputStreamNode = page.locator('[data-test="pipeline-node-output-stream-node"]');
@@ -152,6 +233,9 @@ export class PipelinesPage {
         this.pipelineNodeDefaultOutputHandle = page.locator('[data-test="pipeline-node-default-output-handle"]');
         this.pipelineNodeOutputInputHandle = page.locator('[data-test="pipeline-node-output-input-handle"]');
         this.addPipelineBackBtn = page.locator('[data-test="add-pipeline-back-btn"]');
+        // Backfill jobs list locators — error indicator per row + error dialog.
+        this.backfillErrorIndicatorBtn = page.locator('[data-test="error-indicator-btn"]');
+        this.backfillErrorDialog = page.locator('[data-test="backfill-jobs-list-error-dialog"]');
 
         // Additional locators for raw selector fixes
         this.functionIcon = page.getByRole("img", { name: "Function", exact: true });
@@ -161,8 +245,23 @@ export class PipelinesPage {
         // Get the innermost Monaco editor element (handles nested .monaco-editor elements)
         this.vrlEditorMonaco = page.locator('[data-test="logs-vrl-function-editor"]').first().locator('.monaco-editor').last();
         this.noteText = page.getByText("Note: The function will be");
-        this.streamTypeDropdown = page.locator('div').filter({ hasText: /^Stream Type \*$/ }).first();
+        // Scheduled-pipeline stream-type OSelect — wrapper and auto-derived
+        // `-trigger` / `-popover` / `-option` data-tests (added on
+        // ScheduledPipeline.vue per AGENT_RULES §6).
+        this.streamTypeDropdown = page.locator('[data-test="scheduled-pipeline-stream-type-select"]');
+        this.streamTypeDropdownTrigger = page.locator('[data-test="scheduled-pipeline-stream-type-select-trigger"]');
+        this.streamTypeDropdownPopover = page.locator('[data-test="scheduled-pipeline-stream-type-select-popover"]');
         this.streamTypeLabel = page.getByLabel('Stream Type *');
+        // Scheduled-pipeline stream-name OSelect — searchable=true (default),
+        // so auto-derived `-trigger`, `-popover`, `-search`, and `-option`
+        // data-tests are available alongside the wrapper.
+        this.scheduledStreamNameSelect = page.locator('[data-test="scheduled-pipeline-stream-name-select"]');
+        this.scheduledStreamNameSelectTrigger = page.locator('[data-test="scheduled-pipeline-stream-name-select-trigger"]');
+        this.scheduledStreamNameSelectPopover = page.locator('[data-test="scheduled-pipeline-stream-name-select-popover"]');
+        this.scheduledStreamNameSelectSearch = page.locator('[data-test="scheduled-pipeline-stream-name-select-search"]');
+        this.scheduledStreamNameOptionByValue = (name) => page.locator(
+            `[data-test="scheduled-pipeline-stream-name-select-option"][data-test-value="${name}"]`,
+        ).first();
         this.sqlEditorViewLines = page.locator('[data-test="scheduled-pipeline-sql-editor"] .view-lines');
         this.invalidSqlQueryText = page.getByText("Invalid SQL Query");
         this.queryRoutingSection = page.locator('[data-test="add-stream-query-routing-section "]');
@@ -170,7 +269,12 @@ export class PipelinesPage {
         this.queryNodeDeleteBtn = page.locator('[data-test="pipeline-node-input-delete-btn"]');
         this.cancelPipelineBtn = page.locator('[data-test="add-pipeline-cancel-btn"]');
         this.dashboardsMenuLink = page.locator('[data-test="menu-link-\\/dashboards-item"]');
-        this.connectAllNodesError = page.getByText("Please connect all nodes");
+        // PipelineEditor emits a toast "Please connect all nodes before saving"
+        // when the user clicks Save without joining nodes. OToast renders it via
+        // `data-test-message` on its root.
+        this.connectAllNodesError = page.locator(
+          '[data-test-message="Please connect all nodes before saving"]'
+        ).first();
         this.logsOptionRole = page.getByRole("option", { name: "logs" });
         this.fileInput = page.locator('input[type="file"]');
 
@@ -178,7 +282,7 @@ export class PipelinesPage {
         this.validateAndCloseBtn = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.streamRoutingQueryCancelBtn = page.locator('[data-test="stream-routing-query-cancel-btn"]');
         this.discardChangesDialog = page.getByText('Discard Changes');
-        this.discardChangesOkBtn = page.locator('.q-dialog').locator('[data-test="confirm-button"]');
+        this.discardChangesOkBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.scheduledPipelineCancelBtn = page.locator('button').filter({ hasText: 'Cancel' }).first();
 
         // Bug #11498 - Run Query button (in scheduled pipeline dialog)
@@ -229,21 +333,79 @@ export class PipelinesPage {
     }
 
     async dragStreamToTarget(streamElement, offset = { x: 0, y: 0 }) {
+        // The pipeline NodeSidebar uses HTML5 `@dragstart` (draggable="true"),
+        // and the canvas's `@drop` reads `pipelineObj.draggedNode` set in
+        // `onDragStart`. Playwright's `mouse.move/down/up` does NOT dispatch
+        // HTML5 drag events. We dispatch the full HTML5 drag sequence
+        // (dragstart → dragover → drop) directly via DOM APIs using
+        // `page.evaluate`, sharing a single DataTransfer instance so the
+        // source's `event.dataTransfer.setData` and the drop's `clientX/Y`
+        // both flow through to useDnD.ts:onDrop.
         const targetBox = await this.vueFlowPane.boundingBox();
         const streamBox = await streamElement.boundingBox();
-        targetBox.x += offset.x;
-      targetBox.y += offset.y;
-        if (streamBox && targetBox) {
-          await this.page.mouse.move(streamBox.x + streamBox.width / 2, streamBox.y + streamBox.height / 2);
-          await this.page.mouse.down();
-          await this.page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2);
-          await this.page.mouse.up();
-        }
+        if (!streamBox || !targetBox) return;
+        const sourceX = streamBox.x + streamBox.width / 2;
+        const sourceY = streamBox.y + streamBox.height / 2;
+        const targetX = targetBox.x + targetBox.width / 2 + offset.x;
+        const targetY = targetBox.y + targetBox.height / 2 + offset.y;
+        // Resolve elements via DOM coordinates so we don't introduce
+        // non-data-test selectors here.
+        await this.page.evaluate(
+            ({ sx, sy, tx, ty }) => {
+                const sourceEl = document.elementFromPoint(sx, sy);
+                const targetEl = document.elementFromPoint(tx, ty);
+                if (!sourceEl || !targetEl) return;
+                // Walk up from sourceEl to find the [draggable=true] ancestor
+                let dragEl = sourceEl;
+                while (dragEl && dragEl !== document.body) {
+                    if (dragEl.getAttribute && dragEl.getAttribute('draggable') === 'true') break;
+                    dragEl = dragEl.parentElement;
+                }
+                if (!dragEl) dragEl = sourceEl;
+                const dt = new DataTransfer();
+                dragEl.dispatchEvent(new DragEvent('dragstart', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: sx, clientY: sy,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragenter', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('dragover', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                targetEl.dispatchEvent(new DragEvent('drop', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+                dragEl.dispatchEvent(new DragEvent('dragend', {
+                    bubbles: true, cancelable: true, dataTransfer: dt,
+                    clientX: tx, clientY: ty,
+                }));
+            },
+            { sx: sourceX, sy: sourceY, tx: targetX, ty: targetY }
+        );
+        // Wait for the input-node stream form dialog to render — `onDrop` sets
+        // pipelineObj.dialog.show=true which mounts add-stream-input-stream-routing-section.
+        await this.page.locator('[data-test="add-stream-input-stream-routing-section"]')
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .catch(() => {});
     }
 
     async selectLogs() {
-        await this.logsDropdown.click();
-        await this.logsOption.click();
+        // Open the input-node stream-type OSelect. Stream-type uses the
+        // non-listbox SelectRoot branch (searchable=false, plain string opts),
+        // so there is no `<parent>-trigger` data-test. Click the wrapper.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        // Wait for the OSelect popover to appear (data-test forwarded from parent).
+        await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `logs` option — OSelectItem forwards parent data-test plus a
+        // per-value `data-test-value` (see OSelectItem.vue source mod).
+        await this.inputNodeStreamTypeLogsOption.first().waitFor({ state: 'visible', timeout: 10000 });
+        await this.inputNodeStreamTypeLogsOption.first().click();
     }
 
     /**
@@ -285,41 +447,53 @@ export class PipelinesPage {
         await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(500);
 
-        // The data-test attribute is on a wrapper div, the q-select is inside
-        const streamTypeWrapper = this.page.locator('[data-test="input-node-stream-type-select"]').first();
-        await streamTypeWrapper.waitFor({ state: 'visible', timeout: 15000 });
-
-        // Click on the q-select component inside the wrapper
-        const qSelect = streamTypeWrapper.locator('.q-select');
-        await qSelect.waitFor({ state: 'visible', timeout: 10000 });
-        await qSelect.click();
-        await this.page.waitForTimeout(500);
+        // Post-OSelect-migration contract (§4): the wrapper div carries the data-test;
+        // OSelect auto-derives a `-trigger` data-test for the inner PopoverTrigger.
+        // Prefer the explicit `-trigger`; fall back to the wrapper for backwards compat.
+        const trigger = this.page.locator('[data-test="input-node-stream-type-select-trigger"]').first();
+        const wrapper = this.page.locator('[data-test="input-node-stream-type-select"]').first();
+        if (await trigger.count() > 0) {
+            await trigger.waitFor({ state: 'visible', timeout: 15000 });
+            await trigger.click();
+        } else {
+            await wrapper.waitFor({ state: 'visible', timeout: 15000 });
+            await wrapper.click();
+        }
+        await this.page.locator('[data-test="input-node-stream-type-select-popover"]')
+            .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     /**
      * Select metrics as the stream type in the pipeline node form
      */
     async selectMetrics() {
-        // Click the stream type dropdown - use first() to handle multiple elements
-        const streamTypeSelect = this.page.locator('[data-test="input-node-stream-type-select"]').first();
-        await streamTypeSelect.click();
-        await this.page.waitForTimeout(500);
-        // Select metrics option
-        await this.page.getByRole('option', { name: 'metrics', exact: true }).click();
-        await this.page.waitForTimeout(500);
+        // Open the OSelect popover for the input-node stream-type select.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `metrics` option — OSelectItem stamps `data-test-value`.
+        const metricsOption = this.page.locator(
+            '[data-test="input-node-stream-type-select-option"][data-test-value="metrics"]'
+        ).first();
+        await metricsOption.waitFor({ state: 'visible', timeout: 10000 });
+        await metricsOption.click();
     }
 
     /**
      * Select traces as the stream type in the pipeline node form
      */
     async selectTraces() {
-        // Click the stream type dropdown - use first() to handle multiple elements
-        const streamTypeSelect = this.page.locator('[data-test="input-node-stream-type-select"]').first();
-        await streamTypeSelect.click();
-        await this.page.waitForTimeout(500);
-        // Select traces option
-        await this.page.getByRole('option', { name: 'traces', exact: true }).click();
-        await this.page.waitForTimeout(500);
+        // Open the OSelect popover for the input-node stream-type select.
+        await this.inputNodeStreamTypeSelect.waitFor({ state: 'visible', timeout: 15000 });
+        await this.inputNodeStreamTypeSelect.click();
+        await this.inputNodeStreamTypePopover.first().waitFor({ state: 'visible', timeout: 10000 });
+        // Pick the `traces` option — OSelectItem auto-derives the parent
+        // data-test, so each option stamps `<parent>-option` with `data-test-value`.
+        const tracesOption = this.page.locator(
+            '[data-test="input-node-stream-type-select-option"][data-test-value="traces"]'
+        ).first();
+        await tracesOption.waitFor({ state: 'visible', timeout: 10000 });
+        await tracesOption.click();
     }
 
     /**
@@ -358,7 +532,9 @@ export class PipelinesPage {
      * Log all available menu options (for debugging)
      */
     async logMenuOptions() {
-        const options = await this.page.locator('[role="option"]').allTextContents();
+        // OSelect now forwards parent data-test to ListboxItem (`*-option`); we
+        // grab any option-like node with a data-test ending in `-option`.
+        const options = await this.page.locator('[data-test$="-option"]').allTextContents();
         testLogger.debug('[logMenuOptions] Available options', { options });
     }
 
@@ -410,17 +586,17 @@ export class PipelinesPage {
      * @param {string} searchTerm - The search term to enter
      */
     async fillPipelineListSearch(searchTerm) {
-        await this.pipelineSearchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await this.pipelineSearchInput.fill(searchTerm);
-        await this.page.waitForTimeout(500);
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.fill(searchTerm);
+        await expect(this.pipelineSearchInputField).toHaveValue(searchTerm, { timeout: 5000 });
     }
 
     /**
      * Clear the pipeline list search input
      */
     async clearPipelineListSearch() {
-        await this.pipelineSearchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await this.pipelineSearchInput.clear();
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.clear();
         await this.page.waitForTimeout(500);
     }
 
@@ -429,7 +605,7 @@ export class PipelinesPage {
     }
 
     async confirmStreamError() {
-        await this.selectStreamError.click();
+        await expect(this.selectStreamError.first()).toBeVisible({ timeout: 10000 });
     }
 
     async savePipeline() {
@@ -437,25 +613,39 @@ export class PipelinesPage {
     }
 
     async confirmPipelineNameRequired() {
-        await this.pipelineNameRequiredMessage.click();
+        await expect(this.pipelineNameRequiredMessage.first()).toBeVisible({ timeout: 10000 });
     }
 
     async enterPipelineName(pipelineName) {
+        await this.page.locator('[data-test="add-stream-input-stream-routing-section"]')
+            .first()
+            .waitFor({ state: 'detached', timeout: 10000 })
+            .catch(() => {});
         await this.pipelineNameInput.waitFor({ state: 'visible', timeout: 10000 });
         await this.pipelineNameInput.click();
         await this.pipelineNameInput.fill(pipelineName);
     }
 
     async confirmSourceNodeRequired() {
-        await this.sourceNodeRequiredMessage.click();
+        await expect(this.sourceNodeRequiredMessage.first()).toBeVisible({ timeout: 10000 });
     }
     async enterStreamName(streamName) {
+        // The stream-name OSelect (searchable=true) renders the search input
+        // only when its popover is open. Click the wrapper first to open it,
+        // then fill the `-search` field.
+        const wrapper = this.page.locator('[data-test="input-node-stream-name-select"]').first();
+        const popoverOpen = await this.streamNameInput.isVisible().catch(() => false);
+        if (!popoverOpen) {
+            await wrapper.waitFor({ state: 'visible', timeout: 15000 });
+            await wrapper.click();
+            await this.streamNameInput.waitFor({ state: 'visible', timeout: 10000 });
+        }
+        // Use Ctrl+A/Backspace before fill to clear any existing search term —
+        // matches the OSelect popover search convention from AGENT_RULES.
+        await this.streamNameInput.click();
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.press('Backspace');
         await this.streamNameInput.fill(streamName);
-        await this.streamNameInput.press("Enter");
-    }
-
-    async selectStreamOption() {
-        await this.e2eAutomateOption.click();
     }
 
     /**
@@ -463,21 +653,30 @@ export class PipelinesPage {
      * @param {string} streamName - The name of the stream to select
      */
     async selectStreamOptionByName(streamName) {
-        await this.page.waitForTimeout(1000);
-        const optionLocator = this.page.getByRole('option', { name: streamName, exact: true });
-        await optionLocator.waitFor({ state: 'visible', timeout: 10000 });
-        await optionLocator.click();
-        // Press Escape to close any open dropdown menus
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(500);
+        // OSelect emits `<parent>-option` data-test + a per-value
+        // `data-test-value` for every ListboxItem. Match by value to avoid
+        // the prefix collision that a substring or role-name match would
+        // produce (e.g. "e2e_automate" vs "e2e_automate3").
+        const optionLocator = this.page.locator(
+            `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`
+        ).first();
+        await optionLocator.waitFor({ state: 'visible', timeout: 15000 });
+        await optionLocator.click({ force: true });
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
     }
 
     async saveInputNodeStream() {
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'detached', timeout: 5000 })
+            .catch(() => {});
+        await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
 
     async confirmDestinationNodeRequired() {
-        await this.destinationNodeRequiredMessage.click();
+        await expect(this.destinationNodeRequiredMessage.first()).toBeVisible({ timeout: 10000 });
     }
     async deletePipeline() {
         // Navigate back from pipeline editing
@@ -489,12 +688,10 @@ export class PipelinesPage {
     }
 
     async selectAndDragSecondStream() {
-        await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.secondStreamButton,{ x: 120, y: 120 });
+        await this.dragStreamToTarget(this.secondStreamButton, { x: 120, y: 120 });
     }
 
     async selectAndDragFunction() {
-        await this.secondStreamButton.click();
         await this.dragStreamToTarget(this.functionButton, { x: 250, y: 200 });
     }
 
@@ -517,11 +714,19 @@ export class PipelinesPage {
 
     // Method to click the input node stream save button
     async clickInputNodeStreamSave() {
+        // If the stream-name popover is still open (Enter path in fillDestinationStreamName),
+        // wait for it to detach. It will close via interactOutside when the save button receives
+        // the pointerdown event. The .catch keeps this non-blocking if already detached.
+        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
+            .waitFor({ state: 'detached', timeout: 5000 })
+            .catch(() => {});
+        await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
     async searchPipeline(pipelineName) {
-        await this.pipelineSearchInput.click();
-        await this.pipelineSearchInput.fill(pipelineName);
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+        await this.pipelineSearchInputField.click();
+        await this.pipelineSearchInputField.fill(pipelineName);
     }
 
     /**
@@ -606,7 +811,7 @@ export class PipelinesPage {
 
     // Method to verify deletion success message
     async verifyPipelineDeleted() {
-        await this.deletionSuccessMessage.click();
+        await this.deletionSuccessMessage.waitFor({ state: 'visible' });
     }
 
     async clickSqlEditor() {
@@ -651,7 +856,7 @@ export class PipelinesPage {
     }
 
     async enterFunctionName(name) {
-        await this.functionNameInput.fill(name);
+        await this.functionNameInputField.fill(name);
     }
 
     async assertFunctionNameRequiredErrorVisible() {
@@ -686,10 +891,22 @@ export class PipelinesPage {
         await this.fieldRequiredError.click();
     }
 
+    async verifyConditionRequiredError() {
+        // Condition.saveCondition emits a toast "Please add at least one
+        // condition" when no condition row exists. OToast exposes the
+        // message as `data-test-message="<text>"` on its root.
+        await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
+    }
+
     async navigateToAddEnrichmentTable() {
-        await this.page.locator(this.pipelineMenu).click();
-        await this.page.click(this.enrichmentTableTab, { force: true });
+        await this.pipelineMenuLink.click();
+        // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
+        // visibility races when the tab list animates in.
+        await this.enrichmentTableTabLocator.click({ force: true });
         await this.addEnrichmentTableText.click();
+        // The Add Enrichment Table form (`add-enrichment-table-page`) renders
+        // inside the same parent — wait for it to be visible before returning.
+        await this.addEnrichmentTablePage.waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async uploadEnrichmentTable(fileName, fileContentPath) {
@@ -711,50 +928,59 @@ export class PipelinesPage {
         await this.page.getByPlaceholder('Search').fill(fileName);
         await this.page.waitForTimeout(3000);
     }
+    // Per-row factory helpers for enrichment table rows (data-test scoped by name)
+    getEnrichmentRowTypeCell(name) {
+        return this.page.locator(`[data-test="${name}-type-cell"]`);
+    }
+    getEnrichmentRowDeleteBtn(name) {
+        return this.page.locator(`[data-test="${name}-delete-btn"]`);
+    }
+
     async deleteEnrichmentTableByName(fileName) {
-        // First ensure we search for the specific file
+        // Wait for the enrichment tables list page to be ready
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        const searchBox = this.page.getByPlaceholder('Search Enrichment Table');
-        await searchBox.waitFor({ state: 'visible' });
-        await searchBox.clear();
-        await searchBox.fill(fileName);
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(1000); // Allow search to filter results
-        
-        const rows = await this.tableRowsLocator;
-        let fileFound = false;
 
-        for (let i = 0; i < (await rows.count()); i++) {
-            const row = rows.nth(i);
-            const functionName = await row
-              .locator("td.text-left")
-              .nth(1)
-              .textContent();
+        // Use the OInput search via its auto-derived `-field` native input
+        await this.enrichmentSearchField.waitFor({ state: 'visible', timeout: 30000 });
+        await this.enrichmentSearchField.clear();
+        await this.enrichmentSearchField.fill(fileName);
 
-            if (functionName?.trim() === fileName) {
-                fileFound = true;
-                testLogger.debug("Uploaded file found", { functionName });
-
-                // Click the 'Delete Function' button
-                await row.locator('[title="Delete Function"]').click();
-
-                // Confirm the deletion
-                await this.confirmButton.click();
-                break;
+        // Poll for the row's type-cell — the list may still be loading from
+        // the backend, especially after a navigation. The OTable filter is
+        // client-side so once the row arrives, the filter shows it immediately.
+        const typeCell = this.getEnrichmentRowTypeCell(fileName);
+        let visible = false;
+        for (let attempt = 0; attempt < 3 && !visible; attempt++) {
+            visible = await typeCell.isVisible({ timeout: 10000 }).catch(() => false);
+            if (!visible) {
+                // Re-issue the search; the list may have just hydrated
+                await this.enrichmentSearchField.clear();
+                await this.enrichmentSearchField.fill(fileName);
             }
         }
-
-        if (!fileFound) {
+        if (!visible) {
             throw new Error(
               `Uploaded file "${fileName}" not found in the enrichment table.`
             );
         }
+        testLogger.debug("Uploaded file found", { functionName: fileName });
 
+        // Click the per-row delete button — `<name>-delete-btn`
+        const deleteBtn = this.getEnrichmentRowDeleteBtn(fileName);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
+
+        // Confirm the deletion via the confirm dialog's primary button
+        await this.confirmButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.confirmButton.click();
+
+        // Wait for the row to actually disappear from the list
+        await typeCell.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     }
 
     async navigateToEnrichmentTableTab() {
         await this.pipelineMenuLink.click();
-        await this.enrichmentTableTab.click();
+        await this.page.locator(this.enrichmentTableTab).click();
     }
 
     async deleteDestination(randomNodeName) {
@@ -858,20 +1084,33 @@ export class PipelinesPage {
         await this.selectAndDragCondition();
         await this.page.waitForTimeout(1000);
 
-        // FilterGroup UI: Click column select and fill
-        await this.columnSelect.locator('input').click();
-        await this.columnSelect.locator('input').fill("container_name");
-        await this.page.waitForTimeout(500);
-        await this.page.getByRole("option", { name: "kubernetes_container_name" }).click();
+        // FilterGroup UI: open the column OSelect via its `-trigger`, type into the
+        // `-search` filter, and pick the auto-derived `-option` with data-test-value.
+        if (await this.columnSelectTrigger.count() > 0) {
+            await this.columnSelectTrigger.first().click();
+        } else {
+            await this.columnSelect.first().click();
+        }
+        await this.columnSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        if (await this.columnSelectSearch.count() > 0) {
+            await this.columnSelectSearch.first().fill('container_name');
+        }
+        await this.columnOptionByName('kubernetes_container_name').waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName('kubernetes_container_name').click();
 
-        // Click operator select and choose Contains
-        await this.operatorSelect.click();
-        await this.page.waitForTimeout(300);
-        await this.containsOption.click();
+        // Click operator select via its trigger and choose Contains via option locator.
+        if (await this.operatorSelectTrigger.count() > 0) {
+            await this.operatorSelectTrigger.first().click();
+        } else {
+            await this.operatorSelect.first().click();
+        }
+        await this.operatorSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('[data-test="alert-conditions-operator-select-option"][data-test-value="Contains"]')
+            .first().click();
 
-        // Fill value input
-        await this.valueInput.locator('input').click();
-        await this.valueInput.locator('input').fill("ziox");
+        // Fill value via OInput `-field` inner native input (the wrapper is a div).
+        await this.valueInputField.first().click();
+        await this.valueInputField.first().fill('ziox');
 
         await this.saveCondition();
         await this.page.waitForTimeout(2000);
@@ -880,10 +1119,8 @@ export class PipelinesPage {
     async setupDestinationStream(dynamicDestinationName) {
         // Use drag and drop approach instead of icon click
         await this.selectAndDragSecondStream();
-        await this.streamNameInput.click();
-        await this.page.waitForTimeout(1000);
-        await this.streamNameInput.fill(dynamicDestinationName);
-        await this.page.waitForTimeout(1000);
+        // Open the stream-name OSelect via its trigger and fill the `-search` input.
+        await this.fillDestinationStreamName(dynamicDestinationName);
         await this.clickInputNodeStreamSave();
         
         // Wait for dialog to close and add edge connections
@@ -893,7 +1130,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
         
         // Ensure no dialogs are blocking the interaction
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {
             // Ignore if no backdrop exists
         });
         
@@ -912,7 +1149,16 @@ export class PipelinesPage {
     }
 
     async waitForPipelineSaved() {
-        await this.pipelineSavedMessage.waitFor({ state: "visible" });
+        let saved = false;
+        await Promise.race([
+            this.pipelineSavedMessage.waitFor({ state: 'visible', timeout: 15000 })
+                .then(() => { saved = true; })
+                .catch(() => null),
+            this.page.waitForURL(/\/pipeline\/pipelines(\?|$)/, { timeout: 15000 })
+                .then(() => { saved = true; })
+                .catch(() => null),
+        ]);
+        expect(saved, 'Pipeline save timed out — neither success toast nor URL transition to /pipeline/pipelines was observed within 15 s').toBe(true);
     }
 
     async exploreStreamAndNavigateToPipeline(streamName) {
@@ -950,14 +1196,13 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.streamButton);
         await this.selectLogs();
         await this.enterStreamName(sourceStream);
-        await this.page.waitForTimeout(2000);
-        await this.page.getByRole("option", { name: sourceStream, exact: true }).click();
+        await this.selectStreamOptionByName(sourceStream);
         await this.saveInputNodeStream();
-        await this.page.waitForTimeout(2000);
-        // Use new hover-based delete approach with data-test locator
-        await this.page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
-        await this.page.waitForTimeout(500);
-        await this.page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
+        // Delete auto-created output stream node
+        await this.pipelineNodeOutputStreamNode.first().waitFor({ state: 'visible' });
+        await this.pipelineNodeOutputStreamNode.first().hover();
+        await this.pipelineNodeOutputDeleteBtn.first().waitFor({ state: 'visible' });
+        await this.pipelineNodeOutputDeleteBtn.first().click();
         await this.confirmDeleteButton.click();
     }
 
@@ -967,61 +1212,153 @@ export class PipelinesPage {
         await this.savePipeline();
         await this.waitForPipelineSaved();
 
-        // Verify the dynamic destination stream exists
+        // Verify the dynamic destination stream exists. This navigates via
+        // Streams → Explore → Pipelines, so we need to wait for the pipelines
+        // list API to return at least once before our search has any data to
+        // filter against.
+        const listApiResponse = this.page.waitForResponse(
+            (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+            { timeout: 20000 }
+        ).catch(() => null);
         await this.exploreStreamAndNavigateToPipeline(expectedStreamName);
+        await listApiResponse;
+
+        await this.waitForPipelineListSettled();
 
         // Verify pipeline creation and cleanup
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
-        // Click on more options (three-dot menu) then delete
-        const moreOptionsButton = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-more-options"]`
-        );
-        await moreOptionsButton.waitFor({ state: "visible" });
-        await moreOptionsButton.click();
-        await this.page.waitForTimeout(500);
-        // Click delete option in the menu (Quasar q-item)
-        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
+
+        // Delete is inside the more-options dropdown (not inline in the row).
+        // Use the edit button as the visibility sentinel since it is always inline.
+        const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+        const found = await editBtn.isVisible({ timeout: 15000 }).catch(() => false);
+        if (!found) {
+            testLogger.info(`createAndVerifyPipeline: pipeline ${pipelineName} not in list, polling with reload`);
+            await expect.poll(async () => {
+                const reloadApi = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
+                await this.page.reload().catch(() => {});
+                await reloadApi;
+                const allTab = this.page.locator('[data-test="tab-all"]');
+                if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await allTab.click().catch(() => {});
+                }
+                await this.waitForPipelineListSettled(15000);
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+                await this.pipelineSearchInputField.fill('');
+                await this.searchPipeline(pipelineName);
+                return await editBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+                timeout: 180000,
+            }).toBe(true);
+        }
+        await this.openMoreOptionsAndClickDelete(pipelineName);
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
+    }
+
+    /**
+     * Wait for the pipeline-list table to reach a settled state — either
+     * at least one pipeline row has rendered, or the empty-state (no-data-
+     * message) has appeared. This avoids the read-after-write race where
+     * the test races the GET /api/<org>/pipelines response and filters an
+     * unloaded table to zero rows, hiding the freshly-created pipeline.
+     *
+     * Gates on three orthogonal signals so we are robust to any one of them
+     * being temporarily missing (skeleton mid-flight, virtualised row not
+     * yet stamped with a delete-btn data-test, etc.):
+     *   - a row with a `-delete-pipeline` data-test, OR
+     *   - the empty-state `no-data-message`, OR
+     *   - the OTable pagination footer "Showing X - Y" / "No data available"
+     *     (matches the reportsPage settle pattern that proved stable in CI).
+     */
+    async waitForPipelineListSettled(timeout = 30000) {
+        await this.page.waitForFunction(() => {
+            const table = document.querySelector('[data-test="pipeline-list-table"]');
+            if (!table) return false;
+            // Use the edit button (always inline in the row) as the settled signal.
+            // Delete moved into the more-options dropdown and is not in the DOM until opened.
+            const hasRow = !!table.querySelector('[data-test^="pipeline-list-"][data-test$="-update-pipeline"]');
+            const hasEmpty = !!table.querySelector('[data-test="no-data-message"]');
+            const text = table.textContent || '';
+            const hasFooter = /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+            return hasRow || hasEmpty || hasFooter;
+        }, { timeout }).catch(() => {});
+    }
+
+    /**
+     * Return a locator for the per-row delete action. Delete lives inside the
+     * more-options dropdown — callers must open that menu before this locator
+     * is visible.
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator}
+     */
+    pipelineDeleteBtn(pipelineName) {
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        );
+    }
+
+    /**
+     * Open the more-options dropdown for a pipeline row, then click Delete and
+     * wait for the confirmation dialog.
+     * @param {string} pipelineName - Pipeline name
+     */
+    async openMoreOptionsAndClickDelete(pipelineName) {
+        const moreOptions = this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-more-options"]`
+        );
+        await moreOptions.waitFor({ state: 'visible', timeout: 15000 });
+        await moreOptions.click();
+        const deleteItem = this.pipelineDeleteBtn(pipelineName);
+        await deleteItem.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteItem.click();
     }
 
     // ========== Condition-specific methods ==========
 
     async fillCondition(columnName, operator, value, index = 0) {
-        const columnSelects = this.columnSelect;
-
-        // Try clicking the input first
-        await columnSelects.nth(index).locator('input').click();
-        await this.page.waitForTimeout(200);
-
-        // Check if dropdown opened, if not click the dropdown icon
-        let menuVisible = await this.qMenu.isVisible().catch(() => false);
-        if (!menuVisible) {
-            await columnSelects.nth(index).locator('i').click();
-            await this.page.waitForTimeout(200);
+        // Post-OSelect migration: open the column OSelect via its `-trigger` (the
+        // PopoverTrigger button), narrow the virtualised list via the `-search`
+        // input, and pick the `-option` whose `data-test-value` matches columnName.
+        const triggers = this.columnSelectTrigger;
+        const wrappers = this.columnSelect;
+        const trigCount = await triggers.count();
+        if (trigCount > 0) {
+            await triggers.nth(index).click();
+        } else {
+            await wrappers.nth(index).click();
         }
-
-        await columnSelects.nth(index).locator('input').fill(columnName);
-        await this.page.waitForTimeout(500);
-
-        // Select from dropdown
-        const options = this.qMenu.locator('.q-item');
-        await options.first().click();
+        await this.columnSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const searchCount = await this.columnSelectSearch.count();
+        if (searchCount > 0) {
+            await this.columnSelectSearch.first().fill(columnName);
+        }
+        await this.columnOptionByName(columnName).waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName(columnName).click();
         await this.page.waitForTimeout(300);
 
-        // Select operator
-        await this.operatorSelect.nth(index).click();
-        await this.page.waitForTimeout(500);
-
-        // Scope to the visible dropdown menu and select the operator
-        const visibleMenu = this.qMenu.last();
-        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+        // Operator OSelect — same pattern.
+        const opTriggers = this.operatorSelectTrigger;
+        const opTrigCount = await opTriggers.count();
+        if (opTrigCount > 0) {
+            await opTriggers.nth(index).click();
+        } else {
+            await this.operatorSelect.nth(index).click();
+        }
+        await this.operatorSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator(
+            `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+        ).first().click();
         await this.page.waitForTimeout(300);
 
-        // Fill value
-        await this.valueInput.nth(index).locator('input').click();
-        await this.valueInput.nth(index).locator('input').fill(value);
+        // Fill value via OInput `-field` inner native input.
+        await this.valueInputField.nth(index).click();
+        await this.valueInputField.nth(index).fill(value);
         await this.page.waitForTimeout(300);
     }
 
@@ -1053,12 +1390,11 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.streamButton);
         await this.selectLogs();
         await this.enterStreamName(streamName);
-        await this.page.waitForTimeout(2000);
-        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        await this.selectStreamOptionByName(streamName);
         await this.saveInputNodeStream();
-        await this.page.waitForTimeout(2000);
 
         // Remove default output stream node
+        await this.pipelineNodeOutputStreamNode.first().waitFor({ state: 'visible' });
         await this.pipelineNodeOutputStreamNode.first().hover();
         await this.page.waitForTimeout(500);
         await this.pipelineNodeOutputDeleteBtn.first().click();
@@ -1080,11 +1416,9 @@ export class PipelinesPage {
         // Verify the condition node was created successfully
         await expect(this.pipelineNodeDefaultConditionNode).toBeVisible({ timeout: 5000 });
 
-        // Add destination stream
+        // Add destination stream — use the open-popover-then-fill helper.
         await this.selectAndDragSecondStream();
-        await this.streamNameInput.click();
-        await this.streamNameInput.fill("destination-node");
-        await this.page.waitForTimeout(1000);
+        await this.fillDestinationStreamName("destination-node");
         await this.clickInputNodeStreamSave();
 
         await this.page.waitForTimeout(2000);
@@ -1092,7 +1426,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible', timeout: 10000 });
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible', timeout: 10000 });
 
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         // Connect nodes
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
@@ -1115,17 +1449,59 @@ export class PipelinesPage {
     }
 
     async deletePipelineByName(pipelineName) {
+        // Use the edit button (always inline) as the row-visibility sentinel.
+        // Delete is inside the more-options dropdown and is not in the DOM until opened.
+        const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+
+        // Apply the search filter up front so the initial visibility check works
+        // even when the unfiltered list spans many pipelines and the target row
+        // is off-screen or on a virtual page.
+        await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await this.pipelineSearchInputField.fill('').catch(() => {});
         await this.searchPipeline(pipelineName);
-        await this.page.waitForTimeout(1000);
-        // Click on more options (three-dot menu) then delete
-        const moreOptionsButton = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-more-options"]`
-        );
-        await moreOptionsButton.waitFor({ state: "visible" });
-        await moreOptionsButton.click();
-        await this.page.waitForTimeout(500);
-        // Click delete option in the menu (Quasar q-item)
-        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
+
+        // First quick check — when the row is already in the list we skip
+        // the heavier poll-with-reload loop below entirely.
+        const initialVisible = await editBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!initialVisible) {
+            // Per-pipeline propagation in CI can be slow (cross-cluster, search
+            // re-index, etc.). Match the reportsPage.pauseReport budget (180s,
+            // escalating intervals) instead of a 3-attempt cap that timed out.
+            testLogger.info(`deletePipelineByName: pipeline ${pipelineName} not visible, polling list with reload`);
+            await expect.poll(async () => {
+                const apiPromise = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 5000 }
+                ).catch(() => null);
+                await this.page.reload().catch(() => {});
+                await apiPromise;
+
+                // Ensure we're on the "all" tab so realtime + scheduled pipelines
+                // are both visible regardless of any previous tab selection.
+                const allTab = this.page.locator('[data-test="tab-all"]');
+                if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await allTab.click().catch(() => {});
+                }
+
+                // Wait for at least one pipeline row so we know the table rendered
+                // its data — search against an empty table never surfaces our row.
+                const anyRow = this.page.locator('[data-test^="pipeline-list-"][data-test$="-update-pipeline"]').first();
+                await anyRow.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+
+                // Clear and re-fill the search filter.
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 });
+                await this.pipelineSearchInputField.fill('');
+                // Wait for full list to restore after clearing the filter
+                await anyRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+                await this.searchPipeline(pipelineName);
+
+                return await editBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000, 15000],
+                timeout: 180000,
+            }).toBe(true);
+        }
+        await this.openMoreOptionsAndClickDelete(pipelineName);
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -1245,20 +1621,33 @@ export class PipelinesPage {
     }
 
     async fillPartialCondition(columnName) {
-        await this.columnSelect.first().locator('input').click();
-        await this.columnSelect.first().locator('input').fill(columnName);
-        await this.page.waitForTimeout(300);
-        const options = this.qMenu.locator('.q-item');
-        if (await options.count() > 0) {
-            await options.first().click();
-        }
+        // OSelect: click trigger to open, then type in the search input
+        await this.columnSelectTrigger.first().click();
+        await this.columnSelectSearch.waitFor({ state: 'visible' });
+        await this.columnSelectSearch.fill(columnName);
+        await this.columnSelectFirstOption.waitFor({ state: 'visible' });
+        await this.columnSelectFirstOption.click();
+        // Wait specifically for the column popover to detach (named popover only —
+        // do NOT press Escape, which would close the topmost dismissable layer
+        // (the conditions dialog itself, making the operator trigger disappear).
+        await this.page.locator('[data-test="alert-conditions-select-column-popover"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
     }
 
     async selectOperatorFromMenu(operator) {
-        await this.operatorSelect.first().click();
-        await this.page.waitForTimeout(500);
-        const visibleMenu = this.qMenu.last();
-        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+        // Defensive: wait for the operator trigger to be in the DOM (the conditions
+        // form may still be settling after the column was filled).
+        await this.operatorSelectTrigger.first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.operatorSelectTrigger.first().click();
+        const option = this.page.locator(`[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`).first();
+        await option.waitFor({ state: 'visible' });
+        await option.click();
+        // Wait for the operator popover specifically (not via Escape, which would
+        // close the conditions dialog).
+        await this.page.locator('[data-test="alert-conditions-operator-select-popover"]')
+            .waitFor({ state: 'hidden', timeout: 5000 })
+            .catch(() => {});
     }
 
     async verifyConfirmationDialog() {
@@ -1674,13 +2063,29 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
 
         // Ensure no dialogs are blocking
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
+
+        // Give VueFlow time to finish laying out nodes after any preceding form close
+        await this.page.waitForTimeout(2000);
 
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
         await this.page.mouse.down();
         await this.pipelineNodeOutputInputHandle.hover({ force: true });
         await this.page.mouse.up();
         await this.page.waitForTimeout(1000);
+
+        // Verify edge was created; retry once if not
+        const edgeCount = await this.page.locator('.vue-flow__edge').count();
+        if (edgeCount < 1) {
+            testLogger.info('connectInputToOutput: no edge after first attempt, retrying');
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
+            await this.pipelineNodeInputOutputHandle.hover({ force: true });
+            await this.page.mouse.down();
+            await this.pipelineNodeOutputInputHandle.hover({ force: true });
+            await this.page.mouse.up();
+            await this.page.waitForTimeout(1000);
+        }
     }
 
     /**
@@ -1693,7 +2098,7 @@ export class PipelinesPage {
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
 
         // Ensure no dialogs are blocking
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
 
         // Connect input to middle node
         await this.pipelineNodeInputOutputHandle.hover({ force: true });
@@ -1736,9 +2141,43 @@ export class PipelinesPage {
      * @param {string} streamName - Name for the destination stream
      */
     async fillDestinationStreamName(streamName) {
+        // The stream-name OSelect (searchable=true, creatable for output nodes)
+        // renders the `-search` input only when its popover is open. Click the
+        // wrapper trigger first to open it, then fill the search input. After
+        // typing, the matching option (existing or created) must be clicked or
+        // committed via Enter to register the model value.
+        const wrapper = this.page.locator('[data-test="input-node-stream-name-select"]').first();
+        const trigger = this.page.locator('[data-test="input-node-stream-name-select-trigger"]').first();
+        const popover = this.page.locator('[data-test="input-node-stream-name-select-popover"]').first();
+        const searchOpen = await this.streamNameInput.isVisible().catch(() => false);
+        if (!searchOpen) {
+            if (await trigger.count() > 0) {
+                await trigger.waitFor({ state: 'visible', timeout: 15000 });
+                await trigger.click();
+            } else {
+                await wrapper.waitFor({ state: 'visible', timeout: 15000 });
+                await wrapper.click();
+            }
+            await this.streamNameInput.waitFor({ state: 'visible', timeout: 10000 });
+        }
         await this.streamNameInput.click();
         await this.streamNameInput.fill(streamName);
-        await this.page.waitForTimeout(1000);
+        // Try matching option first; if none, the creatable OSelect commits via Enter.
+        const matchingOption = this.page.locator(
+            `[data-test="input-node-stream-name-select-option"][data-test-value="${streamName}"]`,
+        ).first();
+        const optionVisible = await matchingOption.isVisible({ timeout: 2000 }).catch(() => false);
+        if (optionVisible) {
+            await matchingOption.click();
+        } else {
+            await this.streamNameInput.press('Enter');
+        }
+        // Wait for the popover to close if it was dismissed by an option click.
+        // For newly created names (Enter path), the popover stays open; the save
+        // button click will close it via interactOutside — do NOT press Escape
+        // here, as that would also trigger the ODrawer's escape handler and
+        // prematurely close the drawer.
+        await popover.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
     }
 
     /**
@@ -1749,20 +2188,35 @@ export class PipelinesPage {
      * @param {string} value - Value to filter by
      */
     async fillConditionFields(columnName, columnOption, operator, value) {
-        // Fill column select
-        await this.columnSelect.locator('input').click();
-        await this.columnSelect.locator('input').fill(columnName);
-        await this.page.waitForTimeout(500);
-        await this.page.getByRole("option", { name: columnOption }).click();
+        // Open column OSelect via its `-trigger` and pick the option whose
+        // `data-test-value` matches `columnOption`. Filter the virtualised list
+        // by typing into the `-search` input first when present.
+        if (await this.columnSelectTrigger.count() > 0) {
+            await this.columnSelectTrigger.first().click();
+        } else {
+            await this.columnSelect.first().click();
+        }
+        await this.columnSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        if (await this.columnSelectSearch.count() > 0) {
+            await this.columnSelectSearch.first().fill(columnName);
+        }
+        await this.columnOptionByName(columnOption).waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName(columnOption).click();
 
-        // Select operator
-        await this.operatorSelect.click();
-        await this.page.waitForTimeout(300);
-        await this.page.getByText(operator, { exact: true }).click();
+        // Operator OSelect — open via `-trigger`, pick by `-option` data-test-value.
+        if (await this.operatorSelectTrigger.count() > 0) {
+            await this.operatorSelectTrigger.first().click();
+        } else {
+            await this.operatorSelect.first().click();
+        }
+        await this.operatorSelectPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator(
+            `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+        ).first().click();
 
-        // Fill value input
-        await this.valueInput.locator('input').click();
-        await this.valueInput.locator('input').fill(value);
+        // Fill value via OInput `-field` inner native input.
+        await this.valueInputField.first().click();
+        await this.valueInputField.first().fill(value);
     }
 
     /**
@@ -1770,24 +2224,35 @@ export class PipelinesPage {
      * @param {string} streamName - Exact name of the stream option to select
      */
     async selectStreamOption(streamName) {
-        await this.page.waitForTimeout(2000);
-        // Wait for the option to be enabled (not disabled) before clicking
-        const option = this.page.getByRole("option", { name: streamName, exact: true }).first();
-        // Wait for the option to not have disabled class
+        // When no name is supplied, fall back to the default e2e_automate
+        // option locator stored on the PO (legacy spec calls used no-arg).
+        if (!streamName) {
+            await this.e2eAutomateOption.waitFor({ state: 'visible', timeout: 15000 });
+            await this.e2eAutomateOption.click();
+            return;
+        }
+        // OSelect now forwards parent data-test to ListboxItems
+        // (`<parent>-option`) and stamps a per-value `data-test-value`. Match
+        // by value to avoid the substring match that an earlier hasText
+        // approach used (which collided with overlapping prefixes like
+        // `e2e_automate` vs `e2e_automate3`).
+        const option = this.page
+            .locator(`[data-test$="-option"][data-test-value="${streamName}"]`)
+            .first();
+        await option.waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for the option to be enabled (not disabled) before clicking —
+        // pipeline source streams that are already in use are rendered
+        // disabled.
         await this.page.waitForFunction(
             (name) => {
-                const options = document.querySelectorAll('[role="option"]');
-                for (const opt of options) {
-                    if (opt.textContent?.includes(name) && !opt.classList.contains('disabled')) {
-                        return true;
-                    }
-                }
-                return false;
+                const opt = document.querySelector(
+                    `[data-test$="-option"][data-test-value="${name}"]`,
+                );
+                return !!opt && opt.getAttribute('aria-disabled') !== 'true';
             },
             streamName,
-            { timeout: 10000 }
+            { timeout: 10000 },
         ).catch(() => {
-            // If wait times out, try clicking anyway
             testLogger.debug('selectStreamOption: Wait for enabled option timed out, attempting click anyway');
         });
         await option.click();
@@ -1887,8 +2352,14 @@ export class PipelinesPage {
      * Click stream type dropdown
      */
     async clickStreamTypeDropdown() {
-        await this.streamTypeDropdown.click();
-        await this.streamTypeLabel.click();
+        // Open the scheduled-pipeline stream-type OSelect via its `-trigger`
+        // (PopoverTrigger button); fall back to the wrapper for backwards compat.
+        if (await this.streamTypeDropdownTrigger.count() > 0) {
+            await this.streamTypeDropdownTrigger.first().click();
+        } else {
+            await this.streamTypeDropdown.first().click();
+        }
+        await this.streamTypeDropdownPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     /**
@@ -1981,7 +2452,7 @@ export class PipelinesPage {
      * Verify connection error is displayed
      */
     async verifyConnectionError() {
-        await this.connectAllNodesError.click();
+        await this.connectAllNodesError.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -1991,7 +2462,7 @@ export class PipelinesPage {
         await this.page.waitForTimeout(2000);
         await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' }).catch(() => {});
         await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' }).catch(() => {});
-        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.waitForSelector('[role="dialog"]:not(:visible)', { state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     /**
@@ -2125,30 +2596,52 @@ export class PipelinesPage {
      */
     async selectStreamType(type) {
         testLogger.info(`Selecting stream type: ${type}`);
-        await this.streamTypeLabel.click();
-        // Wait for dropdown to open
-        await this.page.waitForFunction(() => {
-            const options = document.querySelectorAll('[role="option"]');
-            return options.length > 0;
-        }, { timeout: 3000 });
-        await this.page.getByRole("option", { name: type, exact: true }).click();
+        // Open via the OSelect trigger (data-test) added on ScheduledPipeline.vue
+        // and pick the option with the matching `data-test-value`.
+        if (await this.streamTypeDropdownTrigger.count() > 0) {
+            await this.streamTypeDropdownTrigger.first().click();
+        } else {
+            await this.streamTypeDropdown.first().click();
+        }
+        await this.streamTypeDropdownPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator(
+            `[data-test="scheduled-pipeline-stream-type-select-option"][data-test-value="${type}"]`,
+        ).first().click();
         testLogger.info(`Stream type '${type}' selected`);
     }
 
     /**
      * Select stream name from dropdown
      * @param {string} streamName - Stream name to select
-     * Replaces: await page.getByLabel(/Stream Name/i).click(), fill, and option selection
+     * Drives the scheduled-pipeline stream-name OSelect via its auto-derived
+     * `-trigger` / `-search` / `-option` data-tests (popover-search pattern).
      */
     async selectStreamName(streamName) {
         testLogger.info(`Selecting stream: ${streamName}`);
-        await this.streamNameLabel.click();
-        // Wait briefly for dropdown to open
-        await this.page.waitForTimeout(500);
-        await this.streamNameLabel.fill(streamName);
-        // Wait for options to filter
-        await this.page.waitForTimeout(1000);
-        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        // Two pipeline forms expose a stream-name OSelect with different data-tests:
+        //   - ScheduledPipeline.vue → "scheduled-pipeline-stream-name-select*"
+        //   - Stream.vue (input/realtime/metrics/traces) → "input-node-stream-name-select*"
+        // Detect which form is currently open and route accordingly.
+        const scheduledTrigger = this.scheduledStreamNameSelectTrigger;
+        const inputNodeWrapper = this.page.locator('[data-test="input-node-stream-name-select"]').first();
+
+        const scheduledVisible = await scheduledTrigger.isVisible().catch(() => false);
+        if (scheduledVisible) {
+            await scheduledTrigger.click();
+            await this.scheduledStreamNameSelectPopover.waitFor({ state: 'visible', timeout: 10000 });
+            await this.scheduledStreamNameSelectSearch.waitFor({ state: 'visible', timeout: 10000 });
+            await this.scheduledStreamNameSelectSearch.fill(streamName);
+            const option = this.scheduledStreamNameOptionByValue(streamName);
+            await option.waitFor({ state: 'visible', timeout: 10000 });
+            await option.click();
+        } else {
+            // input-node form path — open popover by clicking wrapper, fill search,
+            // click value-matched option, then ensure popper closes (defends against
+            // the next Save click being intercepted by virtual-list row).
+            await inputNodeWrapper.waitFor({ state: 'visible', timeout: 15000 });
+            await this.enterStreamName(streamName);
+            await this.selectStreamOptionByName(streamName);
+        }
         testLogger.info(`Stream '${streamName}' selected`);
     }
 
@@ -2357,7 +2850,7 @@ export class PipelinesPage {
      * Bug #9498 - Preview bounds
      */
     async getPreviewBoundingBox() {
-        const preview = this.page.locator('.q-tooltip, .q-menu, .preview-popup, [class*="preview"], [class*="tooltip"]').first();
+        const preview = this.page.locator('[role="tooltip"], [role="menu"], .preview-popup, [class*="preview"], [class*="tooltip"]').first();
         if (await preview.isVisible().catch(() => false)) {
             return await preview.boundingBox();
         }
@@ -2378,7 +2871,7 @@ export class PipelinesPage {
      * Bug #10029 - Backfill
      */
     async isScheduledDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [data-test*="dialog"]');
+        const dialog = this.page.locator('[data-test*="dialog"]');
         return await dialog.isVisible().catch(() => false);
     }
 
@@ -2397,9 +2890,9 @@ export class PipelinesPage {
             await this.page.waitForTimeout(1000);
 
             // Handle confirmation dialog if it appears
-            const confirmDialog = this.page.locator('.q-dialog, [data-test*="confirm-dialog"]');
+            const confirmDialog = this.page.locator('[data-test*="confirm-dialog"], [data-test*="dialog"]');
             if (await confirmDialog.isVisible().catch(() => false)) {
-                const confirmBtn = this.page.locator('.q-dialog button:has-text("OK"), .q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm")').first();
+                const confirmBtn = this.page.locator('[data-test="o-dialog-primary-btn"]').first();
                 if (await confirmBtn.isVisible().catch(() => false)) {
                     await confirmBtn.click();
                     await this.page.waitForTimeout(1000);
@@ -2440,30 +2933,62 @@ export class PipelinesPage {
     /**
      * Get pipeline row locator by name
      * Used in pipelines.spec.js
+     * Resolves via the row's update-pipeline button (per-row data-test), then
+     * walks up to the nearest table-row container via XPath ancestor with a
+     * `data-test` prefix — keeps the selector data-test-only (§2).
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
     getPipelineRowByName(pipelineName) {
-        return this.page.locator('tr').filter({ hasText: pipelineName });
+        return this.page
+            .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)
+            .locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`)
+            .first();
     }
 
     /**
-     * Get pipeline toggle locator for a specific pipeline
+     * Get pipeline toggle (pause/start) locator for a specific pipeline.
+     * The pause/start OButton is rendered directly in the row (first action button)
+     * and is always visible — no dropdown needed.
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Toggle locator
      */
     getPipelineToggle(pipelineName) {
-        const pipelineRow = this.getPipelineRowByName(pipelineName);
-        return pipelineRow.locator('[data-test*="toggle"]');
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-action"]`
+        );
     }
 
     /**
-     * Toggle pipeline enabled/disabled state
+     * Alias for getPipelineToggle — pause/start OButton is inline in the row.
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Enable/disable button locator
+     */
+    getPipelineEnableDisableButton(pipelineName) {
+        return this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-pause-start-action"]`
+        );
+    }
+
+    /**
+     * Return the pause/start toggle locator after waiting for it to be visible.
+     * No dropdown needs to be opened — the button is always inline in the row.
+     * @param {string} pipelineName - Pipeline name
+     * @returns {Promise<import('@playwright/test').Locator>} Locator for the pause/start button
+     */
+    async openPipelineRowMenuAndGetToggle(pipelineName) {
+        const toggle = this.getPipelineToggle(pipelineName);
+        await toggle.waitFor({ state: 'visible', timeout: 15000 });
+        return toggle;
+    }
+
+    /**
+     * Toggle pipeline enabled/disabled state via the inline pause/start button.
      * @param {string} pipelineName - Pipeline name
      */
     async togglePipeline(pipelineName) {
         const toggle = this.getPipelineToggle(pipelineName);
-        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        await toggle.waitFor({ state: 'visible', timeout: 15000 });
         await toggle.click();
         testLogger.info(`Toggled pipeline: ${pipelineName}`);
     }
@@ -2652,7 +3177,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if progress bar is visible
      */
     async isProgressBarVisible() {
-        const progressLocator = this.page.locator('[data-test*="progress"], .q-linear-progress, progress').first();
+        const progressLocator = this.page.locator('[data-test*="progress"], progress').first();
         return await progressLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2773,9 +3298,11 @@ export class PipelinesPage {
     // Added to fix missing POM methods in pipeline-backfill.spec.js
     // ============================================================================
 
-    /** @returns {import('@playwright/test').Locator} Status badges in backfill/history tables */
+    /** @returns {import('@playwright/test').Locator} Status badges in pipeline-history table */
     get statusBadges() {
-        return this.page.locator('.q-badge, .status-badge, [data-test*="status"], .q-chip');
+        // PipelineHistory.vue stamps `data-test="pipeline-history-status-badge"`
+        // on every row's OBadge (plus a per-row `data-test-status` value).
+        return this.page.locator('[data-test="pipeline-history-status-badge"]');
     }
 
     /** @returns {import('@playwright/test').Locator} Job rows in backfill table */
@@ -2843,7 +3370,10 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if any table is visible
      */
     async isGenericTableVisible() {
-        const tableLocator = this.page.locator('table, .q-table, [role="table"]').first();
+        // TODO(data-test): backfill/jobs/generic tables don't yet expose a data-test
+        // root in their source components — keeping native <table>/.q-table fallback
+        // until added in web/src/components/pipeline/ and shared table components.
+        const tableLocator = this.page.locator('table, .q-table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2871,7 +3401,7 @@ export class PipelinesPage {
             await pipelineFilter.click();
             await this.page.waitForTimeout(500);
             // Select first available option
-            const option = this.page.locator('.q-item, [role="option"]').first();
+            const option = this.page.locator('.q-item').first();
             if (await option.isVisible().catch(() => false)) {
                 await option.click();
             }
@@ -2886,7 +3416,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of progress bars
      */
     async getProgressBarCount() {
-        const progressBars = await this.page.locator('.q-linear-progress, progress, [data-test*="progress"]').all();
+        const progressBars = await this.page.locator('[data-test*="progress"], progress').all();
         return progressBars.length;
     }
 
@@ -2921,7 +3451,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of jobs with status
      */
     async getJobStatusCount(status) {
-        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), .q-badge:has-text("${status}"), .status-badge:has-text("${status}")`).all();
+        const statusElements = await this.page.locator(`[data-test*="status"]:has-text("${status}"), [data-test*="badge"]:has-text("${status}"), .status-badge:has-text("${status}")`).all();
         return statusElements.length;
     }
 
@@ -2930,18 +3460,18 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of error indicators
      */
     async getErrorIndicatorCount() {
-        const errorIndicators = await this.page.locator('[data-test*="error"], .error-indicator, .text-negative, .q-icon[color="negative"]').all();
-        return errorIndicators.length;
+        // Backfill rows render `data-test="error-indicator-btn"` per failed row.
+        return await this.backfillErrorIndicatorBtn.count();
     }
 
     /**
      * Click first error indicator
      */
     async clickFirstErrorIndicator() {
-        const errorIndicator = this.page.locator('[data-test*="error"], .error-indicator, .text-negative').first();
+        const errorIndicator = this.backfillErrorIndicatorBtn.first();
         if (await errorIndicator.isVisible().catch(() => false)) {
             await errorIndicator.click();
-            await this.page.waitForTimeout(500);
+            await this.backfillErrorDialog.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
             testLogger.info('Clicked first error indicator');
         }
     }
@@ -2951,18 +3481,19 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isErrorDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [role="dialog"], [data-test*="error-dialog"]').first();
-        return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.backfillErrorDialog.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
      * Close error dialog
      */
     async closeErrorDialog() {
-        const closeBtn = this.page.locator('.q-dialog button:has-text("Close"), .q-dialog button:has-text("OK"), .q-dialog [data-test*="close"]').first();
+        // BackfillJobsList wires the dialog's primary button to close. The
+        // o-dialog-primary-btn lives inside the dialog data-test wrapper.
+        const closeBtn = this.backfillErrorDialog.locator('[data-test="o-dialog-primary-btn"]').first();
         if (await closeBtn.isVisible().catch(() => false)) {
             await closeBtn.click();
-            await this.page.waitForTimeout(300);
+            await this.backfillErrorDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             testLogger.info('Closed error dialog');
         }
     }
@@ -3074,7 +3605,7 @@ export class PipelinesPage {
      * Select first option in dropdown
      */
     async selectFirstOption() {
-        const option = this.page.locator('.q-item, [role="option"], .q-menu .q-item').first();
+        const option = this.page.getByRole('option').first();
         if (await option.isVisible().catch(() => false)) {
             await option.click();
             await this.page.waitForTimeout(300);
@@ -3099,13 +3630,31 @@ export class PipelinesPage {
      * @returns {Promise<{success: number, error: number, warning: number}>} Status counts
      */
     async getStatusCounts() {
-        const successCount = await this.page.locator('.q-badge:has-text("Success"), .q-badge:has-text("Completed"), .text-positive, [data-test*="status-success"]').count();
-        const errorCount = await this.page.locator('.q-badge:has-text("Error"), .q-badge:has-text("Failed"), .text-negative, [data-test*="status-error"]').count();
-        const warningCount = await this.page.locator('.q-badge:has-text("Warning"), .text-warning, [data-test*="status-warning"]').count();
+        // Each status badge stamps `data-test-status="<status>"` (lowercased).
+        // Backend TriggerDataStatus enum (usage.rs) defines exactly four values:
+        //   completed | failed | condition_not_satisfied | skipped
+        // getStatusVariant() in PipelineHistory.vue maps them to badge variants.
+        const successCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="completed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="success"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="ok"]'
+        ).count();
+        const errorCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="failed"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="error"]'
+        ).count();
+        const warningCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="warning"]'
+        ).count();
+        const skippedCount = await this.page.locator(
+            '[data-test="pipeline-history-status-badge"][data-test-status="condition_not_satisfied"], ' +
+            '[data-test="pipeline-history-status-badge"][data-test-status="skipped"]'
+        ).count();
         return {
             success: successCount,
             error: errorCount,
-            warning: warningCount
+            warning: warningCount,
+            skipped: skippedCount,
         };
     }
 
@@ -3177,7 +3726,7 @@ export class PipelinesPage {
     async dismissOpenDialogs() {
         try {
             if (await this.qDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-                await this.page.keyboard.press('Escape');
+                await this.page.locator('body').click({ position: { x: 10, y: 10 } });
                 await this.page.waitForTimeout(500);
             }
         } catch (e) {
@@ -3249,7 +3798,8 @@ export class PipelinesPage {
         await this.page.waitForTimeout(2000);
         const urlAfter = this.page.url();
         // Check for any error toasts/alerts on the page
-        const errorToast = await this.page.locator('.q-notification, [role="alert"], .q-banner').allTextContents().catch(() => []);
+        // TODO(data-test): notification toasts and banners; using role="alert" which covers both Reka and legacy patterns.
+        const errorToast = await this.page.locator('[role="alert"]').allTextContents().catch(() => []);
         testLogger.info(`Pipeline saved: ${pipelineName}`, { urlBefore, urlAfter, redirected: urlBefore !== urlAfter, toasts: errorToast });
         return pipelineName;
     }

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{ 'hovered': hoveredItem === 'gte' }"
       data-test="context-menu-gte"
     >
-      <q-icon name="arrow_upward" size="xs" class="q-mr-sm" />
+      <OIcon name="arrow-upward" size="xs" class="tw:mr-2" />
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{ 'hovered': hoveredItem === 'lte' }"
       data-test="context-menu-lte"
     >
-      <q-icon name="arrow_downward" size="xs" class="q-mr-sm" />
+      <OIcon name="arrow-downward" size="xs" class="tw:mr-2" />
       <span>{{ fieldName }} &lt;= {{ formattedValue }}</span>
     </div>
   </div>
@@ -50,9 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeUnmount } from 'vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: 'TracesMetricsContextMenu',
+  components: {
+    OIcon,
+  },
   props: {
     visible: {
       type: Boolean,

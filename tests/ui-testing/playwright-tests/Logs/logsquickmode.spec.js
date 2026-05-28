@@ -124,21 +124,25 @@ test.describe("Logs Quickmode testcases", () => {
     tag: ['@errorHandlingHistogramModeLogs', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing error handling with random text in histogram mode');
-    
-    // Strategic 1000ms wait for page stabilization - this is functionally necessary
-    await page.waitForTimeout(1000);
-    await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.typeInQueryEditor("oooo");
-    
-    // Strategic 500ms wait for query editor input processing - this is functionally necessary
-    await page.waitForTimeout(500);
+
+    // Enable SQL mode so "oooo" is invalid SQL and triggers a backend parse error
+    // (in quick/FTS mode "oooo" is a valid full-text search term that returns empty results, not an error)
+    await pm.logsPage.enableSqlModeIfNeeded();
+
+    // Replace the entire editor content with "oooo" (typeQuery does select-all + fill,
+    // ensuring the full SQL query is exactly "oooo" — not appended to an existing valid query
+    // that DataFusion could interpret as a table alias and return results instead of an error).
+    await pm.logsPage.waitForQueryEditorTextbox();
+    await pm.logsPage.typeQuery("oooo");
+
+    // Wait for the editor model to reflect the new value before refreshing
+    await pm.logsPage.expectQueryEditorContainsText("oooo");
     await pm.logsPage.waitForSearchBarRefreshButton();
     await pm.logsPage.clickSearchBarRefreshButton();
-    
-    // Strategic 2000ms wait for error message rendering - this is functionally necessary
-    await page.waitForTimeout(2000);
+
+    // expectErrorMessageVisible auto-waits via expect().toBeVisible()
     await pm.logsPage.expectErrorMessageVisible();
-    
+
     testLogger.info('Error handling histogram mode test completed');
   });
 

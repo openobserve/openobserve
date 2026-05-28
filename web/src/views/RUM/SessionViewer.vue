@@ -15,46 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 tw:h-full tw:px-[0.625rem]">
-    <div class="col-12 row items-end tw:pb-[0.625rem]">
-      <div class="col-12 row card-container tw:px-[0.625rem] tw:py-[0.625rem]">
+  <div class="tw:flex tw:flex-col qp-2 tw:h-full">
+    <div class="tw:w-full tw:flex tw:items-end tw:pb-[0.625rem]">
+      <div class="tw:w-full tw:flex card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
           title="Go Back"
           @click="router.back()"
         >
-          <q-icon name="arrow_back_ios_new" size="0.875rem" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="language" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="calendar_month" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="calendar-month" size="sm" />
           {{ sessionDetails.date }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="person" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="person" size="sm" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="location_on" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="location-on" size="sm" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="settings" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="settings" size="sm" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div
           v-if="frustrationCount > 0"
-          class="text-caption ellipsis row items-center"
+          class="tw:text-xs tw:truncate tw:flex tw:items-center"
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
-          <q-icon
-            name="sentiment_very_dissatisfied"
-            size="0.875rem"
-            class="q-pr-xs"
+          <OIcon
+            name="sentiment-very-dissatisfied"
+            size="sm"
+            class="tw:pr-1"
             style="color: #fb923c"
             data-test="frustration-summary-icon"
           />
@@ -70,9 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="col-12 row card-container tw:overflow-hidden tw:mb-[0.325rem] tw:h-[calc(100%-58px)]!"
+      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:h-[calc(100%-3.125)]!"
     >
-      <div class="col-9 full-height">
+      <div class="tw:w-3/4 tw:h-full">
         <VideoPlayer
           ref="videoPlayerRef"
           :events="segmentEvents"
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-loading="!!isLoading.length"
         />
       </div>
-      <div class="col-3 row">
-        <q-separator vertical class="full-height" />
+      <div class="tw:w-1/4 tw:flex">
+        <OSeparator vertical class="tw:h-full" />
         <PlayerEventsSidebar
           :events="segmentEvents"
           :sessionDetails="sessionDetails"
@@ -113,8 +113,10 @@ import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
 
 const defaultEvent = {
@@ -605,7 +607,7 @@ function formatTimeDifference(start_time: number, end_time: number) {
 }
 
 const getFormattedDate = (timestamp: number) =>
-  date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
+  formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
 const handleSidebarEvent = (event: string, payload: any) => {
   if (event === "event-click") {

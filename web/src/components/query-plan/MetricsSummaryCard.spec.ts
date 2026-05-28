@@ -15,12 +15,10 @@
 
 import { describe, expect, it, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import MetricsSummaryCard from "./MetricsSummaryCard.vue";
 import type { SummaryMetrics } from "@/utils/queryPlanParser";
 
-installQuasar();
 
 const defaultMetrics: SummaryMetrics = {
   totalTime: "1.23ms",

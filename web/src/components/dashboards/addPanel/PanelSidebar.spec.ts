@@ -15,8 +15,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import PanelSidebar from "./PanelSidebar.vue";
+
 
 describe("PanelSidebar", () => {
   let wrapper: VueWrapper<any>;
@@ -29,10 +29,10 @@ describe("PanelSidebar", () => {
         ...props,
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
-          "q-icon": {
-            template: '<div class="q-icon" :class="$attrs.class" :data-test="$attrs[\'data-test\']" :name="name"><slot /></div>',
+          "OIcon": {
+            template: '<div class="OIcon" :class="$attrs.class" :data-test="$attrs[\'data-test\']" :name="name"><slot /></div>',
             props: ["name"],
             inheritAttrs: false,
           },
@@ -42,7 +42,7 @@ describe("PanelSidebar", () => {
             emits: ["click"],
             inheritAttrs: false,
           },
-          "q-separator": {
+          "OSeparator": {
             template: '<div class="q-separator"></div>',
           },
         },
@@ -64,7 +64,7 @@ describe("PanelSidebar", () => {
       wrapper = createWrapper();
       
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".sidebar").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
@@ -126,8 +126,8 @@ describe("PanelSidebar", () => {
     it("should show collapsed header when isOpen is false", () => {
       wrapper = createWrapper({ modelValue: false });
       
-      expect(wrapper.find(".sidebar-header-collapsed").exists()).toBe(true);
-      expect(wrapper.find(".sidebar-header-expanded").exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-sidebar-header-collapsed"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-header-expanded"]').exists()).toBe(false);
     });
 
     it("should render expand icon in collapsed state", () => {
@@ -135,7 +135,7 @@ describe("PanelSidebar", () => {
       
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
       expect(icon.exists()).toBe(true);
-      expect(icon.attributes("name")).toBe("expand_all");
+      expect(icon.attributes("name")).toBe("expand-all");
       expect(icon.classes()).toContain("collapsed-icon");
       expect(icon.classes()).toContain("rotate-90");
     });
@@ -146,7 +146,7 @@ describe("PanelSidebar", () => {
         modelValue: false 
       });
       
-      const titleElement = wrapper.find(".collapsed-title");
+      const titleElement = wrapper.find('[data-test="panel-sidebar-collapsed-title"]');
       expect(titleElement.exists()).toBe(true);
       expect(titleElement.text()).toBe("Test Sidebar Title");
     });
@@ -154,13 +154,13 @@ describe("PanelSidebar", () => {
     it("should apply correct CSS classes in collapsed state", () => {
       wrapper = createWrapper({ modelValue: false });
       
-      expect(wrapper.find(".sidebar").classes()).not.toContain("open");
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).not.toContain("open");
     });
 
     it("should not show sidebar content when collapsed", () => {
       wrapper = createWrapper({ modelValue: false });
       
-      expect(wrapper.find(".sidebar-content").exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-sidebar-content"]').exists()).toBe(false);
     });
   });
 
@@ -168,8 +168,8 @@ describe("PanelSidebar", () => {
     it("should show expanded header when isOpen is true", () => {
       wrapper = createWrapper({ modelValue: true });
       
-      expect(wrapper.find(".sidebar-header-expanded").exists()).toBe(true);
-      expect(wrapper.find(".sidebar-header-collapsed").exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-sidebar-header-expanded"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-header-collapsed"]').exists()).toBe(false);
     });
 
     it("should render collapse button in expanded state", () => {
@@ -177,8 +177,8 @@ describe("PanelSidebar", () => {
 
       const collapseBtn = wrapper.find('[data-test="dashboard-sidebar-collapse-btn"]');
       expect(collapseBtn.exists()).toBe(true);
-      // OButton uses icon-left slot instead of icon prop; icon is rendered inside as q-icon
-      expect(collapseBtn.html()).toContain("unfold_less");
+      // OButton uses icon-left slot instead of icon prop; icon is rendered inside as OIcon
+      expect(collapseBtn.html()).toContain("unfold-less");
       // OButton applies tw:rotate-90 from the class attr; collapse-button is only a CSS definition
       expect(collapseBtn.classes()).toContain("tw:rotate-90");
     });
@@ -189,7 +189,7 @@ describe("PanelSidebar", () => {
         modelValue: true 
       });
       
-      const titleElement = wrapper.find(".expanded-title");
+      const titleElement = wrapper.find('[data-test="panel-sidebar-expanded-title"]');
       expect(titleElement.exists()).toBe(true);
       expect(titleElement.text()).toBe("Expanded Sidebar Title");
     });
@@ -197,14 +197,14 @@ describe("PanelSidebar", () => {
     it("should apply correct CSS classes in expanded state", () => {
       wrapper = createWrapper({ modelValue: true });
       
-      expect(wrapper.find(".sidebar").classes()).toContain("open");
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).toContain("open");
     });
 
     it("should show sidebar content when expanded", () => {
       wrapper = createWrapper({ modelValue: true });
       
-      expect(wrapper.find(".sidebar-content").exists()).toBe(true);
-      expect(wrapper.find(".sidebar-content").classes()).toContain("scroll");
+      expect(wrapper.find('[data-test="panel-sidebar-content"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-content"]').classes()).toContain("scroll");
     });
 
     it("should render slot content in expanded state", () => {
@@ -219,7 +219,7 @@ describe("PanelSidebar", () => {
     it("should toggle sidebar when collapsed header is clicked", async () => {
       wrapper = createWrapper({ modelValue: false });
       
-      const collapsedHeader = wrapper.find(".sidebar-header-collapsed");
+      const collapsedHeader = wrapper.find('[data-test="panel-sidebar-header-collapsed"]');
       await collapsedHeader.trigger("click");
       
       expect(wrapper.vm.isOpen).toBe(true);
@@ -237,7 +237,7 @@ describe("PanelSidebar", () => {
     it("should emit update:modelValue when toggling from collapsed", async () => {
       wrapper = createWrapper({ modelValue: false });
       
-      const collapsedHeader = wrapper.find(".sidebar-header-collapsed");
+      const collapsedHeader = wrapper.find('[data-test="panel-sidebar-header-collapsed"]');
       await collapsedHeader.trigger("click");
       
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -258,7 +258,7 @@ describe("PanelSidebar", () => {
       wrapper = createWrapper({ modelValue: false });
       
       const toggleSpy = vi.spyOn(wrapper.vm, "toggleSidebar");
-      const collapsedHeader = wrapper.find(".sidebar-header-collapsed");
+      const collapsedHeader = wrapper.find('[data-test="panel-sidebar-header-collapsed"]');
       await collapsedHeader.trigger("click");
       
       expect(toggleSpy).toHaveBeenCalledOnce();
@@ -303,22 +303,22 @@ describe("PanelSidebar", () => {
     it("should re-render component when modelValue changes", async () => {
       wrapper = createWrapper({ modelValue: false });
       
-      expect(wrapper.find(".sidebar-header-collapsed").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-header-collapsed"]').exists()).toBe(true);
       
       await wrapper.setProps({ modelValue: true });
       
-      expect(wrapper.find(".sidebar-header-expanded").exists()).toBe(true);
-      expect(wrapper.find(".sidebar-header-collapsed").exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-sidebar-header-expanded"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-header-collapsed"]').exists()).toBe(false);
     });
 
     it("should show/hide content based on modelValue changes", async () => {
       wrapper = createWrapper({ modelValue: false });
       
-      expect(wrapper.find(".sidebar-content").exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-sidebar-content"]').exists()).toBe(false);
       
       await wrapper.setProps({ modelValue: true });
       
-      expect(wrapper.find(".sidebar-content").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-content"]').exists()).toBe(true);
     });
   });
 
@@ -371,15 +371,15 @@ describe("PanelSidebar", () => {
     it("should render q-separator", () => {
       wrapper = createWrapper();
       
-      expect(wrapper.find(".q-separator").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-separator"]').exists()).toBe(true);
     });
 
     it("should render separator in both states", async () => {
       wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.find(".q-separator").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-separator"]').exists()).toBe(true);
       
       await wrapper.setProps({ modelValue: true });
-      expect(wrapper.find(".q-separator").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-separator"]').exists()).toBe(true);
     });
   });
 
@@ -403,16 +403,16 @@ describe("PanelSidebar", () => {
           modelValue: true,
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           stubs: {
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-separator": true,
           },
         },
       });
       
-      expect(wrapper.find(".sidebar-content").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-content"]').exists()).toBe(true);
     });
   });
 
@@ -420,25 +420,27 @@ describe("PanelSidebar", () => {
     it("should apply base sidebar class", () => {
       wrapper = createWrapper();
       
-      expect(wrapper.find(".sidebar").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').exists()).toBe(true);
     });
 
     it("should apply open class when expanded", () => {
       wrapper = createWrapper({ modelValue: true });
-      
-      expect(wrapper.find(".sidebar.open").exists()).toBe(true);
+
+      const sidebar = wrapper.find('[data-test="panel-sidebar-root"]');
+      expect(sidebar.exists()).toBe(true);
+      expect(sidebar.classes()).toContain("open");
     });
 
     it("should not apply open class when collapsed", () => {
       wrapper = createWrapper({ modelValue: false });
       
-      expect(wrapper.find(".sidebar").classes()).not.toContain("open");
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).not.toContain("open");
     });
 
     it("should apply correct icon classes", () => {
       wrapper = createWrapper({ modelValue: false });
-      
-      const icon = wrapper.find(".q-icon");
+
+      const icon = wrapper.find('[data-test="dashboard-sidebar"]');
       expect(icon.classes()).toContain("collapsed-icon");
       expect(icon.classes()).toContain("rotate-90");
     });
@@ -455,8 +457,10 @@ describe("PanelSidebar", () => {
 
     it("should apply scroll class to content", () => {
       wrapper = createWrapper({ modelValue: true });
-      
-      expect(wrapper.find(".sidebar-content.scroll").exists()).toBe(true);
+
+      const content = wrapper.find('[data-test="panel-sidebar-content"]');
+      expect(content.exists()).toBe(true);
+      expect(content.classes()).toContain("scroll");
     });
   });
 
@@ -476,7 +480,7 @@ describe("PanelSidebar", () => {
     it("should be keyboard accessible for collapsed header", async () => {
       wrapper = createWrapper({ modelValue: false });
       
-      const collapsedHeader = wrapper.find(".sidebar-header-collapsed");
+      const collapsedHeader = wrapper.find('[data-test="panel-sidebar-header-collapsed"]');
       
       // Test that click events work (keyboard accessibility through click)
       await collapsedHeader.trigger("click");
@@ -500,7 +504,7 @@ describe("PanelSidebar", () => {
       
       titles.forEach((title) => {
         const testWrapper = createWrapper({ title, modelValue: false });
-        expect(testWrapper.find(".collapsed-title").text()).toBe(title);
+        expect(testWrapper.find('[data-test="panel-sidebar-collapsed-title"]').text()).toBe(title);
         testWrapper.unmount();
       });
     });
@@ -509,23 +513,23 @@ describe("PanelSidebar", () => {
       const title = "Dynamic Title";
       wrapper = createWrapper({ title, modelValue: false });
       
-      expect(wrapper.find(".collapsed-title").text()).toBe(title);
+      expect(wrapper.find('[data-test="panel-sidebar-collapsed-title"]').text()).toBe(title);
       
       await wrapper.setProps({ modelValue: true });
-      expect(wrapper.find(".expanded-title").text()).toBe(title);
+      expect(wrapper.find('[data-test="panel-sidebar-expanded-title"]').text()).toBe(title);
     });
 
     it("should handle empty title", () => {
       wrapper = createWrapper({ title: "", modelValue: false });
       
-      expect(wrapper.find(".collapsed-title").text()).toBe("");
+      expect(wrapper.find('[data-test="panel-sidebar-collapsed-title"]').text()).toBe("");
     });
 
     it("should handle long titles", () => {
       const longTitle = "This is a very long title that might cause layout issues if not handled properly";
       wrapper = createWrapper({ title: longTitle, modelValue: false });
       
-      expect(wrapper.find(".collapsed-title").text()).toBe(longTitle);
+      expect(wrapper.find('[data-test="panel-sidebar-collapsed-title"]').text()).toBe(longTitle);
     });
   });
 
@@ -583,7 +587,7 @@ describe("PanelSidebar", () => {
     it("should handle rapid toggle clicks", async () => {
       wrapper = createWrapper({ modelValue: false });
       
-      const collapsedHeader = wrapper.find(".sidebar-header-collapsed");
+      const collapsedHeader = wrapper.find('[data-test="panel-sidebar-header-collapsed"]');
       
       // Rapid clicks
       await collapsedHeader.trigger("click");
@@ -619,7 +623,7 @@ describe("PanelSidebar", () => {
       
       // Should still be reactive
       expect(wrapper.vm.isOpen).toBe(true);
-      expect(wrapper.find(".sidebar-content").exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-sidebar-content"]').exists()).toBe(true);
     });
   });
 });

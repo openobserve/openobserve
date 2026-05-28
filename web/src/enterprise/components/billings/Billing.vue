@@ -16,28 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none q-pt-xs" style="min-height: inherit;" >
-    <div class="tw:flex tw:justify-between tw:items-center q-pb-md card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
-    <div class="head q-table__title ">
+  <div class="tw:rounded-md tw:p-0 tw:pt-1" style="min-height: inherit;" >
+    <div class="tw:flex tw:justify-between tw:items-center tw:pb-3 card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
+    <div class="head tw:text-xl tw:tracking-[0.005em] ">
       {{ headerBasedOnRoute() }}
     </div>
     <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
       <div class="custom-usage-date-select">
-          <q-select
-            dense
-            borderless
+          <OSelect
             v-model="usageDate"
             :options="options"
-            emit-value
-            map-options
-            icon="schedule"
-            @update:model-value="(value: any) => selectUsageDate()"
-            class="q-pa-none q-mx-none tw:h-[40px] q-mt-xs"
+            labelKey="label"
+            valueKey="value"
+            @update:model-value="selectUsageDate"
+            class="tw:p-0 tw:mx-0 tw:h-[40px] tw:mt-1"
           >
           <template v-slot:prepend>
-            <q-icon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
+            <OIcon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
           </template>
-          </q-select>
+          </OSelect>
         </div>
         <div class="tw:flex tw:items-center ">
           <div class="app-tabs-container tw:h-[36px] ">
@@ -47,10 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
     </div>
       </div>
-    <q-splitter
+    <OSplitter
       v-model="splitterModel"
       unit="px"
-      class="logs-splitter-smooth"
+      :horizontal="false"
     >
       <template v-slot:before>
         <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
@@ -104,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               @click="collapseSidebar"
             >
-              <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" />
+              <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="sm" />
             </OButton> -->
           </div>
         </div>
@@ -113,41 +110,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-          <div class="card-container q-pb-md"  style="height: calc(100vh - var(--navbar-height) - 87px);">
+          <div class="card-container tw:pb-3"  style="height: calc(100vh - var(--navbar-height) - 87px);">
             <router-view title=""> </router-view>
           </div>
         </div>
       </template>
-    </q-splitter>
-  </q-page>
+    </OSplitter>
+  </div>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSelect from '@/lib/forms/Select/OSelect.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { HardDrive, Database } from "lucide-vue-next";
+
 import BillingService from "@/services/billings";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs },
+    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
+    OIcon, OSplitter,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "usage"));
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
@@ -259,12 +259,12 @@ export default defineComponent({
     {
         label: 'Gb',
         value: "gb",
-        icon: HardDrive,
+        icon: "storage",
       },
       {
         label: 'Mb',
         value: "mb",
-        icon: Database,
+        icon: "database",
       }
     ]
 

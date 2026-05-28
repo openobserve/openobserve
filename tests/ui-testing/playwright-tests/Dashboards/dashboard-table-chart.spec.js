@@ -267,10 +267,10 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await reopenPanelConfig(page, pm);
 
       await expect(
-        page.locator('[data-test="dashboard-config-wrap-table-cells"]')
+        page.locator('[data-test="dashboard-config-wrap-table-cells-btn"]')
       ).toHaveAttribute("aria-checked", "true");
       await expect(
-        page.locator('[data-test="dashboard-config-table_transpose"]')
+        page.locator('[data-test="dashboard-config-table_transpose-btn"]')
       ).toHaveAttribute("aria-checked", "true");
 
       await pm.dashboardPanelActions.savePanel();
@@ -618,7 +618,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
           hasText: "kubernetes_container_name = 'ziox'",
         }).last()
       ).toBeVisible();
-      await page.locator('[data-test="query-inspector-close-btn"]').click();
+      await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
 
       testLogger.info("Table filtered by variable", { unfilteredRowCount, filteredRowCount });
 
@@ -671,13 +671,19 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await adhocAddBtn.waitFor({ state: "visible", timeout: 15000 });
       await adhocAddBtn.click();
 
-      const nameSelector = page.locator('[data-test="dashboard-variable-adhoc-name-selector"]');
+      const nameSelector = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
       await nameSelector.click();
       await nameSelector.fill("kubernetes_container_name");
+      await nameSelector.press("Tab"); // flush OInput debounce immediately
 
-      const valueSelector = page.locator('[data-test="dashboard-variable-adhoc-value-selector"]');
+      const valueSelector = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
       await valueSelector.click();
       await valueSelector.fill("ziox");
+      await valueSelector.press("Tab"); // flush OInput debounce immediately
+
+      // Yield one animation frame so Vue's reactive update chain (emitValue →
+      // onVariablesValueUpdated → manager.updateVariableValue) completes before Apply
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
 
       // Apply to re-query with the dynamic filter
       await pm.dashboardPanelActions.applyDashboardBtn();

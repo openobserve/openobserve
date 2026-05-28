@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <div class="q-pt-sm q-pb-xs flex justify-start">
+      <div class="tw:pt-2 tw:pb-1 tw:flex tw:justify-start">
         <div
           data-test="back-button"
-          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -30,31 +30,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="router.back()"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <span class="text-bold">{{ t("rum.eventID") }}:</span>
+        <span class="tw:font-bold">{{ t("rum.eventID") }}:</span>
         <span
           data-test="error-id"
           :title="error.error_id"
-          class="q-pl-xs cursor-pointer"
+          class="tw:pl-1 tw:cursor-pointer"
           >{{ error.error_id }}
-          <q-icon
-            size="12px"
-            name="content_copy"
+          <OIcon
+            size="xs"
+            name="content-copy"
             class="hover:tw:text-[var(--o2-primary-btn-bg)]"
             @click="copyErrorId(error.error_id)"
         /></span>
-        <span class="q-ml-lg">{{ error.timestamp }}</span>
+        <span class="tw:ml-4">{{ error.timestamp }}</span>
       </div>
-      <div class="row items-center no-wrap q-my-xs">
-        <div class="error_type text-bold">{{ error.type }}</div>
+      <div class="tw:flex tw:items-center tw:flex-nowrap tw:my-1">
+        <div class="error_type tw:font-bold">{{ error.type }}</div>
       </div>
-      <div class="error_message q-pt-xs row items-center">
+      <div class="error_message tw:pt-1 tw:flex tw:items-center">
         <div
           v-if="error.error_handling === 'unhandled'"
           :class="
             error.error_handling === 'unhandled'
-              ? 'unhandled_error text-red-6 q-px-xs q-mr-sm'
+              ? 'unhandled_error text-red-6 tw:px-1 tw:mr-2'
               : ''
           "
         >
@@ -69,12 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { defineProps } from "vue";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const router = useRouter();
-const q = useQuasar();
 const props = defineProps({
   error: {
     type: Object,
@@ -83,12 +83,10 @@ const props = defineProps({
 });
 
 const copyErrorId = (id: string) => {
-  q.notify({
-    type: "positive",
-    message: "Copied to clipboard",
+  copyToClipboard(id, {
+    successMessage: "Copied to clipboard",
     timeout: 1500,
   });
-  copyToClipboard(id);
 };
 </script>
 

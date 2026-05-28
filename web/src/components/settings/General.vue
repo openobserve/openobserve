@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div>
-    <div class="q-px-md q-py-md">
-      <div class="general-page-title">
+    <div class="tw:px-3 tw:py-3">
+      <div class="general-page-title" data-test="settings-general-page-title">
         {{ t("settings.generalPageTitle") }}
       </div>
       <div class="general-page-subtitle">
@@ -29,26 +29,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:mx-4">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="tw:w-full tw:flex tw:flex-col">
-        <q-form @submit.stop="onSubmit.execute">
+        <OForm @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
           <div class="settings-grid-item">
             <span class="individual-setting-title">
               {{ t("settings.scrapintervalLabel") }}
             </span>
-            <q-input
+            <OInput
               v-model.number="scrapeIntereval"
               type="number"
               min="0"
-              class="showLabelOnTop q-ml-sm"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
+              class="tw:ml-2"
+              :error="!!scrapeIntervalError"
+              :error-message="scrapeIntervalError"
+              @update:model-value="scrapeIntervalError = ''"
               data-test="general-settings-scrape-interval"
-              :rules="[
-                (val: any) => !!val || t('settings.scrapeIntervalRequired'),
-              ]"
-              :lazy-rules="true"
               style="width: 120px"
             />
             <span class="individual-setting-description">
@@ -61,43 +56,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
-            <q-input
+            <OInput
               v-model.number="maxSeriesPerQuery"
               type="number"
               :min="1000"
               :max="1000000"
-              class="showLabelOnTop q-ml-sm"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
-              data-test="general-settings-max-series-per-query"
-              :rules="[
-                (val: any) => {
-                  // Allow empty/null (user wants default)
-                  if (val === null || val === undefined || val === '')
-                    return true;
-
-                  // Validate numeric range
-                  const numVal = Number(val);
-                  return (
-                    (numVal >= 1000 && numVal <= 1000000) ||
-                    t('settings.maxSeriesPerQueryValidation')
-                  );
-                },
-              ]"
-              :lazy-rules="true"
+              class="tw:ml-2"
+              :error="!!maxSeriesError"
+              :error-message="maxSeriesError"
+              @update:model-value="maxSeriesError = ''"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
+              data-test="general-settings-max-series-per-query"
               style="width: 180px"
             >
-              <template v-slot:append>
-                <q-icon name="info" size="xs" class="cursor-pointer">
-                  <q-tooltip max-width="300px">
-                    {{ t("settings.maxSeriesPerQueryTooltip") }}
-                  </q-tooltip>
-                </q-icon>
+              <template v-slot:icon-right>
+                <OIcon name="info" size="sm" class="tw:cursor-pointer">
+                  <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
+                </OIcon>
               </template>
-            </q-input>
+            </OInput>
             <span class="individual-setting-description">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
@@ -122,10 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customLightColor }"
                 >
-                  <q-icon
+                  <OIcon
                     name="palette"
-                    size="14px"
-                    color="white"
+                    size="xs"
                     class="palette-icon"
                   />
                 </div>
@@ -143,10 +119,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customDarkColor }"
                 >
-                  <q-icon
+                  <OIcon
                     name="palette"
-                    size="14px"
-                    color="white"
+                    size="xs"
                     class="palette-icon"
                   />
                 </div>
@@ -160,8 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <q-icon name="refresh" size="16px" />
-                <q-tooltip>{{ t("settings.resetToDefaultColors") }}</q-tooltip>
+                <OIcon name="refresh" size="sm" />
+                <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
             <span class="individual-setting-description tw:self-start">
@@ -171,18 +146,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <span>&nbsp;</span>
 
-          <div class="flex justify-start">
+          <div class="tw:flex tw:justify-start">
             <OButton
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
               variant="primary"
               size="sm-action"
-              type="submit"
+              @click="onSubmit.execute"
             >
               {{ t("dashboard.save") }}
             </OButton>
           </div>
-        </q-form>
+        </OForm>
       </div>
     </div>
     <div
@@ -193,84 +168,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.identifier
       "
     >
-      <div class="q-px-md q-py-sm">
+      <div class="tw:px-3 tw:py-2">
         <GroupHeader
           :title="t('settings.enterpriseFeatures')"
           :showIcon="false"
         />
       </div>
-      <div class="q-mx-md">
+      <div class="tw:mx-3">
         <div class="settings-grid-item no-border-bottom">
           <span class="individual-setting-title">
             {{ t("settings.customLogoText") }}
           </span>
           <div
             v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-            class="tw:flex tw:gap-3 tw:items-center"
+            class="tw:flex tw:gap-2 tw:items-center"
           >
-            <q-input
-              class="showLabelOnTop tw:w-[250px] tw:mr-sm"
-              stack-label
-              borderless
-              dense
+            <OInput
+              class="tw:w-[250px] tw:mr-sm"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
-            <div class="btn-group tw:flex tw:h-[28px]">
+            <div class="tw:flex tw:gap-x-2">
               <OButton
                 type="button"
-                variant="ghost-destructive"
+                variant="outline-destructive"
                 size="icon-xs-sq"
-                class="q-mr-sm"
-                @click="editingText = !editingText"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                @click="cancelLogoText"
+                icon-left="close"
+              />
               <OButton
                 data-test="settings_ent_logo_custom_text_save_btn"
                 :loading="onSubmit.isLoading.value"
-                variant="primary"
+                variant="outline"
                 size="icon-xs-sq"
-                class="q-mr-sm"
                 type="submit"
                 @click="updateCustomText"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="check"
+              />
             </div>
           </div>
-          <div v-else class="flex items-center">
+          <div v-else class="tw:flex tw:items-center">
             <span class="tw:w-[190px] tw:text-center tw:truncate"
               >{{
                 store.state.zoConfig.custom_logo_text ||
                 t("settings.noTextAvailable")
               }}
-              <q-tooltip
+              <OTooltip
                 v-if="store.state.zoConfig.custom_logo_text.length > 20"
-                class="tw:text-center tw:text-[12px] tw:max-w-[250px]"
-              >
-                {{ store.state.zoConfig.custom_logo_text }}
-              </q-tooltip>
+                side="top"
+                align="center"
+                max-width="250px"
+                :content="store.state.zoConfig.custom_logo_text"
+              />
             </span>
             <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
               :loading="onSubmit.isLoading.value"
-              variant="ghost"
+              variant="outline"
               size="icon-xs-sq"
-              class="q-ml-sm"
+              class="tw:ml-2"
               type="submit"
               @click="editingText = !editingText"
-            >
-              <Pencil class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="edit"
+            />
           </div>
           <span class="individual-setting-description">
             {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+        <div class="settings-grid-item tw:ml-1">
+          <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
           <div
@@ -278,29 +246,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig.custom_logo_img != null
             "
-            class="full-width"
+            class="tw:w-full"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_img"
               :src="
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
               "
               :alt="t('settings.logoLabel')"
               style="max-width: 150px; max-height: 31px"
-              class="q-mx-md"
+              class="tw:mx-3"
             />
             <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
               variant="ghost-destructive"
               size="icon-xs-sq"
-              class="q-mx-md"
+              class="tw:mx-3"
               @click="confirmDeleteLogo('light')"
-            >
-              <Trash2 class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="delete"
+            />
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-3">
-            <q-file
+          <div v-else class="tw:flex tw:items-start tw:gap-2">
+            <OFile
               data-test="setting_ent_custom_logo_img_file_upload"
               v-model="filesLight"
               :label="t('settings.dragDropUpload')"
@@ -308,47 +275,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              dense
-              borderless
-              class="q-mx-none o2-file-input tw:w-[250px]"
+              :help-text="t('settings.fileFormatConstraint')"
+              class="tw:mx-0 o2-file-input"
             >
               <template v-slot:prepend>
-                <q-icon name="attach_file" />
+                <OIcon name="attach-file" size="sm" />
               </template>
-            </q-file>
-            <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+            </OFile>
+            <div class="tw:flex tw:gap-x-2 tw:pt-5.75">
               <OButton
                 type="button"
-                variant="ghost-destructive"
+                variant="outline-destructive"
                 size="icon-xs-sq"
-                class="q-mr-sm"
                 @click="filesLight = null"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="close"
+              />
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
-                variant="primary"
+                variant="outline"
                 size="icon-xs-sq"
-                class="q-mr-sm"
                 type="submit"
                 @click="uploadImage(filesLight, 'light')"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="check"
+              />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mb-5">
-            <span class="individual-setting-description">
+          <span class="individual-setting-description tw:-translate-y-[5px]">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
-        </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+        <div class="settings-grid-item tw:ml-1">
+          <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
           <div
@@ -356,9 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
               store.state.zoConfig.custom_logo_dark_img != null
             "
-            class="full-width"
+            class="tw:w-full"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_dark_img"
               :src="
                 `data:image; base64, ` +
@@ -366,20 +326,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :alt="t('settings.logoLabel')"
               style="max-width: 150px; max-height: 31px"
-              class="q-mx-md"
+              class="tw:mx-3"
             />
             <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
               variant="ghost-destructive"
               size="icon-xs-sq"
-              class="q-mx-md"
+              class="tw:mx-3"
               @click="confirmDeleteLogo('dark')"
-            >
-              <Trash2 class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="delete"
+            />
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-3">
-            <q-file
+          <div v-else class="tw:flex tw:items-start tw:gap-2">
+            <OFile
               data-test="setting_ent_custom_logo_dark_img_file_upload"
               v-model="filesDark"
               :label="t('settings.dragDropUpload')"
@@ -387,95 +346,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              dense
-              borderless
-              class="q-mx-none o2-file-input tw:w-[250px]"
+              :help-text="t('settings.fileFormatConstraint')"
+              class="tw:mx-0 o2-file-input"
             >
               <template v-slot:prepend>
-                <q-icon name="attach_file" />
+                <OIcon name="attach-file" size="sm" />
               </template>
-            </q-file>
-            <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+            </OFile>
+            <div class="tw:flex tw:gap-x-2 tw:pt-5.75">
               <OButton
                 type="button"
-                variant="ghost-destructive"
+                variant="outline-destructive"
                 size="icon-xs-sq"
-                class="q-mr-sm"
                 @click="filesDark = null"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="close"
+              />
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
                 :loading="onSubmit.isLoading.value"
-                variant="primary"
+                variant="outline"
                 size="icon-xs-sq"
-                class="q-mr-sm"
                 type="submit"
                 @click="uploadImage(filesDark, 'dark')"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="check"
+              />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mb-5">
-            <span class="individual-setting-description">
+          <span class="individual-setting-description tw:-translate-y-[5px]">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
-        </div>
       </div>
     </div>
   </div>
-  <q-spinner-hourglass
+  <OSpinner
     v-if="loadingState"
-    class="fixed-center"
-    size="lg"
-    color="primary"
-  ></q-spinner-hourglass>
-  <q-dialog v-model="confirmDeleteImage">
-    <q-card>
-      <q-card-section>
-        {{ t("settings.deleteLogoMessage") }}
-      </q-card-section>
+    size="md"
+    class="tw:fixed tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+    data-test="general-settings-loading-indicator"
+  />
+  <ODialog data-test="general-delete-image-dialog"
+    v-model:open="confirmDeleteImage"
+    size="sm"
+    :title="t('settings.deleteLogoTitle')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="cancelConfirmDialog"
+    @click:primary="confirmDialogOK"
+  >
+    <p>{{ t('settings.deleteLogoMessage') }}</p>
+  </ODialog>
 
-      <q-card-actions align="right" class="tw:flex tw:gap-1">
-        <OButton
-          data-test="logs-search-bar-confirm-dialog-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="cancelConfirmDialog"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </OButton>
-        <OButton
-          data-test="logs-search-bar-confirm-dialog-ok-btn"
-          variant="primary"
-          size="sm-action"
-          @click="confirmDialogOK"
-        >
-          {{ t("confirmDialog.ok") }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
-
-  <!-- Color Picker Dialog -->
-  <q-dialog v-model="showColorPicker" @hide="onColorPickerClose">
-    <q-card style="min-width: 300px">
-      <q-card-section>
-        <div class="text-h6">{{ t("settings.pickCustomColor") }}</div>
-      </q-card-section>
-      <q-card-section>
-        <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
-      </q-card-section>
-      <q-card-actions align="right">
-        <OButton variant="outline" size="sm-action" v-close-popup>
-          {{ t("settings.close") }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog data-test="general-color-picker-dialog"
+    v-model:open="showColorPicker"
+    @update:open="(v) => !v && onColorPickerClose()"
+    size="xs"
+    :title="t('settings.pickCustomColor')"
+    primary-button-label="Close"
+    @click:primary="showColorPicker = false"
+  >
+    <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -484,7 +415,6 @@ import { defineComponent, onActivated, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
@@ -495,7 +425,15 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -515,12 +453,22 @@ export default defineComponent({
   components: {
     GroupHeader,
     OButton,
-  },
+    ODialog,
+    OSpinner,
+    OIcon,
+    OTooltip,
+    OInput,
+    OFile,
+    OForm,
+    OColor,
+},
   setup() {
     const { t } = useI18n();
-    const q = useQuasar();
+
     const store = useStore();
     const router: any = useRouter();
+    const scrapeIntervalError = ref("");
+    const maxSeriesError = ref("");
     const scrapeIntereval = ref(
       store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15,
@@ -644,6 +592,31 @@ export default defineComponent({
     );
 
     const onSubmit = useLoading(async () => {
+      // Validate scrape interval
+      if (!scrapeIntereval.value && scrapeIntereval.value !== 0) {
+        scrapeIntervalError.value = t("settings.scrapeIntervalRequired") || "Scrape interval is required";
+        return;
+      }
+      if (scrapeIntereval.value < 0) {
+        scrapeIntervalError.value = t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number";
+        return;
+      }
+      // Validate max series per query (optional field — only validate when provided)
+      if (
+        maxSeriesPerQuery.value !== null &&
+        maxSeriesPerQuery.value !== undefined &&
+        maxSeriesPerQuery.value !== ""
+      ) {
+        if (maxSeriesPerQuery.value < 1000) {
+          maxSeriesError.value = t("settings.maxSeriesMinError") || "Minimum value is 1000";
+          return;
+        }
+        if (maxSeriesPerQuery.value > 1000000) {
+          maxSeriesError.value = t("settings.maxSeriesMaxError") || "Maximum value is 1000000";
+          return;
+        }
+      }
+
       try {
         //set organizations settings in store
         //scrape interval will be in number
@@ -677,14 +650,14 @@ export default defineComponent({
         // Clear temporary theme colors from store since we're saving permanently
         store.commit("clearTempThemeColors");
 
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("settings.organizationSettingsUpdated"),
           timeout: 2000,
         });
       } catch (err: any) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err?.message || t("settings.somethingWentWrong"),
           timeout: 2000,
         });
@@ -722,8 +695,8 @@ export default defineComponent({
           )
           .then(async (res) => {
             if (res.status == 200) {
-              q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: t("settings.logoUpdatedSuccessfully", {
                   mode:
                     theme === "dark"
@@ -745,16 +718,16 @@ export default defineComponent({
               }
               files.value = null;
             } else {
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: t("settings.somethingWentWrong"),
                 timeout: 2000,
               });
             }
           })
           .catch((e) => {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e?.message || t("settings.errorUploadingImage"),
               timeout: 2000,
             });
@@ -763,14 +736,14 @@ export default defineComponent({
             loadingState.value = false;
           });
       } else if (config.isEnterprise != "true") {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.notAllowedAction"),
           timeout: 2000,
         });
       } else {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.selectFileToUpload"),
           timeout: 2000,
         });
@@ -792,8 +765,8 @@ export default defineComponent({
         )
         .then(async (res: any) => {
           if (res.status == 200) {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: t("settings.logoDeletedSuccessfully", {
                 mode:
                   theme === "dark"
@@ -807,16 +780,16 @@ export default defineComponent({
               store.dispatch("setConfig", res.data);
             });
           } else {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res?.message || t("settings.errorDeletingImage"),
               timeout: 2000,
             });
           }
         })
         .catch(() => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("settings.somethingWentWrong"),
             timeout: 2000,
           });
@@ -924,8 +897,8 @@ export default defineComponent({
       applyThemeColors(color, currentMode, true);
 
       // Show notification
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("settings.themeColorsResetSuccess"),
         timeout: 2000,
       });
@@ -940,8 +913,8 @@ export default defineComponent({
       // Update theme mode in store
       store.dispatch("appTheme", mode);
 
-      // Update Quasar's dark mode - this is critical for proper theme application
-      q.dark.set(mode === "dark");
+      // Update dark mode — this is critical for proper theme application
+      document.documentElement.classList.toggle("dark", mode === "dark");
 
       // Persist theme preference to localStorage
       localStorage.setItem("theme", mode);
@@ -959,6 +932,11 @@ export default defineComponent({
       applyThemeColors(color, mode, isDefault);
     };
 
+    const cancelLogoText = () => {
+      editingText.value = false;
+      customText.value = store.state.zoConfig.custom_logo_text;
+    };
+
     const updateCustomText = () => {
       loadingState.value = true;
       let orgIdentifier = "default";
@@ -970,8 +948,8 @@ export default defineComponent({
 
       customText.value = sanitizeInput(customText.value);
       if (customText.value.length > 100) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.textMaxCharacters"),
           timeout: 2000,
         });
@@ -987,8 +965,8 @@ export default defineComponent({
         )
         .then(async (res: any) => {
           if (res.status == 200) {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: t("settings.logoTextUpdatedSuccessfully"),
               timeout: 2000,
             });
@@ -998,16 +976,16 @@ export default defineComponent({
             store.dispatch("setConfig", stateConfig);
             editingText.value = false;
           } else {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res?.message || t("settings.errorUpdatingImage"),
               timeout: 2000,
             });
           }
         })
         .catch((err) => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.message || t("settings.somethingWentWrong"),
             timeout: 2000,
           });
@@ -1024,12 +1002,13 @@ export default defineComponent({
 
     return {
       t,
-      q,
       store,
       config,
       router,
       scrapeIntereval,
+      scrapeIntervalError,
       maxSeriesPerQuery,
+      maxSeriesError,
       onSubmit,
       files,
       filesLight,
@@ -1043,10 +1022,10 @@ export default defineComponent({
       filesMaxTotalSize: ref(null),
       filesMaxNumber: ref(null),
       onRejected(rejectedEntries: string | any[]) {
-        // Notify plugin needs to be installed
+        //  plugin needs to be installed
         // https://quasar.dev/quasar-plugins/notify#Installation
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.filesValidationFailed", {
             count: rejectedEntries.length,
           }),
@@ -1057,6 +1036,7 @@ export default defineComponent({
       loadingState,
       customText,
       editingText,
+      cancelLogoText,
       updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
@@ -1205,7 +1185,7 @@ body.body--dark .theme-color-chip:hover {
   transform: translateY(-1px) rotate(180deg);
 }
 
-.theme-reset-chip:hover .q-icon {
+.theme-reset-chip:hover .OIcon {
   color: rgb(239, 68, 68);
 }
 
@@ -1218,7 +1198,7 @@ body.body--dark .theme-reset-chip:hover {
   border-color: rgba(239, 68, 68, 0.5);
 }
 
-body.body--dark .theme-reset-chip:hover .q-icon {
+body.body--dark .theme-reset-chip:hover .OIcon {
   color: rgb(248, 113, 113);
 }
 </style>

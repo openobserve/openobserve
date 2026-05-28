@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full service-identity-config q-mt-sm">
+  <div class="tw:w-full service-identity-config tw:mt-2">
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <q-spinner-hourglass color="primary" size="30px" />
+      <OSpinner size="sm" />
     </div>
 
     <div v-else>
@@ -28,24 +28,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :showIcon="false"
         class="tw:mb-2"
       />
-      <div class="text-body2 tw:mb-4">
+      <div class="tw:text-sm tw:mb-4">
         {{ t("settings.correlation.serviceIdentityDescription") }}
       </div>
 
       <!-- How it works explanation -->
-      <q-expansion-item
-        dense
-        dense-toggle
-        icon="help_outline"
+      <OCollapsible
+        v-model="howItWorksOpen"
+        icon="help-outline"
         :label="t('settings.correlation.howItWorksTitle')"
-        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid expanstion-item-o2"
+        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
         :class="
           store.state.theme === 'dark'
-            ? 'bg-grey-9 tw:border-gray-700'
-            : 'bg-grey-2 tw:border-gray-200'
+            ? 'tw:bg-gray-700 tw:border-gray-700'
+            : 'tw:bg-gray-100 tw:border-gray-200'
         "
       >
-        <div class="tw:p-4 text-body2 tw:leading-relaxed">
+        <div class="tw:p-4 tw:text-sm tw:leading-relaxed">
           <div class="tw:mb-3">
             <div class="tw:font-semibold text-primary tw:mb-1">
               {{ t("settings.correlation.serviceIdentityLabel") }}
@@ -54,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             class="tw:mb-3 tw:p-3 tw:rounded"
-            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'"
+            :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'bg-white'"
           >
             <div class="tw:font-semibold text-primary tw:mb-1">
               {{ t("settings.correlation.exampleLabel") }}
@@ -62,33 +61,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <i18n-t keypath="settings.correlation.exampleText" tag="span">
                 <template #dim1>
-                  <q-chip
-                    dense
+                  <OBadge
                     size="sm"
-                    color="primary"
-                    text-color="white"
+                    variant="primary"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >k8s-cluster=prod</q-chip
+                    >k8s-cluster=prod</OBadge
                   >
                 </template>
                 <template #dim2>
-                  <q-chip
-                    dense
+                  <OBadge
                     size="sm"
-                    color="secondary"
-                    text-color="white"
+                    variant="primary"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >k8s-deployment=api-server</q-chip
+                    >k8s-deployment=api-server</OBadge
                   >
                 </template>
                 <template #value>
-                  <q-chip
-                    dense
+                  <OBadge
                     size="sm"
-                    color="positive"
-                    text-color="white"
+                    variant="success"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >prod/api-server</q-chip
+                    >prod/api-server</OBadge
                   >
                 </template>
               </i18n-t>
@@ -112,22 +105,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-expansion-item>
+      </OCollapsible>
 
       <!-- Semantic Field Groups - Collapsible Section -->
-      <q-expansion-item
+      <OCollapsible
         v-model="semanticSectionExpanded"
         icon="category"
         :label="t('settings.correlation.semanticFieldTitle')"
         :caption="t('settings.correlation.semanticFieldDescription')"
-        header-class="section-header"
-        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid expanstion-item-o2"
+        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
         :class="
           store.state.theme === 'dark'
             ? 'tw:border-gray-700'
             : 'tw:border-gray-200'
         "
-        default-opened
       >
         <div class="tw:p-4">
           <SemanticFieldGroupsConfig
@@ -145,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t('common.save') }}</OButton>
           </div>
         </div>
-      </q-expansion-item>
+      </OCollapsible>
     </div>
   </div>
 </template>
@@ -153,16 +144,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 interface FieldAlias {
@@ -189,6 +182,7 @@ const emit = defineEmits<{
 const loading = ref(true);
 const savingSemanticMappings = ref(false);
 const semanticSectionExpanded = ref(true);
+const howItWorksOpen = ref(false);
 const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
 
 const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
@@ -207,8 +201,8 @@ const saveSemanticMappings = async () => {
 
     for (const group of localSemanticGroups.value) {
       if (!group.id) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: group.group + t("settings.correlation.emptyIdError"),
           timeout: 3000,
         });
@@ -218,8 +212,8 @@ const saveSemanticMappings = async () => {
 
       // Validate display name is not empty
       if (!group.display || group.display.trim() === "") {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("common.nameRequired"),
           timeout: 3000,
         });
@@ -229,8 +223,8 @@ const saveSemanticMappings = async () => {
 
       // Validate fields array is not empty
       if (!group.fields || group.fields.length === 0) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `"${group.display || group.id}": ${t("settings.correlation.emptyFieldsError")}`,
           timeout: 3000,
         });
@@ -251,8 +245,8 @@ const saveSemanticMappings = async () => {
         const existingId = categoryMap.get(displayNameLower);
         // Only flag as duplicate if it's a different group (different ID)
         if (existingId !== group.id) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("settings.correlation.duplicateNamesInCategoryError", {
               name: group.display,
               category: category,
@@ -275,8 +269,8 @@ const saveSemanticMappings = async () => {
     }
 
     if (duplicateIds.length > 0) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: t("settings.correlation.duplicateIdsError", {
           ids: duplicateIds.join(", "),
         }),
@@ -295,8 +289,8 @@ const saveSemanticMappings = async () => {
       "Semantic field groups for dimension extraction and correlation",
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.correlation.semanticMappingsSaved"),
       timeout: 2000,
     });
@@ -304,8 +298,8 @@ const saveSemanticMappings = async () => {
     emit("saved");
   } catch (error: any) {
     console.error("Error saving semantic mappings:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.correlation.configSaveFailed"),
       timeout: 3000,
     });
@@ -377,10 +371,6 @@ loadConfig();
   font-weight: 600;
 }
 
-:deep(.q-expansion-item__content) {
-  background: var(--o2-card-bg);
-}
-
 :deep(.tooltip-text) {
   font-size: 0.75rem;
 }
@@ -393,16 +383,4 @@ loadConfig();
   color: var(--o2-text-primary);
 }
 
-body.body--dark {
-  .q-list .q-item__label {
-    color: white !important;
-  }
-}
-</style>
-<style lang="scss">
-.expanstion-item-o2 {
-  .q-item__section--side {
-    min-width: auto;
-  }
-}
 </style>

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             class="tw:font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-500'"
           >
             {{ t("search.patternColumnHeader") }}
           </span>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             class="tw:font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-500'"
           >
             {{ t("search.occurrenceColumnHeader") }}
           </span>
@@ -53,14 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></div>
       </div>
 
-      <!-- Patterns List with Virtual Scroll -->
-      <q-virtual-scroll
-        :items="patterns"
-        virtual-scroll-slice-size="5"
-        v-slot="{ item: pattern, index }"
-        :scroll-target="scrollTarget ?? undefined"
-      >
+      <!-- Patterns List: plain render when wrap is on (variable row heights break virtual scroll) -->
+      <template v-if="wrap">
         <PatternCard
+          v-for="(pattern, index) in patterns"
+          :key="pattern.pattern_id ?? index"
           :pattern="pattern"
           :index="index"
           :wrap="wrap"
@@ -69,7 +66,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @exclude="$emit('add-to-search', pattern, 'exclude')"
           @create-alert="$emit('create-alert', pattern)"
         />
-      </q-virtual-scroll>
+      </template>
+
+      <!-- Patterns List with Virtual Scroll (wrap off) -->
+      <OVirtualScroll
+        v-else
+        :items="patterns"
+        :overscan="5"
+        :scroll-target="scrollTarget ?? null"
+        :dynamic-row-height="true"
+      >
+        <template #default="{ item: pattern, index }">
+          <PatternCard
+            :pattern="pattern"
+            :index="index"
+            :wrap="wrap"
+            @click="$emit('open-details', pattern, index)"
+            @include="$emit('add-to-search', pattern, 'include')"
+            @exclude="$emit('add-to-search', pattern, 'exclude')"
+            @create-alert="$emit('create-alert', pattern)"
+          />
+        </template>
+      </OVirtualScroll>
     </div>
 
     <!-- Loading State -->
@@ -77,10 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="loading"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[3rem]"
     >
-      <q-spinner-hourglass color="primary" size="3.125rem" />
+      <OSpinner size="lg" data-test="pattern-list-loading-indicator" />
       <div
-        class="q-mt-md text-body2"
-        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        class="tw:mt-3 tw:text-sm"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
       >
         Extracting patterns from logs...
       </div>
@@ -93,25 +111,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:text-[3rem] tw:mb-[1rem] tw:opacity-30">📊</div>
       <div
-        class="text-h6 q-mb-sm"
-        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        class="tw:text-xl tw:font-semibold tw:mb-2"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
       >
         No patterns found
       </div>
       <div
-        class="text-body2 tw:max-w-[31.25rem]"
-        :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-8'"
+        class="tw:text-sm tw:max-w-[31.25rem]"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
       >
         <div v-if="totalLogsAnalyzed">
           Only {{ totalLogsAnalyzed }} logs were analyzed.
         </div>
-        <div class="q-mt-sm">
+        <div class="tw:mt-2">
           Try increasing the time range or selecting a different stream with
           more log data.
           <br />Pattern extraction works best with at least 1000+ logs.
         </div>
       </div>
     </div>
+
+    <!-- Bottom spacer so the last row isn't flush with the container edge -->
+    <div v-if="patterns?.length > 0" class="tw:h-4" />
 
     <!-- Wildcard hover popover (outside q-virtual-scroll to avoid DOM recycling conflicts) -->
     <WildcardValuePopover
@@ -132,8 +153,10 @@ import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 
-defineProps<{
+const props = defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;

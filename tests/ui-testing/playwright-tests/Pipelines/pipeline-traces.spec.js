@@ -129,12 +129,12 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     expect(isTracesVisible).toBe(true);
     testLogger.info('Traces option found in stream type dropdown');
 
-    // Close dialog by pressing Escape
-    await page.keyboard.press('Escape');
+    // Close dialog by clicking outside
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
 
     // Navigate back to pipelines list
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     testLogger.info('Test completed: Traces stream type visibility check');
   });
@@ -163,7 +163,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     testLogger.info(`Entered pipeline name: ${pipelineName}`);
 
     // Close dialog without saving
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     testLogger.info('Test completed: Pipeline dialog opens correctly');
   });
@@ -292,7 +292,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.saveCondition();
 
     // Verify error message
-    await pageManager.pipelinesPage.verifyFieldRequiredError();
+    await pageManager.pipelinesPage.verifyConditionRequiredError();
 
     testLogger.info('Test completed: Condition validation error shown');
   });

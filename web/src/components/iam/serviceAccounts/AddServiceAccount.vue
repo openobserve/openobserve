@@ -15,88 +15,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height">
-    <q-card-section class=" q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col ">
-          <div v-if="beingUpdated" style="font-size: 18px">
-            {{ t("serviceAccounts.update") }}
-          </div>
-          <div v-else style="font-size: 18px">{{ t("serviceAccounts.add") }}</div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-service-account-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="$emit('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
+  <ODrawer data-test="add-service-account-dialog"
+    :open="open"
+    :width="30"
+    :title="beingUpdated ? t('serviceAccounts.update') : t('serviceAccounts.add')"
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4">
       <div>
-        <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <q-input
+          <OInput
             v-if="!beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
+            data-test="iam-add-service-account-email-input"
             class="showLabelOnTop tw:mt-2"
-            ref="email"
-            stack-label
-            hide-bottom-space
-            borderless
-            dense
-            :rules="[
-              (val: any, rules: any) =>
-                rules.email(val) || 'Please enter a valid email address',
-            ]"
+            :error="!!emailError"
+            :error-message="emailError"
+            @update:model-value="emailError = ''"
           />
 
-          <q-input
+          <OInput
             v-model="firstName"
             :label="t('user.description')"
+            data-test="iam-add-service-account-description-input"
             class="showLabelOnTop tw:mt-2"
-            ref="description"
-            stack-label
-            hide-bottom-space
-            borderless
-            dense
           />
-          <div class="flex justify-start tw:mt-6 tw:gap-2">
+          <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
             <OButton
               variant="outline"
               size="sm-action"
               data-test="cancel-button"
-              @click="$emit('cancel:hideform')"
+              @click="$emit('update:open', false)"
             >
               {{ t('user.cancel') }}
             </OButton>
             <OButton
               variant="primary"
               size="sm-action"
-              type="submit"
+              data-test="iam-add-service-account-save-btn"
+              @click="onSubmit"
             >
               {{ t('user.save') }}
             </OButton>
           </div>
-        </q-form>
-      </div>
-    </q-card-section>
-  </q-card>
+        </div>
+    </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated } from "vue";
+import { defineComponent, ref, onActivated, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue: any = () => {
   return {
@@ -110,24 +88,27 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton },
+  components: { OButton, ODrawer, OInput },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
-      default: () => defaultValue(),
+      default: /* v8 ignore next */ () => defaultValue(), // prop default only invoked by Vue internally when prop is absent
     },
     isUpdated: {
       type: Boolean,
       default: false,
     },
   },
-  emits: ["update:modelValue", "updated", "cancel:hideform"],
+  emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const $q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(false);
     const beingUpdated: any = ref(false);
@@ -137,14 +118,33 @@ export default defineComponent({
     const logout_confirm = ref(false);
 
     const firstName = ref(formData.value.first_name);
+    const emailError = ref('');
 
     onActivated(() => {
+      /* v8 ignore next */ // only runs under Vue keep-alive, not reachable in jsdom unit tests
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        if (newVal && newVal.email) {
+          beingUpdated.value = true;
+          formData.value = { ...newVal };
+          firstName.value = newVal.first_name ?? "";
+        } else {
+          beingUpdated.value = props.isUpdated;
+          formData.value = defaultValue();
+          formData.value.organization =
+            store.state.selectedOrganization.identifier;
+          firstName.value = "";
+        }
+      },
+      { deep: true, immediate: true },
+    );
+
     return {
       t,
-      $q,
       store,
       router,
       formData,
@@ -157,26 +157,21 @@ export default defineComponent({
       logout_confirm,
       firstName,
       track,
+      emailError,
     };
   },
-  created() {
-    this.formData = { ...defaultValue, ...this.modelValue };
-    this.beingUpdated = this.isUpdated;
 
-    if (
-      this.modelValue &&
-      this.modelValue.email != undefined &&
-      this.modelValue.email != ""
-    ) {
-      this.beingUpdated = true;
-      this.formData = { ...this.modelValue };
-      this.firstName = this.modelValue?.first_name;
-    }
-  },
   methods: {
     onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
+      if (!this.beingUpdated) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!this.formData.email || !emailRegex.test(this.formData.email)) {
+          this.emailError = 'Please enter a valid email address';
+          return;
+        }
+      }
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -194,13 +189,13 @@ export default defineComponent({
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
             this.formData.email = userEmail;
-            this.$emit("updated", res.data, this.formData, "updated");
+              this.$emit("updated", res.data, this.formData, "updated");
+              this.$emit("update:open", false);
           })
           .catch((err: any) => {
             if (err.response?.status != 403) {
               if (err?.response?.data?.message) {
-                this.$q.notify({
-                  color: "negative",
+                toast({
                   message: err?.response?.data?.message,
                   timeout: 2000,
                 });
@@ -220,12 +215,12 @@ export default defineComponent({
             .then((res: any) => {
               dismiss();
               this.$emit("updated", res.data, this.formData, "created");
+              this.$emit("update:open", false);
             })
             .catch((err: any) => {
               if(err.response?.status != 403){
                 if(err?.response?.data?.message ) {
-                  this.$q.notify({
-                    color: "negative",
+                  toast({
                     message: err?.response?.data?.message,
                     timeout: 2000,
                   });

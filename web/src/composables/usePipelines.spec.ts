@@ -18,22 +18,22 @@ import { usePipelines } from './usePipelines';
 import pipelines from '@/services/pipelines';
 import destinationService from '@/services/alert_destination';
 import { useStore } from 'vuex';
-import { useQuasar } from 'quasar';
+import { toast } from '@/lib/feedback/Toast/useToast';
 
 // Mock the services
 vi.mock('@/services/pipelines');
 vi.mock('@/services/alert_destination');
-vi.mock('quasar');
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: vi.fn(),
+}));
 vi.mock('vuex');
 
 describe('usePipelines', () => {
-  let mockNotify: any;
   let mockPipelinesService: any;
   let mockDestinationService: any;
   let mockStore: any;
 
   beforeEach(() => {
-    mockNotify = vi.fn();
     mockStore = {
       state: {
         selectedOrganization: {
@@ -42,14 +42,9 @@ describe('usePipelines', () => {
         }
       }
     };
-    
+
     // Mock the store
     vi.mocked(useStore).mockReturnValue(mockStore);
-    
-    // Mock quasar notify
-    vi.mocked(useQuasar).mockReturnValue({
-      notify: mockNotify
-    });
 
     // Mock the services
     mockPipelinesService = vi.mocked(pipelines);
@@ -124,7 +119,7 @@ describe('usePipelines', () => {
     const result = await getUsedStreamsList();
     
     expect(result).toEqual([]);
-    expect(mockNotify).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
   });
 
   // Test 5: getUsedStreamsList - error handling with non-403 status
@@ -144,10 +139,9 @@ describe('usePipelines', () => {
     const result = await getUsedStreamsList();
     
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(toast).toHaveBeenCalledWith({
       message: 'Internal Server Error',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -167,10 +161,9 @@ describe('usePipelines', () => {
     const result = await getUsedStreamsList();
     
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(toast).toHaveBeenCalledWith({
       message: 'Error fetching used streams',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -189,10 +182,9 @@ describe('usePipelines', () => {
     const result = await getUsedStreamsList();
     
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(toast).toHaveBeenCalledWith({
       message: 'Error fetching used streams',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -329,11 +321,10 @@ describe('usePipelines', () => {
     const { getUsedStreamsList } = usePipelines();
     await getUsedStreamsList();
     
-    expect(mockNotify).toHaveBeenCalledTimes(1);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith({
       message: 'Bad Request Error',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });
@@ -494,14 +485,14 @@ describe('usePipelines', () => {
     const result = await getUsedStreamsList();
     
     expect(result).toEqual([]);
-    expect(mockNotify).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
     
     // Test 402 (should trigger notification)
     mockError.response.status = 402;
     mockPipelinesService.getPipelineStreams.mockRejectedValue(mockError);
     
     await getUsedStreamsList();
-    expect(mockNotify).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledTimes(1);
   });
 
   // Test 23: Composable reusability
@@ -550,10 +541,9 @@ describe('usePipelines', () => {
     const result = await getUsedStreamsList();
     
     expect(result).toEqual([]);
-    expect(mockNotify).toHaveBeenCalledWith({
+    expect(toast).toHaveBeenCalledWith({
       message: 'Validation failed',
-      color: 'negative',
-      position: 'bottom',
+      position: 'bottom-right',
       timeout: 2000,
     });
   });

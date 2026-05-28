@@ -15,8 +15,14 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import DashboardHeader from "./DashboardHeader.vue";
+
+// After the migration the title is rendered inside a <div data-test="dashboard-header-title">
+// so all title lookups go through this helper to return the title node directly.
+const findTitle = (wrapper: VueWrapper<any>) => {
+  const node = wrapper.find('[data-test="dashboard-header-title"]');
+  return node.exists() ? node : undefined;
+};
 
 describe("DashboardHeader", () => {
   let wrapper: VueWrapper<any>;
@@ -25,7 +31,7 @@ describe("DashboardHeader", () => {
     return mount(DashboardHeader, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };
@@ -39,21 +45,22 @@ describe("DashboardHeader", () => {
   describe("Component Initialization", () => {
     it("should render correctly with default props", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.row.items-center.no-wrap.q-mb-sm').exists()).toBe(true);
-      expect(wrapper.findComponent({ name: 'QSeparator' }).exists()).toBe(true);
+      // Title node exists.
+      expect(findTitle(wrapper)?.exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OSeparator" }).exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.$options.name).toBe("DashboardHeader");
     });
 
     it("should initialize with default prop values", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.props('title')).toBe("");
       expect(wrapper.props('backButton')).toBe(false);
     });
@@ -63,9 +70,9 @@ describe("DashboardHeader", () => {
         title: "Custom Title",
         backButton: true
       };
-      
+
       wrapper = createWrapper(customProps);
-      
+
       expect(wrapper.props('title')).toBe("Custom Title");
       expect(wrapper.props('backButton')).toBe(true);
     });
@@ -74,47 +81,46 @@ describe("DashboardHeader", () => {
   describe("Title Display", () => {
     it("should display empty title by default", () => {
       wrapper = createWrapper();
-      
-      const titleElement = wrapper.find('.text-h6');
-      expect(titleElement.exists()).toBe(true);
-      expect(titleElement.text()).toBe("");
+
+      const titleElement = findTitle(wrapper);
+      expect(titleElement?.exists()).toBe(true);
+      expect(titleElement?.text()).toBe("");
     });
 
     it("should display provided title", () => {
       wrapper = createWrapper({ title: "Dashboard Settings" });
-      
-      const titleElement = wrapper.find('.text-h6');
-      expect(titleElement.text()).toBe("Dashboard Settings");
+
+      expect(findTitle(wrapper)?.text()).toBe("Dashboard Settings");
     });
 
     it("should update title when prop changes", async () => {
       wrapper = createWrapper({ title: "Initial Title" });
-      
-      expect(wrapper.find('.text-h6').text()).toBe("Initial Title");
-      
+
+      expect(findTitle(wrapper)?.text()).toBe("Initial Title");
+
       await wrapper.setProps({ title: "Updated Title" });
-      
-      expect(wrapper.find('.text-h6').text()).toBe("Updated Title");
+
+      expect(findTitle(wrapper)?.text()).toBe("Updated Title");
     });
 
     it("should handle special characters in title", () => {
       const specialTitle = "Title with <>&\"' special chars";
       wrapper = createWrapper({ title: specialTitle });
-      
-      expect(wrapper.find('.text-h6').text()).toBe(specialTitle);
+
+      expect(findTitle(wrapper)?.text()).toBe(specialTitle);
     });
 
     it("should handle very long title", () => {
       const longTitle = "A".repeat(200);
       wrapper = createWrapper({ title: longTitle });
-      
-      expect(wrapper.find('.text-h6').text()).toBe(longTitle);
+
+      expect(findTitle(wrapper)?.text()).toBe(longTitle);
     });
 
     it("should handle undefined title gracefully", () => {
       wrapper = createWrapper({ title: undefined });
-      
-      expect(wrapper.find('.text-h6').text()).toBe("");
+
+      expect(findTitle(wrapper)?.text()).toBe("");
     });
   });
 
@@ -129,7 +135,7 @@ describe("DashboardHeader", () => {
     it("should show back button when backButton prop is true", () => {
       wrapper = createWrapper({ backButton: true });
 
-      const backButtonContainer = wrapper.find('.col-auto');
+      const backButtonContainer = wrapper.find('[data-test="dashboard-header-back-button-container"]');
       const backButton = wrapper.findComponent({ name: 'OButton' });
 
       expect(backButtonContainer.exists()).toBe(true);
@@ -143,7 +149,8 @@ describe("DashboardHeader", () => {
 
       expect(backButton.props('variant')).toBe('outline');
       expect(backButton.props('size')).toBe('icon-xs');
-      expect(backButton.classes()).toContain('q-mr-sm');
+      // Migration replaced q-mr-sm with tw:mr-2.
+      expect(backButton.classes().some((c) => c.includes("mr-2"))).toBe(true);
     });
 
     it("should emit back event when back button is clicked", async () => {
@@ -190,10 +197,10 @@ describe("DashboardHeader", () => {
           right: '<button data-test="custom-button">Custom Button</button>'
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
-      
+
       const rightSlot = wrapper.find('[data-test="custom-button"]');
       expect(rightSlot.exists()).toBe(true);
       expect(rightSlot.text()).toBe("Custom Button");
@@ -206,127 +213,112 @@ describe("DashboardHeader", () => {
           right: '<span data-test="span-1">Span 1</span><span data-test="span-2">Span 2</span>'
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
-      
+
       expect(wrapper.find('[data-test="span-1"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="span-2"]').exists()).toBe(true);
     });
 
     it("should handle empty right slot", () => {
       wrapper = createWrapper({ title: "Test" });
-      
-      const rightSlotContainers = wrapper.findAll('.col-auto');
-      const rightSlotContainer = rightSlotContainers.length > 0 ? rightSlotContainers[rightSlotContainers.length - 1] : undefined;
-      if (rightSlotContainer) {
-        expect(rightSlotContainer.exists()).toBe(true);
-        expect(rightSlotContainer.text()).toBe("");
-      } else {
-        // If no col-auto exists, the right slot container should still be present but empty
-        expect(wrapper.html()).toContain('<div class="col-auto"></div>');
-      }
+
+      const rightSlotContainer = wrapper.find('[data-test="dashboard-header-right-slot-container"]');
+      expect(rightSlotContainer.exists()).toBe(true);
+      expect(rightSlotContainer.text()).toBe("");
     });
 
     it("should handle complex slot content", () => {
       const complexSlotContent = `
         <div data-test="complex-slot">
-          <button>Button 1</button>
-          <input type="text" />
-          <select><option>Option 1</option></select>
+          <button data-test="complex-slot-button">Button 1</button>
+          <input data-test="complex-slot-input" type="text" />
+          <select data-test="complex-slot-select"><option>Option 1</option></select>
         </div>
       `;
-      
+
       wrapper = mount(DashboardHeader, {
         props: { title: "Test" },
         slots: {
           right: complexSlotContent
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
-      
+
       const complexSlot = wrapper.find('[data-test="complex-slot"]');
       expect(complexSlot.exists()).toBe(true);
-      expect(complexSlot.find('button').exists()).toBe(true);
-      expect(complexSlot.find('input').exists()).toBe(true);
-      expect(complexSlot.find('select').exists()).toBe(true);
+      expect(complexSlot.find('[data-test="complex-slot-button"]').exists()).toBe(true);
+      expect(complexSlot.find('[data-test="complex-slot-input"]').exists()).toBe(true);
+      expect(complexSlot.find('[data-test="complex-slot-select"]').exists()).toBe(true);
     });
   });
 
   describe("Layout Structure", () => {
     it("should have correct CSS classes for layout", () => {
       wrapper = createWrapper({ backButton: true });
-      
-      const mainRow = wrapper.find('.row.items-center.no-wrap.q-mb-sm');
-      expect(mainRow.exists()).toBe(true);
-      
-      const titleColumn = wrapper.find('.col');
-      expect(titleColumn.exists()).toBe(true);
-      
-      const rightColumn = wrapper.findAll('.col-auto');
-      expect(rightColumn.length).toBe(2); // Back button and right slot containers
+
+      // Migrated component uses tailwind layout, not Quasar grid.
+      expect(findTitle(wrapper)?.exists()).toBe(true);
+
+      // Only the back button div and right slot container exist post-migration.
+      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(true);
     });
 
     it("should have separator with correct classes", () => {
       wrapper = createWrapper();
-      
-      const separator = wrapper.findComponent({ name: 'QSeparator' });
+
+      const separator = wrapper.findComponent({ name: 'OSeparator' });
       expect(separator.exists()).toBe(true);
-      expect(separator.classes()).toContain('q-mb-sm');
+      // tw:mb-2 replaces q-mb-sm.
+      expect(separator.classes().some((c) => c.includes("mb-2"))).toBe(true);
     });
 
     it("should maintain layout structure without back button", () => {
       wrapper = createWrapper({ backButton: false, title: "Test Title" });
-      
-      const mainRow = wrapper.find('.row.items-center.no-wrap.q-mb-sm');
-      expect(mainRow.exists()).toBe(true);
-      
-      const titleColumn = wrapper.find('.col');
-      expect(titleColumn.exists()).toBe(true);
-      
-      // Should have only one col-auto for right slot when no back button
-      const rightColumn = wrapper.findAll('.col-auto');
-      expect(rightColumn.length).toBe(1);
+
+      expect(findTitle(wrapper)?.exists()).toBe(true);
+
+      // Should have only right slot container when no back button.
+      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(true);
     });
 
     it("should maintain layout structure with back button", () => {
       wrapper = createWrapper({ backButton: true, title: "Test Title" });
-      
-      const mainRow = wrapper.find('.row.items-center.no-wrap.q-mb-sm');
-      expect(mainRow.exists()).toBe(true);
-      
-      const titleColumn = wrapper.find('.col');
-      expect(titleColumn.exists()).toBe(true);
-      
-      // Should have two col-auto: one for back button, one for right slot
-      const autoColumns = wrapper.findAll('.col-auto');
-      expect(autoColumns.length).toBe(2);
+
+      expect(findTitle(wrapper)?.exists()).toBe(true);
+
+      // Should have both back button and right slot containers.
+      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(true);
     });
   });
 
   describe("Event Handling", () => {
     it("should have onBackClicked method in component instance", () => {
       wrapper = createWrapper({ backButton: true });
-      
+
       expect(wrapper.vm.onBackClicked).toBeDefined();
       expect(typeof wrapper.vm.onBackClicked).toBe('function');
     });
 
     it("should call onBackClicked when back button is triggered programmatically", async () => {
       wrapper = createWrapper({ backButton: true });
-      
+
       wrapper.vm.onBackClicked();
-      
+
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.emitted('back')).toBeTruthy();
     });
 
     it("should not have back event emitted without back button", () => {
       wrapper = createWrapper({ backButton: false });
-      
+
       expect(wrapper.emitted('back')).toBeFalsy();
     });
   });
@@ -334,25 +326,25 @@ describe("DashboardHeader", () => {
   describe("Props Validation", () => {
     it("should handle string title prop", () => {
       wrapper = createWrapper({ title: "Valid String Title" });
-      
+
       expect(wrapper.props('title')).toBe("Valid String Title");
     });
 
     it("should handle boolean backButton prop", () => {
       wrapper = createWrapper({ backButton: true });
-      
+
       expect(wrapper.props('backButton')).toBe(true);
     });
 
     it("should handle boolean false for backButton", () => {
       wrapper = createWrapper({ backButton: false });
-      
+
       expect(wrapper.props('backButton')).toBe(false);
     });
 
     it("should use default values when props are not provided", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.props('title')).toBe("");
       expect(wrapper.props('backButton')).toBe(false);
     });
@@ -368,10 +360,13 @@ describe("DashboardHeader", () => {
 
     it("should have proper heading hierarchy with title", () => {
       wrapper = createWrapper({ title: "Main Title" });
-      
-      const titleElement = wrapper.find('.text-h6');
-      expect(titleElement.exists()).toBe(true);
-      expect(titleElement.classes()).toContain('text-h6');
+
+      const titleElement = findTitle(wrapper);
+      expect(titleElement?.exists()).toBe(true);
+      // The migrated heading uses tw:text-xl + tw:font-semibold.
+      expect(
+        titleElement?.classes().some((c) => c.includes("text-xl")),
+      ).toBe(true);
     });
 
     it("should support keyboard navigation for back button", async () => {
@@ -393,30 +388,30 @@ describe("DashboardHeader", () => {
   describe("Edge Cases and Error Handling", () => {
     it("should handle null title", () => {
       wrapper = createWrapper({ title: null });
-      
-      expect(wrapper.find('.text-h6').text()).toBe("");
+
+      expect(findTitle(wrapper)?.text()).toBe("");
     });
 
     it("should handle numeric title", () => {
       wrapper = createWrapper({ title: 123 });
-      
-      expect(wrapper.find('.text-h6').text()).toBe("123");
+
+      expect(findTitle(wrapper)?.text()).toBe("123");
     });
 
     it("should handle empty string title", () => {
       wrapper = createWrapper({ title: "" });
-      
-      expect(wrapper.find('.text-h6').text()).toBe("");
+
+      expect(findTitle(wrapper)?.text()).toBe("");
     });
 
     it("should handle rapid prop changes", async () => {
       wrapper = createWrapper({ title: "Initial", backButton: false });
-      
+
       await wrapper.setProps({ title: "Changed 1", backButton: true });
       await wrapper.setProps({ title: "Changed 2", backButton: false });
       await wrapper.setProps({ title: "Final", backButton: true });
-      
-      expect(wrapper.find('.text-h6').text()).toBe("Final");
+
+      expect(findTitle(wrapper)?.text()).toBe("Final");
       expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(true);
     });
 
@@ -431,7 +426,7 @@ describe("DashboardHeader", () => {
       }
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.text-h6').text()).toBe("Title 9");
+      expect(findTitle(wrapper)?.text()).toBe("Title 9");
       expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(false); // 9 % 2 !== 0
     });
   });

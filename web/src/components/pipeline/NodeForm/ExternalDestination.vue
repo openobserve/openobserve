@@ -15,112 +15,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-stream-input-stream-routing-section"
-    class="tw:h-[calc(100vh)] tw:overflow-auto tw:w-[40vw]"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    title="External Destination"
+    size="lg"
+    :show-close="true"
+    @keydown.stop
+    :primaryButtonLabel="!createNewDestination ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!createNewDestination ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!createNewDestination && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveDestination"
+    @click:secondary="handleCancel"
+    @click:neutral="openDeleteDialog"
   >
-    <q-page>
-      <div class="o2-input">
-        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
-          <div class="flex items-center tw:w-full">
-            <div class="tw:w-full" data-test="add-destination-title">
-              <div
-                class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"
-              >
-                External Destination
-                <div>
-                  <OButton variant="ghost" size="icon" v-close-popup>
-                    <q-icon name="cancel" size="14px" />
-                  </OButton>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <q-separator />
-        <div class="row q-col-gutter-sm q-px-lg">
-          <q-toggle
-            data-test="create-stream-toggle"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-xs tw:mr-3 q-mt-md"
-            size="xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-            :label="'Create new Destination'"
-            v-model="createNewDestination"
-          />
+    <div class="tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
+      <OSwitch
+        data-test="create-stream-toggle"
+        :label="'Create new Destination'"
+        v-model="createNewDestination"
+      />
 
-          <div v-if="createNewDestination" class="q-mt-sm q-mb-md col-12">
-            <!-- Create New Destination Form -->
-            <CreateDestinationForm
-              @created="handleDestinationCreated"
-              @cancel="handleCancel"
-            />
-          </div>
-
-          <!-- Select Existing Destination -->
-          <div v-else class="col-12">
-            <div class="col-12 q-py-xs destination-method-select">
-              <q-select
-                data-test="external-destination-select"
-                v-model="selectedDestination"
-                :label="'Destination *'"
-                :options="getFormattedDestinations"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                tabindex="0"
-              >
-                <template v-slot:option="scope">
-                  <q-item
-                    style="max-width: calc(40vw - 42px)"
-                    v-bind="scope.itemProps"
-                  >
-                    <q-item-section class="flex flex-col">
-                      <q-item-label>
-                        <span class="text-bold"> {{ scope.opt.label }}</span> -
-                        <span class="truncate-url"> {{ scope.opt.url }}</span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-            </div>
-
-            <!-- Action buttons for existing destination selection -->
-            <div class="tw:flex tw:gap-2 q-mt-md q-mb-md">
-              <OButton
-                v-if="pipelineObj.isEditNode"
-                data-test="add-destination-delete-btn"
-                variant="outline-destructive"
-                size="sm-action"
-                @click="openDeleteDialog"
-              >{{ t("pipeline.deleteNode") }}</OButton>
-              <OButton
-                data-test="add-destination-cancel-btn"
-                variant="outline"
-                size="sm-action"
-                @click="handleCancel"
-              >{{ t('alerts.cancel') }}</OButton>
-              <OButton
-                data-test="add-destination-save-btn"
-                variant="primary"
-                size="sm-action"
-                @click="saveDestination"
-              >{{ t('alerts.save') }}</OButton>
-            </div>
-          </div>
-        </div>
+      <div v-if="createNewDestination" class="tw:w-full">
+        <!-- Create New Destination Form -->
+        <CreateDestinationForm
+          @created="handleDestinationCreated"
+          @cancel="handleCancel"
+        />
       </div>
-    </q-page>
-  </div>
+
+      <!-- Select Existing Destination -->
+      <template v-else>
+        <OSelect
+          data-test="external-destination-select"
+          v-model="selectedDestination"
+          :label="'Destination *'"
+          :options="getFormattedDestinations"
+          class="destination-method-select"
+          tabindex="0"
+        />
+      </template>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -135,26 +72,33 @@ import { ref, computed, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
+const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
-const q = useQuasar();
+
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
 const store = useStore();
 const { t } = useI18n();
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 const createNewDestination = ref(false);
-const selectedDestination: any = ref(
-  pipelineObj.currentSelectedNodeData?.data?.destination_name
-    ? {
-        label: pipelineObj.currentSelectedNodeData.data.destination_name,
-        value: pipelineObj.currentSelectedNodeData.data.destination_name,
-      }
-    : { label: "", value: "" },
+const selectedDestination = ref<string>(
+  pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "",
 );
 const destinations = ref([]);
 
@@ -189,14 +133,15 @@ const getFormattedDestinations = computed(() => {
     return {
       label: destination.name,
       value: destination.name,
-      url: truncatedUrl,
+      subLabel: truncatedUrl,
+      subLabelInline: true,
     };
   });
 });
 
 const getDestinations = () => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while loading destinations...",
   });
   destinationService
@@ -213,8 +158,8 @@ const getDestinations = () => {
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling destinations.",
           timeout: 2000,
         });
@@ -226,19 +171,15 @@ const getDestinations = () => {
 
 const saveDestination = () => {
   const destinationData = {
-    destination_name: selectedDestination.value.value,
+    destination_name: selectedDestination.value,
     node_type: "remote_stream",
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
   };
-  if (
-    selectedDestination.value.hasOwnProperty("value") &&
-    selectedDestination.value.value === ""
-  ) {
-    q.notify({
+  if (!selectedDestination.value) {
+    toast({
+      variant: "warning",
       message: "Please select External destination from the list",
-      color: "negative",
-      position: "bottom",
       timeout: 2000,
     });
     return;
@@ -249,10 +190,7 @@ const saveDestination = () => {
 
 const handleDestinationCreated = (destinationName: string) => {
   // Switch back to selection mode and select the newly created destination
-  selectedDestination.value = {
-    label: destinationName,
-    value: destinationName,
-  };
+  selectedDestination.value = destinationName;
   createNewDestination.value = false;
   getDestinations();
 };

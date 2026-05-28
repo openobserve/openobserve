@@ -15,16 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height no-wrap tw:w-[70vw]!">
-    <!-- Header -->
-    <q-card-section class="tw:px-2 tw:py-[0.625rem]!">
-      <div class="row items-center no-wrap">
-        <div class="col">
+  <ODrawer data-test="event-detail-drawer"
+    :open="open"
+    size="xl"
+    @update:open="emit('update:open', $event)"
+  >
+    <template #header>
+      <div class="tw:px-1 tw:py-[0.625rem] tw:w-full">
+        <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full">
+        <div class="tw:flex tw:flex-col tw:w-full">
           <!-- Event Header -->
-          <div>
-            <div class="row items-center justify-between tw:mb-[0.625rem]">
+          <div class="tw:flex tw:items-center tw:justify-between tw:mb-[0.625rem]">
               <div
-                class="row items-center tw:w-full tw:max-w-[calc(100%-1.9rem)]"
+                class="tw:flex tw:items-center tw:w-full"
               >
                 <div
                   class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
@@ -41,69 +44,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <FrustrationEventBadge
                     :frustration-types="event.frustration_types"
-                    class="q-mr-xs inline"
+                    class="tw:mr-1 tw:inline"
                   />
                 </template>
                 <div
-                  class="tw:text-sm tw:semi-bold tw:leading-tight tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:max-w-[calc(100%-12rem)]"
+                  class="tw:text-sm tw:semi-bold tw:leading-tight tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap flex-1"
                   :title="event.name"
                 >
                   {{ event.name }}
                 </div>
               </div>
-              <div class="col-auto">
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  data-test="close-drawer-btn"
-                  @click="$emit('close')"
-                >
-                  <X class="tw:size-4" />
-                </OButton>
-              </div>
-            </div>
-            <div
+          </div>
+          <div
               data-test="event-session-meta-data"
-              class="row items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
+              class="tw:flex tw:items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
             >
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="language" size="0.75rem" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="language" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.ip }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
-                <q-icon :name="outlinedCode" size="1rem" class="q-pr-xs" />
+              <div class="tw:text-xs tw:flex tw:items-center">
+                <OIcon name="code" size="sm" class="tw:pr-1" />
                 {{ rawEvent.service || "Unknown User" }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
+              <div class="tw:text-xs tw:flex tw:items-center">
                 V {{ rawEvent.version || "Unknown User" }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
-                <q-icon name="mail" size="0.75rem" class="q-pr-xs" />
+              <div class="tw:text-xs tw:flex tw:items-center">
+                <OIcon name="mail" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.user_email || "Unknown User" }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="settings" size="0.75rem" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="settings" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.browser }}, {{ sessionDetails.os }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="location_on" size="0.75rem" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="location-on" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.city }}, {{ sessionDetails.country }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="schedule" size="0.75rem" class="q-pr-xs" />
+              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
+                <OIcon name="schedule" size="sm" class="tw:pr-1" />
                 {{ sessionDetails.date }}
               </div>
-            </div>
           </div>
         </div>
       </div>
-    </q-card-section>
+      </div>
+    </template>
 
     <!-- Tabs Navigation -->
-    <q-separator />
-    <div class="row q-pt-sm q-px-sm">
-      <div class="col-12">
-        <OTabs v-model="activeTab" align="left">
+    <div class="tw:flex tw:pt-2 tw:px-2">
+      <div class="tw:w-full">
+        <OTabs v-model="activeTab" align="left" dense>
           <OTab
             data-test="event-detail-overview-tab"
             name="overview"
@@ -122,8 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </div>
     </div>
-
-    <q-separator />
 
     <!-- Tab Content -->
     <OTabPanels
@@ -186,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="
                       rawEvent.error_handling === 'unhandled'
                         ? 'text-red-6 tw:border tw:border-solid tw:border-red-6'
-                        : 'text-grey-8'
+                        : 'tw:text-gray-500'
                     "
                   >
                     {{ rawEvent.error_handling }}
@@ -230,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Loading Type:
                 </div>
-                <div class="tw:flex-1 text-capitalize tw:break-words">
+                <div class="tw:flex-1 tw:capitalize tw:break-words">
                   {{ rawEvent.view_loading_type.replace("_", " ") }}
                 </div>
               </div>
@@ -282,9 +272,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Related Events for Actions -->
           <div v-if="event.type === 'action'" class="tw:mb-3">
             <template v-if="isLoadingRelatedResources">
-              <div class="tw:mt-2 tw:p-2 text-center">
-                <q-spinner-hourglass color="primary" size="1rem" />
-                <div class="tw:mt-1 text-grey-7 tw:text-xs">
+              <div class="tw:mt-2 tw:p-2 tw:text-center">
+                <OSpinner size="xs" />
+                <div class="tw:mt-1 tw:text-gray-400 tw:text-xs">
                   Loading related events...
                 </div>
               </div>
@@ -302,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
-                  <div class="row items-center tw:mb-0.5">
+                  <div class="tw:flex tw:items-center tw:mb-0.5">
                     <div
                       class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
                       :class="getEventTypeClass(item.type)"
@@ -313,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
                       <span
-                        class="tw:mr-1 text-bold tw:text-[10px] tw:text-[var(--o2-primary-btn-bg)]"
+                        class="tw:mr-1 tw:font-bold tw:text-[10px] tw:text-[var(--o2-primary-btn-bg)]"
                       >
                         {{ item.resource_method || "GET" }}
                       </span>
@@ -362,27 +352,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="tw:flex items-center text-grey-7 tw:text-[10px]">
-                    <q-icon name="schedule" size="0.75rem" class="tw:mr-1" />
+                  <div class="tw:flex tw:items-center tw:text-gray-400 tw:text-[10px]">
+                    <OIcon name="schedule" size="xs" class="tw:mr-1" />
                     <span class="tw:mr-2">{{
                       formatTimestamp(item.date)
                     }}</span>
 
                     <!-- Resource-specific details -->
                     <template v-if="item.type === 'resource'">
-                      <q-icon
-                        name="access_time"
-                        size="0.75rem"
+                      <OIcon
+                        name="access-time"
+                        size="xs"
                         class="tw:mr-0.5"
                       />
                       <span class="tw:mr-2">{{
                         formatDuration(item.resource_duration / 1000000)
                       }}</span>
-                      <q-icon
+                      <OIcon
                         :name="getStatusIcon(item.resource_status_code)"
-                        :color="getStatusColor(item.resource_status_code)"
-                        size="0.75rem"
-                        class="tw:mr-0.5"
+                        :class="['tw:mr-0.5', getStatusColorClass(item.resource_status_code)]"
+                        size="xs"
                       />
                       <span>{{ item.resource_status_code }}</span>
                     </template>
@@ -390,14 +379,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Clickable Trace Button -->
                     <OButton
                       v-if="item._oo_trace_id"
-                      variant="ghost"
-                      size="icon-chip"
+                      variant="outline"
+                      size="xs"
                       title="View trace details"
                       data-test="view-trace-btn"
+                      class="tw:ml-2 tw:h-5! tw:px-1.5"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
                     >
-                      <GitBranch class="tw:size-3" />
-                      <span v-if="item._oo_trace_id" class="tw:text-[10px] tw:pl-[0.2rem]">Trace</span>
+                      <OIcon name="account-tree" size="xs" />
+                      <span v-if="item._oo_trace_id">View Trace</span>
                     </OButton>
                   </div>
                 </div>
@@ -431,23 +421,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <div
-                class="row items-center tw:gap-x-3 tw:text-[10px] text-grey-7"
+                class="tw:flex tw:items-center tw:gap-x-3 tw:text-[10px] tw:text-gray-400"
               >
                 <div class="tw:flex tw:items-center">
-                  <q-icon name="access_time" size="0.75rem" class="tw:mr-1" />
+                  <OIcon name="access-time" size="xs" class="tw:mr-1" />
                   {{ formatDuration(resource.resource_duration / 1000000) }}
                 </div>
                 <div class="tw:flex tw:items-center">
-                  <q-icon
+                  <OIcon
                     :name="getStatusIcon(resource.resource_status_code)"
-                    :color="getStatusColor(resource.resource_status_code)"
-                    size="0.75rem"
-                    class="tw:mr-1"
+                    :class="['tw:mr-1', getStatusColorClass(resource.resource_status_code)]"
+                    size="xs"
                   />
                   {{ resource.resource_status_code }}
                 </div>
                 <div class="tw:flex tw:items-center">
-                  <q-icon name="schedule" size="0.75rem" class="tw:mr-1" />
+                  <OIcon name="schedule" size="xs" class="tw:mr-1" />
                   {{ formatTimestamp(resource.date) }}
                 </div>
               </div>
@@ -456,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <div
           v-else
-          class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm"
+          class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm"
           data-test="network-empty-state"
         >
           No network requests found for this event
@@ -465,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Console Tab -->
       <OTabPanel name="console" padding="sm" data-test="console-tab">
-        <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
+        <div class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm">
           Console logs coming soon
         </div>
       </OTabPanel>
@@ -476,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         padding="sm"
         data-test="performance-tab"
       >
-        <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
+        <div class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm">
           Performance metrics coming soon
         </div>
       </OTabPanel>
@@ -485,13 +474,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
           <OButton
+            icon-left="content-copy"
             variant="outline"
-            size="sm-action"
-            class="q-px-sm"
+            size="xs"
             data-test="attributes-copy-btn"
             @click="copyAttributesToClipboard"
           >
-            <Copy class="tw:size-4 tw:mr-1" />
             {{ t('common.copyToClipboard') }}
           </OButton>
         </div>
@@ -519,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OTabPanel>
     </OTabPanels>
-  </q-card>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -530,13 +518,9 @@ import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
-import {
-  outlinedAccountTree,
-  outlinedCode,
-} from "@quasar/extras/material-icons-outlined";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import EventDetailsSection from "./common/EventDetailsSection.vue";
@@ -544,9 +528,15 @@ import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X, GitBranch, Copy } from 'lucide-vue-next';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   event: {
     type: Object,
     default: () => ({}),
@@ -573,11 +563,10 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["close", "resource-selected"]);
+const emit = defineEmits(["update:open", "resource-selected"]);
 
 const store = useStore();
 const router = useRouter();
-const q = useQuasar();
 const { t } = useI18n();
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
@@ -588,27 +577,17 @@ const {
   formatTimestamp,
   formatId,
   getStatusIcon,
-  getStatusColor,
+  getStatusColorClass,
   formatResourceDuration,
   getEventTypeClass,
 } = useEventFormatters();
 
 const copyAttributesToClipboard = () => {
-  copyToClipboard(JSON.stringify(props.rawEvent, null, 2))
-    .then(() => {
-      q.notify({
-        type: "positive",
-        message: t("common.copyToClipboard") + " - " + t("common.success"),
-        timeout: 1500,
-      });
-    })
-    .catch(() => {
-      q.notify({
-        type: "negative",
-        message: "Error while copying content.",
-        timeout: 1500,
-      });
-    });
+  copyToClipboard(JSON.stringify(props.rawEvent, null, 2), {
+    successMessage: t("common.copyToClipboard") + " - " + t("common.success"),
+    errorMessage: "Error while copying content.",
+    timeout: 1500,
+  });
 };
 
 const networkResources = computed(() => {
@@ -646,7 +625,7 @@ const viewFields = computed(() => [
     key: "view_loading_type",
     label: "Loading Type",
     value: props.rawEvent?.view_loading_type?.replace("_", " "),
-    valueClass: "text-capitalize",
+    valueClass: "tw:capitalize",
   },
   {
     key: "view_url",
@@ -666,7 +645,7 @@ const actionFields = computed(() => [
     key: "action_type",
     label: "Action Type",
     value: props.rawEvent?.action_type || "N/A",
-    valueClass: "text-capitalize",
+    valueClass: "tw:capitalize",
   },
   {
     key: "action_target_name",
@@ -785,7 +764,7 @@ const navigateToSpecificTrace = (traceId: string) => {
 };
 
 defineExpose({
-  outlinedAccountTree,
+  outlinedAccountTree: "account-tree",
 });
 </script>
 

@@ -17,10 +17,8 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
 import { createStore } from "vuex";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Mock search service
@@ -395,9 +393,8 @@ function mountServicesCatalog(
         },
         "q-input": false,
         "q-btn": false,
-        "q-icon": false,
+        "OIcon": false,
         "q-tooltip": false,
-        "q-spinner-hourglass": false,
       },
     },
   });

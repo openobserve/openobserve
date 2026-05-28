@@ -1,94 +1,63 @@
 <template>
   <div>
-    <div class="q-px-md q-pt-md q-pb-md">
-      <div class="text-body1 text-bold">
+    <div class="tw:px-3 tw:pt-3 tw:pb-3">
+      <div class="tw:text-base tw:font-bold">
         {{ t("settings.logDetails") }}
       </div>
     </div>
 
-    <div class="q-mx-md q-mb-md">
+    <div class="tw:mx-3 tw:mb-3">
     <div
       data-test="add-role-rolename-input-btn"
-      class="trace-id-field-name o2-input q-mb-sm"
+      class="trace-id-field-name o2-input tw:mb-2"
     >
-      <q-input
+      <OInput
         v-model.trim="traceIdFieldName"
         :label="t('settings.traceIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidTraceField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
+        class="tw:py-3 showLabelOnTop"
+        :error="!!traceIdFieldNameError"
+        :error-message="traceIdFieldNameError"
+        help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
+        @update:model-value="updateFieldName('trace'); traceIdFieldNameError = ''"
+      />
     </div>
 
     <div
       data-test="add-role-rolename-input-btn"
       class="span-id-field-name o2-input"
     >
-      <q-input
+      <OInput
         v-model.trim="spanIdFieldName"
         :label="t('settings.spanIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidSpanField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-        @update:model-value="updateFieldName('span')"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
+        class="tw:py-3 showLabelOnTop"
+        :error="!!spanIdFieldNameError"
+        :error-message="spanIdFieldNameError"
+        help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
+        @update:model-value="updateFieldName('span'); spanIdFieldNameError = ''"
+      />
     </div>
 
     <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
-      <q-toggle
+      <OSwitch
         data-test="add-toggle-ingestion-btn"
         v-model="toggleIngestionLogs"
         :label="t('settings.toggleIngestionLogsLabel')"
-        stack-label
-        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-        size="lg"
-      >
-      </q-toggle>
+        class="tw:mt-2"
+      />
     </div>
 
     <div data-test="add-toggle-usage-stream" class="o2-input">
-      <q-toggle
+      <OSwitch
         data-test="add-toggle-usage-stream-btn"
         v-model="usageStreamEnabled"
         :label="t('settings.usageStreamEnabledLabel')"
-        stack-label
-        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-        size="lg"
-      >
-      </q-toggle>
+        class="tw:mt-2"
+      />
     </div>
 
     <!-- Cross-Linking Configuration -->
     <template v-if="store.state.zoConfig?.enable_cross_linking">
-      <q-separator class="q-mt-lg q-mb-md" />
+      <OSeparator class="tw:mt-6 tw:mb-4" />
       <CrossLinkManager
         v-model="crossLinks"
         :title="t('crossLinks.orgConfigTitle')"
@@ -97,7 +66,7 @@
       />
     </template>
 
-    <div class="tw:flex tw:gap-2 q-mt-md">
+    <div class="tw:flex tw:gap-2 tw:mt-3">
       <OButton
         data-test="add-alert-cancel-btn"
         variant="outline"
@@ -117,14 +86,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 
@@ -138,10 +110,11 @@ const spanIdFieldName = ref(
   store.state?.organizationData?.organizationSettings?.span_id_field_name,
 );
 
-const q = useQuasar();
 
 const isValidSpanField = ref(true);
 const isValidTraceField = ref(true);
+const traceIdFieldNameError = ref('');
+const spanIdFieldNameError = ref('');
 const toggleIngestionLogs = ref(
   store.state?.organizationData?.organizationSettings?.toggle_ingestion_logs ||
     false,
@@ -152,6 +125,15 @@ const usageStreamEnabled = ref(
 );
 const crossLinks = ref(
   store.state?.organizationData?.organizationSettings?.cross_links || [],
+);
+
+watch(
+  () => store.state?.organizationData?.organizationSettings?.cross_links,
+  (newVal) => {
+    if (!formDirty.value) {
+      crossLinks.value = newVal || [];
+    }
+  },
 );
 const formDirty = ref(false);
 
@@ -175,7 +157,27 @@ const updateFieldName = (fieldName: string) => {
     isValidTraceField.value = validateFieldName(traceIdFieldName.value);
 };
 
+const validateOrgSettings = () => {
+  let valid = true;
+  if (!traceIdFieldName.value) {
+    traceIdFieldNameError.value = t('common.nameRequired');
+    valid = false;
+  } else if (!isValidTraceField.value) {
+    traceIdFieldNameError.value = `Use alphanumeric and '+=,.@-_' characters only, without spaces.`;
+    valid = false;
+  }
+  if (!spanIdFieldName.value) {
+    spanIdFieldNameError.value = t('common.nameRequired');
+    valid = false;
+  } else if (!isValidSpanField.value) {
+    spanIdFieldNameError.value = `Use alphanumeric and '+=,.@-_' characters only, without spaces.`;
+    valid = false;
+  }
+  return valid;
+};
+
 const saveOrgSettings = async () => {
+  if (!validateOrgSettings()) return;
   try {
     const payload: any = {
       trace_id_field_name: traceIdFieldName.value,
@@ -201,17 +203,17 @@ const saveOrgSettings = async () => {
 
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    q.notify({
+    formDirty.value = false;
+
+    toast({
       message: "Organization settings updated successfully",
-      color: "positive",
-      position: "bottom",
+      position: "bottom-right",
       timeout: 3000,
     });
   } catch (e: any) {
-    q.notify({
+    toast({
       message: e?.message || "Error saving organization settings",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-right",
       timeout: 3000,
     });
   }

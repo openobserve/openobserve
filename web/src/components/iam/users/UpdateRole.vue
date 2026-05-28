@@ -15,69 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold text-dark">
-            {{ t("user.editUser") }}
-          </div>
-          <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
-        </div>
-        <div class="col-auto">
-          <OButton v-close-popup="true" variant="ghost" size="icon-circle-sm">
-            <q-icon name="cancel" />
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-        <q-input
+  <ODrawer data-test="update-role-dialog"
+    :open="open"
+    :width="30"
+    :title="t('user.editUser')"
+    persistent
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4">
+      <div>
+        <OInput
           v-model="orgMemberData.first_name"
           :label="t('user.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
+          class="tw:py-3 showLabelOnTop"
           readonly
-          filled
-          dense
         />
 
-        <!--
-        <q-input
-          v-model="orgMemberData.email"
-          :label="t('user.email')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          readonly
-          filled
-          dense
-        />
-        -->
-
-        <q-select
+        <OSelect
           v-model="orgMemberData.role"
           :label="t('user.role')"
           :options="roleOptions"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-pt-md q-pb-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
+          class="tw:pt-3 tw:pb-2 showLabelOnTop"
         />
 
-        <div class="flex justify-center q-mt-lg tw:gap-2">
+        <div class="tw:flex tw:justify-center tw:mt-4 tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('update:open', false)"
             variant="outline"
             size="sm-action"
           >
@@ -86,25 +49,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="onSubmit"
           >
             {{ t('user.save') }}
           </OButton>
         </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
+      </div>
+    </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
 import organizationsService from "@/services/organizations";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue: any = () => {
   return {
@@ -118,18 +84,21 @@ let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
-  components: { OButton },
+  components: { OButton, ODrawer, OInput, OSelect },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
     },
   },
-  emits: ["update:modelValue", "updated", "finish"],
+  emits: ["update:modelValue", "updated", "finish", "update:open"],
   setup() {
     const store: any = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const roleOptions = ["admin"];
     const orgMemberData: any = ref(defaultValue());
     const updateUserForm: any = ref(null);
@@ -155,8 +124,8 @@ export default defineComponent({
   },
   methods: {
     onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -179,20 +148,21 @@ export default defineComponent({
           if (res?.data?.error_members != null) {
             const message = `Error while updating organization member`;
 
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: message,
               timeout: 15000,
             });
           } else {
-            this.$q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Organization member updated successfully.",
               timeout: 3000,
             });
           }
 
           this.$emit("updated", res?.data);
+          this.$emit("update:open", false);
           this.updateUserForm.resetValidation();
           dismiss();
         });
@@ -203,25 +173,4 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 8px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-
-    .q-item {
-      text-transform: capitalize;
-      border-radius: 0.25rem;
-      margin-bottom: 0.25rem;
-      font-weight: 600;
-
-      &--active {
-        background-color: $selected-list-bg;
-        color: $primary;
-      }
-    }
-  }
-}
 </style>

@@ -15,12 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row col-11 justify-center q-mt-xl">
-    <q-icon
-      name="warning"
-      size="80px"
-      color="warning row col-8 justify-center q-mt-lg"
-    /><br />
+  <div class="tw:flex tw:w-11/12 tw:justify-center tw:mt-6">
+    <OIcon
+      name="warning" class="tw:text-[var(--o2-warning)]" style="width: 80px; height: 80px;" /><br />
     <h5>
       <b
         ><u><span class="text-red">Warning:</span></u></b
@@ -42,10 +39,13 @@ import { useRouter } from "vue-router";
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PendingSubscriptionWarning",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   setup() {
     const router = useRouter();
     const store = useStore();

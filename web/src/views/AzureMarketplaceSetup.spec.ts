@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AzureMarketplaceSetup from "./AzureMarketplaceSetup.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-installQuasar();
 
 describe("AzureMarketplaceSetup", () => {
   let store: any;

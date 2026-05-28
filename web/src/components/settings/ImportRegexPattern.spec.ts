@@ -17,13 +17,18 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ImportRegexPattern from "@/components/settings/ImportRegexPattern.vue";
 import regexPatternsService from "@/services/regex_pattern";
-import { Notify } from "quasar";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick, ref } from "vue";
 import axios from "axios";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
+
+const { mockToastFn } = vi.hoisted(() => ({
+  mockToastFn: vi.fn(),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToastFn(...args),
+}));
 
 // Mock services
 vi.mock("@/services/regex_pattern", () => ({
@@ -43,9 +48,6 @@ vi.mock("@/utils/cookies", () => ({
   getLanguage: vi.fn(() => "en-gb")
 }));
 
-installQuasar({
-  plugins: [Notify]
-});
 
 describe("ImportRegexPattern", () => {
   let wrapper: any = null;
@@ -95,7 +97,7 @@ describe("ImportRegexPattern", () => {
             props: ['tabs', 'activeTab'],
             emits: ['update:active-tab']
           },
-          "q-icon": true,
+          "OIcon": true,
           "built-in-patterns-tab": true
         }
       }
@@ -445,14 +447,14 @@ describe("ImportRegexPattern", () => {
         jsonArray: []
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToastFn.mockClear();
 
       await wrapper.vm.importJson(payload);
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith({
+      expect(mockToastFn).toHaveBeenCalledWith({
         message: "JSON string is empty",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-right",
         timeout: 2000,
       });
     });
@@ -477,18 +479,18 @@ describe("ImportRegexPattern", () => {
         jsonArray: []
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToastFn.mockClear();
 
       await wrapper.vm.importJson(payload);
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          color: "negative",
-          position: "bottom",
+          position: "bottom-right",
           timeout: 2000,
         })
       );
-      expect(notifySpy.mock.calls[0][0].message).toContain("JSON");
+      expect(mockToastFn.mock.calls[0][0].message).toContain("JSON");
     });
 
     it("should reset BaseImport isImporting flag when JSON is invalid", async () => {
