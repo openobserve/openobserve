@@ -239,7 +239,10 @@ impl Condition {
                 }
             }
             Condition::Regex(field, value) => format!("{field}=~{value}"),
-            Condition::MatchAll(value) => format!("{INDEX_FIELD_NAME_FOR_ALL}:{value}"),
+            Condition::MatchAll(value) => {
+                let tokens = o2_collect_search_tokens(value);
+                format!("({INDEX_FIELD_NAME_FOR_ALL}:{value}):({tokens:?})")
+            }
             Condition::FuzzyMatchAll(value, distance) => {
                 format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
             }
@@ -1170,7 +1173,7 @@ mod tests {
     #[test]
     fn test_condition_to_query_match_all() {
         let condition = Condition::MatchAll("search_term".to_string());
-        assert_eq!(condition.to_query(), "_all:search_term");
+        assert_eq!(condition.to_query(), "_all:search_term [\"search\", \"term\"]");
     }
 
     #[test]
