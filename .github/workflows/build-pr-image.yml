@@ -22,6 +22,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      # we cache the git tag and hash and pass it to other jobs
       GIT_TAG: ${{ steps.set-git-tag.outputs.GIT_TAG }}
       GIT_HASH: ${{ steps.set-git-tag.outputs.GIT_HASH }}
     steps:
