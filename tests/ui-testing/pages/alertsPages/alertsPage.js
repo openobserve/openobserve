@@ -2160,10 +2160,10 @@ export class AlertsPage {
         await this.page.waitForTimeout(2000);
 
         await this.page.locator(this.locators.alertImportJsonBtn).click();
-        // ImportAlert throws internally for structurally invalid JSON — the only signal is a
-        // default-variant toast (data-test="o-toast-default"). It auto-dismisses in 2s so use
-        // waitFor({ state: 'visible' }) which resolves the moment the element appears.
-        await this.page.locator('[data-test-variant="default"]').waitFor({ state: 'visible', timeout: 15000 });
+        // ImportAlert throws internally for structurally invalid JSON — the only signal is an
+        // error-variant toast. It auto-dismisses so use waitFor({ state: 'visible' }) which
+        // resolves the moment the element appears.
+        await this.page.locator(this.locators.oToastError).waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Invalid file import error shown as expected');
     }
 
