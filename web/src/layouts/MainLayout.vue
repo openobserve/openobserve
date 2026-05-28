@@ -297,7 +297,7 @@ export default defineComponent({
         },
       });
     },
-    changeLanguage(item: { code: string; label: string; icon: string }) {
+    changeLanguage(item: { code: string; label: string }) {
       setLanguage(item.code);
       window.location.reload();
     },
@@ -456,57 +456,46 @@ export default defineComponent({
       {
         label: "English",
         code: "en-gb",
-        icon: "img:" + getImageURL("images/language_flags/en-gb.svg"),
       },
       {
         label: "Türkçe",
         code: "tr-turk",
-        icon: "img:" + getImageURL("images/language_flags/tr-turk.svg"),
       },
       {
         label: "简体中文",
         code: "zh-cn",
-        icon: "img:" + getImageURL("images/language_flags/zh-cn.svg"),
       },
       {
         label: "Français",
         code: "fr",
-        icon: "img:" + getImageURL("images/language_flags/fr.svg"),
       },
       {
         label: "Español",
         code: "es",
-        icon: "img:" + getImageURL("images/language_flags/es.svg"),
       },
       {
         label: "Deutsch",
         code: "de",
-        icon: "img:" + getImageURL("images/language_flags/de.svg"),
       },
       {
         label: "Italiano",
         code: "it",
-        icon: "img:" + getImageURL("images/language_flags/it.svg"),
       },
       {
         label: "日本語",
         code: "ja",
-        icon: "img:" + getImageURL("images/language_flags/ja.svg"),
       },
       {
         label: "한국어",
         code: "ko",
-        icon: "img:" + getImageURL("images/language_flags/ko.svg"),
       },
       {
         label: "Nederlands",
         code: "nl",
-        icon: "img:" + getImageURL("images/language_flags/nl.svg"),
       },
       {
         label: "Português",
         code: "pt",
-        icon: "img:" + getImageURL("images/language_flags/pt.svg"),
       },
     ];
 

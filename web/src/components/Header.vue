@@ -481,17 +481,7 @@ name="language" class="padding-none" />
               </q-item-section>
               <q-item-section></q-item-section>
               <q-item-section side>
-                <div class="q-gutter-xs">
-                  <q-icon
-                    size="xs"
-                    :name="selectedLanguage.icon"
-                    class="padding-none"
-                  />
-                  <span
-                    class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label"
-                    >{{ selectedLanguage.label }}</span
-                  >
-                </div>
+                <span class="selected-lang-label">{{ selectedLanguage.label }}</span>
               </q-item-section>
               <q-item-section side style="padding-left: 0px">
                 <q-icon
@@ -512,19 +502,10 @@ name="language" class="padding-none" />
                   <q-item
                     v-for="lang in langList"
                     :key="lang.code"
-                    v-bind="lang"
                     dense
                     clickable
                     @click="changeLanguage(lang)"
                   >
-                    <q-item-section avatar>
-                      <q-icon
-                        size="xs"
-                        :name="lang.icon"
-                        class="padding-none"
-                      />
-                    </q-item-section>
-
                     <q-item-section
                       :data-test="`language-dropdown-item-${lang.code}`"
                     >
