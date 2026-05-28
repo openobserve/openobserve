@@ -116,38 +116,30 @@ jobs:
           <!-- deepseek-pr-review -->
           ## Code Review
 
-          <details>
-          <summary>🔴 High: `path/file:line`</summary>
-
-          Description of the issue. **Fix:** suggestion.
-
-          </details>
-
-          <details>
-          <summary>🟡 Medium: `path/file:line`</summary>
-
-          Description of the issue. **Fix:** suggestion.
-
-          </details>
+          | Severity | File:Line | Issue | Fix |
+          |----------|-----------|-------|-----|
+          | High | `src/main.rs:42` | Potential null pointer dereference. | Use `if let Some(x) = opt` to safely unwrap. |
+          | Medium | `src/utils.rs:128` | Unnecessary clone before iteration. | Use `&collection` instead of cloning. |
+          | Low | `src/lib.rs:55` | Redundant check in if-else chain. | Merge conditions into a match expression. |
           ```
 
-          Each issue MUST be wrapped in `<details>` like above.
           If NO issues found:
           ```
           <!-- deepseek-pr-review -->
           ## Code Review
 
-          **LGTM ✅** — No bugs, security, or performance issues found.
+          **LGTM** — No bugs, security, or performance issues found.
           ```
 
           STRICT RULES:
           - Output ONLY the `<!-- deepseek-pr-review -->` marker followed by the review content — no extra text, no summaries, no praise
-          - Each finding MUST be a `<details>` block with severity emoji in the `<summary>`: `🔴 High`, `🟡 Medium`, `🟢 Low`
-          - The summary line format: `🔴 High: \`path/file:line\`` (severity + file path with line)
-          - Inside each `<details>` block: one or two sentences describing the issue and fix
+          - Each finding MUST be a row in the table
+          - Severity column must be one of: High, Medium, Low
+          - File:Line column must use backtick-wrapped path, e.g. `path/file:line`
+          - Issue and Fix columns: one or two sentences each, no markdown headers or bold
           - Max 10 issues, sorted by severity (high first)
           - If existing review body shows resolved issues, append a "### Resolved" section with ~~strikethrough~~
-          - Maintain a blank line between `</details>` and the next `<details>`
+          - DO NOT use any emojis anywhere in the output
           ENDINSTRUCTIONS
 
           SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
