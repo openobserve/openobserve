@@ -146,7 +146,7 @@ jobs:
     needs: [build_binary]
     if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
-      labels: repo-openobserve-standard-16
+      labels: repo-openobserve-standard-8
     permissions:
       contents: read
       actions: read
