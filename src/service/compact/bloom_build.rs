@@ -143,19 +143,18 @@ pub(crate) async fn build_for_stream(
 
     let base_ver = now_micros();
     let chunk_total = files.len().div_ceil(max_files_per_bf);
-    let build_key = format!("{org_id}/{stream_type}/{stream_name}/{date_key}");
     for (chunk_idx, chunk) in files.chunks(max_files_per_bf).enumerate() {
         let bloom_ver = base_ver + chunk_idx as i64;
         let bloom_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
         match build_for_chunk(org_id, bloom_ver, &bloom_path, chunk, &target_fields, fpp).await {
             Ok((took, num_blocks, contributing_ids)) => {
                 log::info!(
-                    "[BLOOM_BUILD] {build_key}: wrote chunk {}/{chunk_total}, num_blocks={num_blocks} covering {contributing_ids} files in {took} ms",
+                    "[BLOOM_BUILD] {bloom_path}: wrote chunk {}/{chunk_total}, num_blocks={num_blocks} covering {contributing_ids} files in {took} ms",
                     chunk_idx + 1,
                 );
             }
             Err(e) => {
-                log::warn!("[BLOOM_BUILD] {build_key}: build chunk {chunk_idx} failed: {e}");
+                log::warn!("[BLOOM_BUILD] {bloom_path}: build chunk failed: {e}");
             }
         }
     }

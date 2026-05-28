@@ -500,9 +500,10 @@ pub async fn merge_by_stream(
                             if job_strategy == MergeStrategy::FileSize {
                                 break;
                             }
-                            new_file_size = 0;
                             new_file_list.clear();
-                            continue; // this batch don't need to merge, skip
+                            new_file_size = file.meta.original_size;
+                            new_file_list.push(file.clone());
+                            continue; // replace previous file with current file
                         }
                         batch_groups.push(MergeBatch {
                             batch_id: batch_groups.len(),
