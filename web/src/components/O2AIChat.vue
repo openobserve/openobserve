@@ -131,7 +131,7 @@
                     variant="ghost-subtle"
                     :block="true"
                     @click.stop="
-                      exportAllConversations;
+                      exportAllConversations();
                       titleMenuOpen = false;
                     "
                   >
