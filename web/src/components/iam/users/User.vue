@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedUserIds"
           :global-filter="filterQuery"
           pagination="client"
-          :page-size="500"
+          :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           :footer-title="t('iam.basicUsers')"
           sorting="client"
