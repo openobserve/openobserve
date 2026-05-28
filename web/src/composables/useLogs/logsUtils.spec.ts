@@ -612,9 +612,8 @@ describe("logsUtils", () => {
     it("should call toast with correct parameters", () => {
       utils.showCancelSearchNotification();
       expect(mockToast).toHaveBeenCalledWith({
+        variant: "info",
         message: "Running query cancelled successfully",
-        position: "bottom-right",
-        timeout: 4000,
       });
     });
   });
