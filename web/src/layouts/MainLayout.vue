@@ -412,6 +412,10 @@ export default defineComponent({
         code: "zh-cn",
       },
       {
+        label: "繁體中文",
+        code: "zh-tw",
+      },
+      {
         label: "Français",
         code: "fr",
       },
