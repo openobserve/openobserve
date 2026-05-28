@@ -21,3 +21,7 @@ export const getAiChat = (messages: any) => {
   return http({ headers: { traceparent } }).post("/api/default/ai/chat_stream", { messages });
 };
 
+export const checkChatExportPermission = (org_identifier: string) => {
+  return http().get(`/api/${org_identifier}/ai/chat/export-permission`);
+};
+

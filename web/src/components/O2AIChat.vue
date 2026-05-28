@@ -1536,6 +1536,7 @@ import {
 } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { checkChatExportPermission } from "@/services/ai_chat";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -5013,6 +5014,15 @@ export default defineComponent({
 
       // Load auto navigation preferences from localStorage
       loadAutoNavigationPreferences();
+
+      // Check if user has RBAC permission to export chats
+      checkChatExportPermission(store.state.selectedOrganization.identifier)
+        .then(() => {
+          chatExportEnabled.value = true;
+        })
+        .catch(() => {
+          chatExportEnabled.value = false;
+        });
     });
 
     onUnmounted(() => {
@@ -5666,7 +5676,7 @@ export default defineComponent({
       );
     });
 
-    const chatExportEnabled = computed(() => store.state.zoConfig.ai_chat_export_enabled === true);
+    const chatExportEnabled = ref(false);
 
     return {
       inputMessage,

@@ -4,6 +4,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useChatHistory } from "@/composables/useChatHistory";
+import { checkChatExportPermission } from "@/services/ai_chat";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -28,7 +29,16 @@ async function refresh() {
   history.value = await loadHistory();
 }
 
-onMounted(refresh);
+onMounted(async () => {
+  await refresh();
+  checkChatExportPermission(store.state.selectedOrganization.identifier)
+    .then(() => {
+      chatExportEnabled.value = true;
+    })
+    .catch(() => {
+      chatExportEnabled.value = false;
+    });
+});
 
 // Re-fetch whenever a chat is saved (chatUpdated flips true)
 watch(
@@ -45,7 +55,7 @@ const filtered = computed(() => {
 });
 
 const activeChatId = computed(() => store.state.currentChatTimestamp);
-const chatExportEnabled = computed(() => store.state.zoConfig.ai_chat_export_enabled === true);
+const chatExportEnabled = ref(false);
 
 function selectChat(id: number) {
   store.dispatch("setCurrentChatTimestamp", id);

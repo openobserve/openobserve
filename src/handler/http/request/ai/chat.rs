@@ -1086,6 +1086,28 @@ pub async fn confirm_action(
     }
 }
 
+/// Check if the authenticated user has permission to export AI chat history.
+///
+/// This endpoint is gated by both:
+/// 1. RBAC via auth middleware (resource: `ai_export`)
+/// 2. The `O2_AI_CHAT_EXPORT_ENABLED` environment variable
+///
+/// Returns `{ "allowed": true }` if both checks pass.
+pub async fn chat_export_check(Path(_org_id): Path<String>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !get_o2_config().ai.chat_export_enabled {
+            return MetaHttpResponse::bad_request("AI chat export is not enabled");
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(_org_id);
+        return MetaHttpResponse::bad_request("AI chat export is only available in enterprise version");
+    }
+    MetaHttpResponse::json(serde_json::json!({ "allowed": true }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
