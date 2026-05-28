@@ -102,19 +102,10 @@
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
         <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
-        <textarea
-          style="
-            min-width: 100%;
-            max-width: 100%;
-            resize: vertical;
-            border: 1px solid;
-            border-radius: 4px;
-            padding: 2px;
-          "
+        <OTextarea
           v-model="drilldownData.data.url"
-          :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
           data-test="dashboard-drilldown-url-textarea"
-        ></textarea>
+        />
         <div
           style="color: red; font-size: 12px"
           v-if="!isFormURLValid && drilldownData.data.url.trim()"
@@ -268,6 +259,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 const QueryEditor = defineAsyncComponent(
@@ -288,7 +280,8 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OIcon,
-},
+    OTextarea,
+  },
   props: {
     open: {
       type: Boolean,
