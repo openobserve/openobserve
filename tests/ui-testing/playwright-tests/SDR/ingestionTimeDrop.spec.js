@@ -2,163 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-async function closeStreamDetailSidebar(page) {
-  // Close stream detail sidebar if open
-  const cancelButton = page.locator('[data-test="schema-cancel-button"]');
-  const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
-  if (cancelVisible) {
-    await cancelButton.click();
-    testLogger.info('Closed stream detail sidebar');
-    await page.waitForTimeout(500);
-  }
-}
-
-async function navigateToLogsQuick(page) {
-  // Quick navigation to logs without VRL editor wait
-  await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-  testLogger.info('Navigated to Logs (fast - no VRL wait)');
-}
-
-async function verifyMultipleFieldsDrop(page, pm, streamName, fieldsToVerify) {
-  testLogger.info(`Verifying ${fieldsToVerify.length} fields for drop status`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(1000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(2000);
-
-  // Try multiple selectors to find all log entries
-  let logTableCell = page.locator('[data-test="log-table-column-0-source"]');
-  let logCount = await logTableCell.count();
-  testLogger.info(`Selector [data-test="log-table-column-0-source"] found ${logCount} entries`);
-
-  // If that doesn't work, try table rows
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('.logs-result-table tbody tr[role="row"]');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector .logs-result-table tbody tr[role="row"] found ${logCount} entries`);
-  }
-
-  // Try another common selector
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('tbody tr');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector tbody tr found ${logCount} entries`);
-  }
-
-  testLogger.info(`Final: Found ${logCount} log entries in the UI`);
-
-  if (logCount === 0) {
-    throw new Error('No logs found in the stream');
-  }
-
-  // Get all log texts
-  const allLogTexts = [];
-  for (let i = 0; i < logCount; i++) {
-    const text = await logTableCell.nth(i).textContent();
-    allLogTexts.push(text);
-  }
-
-  // For each field we want to verify, search through all logs to find the one containing that field
-  for (const { fieldName, shouldBeDropped } of fieldsToVerify) {
-    testLogger.info(`Searching for log containing field: ${fieldName}`);
-
-    let foundLog = null;
-    let foundIndex = -1;
-
-    // Search through all logs to find one containing this field
-    for (let i = 0; i < allLogTexts.length; i++) {
-      const logText = allLogTexts[i];
-      const fieldAsJsonKey = `"${fieldName}":`;
-      const fieldAsKey = `${fieldName}:`;
-
-      if (logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey)) {
-        foundLog = logText;
-        foundIndex = i;
-        break;
-      }
-    }
-
-    if (!foundLog) {
-      testLogger.error(`Could not find log containing field: ${fieldName}`);
-      testLogger.error(`Available logs: ${allLogTexts.map((t, i) => `\n  Log ${i}: ${t.substring(0, 150)}...`).join('')}`);
-      throw new Error(`Could not find log entry containing field: ${fieldName}`);
-    }
-
-    testLogger.info(`Found ${fieldName} in log ${foundIndex}`);
-
-    // For DROP, the logic is different - if dropped, the field should NOT be found at all
-    if (shouldBeDropped) {
-      // Field should be dropped - we shouldn't have found it
-      testLogger.error(`Field ${fieldName} should have been DROPPED but was found in logs!`);
-      throw new Error(`Field ${fieldName} was not dropped - still present in logs`);
-    } else {
-      // Field should be visible - we found it, good
-      testLogger.info(`✓ Field ${fieldName} is visible with actual value (as expected)`);
-    }
-  }
-}
-
-// Special verification for dropped fields - they should NOT exist
-async function verifyFieldsAreDropped(page, pm, streamName, fieldNames) {
-  testLogger.info(`Verifying ${fieldNames.length} fields are DROPPED (not present) - checking ONLY most recent logs`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(1000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(2000);
-
-  // Get all logs
-  let logTableCell = page.locator('[data-test="log-table-column-0-source"]');
-  let logCount = await logTableCell.count();
-
-  if (logCount < fieldNames.length) {
-    logTableCell = page.locator('tbody tr');
-    logCount = await logTableCell.count();
-  }
-
-  testLogger.info(`Found ${logCount} log entries total. Will check only the FIRST ${fieldNames.length} logs (most recent)`);
-
-  // Get only the FIRST N logs (most recent ones at the top)
-  const recentLogTexts = [];
-  const logsToCheck = Math.min(logCount, fieldNames.length);
-  for (let i = 0; i < logsToCheck; i++) {
-    const text = await logTableCell.nth(i).textContent();
-    recentLogTexts.push(text);
-    testLogger.info(`Log ${i}: ${text.substring(0, 150)}...`);
-  }
-
-  // For each field, verify it's NOT present in the recent logs
-  for (const fieldName of fieldNames) {
-    testLogger.info(`Verifying field ${fieldName} is DROPPED (not present in recent logs)`);
-
-    let foundInRecentLogs = false;
-    for (let i = 0; i < recentLogTexts.length; i++) {
-      const logText = recentLogTexts[i];
-      const fieldAsJsonKey = `"${fieldName}":`;
-      const fieldAsKey = `${fieldName}:`;
-
-      if (logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey)) {
-        foundInRecentLogs = true;
-        testLogger.error(`Field ${fieldName} found in recent log ${i}: ${logText.substring(0, 200)}`);
-        break;
-      }
-    }
-
-    if (foundInRecentLogs) {
-      throw new Error(`Field ${fieldName} should have been DROPPED but was found in recent logs!`);
-    }
-
-    testLogger.info(`✓ Field ${fieldName} is correctly DROPPED (not present in recent logs)`);
-  }
-}
-
-
 test.describe("Ingestion Time Drop - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -205,15 +48,6 @@ test.describe("Ingestion Time Drop - Combined Test", { tag: '@enterprise' }, () 
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-
-    // Override the navigateToLogs method to skip VRL editor wait for this test
-    const originalNavigateToLogs = pm.logsPage.navigateToLogs.bind(pm.logsPage);
-    pm.logsPage.navigateToLogs = async function() {
-      await this.logsMenuItem.click();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      testLogger.info('Navigated to Logs (skipped VRL editor wait)');
-    };
-
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Combined ingestion time drop test setup completed');
   });
@@ -269,7 +103,7 @@ test.describe("Ingestion Time Drop - Combined Test", { tag: '@enterprise' }, () 
     await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep1 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeDropped: false }));
-    await verifyMultipleFieldsDrop(page, pm, testStreamName, fieldsToVerifyStep1);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsToVerifyStep1);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -309,7 +143,7 @@ test.describe("Ingestion Time Drop - Combined Test", { tag: '@enterprise' }, () 
     await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToCheck = patternsToTest.map(p => p.field);
-    await verifyFieldsAreDropped(page, pm, testStreamName, fieldsToCheck);
+    await pm.sdrVerificationPage.verifyFieldsAreAbsent(pm.logsPage, testStreamName, fieldsToCheck);
     testLogger.info('✓ STEP 4 PASSED: All fields are DROPPED (not present)');
 
     testLogger.info('=== ✓ COMBINED DROP TEST COMPLETED SUCCESSFULLY ===');

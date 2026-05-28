@@ -115,21 +115,15 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     testLogger.info('Attempting to import selected patterns');
     await pm.sdrPatternsPage.clickImportJsonButton();
 
-    // Check for either success or "already exists" type messages
-    const importSuccess = await pm.sdrPatternsPage.verifyImportSuccess();
-    const alreadyExistsMsg = await page.locator('[data-test="o-toast"]').filter({ hasText: /already exists|Pattern with given id\/name/i }).first().isVisible({ timeout: 2000 }).catch(() => false);
+    // Verify import result by checking if the import dialog closed
+    const importResult = await pm.sdrPatternsPage.verifyImportResult();
 
-    if (importSuccess) {
+    if (importResult.success) {
       testLogger.info('✓ Patterns imported successfully');
-    } else if (alreadyExistsMsg) {
+    } else if (importResult.isDuplicate) {
       testLogger.info('⚠ Patterns already exist (expected if test was run before)');
-      // Close any error dialog
-      const okButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-      if (await okButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await okButton.click();
-      }
     } else {
-      testLogger.warn('⚠ No success or error message detected');
+      testLogger.warn('⚠ Import result unclear');
     }
 
     // The main test goal is checkbox interaction, not import success

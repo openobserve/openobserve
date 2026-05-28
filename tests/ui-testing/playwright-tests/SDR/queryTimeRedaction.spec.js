@@ -2,99 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-async function closeStreamDetailSidebar(page) {
-  const cancelButton = page.locator('[data-test="schema-cancel-button"]');
-  const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
-  if (cancelVisible) {
-    await cancelButton.click();
-    testLogger.info('Closed stream detail sidebar');
-    await page.waitForTimeout(500);
-  }
-}
-
-async function navigateToLogsQuick(page) {
-  await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-  testLogger.info('Navigated to Logs (fast - no VRL wait)');
-}
-
-async function verifyMultipleFieldsRedaction(page, pm, streamName, fieldsToVerify) {
-  testLogger.info(`Verifying ${fieldsToVerify.length} fields for redaction status`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(1000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(2000);
-
-  let logTableCell = page.locator('[data-test="log-table-column-0-source"]');
-  let logCount = await logTableCell.count();
-  testLogger.info(`Selector [data-test="log-table-column-0-source"] found ${logCount} entries`);
-
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('.logs-result-table tbody tr[role="row"]');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector .logs-result-table tbody tr[role="row"] found ${logCount} entries`);
-  }
-
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('tbody tr');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector tbody tr found ${logCount} entries`);
-  }
-
-  testLogger.info(`Final: Found ${logCount} log entries in the UI`);
-
-  if (logCount === 0) {
-    throw new Error('No logs found in the stream');
-  }
-
-  const allLogTexts = [];
-  for (let i = 0; i < logCount; i++) {
-    const text = await logTableCell.nth(i).textContent();
-    allLogTexts.push(text);
-  }
-
-  for (const { fieldName, shouldBeRedacted } of fieldsToVerify) {
-    testLogger.info(`Searching for log containing field: ${fieldName}`);
-
-    let foundLog = null;
-    let foundIndex = -1;
-
-    for (let i = 0; i < allLogTexts.length; i++) {
-      const logText = allLogTexts[i];
-      const fieldAsJsonKey = `"${fieldName}":`;
-      const fieldAsKey = `${fieldName}:`;
-
-      if (logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey)) {
-        foundLog = logText;
-        foundIndex = i;
-        break;
-      }
-    }
-
-    if (!foundLog) {
-      testLogger.error(`Could not find log containing field: ${fieldName}`);
-      testLogger.error(`Available logs: ${allLogTexts.map((t, i) => `\n  Log ${i}: ${t.substring(0, 150)}...`).join('')}`);
-      throw new Error(`Could not find log entry containing field: ${fieldName}`);
-    }
-
-    testLogger.info(`Found ${fieldName} in log ${foundIndex}`);
-
-    if (shouldBeRedacted) {
-      testLogger.info(`Checking if field ${fieldName} is REDACTED at query time`);
-      expect(foundLog).toContain('[REDACTED]');
-      testLogger.info(`✓ Field ${fieldName} is correctly REDACTED at query time`);
-    } else {
-      testLogger.info(`Checking if field ${fieldName} is visible with actual value`);
-      expect(foundLog).not.toContain('[REDACTED]');
-      testLogger.info(`✓ Field ${fieldName} is visible with actual value`);
-    }
-  }
-}
-
-
 test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -199,12 +106,11 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
     await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     // Verify all fields are visible without redaction
-    testLogger.info('Verifying 4 fields for redaction status');
     const fieldsBeforeRedaction = patternsToTest.map(p => ({
       fieldName: p.field,
       shouldBeRedacted: false
     }));
-    await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsBeforeRedaction);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsBeforeRedaction);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -247,7 +153,7 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
       fieldName: p.field,
       shouldBeRedacted: true
     }));
-    await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsAfterRedaction);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsAfterRedaction);
     testLogger.info('✓ STEP 4 PASSED: All fields are REDACTED at query time');
 
     testLogger.info('=== ✓ COMBINED QUERY TIME REDACTION TEST COMPLETED SUCCESSFULLY ===');

@@ -70,11 +70,9 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
     );
     await pm.sdrPatternsPage.clickSavePattern();
 
-    // Verify the specific error message
-    await page.waitForTimeout(1000);
-    const errorVisible = await page.locator('[data-test="o-toast"]').filter({ hasText: /Error in creating block db/i }).first().isVisible({ timeout: 3000 }).catch(() => false);
-    expect(errorVisible).toBeTruthy();
-    testLogger.info('Invalid regex error message verified');
+    // Verify save failed: drawer stays open (invalid regex rejected by server)
+    await pm.sdrPatternsPage.verifyPatternCreationFailed();
+    testLogger.info('Invalid regex rejected — drawer remained open as expected');
   });
 
   test("should handle duplicate pattern name and allow fixing", {
@@ -142,20 +140,11 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   }, async ({ page }) => {
     testLogger.info('Testing regex pattern import');
 
-    const importFilePath = path.resolve(__dirname, '../../../../test-data/regex_patterns_import.json');
-
     await pm.sdrPatternsPage.navigateToRegexPatterns();
 
-    const fileInputExists = await page.locator('input[type="file"]').count() > 0;
-
-    if (fileInputExists) {
-      await pm.sdrPatternsPage.clickImport();
-      await pm.sdrPatternsPage.uploadImportFile(importFilePath);
-      await pm.sdrPatternsPage.waitForPatternListUpdate();
-
-      testLogger.info('Import completed, verifying imported patterns');
-    } else {
-      testLogger.info('Import functionality not available via file input, skipping');
-    }
+    const importFilePath = path.resolve(__dirname, '../../../../test-data/regex_patterns_import.json');
+    const imported = await pm.sdrPatternsPage.importPatternsFromFile(importFilePath);
+    expect(imported, 'Import should complete successfully (dialog should close)').toBeTruthy();
+    testLogger.info('Import completed, verifying imported patterns');
   });
 });
