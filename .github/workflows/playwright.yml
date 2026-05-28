@@ -161,6 +161,14 @@ jobs:
           restore-keys: |
             playwright-chromium-${{ runner.os }}-
 
+      - name: Kill background apt processes
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+          sudo systemctl disable apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+          sudo flock --wait 30 /var/lib/dpkg/lock-frontend true 2>/dev/null || true
+
       - uses: actions/setup-node@v5
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         with:
