@@ -5271,7 +5271,9 @@ html.dark .file-type label,
 }
 
 // Remove outer box border so both panels blend into the dialog background
-.saved-view-table :deep(.tw\:border) {
+// Exclude elements that also have tw:rounded-md (OInput wrapper) so the
+// search input keeps its visible border.
+.saved-view-table :deep(.tw\:border:not(.tw\:rounded-md)) {
   border: none;
 }
 
