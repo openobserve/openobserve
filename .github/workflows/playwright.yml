@@ -144,7 +144,7 @@ jobs:
     timeout-minutes: 30
     name: warm_cache
     runs-on:
-      labels: repo-openobserve-standard-4
+      labels: repo-openobserve-standard-8
     continue-on-error: true
     steps:
       - name: Clone the current repo (shallow)
