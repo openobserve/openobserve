@@ -262,17 +262,17 @@
             class="welcome-section"
             :class="{ 'welcome-section--centered': centeredStart }"
           >
+            <!-- Home tab: rich V2 welcome -->
+            <O2AIHomeWelcome
+              v-if="centeredStart"
+              @select-prompt="selectWelcomePrompt"
+            />
+            <!-- Sidepanel: minimal logo + title (unchanged) -->
             <div
+              v-else
               class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full"
-              :class="{ 'tw:relative': centeredStart }"
             >
-              <div
-                class="tw:flex tw:flex-col tw:items-center"
-                :class="{
-                  'tw:absolute tw:left-1/2 tw:-translate-x-1/2': centeredStart,
-                }"
-                :style="centeredStart ? { top: 'calc(50% - 150px)' } : {}"
-              >
+              <div class="tw:flex tw:flex-col tw:items-center">
                 <img :src="o2AiTitleLogo" />
                 <div class="tw:relative tw:inline-block">
                   <span
@@ -280,45 +280,6 @@
                     >O2 Assistant</span
                   >
                   <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
-                </div>
-              </div>
-              <!-- Input rendered here when centeredStart so it appears mid-screen -->
-              <div v-if="centeredStart" class="centered-input-wrap">
-                <div
-                  class="unified-input-box"
-                  :class="
-                    store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                  "
-                  @dragover="handleDragOver"
-                  @drop="handleDrop"
-                  @paste="handlePaste"
-                >
-                  <RichTextInput
-                    ref="chatInput"
-                    v-model="inputMessage"
-                    :placeholder="'Write your prompt'"
-                    :disabled="isLoading"
-                    :theme="store.state.theme"
-                    :references="contextReferences"
-                    :borderless="true"
-                    @keydown="handleKeyDown"
-                    @submit="sendMessage"
-                    @update:references="handleReferencesUpdate"
-                  />
-                  <div class="input-bottom-bar">
-                    <div class="tw:flex tw:items-center tw:gap-2"></div>
-                    <div class="tw:flex tw:items-center tw:gap-2">
-                      <OButton
-                        v-if="inputMessage.trim() || pendingImages.length > 0"
-                        @click="sendMessage"
-                        variant="ai-gradient"
-                        size="icon-xs-circle"
-                        class="send-button"
-                      >
-                        <OIcon name="send" size="sm" />
-                      </OButton>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1234,10 +1195,7 @@
         </div>
       </div>
 
-      <div
-        v-if="!(centeredStart && chatMessages.length === 0)"
-        class="chat-input-container tw:m-3"
-      >
+      <div class="chat-input-container tw:m-3">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1294,7 +1252,7 @@
           <RichTextInput
             ref="chatInput"
             v-model="inputMessage"
-            :placeholder="'Write your prompt'"
+            :placeholder="inputPlaceholder"
             :disabled="isLoading"
             :theme="store.state.theme"
             :references="contextReferences"
@@ -1399,7 +1357,9 @@ import {
   computed,
   onUnmounted,
 } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 import "highlight.js/styles/github-dark.css";
@@ -1423,6 +1383,7 @@ import {
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
 import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
+import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
 import { useChatHistory } from "@/composables/useChatHistory";
 import useKeyboardShortcuts from "@/composables/useKeyboardShortcuts";
 import {
@@ -1483,6 +1444,7 @@ export default defineComponent({
     ConfirmDialog,
     RichTextInput,
     O2AIConfirmDialog,
+    O2AIHomeWelcome,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -1542,8 +1504,35 @@ export default defineComponent({
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore();
+    const { t } = useI18n();
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
+
+    // Typewriter placeholder — only animates on the home tab (centeredStart) when no chat is open.
+    // On the sidepanel the placeholder stays static ("Write your prompt").
+    const typewriterPrompts = computed(() => [
+      t("aiAssistant.placeholderRotation.one"),
+      t("aiAssistant.placeholderRotation.two"),
+      t("aiAssistant.placeholderRotation.three"),
+    ]);
+    const typewriterEnabled = computed(
+      () => !!props.centeredStart && chatMessages.value.length === 0,
+    );
+    const { placeholder: typewriterPlaceholder } = useTypewriterPlaceholder(
+      typewriterPrompts,
+      {
+        enabled: typewriterEnabled,
+        typeSpeedMs: 85,
+        eraseSpeedMs: 45,
+        holdMs: 2800,
+        initialDelayMs: 500,
+      },
+    );
+    const inputPlaceholder = computed(() =>
+      props.centeredStart && chatMessages.value.length === 0
+        ? typewriterPlaceholder.value || "Write your prompt"
+        : "Write your prompt",
+    );
 
     // Chat history composable
     const {
@@ -4253,6 +4242,13 @@ export default defineComponent({
       inputMessage.value = capability.replace(/^\d+\.\s/, "");
     };
 
+    const selectWelcomePrompt = (prompt: string) => {
+      inputMessage.value = prompt;
+      nextTick(() => {
+        chatInput.value?.focus?.();
+      });
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault(); // Prevent the default enter behavior
@@ -5569,6 +5565,8 @@ export default defineComponent({
       formatMessage,
       capabilities,
       selectCapability,
+      selectWelcomePrompt,
+      inputPlaceholder,
       showHistory,
       chatHistory,
       currentChatId,
