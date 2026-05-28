@@ -13,17 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Cursor;
+
 use anyhow::Context;
-use arrow::array::RecordBatch;
+use arrow::{array::RecordBatch, error::ArrowError};
 use bytes::Bytes;
 use config::{
-    FileFormat,
+    FileFormat, TIMESTAMP_COL_NAME, get_batch_size,
     utils::{
-        parquet::get_recordbatch_reader_from_bytes,
+        parquet::{RecordBatchStream, get_recordbatch_reader_from_bytes},
         tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
 };
 use futures::TryStreamExt;
+use parquet::arrow::{ParquetRecordBatchStreamBuilder, ProjectionMask};
 use tokio::task::JoinHandle;
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
@@ -36,7 +39,7 @@ pub(super) async fn build_index<D: tantivy::Directory>(
     index_schema: TantivyIndexSchema,
 ) -> Result<Option<tantivy::Index>, anyhow::Error> {
     let start = std::time::Instant::now();
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
+    let reader = open_reader(file_format, buf, &index_schema).await?;
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let index_writer = tantivy::IndexBuilder::new()
@@ -102,6 +105,38 @@ pub(super) async fn build_index<D: tantivy::Directory>(
     );
 
     Ok(Some(index))
+}
+
+/// Open a `RecordBatch` stream that only decodes the columns we will index.
+async fn open_reader(
+    file_format: FileFormat,
+    buf: Bytes,
+    index_schema: &TantivyIndexSchema,
+) -> Result<RecordBatchStream, anyhow::Error> {
+    if !matches!(file_format, FileFormat::Parquet) {
+        let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
+        return Ok(reader);
+    }
+
+    let builder = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf)).await?;
+    let projection_indices: Vec<usize> = builder
+        .schema()
+        .fields()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, f)| {
+            (f.name() == TIMESTAMP_COL_NAME || index_schema.fields.contains(f.name())).then_some(i)
+        })
+        .collect();
+    let projection_mask = ProjectionMask::roots(
+        builder.metadata().file_metadata().schema_descr(),
+        projection_indices,
+    );
+    let stream = builder
+        .with_batch_size(get_batch_size())
+        .with_projection(projection_mask)
+        .build()?;
+    Ok(Box::pin(stream.map_err(ArrowError::from)))
 }
 
 #[cfg(test)]
