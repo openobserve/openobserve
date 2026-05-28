@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1 tw:pb-[0.625rem]">
-    <div data-test="add-report-section" class="tw:w-full create-report-page">
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:flex tw:flex-col">
+    <div data-test="add-report-section" class="tw:w-full tw:flex-1 tw:min-h-0 tw:flex tw:flex-col create-report-page">
       <div
         class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
       >
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="tw:flex card-container tw:mb-[0.675rem] tw:h-[calc(100vh-12.5rem)] tw:overflow-auto"
+        class="tw:flex card-container tw:flex-1 tw:min-h-0 tw:overflow-auto"
       >
         <div
           ref="addAlertFormRef"

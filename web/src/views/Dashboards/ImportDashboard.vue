@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:mx-2 tw:pt-1">
+  <div class="tw:mx-2">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
         <div class="tw:flex tw:flex-col tw:flex-1">

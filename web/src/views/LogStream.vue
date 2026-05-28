@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="tw:p-0 tw:flex tw:flex-col">
-    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pb-2.5 tw:pt-1">
+    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5">
       <div class="card-container tw:mb-2.5">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
@@ -117,11 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           :loading="loadingState"
           width="100%"
-          :style="
-            logStream?.length
-              ? 'width: 100%; height: 100%'
-              : 'width: 100%'
-          "
+          style="width: 100%; height: 100%"
         >
           <!--
             Render the stream-name cell with a deterministic per-name data-test.

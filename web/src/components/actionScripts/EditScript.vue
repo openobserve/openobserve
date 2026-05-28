@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="add-action-script-section">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem]">
       <div class="card-container">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem]">
       <div
         class="card-container tw:overflow-auto"
         style="max-height: calc(100vh - var(--navbar-height) - 157px)"

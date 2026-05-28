@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="tw:p-0 tw:flex tw:flex-col"
+    class="tw:p-0 tw:flex tw:flex-col tw:h-full"
   >
     <!-- Header bar -->
-    <div class="tw:w-full tw:px-[0.625rem] tw:pt-1">
-      <div class="card-container">
+    <div class="tw:w-full tw:shrink-0 tw:px-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] tw:items-center"
+          class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px] tw:items-center"
         >
           <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="report-list-title">
             {{ t("reports.header") }}
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Left: folder list -->
         <template #before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+          <div class="tw:w-full tw:h-full tw:pl-[0.625rem]">
             <div class="tw:h-full">
               <FolderList
                 type="reports"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right: report table -->
         <template #after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+          <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
             <div class="tw:h-full card-container">
               <OTable
                 data-test="report-list-table"
@@ -121,12 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 pagination="client"
                 selection="multiple"
                 v-model:selected-ids="selectedReportIds"
-                style="width: 100%"
-                :style="
-                  hasVisibleRows
-                    ? 'width: 100%; height: 100%'
-                    : 'width: 100%'
-                "
+                style="width: 100%; height: 100%"
                 :show-global-filter="false"
               >
                 <template #empty>

@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div :key="store.state.selectedOrganization.identifier">
-    <div class="tw:pb-[0.625rem]">
+  <div :key="store.state.selectedOrganization.identifier" class="tw:flex tw:flex-col tw:h-full">
+    <div class="tw:pb-[0.625rem] tw:shrink-0">
       <div class="card-container">
         <div class="tw:flex tw:justify-between tw:items-center tw:py-2 tw:px-3">
           <div class="performance_title">

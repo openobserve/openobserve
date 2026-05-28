@@ -18,13 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="tw:flex tw:flex-col"
+    class="tw:flex tw:flex-col tw:h-full"
     :key="store.state.selectedOrganization.identifier"
-    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
     <!-- searchBar at top -->
 
-    <div class="tw:shrink-0 tw:px-[0.625rem] tw:pt-[0.625rem]">
+    <div class="tw:shrink-0 tw:px-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
           class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
@@ -120,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:gap-[0.625rem]"
     >
       <!-- Left: FolderList -->
       <div

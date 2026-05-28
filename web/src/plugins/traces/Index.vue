@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
+  <div class="tw:rounded-md tracePage tw:h-full tw:overflow-hidden!"
     id="tracePage"
-    style="min-height: auto"
   >
     <div id="tracesSecondLevel" class="tw:h-full">
       <OSplitter
@@ -42,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
+            class="tw:w-full tw:h-full tw:px-[0.625rem]"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -138,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
             >
               <template #before>
-                <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+                <div class="tw:h-full tw:pl-[0.625rem]">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     ref="indexListRef"
@@ -180,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></OButton>
               </template>
               <template #after>
-                <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+                <div class="tw:h-full tw:pr-[0.625rem]">
                   <div
                     v-if="
                       searchObj.data.errorMsg !== '' &&

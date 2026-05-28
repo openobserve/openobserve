@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-    <div class="tw:pb-[0.625rem]">
+    <div class="tw:pb-[0.625rem] tw:shrink-0">
       <div class="card-container">
         <div
           class="tw:text-right tw:p-[0.375rem] tw:flex tw:gap-x-2 align-center tw:justify-end metrics-date-time"

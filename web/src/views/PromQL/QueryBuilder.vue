@@ -169,7 +169,7 @@ const testQuery = () => {
 .promql-query-builder {
   max-width: 1400px;
   margin: 0 auto;
-  height: calc(100vh - 50px);
+  height: 100%;
   overflow: auto;
 }
 

@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5" data-test="metrics-page">
+  <div class="scroll tw:flex tw:flex-col tw:h-full tw:overflow-y-auto" data-test="metrics-page">
     <!-- Header Section -->
     <div
-      class="tw:flex tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1"
-      style="height: 48px; overflow-y: auto"
+      class="tw:flex tw:shrink-0 tw:px-[0.625rem] tw:mb-[0.625rem] tw:h-12 tw:overflow-hidden"
     >
       <div class="card-container tw:w-full tw:h-full tw:flex">
         <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:grow">

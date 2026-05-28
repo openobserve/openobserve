@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:pt-1" style="min-height: inherit;" >
-    <div class="tw:flex tw:justify-between tw:items-center tw:pb-3 card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
+  <div class="tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full">
+    <div class="tw:flex tw:justify-between tw:items-center tw:pb-3 card-container tw:h-[62px] tw:shrink-0 tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
     <div class="head tw:text-xl tw:tracking-[0.005em] ">
       {{ headerBasedOnRoute() }}
     </div>
@@ -48,10 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
+      class="tw:flex-1 tw:min-h-0"
     >
       <template v-slot:before>
         <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
-          <div class="card-container" style="min-height: calc(100vh - var(--navbar-height) - 87px);">
+          <div class="card-container">
             <OTabs
               v-model="billingtab"
               orientation="vertical"
@@ -110,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-          <div class="card-container tw:pb-3"  style="height: calc(100vh - var(--navbar-height) - 87px);">
+          <div class="card-container tw:pb-3 tw:h-full">
             <router-view title=""> </router-view>
           </div>
         </div>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem]">
+  <div class="upload-source-maps-page tw:w-full tw:h-full tw:flex tw:flex-col tw:px-[0.625rem]">
     <!-- Top Header Bar -->
     <div class="header-bar card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]">
       <div class="tw:flex tw:items-center tw:gap-3">
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Form Content Area -->
-    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
+    <div class="form-content-area card-container tw:flex-1 tw:min-h-0 tw:p-6" style="overflow: auto">
       <div class="upload-form">
         <!-- Input Fields -->
         <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="source-maps-container card-container tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
   >
     <!-- Filters Section -->
-    <div class="filters-section tw:p-3">
+    <div class="filters-section tw:p-3 tw:shrink-0">
       <div class="tw:flex tw:justify-between tw:items-end">
       <div class="tw:flex tw:gap-4 tw:items-end">
           <!-- Version Filter -->
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expansion="single"
           expand-on-row-click
           v-model:expanded-ids="expandedIds"
-          class="tw:w-full"
+          class="tw:w-full tw:h-full"
         >
           <template #expansion="{ row }">
             <div class="expanded-details tw:p-3">

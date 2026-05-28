@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:overflow-hidden tw:pt-1 tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
+  <div class="tw:h-full tw:overflow-hidden tw:px-2.5 tw:flex tw:flex-col">
     <template v-if="isLoading.length">
       <div
-        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
+        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:flex-1"
       >
         <div>
           <OSpinner
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem]">
+      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:shrink-0">
         <div class="card-container tw:px-4 tw:pt-2">
           <OTabs v-model="activeTab" align="left" dense @change="changeTab">
             <OTab

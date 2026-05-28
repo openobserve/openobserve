@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
+            class="tw:w-full tw:h-full tw:px-[0.625rem]"
           >
             <search-bar
               data-test="logs-search-bar"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <template #after>
-                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
+                <div class="tw:pr-[0.625rem] tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
@@ -3467,9 +3467,7 @@ export default defineComponent({
 
 <style lang="scss">
 .logPage {
-  height: calc(100vh - var(--navbar-height));
-  min-height: calc(100vh - var(--navbar-height)) !important;
-  max-height: calc(100vh - var(--navbar-height)) !important;
+  height: 100%;
   overflow: hidden !important;
 
   .index-menu .field_list .field_overlay .field_label,

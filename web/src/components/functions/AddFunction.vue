@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
     <div class="card-container tw:mb-[0.8rem] tw:shrink-0">
       <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
           <FunctionsToolbar

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:flex tw:pt-1">
-    <div class="tw:w-full tw:h-full tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
+  <div data-test="incident-list" class="tw:flex">
+    <div class="tw:w-full tw:h-full tw:px-2.5 tw:flex tw:flex-col">
       <!-- Header with title and search -->
       <div class="card-container tw:mb-2.5">
         <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0" data-test="incident-detail-page">
-    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pt-1 tw:pb-2.5">
+    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5">
     <!-- Header -->
     <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-2.5 tw:h-[68px] tw:px-2.5 tw:mb-2.5">
       <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1">

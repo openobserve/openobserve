@@ -16,21 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:h-[calc(100vh-var(--navbar-height))] tw:overflow-hidden">
+  <div class="tw:rounded-md tw:h-full tw:overflow-hidden">
     <!-- <div class="head tw:text-xl tw:tracking-[0.005em] tw:mx-2 tw:mb-2 tw:px-2 tw:py-2 o2-management-header">
       {{ t("settings.header") }}
     </div> -->
       <OSplitter
-      class="logs-splitter-smooth tw:overflow-hidden"
+      class="logs-splitter-smooth tw:h-full tw:overflow-hidden"
       :model-value="splitterModel"
       @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 400]"
       unit="px"
     >
       <template #before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1 tw:overflow-hidden">
-          <div class="card-container tw:mb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 15px)">
-            <div class="tw:flex tw:h-[calc(100vh-50px)]">
+        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:overflow-hidden">
+          <div class="card-container tw:h-full">
+            <div class="tw:flex tw:h-full">
               <div class="tw:w-full" v-if="showManagementTabs">
                 <OTabs
                   class="management-tabs"
@@ -258,9 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pl-1 tw:pb-[0.625rem] tw:pt-1">
+        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pl-1 tw:pt-1">
             <div
-              class="card-container tw:h-[calc(100vh-var(--navbar-height)-15px)] tw:overflow-auto"
+              class="card-container tw:h-full tw:overflow-auto"
             >
              <router-view title=""> </router-view>
           </div>
