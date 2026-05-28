@@ -9,6 +9,7 @@ import type {
 } from "./OFile.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -47,7 +48,30 @@ const heightClasses: Record<NonNullable<FileProps["size"]>, string> = {
 };
 
 function emitFiles(fileList: FileList | File[] | null) {
-  const list = fileList ? Array.from(fileList) : [];
+  let list = fileList ? Array.from(fileList) : [];
+
+  // Filter by accept before anything else — enforces the restriction for both
+  // the native file picker and drag-and-drop sources.
+  if (list.length > 0 && props.accept) {
+    const accepted = filterByAccept(list, props.accept);
+    const rejected = list.filter((f) => !accepted.includes(f));
+
+    if (rejected.length > 0) {
+      const names = rejected.map((f) => f.name).join(", ");
+      const allowed = props.accept
+        .split(",")
+        .map((t) => t.trim())
+        .join(", ");
+      toast({
+        message: `"${names}" is not a supported file type. Only ${allowed} files are allowed.`,
+        position: "bottom-right",
+        timeout: 3000,
+      });
+      emit("type-error", rejected);
+    }
+
+    list = accepted;
+  }
 
   if (list.length === 0) {
     emit("update:modelValue", null);
@@ -139,11 +163,7 @@ function onDrop(event: DragEvent) {
   event.preventDefault();
   isDragging.value = false;
   const dropped = event.dataTransfer?.files ?? null;
-  if (dropped && props.accept) {
-    emitFiles(filterByAccept(Array.from(dropped), props.accept));
-  } else {
-    emitFiles(dropped);
-  }
+  emitFiles(dropped);
 }
 
 function formatSize(bytes: number) {
