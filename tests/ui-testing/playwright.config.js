@@ -19,6 +19,7 @@ if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
+  globalTimeout: process.env.CI ? 40 * 60 * 1000 : undefined,
   /* Output directory for test artifacts */
   outputDir: './test-results',
   /* Exclude archived tests from all test runs */
@@ -77,8 +78,10 @@ module.exports = defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1500, height: 1024 },
-        // Grant clipboard permissions for share link tests
         permissions: ['clipboard-read', 'clipboard-write'],
+        launchOptions: {
+          args: process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
+        },
       },
     },
     //   {
