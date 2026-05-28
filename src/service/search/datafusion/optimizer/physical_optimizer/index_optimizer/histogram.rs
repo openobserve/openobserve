@@ -30,8 +30,7 @@ use datafusion::{
 };
 
 use crate::service::search::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::is_complex_plan,
-    utils::{get_column_name, is_column},
+    index_optimizer::utils::is_complex_plan, utils::get_column_name,
 };
 
 #[rustfmt::skip]
