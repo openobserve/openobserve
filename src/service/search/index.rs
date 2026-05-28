@@ -1173,7 +1173,10 @@ mod tests {
     #[test]
     fn test_condition_to_query_match_all() {
         let condition = Condition::MatchAll("search_term".to_string());
-        assert_eq!(condition.to_query(), "_all:search_term [\"search\", \"term\"]");
+        assert_eq!(
+            condition.to_query(),
+            "_all:search_term [\"search\", \"term\"]"
+        );
     }
 
     #[test]
