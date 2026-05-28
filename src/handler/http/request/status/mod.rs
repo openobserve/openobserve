@@ -76,10 +76,14 @@ use {
 };
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        user::{AuthTokens, AuthTokensExt},
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            user::{AuthTokens, AuthTokensExt},
+        },
+        utils::auth::{UserEmail, is_root_user},
     },
+    handler::http::extractors::Headers,
     service::{
         db,
         search::{
@@ -774,7 +778,14 @@ pub async fn cache_status() -> impl IntoResponse {
     axum::Json(stats)
 }
 
-pub async fn config_reload() -> impl IntoResponse {
+pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl IntoResponse {
+    let user_id = user_email.user_id.as_str();
+    if !is_root_user(user_id) {
+        return (
+            StatusCode::FORBIDDEN,
+            axum::Json(serde_json::json!({"message": "Only root users can reload config"})),
+        );
+    }
     if let Err(e) = config::refresh_config() {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -792,8 +803,7 @@ pub async fn config_reload() -> impl IntoResponse {
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
-        // Since this is not a protected route, there is no way to get the user email
-        user_email: "".to_string(),
+        user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
         protocol: Protocol::Http,
