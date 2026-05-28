@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
-    "functionEditorLabel": "Functie-editor",
-    "loadingStream": "Stream wordt geladen..."
+    "functionEditorLabel": "Functie-editor"
   },
   "menu": {
     "home": "Home",
@@ -3433,8 +3432,7 @@
     "serviceGroupProtected": "De servicegroep kan niet worden verwijderd. U kunt alleen de toegewezen velden wijzigen.",
     "noDataFound": "Geen gegevens gevonden",
     "isWorkloadType": "Service-ID",
-    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam.",
-    "loadingCorrelation": "Correlatiedata wordt geladen..."
+    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

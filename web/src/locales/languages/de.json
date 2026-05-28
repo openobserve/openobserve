@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "Keine Werte verfügbar",
     "selectLogStream": "Logs-Stream auswählen",
     "noData": "Keine Daten verfügbar",
-    "functionEditorLabel": "Funktionseditor",
-    "loadingStream": "Stream wird geladen..."
+    "functionEditorLabel": "Funktionseditor"
   },
   "menu": {
     "home": "Startseite",
@@ -3422,8 +3421,7 @@
     "serviceGroupProtected": "Die Dienstgruppe kann nicht entfernt werden. Sie können nur die zugewiesenen Felder ändern.",
     "noDataFound": "Keine Daten gefunden",
     "isWorkloadType": "Dienstkennzeichnung",
-    "isWorkloadTypeTooltip": "Wenn diese Gruppe aktiviert ist, wird sie verwendet, um einen Dienst eindeutig zu identifizieren (z. B. Cluster, Namespace, Deployment). Deaktiviert für Gruppen, die Operationen über einen Dienst beschreiben, z. B. eine HTTP-Methode oder einen Datenbanknamen.",
-    "loadingCorrelation": "Korrelationsdaten werden geladen..."
+    "isWorkloadTypeTooltip": "Wenn diese Gruppe aktiviert ist, wird sie verwendet, um einen Dienst eindeutig zu identifizieren (z. B. Cluster, Namespace, Deployment). Deaktiviert für Gruppen, die Operationen über einen Dienst beschreiben, z. B. eine HTTP-Methode oder einen Datenbanknamen."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

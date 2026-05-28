@@ -398,8 +398,7 @@
     "patternNoValuesAvailable": "No hay valores disponibles",
     "selectLogStream": "Seleccione la secuencia de registros",
     "noData": "No hay datos disponibles",
-    "functionEditorLabel": "Editor de funciones",
-    "loadingStream": "Cargando Stream..."
+    "functionEditorLabel": "Editor de funciones"
   },
   "menu": {
     "home": "Inicio",
@@ -3420,8 +3419,7 @@
     "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados.",
     "noDataFound": "No se han encontrado datos",
     "isWorkloadType": "Identificador de servicio",
-    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos.",
-    "loadingCorrelation": "Cargando datos de correlación..."
+    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
