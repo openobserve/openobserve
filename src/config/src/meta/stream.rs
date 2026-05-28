@@ -829,6 +829,16 @@ pub struct CrossLink {
     pub fields: Vec<CrossLinkField>,
 }
 
+impl Display for CrossLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "name: {}, url: {}, fields: {:?}",
+            self.name, self.url, self.fields
+        )
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct CrossLinkField {
     pub name: String,
@@ -932,23 +942,21 @@ pub struct StreamSettings {
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
     #[serde(default)]
+    pub defined_schema_fields: Vec<String>,
+    #[serde(default)]
+    pub storage_type: StorageType,
+    #[serde(default)]
     pub data_retention: i64,
     #[serde(default)]
-    pub flatten_level: Option<i64>,
+    pub extended_retention_days: Vec<TimeRange>,
     #[serde(default)]
-    pub defined_schema_fields: Vec<String>,
+    pub flatten_level: Option<i64>,
     #[serde(default)]
     pub max_query_range: i64, // hours
     #[serde(default)]
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(default)]
-    pub distinct_value_fields: Vec<DistinctField>,
-    #[serde(default)]
-    pub index_updated_at: i64,
-    #[serde(default)]
-    pub extended_retention_days: Vec<TimeRange>,
     #[serde(default)]
     pub index_original_data: bool,
     #[serde(default)]
@@ -960,9 +968,11 @@ pub struct StreamSettings {
     #[serde(default)]
     pub is_llm_stream: bool,
     #[serde(default)]
+    pub distinct_value_fields: Vec<DistinctField>,
+    #[serde(default)]
     pub cross_links: Vec<CrossLink>,
     #[serde(default)]
-    pub storage_type: StorageType,
+    pub index_updated_at: i64,
 }
 
 impl Default for StreamSettings {
