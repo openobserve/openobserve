@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Server URL"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                   />
                   <OInput
                     data-test="storage-settings-region-input"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Region"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode || !!cloudRegion"
+                    :disabled="isEditMode || !!cloudRegion"
                   />
                   <OInput
                     data-test="storage-settings-bucket-name-input"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Bucket Name *"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                     :error="!!fieldErrors.bucket_name"
                     :error-message="fieldErrors.bucket_name"
                   />
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Storage Account Name *"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                     :error="!!fieldErrors.storage_account"
                     :error-message="fieldErrors.storage_account"
                   />
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Bucket Name *"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                     :error="!!fieldErrors.bucket_name"
                     :error-message="fieldErrors.bucket_name"
                   />
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Server URL"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                   />
                 </div>
               </template>
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Bucket Name *"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                     :error="!!fieldErrors.bucket_name"
                     :error-message="fieldErrors.bucket_name"
                   />
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Server URL"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                   />
                 </div>
               </template>
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Bucket Name *"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode"
+                    :disabled="isEditMode"
                     :error="!!fieldErrors.bucket_name"
                     :error-message="fieldErrors.bucket_name"
                   />
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Region *"
                     class="no-border showLabelOnTop"
                     flat
-                    :disable="isEditMode || !!cloudRegion"
+                    :disabled="isEditMode || !!cloudRegion"
                     :error="!!fieldErrors.region"
                     :error-message="fieldErrors.region"
                   />
