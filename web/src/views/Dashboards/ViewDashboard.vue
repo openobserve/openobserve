@@ -20,72 +20,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:h-full" :key="store.state.selectedOrganization.identifier">
     <div
       ref="fullscreenDiv"
-      :class="{
-        fullscreen: isFullscreen,
-        'print-mode-container': store.state.printMode,
-      }"
+      :class="[
+        {
+          fullscreen: isFullscreen,
+          'print-mode-container': store.state.printMode,
+        },
+        store.state.printMode === true
+          ? 'tw:px-6 tw:pb-6'
+          : !isFullscreen
+            ? 'tw:pt-0.5 tw:pl-0.5 tw:pr-2 tw:pb-2'
+            : '',
+      ]"
       :style="
         !store.state.printMode && !isFullscreen
           ? { height: 'calc(100vh - var(--navbar-height))' }
           : {}
       "
-      class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden tw:pt-1"
+      class="tw:bg-[var(--color-surface-chrome)] tw:flex tw:flex-col tw:overflow-hidden"
     >
+      <!-- ── Single floating content card on the unified chrome ──── -->
       <div
-        :class="`${
-          store.state.theme === 'light' ? 'tw:bg-white' : 'dark-mode'
-        } stickyHeader ${
-          isFullscreen || store.state.printMode === true
-            ? 'fullscreenHeader'
-            : ''
-        }`"
-        class="tw:mb-[0.625rem]"
+        :class="
+          store.state.printMode === true
+            ? 'tw:contents'
+            : !isFullscreen
+              ? 'tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden tw:bg-surface-base tw:border tw:border-border-default tw:rounded-xl'
+              : 'tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden'
+        "
       >
+        <!-- ── Page header band ─────────────────────────────────── -->
         <div
-          class="tw:flex tw:justify-between tw:items-center tw:w-full tw:px-[0.626rem] tw:min-w-0 card-container tw:h-[48px]"
+          class="stickyHeader"
+          :class="
+            isFullscreen || store.state.printMode === true
+              ? 'fullscreenHeader tw:bg-surface-panel'
+              : 'tw:shrink-0 tw:bg-surface-base tw:px-3 tw:border-b tw:border-border-default'
+          "
         >
-          <div class="tw:flex tw:flex-1 tw:overflow-hidden">
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-xs"
-              @click="goBackToDashboardList"
-              data-test="dashboard-back-btn"
-            >
-              <template #icon-left
-                ><OIcon name="arrow-back-ios-new" size="sm"
-              /></template>
-            </OButton>
+          <AppPageHeader icon="dashboard">
+          <template #title>
             <span
-              class="tw:text-xl tw:tracking-[0.005em] folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
-              data-test="dashboard-view-folder-breadcrumb"
-              @click="goBackToDashboardList"
-              >{{ folderNameFromFolderId }}
-            </span>
-            <OSpinner
-              v-if="!store.state.organizationData.folders.length"
-              variant="dots"
-              size="sm"
-            />
-            <OIcon
-              class="tw:text-gray-400 tw:mt-1"
-              name="chevron-right" size="sm"
-             />
-            <span
-              class="tw:text-xl tw:tracking-[0.005em] tw:mx-2 tw:truncate tw:flex-1"
               :title="currentDashboardData.data?.title"
               data-test="dashboard-name-title"
+              >{{ currentDashboardData.data?.title }}</span
             >
-              {{ currentDashboardData.data?.title }}
-            </span>
-          </div>
-          <div class="tw:flex tw:gap-2 tw:items-center">
+          </template>
+          <template #subtitle>
+            <nav
+              v-if="!isFullscreen && store.state.printMode !== true"
+              class="tw:flex tw:items-center tw:gap-0.5 tw:-ms-1.5 tw:min-w-0"
+              aria-label="Breadcrumb"
+            >
+              <button
+                type="button"
+                class="tw:text-text-secondary tw:px-1.5 tw:py-0.5 tw:rounded-md tw:outline-none tw:transition-colors tw:hover:text-text-primary tw:hover:bg-surface-subtle tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset tw:shrink-0"
+                data-test="dashboard-back-btn"
+                @click="goBackToDashboardList"
+              >
+                {{ t("dashboard.header") }}
+              </button>
+              <OIcon
+                name="chevron-right"
+                size="sm"
+                class="tw:text-text-disabled tw:shrink-0"
+              />
+              <button
+                type="button"
+                class="tw:text-text-secondary tw:max-w-[12rem] tw:truncate tw:px-1.5 tw:py-0.5 tw:rounded-md tw:outline-none tw:transition-colors tw:hover:text-text-primary tw:hover:bg-surface-subtle tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                data-test="dashboard-view-folder-breadcrumb"
+                :title="folderNameFromFolderId"
+                @click="goBackToDashboardList"
+              >
+                {{ folderNameFromFolderId }}
+              </button>
+              <OSpinner
+                v-if="!store.state.organizationData.folders.length"
+                variant="dots"
+                size="sm"
+              />
+            </nav>
+          </template>
+          <template #actions>
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               @click="addPanelData"
               data-test="dashboard-panel-add"
               icon-left="add"
@@ -136,8 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               v-show="store.state.printMode !== true"
-              variant="outline-destructive"
-              size="icon-xs"
+              variant="ghost-destructive"
+              size="icon-sm"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"
               icon-left="cancel"
@@ -148,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               v-show="store.state.printMode !== true"
               :variant="isVariablesChanged ? 'warning' : 'outline'"
-              size="icon-xs"
+              size="icon-sm"
               @click="refreshData"
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
@@ -168,14 +188,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="store.state.printMode !== true"
               :url="dashboardShareURL"
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               data-test="dashboard-share-btn"
             />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
               icon-left="settings"
@@ -184,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
@@ -197,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
@@ -213,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
             >
@@ -226,19 +246,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-sm"
               data-test="dashboard-json-edit-btn"
               @click="openJsonEditor"
               icon-left="code"
             >
               <OTooltip :content="t('dashboard.editJson')" />
             </OButton>
-          </div>
-        </div>
-        <OSeparator />
+          </template>
+        </AppPageHeader>
       </div>
 
       <RenderDashboardCharts
+        :frame="false"
         :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
         :key="
           currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
@@ -274,6 +294,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :runId="runId"
         @update:runId="updateRunId"
       />
+      </div>
+      <!-- ── /Single floating content card ──────────────────────── -->
 
       <DashboardSettings
         v-model:open="showDashboardSettingsDialog"
@@ -361,6 +383,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -390,6 +413,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
+    AppPageHeader,
     OSeparator,
     DateTimePickerDashboard,
     ShareButton,

@@ -250,6 +250,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       handle=".table-head"
       tag="tr"
       :class="[
+        'tw:bg-[var(--color-table-header-bg)]',
         columnOrder.length > 1 ? 'tw:cursor-move' : '',
       ]"
       :style="{
@@ -391,8 +392,15 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       </th>
     </VueDraggable>
 
-    <!-- Non-draggable header (when reorder disabled) -->
-    <tr v-if="!enableColumnReorder">
+    <!-- Non-draggable header (when reorder disabled).
+         The white background lives on the <tr> (not just the <thead>) because in
+         border-separate tables — used whenever a column is pinned/isAction — the
+         row-group (<thead>) background does not paint, leaving the header grey
+         while the toolbar <div> stays white. -->
+    <tr
+      v-if="!enableColumnReorder"
+      class="tw:bg-[var(--color-table-header-bg)]"
+    >
       <th
         v-if="expansionEnabled"
         class="tw:w-4 tw:min-w-4 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"

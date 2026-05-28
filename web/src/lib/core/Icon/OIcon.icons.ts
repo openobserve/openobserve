@@ -287,6 +287,7 @@ import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
+import FolderOutline from "~icons/material-symbols/folder-outline";
 import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
@@ -458,6 +459,7 @@ export const iconRegistry = {
   "dataset": Dataset,
   "folder-open": FolderOpen,
   "folder": Folder,
+  "folder-outline": FolderOutline,
   "widgets": Widgets,
   "lan": Lan,
   "trending-up-filled": TrendingUpFilled,

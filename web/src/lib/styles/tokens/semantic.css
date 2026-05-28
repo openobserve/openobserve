@@ -11,10 +11,12 @@
 
 /* ── Light-mode defaults ─────────────────────────────────── */
 :root {
-  /* Text */
+  /* Text — secondary/disabled darkened one step for crisper contrast on white
+     (secondary grey-500→600 ≈ 4.8:1→7.4:1 AAA; disabled grey-400→500 so faint
+     mono/identifier text stays readable). */
   --color-text-primary:   var(--color-grey-900);
-  --color-text-secondary: var(--color-grey-500);
-  --color-text-disabled:  var(--color-grey-400);
+  --color-text-secondary: var(--color-grey-600);
+  --color-text-disabled:  var(--color-grey-500);
   --color-text-inverse:   var(--color-white);
 
   /* Surfaces */
@@ -23,6 +25,11 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle:       var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
+  /* App chrome (top nav + side nav + the gutter behind the content card) — a
+     flat, single soft-primary tint (no gradient) so the white content card
+     reads as floating on a subtly branded backdrop, not plain neutral grey.
+     Kept light: the primary-50 palette tint — the lightest branded backdrop. */
+  --color-surface-chrome:  var(--color-primary-50);
 
   /* Borders */
   --color-border-default: var(--color-grey-200);

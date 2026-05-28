@@ -18,246 +18,194 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="tw:flex tw:flex-col"
+    class="tw:bg-[var(--color-surface-chrome)] tw:flex tw:flex-col tw:pt-0.5 tw:pl-0.5 tw:pr-2 tw:pb-2"
     :key="store.state.selectedOrganization.identifier"
     :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
-    <!-- searchBar at top -->
-
-    <div class="tw:shrink-0 tw:px-[0.625rem] tw:pt-[0.625rem]">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-
-          <div class="tw:text-xl tw:tracking-[0.005em]">{{ t("dashboard.header") }}</div>
-
-          <div
-            class="tw:flex tw:flex-row tw:gap-x-2 tw:justify-end tw:items-center"
-          >
-            <OInput
-              v-model="dynamicQueryModel"
-              :placeholder="
-                searchAcrossFolders
-                  ? t('dashboard.searchAcross')
-                  : t('dashboard.search')
-              "
-              :clearable="searchAcrossFolders"
-              @clear="clearSearchHistory"
-              data-test="dashboard-search"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
-
-            <OSwitch
-              data-test="dashboard-search-across-folders-toggle"
-              v-model="searchAcrossFolders"
-              label="All Folders"
-              size="lg"
-              class="tw:h-8 tw:px-2 tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap"
-            >
-              <template #tooltip>
-                <OTooltip
-                  :content="
-                    searchAcrossFolders
-                      ? t('dashboard.searchSelf')
-                      : t('dashboard.searchAll')
-                  "
-                />
-              </template>
-            </OSwitch>
-
-            <!-- import dashboard button with dropdown -->
-            <ODropdown side="bottom" align="end">
-              <template #trigger>
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  data-test="dashboard-import"
-                  icon-right="expand-more"
-                >
-                  {{ t(`dashboard.import`) }}
-                </OButton>
-              </template>
-              <ODropdownItem
-                @select="importDashboard"
-                data-test="dashboard-import-custom"
-              >
-                <div class="tw:flex tw:flex-col">
-                  <span>Custom</span>
-                  <span
-                    class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                    >Import from JSON file or URL</span
-                  >
-                </div>
-              </ODropdownItem>
-              <ODropdownItem
-                @select="showAddDashboardFromGitHub = true"
-                data-test="dashboard-import-templates"
-              >
-                <div class="tw:flex tw:flex-col">
-                  <span>Templates</span>
-                  <span
-                    class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                    >Browse and import from gallery</span
-                  >
-                </div>
-              </ODropdownItem>
-            </ODropdown>
-            <!-- new dashboard button -->
-            <OButton
-              variant="primary"
-              size="sm"
-              data-test="dashboard-new"
-              @click="addDashboard"
-            >
-              {{ t(`dashboard.add`) }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- ── Single floating content card on the unified chrome ──── -->
     <div
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
+      class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:border tw:border-border-default tw:rounded-xl tw:overflow-hidden"
     >
-      <!-- Left: FolderList -->
-      <div
-        class="tw:shrink-0 tw:h-full"
-        :style="{ width: splitterModel + 'px' }"
-      >
-        <div class="tw:h-full">
-          <div
-            class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]"
-          >
-            <!-- folder list starts here -->
-            <div
-              class="dashboard-folder-header dashboard-sticky-top"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dashboard-folder-header-dark'
-                  : 'dashboard-folder-header-light'
-              "
+      <!-- ── Page header band ────────────────────────────────────── -->
+      <div class="tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default">
+        <AppPageHeader
+          icon="dashboard"
+          :title="t('dashboard.header')"
+          subtitle="Create, organize, and explore your observability dashboards."
+        >
+      <template #actions>
+        <!-- import dashboard button with dropdown -->
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="dashboard-import"
+              icon-left="upload-file"
+              icon-right="expand-more"
             >
-              <div
-                class="tw:font-bold tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2"
+              {{ t(`dashboard.import`) }}
+            </OButton>
+          </template>
+          <ODropdownItem
+            @select="importDashboard"
+            data-test="dashboard-import-custom"
+          >
+            <div class="tw:flex tw:flex-col">
+              <span>Custom</span>
+              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                >Import from JSON file or URL</span
               >
-                {{ t("dashboard.folderLabel") }}
-                <div>
+            </div>
+          </ODropdownItem>
+          <ODropdownItem
+            @select="showAddDashboardFromGitHub = true"
+            data-test="dashboard-import-templates"
+          >
+            <div class="tw:flex tw:flex-col">
+              <span>Templates</span>
+              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                >Browse and import from gallery</span
+              >
+            </div>
+          </ODropdownItem>
+        </ODropdown>
+        <!-- new dashboard button -->
+        <OButton
+          variant="primary"
+          size="sm"
+          icon-left="add"
+          data-test="dashboard-new"
+          @click="addDashboard"
+        >
+          {{ t(`dashboard.add`) }}
+        </OButton>
+      </template>
+        </AppPageHeader>
+      </div>
+
+      <!-- ── Body: folder rail + table share one card ────────────── -->
+      <div class="tw:flex-1 tw:flex tw:min-h-0">
+        <!-- ── Left: Folder rail (flush panel, divider only) ─────── -->
+        <aside
+          class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-default"
+          :style="{ width: splitterModel + 'px' }"
+        >
+        <div
+          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-3 tw:pb-2"
+        >
+          <h2
+            class="tw:text-sm! tw:font-semibold! tw:leading-tight! tw:text-text-primary"
+          >
+            {{ t("dashboard.folderLabel") }}
+          </h2>
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="add"
+            @click.stop="addFolder"
+            data-test="dashboard-new-folder-btn"
+            title="Add Folder"
+          />
+        </div>
+        <!-- Folder search -->
+        <div class="tw:px-3 tw:pb-2">
+          <OInput
+            v-model="folderSearchQuery"
+            data-test="folder-search"
+            placeholder="Search folders"
+            clearable
+            class="tw:w-full"
+          >
+            <template #icon-left>
+              <OIcon name="search" size="sm" />
+            </template>
+          </OInput>
+        </div>
+        <nav
+          class="tw:flex-1 tw:overflow-y-auto tw:px-2 tw:pb-2 tw:flex tw:flex-col tw:gap-0.5"
+          data-test="dashboards-folder-tabs"
+        >
+          <div
+            v-for="(tab, index) in filteredFolders"
+            :key="tab.folderId"
+            class="tw:group/row tw:relative tw:rounded-md tw:transition-colors"
+            :class="
+              activeFolderId === tab.folderId
+                ? 'tw:bg-tabs-active-bg tw:text-tabs-active-text tw:font-semibold'
+                : 'tw:text-tabs-inactive-text tw:hover:bg-tabs-hover-bg tw:hover:text-tabs-hover-text'
+            "
+            :data-test="`dashboard-folder-tab-${tab.folderId}`"
+            :data-test-folder-name="tab.name"
+          >
+            <button
+              type="button"
+              class="tw:flex tw:items-center tw:w-full tw:text-left tw:px-2 tw:py-1.5 tw:rounded-md tw:outline-none tw:transition-shadow tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+              @click="activeFolderId = tab.folderId"
+              :data-test="`dashboard-folder-tab-name-${tab.name}`"
+            >
+              <span
+                class="tw:flex-1 tw:truncate tw:pr-5 tw:text-sm"
+                :title="tab.name"
+                :data-test="`dashboard-folder-name-${tab.name}`"
+                >{{ tab.name }}</span
+              >
+            </button>
+            <span
+              v-if="
+                index ||
+                (folderSearchQuery?.length > 0 &&
+                  index == 0 &&
+                  tab.folderId.toLowerCase() != 'default')
+              "
+              class="tw:absolute tw:right-1 tw:top-1/2 tw:-translate-y-1/2 tw:flex tw:items-center tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible"
+            >
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
                   <OButton
-                    variant="outline"
-                    size="icon"
-                    icon-left="add"
-                    class="tw:h-7 tw:w-8"
-                    @click.stop="addFolder"
-                    data-test="dashboard-new-folder-btn"
-                    title="Add Folder"
+                    size="icon-xs"
+                    variant="ghost"
+                    icon-left="more-vert"
+                    data-test="dashboard-more-icon"
                   />
-                </div>
-              </div>
-              <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
-              <!-- Search Input -->
-              <div class="tw:flex folder-item tw:py-1 tw:w-full tw:px-2">
-                <OInput
-                  v-model="folderSearchQuery"
-                  data-test="folder-search"
-                  placeholder="Search Folder"
-                  clearable
-                  class="tw:w-full"
+                </template>
+                <ODropdownItem
+                  @select="editFolder(tab.folderId)"
+                  data-test="dashboard-edit-folder-icon"
                 >
                   <template #icon-left>
-                    <OIcon name="search" size="sm" />
+                    <OIcon name="edit" size="xs" />
                   </template>
-                </OInput>
-                <div></div>
-              </div>
-            </div>
-            <div class="dashboards-tabs tw:flex-1 tw:overflow-y-auto">
-              <OTabs
-                orientation="vertical"
-                v-model="activeFolderId"
-                data-test="dashboards-folder-tabs"
-              >
-                <OTab
-                  v-for="(tab, index) in filteredFolders"
-                  :key="tab.folderId"
-                  :name="tab.folderId"
-                  class="individual-tab"
-                  :data-test="`dashboard-folder-tab-${tab.folderId}`"
-                  :data-test-folder-name="tab.name"
+                  Edit
+                </ODropdownItem>
+                <ODropdownItem
+                  variant="destructive"
+                  @select="showDeleteFolderDialogFn(tab.folderId)"
+                  data-test="dashboard-delete-folder-icon"
                 >
-                  <div
-                    class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row"
-                    :data-test="`dashboard-folder-tab-name-${tab.name}`"
-                  >
-                    <span
-                      class="folder-name text-truncate"
-                      :title="tab.name"
-                      :data-test="`dashboard-folder-name-${tab.name}`"
-                    >{{
-                      tab.name
-                    }}</span>
-                    <div
-                      class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2"
-                    >
-                      <ODropdown
-                        v-if="
-                          index ||
-                          (folderSearchQuery?.length > 0 &&
-                            index == 0 &&
-                            tab.folderId.toLowerCase() != 'default')
-                        "
-                        side="bottom"
-                        align="start"
-                      >
-                        <template #trigger>
-                          <OButton
-                            size="icon"
-                            variant="ghost"
-                            icon-left="more-vert"
-                            class="tw:h-6 tw:w-6"
-                            data-test="dashboard-more-icon"
-                          />
-                        </template>
-                        <ODropdownItem
-                          @select="editFolder(tab.folderId)"
-                          data-test="dashboard-edit-folder-icon"
-                        >
-                          <template #icon-left>
-                            <OIcon name="edit" size="xs" />
-                          </template>
-                          Edit
-                        </ODropdownItem>
-                        <ODropdownItem
-                          @select="showDeleteFolderDialogFn(tab.folderId)"
-                          data-test="dashboard-delete-folder-icon"
-                        >
-                          <template #icon-left>
-                            <OIcon name="delete" size="xs" />
-                          </template>
-                          Delete
-                        </ODropdownItem>
-                      </ODropdown>
-                    </div>
-                  </div>
-                </OTab>
-              </OTabs>
-            </div>
+                  <template #icon-left>
+                    <OIcon name="delete" size="xs" />
+                  </template>
+                  Delete
+                </ODropdownItem>
+              </ODropdown>
+            </span>
           </div>
-        </div>
-      </div>
-      <!-- Right: Table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+        </nav>
+      </aside>
 
-          <!-- add dashboard table -->
+        <!-- ── Right: Table (flush inside the card — no own frame) ── -->
+        <section class="tw:flex-1 tw:min-w-0 tw:h-full">
+          <div class="tw:h-full tw:overflow-hidden">
           <OTable
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :frame="false"
+            :default-columns="false"
+            :row-height="32"
             :global-filter="filterQuery"
             :show-global-filter="false"
             :footer-title="t('dashboard.header')"
@@ -269,46 +217,144 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-table"
             style="width: 100%; height: 100%"
           >
-            <template #cell-name="{ row, value }">
-              <div
-                :title="value"
-                :data-test="`dashboard-name-cell-${value}`"
-                class="text-truncate"
-              >
-                {{
-                  value && value.length > 30
-                    ? value.slice(0, 30) + "..."
-                    : value
-                }}
-                <OTooltip
-                  v-if="value && value.length > 30"
-                  :content="value"
-                  max-width="300px"
+            <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
+            <template #toolbar>
+              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                <div class="tw:flex-1 tw:min-w-0">
+                  <OInput
+                    v-model="dynamicQueryModel"
+                    :placeholder="
+                      searchAcrossFolders
+                        ? t('dashboard.searchAcross')
+                        : t('dashboard.search')
+                    "
+                    :clearable="searchAcrossFolders"
+                    @clear="clearSearchHistory"
+                    data-test="dashboard-search"
+                    class="tw:w-full"
+                  >
+                    <template #icon-left>
+                      <OIcon name="search" size="sm" />
+                    </template>
+                    <!-- Search scope: inline segmented control (both options visible, one click) -->
+                    <template #icon-right>
+                      <div
+                        role="radiogroup"
+                        aria-label="Search scope"
+                        class="tw:flex tw:items-center tw:gap-0.5 tw:self-stretch tw:my-1.5 tw:ps-1.5 tw:border-l tw:border-border-default"
+                      >
+                        <button
+                          type="button"
+                          role="radio"
+                          :aria-checked="!searchAcrossFolders"
+                          class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
+                          :class="
+                            !searchAcrossFolders
+                              ? 'tw:bg-tabs-active-bg tw:text-primary-600'
+                              : 'tw:text-text-secondary tw:hover:text-text-primary tw:hover:bg-surface-subtle'
+                          "
+                          data-test="dashboard-search-scope-current"
+                          title="Search only this folder"
+                          @click="searchAcrossFolders = false"
+                        >
+                          <OIcon name="folder-outline" size="xs" />
+                          <span class="tw:whitespace-nowrap">This folder</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="radio"
+                          :aria-checked="searchAcrossFolders"
+                          class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
+                          :class="
+                            searchAcrossFolders
+                              ? 'tw:bg-tabs-active-bg tw:text-primary-600'
+                              : 'tw:text-text-secondary tw:hover:text-text-primary tw:hover:bg-surface-subtle'
+                          "
+                          data-test="dashboard-search-across-folders-toggle"
+                          title="Search across all folders"
+                          @click="searchAcrossFolders = true"
+                        >
+                          <OIcon name="search" size="xs" />
+                          <span class="tw:whitespace-nowrap">All folders</span>
+                        </button>
+                      </div>
+                    </template>
+                  </OInput>
+                </div>
+
+                <OButton
+                  variant="outline"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  :loading="loading"
+                  title="Reload dashboards"
+                  data-test="dashboard-list-refresh"
+                  @click="getDashboards"
                 />
               </div>
             </template>
-            <template #cell-description="{ row, value }">
-              <div :title="value">
-                {{
-                  value && value.length > 30
-                    ? value.slice(0, 30) + "..."
-                    : value
-                }}
-              </div>
+            <template #cell-name="{ row, value }">
+              <span
+                class="tw:font-medium tw:text-text-primary text-truncate tw:block"
+                :data-test="`dashboard-name-cell-${value}`"
+                :title="value"
+                >{{ value }}</span
+              >
+            </template>
+            <template #cell-identifier="{ value }">
+              <span
+                class="tw:font-mono tw:text-xs tw:text-text-disabled"
+                :title="value"
+                >{{ value }}</span
+              >
+            </template>
+            <template #cell-description="{ value }">
+              <span
+                class="tw:text-text-secondary text-truncate tw:block"
+                :title="value"
+                >{{ value || "—" }}</span
+              >
+            </template>
+            <template #cell-owner="{ value }">
+              <span
+                v-if="value"
+                class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
+              >
+                <span
+                  class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:bg-surface-subtle tw:text-text-secondary tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.02em]"
+                  >{{ ownerInitials(value) }}</span
+                >
+                <span
+                  class="tw:text-text-primary text-truncate"
+                  :title="value"
+                  >{{ value }}</span
+                >
+              </span>
+              <span v-else class="tw:text-text-disabled">—</span>
+            </template>
+            <template #cell-created="{ value }">
+              <span class="tw:text-text-secondary">{{ value }}</span>
             </template>
             <template #cell-folder="{ row }">
-              <div @click.stop="updateActiveFolderId(row.folder_id)">
-                {{ row.folder }}
-              </div>
+              <button
+                type="button"
+                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-secondary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                @click.stop="updateActiveFolderId(row.folder_id)"
+              >
+                <OIcon name="folder-outline" size="xs" />
+                <span class="tw:truncate">{{ row.folder }}</span>
+              </button>
             </template>
             <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center actions-container">
+              <span
+                class="row-actions tw:flex tw:items-center tw:justify-center tw:gap-0.5"
+              >
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
                   :title="t('dashboard.move_to_another_folder')"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
                 />
@@ -317,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="content-copy"
                   :title="t('dashboard.duplicate')"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   data-test="dashboard-duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
                 />
@@ -326,28 +372,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="delete"
                   :title="t('dashboard.delete')"
                   variant="ghost-destructive"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   data-test="dashboard-delete"
                   @click.stop="showDeleteDialogFn({ row })"
                 />
-              </div>
+              </span>
             </template>
             <template #empty>
-              <NoData />
+              <NoDashboards
+                @create="addDashboard"
+                @import="importDashboard"
+                @templates="showAddDashboardFromGitHub = true"
+              />
             </template>
             <template #bottom>
-              <div class="bottom-btn tw:py-2">
+              <div
+                class="tw:flex tw:w-full tw:justify-between tw:items-center tw:py-1"
+              >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md"
+                  class="o2-table-footer-title tw:flex tw:items-center tw:gap-2 tw:shrink-0"
                 >
-                  {{ resultTotal }} {{ t("dashboard.header") }}
+                  <span class="tw:font-medium tw:text-text-primary">{{
+                    resultTotal || 0
+                  }}</span>
+                  <span class="tw:text-text-secondary">{{
+                    t("dashboard.header")
+                  }}</span>
                 </div>
-                <div class="bottom-btn-dashboard-list">
+                <div
+                  v-if="selectedIds.length > 0"
+                  class="bulk-action-bar tw:flex tw:items-center tw:gap-2"
+                >
+                  <span
+                    class="tw:text-sm tw:font-medium tw:text-text-primary tw:mr-1"
+                    >{{ selectedIds.length }} selected</span
+                  >
                   <OButton
-                    v-if="selectedIds.length > 0"
                     variant="outline"
-                    size="sm"
-                    class="tw:mr-2 tw:h-9"
+                    size="sm-action"
                     data-test="dashboard-list-move-across-folders-btn"
                     @click="moveMultipleDashboards"
                     icon-left="drive-file-move"
@@ -355,10 +417,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Move
                   </OButton>
                   <OButton
-                    v-if="selectedIds.length > 0"
                     variant="outline"
-                    size="sm"
-                    class="tw:mr-2 tw:h-9"
+                    size="sm-action"
                     icon-left="download"
                     data-test="dashboard-list-export-dashboards-btn"
                     @click="multipleExportDashboard"
@@ -366,10 +426,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Export
                   </OButton>
                   <OButton
-                    v-if="selectedIds.length > 0"
                     variant="outline-destructive"
-                    size="sm"
-                    class="tw:mr-2 tw:h-9"
+                    size="sm-action"
                     icon-left="delete"
                     data-test="dashboard-list-delete-dashboards-btn"
                     @click="openBulkDeleteDialog"
@@ -380,10 +438,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
+        </div>
 
-          <!-- add dashboard -->
-          <ODrawer
-            v-model:open="showAddDashboardDialog"
+        <!-- add dashboard -->
+        <ODrawer
+          v-model:open="showAddDashboardDialog"
             :width="30"
             :title="t('dashboard.createdashboard')"
             data-test="dashboard-add-dialog"
@@ -467,15 +526,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:cancel="confirmBulkDelete = false"
             v-model="confirmBulkDelete"
           />
-        </div>
+        </section>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -483,7 +540,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 // @ts-nocheck
 import {
@@ -502,8 +558,8 @@ import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import NoData from "../../components/shared/grid/NoData.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import NoDashboards from "@/components/common/empty-states/NoDashboards.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
@@ -542,22 +598,19 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
 export default defineComponent({
   name: "Dashboards",
   components: {
-    OSeparator,
-    OTabs,
-    OTab,
+    AppPageHeader,
+    NoDashboards,
     OButton,
     OIcon,
     ODropdown,
     ODropdownItem,
     OInput,
-    OSwitch,
     OCheckbox,
     ODrawer,
     AddDashboard,
     OTooltip,
     AddDashboardFromGitHub,
     OTable,
-    NoData,
     ConfirmDialog,
     AddFolder,
     MoveDashboardToAnotherFolder,
@@ -627,14 +680,15 @@ export default defineComponent({
           header: "#",
           accessorKey: "#",
           sortable: false,
-          size: 67,
-          meta: { align: "left" },
+          size: 52,
+          meta: { align: "left", headerClass: "tw:text-text-disabled" },
         },
         {
           id: "name",
           header: t("dashboard.name"),
           accessorKey: "name",
           sortable: true,
+          size: 340,
           meta: { align: "left" },
         },
         {
@@ -642,6 +696,7 @@ export default defineComponent({
           header: t("dashboard.identifier"),
           accessorKey: "identifier",
           sortable: true,
+          size: 200,
           meta: { align: "left" },
         },
         {
@@ -649,6 +704,7 @@ export default defineComponent({
           header: t("dashboard.description"),
           accessorKey: "description",
           sortable: true,
+          size: 280,
           meta: { align: "left" },
         },
         {
@@ -656,6 +712,7 @@ export default defineComponent({
           header: t("dashboard.owner"),
           accessorKey: "owner",
           sortable: true,
+          size: 180,
           meta: { align: "left" },
         },
         {
@@ -663,6 +720,7 @@ export default defineComponent({
           header: t("dashboard.created"),
           accessorKey: "created",
           sortable: true,
+          size: 150,
           meta: { align: "left" },
         },
         {
@@ -670,6 +728,7 @@ export default defineComponent({
           header: t("dashboard.actions"),
           sortable: false,
           isAction: true,
+          size: 124,
           meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
         },
       ];
@@ -680,6 +739,7 @@ export default defineComponent({
           header: t("dashboard.folder"),
           accessorKey: "folder",
           sortable: true,
+          size: 160,
           meta: { align: "left" },
         });
       }
@@ -965,7 +1025,7 @@ export default defineComponent({
       owner: folderInfo ? board.dashboard.owner : board.owner,
       created: formatDate(
         folderInfo ? board.dashboard.created : board.created,
-        "YYYY-MM-DDTHH:mm:ss",
+        "MMM D, YYYY",
       ),
       actions: "true",
     });
@@ -1383,125 +1443,12 @@ export default defineComponent({
     onRowClick(row, _evt) {
       this.routeToViewD(row);
     },
+    ownerInitials(name: string) {
+      if (!name) return "";
+      const parts = name.trim().split(/\s+/).filter(Boolean);
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    },
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.dashboards-tabs {
-  .o-tabs {
-    height: auto !important;
-    max-height: none !important;
-  }
-
-  .individual-tab {
-    min-height: 1.5rem;
-  }
-  .folder-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: relative;
-    border-radius: 0.25rem;
-    transition: background-color 0.3s;
-
-    // .folder-name {
-    //   white-space: nowrap;
-    //   overflow: hidden;
-    //   text-overflow: ellipsis;
-    // }
-  }
-
-  .o-tabs {
-    &--vertical {
-      margin: 5px;
-
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-
-        &--active {
-          background-color: var(--o2-primary-btn-bg);
-          color: white;
-        }
-      }
-    }
-  }
-}
-
-.folder-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: none !important;
-}
-.dashboard-folder-header {
-  &.dashboard-sticky-top {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-
-  &.dashboard-folder-header-light {
-    background-color: white;
-  }
-
-  &.dashboard-folder-header-dark {
-    background-color: #1a1a1a;
-  }
-  border-radius: 0.625rem;
-}
-
-// Toolbar Icon and Toggle Styles
-.toolbar-toggle-container {
-  padding: 0.45rem 0.375rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0.0625rem solid var(--color-button-outline-border); // 1px
-  border-radius: 0.375rem; // 6px
-  transition: all 0.2s ease;
-  cursor: pointer;
-  white-space: nowrap;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid var(--color-button-outline-border);
-}
-
-.bottom-btn-dashboard-list {
-  display: flex;
-  width: 100%;
-  align-items: center;
-}
-
-.move-btn-dashboard-list {
-  width: calc(10vw);
-}
-
-.export-btn-dashboard-list {
-  width: calc(10vw);
-}
-
-.bottom-btn {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-</style>

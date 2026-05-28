@@ -34,9 +34,11 @@
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-primary);
-  --color-button-outline-border: var(--color-primary-300);
+  /* Neutral grey border (was primary-300) — outline buttons should read as
+     quiet secondary actions, not brand-tinted, but still clearly bordered. */
+  --color-button-outline-border: var(--color-border-strong);
   --color-button-outline-hover-bg: var(--o2-hover-accent);
-  --color-button-outline-hover-border: var(--color-primary-400);
+  --color-button-outline-hover-border: var(--color-border-strong);
   --color-button-outline-active-bg: var(--color-primary-100);
   --color-button-outline-focus-ring: var(--color-primary-400);
 
@@ -378,7 +380,9 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-strong);
+  /* Gentle resting border (border-default, theme-aware) to match the soft-panel
+     aesthetic; hover/focus escalate to primary for a clear affordance. */
+  --color-input-border: var(--color-border-default);
   --color-input-border-hover: var(--color-primary-400);
   --color-input-border-focus: var(--color-primary-500);
   --color-input-border-error: var(--color-error-500);
@@ -401,7 +405,8 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-strong);
+  /* Gentle resting border — matches OInput / the soft-panel aesthetic. */
+  --color-select-border: var(--color-border-default);
   --color-select-border-hover: var(--color-primary-400);
   --color-select-border-focus: var(--color-primary-500);
   --color-select-border-error: var(--color-error-500);
@@ -556,7 +561,7 @@
   --color-option-group-error-text: var(--color-error-600);
 
   /* OTable */
-  --color-table-header-bg: var(--color-surface-subtle);
+  --color-table-header-bg: var(--color-surface-base);
   --color-table-header-text: var(--color-text-secondary);
   --color-table-header-border: var(--color-border-default);
   --color-table-row-hover-bg: var(--color-primary-50);

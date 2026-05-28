@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0"
+          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome)]"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded

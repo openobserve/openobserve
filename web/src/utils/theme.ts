@@ -159,22 +159,30 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.documentElement.style.removeProperty('--o2-menu-gradient-start');
     document.documentElement.style.removeProperty('--o2-menu-gradient-end');
     document.documentElement.style.removeProperty('--o2-menu-color');
-    document.body.style.removeProperty('background');
+    // Page background = a single near-black color with a subtle theme tint (no
+    // gradient), mirroring the light-mode single-tint treatment.
+    const darkBodyBg = mixColors(themeColor, '#000000', 8); // 8% theme + 92% black
+    document.body.style.setProperty('background', darkBodyBg, 'important');
   } else {
     // Apply light mode theme color
     const rgbaColor = hexToRgba(themeColor, 10);
     document.documentElement.style.setProperty('--o2-theme-color', rgbaColor);
 
-    // Auto-calculate and apply background colors based on theme color
+    // Auto-calculate and apply background colors based on theme color.
+    // primaryBg (1%) is reused as a subtle surface tint by other components
+    // (QueryInspector, .bg-white) — keep it. secondaryBg is kept for legacy
+    // .o2-custom-bg consumers.
     const primaryBg = hexToRgba(themeColor, 0.1); // 0.01 alpha (1%)
     const secondaryBg = hexToRgba(themeColor, 4); // 0.4 alpha (40%)
 
     document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
     document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
 
-    // Update body gradient with auto-calculated colors
-    const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
-    document.body.style.setProperty('background', gradient, 'important');
+    // Page background = a single, subtle primary tint (no gradient) so the muted
+    // area around the white content card reads as one calm color — matching the
+    // page chrome (surface-chrome = primary-100).
+    const bodyBg = hexToRgba(themeColor, 0.6); // 0.06 alpha — very light tint, ~primary-50
+    document.body.style.setProperty('background', bodyBg, 'important');
 
     // Apply table header background color (80% theme color mixed with 20% white)
     const tableHeaderBg = mixColors(themeColor, '#FFFFFF', 30);

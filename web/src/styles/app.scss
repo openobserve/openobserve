@@ -38,9 +38,10 @@ html {
 }
 
 body {
-  background: var(--o2-body-secondary-bg);
-  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));
-  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));
+  /* Single-color page background (no gradient). theme.ts overrides this inline
+     with a computed theme tint for both light and dark; this is the pre-JS
+     fallback. */
+  background: var(--o2-body-primary-bg);
   overflow: hidden;
   color: var(--o2-text-body);
   font-family: var(--font-sans);

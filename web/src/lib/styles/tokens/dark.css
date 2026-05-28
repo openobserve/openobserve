@@ -19,7 +19,9 @@
     /* --- Text --- */
     --color-text-primary: var(--color-grey-50);
     --color-text-secondary: var(--color-grey-400);
-    --color-text-disabled: var(--color-grey-600);
+    /* disabled grey-600→500: grey-600 on the dark card was near-illegible for
+       faint text (e.g. the identifier column); grey-500 lifts it to ~3.9:1. */
+    --color-text-disabled: var(--color-grey-500);
     --color-text-inverse: var(--color-grey-900);
 
     /* --- Surfaces --- */
@@ -28,6 +30,9 @@
     --color-surface-overlay: var(--color-grey-800);
     --color-surface-subtle: var(--color-grey-800);
     --color-surface-subtle-hover: var(--color-grey-700);
+    /* App chrome — teal-tinted dark backdrop (kept lighter than the grey-950
+       content card so the card still reads as a distinct floating surface). */
+    --color-surface-chrome: color-mix(in srgb, var(--color-primary-500) 12%, var(--color-grey-900));
 
     /* --- Borders --- */
     --color-border-default: var(--color-grey-700);
@@ -42,11 +47,11 @@
     --color-button-secondary-disabled: var(--color-surface-overlay);
     --color-button-secondary-foreground: var(--color-text-primary);
 
-    /* outline */
+    /* outline — neutral grey border in dark too (matches light treatment) */
     --color-button-outline-text: var(--color-text-primary);
-    --color-button-outline-border: var(--color-primary-700);
+    --color-button-outline-border: var(--color-border-strong);
     --color-button-outline-hover-bg: var(--color-primary-900);
-    --color-button-outline-hover-border: var(--color-primary-600);
+    --color-button-outline-hover-border: var(--color-border-strong);
     --color-button-outline-active-bg: var(--color-primary-800);
 
     /* ghost */
@@ -370,7 +375,7 @@
     --color-toast-action-hover:   var(--color-primary-300);
 
     /* ── OTable (dark) ─────────────────────────────────── */
-    --color-table-header-bg: var(--color-grey-800);
+    --color-table-header-bg: var(--color-surface-base);
     --color-table-row-hover-bg: var(--color-primary-900);
     --color-table-row-selected-bg: color-mix(in srgb, var(--color-primary-800) 50%, var(--color-grey-900));
     --color-table-row-striped-bg: var(--color-grey-800);

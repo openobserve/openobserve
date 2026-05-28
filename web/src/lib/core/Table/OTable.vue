@@ -43,6 +43,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   error: null,
   dense: true,
   bordered: true,
+  frame: true,
   striped: false,
   stickyHeader: true,
   wrap: false,
@@ -399,10 +400,21 @@ defineExpose({
     <slot name="top" />
 
     <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
-    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:border tw:border-[var(--color-border-default)]">
+    <div
+      class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0"
+      :class="props.frame ? 'tw:border tw:border-border-default' : ''"
+    >
+    <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
+    <div
+      v-if="slots.toolbar"
+      class="tw:flex tw:items-center tw:px-2 tw:py-1.5 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      data-test="o2-table-toolbar"
+    >
+      <slot name="toolbar" />
+    </div>
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
-      v-if="props.showGlobalFilter && !slots.top"
+      v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
       class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)] tw:bg-[var(--color-table-header-bg)]"
       data-test="o2-table-global-filter"
     >

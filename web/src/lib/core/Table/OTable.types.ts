@@ -195,6 +195,12 @@ export interface OTableProps<TData = any> {
   emptyMessage?: string;
   dense?: boolean;
   bordered?: boolean;
+  /**
+   * Draws the outer frame (border) around the whole table region. Default true.
+   * Set false when the table is embedded inside an already-bordered container
+   * (e.g. a page card) so it renders flush without a double border.
+   */
+  frame?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
@@ -315,6 +321,9 @@ export interface OTableSlots<TData = any> {
   "header-actions"?: () => any;
   /** Content above the table */
   top?: () => any;
+  /** Toolbar rendered INSIDE the table's bordered frame, above the column
+   *  header (search / filters / view controls). Reads as part of the table. */
+  toolbar?: () => any;
   /** Content below the table (above pagination). Scoped with pagination state. */
   bottom?: (props: {
     currentPage: number;
