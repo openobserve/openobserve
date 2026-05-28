@@ -633,6 +633,7 @@ describe("MainLayout Methods and Functions", () => {
         { code: "en-gb", label: "English" },
         { code: "tr-turk", label: "Türkçe" },
         { code: "zh-cn", label: "简体中文" },
+        { code: "zh-tw", label: "繁體中文" },
         { code: "fr", label: "Français" },
         { code: "es", label: "Español" },
         { code: "de", label: "Deutsch" },
@@ -643,7 +644,7 @@ describe("MainLayout Methods and Functions", () => {
         { code: "pt", label: "Português" },
       ];
 
-      expect(langList).toHaveLength(11);
+      expect(langList).toHaveLength(12);
       expect(langList[0].code).toBe("en-gb");
       expect(langList[0].label).toBe("English");
     });
