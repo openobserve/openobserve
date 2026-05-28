@@ -156,8 +156,8 @@ describe("Header Component", () => {
       slackIcon: {},
       zoBackendUrl: "http://localhost:5080",
       langList: [
-        { code: "en-gb", label: "English", icon: "flag-icon flag-icon-gb" },
-        { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" },
+        { code: "en-gb", label: "English" },
+        { code: "fr", label: "Français" },
       ],
       selectedLanguage: { code: "en-gb", label: "English" },
       selectedOrg: { identifier: "test-org", label: "Test Organization" },
@@ -920,7 +920,7 @@ describe("Header Component", () => {
     });
 
     it("should emit changeLanguage event with correct language data", () => {
-      const newLang = { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" };
+      const newLang = { code: "fr", label: "Français" };
       wrapper.vm.changeLanguage(newLang);
 
       // Verify the event was emitted with the correct language object
@@ -940,9 +940,9 @@ describe("Header Component", () => {
 
     it("should emit changeLanguage for each language in langList", () => {
       const languages = [
-        { code: "en-gb", label: "English", icon: "flag-icon flag-icon-gb" },
-        { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" },
-        { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" },
+        { code: "en-gb", label: "English" },
+        { code: "fr", label: "Français" },
+        { code: "de", label: "Deutsch" },
       ];
 
       const langWrapper = createWrapper({
@@ -965,7 +965,7 @@ describe("Header Component", () => {
       // Clear previous mock calls
       vi.clearAllMocks();
 
-      const frenchLang = { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" };
+      const frenchLang = { code: "fr", label: "Français" };
 
       // User changes language in Header component
       wrapper.vm.changeLanguage(frenchLang);
@@ -995,7 +995,7 @@ describe("Header Component", () => {
       // Clear previous mock calls
       vi.clearAllMocks();
 
-      const germanLang = { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" };
+      const germanLang = { code: "de", label: "Deutsch" };
 
       // User changes language
       wrapper.vm.changeLanguage(germanLang);
