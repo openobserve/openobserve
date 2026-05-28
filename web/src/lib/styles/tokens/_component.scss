@@ -34,11 +34,11 @@
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-primary);
-  --color-button-outline-border: var(--color-primary-300);
+  --color-button-outline-border: var(--color-border-default);
   --color-button-outline-hover-bg: var(--o2-hover-accent);
-  --color-button-outline-hover-border: var(--color-primary-400);
+  --color-button-outline-hover-border: var(--color-primary-300);
   --color-button-outline-active-bg: var(--color-primary-100);
-  --color-button-outline-focus-ring: var(--color-primary-400);
+  --color-button-outline-focus-ring: var(--color-primary-200);
 
   /* Button — ghost */
   --color-button-ghost-text: var(--color-text-primary);
@@ -377,9 +377,9 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-strong);
-  --color-input-border-hover: var(--color-primary-400);
-  --color-input-border-focus: var(--color-primary-500);
+  --color-input-border: var(--color-border-default);
+  --color-input-border-hover: var(--color-primary-300);
+  --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
   /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
      was almost identical to the enabled white bg in light mode, making
@@ -387,7 +387,7 @@
   --color-input-disabled-bg: var(--color-grey-200);
   --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
-  --color-input-focus-ring: var(--color-primary-400);
+  --color-input-focus-ring: var(--color-primary-200);
   --color-input-text: var(--color-text-primary);
   --color-input-placeholder: var(--color-text-disabled);
   /* Labels were resolving to text-secondary which is the same muted grey
@@ -403,15 +403,15 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-strong);
-  --color-select-border-hover: var(--color-primary-400);
-  --color-select-border-focus: var(--color-primary-500);
+  --color-select-border: var(--color-border-default);
+  --color-select-border-hover: var(--color-primary-300);
+  --color-select-border-focus: var(--color-primary-300);
   --color-select-border-error: var(--color-error-500);
   /* Same rationale as input-disabled-bg. */
   --color-select-disabled-bg: var(--color-grey-200);
   --color-select-disabled-text: var(--color-text-secondary);
-  --color-select-focus-ring: var(--color-primary-400);
-  --color-select-text: var(--color-text-primary);
+  --color-select-focus-ring: var(--color-primary-200);
+  --color-select-text: var(--color-text-soft);
   --color-select-placeholder: var(--color-text-disabled);
   /* Select labels were grey (text-secondary) — same fix as input-label. */
   --color-select-label: var(--color-text-primary);

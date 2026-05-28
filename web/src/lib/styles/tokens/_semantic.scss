@@ -21,6 +21,7 @@
   --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
   --color-text-disabled:    var(--color-grey-400);
   --color-text-placeholder: var(--color-grey-400);
+  --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% — readable but not harsh */
   --color-text-link:        var(--color-primary-600);  /* clickable links */
   --color-text-link-hover:  var(--color-primary-700);  /* link hover state */
   --color-text-code:        var(--color-grey-700);     /* inline code, monospace */

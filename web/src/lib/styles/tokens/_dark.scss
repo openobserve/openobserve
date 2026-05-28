@@ -53,9 +53,9 @@
 
     /* outline */
     --color-button-outline-text: var(--color-text-primary);
-    --color-button-outline-border: var(--color-primary-700);
+    --color-button-outline-border: var(--color-border-default);
     --color-button-outline-hover-bg: var(--color-primary-900);
-    --color-button-outline-hover-border: var(--color-primary-600);
+    --color-button-outline-hover-border: var(--color-border-strong);
     --color-button-outline-active-bg: var(--color-primary-800);
 
     /* ghost */
@@ -172,7 +172,7 @@
        sits noticeably brighter than the enabled `surface-panel` grey-900
        (#171717) so disabled fields are visually obvious in dark mode. */
     --color-input-bg: var(--color-surface-panel);
-    --color-input-border: var(--color-border-strong);
+    --color-input-border: var(--color-border-default);
     --color-input-disabled-bg: var(--color-grey-700);
     --color-input-disabled-text: var(--color-text-secondary);
     --color-input-placeholder: var(--color-text-disabled);
@@ -181,7 +181,7 @@
 
     /* Select (OSelect) — same disabled-bg strategy as input. */
     --color-select-bg: var(--color-surface-panel);
-    --color-select-border: var(--color-border-strong);
+    --color-select-border: var(--color-border-default);
     --color-select-disabled-bg: var(--color-grey-700);
     --color-select-disabled-text: var(--color-text-secondary);
     --color-select-placeholder: var(--color-text-disabled);
