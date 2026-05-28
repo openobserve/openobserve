@@ -454,7 +454,7 @@ pub async fn save_stream_settings(
     }
 
     // Check the fields are not reserved
-    let fst_set: HashSet<_> = settings.full_text_search_keys.iter().cloned().collect();
+    let fts_set: HashSet<_> = settings.full_text_search_keys.iter().cloned().collect();
     let index_set: HashSet<_> = settings.index_fields.iter().cloned().collect();
     let bloom_set: HashSet<_> = settings.bloom_filter_fields.iter().cloned().collect();
     let pk_set: HashSet<_> = settings
@@ -485,7 +485,7 @@ pub async fn save_stream_settings(
     }
     for &r in &strict_reserved {
         // FTS is explicitly allowed for these — they hold human-readable content.
-        if fst_set.contains(r) {
+        if fts_set.contains(r) {
             return Ok(MetaHttpResponse::bad_request(format!(
                 "field [{r}] is reserved and cannot be used for full text search"
             )));
@@ -493,30 +493,25 @@ pub async fn save_stream_settings(
     }
 
     // ---- 2. FTS ∩ Index = ∅ (resolved) ----
-    if let Some(name) = fst_set.intersection(&index_set).next() {
+    if let Some(name) = fts_set.intersection(&index_set).next() {
         return Ok(MetaHttpResponse::bad_request(format!(
             "field [{name}] cannot be both full text search and secondary index — choose one"
         )));
     }
     // ---- 3. FTS ∩ Bloom = ∅ (resolved) ----
-    if let Some(name) = fst_set.intersection(&bloom_set).next() {
+    if let Some(name) = fts_set.intersection(&bloom_set).next() {
         return Ok(MetaHttpResponse::bad_request(format!(
             "field [{name}] cannot be both full text search and bloom filter"
         )));
     }
     // ---- 4. Bloom ⊆ Index (raw) ----
-    //
-    // Invariant on stored state. The resolved index getter folds bloom fields
-    // into the index view automatically, so checking the resolved sets would
-    // always pass and never catch a malformed save. Direct save callers must
-    // run the bloom→index auto-fold before reaching here.
     if let Some(name) = bloom_set.difference(&index_set).next() {
         return Ok(MetaHttpResponse::bad_request(format!(
             "bloom filter field [{name}] must also be a secondary index field"
         )));
     }
     // ---- 5. Partition keys disjoint from FTS / Index / Bloom (resolved) ----
-    if let Some(name) = pk_set.intersection(&fst_set).next() {
+    if let Some(name) = pk_set.intersection(&fts_set).next() {
         return Ok(MetaHttpResponse::bad_request(format!(
             "partition key [{name}] cannot also be a full text search field"
         )));
@@ -532,13 +527,9 @@ pub async fn save_stream_settings(
         )));
     }
 
-    // Default FTS list isn't a real reserved-column rule, but we keep it here:
-    // a partition_key on a default-FTS field would conflict with how text-style
-    // fields are queried. (validate_stream_settings only sees configured FTS,
-    // so this catches the case where the user partitions on `log`/`message`/…
-    // without explicitly adding it to full_text_search_keys.)
+    // check if the partition key is a full text search field
     for key in settings.partition_keys.iter() {
-        if settings.full_text_search_keys.contains(&key.field) {
+        if fts_set.contains(&key.field) {
             return Ok(MetaHttpResponse::bad_request(format!(
                 "field [{}] can't be used for partition key",
                 key.field
