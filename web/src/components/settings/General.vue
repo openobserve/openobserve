@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, onMounted, ref, watch } from "vue";
+import { defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -984,6 +984,47 @@ export default defineComponent({
       totalSize: string;
       filesNumber: number;
     }
+
+    /**
+     * When navigating away from General Settings without saving, clear temp preview
+     * colors and restore the correct colors for the current mode.
+     *
+     * Without this, tempThemeColors persists in the Vuex store and can cause
+     * App.vue's initializeThemeColors() to apply stale/wrong CSS variables
+     * when the user switches theme modes on other pages.
+     */
+    onBeforeUnmount(() => {
+      const hasTempColors =
+        store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+      if (hasTempColors) {
+        // Clear the unsaved preview colors from the store
+        store.commit("clearTempThemeColors");
+
+        // Re-apply the correct (saved) colors for the current mode so the rest
+        // of the app doesn't remain stuck with the preview's CSS variables.
+        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const defaultLight = store.state.defaultThemeColors?.light || "#3F7994";
+        const defaultDark = store.state.defaultThemeColors?.dark || "#5B9FBE";
+
+        const savedLight =
+          localStorage.getItem("customLightColor") ||
+          store.state?.organizationData?.organizationSettings
+            ?.light_mode_theme_color ||
+          defaultLight;
+        const savedDark =
+          localStorage.getItem("customDarkColor") ||
+          store.state?.organizationData?.organizationSettings
+            ?.dark_mode_theme_color ||
+          defaultDark;
+
+        const color = currentMode === "light" ? savedLight : savedDark;
+        const isDefault =
+          (currentMode === "light" && color === defaultLight) ||
+          (currentMode === "dark" && color === defaultDark);
+
+        applyThemeColors(color, currentMode, isDefault);
+      }
+    });
 
     return {
       t,
