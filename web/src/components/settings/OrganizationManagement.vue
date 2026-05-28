@@ -340,7 +340,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading data...",
-      });
+              timeout: 0,
+});
 
       OrganizationServices.get_admin_org(
         store.state.selectedOrganization.identifier,
@@ -426,7 +427,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Creating external contract...",
-        });
+                  timeout: 0,
+});
         OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
             toast({
@@ -463,7 +465,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Extending external contract...",
-        });
+                  timeout: 0,
+});
         OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
             toast({
@@ -500,7 +503,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Revoking external contract...",
-        });
+                  timeout: 0,
+});
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
             toast({
@@ -535,7 +539,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "enabling storage settings...",
-        });
+                  timeout: 0,
+});
         orgStorageService
           .enable(row.identifier)
           .then(() => {
@@ -572,7 +577,8 @@ export default defineComponent({
         variant: "loading",
         message:
           "Please wait while processing trial period extension request...",
-      });
+              timeout: 0,
+});
       OrganizationServices.extend_trial_period(
         store.state.selectedOrganization.identifier,
         payload,

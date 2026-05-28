@@ -533,7 +533,6 @@ export const validateSqlQuery = async (
           toast({
             variant: "error",
             message: "Invalid VRL Function",
-            timeout: 3000,
           });
           reject("function_error");
         } else vrlFunctionError.value = "";
@@ -586,7 +585,6 @@ export const saveAlertJson = async (
         toast({
           variant: "error",
           message: err.response?.data?.message || "Error fetching streams",
-          timeout: 3000,
         });
       }
     }

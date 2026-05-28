@@ -421,7 +421,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading actions...",
-      });
+              timeout: 0,
+});
 
       loading.value = true;
       getAllActions()
@@ -482,7 +483,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "Error while pulling Actions.",
-            timeout: 2000,
           });
         })
         .finally(() => {
@@ -577,14 +577,12 @@ export default defineComponent({
             toast({
               variant: "success",
               message: res.data.message,
-              timeout: 2000,
             });
             getActionScripts();
           } else {
             toast({
               variant: "error",
               message: res.data.message,
-              timeout: 2000,
             });
           }
         })
@@ -595,7 +593,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: err?.data?.message || "Error while deleting alert.",
-            timeout: 2000,
           });
         });
       if (config.enableAnalytics == "true") {
@@ -624,7 +621,6 @@ export default defineComponent({
           toast({
             variant: "warning",
             message: "No action scripts selected",
-            timeout: 2000,
           });
           confirmBulkDelete.value = false;
           return;
@@ -647,19 +643,16 @@ export default defineComponent({
           toast({
             variant: "success",
             message: `Successfully deleted ${successful.length} action script(s)`,
-            timeout: 2000,
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             variant: "warning",
             message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
-            timeout: 3000,
           });
         } else if (unsuccessful.length > 0) {
           toast({
             variant: "error",
             message: `Failed to delete ${unsuccessful.length} action script(s)`,
-            timeout: 2000,
           });
         }
 
@@ -674,7 +667,6 @@ export default defineComponent({
               error.response?.data?.message ||
               error?.message ||
               "Error while deleting action scripts",
-            timeout: 2000,
           });
         }
         confirmBulkDelete.value = false;

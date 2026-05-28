@@ -512,7 +512,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: `Successfully imported ${successCount} dashboard(s)!`,
-            timeout: 3000,
           });
         } else if (successCount > 0 && failCount > 0) {
           toast({

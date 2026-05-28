@@ -120,7 +120,8 @@ const getInvoiceHistory = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while loading invoice history...",
-  });
+      timeout: 0,
+});
 
   BillingService.list_invoice_history(
     store.state.selectedOrganization.identifier

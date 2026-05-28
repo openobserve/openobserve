@@ -344,8 +344,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: e.message || "Invalid JSON format",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -368,8 +367,7 @@ export default defineComponent({
       if (successCount === totalCount) {
         toast({
           message: `Successfully imported ${successCount} pattern(s)`,
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "success",
         });
 
         setTimeout(() => {
@@ -409,8 +407,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           message: "Error importing Regex Pattern please check the JSON",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "error",
         });
         return false;
       }
@@ -461,15 +458,13 @@ export default defineComponent({
           if (errorMessage.includes("already exists")) {
             toast({
               message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
-              position: "bottom-right",
-              timeout: 4000,
+              variant: "error",
             });
           } else {
             // Show generic error notification for other errors
             toast({
               message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
-              position: "bottom-right",
-              timeout: 4000,
+              variant: "error",
             });
           }
 

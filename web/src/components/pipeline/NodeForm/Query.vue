@@ -621,7 +621,6 @@ const validateSqlQuery = async () => {
           toast({
             variant: "error",
             message: `${message}`,
-            timeout: 3000,
           });
           reject(message);
         } else {

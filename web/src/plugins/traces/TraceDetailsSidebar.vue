@@ -1499,7 +1499,6 @@ export default defineComponent({
     const copySpanId = () => {
       copyToClipboard(props.span?.span_id || "", {
         successMessage: "Span ID copied to clipboard",
-        timeout: 2000,
       });
     };
 
@@ -1509,7 +1508,6 @@ export default defineComponent({
 
       copyToClipboard(attributesText, {
         successMessage: "Attributes copied to clipboard",
-        timeout: 2000,
       });
     };
 
@@ -1853,13 +1851,11 @@ export default defineComponent({
         copyToClipboard(textToCopy, {
           successMessage: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
           errorMessage: "Failed to copy to clipboard",
-          timeout: 2000,
         });
       } catch (error) {
         toast({
           variant: "error",
           message: "Failed to copy content",
-          timeout: 2000,
         });
       }
     };

@@ -159,8 +159,7 @@ const useLogs = () => {
           .then((res: any) => {
             toast({
               variant: "success",
-              message: "Job Added Succesfully",
-              timeout: 2000,
+              message: "Job added successfully",
               action: {
                 label: "Go To Job Scheduler",
                 handler: () => routeToSearchSchedule(),
@@ -230,8 +229,8 @@ const useLogs = () => {
         // only notify if user is in logs page
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
+            variant: "info",
             message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-            timeout: 1000,
           });
         }
       } else {

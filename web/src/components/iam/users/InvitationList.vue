@@ -193,7 +193,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Loading pending invitations...",
-      });
+              timeout: 0,
+});
 
       loading.value = true;
       try {
@@ -213,7 +214,7 @@ export default defineComponent({
           message:
             error.response?.data?.message ||
             "Failed to load pending invitations",
-          timeout: 4000,
+          variant: "error",
         });
       } finally {
         loading.value = false;
@@ -258,7 +259,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Accepting invitation...",
-      });
+              timeout: 0,
+});
 
       try {
         await organizationsService.process_subscription(
@@ -274,6 +276,7 @@ export default defineComponent({
         dismiss();
         toast({
           message: "Invitation accepted successfully!",
+          variant: "success",
         });
 
         // Set the selected organization and redirect
@@ -292,7 +295,7 @@ export default defineComponent({
         toast({
           message:
             error.response?.data?.message || "Failed to accept invitation",
-          timeout: 4000,
+          variant: "error",
         });
       }
     };
@@ -304,7 +307,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Rejecting invitation...",
-      });
+              timeout: 0,
+});
 
       try {
         await organizationsService.decline_subscription(
@@ -313,6 +317,7 @@ export default defineComponent({
         dismiss();
         toast({
           message: "Invitation rejected successfully!",
+          variant: "success",
         });
 
         // Remove from list
@@ -329,7 +334,7 @@ export default defineComponent({
         toast({
           message:
             error.response?.data?.message || "Failed to reject invitation",
-          timeout: 4000,
+          variant: "error",
         });
       }
     };

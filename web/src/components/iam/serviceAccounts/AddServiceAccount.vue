@@ -173,8 +173,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
-      });
+              timeout: 0,
+});
       let selectedOrg = this.store.state.selectedOrganization.identifier;
       this.formData.organization =
         this.store.state.selectedOrganization.identifier;
@@ -197,7 +197,7 @@ export default defineComponent({
               if (err?.response?.data?.message) {
                 toast({
                   message: err?.response?.data?.message,
-                  timeout: 2000,
+                  variant: "error",
                 });
               }
             }
@@ -222,7 +222,7 @@ export default defineComponent({
                 if(err?.response?.data?.message ) {
                   toast({
                     message: err?.response?.data?.message,
-                    timeout: 2000,
+                    variant: "error",
                   });
                 }
               }

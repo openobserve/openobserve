@@ -305,7 +305,6 @@ const cancelJob = async () => {
     toast({
       variant: "error",
       message: "Job information not available. Please try again.",
-      timeout: 3000,
     });
     return;
   }
@@ -320,7 +319,6 @@ const cancelJob = async () => {
     toast({
       variant: "success",
       message: "Backfill job canceled successfully",
-      timeout: 3000,
     });
 
     emit("job-canceled");

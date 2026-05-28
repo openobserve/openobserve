@@ -837,8 +837,8 @@ const saveActionScript = async () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
   const actionId: string = (router.currentRoute.value.query?.id ||
     "") as string;
 
@@ -849,7 +849,6 @@ const saveActionScript = async () => {
         message: `Action ${
           isEditingActionScript.value ? "updated" : "saved"
         } successfully.`,
-        timeout: 3000,
       });
       goToActionScripts();
       emit("getActionScripts");
@@ -864,7 +863,6 @@ const saveActionScript = async () => {
             `Error while ${
               isEditingActionScript.value ? "updating" : "saving"
             } Action.`,
-          timeout: 4000,
         });
       }
     })
@@ -1072,7 +1070,6 @@ const handleActionScript = async () => {
           toast({
             variant: "error",
             message: err?.data?.message || "Error while fetching Action!",
-            timeout: 4000,
           });
         }
       })
@@ -1116,7 +1113,6 @@ const getServiceAccounts = async () => {
         message:
           err.response?.data?.message ||
           "Error while fetching service accounts.",
-        timeout: 3000,
       });
     }
   } finally {
