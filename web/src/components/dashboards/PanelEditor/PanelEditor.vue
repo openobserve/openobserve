@@ -987,12 +987,9 @@ const fieldListContainerStyle = computed(() => {
   return { height: contentHeight.value };
 });
 
-// Field list inner div style - logs/build needs height: 100%
+// Field list inner div style - needs height: 100% so PanelFieldList's h-full resolves correctly
 const fieldListInnerStyle = computed(() => {
-  if (props.pageType === "logs" || props.pageType === "build") {
-    return { width: "100%", height: "100%" };
-  }
-  return { width: "100%" };
+  return { width: "100%", height: "100%" };
 });
 
 // Search type for PanelSchemaRenderer
