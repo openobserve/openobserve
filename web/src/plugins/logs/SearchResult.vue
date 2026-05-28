@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="rowsPerPageOptions"
             class="select-pagination tw:min-w-[4.5rem]"
             size="sm"
+            :searchable="false"
             :disable="searchObj.loading"
             @update:model-value="getPageData('recordsPerPage')"
           />
