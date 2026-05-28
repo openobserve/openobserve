@@ -153,11 +153,16 @@ export default class DashboardactionPage {
     // The Apply button switches data-test to "dashboard-cancel" while loading.
     // After the query completes, the panelData conversion runs async —
     // poll until loading is done AND the no-data element clears.
+    // Wait for the loading state (Cancel button) to disappear first
     await this.page.waitForFunction(() => {
-      if (document.querySelector('[data-test="dashboard-cancel"]')) return false;
-      const noData = document.querySelector('[data-test="no-data"]');
-      return !noData || noData.textContent.trim() !== 'No Data';
+      return !document.querySelector('[data-test="dashboard-cancel"]');
     }, { timeout: 30000 });
+
+    // Wait for the no-data element to disappear (data pipeline settling)
+    await this.noDataElement.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+
+    // Allow chart canvas to finish rendering after data loads
+    await this.page.waitForTimeout(1000);
 
     // 1. No "no data" placeholder
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
