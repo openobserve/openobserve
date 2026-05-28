@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "사용할 수 있는 값 없음",
     "selectLogStream": "로그 스트림 선택",
     "noData": "사용 가능한 데이터 없음",
-    "functionEditorLabel": "함수 에디터"
+    "functionEditorLabel": "함수 에디터",
+    "loadingStream": "스트림 로드 중..."
   },
   "menu": {
     "home": "홈",
@@ -3432,7 +3433,8 @@
     "serviceGroupProtected": "서비스 그룹은 제거할 수 없습니다.매핑된 필드만 수정할 수 있습니다.",
     "noDataFound": "데이터를 찾을 수 없음",
     "isWorkloadType": "서비스 식별자",
-    "isWorkloadTypeTooltip": "활성화되면 이 그룹은 서비스 (예: 클러스터, 네임스페이스, 배포) 를 고유하게 식별하는 데 사용됩니다.HTTP 메서드 또는 데이터베이스 이름과 같이 서비스를 통한 작업을 설명하는 그룹에 대해서는 사용하지 않도록 설정합니다."
+    "isWorkloadTypeTooltip": "활성화되면 이 그룹은 서비스 (예: 클러스터, 네임스페이스, 배포) 를 고유하게 식별하는 데 사용됩니다.HTTP 메서드 또는 데이터베이스 이름과 같이 서비스를 통한 작업을 설명하는 그룹에 대해서는 사용하지 않도록 설정합니다.",
+    "loadingCorrelation": "상관관계 데이터 로드 중..."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",
@@ -3843,5 +3845,56 @@
     "awsStsSelfHostedInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.설치 환경에서 이 역할에 액세스할 수 있는 AWS 자격 증명을 구성했는지 확인하십시오.",
     "externalIdRequired": "외부 ID가 필요합니다.",
     "storageAccountRequired": "스토리지 계정 이름이 필요합니다"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "굿모닝",
+      "afternoon": "굿 애프터눈",
+      "evening": "굿 이브닝",
+      "night": "늦게까지 일하기"
+    },
+    "welcome": {
+      "taglineLead": "특수 용도에 맞게 제작",
+      "taglineHighlight": "옵저버빌리티 에이전트",
+      "taglineTail": "오픈옵저브용 — 쓰기",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "ProMQL",
+      "taglineAnd": "로그, 추적, 지표 및 인시던트를 안내합니다.",
+      "signedInAs": "로 로그인",
+      "role": "역할",
+      "tryOneOfThese": "또는 다음 중 하나를 시도해 보십시오."
+    },
+    "capabilities": {
+      "query": {
+        "title": "쿼리 작성",
+        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL"
+      },
+      "incident": {
+        "title": "인시던트 조사",
+        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)"
+      },
+      "dashboard": {
+        "title": "대시보드 구축",
+        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다."
+      },
+      "alert": {
+        "title": "알림 생성",
+        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "내 nginx 로그에서 JSON을 구문 분석하기 위해 VRL을 작성하세요",
+      "regexRedact": "이메일을 교정하기 위한 정규식 패턴 생성",
+      "mapStreamSchema": "내 '기본' 스트림 스키마 매핑",
+      "promqlCpu": "80% 이상의 CPU를 사용하는 포드용 PromQL을 작성하십시오.",
+      "datadogToO2": "이 데이터독 쿼리를 OpenObserve SQL로 변환",
+      "lastAlertFired": "왜 내 마지막 경보가 울렸지?"
+    },
+    "placeholderRotation": {
+      "one": "지난 한 시간 동안 발생한 오류를 보여주세요...",
+      "two": "nginx 로그에서 JSON을 구문 분석하기 위해 VRL을 작성하세요...",
+      "three": "K8s 노드 상태를 위한 대시보드 구축..."
+    }
   }
 }

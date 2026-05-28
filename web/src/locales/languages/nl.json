@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
-    "functionEditorLabel": "Functie-editor"
+    "functionEditorLabel": "Functie-editor",
+    "loadingStream": "Stream wordt geladen..."
   },
   "menu": {
     "home": "Home",
@@ -3432,7 +3433,8 @@
     "serviceGroupProtected": "De servicegroep kan niet worden verwijderd. U kunt alleen de toegewezen velden wijzigen.",
     "noDataFound": "Geen gegevens gevonden",
     "isWorkloadType": "Service-ID",
-    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam."
+    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam.",
+    "loadingCorrelation": "Correlatiedata wordt geladen..."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
@@ -3843,5 +3845,56 @@
     "awsStsSelfHostedInfo": "Dit maakt gebruik van AWS sts om de rol op zich te nemen en operaties uit te voeren. Zorg ervoor dat u aws-inloggegevens hebt geconfigureerd in de installatie-env die toegang hebben tot deze rol.",
     "externalIdRequired": "Externe ID is vereist",
     "storageAccountRequired": "De naam van het opslagaccount is vereist"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Goedemorgen",
+      "afternoon": "Goedemiddag",
+      "evening": "Goedenavond",
+      "night": "Tot laat aan het werk"
+    },
+    "welcome": {
+      "taglineLead": "Een speciaal gebouwde",
+      "taglineHighlight": "waarneembaarheidsmiddel",
+      "taglineTail": "voor OpenObserve — schrijft",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "ProMQL",
+      "taglineAnd": "en leidt je door je logboeken, sporen, statistieken en incidenten.",
+      "signedInAs": "Ingelogd als",
+      "role": "Rol",
+      "tryOneOfThese": "Of probeer een van deze"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Een vraag schrijven",
+        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken."
+      },
+      "incident": {
+        "title": "Incidenten onderzoeken",
+        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”"
+      },
+      "dashboard": {
+        "title": "Een dashboard bouwen",
+        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen."
+      },
+      "alert": {
+        "title": "Een waarschuwing aanmaken",
+        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Schrijf VRL om JSON uit mijn nginx-logboeken te parseren",
+      "regexRedact": "Genereer een regex-patroon om e-mails te redigeren",
+      "mapStreamSchema": "Breng mijn „standaard” streamschema in kaart",
+      "promqlCpu": "Schrijf ProMQL voor pods met een CPU van > 80%",
+      "datadogToO2": "Converteer deze Datadog-query naar OpenObserve SQL",
+      "lastAlertFired": "Waarom is mijn laatste waarschuwing afgevuurd?"
+    },
+    "placeholderRotation": {
+      "one": "Laat me fouten zien van het afgelopen uur...",
+      "two": "Schrijf VRL om JSON te parseren uit nginx-logboeken...",
+      "three": "Bouw een dashboard voor de gezondheid van K8s nodes..."
+    }
   }
 }

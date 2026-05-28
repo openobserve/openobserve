@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "使用可能な値はありません",
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
-    "functionEditorLabel": "関数エディター"
+    "functionEditorLabel": "関数エディター",
+    "loadingStream": "ストリームをロード中..."
   },
   "menu": {
     "home": "ホーム",
@@ -3421,7 +3422,8 @@
     "serviceGroupProtected": "サービスグループは削除できません。変更できるのはマップされたフィールドだけです。",
     "noDataFound": "データが見つかりません",
     "isWorkloadType": "サービス識別子",
-    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。"
+    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。",
+    "loadingCorrelation": "相関データを読み込んでいます..."
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
@@ -3832,5 +3834,56 @@
     "awsStsSelfHostedInfo": "これは AWS sts を使用して役割を引き受け、操作を実行します。インストール環境で、このロールにアクセスできる AWS 認証情報が設定されていることを確認してください。",
     "externalIdRequired": "外部 ID が必要です",
     "storageAccountRequired": "ストレージアカウント名が必要です"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "グッドモーニング",
+      "afternoon": "グッドアフタヌーン",
+      "evening": "こんばんは",
+      "night": "遅くまで働く"
+    },
+    "welcome": {
+      "taglineLead": "目的に合わせた設計",
+      "taglineHighlight": "オブザーバビリティエージェント",
+      "taglineTail": "オープンオブザーブ用 — 書き込み",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "PromQL",
+      "taglineAnd": "ログ、トレース、メトリクス、インシデントを順を追って確認できます。",
+      "signedInAs": "としてサインイン",
+      "role": "役割",
+      "tryOneOfThese": "または、次のいずれかを試してください"
+    },
+    "capabilities": {
+      "query": {
+        "title": "クエリーを書く",
+        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。"
+      },
+      "incident": {
+        "title": "インシデントを調査",
+        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」"
+      },
+      "dashboard": {
+        "title": "ダッシュボードの作成",
+        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。"
+      },
+      "alert": {
+        "title": "アラートを作成",
+        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。"
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "nginx ログから JSON を解析するために VRL を記述してください",
+      "regexRedact": "正規表現パターンを生成してメールを編集する",
+      "mapStreamSchema": "「デフォルト」のストリームスキーマをマップする",
+      "promqlCpu": "80% 以上の CPU を使用するポッド用の PromQL を記述する",
+      "datadogToO2": "このデータドッグクエリを OpenObserve SQL に変換",
+      "lastAlertFired": "前回のアラートはなぜ起動されたのですか？"
+    },
+    "placeholderRotation": {
+      "one": "過去 1 時間のエラーを表示...",
+      "two": "nginx ログから JSON を解析するための VRL を書き込みます...",
+      "three": "K8s ノードの状態を示すダッシュボードを作成..."
+    }
   }
 }
