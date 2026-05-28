@@ -218,7 +218,7 @@ const pagination = useTablePagination(table, {
   pagination: props.pagination,
   pageSize: props.pageSize,
   pageSizeOptions: props.pageSizeOptions,
-  currentPage: props.currentPage,
+  get currentPage() { return props.currentPage; },
   get totalCount() { return props.totalCount; },
   get data() { return props.data; },
 }, emit);
