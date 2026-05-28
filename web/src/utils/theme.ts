@@ -172,8 +172,9 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
     document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
 
-    // Use a flat light tint from the primary palette instead of a gradient
-    document.body.style.setProperty('background', 'var(--color-primary-50)', 'important');
+    // Update body gradient with auto-calculated colors
+    const gradient = `linear-gradient(to bottom right, ${primaryBg}, ${secondaryBg})`;
+    document.body.style.setProperty('background', gradient, 'important');
 
     // Apply table header background color (80% theme color mixed with 20% white)
     const tableHeaderBg = mixColors(themeColor, '#FFFFFF', 30);
