@@ -59,12 +59,6 @@ pub async fn merge_parquet_files_with_downsampling(
 ) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    let mut metadata = metadata.clone();
-    // assume that the metrics data is sampled at a point every 15 seconds, and then estimate the
-    // records, used for bloom filter.
-    let step = if rule.step < 15 { 15 } else { rule.step };
-    metadata.records = (metadata.records * 15) / step;
-
     let sql = generate_downsampling_sql(&schema, rule);
 
     log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
@@ -113,7 +107,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     // Write batches to the appropriate format
     let (bufs, file_metas) = match cfg.common.file_format {
-        FileFormat::Parquet => write_downsampled_parquet(rx, &schema, &metadata, &cfg).await?,
+        FileFormat::Parquet => write_downsampled_parquet(rx, &schema, metadata, &cfg).await?,
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => {
             write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?
