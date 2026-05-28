@@ -2020,13 +2020,13 @@
       "night": "Working Late"
     },
     "welcome": {
-      "taglineLead": "A purpose-built",
-      "taglineHighlight": "observability agent",
-      "taglineTail": "for OpenObserve — writes",
+      "taglineLead": "I'm",
+      "taglineHighlight": "O2 Assistant",
+      "taglineTail": ". I can write your",
       "taglineSql": "SQL",
       "taglineVrl": "VRL",
       "taglinePromql": "PromQL",
-      "taglineAnd": "and walks you through your logs, traces, metrics and incidents.",
+      "taglineAnd": "and walk you through your logs, traces, metrics and incidents.",
       "signedInAs": "Signed in as",
       "role": "Role",
       "tryOneOfThese": "Or try one of these"

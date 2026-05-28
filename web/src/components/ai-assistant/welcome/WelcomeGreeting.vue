@@ -40,8 +40,8 @@ const logoSrc = computed(() =>
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span class="welcome-hero__highlight">{{
         t("aiAssistant.welcome.taglineHighlight")
-      }}</span>
-      {{ t("aiAssistant.welcome.taglineTail") }}
+      }}</span
+      >{{ t("aiAssistant.welcome.taglineTail") }}
       <span class="welcome-hero__code welcome-hero__code--sql">{{
         t("aiAssistant.welcome.taglineSql")
       }}</span>,
@@ -51,7 +51,8 @@ const logoSrc = computed(() =>
       and
       <span class="welcome-hero__code welcome-hero__code--promql">{{
         t("aiAssistant.welcome.taglinePromql")
-      }}</span>, {{ t("aiAssistant.welcome.taglineAnd") }}
+      }}</span>
+      — {{ t("aiAssistant.welcome.taglineAnd") }}
     </p>
 
     <div v-if="email" class="welcome-hero__meta">
