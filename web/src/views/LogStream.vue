@@ -360,7 +360,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: 2,
         meta: { align: "left" },
       },
       {
@@ -374,6 +374,7 @@ export default defineComponent({
         id: "stream_type",
         accessorKey: "stream_type",
         header: t("logStream.type"),
+        size: 30,
         meta: { align: "left" },
       },
       {
@@ -382,6 +383,7 @@ export default defineComponent({
           row.doc_num?.toLocaleString?.() ?? row.doc_num,
         header: t("logStream.docNum"),
         sortable: true,
+        size: 80,
         meta: { align: "left" },
       },
       {
@@ -389,6 +391,7 @@ export default defineComponent({
         accessorFn: (row: any) => formatSizeFromMB(row.storage_size),
         header: t("logStream.storageSize"),
         sortable: true,
+        size: 50,
         meta: { align: "left" },
       },
       {
@@ -396,6 +399,7 @@ export default defineComponent({
         accessorFn: (row: any) => formatSizeFromMB(row.compressed_size),
         header: t("logStream.compressedSize"),
         sortable: true,
+        size: 50,
         meta: { align: "left" },
       },
       {
@@ -403,13 +407,14 @@ export default defineComponent({
         accessorFn: (row: any) => formatSizeFromMB(row.index_size),
         header: t("logStream.indexSize"),
         sortable: true,
+        size: 50,
         meta: { align: "left" },
       },
       {
         id: "actions",
         header: t("user.actions"),
         isAction: true,
-        size: 120,
+        size: 50,
         meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
       },
     ]);
