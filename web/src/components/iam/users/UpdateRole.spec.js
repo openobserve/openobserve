@@ -262,7 +262,7 @@ describe("UpdateRole Component", () => {
         expect.objectContaining({
           variant: "loading",
           message: "Please wait...",
-          timeout: 2000,
+          timeout: 0,
         }),
       );
     });
@@ -324,7 +324,6 @@ describe("UpdateRole Component", () => {
         expect.objectContaining({
           variant: "success",
           message: "Organization member updated successfully.",
-          timeout: 3000,
         }),
       );
     });
@@ -346,7 +345,6 @@ describe("UpdateRole Component", () => {
         expect.objectContaining({
           variant: "success",
           message: "Organization member updated successfully.",
-          timeout: 3000,
         }),
       );
     });

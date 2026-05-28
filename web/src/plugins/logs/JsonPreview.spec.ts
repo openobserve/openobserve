@@ -512,8 +512,7 @@ describe("JsonPreview Component", () => {
       expect(wrapper.vm.loading).toBe(false);
       expect(mockToast).toHaveBeenCalledWith({
         message: "Failed to get the Original data",
-        position: "bottom-right",
-        timeout: 1500,
+        variant: "error",
       });
     });
 
@@ -532,8 +531,7 @@ describe("JsonPreview Component", () => {
       
       expect(mockToast).toHaveBeenCalledWith({
         message: "Custom error message",
-        position: "bottom-right",
-        timeout: 1500,
+        variant: "error",
       });
     });
   });
