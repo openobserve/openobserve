@@ -554,8 +554,8 @@ defineExpose({
 /* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
 .ai-floating-button {
   position: absolute;
-  top: 3px;
-  right: 8px;
+  top: 0.1875rem;
+  right: 1.375rem;
   z-index: 100;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   color: white !important;

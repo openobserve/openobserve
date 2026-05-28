@@ -1188,6 +1188,8 @@ export default defineComponent({
       fieldName: "",
     });
 
+    const assocPatternsRef = ref<any>(null);
+
     const selectedFields = ref([]);
 
     const filteredSchemaData = computed(() => {
@@ -2738,6 +2740,7 @@ export default defineComponent({
       showStoreOriginalDataToggle,
       patternAssociations,
       patternAssociationDialog,
+      assocPatternsRef,
       openPatternAssociationDialog,
       handleAddPattern,
       handleRemovePattern,
