@@ -241,13 +241,24 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.logsPage.ensureQuickModeState(false);
         // ensureQuickModeState already waits for the toggle data-state to flip
 
-        // Run query and wait for the search API and result_schema responses
-        const resultSchemaPromise = page.waitForResponse(
-            (resp) => resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200,
-            { timeout: 20000 }
-        ).catch(() => {});
+        // Run query and wait for BOTH result_schema cross-linking responses
+        // (UNION ALL fires one per stream — we need both before checking cross-links)
+        let schemaCount = 0;
+        const bothSchemasPromise = new Promise((resolve) => {
+            const handler = (resp) => {
+                if (resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200) {
+                    schemaCount++;
+                    if (schemaCount >= 2) {
+                        page.off('response', handler);
+                        resolve();
+                    }
+                }
+            };
+            page.on('response', handler);
+            setTimeout(() => { page.off('response', handler); resolve(); }, 20000);
+        });
         await pm.logsPage.selectRunQuery();
-        await resultSchemaPromise;
+        await bothSchemasPromise;
 
         // Step 4: Expand a log row
         await pm.crossLinkPage.expandFirstLogRow();
