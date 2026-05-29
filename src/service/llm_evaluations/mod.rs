@@ -13,21 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! This module contains models that can be serialized and deserialized as JSON
-//! for HTTP responses and requests.
-
-pub mod action;
-#[cfg(feature = "enterprise")]
-pub mod ai;
-pub mod alerts;
-#[cfg(feature = "cloud")]
-pub mod billings;
-pub mod dashboards;
-pub mod destinations;
 pub mod eval_jobs;
-pub mod folders;
-pub mod pipelines;
-pub mod providers;
-pub mod reports;
+pub mod evaluator_trace;
+pub mod prepared_scorers;
 pub mod score_configs;
+pub mod score_writer;
 pub mod scorers;
