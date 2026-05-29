@@ -1153,16 +1153,6 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                         log::warn!(
                             "[COMPACT] download file {file_name} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
                         );
-                        // update database
-                        // if let Err(e) =
-                        //     file_list::update_compressed_size(&file_name, data_len as i64).await
-                        // {
-                        //     log::error!(
-                        //         "[COMPACT] update file size for file {} err: {}",
-                        //         file_name,
-                        //         e
-                        //     );
-                        // }
                         // skip this file for compact
                         Some(file_name)
                     } else {
@@ -1243,9 +1233,6 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::{FileKey, FileMeta};
 
     use super::*;
