@@ -1954,10 +1954,6 @@ export default defineComponent({
   height: 30px;
   transition: all 0.2s ease;
 
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-
   :deep(.q-btn-dropdown) {
     height: 30px;
     min-height: 30px;

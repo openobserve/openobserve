@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-refresh-interval-btn"
           size="icon-toolbar"
-          variant="outline"
+          :variant="variant"
           :active="isAnimating"
         >
           <OIcon
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #trigger>
         <OButton
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
-          variant="outline"
+          :variant="variant"
           size="sm-toolbar"
         >
           <div class="tw:flex tw:items-center tw:flex-nowrap">
@@ -208,6 +208,10 @@ export default defineComponent({
     isCompact: {
       type: Boolean,
       default: false,
+    },
+    variant: {
+      type: String,
+      default: "outline",
     },
   },
   emits: ["update:modelValue", "trigger"],
