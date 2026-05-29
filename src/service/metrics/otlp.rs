@@ -102,7 +102,14 @@ pub async fn otlp_json(
     body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
-    let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
+    // NOTE: cannot use `serde_json::from_slice::<ExportMetricsServiceRequest>`
+    // here. `opentelemetry-proto`'s `with-serde` derive does not implement the
+    // OTLP/JSON wire format correctly: the `Metric.data` oneof always
+    // deserializes as `None`, and the string-encoded int64/uint64 fields used
+    // by histograms and summaries are inconsistently handled. The result is
+    // that streams get registered from the metric name but every data point
+    // is silently dropped. See `service::metrics::otlp_json` for details.
+    let request = match super::otlp_json::parse_export_metrics_request(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {e}");
