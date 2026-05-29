@@ -2,7 +2,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import AddJoinPopUp from "@/views/Dashboards/addPanel/AddJoinPopUp.vue";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import { createI18n } from "vue-i18n";
 
 // Mock composables
@@ -50,6 +49,7 @@ const i18n = createI18n({
   },
 });
 
+
 describe("AddJoinPopUp", () => {
   let wrapper: any;
   let store: any;
@@ -63,7 +63,7 @@ describe("AddJoinPopUp", () => {
 
     wrapper = mount(AddJoinPopUp, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           LeftJoinSvg: true,
           LeftJoinTypeSvg: true,
@@ -99,7 +99,9 @@ describe("AddJoinPopUp", () => {
     expect(wrapper.find('[data-test="dashboard-join-pop-up"]').exists()).toBe(
       true,
     );
-    expect(wrapper.find(".join-header").exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="dashboard-join-pop-up-header"]').exists(),
+    ).toBe(true);
   });
 
   it("displays correct join type", () => {
@@ -222,7 +224,7 @@ describe("AddJoinPopUp", () => {
     // Test with empty conditions
     const emptyWrapper = mount(AddJoinPopUp, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           LeftJoinSvg: true,
           LeftJoinTypeSvg: true,
@@ -252,7 +254,7 @@ describe("AddJoinPopUp", () => {
   it("handles multiple conditions", () => {
     const multiCondWrapper = mount(AddJoinPopUp, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           LeftJoinSvg: true,
           LeftJoinTypeSvg: true,
@@ -294,7 +296,6 @@ describe("AddJoinPopUp", () => {
 
   it("displays join summary", () => {
     // The component should show join summary
-    const summaryElement = wrapper.find(".join-preview");
     // Component may or may not show preview based on conditions
     expect(wrapper.exists()).toBe(true);
   });

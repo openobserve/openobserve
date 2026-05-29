@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="scroll"
+    data-test="markdown-renderer-scroll-container"
     style="width: 100%; height: 100%; overflow: auto; padding: 1%"
   >
     <div

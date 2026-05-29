@@ -24,8 +24,6 @@ import {
   beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 
 // Hoisted mock references — available inside vi.mock factories so individual
 // tests can assert against them without re-mocking entire modules.
@@ -117,9 +115,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
-});
 
 const mockStore = createStore({
   state: {
@@ -145,6 +140,7 @@ const mockLinks =
 
 const mockSpan = {
   _timestamp: 1752490492843047,
+  "@timestamp": 1752490492843047,
   start_time: 1752490492843000000,
   end_time: 1752490493164419300,
   duration: 321372,
@@ -479,6 +475,41 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
+    describe("when isEnterprise is true but correlationProps is null (fallback path)", () => {
+      beforeEach(() => {
+        config.isEnterprise = "true";
+        // correlationProps is null — correlation data hasn't been loaded yet
+        wrapper.vm.correlationProps = null;
+        dispatchSpy = vi
+          .spyOn(mockStore, "dispatch")
+          .mockResolvedValue(undefined);
+        pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      });
+
+      it("should fall back to buildQueryDetails and navigateToLogs when correlationProps is null", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        expect(viewLogsBtn.exists()).toBe(true);
+
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
+        expect(mockNavigateToLogs).toHaveBeenCalled();
+      });
+
+      it("should not call navigateToCorrelatedLogs when correlationProps is null", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when isEnterprise is false (non-enterprise branch)", () => {
       beforeEach(() => {
         config.isEnterprise = "false";
@@ -521,9 +552,6 @@ describe("TraceDetailsSidebar", async () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       mockSpan.span_id,
     );
-
-    // Check if notification was triggered
-    expect(wrapper.vm.$q.notify).toBeTruthy();
   });
 
   it("should show error notification when copy fails", async () => {
@@ -546,9 +574,6 @@ describe("TraceDetailsSidebar", async () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       mockSpan.span_id,
     );
-
-    // Check if error notification was triggered
-    expect(wrapper.vm.$q.notify).toBeTruthy();
 
     // Restore original mock
     (navigator.clipboard.writeText as any) = originalWriteText;
@@ -1251,14 +1276,12 @@ describe("TraceDetailsSidebar", async () => {
       expect(result).toBe(displayValue);
     });
 
-    it("should fall back to display value when start_time is absent from props.span", async () => {
-      const spanWithoutStartTime = { ...mockSpan };
-      delete (spanWithoutStartTime as any).start_time;
-      await wrapper.setProps({ span: spanWithoutStartTime });
-
+    it("should return raw start_time value when _start_time_ns is absent", () => {
+      // mockSpan has start_time but not _start_time_ns, so the ?? chain
+      // returns span.start_time (the raw nanosecond value)
       const displayValue = "fallback display";
       const result = wrapper.vm.getFilterValue("start_time", displayValue);
-      expect(result).toBe(displayValue);
+      expect(result).toBe(mockSpan.start_time);
     });
 
     it("should return the raw value for the configured timestamp column (@timestamp)", async () => {
@@ -1392,14 +1415,16 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should emit apply-filter-immediately with the raw NS-string start_time, not the display string", async () => {
-      // The stub renders the slot for every key. Find the q-item under the start_time field.
+      // The stub renders the slot for every key. Find the filter action under the start_time field.
       const startTimeSlot = filterWrapper.find(
         '[data-test="json-preview-field-start_time"]',
       );
       expect(startTimeSlot.exists()).toBe(true);
 
-      // Click the first q-item in the slot (the "=" filter action)
-      const items = startTimeSlot.findAll(".q-item");
+      // Click the first filter action (the "=" operator) within the slot
+      const items = startTimeSlot.findAll(
+        '[data-test^="trace-details-sidebar-json-filter-action-"]',
+      );
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 
@@ -1418,7 +1443,9 @@ describe("TraceDetailsSidebar", async () => {
       );
       expect(endTimeSlot.exists()).toBe(true);
 
-      const items = endTimeSlot.findAll(".q-item");
+      const items = endTimeSlot.findAll(
+        '[data-test^="trace-details-sidebar-json-filter-action-"]',
+      );
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 
@@ -1437,7 +1464,9 @@ describe("TraceDetailsSidebar", async () => {
       );
       expect(spanIdSlot.exists()).toBe(true);
 
-      const items = spanIdSlot.findAll(".q-item");
+      const items = spanIdSlot.findAll(
+        '[data-test^="trace-details-sidebar-json-filter-action-"]',
+      );
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 
@@ -1472,9 +1501,6 @@ describe("TraceDetailsSidebar", async () => {
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
           mockSpan.span_id,
         );
-
-        // Check if error notification was triggered
-        expect(wrapper.vm.$q.notify).toBeTruthy();
       } else {
         console.log("Copy button not found, skipping test");
       }
@@ -1502,6 +1528,7 @@ describe("TraceDetailsSidebar", async () => {
 
     const mockLLMSpan = {
       _timestamp: 1752490492843047,
+      "@timestamp": 1752490492843047,
       start_time: 1752490492843000000,
       end_time: 1752490493164419300,
       duration: 321372,

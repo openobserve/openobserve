@@ -1,10 +1,15 @@
 <template>
-  <div class="group" :style="`--group-index: ${groupNestedIndex}`">
-    <div class="group-conditions">
+  <div
+    class="group"
+    data-test="dashboard-group"
+    :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}`"
+  >
+    <div class="group-conditions" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
         class="condition-group"
+        data-test="dashboard-group-condition-group"
       >
         <Group
           v-if="condition.filterType === 'group'"
@@ -32,27 +37,28 @@
           :condition-index="index"
         />
       </div>
-      <OButton
-        variant="primary"
-        size="icon-xs-circle"
-        data-test="dashboard-add-condition-add"
-      >
-        <template #icon-left><q-icon name="add" /></template>
-        <q-menu v-model="showAddMenu">
-          <q-list>
-            <q-item clickable @click="emitAddCondition">
-              <q-item-section data-test="dashboard-add-group-add-condition">{{
-                t("common.addCondition")
-              }}</q-item-section>
-            </q-item>
-            <q-item clickable @click="emitAddGroup">
-              <q-item-section data-test="dashboard-add-group-add-group">{{
-                t("common.addGroup")
-              }}</q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </OButton>
+      <ODropdown v-model:open="showAddMenu">
+        <template #trigger>
+          <OButton
+            variant="primary"
+            size="icon-xs-circle"
+            data-test="dashboard-add-condition-add"
+            icon-left="add"
+          />
+        </template>
+        <ODropdownItem
+          data-test="dashboard-add-group-add-condition"
+          @select="emitAddCondition"
+        >
+          {{ t("common.addCondition") }}
+        </ODropdownItem>
+        <ODropdownItem
+          data-test="dashboard-add-group-add-group"
+          @select="emitAddGroup"
+        >
+          {{ t("common.addGroup") }}
+        </ODropdownItem>
+      </ODropdown>
     </div>
     <div v-if="groupNestedIndex !== 0" class="group-remove">
       <OButton
@@ -60,8 +66,8 @@
         size="icon"
         @click="$emit('remove-group')"
         data-test="dashboard-add-group-remove"
+        icon-left="close"
       >
-        <template #icon-left><q-icon name="close" /></template>
       </OButton>
     </div>
   </div>
@@ -70,12 +76,14 @@
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18n } from "vue-i18n";
 import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "Group",
-  components: { AddCondition, OButton },
+  components: { AddCondition, OButton, ODropdown, ODropdownItem },
   props: {
     group: {
       type: Object,
@@ -180,7 +188,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .group {
   display: flex;
-  padding: 0px 0px 0px 5px;
+  padding: 0px;
   background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));
   border-radius: 5px;
 }

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="feature-comparison-header tw:mb-6">
       <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
         <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-          <q-icon name="compare_arrows" size="24px" />
+          <OIcon name="compare-arrows" size="md" />
         </div>
         <h3 class="feature-title">{{ t("about.feature_comparison_lbl") }}</h3>
       </div>
@@ -58,74 +58,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="table-wrapper">
-      <q-table
-        :rows="featureData.features"
+      <OTable
+        :data="featureData.features"
         :columns="columns"
         row-key="name"
-        :pagination="pagination"
-        hide-pagination
-        flat
-        bordered
-        dense
-        class="feature-comparison-table o2-quasar-table"
+        pagination="none"
+        :show-global-filter="false"
+        :default-columns="false"
+        class="feature-comparison-table"
       >
-        <template v-slot:body="props">
-          <q-tr :props="props">
-            <q-td key="name" :props="props" class="feature-name-cell">
-              {{ props.row.name }}
-            </q-td>
-            <q-td
-              key="opensource"
-              :props="props"
-              class="feature-value-cell"
-              :class="{
-                'highlighted-column':
-                  store.state.zoConfig.build_type === 'opensource',
-              }"
-            >
-              <span v-if="props.row.values.opensource === true" class="status-icon status-available">
-                ✅
-              </span>
-              <span v-else-if="props.row.values.opensource === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.opensource }}
-              </span>
-            </q-td>
-            <q-td
-              key="enterprise"
-              :props="props"
-              class="feature-value-cell"
-              :class="{
-                'highlighted-column':
-                  store.state.zoConfig.build_type === 'enterprise',
-              }"
-            >
-              <span v-if="props.row.values.enterprise === true" class="status-icon status-available">
-                ✅
-              </span>
-              <span v-else-if="props.row.values.enterprise === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.enterprise }}
-              </span>
-            </q-td>
-            <q-td key="cloud" :props="props" class="feature-value-cell">
-              <span v-if="props.row.values.cloud === true" class="status-icon status-available">
-                ✅
-              </span>
-              <span v-else-if="props.row.values.cloud === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.cloud }}
-              </span>
-            </q-td>
-          </q-tr>
+        <template #cell-opensource="{ row }">
+          <span v-if="row.values.opensource === true" class="status-icon status-available">✅</span>
+          <span v-else-if="row.values.opensource === false" class="status-icon status-unavailable">❌</span>
+          <span v-else class="status-text">{{ row.values.opensource }}</span>
         </template>
-      </q-table>
+        <template #cell-enterprise="{ row }">
+          <span v-if="row.values.enterprise === true" class="status-icon status-available">✅</span>
+          <span v-else-if="row.values.enterprise === false" class="status-icon status-unavailable">❌</span>
+          <span v-else class="status-text">{{ row.values.enterprise }}</span>
+        </template>
+        <template #cell-cloud="{ row }">
+          <span v-if="row.values.cloud === true" class="status-icon status-available">✅</span>
+          <span v-else-if="row.values.cloud === false" class="status-icon status-unavailable">❌</span>
+          <span v-else class="status-text">{{ row.values.cloud }}</span>
+        </template>
+      </OTable>
     </div>
   </div>
 </template>
@@ -133,8 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
-import type { QTableColumn } from "quasar";
 import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
 
 interface FeatureValue {
@@ -161,44 +120,58 @@ interface FeatureData {
 const store = useStore();
 const { t } = useI18n();
 
-const columns = ref<QTableColumn[]>([
-  {
-    name: 'name',
-    label: t('about.feature_column_name'),
-    field: 'name',
-    align: 'left',
-    sortable: false,
-    style: 'width: 250px; min-width: 200px;'
-  },
-  {
-    name: 'opensource',
-    label: t('about.edition_opensource'),
-    field: 'opensource',
-    align: 'center',
-    sortable: false,
-    style: 'width: 150px; max-width: 150px;'
-  },
-  {
-    name: 'enterprise',
-    label: t('about.edition_enterprise'),
-    field: 'enterprise',
-    align: 'center',
-    sortable: false,
-    style: 'width: 150px; max-width: 150px;'
-  },
-  {
-    name: 'cloud',
-    label: t('about.edition_cloud'),
-    field: 'cloud',
-    align: 'center',
-    sortable: false,
-    style: 'width: 150px; max-width: 150px;'
-  }
-]);
+const buildType = store.state.zoConfig.build_type;
 
-const pagination = ref({
-  rowsPerPage: 0 // 0 means show all rows
-});
+const columns: OTableColumnDef[] = [
+  {
+    id: "name",
+    header: t("about.feature_column_name"),
+    accessorKey: "name",
+    sortable: false,
+    size: 250,
+    minSize: 200,
+    meta: { align: "left", cellClass: "feature-name-cell" },
+  },
+  {
+    id: "opensource",
+    header: t("about.edition_opensource"),
+    accessorFn: (row: Feature) => row.values.opensource,
+    sortable: false,
+    size: 150,
+    maxSize: 150,
+    meta: {
+      align: "center",
+      cellClass:
+        buildType === "opensource"
+          ? "feature-value-cell highlighted-column"
+          : "feature-value-cell",
+    },
+  },
+  {
+    id: "enterprise",
+    header: t("about.edition_enterprise"),
+    accessorFn: (row: Feature) => row.values.enterprise,
+    sortable: false,
+    size: 150,
+    maxSize: 150,
+    meta: {
+      align: "center",
+      cellClass:
+        buildType === "enterprise"
+          ? "feature-value-cell highlighted-column"
+          : "feature-value-cell",
+    },
+  },
+  {
+    id: "cloud",
+    header: t("about.edition_cloud"),
+    accessorFn: (row: Feature) => row.values.cloud,
+    sortable: false,
+    size: 150,
+    maxSize: 150,
+    meta: { align: "center", cellClass: "feature-value-cell" },
+  },
+];
 
 /**
  * Converts feature registry to display format
@@ -328,66 +301,65 @@ const currentPlanName = computed(() => {
     width: auto;
     margin: auto;
     max-width: 800px;
-    
-    .feature-name-cell {
-      font-weight: 500;
-      color: var(--q-text-color);
-      padding: 0.875rem 1rem;
-    }
+  }
 
-    .feature-value-cell {
-      text-align: center;
-      padding: 0.875rem 1rem;
-      word-wrap: break-word;
-      white-space: normal;
+  // These classes are applied to OTable's internal <td> elements via meta.cellClass
+  :deep(.feature-name-cell) {
+    font-weight: 500;
+    color: var(--q-text-color);
+    padding: 0.875rem 1rem;
+  }
 
-      .status-icon {
-        font-size: 0.9rem;
-        display: inline-block;
+  :deep(.feature-value-cell) {
+    text-align: center;
+    padding: 0.875rem 1rem;
+    word-wrap: break-word;
+    white-space: normal;
+  }
 
-        &.status-available {
-          color: #4caf50;
-        }
+  :deep(.status-icon) {
+    font-size: 0.9rem;
+    display: inline-block;
+  }
 
-        &.status-unavailable {
-          color: #f44336;
-        }
-      }
+  :deep(.status-icon.status-available) {
+    color: #4caf50;
+  }
 
-      .status-text {
-        font-size: 0.875rem;
-        color: var(--q-text-color);
-        display: block;
-        padding: 0 0.5rem;
-        word-wrap: break-word;
-        white-space: normal;
-      }
+  :deep(.status-icon.status-unavailable) {
+    color: #f44336;
+  }
 
-      &.highlighted-column {
-        background-color: color-mix(in srgb, var(--o2-theme-color) 15%, var(--o2-theme-mode) 85%);
-        font-weight: 500;
-        position: relative;
+  :deep(.status-text) {
+    font-size: 0.875rem;
+    color: var(--q-text-color);
+    display: block;
+    padding: 0 0.5rem;
+    word-wrap: break-word;
+    white-space: normal;
+  }
 
-        &::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 3px;
-        }
-      }
+  :deep(.highlighted-column) {
+    background-color: color-mix(in srgb, var(--o2-theme-color) 15%, var(--o2-theme-mode) 85%);
+    font-weight: 500;
+    position: relative;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
     }
   }
 
-  // Dark theme adjustments
-  :deep(.body--dark) {
-    .feature-comparison-table tbody tr:nth-child(even) {
-      background: rgba(255, 255, 255, 0.03);
+  // Dark theme striped rows
+  :deep(.body--dark .feature-comparison-table tbody tr:nth-child(even)) {
+    background: rgba(255, 255, 255, 0.03);
 
-      &:hover {
-        background: rgba(33, 150, 243, 0.08);
-      }
+    &:hover {
+      background: rgba(33, 150, 243, 0.08);
     }
   }
 
@@ -397,20 +369,20 @@ const currentPlanName = computed(() => {
 
     .feature-comparison-table {
       font-size: 0.8125rem;
+    }
 
-      :deep(thead tr th) {
-        padding: 0.75rem 0.5rem;
-        font-size: 0.875rem;
-      }
+    :deep(thead tr th) {
+      padding: 0.75rem 0.5rem;
+      font-size: 0.875rem;
+    }
 
-      .feature-name-cell,
-      .feature-value-cell {
-        padding: 0.625rem 0.5rem;
-      }
+    :deep(.feature-name-cell),
+    :deep(.feature-value-cell) {
+      padding: 0.625rem 0.5rem;
+    }
 
-      .feature-value-cell .status-text {
-        font-size: 0.8125rem;
-      }
+    :deep(.feature-value-cell .status-text) {
+      font-size: 0.8125rem;
     }
   }
 }

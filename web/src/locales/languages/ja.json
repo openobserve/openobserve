@@ -396,7 +396,10 @@
     "traces": "トレース",
     "switchToLogs": "クリックしてログに戻る",
     "patternNoValuesAvailable": "使用可能な値はありません",
-    "selectLogStream": "ログストリームを選択"
+    "selectLogStream": "ログストリームを選択",
+    "noData": "データはありません",
+    "functionEditorLabel": "関数エディター",
+    "loadingStream": "ストリームをロード中..."
   },
   "menu": {
     "home": "ホーム",
@@ -790,7 +793,8 @@
     "no_keep_current": "いいえ、最新の状態に保つ",
     "feature_correlation_management": "相関管理",
     "feature_log_patterns": "ログパターン",
-    "environment_type": "環境タイプ"
+    "environment_type": "環境タイプ",
+    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。"
   },
   "login": {
     "userid": "ユーザーID",
@@ -856,7 +860,12 @@
     "groups": "グループ",
     "customRole": "カスタムロール",
     "description": "[説明]",
-    "revoke_invite": "招待を取り消す"
+    "revoke_invite": "招待を取り消す",
+    "authType": "認証",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "ネイティブ",
+    "noCustomRolesHint": "カスタムロールは定義されていません — IAM → ロールで作成",
+    "externalUserCustomRoleHint": "外部ユーザーはソースシステム経由でのみ変更できます"
   },
   "serviceAccounts": {
     "header": "サービスアカウント",
@@ -1428,7 +1437,7 @@
     "markLineYAxis": "Y 軸",
     "colorPalette": "カラーパレット",
     "colorSeriesBy": "カラーシリーズ別：",
-    "colorBySeries": "<b>シリーズ別</b>",
+    "colorBySeries": "シリーズ別",
     "colorDefaultPaletteBySeries": "デフォルトパレット (シリーズ別)",
     "colorDefaultPaletteBySeriesSubLabel": "同じ名前のシリーズは同じ色を使用します",
     "colorPaletteClassic": "パレット-クラシック",
@@ -1437,7 +1446,7 @@
     "colorSingleColorSubLabel": "すべてのシリーズに特定の色を設定",
     "colorShadesOfSpecificColor": "特定の色のシェード",
     "colorShadesOfSpecificColorSubLabel": "特定の色のさまざまな色合い",
-    "colorByValue": "<b>[値別]</b>",
+    "colorByValue": "[値別]",
     "colorGreenYellowRed": "緑-黄-赤 (値別)",
     "colorRedYellowGreen": "赤-黄-緑 (値別)",
     "colorTemperature": "温度 (値別)",
@@ -1607,7 +1616,9 @@
     "axisLabelRotateTooltipText": "X 軸のラベルテキストを選択した角度 (度単位) で回転させると、ラベルが長い場合やラベルが混み合っている場合に読みやすくなります。",
     "axisLabelTruncateTooltipText": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。",
     "axisLabelTooltipNotePrefix": "注記:",
-    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。"
+    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。",
+    "allFolders": "すべてのフォルダー",
+    "selectFile": "[ファイルを選択]"
   },
   "panel": {
     "header": "パネル",
@@ -2641,6 +2652,7 @@
     "quota": "クォータ",
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
+    "organizationMembers": "組織メンバー",
     "externalUserWarningTitle": "外部ユーザー警告",
     "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
     "invitations": "招待状"
@@ -2956,7 +2968,75 @@
     "copyStacktrace": "スタックトレースをコピー",
     "noStacktraceAvailable": "スタックトレースはありません",
     "stacktraceCopied": "スタックトレースをクリップボードにコピーしました",
-    "stacktraceCopyFailed": "スタックトレースをコピーできませんでした"
+    "stacktraceCopyFailed": "スタックトレースをコピーできませんでした",
+    "sessionsList": {
+      "noStreamsTooltip": "LLM ストリームはありません。",
+      "session": "セッション",
+      "sessions": "セッション",
+      "countPill": "{合計} {単位} の {カウント}",
+      "noStreamsFound": "LLM ストリームが見つかりません",
+      "noStreamsDescription1": "セッションのグループスパン",
+      "noStreamsDescription2": "LLM ストリームとしてマークされたトレースストリーム全体該当するストリームが存在しないか、スパンがまだ取り込まれていないかのどちらかです。",
+      "failedToLoad": "セッションを読み込めませんでした",
+      "retry": "リトライ",
+      "noSessionsFound": "セッションが見つかりません",
+      "noSessionsDescription": "{stream} には、この時間範囲の LLM セッションは記録されていません。時間範囲を広げるか、別のストリームに切り替えてみてください。",
+      "loading": "セッションをロード中...",
+      "tokenTooltip": "入力:{入力} · 出力:{出力} · 合計:{合計}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "タイムスタンプ",
+        "sessionId": "セッション ID",
+        "turns": "ターン",
+        "duration": "所要時間",
+        "tokens": "トークン",
+        "cost": "費用",
+        "status": "ステータス"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "セッションに戻る",
+      "pageTitle": "セッション詳細",
+      "failedToLoad": "セッションを読み込めませんでした",
+      "retry": "リトライ",
+      "sessionNotFound": "セッションが見つかりません",
+      "noSpansFound": "現在の時間範囲では {id} のスパンが見つかりません。",
+      "searchPlaceholder": "このセッションのトレースを検索...",
+      "turn": "順番",
+      "turns": "ターン",
+      "turnsShown": "{total} {unit} の {フィルター済み} が表示されました",
+      "userBadge": "ユーザ",
+      "sessionPrefix": "セッション",
+      "copySessionId": "セッション ID をコピー",
+      "openInTraceExplorer": "トレースエクスプローラーで開く",
+      "unknownUser": "不明なユーザー",
+      "kpi": {
+        "turns": "ターン",
+        "duration": "所要時間",
+        "inputTokens": "入力トークン",
+        "outputTokens": "出力トークン",
+        "cost": "費用"
+      },
+      "conversation": "会話",
+      "turnLabel": "ターン",
+      "openTrace": "オープントレース",
+      "noUserMessage": "このターンのユーザーメッセージはキャプチャされませんでした。",
+      "noAssistantMessage": "このターンのアシスタントの応答はキャプチャされませんでした。",
+      "roles": {
+        "user": "ユーザ",
+        "assistant": "アシスタント"
+      },
+      "stats": {
+        "status": "ステータス",
+        "model": "モデル",
+        "tokens": "トークン",
+        "input": "入力",
+        "output": "出力",
+        "total": "合計",
+        "cost": "費用",
+        "spans": "スパン"
+      }
+    }
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -3001,7 +3081,10 @@
     "algorithm": "アルゴリズム",
     "storeType": "ストアタイプ",
     "mechanismType": "方式タイプ",
-    "actions": "操作"
+    "actions": "操作",
+    "providerTypeRequired": "プロバイダのタイプが必要です",
+    "algorithmRequired": "アルゴリズムが必要です",
+    "secretRequired": "シークレットが必要です"
   },
   "quota": {
     "header": "クォータ",
@@ -3339,7 +3422,8 @@
     "serviceGroupProtected": "サービスグループは削除できません。変更できるのはマップされたフィールドだけです。",
     "noDataFound": "データが見つかりません",
     "isWorkloadType": "サービス識別子",
-    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。"
+    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。",
+    "loadingCorrelation": "相関データを読み込んでいます..."
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
@@ -3676,7 +3760,8 @@
     "errSave": "保存できませんでした",
     "errLoadModel": "モデルを読み込めませんでした",
     "tierDefaultName": "デフォルト",
-    "tierConditionalName": "条件付き階層"
+    "tierConditionalName": "条件付き階層",
+    "shadowedWarningBanner": "以下のルールは「{name}」に覆われています。優先度の高いルールでは無効になり、コスト計算には使用されません。"
   },
   "overview": {
     "title": "システム概要",
@@ -3702,5 +3787,52 @@
     "clearAll": "すべてクリア",
     "clearAllTitle": "すべてのチャットをクリア",
     "clearAllMessage": "これにより、すべてのチャット履歴が完全に削除されます。このアクションは元に戻せません。"
+  },
+  "storage_settings": {
+    "tabLabel": "組織ストレージ",
+    "title": "組織ストレージ",
+    "notEnabled": "この組織では組織ストレージが有効になっていません",
+    "notConfigured": "この組織のデータ用のカスタムストレージプロバイダーを設定",
+    "configured": "設定済み",
+    "heroHeadline": "自分のストレージを持参して",
+    "heroSub": "独自のクラウドバケットを接続しても、データはインフラストラクチャに残り、完全に制御され、ロックインは発生しません。",
+    "configureStorage": "ストレージの設定",
+    "supportedProviders": "サポート対象プロバイダー",
+    "noStorageConfigured": "ストレージが設定されていません",
+    "routeDataDesc": "この組織のデータは、他の組織やグローバルデフォルトとは無関係に、専用のバケットにルーティングします。",
+    "perOrgIsolation": "組織ごとの分離",
+    "appliesImmediately": "新しいデータに直ちに適用",
+    "usesOrgCredentials": "組織を対象とした認証情報を使用する",
+    "updateStorage": "ストレージを更新",
+    "active": "アクティブ",
+    "bucketName": "バケット名",
+    "region": "領域",
+    "serverUrl": "サーバー URL",
+    "accessKey": "アクセスキー",
+    "secretKey": "シークレットキー",
+    "roleArn": "ロールアン",
+    "createdAt": "作成日",
+    "updatedAt": "更新日",
+    "featureOwnDataTitle": "データをエンドツーエンドで管理",
+    "featureOwnDataDesc": "取り込んだデータを自分のバケットに直接保存し、誰がアクセスできるかを完全に制御できます。",
+    "featureSecureTitle": "安全で規制に準拠",
+    "featureSecureDesc": "きめ細かなアクセスキーにより、機密データはインフラストラクチャに残ります。",
+    "goBack": "戻る",
+    "newStorageConfiguration": "新しいストレージ構成",
+    "selectProviderDesc": "この組織のデータを保存するクラウドストレージプロバイダーを選択してください。",
+    "bucketNameRequired": "バケット名が必要です",
+    "accessKeyRequired": "アクセスキーが必要です",
+    "secretKeyRequired": "シークレットキーが必要です",
+    "serverURLRequired": "サーバー URL が必要です",
+    "regionRequired": "地域が必要です",
+    "roleARNRequired": "ロール ARN が必要です",
+    "back": "戻る",
+    "continue": "続行",
+    "save": "[保存]",
+    "update": "[更新]",
+    "awsStsCloudInfo": "これは AWS sts を使用して役割を引き受け、操作を実行します。Openobserve AWS アカウントをこのロールの信頼できるエンティティタイプとして AWS コンソールに追加する必要があります。Openobserve チームに連絡して、アカウント情報を入手したり、アカウントの設定についてさらにサポートを受けたりしてください。",
+    "awsStsSelfHostedInfo": "これは AWS sts を使用して役割を引き受け、操作を実行します。インストール環境で、このロールにアクセスできる AWS 認証情報が設定されていることを確認してください。",
+    "externalIdRequired": "外部 ID が必要です",
+    "storageAccountRequired": "ストレージアカウント名が必要です"
   }
 }

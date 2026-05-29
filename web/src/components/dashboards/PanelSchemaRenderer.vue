@@ -68,13 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="col column"
+          class="tw:flex tw:flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
-            class="col"
+            class="tw:flex tw:flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -82,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="col column"
+          class="tw:flex tw:flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
-            class="col"
+            class="tw:flex tw:flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -99,27 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
           style="width: 100%; height: 100%"
-          class="col"
+          class="tw:flex tw:flex-col"
           @error="errorDetail = $event"
         />
         <ChartRenderer
           v-else
           ref="chartRendererRef"
-          :data="
-            panelSchema.queryType === 'promql' ||
-            (panelData.chartType != 'geomap' &&
-              panelData.chartType != 'table' &&
-              panelData.chartType != 'maps' &&
-              loading)
-              ? panelData
-              : noData == 'No Data'
-                ? {
-                    options: {
-                      backgroundColor: 'transparent',
-                    },
-                  }
-                : panelData
-          "
+          :data="chartRendererData"
           :height="chartPanelHeight"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
@@ -146,8 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.custom_error_handeling
         "
         class="errorMessage"
+        data-test="panel-schema-renderer-error-message"
       >
-        <q-icon size="md" name="warning" />
+        <OIcon size="md" name="warning" />
         <div style="height: 80%; width: 100%">
           {{
             errorDetail?.code?.toString().startsWith("4")
@@ -164,11 +151,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           panelSchema?.error_config?.custom_error_message
         "
         class="customErrorMessage"
+        data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        class="row"
+        class="tw:flex"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
         <LoadingProgress
@@ -178,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="isCursorOverPanel"
-        class="flex items-center q-gutter-x-xs"
+        class="tw:flex tw:items-center q-gutter-x-xs"
         style="
           position: absolute;
           top: 0px;
@@ -208,11 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-circle"
           @click="$emit('show-legends')"
+          icon-left="format-list-bulleted"
+          data-test="dashboard-show-legends-btn"
         >
-          <template #icon-left><q-icon name="format_list_bulleted" /></template>
-          <q-tooltip anchor="top middle" self="bottom right">
-            Show Legends
-          </q-tooltip>
+          <OTooltip content="Show Legends" side="top" align="end" />
         </OButton>
         <OButton
           v-if="
@@ -230,18 +217,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowAnnotationsAdd &&
             !viewOnly
           "
+          data-test="panel-schema-renderer-annotation-button"
           variant="outline"
           size="icon-circle"
           @click="toggleAddAnnotationMode"
         >
           <template #icon-left
-            ><q-icon :name="isAddAnnotationMode ? 'cancel' : 'edit'"
+            ><OIcon :name="isAddAnnotationMode ? 'cancel' : 'edit'" size="sm"
           /></template>
-          <q-tooltip anchor="top middle" self="bottom right">
-            {{
-              isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
-            }}
-          </q-tooltip>
+          <OTooltip :content="isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="top" align="end" />
         </OButton>
       </div>
       <div
@@ -257,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(drilldown, index) in drilldownArray"
           :key="JSON.stringify(drilldown)"
         >
-          <q-separator
+          <OSeparator
             v-if="
               drilldown._isCrossLink &&
               index > 0 &&
@@ -266,13 +250,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             class="crosslink-drilldown-menu-item"
-            data-test="drilldown-menu-item"
+            :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
-            <q-icon
+            <OIcon
               size="xs"
-              class="q-mr-sm"
-              :name="drilldown._isCrossLink ? 'open_in_new' : 'link'"
+              class="tw:mr-2"
+              :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
             />
             <span>{{ drilldown.name }}</span>
           </div>
@@ -293,11 +277,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
         ref="annotationPopupRef"
       >
         <div
-          class="q-px-sm q-py-xs"
+          class="tw:px-2 tw:py-1"
           style="
             display: flex;
             flex-direction: row;
@@ -406,10 +390,14 @@ const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
+    OSeparator,
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,
@@ -422,7 +410,9 @@ export default defineComponent({
     CustomChartRenderer,
     LoadingProgress,
     OButton,
-  },
+    OIcon,
+    OTooltip,
+},
   props: {
     selectedTimeObj: {
       required: true,
@@ -1333,117 +1323,87 @@ export default defineComponent({
       }
     };
 
-    const handleNoData = (panelType: any) => {
-      const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias || [],
-      );
-      const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias || [],
-      );
-      const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias || [],
-      );
-
-      const firstRow = data.value[0]?.[0];
-
-      switch (panelType) {
-        case "area":
-        case "area-stacked":
-        case "bar":
-        case "h-bar":
-        case "stacked":
-        case "h-stacked":
-        case "line":
-        case "scatter":
-        case "gauge": {
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
-              yAlias.every((y: any) => getDataValue(firstRow, y) != null))
-          );
-        }
-        case "table": {
-          // For tables, simply check if there's any data in the array
-          return (
-            data.value[0]?.length > 1 ||
-            (data.value[0]?.length == 1 &&
-              (xAlias.some((x: any) => getDataValue(firstRow, x) != null) ||
-                yAlias.some((y: any) => getDataValue(firstRow, y) != null)))
-          );
-        }
-        case "metric": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
-          );
-        }
-        case "heatmap": {
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
-              yAlias.every((y: any) => getDataValue(firstRow, y) != null) &&
-              zAlias.every((z: any) => getDataValue(firstRow, z) != null))
-          );
-        }
-        case "pie":
-        case "donut": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
-          );
-        }
-        case "maps":
-        case "geomap": {
-          return true;
-        }
-        case "sankey": {
-          const source = panelSchema.value.queries[0].fields.source.alias;
-          const target = panelSchema.value.queries[0].fields.target.alias;
-          const value = panelSchema.value.queries[0].fields.value.alias;
-          return (
-            data.value[0]?.length > 1 ||
-            source.every((s: any) => getDataValue(firstRow, s) != null) ||
-            target.every((t: any) => getDataValue(firstRow, t) != null) ||
-            value.every((v: any) => getDataValue(firstRow, v) != null)
-          );
-        }
-        default:
-          break;
-      }
-    };
-
-    // Compute the value of the 'noData' variable
+    // Compute the value of the 'noData' variable.
+    // Instead of re-scanning raw rows, this checks the conversion output
+    // (panelData) which the pipeline already computed — O(1) property access.
     const noData = computed(() => {
-      // if panel type is 'html' or 'markdown', return an empty string
-      if (
-        panelSchema.value.type == "html" ||
-        panelSchema.value.type == "markdown" ||
-        panelSchema.value.type == "custom_chart"
-      ) {
+      const type = panelSchema.value.type;
+
+      if (type === "html" || type === "markdown" || type === "custom_chart") {
         return "";
       }
-      // Check if the queryType is 'promql'
-      if (panelSchema.value?.queryType == "promql") {
-        // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
+
+      if (panelSchema.value?.queryType === "promql") {
         return filteredData.value?.length &&
           filteredData.value.some((item: any) => item?.result?.length)
-          ? "" // Return an empty string if there is data
-          : "No Data"; // Return "No Data" if there is no data
+          ? ""
+          : "No Data";
       }
 
-      // A rendered chart is already on screen — suppress "No Data" even if
-      // the raw data buffer is momentarily empty. This prevents a flicker on
-      // refresh where the executor resets state.data = [] before loading
-      // flips to true, transiently firing this computed with empty data.
-      if (panelData.value?.options?.series?.length > 0) {
+      const hasRawData = data.value?.length && data.value[0]?.length;
+
+      // During data buffer reset (executor clears state.data before reload),
+      // suppress "No Data" only while still loading to avoid flicker.
+      // Once loading completes with empty data, show "No Data".
+      if (!hasRawData) {
+        return loading.value && panelData.value?.chartType ? "" : "No Data";
+      }
+
+      // Raw data exists but conversion hasn't produced output yet — wait.
+      if (!panelData.value?.chartType) {
         return "";
       }
-      // The queryType is not 'promql'
-      return data.value.length &&
-        data.value[0]?.length &&
-        handleNoData(panelSchema.value.type)
-        ? ""
-        : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+
+      // Table renders raw rows; the conversion returns { rows, columns }.
+      if (type === "table") {
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
+      }
+
+      // Maps/geomap handle their own empty state.
+      if (type === "geomap" || type === "maps") {
+        return "";
+      }
+
+      // Sankey returns { options: null } when data is invalid.
+      if (type === "sankey") {
+        return panelData.value?.options != null ? "" : "No Data";
+      }
+
+      // Metric/gauge series are always created by the converter
+      // (they use renderItem, not data arrays), so check the raw Y value.
+      if (type === "metric" || type === "gauge") {
+        const firstRow = data.value[0]?.[0];
+        const yAlias = panelSchema.value.queries[0].fields.y.map(
+          (it: any) => it.alias || [],
+        );
+        return yAlias.every((y: any) => getDataValue(firstRow, y) != null)
+          ? ""
+          : "No Data";
+      }
+
+      // For all other chart types (line, area, bar, scatter, heatmap, etc.),
+      // the series filter in the conversion pipeline already excluded series
+      // whose data is entirely null. Just check what survived.
+      return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
+    });
+
+    // Determines what data to pass to ChartRenderer.
+    // noData check is evaluated first so promql panels with no results
+    // also get the transparent background instead of showing a skeleton.
+    const chartRendererData = computed(() => {
+      if (noData.value === "No Data") {
+        return { options: { backgroundColor: "transparent" } };
+      }
+      if (
+        panelSchema.value.queryType === "promql" ||
+        (panelData.value.chartType !== "geomap" &&
+          panelData.value.chartType !== "table" &&
+          panelData.value.chartType !== "maps" &&
+          loading.value)
+      ) {
+        return panelData.value;
+      }
+      return panelData.value;
     });
 
     // when the error changes, emit the error
@@ -1513,7 +1473,7 @@ export default defineComponent({
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
-        return "overflow-auto";
+        return "tw:overflow-auto";
       }
 
       return "";
@@ -1554,6 +1514,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      chartRendererData,
       metadata,
       tableRendererRef,
       tableRendererData,

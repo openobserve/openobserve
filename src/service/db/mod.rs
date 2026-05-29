@@ -40,6 +40,8 @@ pub mod model_pricing;
 pub mod model_pricing_sync;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
+#[cfg(feature = "enterprise")]
+pub mod org_storage_providers;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline;

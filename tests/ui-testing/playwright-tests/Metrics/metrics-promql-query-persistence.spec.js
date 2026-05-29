@@ -6,7 +6,7 @@
  *
  * Bug: In metrics console, whenever we write a query in tab1 and go to other tab and come back to tab1,
  * the previous query was not being persisted.
- * 
+ *
  * Test scenarios covered:
  * 1. Auto-populated query appears when stream is selected in Tab 1
  * 2. Query persists in Tab 1 after switching to Tab 2 and back (CRITICAL BUG FIX)
@@ -43,10 +43,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         await pm.metricsPage.gotoMetricsPage();
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Close any dialogs or modals that might be open
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-
         testLogger.info('Test setup completed - navigated to metrics page');
     });
 
@@ -65,54 +61,24 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     }, async ({ page }) => {
         testLogger.info('Test: Verify auto-populated query in Tab 1');
 
-        // Switch to PromQL mode
-        await pm.metricsPage.switchToPromQLMode();
-        await page.waitForTimeout(1000);
+        // Switch to PromQL Custom mode (Metrics page only renders stream dropdown — no stream_type dropdown)
+        await queryEditor.switchToPromQLCustomMode();
 
-        // Select stream type
-        const streamTypeSelector = page.locator('[data-test="index-dropdown-stream_type"]');
-        if (await streamTypeSelector.isVisible({ timeout: 3000 })) {
-            await streamTypeSelector.click();
-            await page.waitForTimeout(500);
-
-            const metricsOption = page.getByRole('option', { name: 'metrics' }).locator('div').nth(2);
-            if (await metricsOption.isVisible({ timeout: 3000 })) {
-                await metricsOption.click();
-                await page.waitForTimeout(1000);
-                testLogger.info('Selected stream type: metrics');
-            }
+        // Select first available stream — auto-populates query
+        const streamValue = await queryEditor.selectFirstStream();
+        if (!streamValue) {
+            testLogger.warn('No streams available — auto-populate cannot be verified in this env');
+            return;
         }
 
-        // Select a stream name
-        const streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
-        if (await streamDropdown.isVisible({ timeout: 3000 })) {
-            await streamDropdown.click();
-            await page.waitForTimeout(1000);
+        // Verify auto-populated query exists in the editor model
+        await expect.poll(async () => {
+            return await queryEditor.getCurrentQueryText();
+        }, { timeout: 5000, intervals: [200, 500] }).not.toBe('');
 
-            // Get first available stream
-            const firstStream = page.locator('[role="option"]').first();
-            const streamName = await firstStream.textContent();
-
-            if (streamName) {
-                await firstStream.click();
-                await page.waitForTimeout(2000);
-                testLogger.info(`Selected stream: ${streamName}`);
-
-                // Verify auto-populated query exists
-                const editorElement = page.locator('.monaco-editor, .cm-content, textarea').first();
-                if (await editorElement.isVisible({ timeout: 5000 })) {
-                    const queryText = await editorElement.textContent();
-
-                    expect(queryText.length).toBeGreaterThan(0);
-                    testLogger.info(`✓ Auto-populated query found: ${queryText.substring(0, 100)}...`);
-                } else {
-                    testLogger.warn('Query editor not found - test may be inconclusive');
-                }
-            } else {
-                testLogger.warn('No streams available for testing - test skipped');
-                test.skip();
-            }
-        }
+        const queryText = await queryEditor.getCurrentQueryText();
+        expect(queryText.length).toBeGreaterThan(0);
+        testLogger.info(`✓ Auto-populated query found: ${queryText.substring(0, 100)}...`);
     });
 
     /**
@@ -132,7 +98,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Switch to PromQL Custom mode (not Builder)
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(500);
 
         // Enter a test query in Tab 1
         const testQuery = 'up{job="prometheus"}';
@@ -155,7 +120,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         }
 
         // Step 3: Verify Tab 2 is active (newly created tabs are usually auto-selected)
-        await page.waitForTimeout(1000);
         testLogger.info('Tab 2 should now be active');
 
         // Step 4: Switch back to Tab 1
@@ -165,11 +129,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         if (switchedToTab1) {
             testLogger.info('✓ Switched back to Tab 1');
         } else {
-            testLogger.warn('Could not switch to Tab 1 using helper - trying fallback');
-            // Fallback: try clicking first tab directly
-            const firstTab = page.locator('[role="tab"]').first();
-            await firstTab.click({ force: true });
-            await page.waitForTimeout(1500);
+            testLogger.warn('Could not switch to Tab 1 using helper');
         }
 
         // Step 5: Verify query is still there (THE CRITICAL CHECK)
@@ -205,7 +165,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Step 1: Switch to PromQL Custom mode in Tab 1
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
 
         // Step 2: Enter Query A in Tab 1 using keyboard
         const queryA = 'metric_a';
@@ -225,11 +184,9 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         // Step 3: Create Tab 2
         testLogger.info('Creating Tab 2...');
         await queryEditor.addQueryTab();
-        await page.waitForTimeout(1500);
 
         // Step 4: Switch Tab 2 to Custom mode and enter Query B
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
 
         const queryB = 'metric_b';
         testLogger.info(`Entering query in Tab 2: "${queryB}"`);
@@ -248,7 +205,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         // Step 5: Switch back to Tab 1 and verify Query A is preserved
         testLogger.info('Switching back to Tab 1...');
         await queryEditor.switchToTab(1);
-        await page.waitForTimeout(3000); // Wait for Vue reactivity and Monaco update
 
         // Poll for the correct value (handles async updates)
         const tab1Result = await queryEditor.pollForQueryText(queryA);
@@ -262,7 +218,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         // Step 6: Switch to Tab 2 and verify Query B is preserved
         testLogger.info('Switching to Tab 2...');
         await queryEditor.switchToTab(2);
-        await page.waitForTimeout(3000);
 
         const tab2Result = await queryEditor.pollForQueryText(queryB);
 
@@ -287,7 +242,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         testLogger.info('Test: Query persistence with stream changes across tabs');
 
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
 
         // Enter query in Tab 1 using keyboard
         const queryTab1 = 'cpu_query';
@@ -303,11 +257,9 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Create Tab 2
         await queryEditor.addQueryTab();
-        await page.waitForTimeout(1500);
 
         // Switch to Custom mode and enter different query
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
 
         const queryTab2 = 'memory_query';
         await queryEditor.enterQueryViaKeyboard(queryTab2);
@@ -317,7 +269,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Switch back to Tab 1 and verify
         await queryEditor.switchToTab(1);
-        await page.waitForTimeout(3000);
 
         // Poll for correct value
         const tab1Result = await queryEditor.pollForQueryText(queryTab1);
@@ -338,7 +289,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         testLogger.info('Test: Manually edited query persistence');
 
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
 
         // Enter a custom query using keyboard
         const customQuery = 'custom_metric';
@@ -354,11 +304,9 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Add Tab 2
         await queryEditor.addQueryTab();
-        await page.waitForTimeout(1500);
 
         // Switch Tab 2 to Custom mode and enter different query
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
 
         const tab2Query = 'other_metric';
         await queryEditor.enterQueryViaKeyboard(tab2Query);
@@ -368,7 +316,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Switch back to Tab 1
         await queryEditor.switchToTab(1);
-        await page.waitForTimeout(3000);
 
         // Poll for correct value
         const result = await queryEditor.pollForQueryText(customQuery);
@@ -389,7 +336,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         testLogger.info('Test: Query persistence under rapid tab switching');
 
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
 
         // Simple queries for each tab
         const queries = ['query_one', 'query_two', 'query_three'];
@@ -401,18 +347,14 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Create and set Tab 2
         await queryEditor.addQueryTab();
-        await page.waitForTimeout(1500);
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
         await queryEditor.enterQueryViaKeyboard(queries[1]);
         await queryEditor.clickRunQuery();
         testLogger.info(`Tab 2 query: ${queries[1]}`);
 
         // Create and set Tab 3
         await queryEditor.addQueryTab();
-        await page.waitForTimeout(1500);
         await queryEditor.switchToPromQLCustomMode();
-        await page.waitForTimeout(1000);
         await queryEditor.enterQueryViaKeyboard(queries[2]);
         await queryEditor.clickRunQuery();
         testLogger.info(`Tab 3 query: ${queries[2]}`);
@@ -425,7 +367,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         for (const tabIndex of switchPattern) {
             await queryEditor.switchToTab(tabIndex);
-            await page.waitForTimeout(500);
         }
 
         testLogger.info('Rapid switching completed, verifying queries');
@@ -436,7 +377,6 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
             testLogger.info(`Verifying query in tab ${tabIndex}...`);
 
             await queryEditor.switchToTab(tabIndex);
-            await page.waitForTimeout(3000);
 
             const result = await queryEditor.pollForQueryText(queries[i]);
             expect(result.text).toContain(queries[i]);

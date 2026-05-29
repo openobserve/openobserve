@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify, Quasar } from "quasar";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -90,7 +88,6 @@ vi.mock("@/utils/commons", () => ({
 
 const platform = { is: { desktop: true, mobile: false }, has: { touch: false } };
 
-installQuasar({ plugins: [Notify], config: { platform } });
 
 const MOCK_FOLDERS = [
   { name: "Default", folderId: "folder-1" },
@@ -150,7 +147,7 @@ function mountComponent(routeQuery: Record<string, string> = {}) {
 
   const wrapper = mount(CreateReport, {
     global: {
-      plugins: [[Quasar, { platform }], i18n],
+      plugins: [[{ platform }], i18n],
       provide: { store, platform },
       stubs: {
         DateTime: { template: '<div data-test="datetime-stub" />' },
@@ -537,10 +534,13 @@ describe("CreateReport", () => {
       ({ wrapper } = mountComponent({ name: "existing-report" }));
       await flushPromises();
 
+      // setupEditingReport blanks dashboard fields; set them for validation to pass
+      wrapper.vm.formData.dashboards[0].folder = "folder-1";
+      wrapper.vm.formData.dashboards[0].dashboard = "dash-1";
+      wrapper.vm.formData.dashboards[0].tabs = "tab-1";
       wrapper.vm.emails = "user@example.com";
       wrapper.vm.scheduling = { date: "01-01-2025", time: "10:00", timezone: "UTC" };
       wrapper.vm.formData.title = "Updated Title";
-      // Quasar form ref not attached in jsdom — mock validate() to return true
       wrapper.vm.addReportFormRef = { validate: vi.fn().mockResolvedValue(true) };
 
       await wrapper.vm.saveReport();
@@ -586,14 +586,15 @@ describe("CreateReport", () => {
     it("should set step to 3 when title is missing", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
+      wrapper.vm.formData.name = "valid-name";
       wrapper.vm.formData.dashboards[0].folder = "folder-1";
       wrapper.vm.formData.dashboards[0].dashboard = "dash-1";
       wrapper.vm.formData.dashboards[0].tabs = "tab-1";
       wrapper.vm.formData.start = 1000;
-      wrapper.vm.formData.timezone = "UTC";
       wrapper.vm.formData.frequency = { interval: 1, type: "once", cron: "" };
       wrapper.vm.formData.title = "";
       wrapper.vm.emails = "valid@example.com";
+      wrapper.vm.scheduling = { date: "01-01-2025", time: "10:00", timezone: "UTC" };
       wrapper.vm.step = 1;
       await wrapper.vm.validateReportData();
       expect(wrapper.vm.step).toBe(3);

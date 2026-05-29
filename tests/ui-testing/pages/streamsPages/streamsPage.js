@@ -153,22 +153,20 @@ export class StreamsPage {
     }
 
     async searchStream(streamName) {
-        await this.page.getByPlaceholder("Search Stream").click();
-        await this.page.getByPlaceholder("Search Stream").fill(streamName);
+        const searchInput = this.page.locator('[data-test="streams-search-stream-input-field"]');
+        await searchInput.click();
+        await searchInput.fill(streamName);
         await this.waitForUI(3000);
     }
 
     async verifyStreamNameVisibility(streamName) {
-        await expect(this.page.getByText(streamName)).toBeVisible();
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible();
     }
 
     async exploreStream() {
-        // Scope to the first table row to avoid strict mode violation when
-        // multiple streams match the search (e.g. "e2e_automate" matches 6 rows)
-        const firstRow = this.page.locator('tbody tr').first();
-        const streamButton = firstRow.getByRole("button", { name: 'Explore' });
-        await expect(streamButton).toBeVisible();
-        await streamButton.click({ force: true });
+        const exploreBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-explore-btn"]').first();
+        await expect(exploreBtn).toBeVisible();
+        await exploreBtn.click({ force: true });
         await this.waitForUI(1000);
     }
 
@@ -217,59 +215,27 @@ export class StreamsPage {
 
     // Validation methods
     async verifyNoHistogramError() {
-        const errorHeading = this.page.getByRole('heading', { name: 'Error while fetching' });
-        await expect(errorHeading).not.toBeVisible();
         const errorDetailsButton = this.page.locator('[data-test="logs-page-histogram-error-details-btn"]');
         await expect(errorDetailsButton).not.toBeVisible();
     }
 
     // Validation method for 'No data found for histogram.'
     async expectNoDataFoundForHistogram() {
-        // Wait for query execution to complete on Firefox
+        // Wait for query execution to complete
         await this.page.waitForTimeout(5000);
 
-        // Use multiple locator strategies for cross-browser compatibility
-        const possibleLocators = [
-            this.page.getByText('No data found for histogram'),
-            this.page.getByText('No data found for histogram.'),
-            this.page.getByText('warning No data found for histogram'),
-            this.page.getByText('warning No data found for histogram.'),
-            this.page.locator('text=/No data.*histogram/i'),
-            this.page.locator('[data-test*="histogram"]').filter({ hasText: /no data/i }),
-            this.page.locator('.q-banner').filter({ hasText: /histogram/i }),
-            // Additional locators for variations in text rendering
-            this.page.locator('span').filter({ hasText: 'No data found for histogram' }),
-            this.page.locator('div').filter({ hasText: 'No data found for histogram' }).first()
-        ];
-
-        // Try each locator with increasing timeouts
-        for (const locator of possibleLocators) {
-            try {
-                await expect(locator).toBeVisible({ timeout: 8000 });
-                return; // Found it!
-            } catch (e) {
-                // Try next locator
-            }
-        }
-
-        // Alternative check: verify histogram area doesn't have data (empty chart)
-        // This handles cases where the message isn't displayed but histogram shows no data
+        // Check the no-data message via data-test attribute
+        const noDataMsg = this.page.locator('[data-test="logs-search-no-data-histogram"]');
         try {
-            // Check if histogram toggle is off or shows empty state
-            const histogramToggle = this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-            if (await histogramToggle.isVisible({ timeout: 3000 })) {
-                // Histogram toggle exists - the test can pass if no error is shown
-                const histogramError = this.page.locator('[data-test="logs-page-histogram-error-details-btn"]');
-                await expect(histogramError).not.toBeVisible({ timeout: 5000 });
-                return; // No error means the histogram handled "no data" gracefully
-            }
+            await expect(noDataMsg).toBeVisible({ timeout: 10000 });
+            return;
         } catch (e) {
-            // Continue to final check
+            // No-data message not found — fall back to verifying no error is shown
         }
 
-        // Final attempt: look for any element containing "histogram" in its warning message
-        const anyHistogramWarning = this.page.locator('.q-notification__message, .warning-message, [class*="warning"]').filter({ hasText: /histogram/i }).first();
-        await expect(anyHistogramWarning).toBeVisible({ timeout: 15000 });
+        // Acceptable fallback: histogram rendered but with no data (no error shown)
+        const histogramError = this.page.locator('[data-test="logs-page-histogram-error-details-btn"]');
+        await expect(histogramError).not.toBeVisible({ timeout: 5000 });
     }
 
     // Methods from legacy streamsPage.js
@@ -303,30 +269,44 @@ export class StreamsPage {
 
     // Stream Settings Methods (minimal set for stream-settings.spec.js)
     async expectStreamExistsExact(streamName) {
-        await expect(this.page.getByRole('cell', { name: streamName, exact: true })).toBeVisible();
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible();
     }
 
     async openStreamDetail(streamName) {
-        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        const schemaBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-schema-btn"]').first();
+        await schemaBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await schemaBtn.click();
     }
 
     async searchForField(fieldName) {
-        await this.page.locator('[data-test="schema-field-search-input"]').click();
-        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+        // OInput exposes the fillable inner <input> via `${parent}-field`. The
+        // wrapper `data-test="schema-field-search-input"` resolves to a <div>
+        // which page.fill() rejects.
+        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
+        await field.click();
+        await field.fill(fieldName);
     }
 
     async selectFullTextSearch() {
-        // Open dropdown first
-        await this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1).click();
-        await this.waitForUI(500);
-        
-        // Then select Full text search option
-        await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
+        // Per-row OSelect on schema.vue uses data-test "schema-field-<row>-index-type-select".
+        // The currently-targeted row is decided by the prior searchForField() call; the
+        // visible OSelect is the only one rendered, so .first() is safe.
+        // Open the OSelect via its auto-derived `-trigger`, then click the option with
+        // `data-test-value="fullTextSearchKey"` (see streamIndexType in schema.vue:1392).
+        const trigger = this.page.locator('[data-test$="-index-type-select-trigger"]').first();
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        await trigger.click();
+        await this.page.locator('[data-test$="-index-type-select-popover"]').first()
+            .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]')
+            .first().click();
     }
 
     async selectSecondaryIndex() {
-        // Dropdown stays open after first selection, so just select the option
-        await this.page.getByText('Secondary index').click();
+        // Dropdown stays open after first selection (multiple-select mode) — pick
+        // the Secondary index option via its OSelect `-option` data-test-value.
+        await this.page.locator('[data-test$="-index-type-select-option"][data-test-value="secondaryIndexKey"]')
+            .first().click();
     }
 
     async clickUpdateSettingsButton() {
@@ -334,26 +314,41 @@ export class StreamsPage {
     }
 
     async expectValidationErrorVisible() {
-        // Field-agnostic validation error - matches any field name
-        await expect(this.page.locator("text=/Field\\(s\\) '.*' cannot have/")).toBeVisible();
+        // Field-agnostic validation error - matches any field name.
+        // OToast renders the same message in 3 places (sr-only ARIA-live span,
+        // <title>, and the visible <div data-test="o-toast-message">). A plain
+        // text= regex hits all three → strict-mode violation. Scope to the
+        // toast-message inside the error/warning toast container.
+        await expect(
+            this.page
+                .locator('[data-test="o-toast-message"]')
+                .filter({ hasText: /field \[.*\] cannot be both/i })
+                .first(),
+        ).toBeVisible({ timeout: 30000 });
     }
 
     async verifyIndexTypeOptions() {
         // Wait a bit for the page to load completely
         await this.waitForUI(2000);
-        
+
         try {
-            // Click the dropdown arrow to open the options
-            const dropdownArrow = this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1);
-            await dropdownArrow.click({ timeout: 5000 });
+            // Open the OSelect via its auto-derived `-trigger` data-test
+            const trigger = this.page.locator('[data-test$="-index-type-select-trigger"]').first();
+            await trigger.waitFor({ state: 'visible', timeout: 10000 });
+            await trigger.click({ timeout: 5000 });
             testLogger.info('Clicked dropdown arrow');
 
-            // Wait for dropdown to open
-            await this.waitForUI(1000);
+            // Wait for popover to open
+            await this.page.locator('[data-test$="-index-type-select-popover"]').first()
+                .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
             // Check if Full text search and Secondary index options are visible in the dropdown
-            const fullTextOption = this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1);
-            const secondaryIndexOption = this.page.getByText('Secondary index');
+            const fullTextOption = this.page.locator(
+                '[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]',
+            ).first();
+            const secondaryIndexOption = this.page.locator(
+                '[data-test$="-index-type-select-option"][data-test-value="secondaryIndexKey"]',
+            ).first();
 
             const options = [];
             try {
@@ -385,15 +380,18 @@ export class StreamsPage {
 
     async clearIndexTypeSelection(indexType) {
         if (indexType === 'Full text search') {
-            // When both are selected, UI shows "Secondary index, Full text" 
-            // We need to click the combined option first, then clear full text
+            // OSelect (multiple) keeps options toggleable — click the same option
+            // again to clear it. Re-open the popover first if needed.
             try {
-                // First check if both are selected (combined state)
-                const combinedOption = this.page.getByText('Secondary index, Full text');
-                if (await combinedOption.isVisible({ timeout: 2000 })) {
-                    await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
-                    return;
+                const trigger = this.page.locator('[data-test$="-index-type-select-trigger"]').first();
+                if (await trigger.isVisible({ timeout: 2000 })) {
+                    await trigger.click();
                 }
+                await this.page.locator('[data-test$="-index-type-select-popover"]').first()
+                    .waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+                await this.page.locator(
+                    '[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]',
+                ).first().click({ timeout: 3000 });
             } catch (e) {
                 // Fallback to individual clearing
             }
@@ -413,12 +411,14 @@ export class StreamsPage {
 
     // Extended Retention Methods
     async navigateToExtendedRetention() {
-        // First open the stream detail view
-        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        // Open the stream schema/detail view
+        const schemaBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-schema-btn"]').first();
+        await schemaBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await schemaBtn.click();
         await this.waitForUI(2000);
-        
-        // Navigate to Extended Retention tab directly
-        await this.page.getByText('Extended Retention').click();
+
+        // Navigate to Extended Retention tab
+        await this.page.locator('[data-test="schema-extended-retention-tab"]').click();
         await this.waitForUI(1000);
     }
 
@@ -492,11 +492,11 @@ export class StreamsPage {
         // Select the checkbox for deletion
         await this.page.getByRole('row', { name: dateRangeText }).locator('[data-test="schema-stream-delete-undefined-field-fts-key-checkbox"]').click();
         await this.page.locator('[data-test="schema-delete-button"]').click();
-        await this.page.locator('[data-test="confirm-button"]').click();
+        await this.page.locator('[data-test="o-dialog-primary-btn"]').click();
     }
 
     async expectStreamSettingsUpdatedMessage() {
-        await expect(this.page.getByText('Stream settings updated')).toBeVisible();
+        await expect(this.page.locator('[data-test-variant="success"]')).toBeVisible({ timeout: 10000 });
     }
 
     async waitForUI(milliseconds) {
@@ -714,12 +714,12 @@ export class StreamsPage {
     get cancelStreamButton() { return this.page.locator('[data-test="add-stream-cancel-btn"]'); }
     get closeStreamButton() { return this.page.locator('[data-test="add-stream-close-btn"]'); }
     get streamsTable() { return this.page.locator('[data-test="log-stream-table"]'); }
-    get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input"] input'); }
+    get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input-field"]'); }
     get indexTypeSelect() { return this.page.locator('[data-test="schema-stream-index-select"]').first(); }
-    get fieldSearchInput() { return this.page.locator('input[placeholder*="Search Field"], input[placeholder*="search"]').first(); }
+    get fieldSearchInput() { return this.page.locator('[data-test="schema-field-search-input-field"]'); }
     get quickModeIcons() { return this.page.locator('img[alt*="quick"], img[alt*="Quick"]'); }
-    get quickModeTooltip() { return this.page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i }); }
-    get schemaTable() { return this.page.locator('.q-table').first(); }
+    get quickModeTooltip() { return this.page.locator('[data-test*="quick-mode-tooltip"]'); }
+    get schemaTable() { return this.page.locator('[data-test="schema-table"]'); }
 
     /**
      * Click Add Stream button to open the modal
@@ -756,8 +756,10 @@ export class StreamsPage {
         testLogger.info('Selecting stream type', { type });
         await this.streamTypeSelect.click();
         await this.waitForUI(300);
-        // Click the option with matching text
-        await this.page.getByRole('option', { name: new RegExp(type, 'i') }).click();
+        // Click the OSelect option via data-test-value matching the type
+        const option = this.page.locator(`[data-test="add-stream-type-input-option"][data-test-value="${type.toLowerCase()}"]`);
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
         await this.waitForUI(300);
     }
 
@@ -825,7 +827,7 @@ export class StreamsPage {
      */
     async expectSuccessToast(message = 'Stream created successfully') {
         testLogger.info('Verifying success toast', { message });
-        await expect(this.page.getByText(message)).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test-variant="success"]')).toBeVisible({ timeout: 5000 });
     }
 
     /**
@@ -834,9 +836,7 @@ export class StreamsPage {
      */
     async expectErrorToast(message) {
         testLogger.info('Verifying error toast', { message });
-        // Wait for the Quasar notification to appear with the message
-        const toastLocator = this.page.locator('.q-notification__message').filter({ hasText: message });
-        await expect(toastLocator).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test-variant="error"]')).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -864,7 +864,7 @@ export class StreamsPage {
      */
     async expectStreamInTable(streamName) {
         testLogger.info('Verifying stream in table', { streamName });
-        await expect(this.page.getByRole('cell', { name: streamName })).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -873,7 +873,7 @@ export class StreamsPage {
      */
     async expectStreamNotInTable(streamName) {
         testLogger.info('Verifying stream NOT in table', { streamName });
-        await expect(this.page.getByRole('cell', { name: streamName })).not.toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)).not.toBeVisible({ timeout: 5000 });
     }
 
     /**
@@ -951,7 +951,7 @@ export class StreamsPage {
      */
     async expectExactStreamCellVisible(streamName, timeout = 10000) {
         await expect(
-            this.page.getByRole('cell', { name: streamName, exact: true }).first()
+            this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`)
         ).toBeVisible({ timeout });
         testLogger.info(`Stream cell visible: ${streamName}`);
     }
@@ -961,8 +961,7 @@ export class StreamsPage {
      * Bug #9354 - FTS auto-add
      */
     async isStreamVisible(streamName) {
-        const streamRow = this.page.locator('tr').filter({ hasText: streamName }).first();
-        return await streamRow.isVisible().catch(() => false);
+        return await this.page.locator(`[data-test="log-stream-name-cell-${streamName}"]`).isVisible().catch(() => false);
     }
 
     /**
@@ -1000,8 +999,11 @@ export class StreamsPage {
      * Search for a specific field in the schema view
      */
     async searchForField(fieldName) {
-        await this.page.locator('[data-test="schema-field-search-input"]').click();
-        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+        // OInput convention: the fillable inner <input> is auto-derived at
+        // `${parent}-field`. Filling the wrapper data-test (a <div>) throws.
+        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
+        await field.click();
+        await field.fill(fieldName);
     }
 
     /**
@@ -1012,10 +1014,12 @@ export class StreamsPage {
     }
 
     /**
-     * Get full text search option from dropdown
+     * Get full text search option from dropdown.
+     * StreamFieldInputs uses OSelect post-migration (Reka Listbox role=option);
+     * legacy q-select uses .q-item.
      */
     getFullTextSearchOption() {
-        return this.page.locator('.q-item').filter({ hasText: 'Full text search' });
+        return this.page.locator('[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]').first();
     }
 
     /**

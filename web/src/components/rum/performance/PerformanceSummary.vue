@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @variablesManagerReady="onVariablesManagerReady"
       >
         <template v-slot:before_panels>
-          <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
-            <div class="text-center tw:w-[25%]">
+          <div class="tw:flex tw:items-center q-pb tw:pt-3 tw:text-base tw:font-medium tw:font-bold">
+            <div class="tw:text-center tw:w-[25%]">
               {{ t("rum.webVitalsLabel") }}
             </div>
-            <div class="text-center tw:w-[25%]">
+            <div class="tw:text-center tw:w-[25%]">
               {{ t("rum.errorLabel") }}
             </div>
-            <div class="text-center tw:w-[25%]">
+            <div class="tw:text-center tw:w-[25%]">
               {{ t("rum.sessionLabel") }}
             </div>
           </div>
@@ -47,15 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="2.5rem"
+        <OSpinner
+          size="md"
           class="tw:mx-auto tw:block"
+          data-test="performance-summary-loading-indicator"
         />
-        <div class="text-center full-width">Loading Dashboard</div>
+        <div class="tw:text-center tw:w-full">Loading Dashboard</div>
       </div>
     </div>
   </div>
@@ -83,11 +83,13 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import overviewDashboard from "@/utils/rum/overview.json";
 import { cloneDeep } from "lodash-es";
 import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "PerformanceSummary",
   components: {
     RenderDashboardCharts,
+    OSpinner,
   },
   props: {
     dateTime: {

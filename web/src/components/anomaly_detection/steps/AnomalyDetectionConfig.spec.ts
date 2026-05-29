@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
@@ -46,7 +45,6 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Mount factory — keeps stubs and global plugins in one place
@@ -131,22 +129,22 @@ describe("AnomalyDetectionConfig", () => {
       expect(sql).toContain("sum(bytes) AS value");
     });
 
-    it("should use p95(latency) AS value when detection_function is p95", async () => {
+    it("should use approx_percentile_cont(latency, 0.95) AS value when detection_function is p95", async () => {
       wrapper = mountConfig({
         detection_function: "p95",
         detection_function_field: "latency",
       });
       const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("p95(latency) AS value");
+      expect(sql).toContain("approx_percentile_cont(latency, 0.95) AS value");
     });
 
-    it("should use p99(latency) AS value when detection_function is p99", async () => {
+    it("should use approx_percentile_cont(latency, 0.99) AS value when detection_function is p99", async () => {
       wrapper = mountConfig({
         detection_function: "p99",
         detection_function_field: "latency",
       });
       const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("p99(latency) AS value");
+      expect(sql).toContain("approx_percentile_cont(latency, 0.99) AS value");
     });
 
     it("should include the stream name in FROM clause", async () => {

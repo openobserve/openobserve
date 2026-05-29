@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
-import { Quasar } from 'quasar';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import GetStarted from './GetStarted.vue';
@@ -12,15 +11,10 @@ vi.mock('@/services/billings', () => ({
   },
 }));
 
-// Mock useQuasar
-const mockNotify = vi.fn();
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
+// Mock toast function
+vi.mock('@/lib/feedback/Toast/useToast', () => {
   return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
+    toast: vi.fn(),
   };
 });
 
@@ -44,9 +38,13 @@ const mockI18n = createI18n({
 
 describe('GetStarted.vue', () => {
   let wrapper: VueWrapper;
+  let mockToast: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const toastModule = await import('@/lib/feedback/Toast/useToast');
+    mockToast = vi.mocked(toastModule.toast);
+    mockToast.mockClear();
   });
 
   afterEach(() => {
@@ -58,7 +56,7 @@ describe('GetStarted.vue', () => {
   const createWrapper = (storeOverride?: any) => {
     return mount(GetStarted, {
       global: {
-        plugins: [Quasar, mockI18n, storeOverride || mockStore],
+        plugins: [mockI18n, storeOverride || mockStore],
       },
     });
   };
@@ -194,9 +192,9 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Please fill all the fields',
-        color: 'negative',
+        variant: 'warning',
       });
     });
 
@@ -266,9 +264,9 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Thank you for your feedback',
-        color: 'positive',
+        variant: 'success',
       });
     });
 
@@ -314,9 +312,9 @@ describe('GetStarted.vue', () => {
 
       await vm.onSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Something went wrong',
-        color: 'negative',
+        variant: 'error',
       });
     });
 

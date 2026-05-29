@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="q-pa-sm">
+    <div class="tw:p-2">
       <CopyContent class="copy-content-container-cls" :content="content" />
     </div>
     <div>
       <a
         href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-metric-streams-setup-datalake.html"
-        class="q-ml-lg text-bold"
+        class="tw:ml-4 tw:font-bold"
         style="padding-right: 2px"
         target="_blank"
         title="AWS CloudWatch Metrics - Set up a custom metric stream with Firehose"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       to explore the process of setting up a CloudWatch custom metric stream
       with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry
       1.0 as the output format.
-      <p class="q-ml-lg text-italic" style="padding-right: 2px">
+      <p class="tw:ml-4 tw:italic" style="padding-right: 2px">
         Note: Output is available under Logs with stream name
         'cloudwatch_metrics'.
       </p>

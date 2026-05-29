@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod bloom;
 pub mod cli;
+mod gc;
 mod http;
 mod load;
 mod query_optimiser;
+mod stream;
 mod test;

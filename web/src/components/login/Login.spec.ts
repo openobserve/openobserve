@@ -13,26 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Login from "@/components/login/Login.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Mock useQuasar
+// Mock toast notification
 const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 // Mock dependencies
 vi.mock("@/services/auth", () => ({
@@ -77,9 +69,6 @@ vi.mock("@openobserve/browser-rum", () => ({
   },
 }));
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -92,32 +81,23 @@ describe("Login", () => {
   
   // Helper function to mount component with mocks
   const mountComponentWithMocks = (options: any = {}) => {
-    const mockNotify = options.mockNotify || vi.fn();
     const mockResetValidation = options.mockResetValidation || vi.fn();
-    
+
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, options.customStore || store, router],
-        provide: {
-          $q: { notify: mockNotify },
-        },
         ...options.globalOptions,
       },
       ...options.mountOptions,
     });
-    
+
     // Set up component mocks after mounting
-    Object.defineProperty(wrapper.vm, '$q', {
-      value: { notify: mockNotify },
-      writable: true,
-    });
-    
     Object.defineProperty(wrapper.vm, 'loginform', {
       value: { value: { resetValidation: mockResetValidation } },
       writable: true,
     });
-    
-    return { mockNotify, mockResetValidation };
+
+    return { mockResetValidation };
   };
 
   beforeEach(async () => {
@@ -407,14 +387,12 @@ describe("Login", () => {
 
   // Test 15: selected method shows notification
   it("should show notification when selected method is called", () => {
-    const mockNotify = vi.fn();
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
       },
     });
 
-    wrapper.vm.$q = { notify: mockNotify };
     const item = { label: "Test Item" };
     wrapper.vm.selected(item);
 
@@ -798,7 +776,7 @@ describe("Login", () => {
     });
 
     const expectedProperties = [
-      't', 'name', 'password', 'confirmpassword', 'email', 'loginform',
+      't', 'name', 'password', 'confirmpassword', 'email',
       'submitting', 'onSignIn', 'tab', 'innerTab', 'store', 'getImageURL',
       'loginAsInternalUser', 'showSSO', 'showInternalLogin', 'loginWithSSo',
       'config', 'autoRedirectDexLogin'
@@ -991,14 +969,12 @@ describe("Login", () => {
   });
 
   it("should have selected method that accepts parameters", () => {
-    const mockNotify = vi.fn();
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, store, router],
       },
     });
 
-    wrapper.vm.$q = { notify: mockNotify };
     expect(() => wrapper.vm.selected({ label: "test" })).not.toThrow();
   });
 
@@ -1022,8 +998,7 @@ describe("Login", () => {
 
   it("should handle failed sign in form validation reset", async () => {
     const authService = await import("@/services/auth");
-    const mockResetValidation = vi.fn();
-    
+
     (authService.default.sign_in_user as any).mockResolvedValueOnce({
       data: {
         status: false,
@@ -1039,10 +1014,14 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "wrongpassword";
-    wrapper.vm.loginform = { resetValidation: mockResetValidation };
-    
+
     await wrapper.vm.onSignIn();
-    expect(mockResetValidation).toHaveBeenCalled();
+
+    // submitting is reset and error toast is shown
+    expect(wrapper.vm.submitting).toBe(false);
+    expect(mockNotify).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Invalid credentials" }),
+    );
   });
 
   // Test 42: loginWithSSo handles null response

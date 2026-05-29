@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import TransformSelector from "@/plugins/logs/TransformSelector.vue";
 import i18n from "@/locales";
 import { ref } from "vue";
-import { Quasar } from "quasar";
 
 // Create mock objects that can be modified per test
 const mockSearchObj = {
@@ -58,6 +57,7 @@ vi.mock("@/composables/useLogs/logsUtils", () => ({
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mocked-${path}`),
 }));
+
 
 describe("TransformSelector.vue", () => {
   let store: any;
@@ -102,7 +102,7 @@ describe("TransformSelector.vue", () => {
     return mount(TransformSelector, {
       props,
       global: {
-        plugins: [store, i18n, Quasar],
+        plugins: [store, i18n],
         mocks: {
           $q,
         },
@@ -111,7 +111,7 @@ describe("TransformSelector.vue", () => {
           "q-btn-group": { template: "<div class='q-btn-group'><slot /></div>" },
           "q-btn-dropdown": { template: "<div class='q-btn-dropdown'><slot /></div>" },
           "q-btn": { template: "<button class='q-btn'><slot /></button>" },
-          "q-icon": { template: "<span class='q-icon' />" },
+          "OIcon": { template: "<span class='OIcon' />" },
           "q-tooltip": { template: "<div class='q-tooltip'><slot /></div>" },
           "q-list": { template: "<div class='q-list'><slot /></div>" },
           "q-item": { template: "<div class='q-item'><slot /></div>" },
@@ -136,29 +136,35 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
-          mocks: {
-            $q,
-          },
+          plugins: [store, i18n],
           stubs: {
-            "q-toggle": { template: "<div class='q-toggle' />" },
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "q-icon": true,
-            "q-tooltip": true,
+            OButtonGroup: { template: "<div><slot /></div>" },
+            OSwitch: {
+              template: '<div data-test="logs-search-bar-show-query-toggle-btn" />',
+              props: ["modelValue", "size", "disabled"],
+            },
+            ODropdown: {
+              template: "<div><slot name='trigger' /><slot /></div>",
+              props: ["open"],
+              emits: ["update:open"],
+            },
+            OButton: true,
+            OIcon: true,
+            OTooltip: true,
+            OSelect: true,
+            OInput: true,
           },
         },
       });
 
-      expect(wrapper.find(".q-toggle").exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-show-query-toggle-btn"]').exists()).toBe(true);
     });
 
     it("should render save button", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -169,7 +175,7 @@ describe("TransformSelector.vue", () => {
             "q-btn": {
               template: '<button class="save-btn" />',
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             OButton: {
               name: 'OButton',
@@ -192,7 +198,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -201,7 +207,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             "q-select": {
               template: '<div class="q-select"><slot /></div>',
@@ -220,7 +226,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -231,7 +237,7 @@ describe("TransformSelector.vue", () => {
               template: "<div><slot /></div>",
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             "q-input": true,
             "q-select": true,
@@ -248,7 +254,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -257,7 +263,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             "q-input": true,
             "q-select": true,
@@ -274,7 +280,7 @@ describe("TransformSelector.vue", () => {
           functionOptions: [],
         },
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -285,7 +291,7 @@ describe("TransformSelector.vue", () => {
               template: "<div><slot /></div>",
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
@@ -320,7 +326,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -331,7 +337,7 @@ describe("TransformSelector.vue", () => {
               template: "<div><slot /></div>",
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
@@ -353,7 +359,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -364,7 +370,7 @@ describe("TransformSelector.vue", () => {
             "q-btn": {
               template: '<button @click="$attrs.onClick" />',
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             OButton: {
               name: 'OButton',
@@ -397,7 +403,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -408,7 +414,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -423,7 +429,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -434,7 +440,7 @@ describe("TransformSelector.vue", () => {
             "q-btn": {
               template: '<button :disable="$attrs.disable" />',
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -457,7 +463,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -470,7 +476,7 @@ describe("TransformSelector.vue", () => {
               template: '<div :disable="$attrs.disable" />',
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -488,7 +494,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -499,7 +505,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -516,7 +522,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -527,7 +533,7 @@ describe("TransformSelector.vue", () => {
             "q-btn": {
               template: '<button :disable="$attrs.disable" />',
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -545,7 +551,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -556,7 +562,7 @@ describe("TransformSelector.vue", () => {
               template: '<div class="dropdown" :disable="$attrs.disable"><slot /></div>',
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -574,7 +580,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -585,7 +591,7 @@ describe("TransformSelector.vue", () => {
               template: '<div :label="$attrs.label"><slot /></div>',
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -600,7 +606,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -609,7 +615,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -627,7 +633,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -638,7 +644,7 @@ describe("TransformSelector.vue", () => {
               template: '<div :label="$attrs.label"><slot /></div>',
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -656,7 +662,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -665,7 +671,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -685,7 +691,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -694,7 +700,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -713,7 +719,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -722,7 +728,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -743,7 +749,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [darkStore, i18n, Quasar],
+          plugins: [darkStore, i18n],
           mocks: {
             $q,
           },
@@ -755,7 +761,7 @@ describe("TransformSelector.vue", () => {
             },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
             OButton: {
               name: 'OButton',
@@ -796,7 +802,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -807,7 +813,7 @@ describe("TransformSelector.vue", () => {
               template: '<div :label="$attrs.label"><slot /></div>',
             },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -827,7 +833,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -836,7 +842,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -855,7 +861,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -864,7 +870,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": true,
           },
         },
@@ -883,7 +889,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -892,7 +898,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": { template: "<div class='tooltip'><slot /></div>" },
           },
         },
@@ -910,7 +916,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n, Quasar],
+          plugins: [store, i18n],
           mocks: {
             $q,
           },
@@ -919,7 +925,7 @@ describe("TransformSelector.vue", () => {
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": { template: "<div><slot /></div>" },
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-tooltip": { template: "<div class='tooltip'><slot /></div>" },
           },
         },

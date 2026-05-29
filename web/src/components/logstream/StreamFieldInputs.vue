@@ -1,6 +1,6 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
+    <div v-if="showHeader" data-test="alert-conditions-text" class="tw:text-[var(--o2-text-label)] tw:text-sm">
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!fields.length">
@@ -8,10 +8,10 @@
         data-test="add-stream-add-field-btn"
         variant="outline"
         size="sm-action"
-        class="q-mt-sm"
+        icon-left="add"
+        class="tw:mt-2"
         @click="addApiHeader"
       >
-        <Plus :size="14" class="tw:mr-1" />
         {{ t("logStream.addField") }}
       </OButton>
     </template>
@@ -19,136 +19,69 @@
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class="flex justify-start items-end q-col-gutter-sm"
-        :data-test="`alert-conditions-${index + 1}`"
+        class="tw:flex tw:flex-wrap tw:items-end tw:gap-2 tw:mt-2"
+        :data-test="`add-stream-field-row-${index}`"
       >
-        <div
-          data-test="add-stream-field-name-input"
-          class="q-ml-none o2-input flex items-center"
-        >
-          <q-input
+        <div data-test="add-stream-field-name-input" class="tw:flex-1 tw:min-w-[160px]">
+          <OInput
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
-            class="q-py-sm"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) => !!val.trim() || t('logStream.fieldRequired'),
-            ]"
+            :error="!!fieldNameErrors[index]"
+            :error-message="fieldNameErrors[index] || ''"
+            @update:model-value="fieldNameErrors[index] = ''"
             tabindex="0"
-            :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
         </div>
-        <!-- <div
-          v-if="visibleInputs.type"
-          data-test="alert-conditions-operator-select"
-          class="q-ml-none o2-input"
-        >
-          <q-select
-            v-model="field.type"
-            :options="fieldTypes"
-            :popup-content-style="{ textTransform: 'capitalize' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 120px"
-            @update:model-value="emits('input:update', 'conditions', field)"
-          />
-        </div> -->
         <div
           v-if="visibleInputs.index_type"
-          data-test="add-stream-field-type-select-input"
-          class="q-ml-none flex items-end o2-input"
+          data-test="add-stream-field-index-type-select"
+          class="tw:min-w-[140px]"
         >
-          <q-select
+          <OSelect
             v-model="field.index_type"
-            :options="streamIndexType"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            class="q-py-sm"
+            :options="getIndexTypeOptions(field)"
             multiple
-            :max-values="2"
-            map-options
-            :option-disable="(_option: any) => disableOptions(field, _option)"
-            emit-value
             clearable
-            stack-label
-            borderless
-            dense
-            use-input
-            fill-input
-            style="width: 250px"
-            :placeholder="
-              !isFocused && (!field.index_type || field.index_type.length === 0)
-                ? t('logStream.indexType')
-                : ''
-            "
+            :placeholder="t('logStream.indexType')"
             @update:model-value="emits('input:update', 'conditions', field)"
-            @focus="handleFocus"
-            @blur="handleBlur"
           />
         </div>
         <div
           v-if="visibleInputs.data_type"
-          data-test="add-stream-field-type-select-input"
-          class="q-ml-none flex items-end o2-input"
+          data-test="add-stream-field-data-type-select"
+          class="tw:min-w-[100px]"
         >
-          <q-select
+          <OSelect
             v-model="field.type"
             :options="dataTypes"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            class="q-py-sm"
-            option-label="label"
-            option-value="value"
+            label-key="label"
+            value-key="value"
             clearable
-            borderless
-            dense
-            use-input
-            fill-input
-            hide-selected
-            emit-value
-            style="width: 250px"
-            :placeholder="
-              !isDataTypeFocused && (!field.type || field.type.length === 0)
-                ? t('logStream.dataType') + ' *'
-                : ''
-            "
-            :rules="[(val: any) => !!val || t('logStream.dataTypeRequired')]"
-            @update:model-value="emits('input:update', 'conditions', field)"
-            @focus="handleDataTypeFocus"
-            @blur="handleDataTypeBlur"
+            :placeholder="t('logStream.dataType') + ' *'"
+            :error="!!fieldDataTypeErrors[index]"
+            :error-message="fieldDataTypeErrors[index] || ''"
+            @update:model-value="fieldDataTypeErrors[index] = ''; emits('input:update', 'conditions', field)"
           />
         </div>
-        <div class="q-ml-none" style="margin-bottom: 8px">
+        <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
           <OButton
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
             variant="outline"
             size="icon-sm"
-            class="q-ml-xs"
-            :disabled="
-              field.name === '' || (fields.length === 1 && field.name == '')
-            "
-            :title="t('alert_templates.edit')"
-            @click="addApiHeader()"
-          >
-            <Plus :size="14" />
-          </OButton>
+            :disabled="!field.name.trim()"
+            :title="t('logStream.addField')"
+            icon-left="add"
+            @click="addApiHeader"
+          />
           <OButton
             data-test="add-stream-delete-field-btn"
             variant="outline-destructive"
             size="icon-sm"
-            class="q-ml-xs"
-            :title="t('alert_templates.edit')"
+            :title="t('logStream.deleteField')"
+            icon-left="delete"
             @click="deleteApiHeader(field, index)"
-          >
-            <Trash2 :size="14" />
-          </OButton>
+          />
         </div>
       </div>
     </template>
@@ -157,13 +90,13 @@
 
 <script lang="ts" setup>
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Plus, Trash2 } from "lucide-vue-next";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
-defineProps({
+const props = defineProps({
   fields: {
     type: Array,
     default: () => [],
@@ -228,6 +161,8 @@ const dataTypes = [
 const store = useStore();
 
 const { t } = useI18n();
+const fieldNameErrors = ref<string[]>([]);
+const fieldDataTypeErrors = ref<string[]>([]);
 
 const isFocused = ref(false);
 //repetitive need to refactor
@@ -240,6 +175,13 @@ const deleteApiHeader = (field: any, index: number) => {
 
 const addApiHeader = () => {
   emits("add");
+};
+
+const getIndexTypeOptions = (field: any) => {
+  return streamIndexType.map((option) => ({
+    ...option,
+    disabled: disableOptions(field, option),
+  }));
 };
 
 const disableOptions = (schema: any, option: any) => {
@@ -298,8 +240,25 @@ const handleDataTypeBlur = () => {
   isDataTypeFocused.value = false;
 };
 
+const validate = () => {
+  const fields = props.fields as any[];
+  fields.forEach((field, index) => {
+    if (!field.name.trim()) {
+      fieldNameErrors.value[index] = t("logStream.fieldRequired");
+    }
+    if (props.visibleInputs.data_type && !field.type) {
+      fieldDataTypeErrors.value[index] = t("logStream.dataTypeRequired");
+    }
+  });
+  return fields.every(
+    (field) =>
+      field.name.trim() && (!props.visibleInputs.data_type || field.type),
+  );
+};
+
 // Expose methods and data for testing
 defineExpose({
+  validate,
   deleteApiHeader,
   addApiHeader,
   disableOptions,
@@ -316,19 +275,5 @@ defineExpose({
 });
 </script>
 
-<style lang="scss">
-.add-field {
-  .q-icon {
-    margin-right: 4px !important;
-    font-size: 15px !important;
-  }
-}
 
-.alerts-condition-action {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
-}
-</style>
+

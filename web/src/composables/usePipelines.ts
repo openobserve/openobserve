@@ -1,12 +1,11 @@
 import pipelines from "@/services/pipelines";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import destinationService from "@/services/alert_destination";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 export const usePipelines = () => {
     const store = useStore();
-    const $q = useQuasar();
 
     async function getUsedStreamsList() {
         const org_identifier = store.state.selectedOrganization.identifier;
@@ -15,12 +14,10 @@ export const usePipelines = () => {
         return res.data.list;
       } catch (error:any) {
         if(error.response.status != 403){
-          $q.notify({
-          message: error.response?.data?.message || "Error fetching used streams",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
+          toast({
+            variant: "error",
+            message: error.response?.data?.message || "Error fetching used streams",
+          });
         }
        return [];
       }

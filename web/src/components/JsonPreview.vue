@@ -8,10 +8,10 @@
       :class="copyButtonClass"
       @click="copyToClipboard"
     >
-      <q-icon name="content_copy" />
-      <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
+      <OIcon name="content-copy" size="sm" />
+      <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
-    <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
+    <div class="tw:pb-1 tw:flex tw:justify-start tw:items-center tw:px-3 copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
     </div>
@@ -33,10 +33,10 @@
             data-test="json-preview-field-dropdown-btn"
             size="xs"
             variant="ghost"
-            class="q-ml-sm log-json-field-dropdown-btn"
+            class="tw:ml-2 log-json-field-dropdown-btn"
             aria-label="Add icon"
           >
-            <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+            <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
           </OButton>
         </template>
         <div class="logs-table-list tw:min-w-[180px]">
@@ -75,13 +75,14 @@
 import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard as quasarCopyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard as copyTextToClipboard } from "@/utils/clipboard";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-
 export default {
   name: "JsonPreview",
   components: {
@@ -89,6 +90,8 @@ export default {
     ChunkedContent,
     OButton,
     ODropdown,
+    OTooltip,
+    OIcon,
   },
   props: {
     value: {
@@ -113,17 +116,14 @@ export default {
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const slots = useSlots();
 
     const hasFieldDropdownSlot = computed(() => !!slots["field-dropdown"]);
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const copyToClipboard = () => {
-      quasarCopyToClipboard(JSON.stringify(props.value, null, 2));
-      $q.notify({
-        type: "positive",
-        message: t("common.copyToClipboard") + "!",
+      copyTextToClipboard(JSON.stringify(props.value, null, 2), {
+        successMessage: t("common.copyToClipboard") + "!",
         timeout: 1500,
       });
       emit("copy", props.value);

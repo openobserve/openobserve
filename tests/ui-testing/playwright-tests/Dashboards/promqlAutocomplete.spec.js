@@ -14,13 +14,14 @@
  *   [data-test="dashboard-promql-query-type"]    — PromQL mode button
  *   [data-test="dashboard-custom-query-type"]    — Custom mode button
  *   [data-test="dashboard-builder-query-type"]   — Builder mode button
- *   .monaco-editor .suggest-widget               — Monaco autocomplete widget
- *   .monaco-editor .suggest-widget .monaco-list-row — Individual suggestion items
  *
  * METRICS PAGE ELEMENTS (verified data-test attributes):
  *   [data-test="dashboard-promql-query-type"]    — PromQL mode button (same component)
  *   [data-test="dashboard-custom-query-type"]    — Custom mode button (same component)
  *   [data-test="metrics-apply"]                  — Run Query button
+ *
+ * Selectors / Monaco access live in the PO (pages/dashboardPages/dashboard-promql-editor.js);
+ * this spec only calls PO methods so it complies with the data-test-only selector policy.
  */
 
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
@@ -38,32 +39,51 @@ const generateUniqueDashboardName = () =>
   "Dashboard_PromQL_AC_" + Math.random().toString(36).slice(2, 9) + "_" + Date.now();
 
 /**
- * Clear Monaco editor content in a cross-platform way.
- * Triple-click selects the current line; Ctrl+A selects all; Backspace removes.
+ * Trigger PromQL suggestions and poll the Monaco suggest controller until at
+ * least one completion item appears (or the deadline elapses).
+ *
+ * The streamResults-driven autocomplete watcher (Fix 2) populates metric
+ * keywords asynchronously after `selectStreamType("metrics")` resolves the
+ * stream list. On a slow backend the first Ctrl+Space can fire before the
+ * keywords land, so we re-trigger via dismiss + Ctrl+Space and re-check.
+ *
+ * @returns {Promise<number>} the final suggestion count (0 if none arrived)
  */
-const clearMonacoEditor = async (page, monacoEditor) => {
-  await monacoEditor.click({ clickCount: 3 });
-  await page.keyboard.press('Control+a');
-  await page.keyboard.press('Backspace');
-};
-
-/**
- * Wait for the Monaco suggestions widget to become visible and for at least one
- * suggestion row to appear.
- */
-const waitForSuggestionsStable = async (page, timeout = 10000) => {
-  const suggestWidget = page.locator('.monaco-editor .suggest-widget');
-  await suggestWidget.waitFor({ state: 'visible', timeout });
-  const suggestionRows = page.locator('.monaco-editor .suggest-widget .monaco-list-row');
-  await suggestionRows.first().waitFor({ state: 'visible', timeout: 5000 });
-  return { suggestWidget, suggestionRows };
+const triggerAndWaitForSuggestions = async (promqlEditor, { totalTimeoutMs = 30000, perTryTimeoutMs = 5000 } = {}) => {
+  const deadline = Date.now() + totalTimeoutMs;
+  let lastCount = 0;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      // Programmatic trigger via Monaco's action — survives transient focus
+      // losses better than a raw Ctrl+Space, while still being deterministic.
+      await promqlEditor.page.evaluate(() => {
+        const m = window.monaco;
+        const editors = m?.editor?.getEditors?.() || [];
+        const editor = editors[editors.length - 1];
+        if (!editor) return;
+        editor.focus();
+        editor.trigger('e2e', 'editor.action.triggerSuggest', {});
+      });
+      await promqlEditor.waitForSuggestionsReady(perTryTimeoutMs);
+      lastCount = await promqlEditor.getSuggestionCount();
+      if (lastCount > 0) return lastCount;
+    } catch (err) {
+      lastError = err;
+      // No completion items yet — re-trigger after dismissing the popup.
+    }
+    await promqlEditor.dismissSuggestions();
+  }
+  if (lastError) {
+    testLogger.warn(`Suggestions widget not visible: ${lastError.message}`);
+  }
+  return lastCount;
 };
 
 /**
  * Navigate a dashboard add-panel flow into PromQL Custom mode.
- * Returns the Monaco editor container locator (data-test="dashboard-panel-query-editor").
- *
- * Skips the test (via test.skip) if the PromQL button is not available.
+ * Returns true if the editor is ready; false if PromQL is unavailable
+ * (in which case the panel is discarded and the dashboard cleaned up).
  */
 const setupPromQLCustomPanel = async (page, pm, dashboardName, panelName) => {
   // Navigate to dashboards
@@ -81,31 +101,26 @@ const setupPromQLCustomPanel = async (page, pm, dashboardName, panelName) => {
   await pm.chartTypeSelector.selectStreamType("metrics");
 
   // Check PromQL button is available (metrics-only feature)
-  const promqlButton = page.locator('[data-test="dashboard-promql-query-type"]');
-  const isPromqlVisible = await promqlButton.isVisible({ timeout: 5000 }).catch(() => false);
+  const isPromqlVisible = await pm.dashboardPromQLEditor.isPromqlAvailable();
 
   if (!isPromqlVisible) {
     testLogger.warn('PromQL button not visible — skipping test');
-    await page.locator('[data-test="dashboard-panel-discard"]').click().catch(() => {});
+    await pm.dashboardPromQLEditor.discardPanelIfVisible();
     await deleteDashboard(page, dashboardName).catch(() => {});
-    return null;
+    return false;
   }
 
   // Switch to PromQL mode
-  await promqlButton.click();
+  await pm.dashboardPromQLEditor.switchToPromql();
   testLogger.info('Switched to PromQL mode');
 
   // Switch to Custom mode so the Monaco editor is editable
-  const customButton = page.locator('[data-test="dashboard-custom-query-type"]');
-  await customButton.waitFor({ state: 'visible', timeout: 5000 });
-  await customButton.click();
+  await pm.dashboardPromQLEditor.switchToCustomQuery();
   testLogger.info('Switched to Custom query mode');
 
-  // Wait for the Monaco editor container
-  const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-  await queryEditor.waitFor({ state: 'visible', timeout: 10000 });
-
-  return queryEditor;
+  // Wait for the Monaco editor to be ready (container + editor instance attached)
+  await pm.dashboardPromQLEditor.waitForEditorReady();
+  return true;
 };
 
 /**
@@ -115,15 +130,9 @@ const setupPromQLCustomPanel = async (page, pm, dashboardName, panelName) => {
  */
 const cleanupDashboard = async (page, pm, dashboardName) => {
   try {
-    const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-    const monacoEditor = queryEditor.getByRole('code');
-    await monacoEditor.click();
-    await page.keyboard.press('Control+a');
-    await page.keyboard.type('up');
-    await page.keyboard.press('Escape');
-
-    // Allow Monaco debounce to sync (500 ms default in CodeQueryEditor.vue)
-    await page.waitForTimeout(3000);
+    // Reset to a syntactically valid PromQL query via the Monaco model so the
+    // panel can be applied + saved cleanly during teardown.
+    await pm.dashboardPromQLEditor.resetToValidPromqlQuery();
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
@@ -167,44 +176,29 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
         "promqlAutocomplete.spec.js"
       );
 
-      const queryEditor = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
-      if (!queryEditor) {
+      const editorReady = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
+      if (!editorReady) {
         test.skip(true, 'PromQL not available in this environment');
         return;
       }
 
-      const monacoEditor = queryEditor.getByRole('code');
-      await monacoEditor.click();
+      await pm.dashboardPromQLEditor.focusEditor();
 
       // Clear and type a partial metric name that is known to be ingested by ensureMetricsIngested
       // The ingested metrics include: up, cpu_usage, memory_usage, request_count, etc.
-      await clearMonacoEditor(page, monacoEditor);
-      await page.keyboard.type('cpu', { delay: 50 });
+      await pm.dashboardPromQLEditor.clearEditor();
+      await pm.dashboardPromQLEditor.typeInEditor('cpu', { delay: 50 });
 
       // Trigger suggestions — the watcher (Fix 2) should have already fed metric names
       // into autoCompletePromqlKeywords via updateMetricKeywords
-      await page.keyboard.press('Control+Space');
-
-      let suggestionsFound = false;
       try {
-        const { suggestionRows } = await waitForSuggestionsStable(page);
-        const count = await suggestionRows.count();
+        const count = await triggerAndWaitForSuggestions(pm.dashboardPromQLEditor);
         testLogger.info(`Found ${count} metric name suggestions for prefix "cpu"`);
 
-        expect(count).toBeGreaterThan(0);
-        suggestionsFound = true;
-
-        // Collect suggestion labels for logging
-        const labels = [];
-        for (let i = 0; i < Math.min(count, 8); i++) {
-          labels.push((await suggestionRows.nth(i).textContent()).trim());
-        }
-        testLogger.info(`Metric name suggestions: ${labels.join(', ')}`);
-      } catch (err) {
-        testLogger.warn(`Suggestions widget not visible: ${err.message}`);
-        expect(suggestionsFound, 'Expected metric name suggestions to appear but none were shown').toBe(true);
+        expect(count, 'Expected metric name suggestions to appear but none were shown').toBeGreaterThan(0);
+        await pm.dashboardPromQLEditor.logSuggestions('Metric name suggestions', 8);
       } finally {
-        await page.keyboard.press('Escape');
+        await pm.dashboardPromQLEditor.dismissSuggestions();
       }
 
       await cleanupDashboard(page, pm, dashboardName);
@@ -229,40 +223,27 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
         "promqlAutocomplete.spec.js"
       );
 
-      const queryEditor = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
-      if (!queryEditor) {
+      const editorReady = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
+      if (!editorReady) {
         test.skip(true, 'PromQL not available in this environment');
         return;
       }
 
-      const monacoEditor = queryEditor.getByRole('code');
-      await monacoEditor.click();
+      await pm.dashboardPromQLEditor.focusEditor();
 
       // Type metric{} and position cursor inside braces
-      await clearMonacoEditor(page, monacoEditor);
-      await page.keyboard.type('cpu_usage{}', { delay: 50 });
-      await page.keyboard.press('ArrowLeft'); // cursor moves inside {}
-      await page.keyboard.press('Control+Space');
+      await pm.dashboardPromQLEditor.clearEditor();
+      await pm.dashboardPromQLEditor.typeInEditor('cpu_usage{}', { delay: 50 });
+      await pm.dashboardPromQLEditor.pressKey('ArrowLeft'); // cursor moves inside {}
 
-      let suggestionsFound = false;
       try {
-        const { suggestionRows } = await waitForSuggestionsStable(page);
-        const count = await suggestionRows.count();
+        const count = await triggerAndWaitForSuggestions(pm.dashboardPromQLEditor);
         testLogger.info(`Found ${count} label name suggestions inside cpu_usage{}`);
 
-        expect(count).toBeGreaterThan(0);
-        suggestionsFound = true;
-
-        const labels = [];
-        for (let i = 0; i < Math.min(count, 8); i++) {
-          labels.push((await suggestionRows.nth(i).textContent()).trim());
-        }
-        testLogger.info(`Label name suggestions: ${labels.join(', ')}`);
-      } catch (err) {
-        testLogger.warn(`Suggestions widget not visible: ${err.message}`);
-        expect(suggestionsFound, 'Expected label name suggestions to appear but none were shown').toBe(true);
+        expect(count, 'Expected label name suggestions to appear but none were shown').toBeGreaterThan(0);
+        await pm.dashboardPromQLEditor.logSuggestions('Label name suggestions', 8);
       } finally {
-        await page.keyboard.press('Escape');
+        await pm.dashboardPromQLEditor.dismissSuggestions();
       }
 
       await cleanupDashboard(page, pm, dashboardName);
@@ -287,37 +268,27 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
         "promqlAutocomplete.spec.js"
       );
 
-      const queryEditor = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
-      if (!queryEditor) {
+      const editorReady = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
+      if (!editorReady) {
         test.skip(true, 'PromQL not available in this environment');
         return;
       }
 
-      const monacoEditor = queryEditor.getByRole('code');
-      await monacoEditor.click();
+      await pm.dashboardPromQLEditor.focusEditor();
 
       // Type an unclosed brace — no closing } — this is the pattern that broke before Fix 3
-      await clearMonacoEditor(page, monacoEditor);
-      await page.keyboard.type('cpu_usage{', { delay: 50 });
+      await pm.dashboardPromQLEditor.clearEditor();
+      await pm.dashboardPromQLEditor.typeInEditor('cpu_usage{', { delay: 50 });
       // Cursor is now right after '{' — analyzeLabelFocus must detect unclosed brace
-      await page.keyboard.press('Control+Space');
 
-      let suggestionsFound = false;
       try {
-        const { suggestionRows } = await waitForSuggestionsStable(page);
-        const count = await suggestionRows.count();
+        const count = await triggerAndWaitForSuggestions(pm.dashboardPromQLEditor);
         testLogger.info(`Found ${count} suggestions for unclosed-brace pattern cpu_usage{`);
 
         // The key assertion: at least one suggestion must appear.
         // Before Fix 3, isFocused remained false so no suggestions were shown at all.
-        expect(count).toBeGreaterThan(0);
-        suggestionsFound = true;
-
-        const labels = [];
-        for (let i = 0; i < Math.min(count, 8); i++) {
-          labels.push((await suggestionRows.nth(i).textContent()).trim());
-        }
-        testLogger.info(`Suggestions for cpu_usage{: ${labels.join(', ')}`);
+        expect(count, 'Expected label suggestions to appear for unclosed brace but none were shown').toBeGreaterThan(0);
+        await pm.dashboardPromQLEditor.logSuggestions('Suggestions for cpu_usage{', 8);
 
         // Verify these look like label names (not raw stream names from the stream dropdown).
         // Label names from ingested test metrics include: node, instance, service, region, etc.
@@ -325,11 +296,8 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
         // We cannot assert a specific label name here because the test environment may vary,
         // but we can assert that suggestions appeared (the core regression check).
         testLogger.info('Fix 3 verified: label suggestions shown for unclosed brace pattern');
-      } catch (err) {
-        testLogger.warn(`Suggestions widget not visible: ${err.message}`);
-        expect(suggestionsFound, 'Expected label suggestions to appear for unclosed brace but none were shown').toBe(true);
       } finally {
-        await page.keyboard.press('Escape');
+        await pm.dashboardPromQLEditor.dismissSuggestions();
       }
 
       await cleanupDashboard(page, pm, dashboardName);
@@ -352,41 +320,28 @@ test.describe("PromQL Autocomplete — Dashboard Add Panel", () => {
         "promqlAutocomplete.spec.js"
       );
 
-      const queryEditor = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
-      if (!queryEditor) {
+      const editorReady = await setupPromQLCustomPanel(page, pm, dashboardName, panelName);
+      if (!editorReady) {
         test.skip(true, 'PromQL not available in this environment');
         return;
       }
 
-      const monacoEditor = queryEditor.getByRole('code');
-      await monacoEditor.click();
+      await pm.dashboardPromQLEditor.focusEditor();
 
       // Type metric{} then move cursor inside and type label=
-      await clearMonacoEditor(page, monacoEditor);
-      await page.keyboard.type('cpu_usage{}', { delay: 50 });
-      await page.keyboard.press('ArrowLeft'); // cursor inside {}
-      await page.keyboard.type('node=', { delay: 50 });
-      await page.keyboard.press('Control+Space');
+      await pm.dashboardPromQLEditor.clearEditor();
+      await pm.dashboardPromQLEditor.typeInEditor('cpu_usage{}', { delay: 50 });
+      await pm.dashboardPromQLEditor.pressKey('ArrowLeft'); // cursor inside {}
+      await pm.dashboardPromQLEditor.typeInEditor('node=', { delay: 50 });
 
-      let suggestionsFound = false;
       try {
-        const { suggestionRows } = await waitForSuggestionsStable(page);
-        const count = await suggestionRows.count();
+        const count = await triggerAndWaitForSuggestions(pm.dashboardPromQLEditor);
         testLogger.info(`Found ${count} label value suggestions for node=`);
 
-        expect(count).toBeGreaterThan(0);
-        suggestionsFound = true;
-
-        const labels = [];
-        for (let i = 0; i < Math.min(count, 8); i++) {
-          labels.push((await suggestionRows.nth(i).textContent()).trim());
-        }
-        testLogger.info(`Label value suggestions: ${labels.join(', ')}`);
-      } catch (err) {
-        testLogger.warn(`Suggestions widget not visible: ${err.message}`);
-        expect(suggestionsFound, 'Expected label value suggestions to appear but none were shown').toBe(true);
+        expect(count, 'Expected label value suggestions to appear but none were shown').toBeGreaterThan(0);
+        await pm.dashboardPromQLEditor.logSuggestions('Label value suggestions', 8);
       } finally {
-        await page.keyboard.press('Escape');
+        await pm.dashboardPromQLEditor.dismissSuggestions();
       }
 
       await cleanupDashboard(page, pm, dashboardName);
@@ -425,41 +380,25 @@ test.describe("PromQL Autocomplete — Metrics Page", () => {
 
       // The metrics page defaults to PromQL mode.
       // Switch to Custom mode using the data-test selector on QueryTypeSelector.vue.
-      const customButton = page.locator('[data-test="dashboard-custom-query-type"]');
-      await customButton.waitFor({ state: 'visible', timeout: 10000 });
-      await customButton.click();
+      await pm.dashboardPromQLEditor.switchToCustomQuery();
       testLogger.info('Switched to Custom query mode on Metrics page');
 
-      // Wait for Monaco query editor
-      const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-      await queryEditor.waitFor({ state: 'visible', timeout: 10000 });
+      // Wait for Monaco query editor (container + instance attached)
+      await pm.dashboardPromQLEditor.waitForEditorReady();
 
       // Focus the Monaco editor and type a partial metric name
-      const monacoEditor = queryEditor.getByRole('code');
-      await monacoEditor.click();
-      await clearMonacoEditor(page, monacoEditor);
-      await page.keyboard.type('cpu', { delay: 50 });
-      await page.keyboard.press('Control+Space');
+      await pm.dashboardPromQLEditor.focusEditor();
+      await pm.dashboardPromQLEditor.clearEditor();
+      await pm.dashboardPromQLEditor.typeInEditor('cpu', { delay: 50 });
 
-      let suggestionsFound = false;
       try {
-        const { suggestionRows } = await waitForSuggestionsStable(page);
-        const count = await suggestionRows.count();
+        const count = await triggerAndWaitForSuggestions(pm.dashboardPromQLEditor);
         testLogger.info(`Found ${count} metric name suggestions for "cpu" on Metrics page`);
 
-        expect(count).toBeGreaterThan(0);
-        suggestionsFound = true;
-
-        const labels = [];
-        for (let i = 0; i < Math.min(count, 8); i++) {
-          labels.push((await suggestionRows.nth(i).textContent()).trim());
-        }
-        testLogger.info(`Metric name suggestions on Metrics page: ${labels.join(', ')}`);
-      } catch (err) {
-        testLogger.warn(`Suggestions widget not visible: ${err.message}`);
-        expect(suggestionsFound, 'Expected metric name suggestions on Metrics page but none appeared').toBe(true);
+        expect(count, 'Expected metric name suggestions on Metrics page but none appeared').toBeGreaterThan(0);
+        await pm.dashboardPromQLEditor.logSuggestions('Metric name suggestions on Metrics page', 8);
       } finally {
-        await page.keyboard.press('Escape');
+        await pm.dashboardPromQLEditor.dismissSuggestions();
       }
     }
   );
@@ -479,43 +418,27 @@ test.describe("PromQL Autocomplete — Metrics Page", () => {
       testLogger.info('Navigated to Metrics page');
 
       // Switch to Custom mode
-      const customButton = page.locator('[data-test="dashboard-custom-query-type"]');
-      await customButton.waitFor({ state: 'visible', timeout: 10000 });
-      await customButton.click();
+      await pm.dashboardPromQLEditor.switchToCustomQuery();
       testLogger.info('Switched to Custom query mode on Metrics page');
 
-      // Wait for Monaco query editor
-      const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-      await queryEditor.waitFor({ state: 'visible', timeout: 10000 });
+      // Wait for Monaco query editor (container + instance attached)
+      await pm.dashboardPromQLEditor.waitForEditorReady();
 
-      const monacoEditor = queryEditor.getByRole('code');
-      await monacoEditor.click();
+      await pm.dashboardPromQLEditor.focusEditor();
 
       // Type metric{} and position cursor inside braces
-      await clearMonacoEditor(page, monacoEditor);
-      await page.keyboard.type('cpu_usage{}', { delay: 50 });
-      await page.keyboard.press('ArrowLeft');
-      await page.keyboard.press('Control+Space');
+      await pm.dashboardPromQLEditor.clearEditor();
+      await pm.dashboardPromQLEditor.typeInEditor('cpu_usage{}', { delay: 50 });
+      await pm.dashboardPromQLEditor.pressKey('ArrowLeft');
 
-      let suggestionsFound = false;
       try {
-        const { suggestionRows } = await waitForSuggestionsStable(page);
-        const count = await suggestionRows.count();
+        const count = await triggerAndWaitForSuggestions(pm.dashboardPromQLEditor);
         testLogger.info(`Found ${count} label name suggestions inside cpu_usage{} on Metrics page`);
 
-        expect(count).toBeGreaterThan(0);
-        suggestionsFound = true;
-
-        const labels = [];
-        for (let i = 0; i < Math.min(count, 8); i++) {
-          labels.push((await suggestionRows.nth(i).textContent()).trim());
-        }
-        testLogger.info(`Label name suggestions on Metrics page: ${labels.join(', ')}`);
-      } catch (err) {
-        testLogger.warn(`Suggestions widget not visible: ${err.message}`);
-        expect(suggestionsFound, 'Expected label name suggestions on Metrics page but none appeared').toBe(true);
+        expect(count, 'Expected label name suggestions on Metrics page but none appeared').toBeGreaterThan(0);
+        await pm.dashboardPromQLEditor.logSuggestions('Label name suggestions on Metrics page', 8);
       } finally {
-        await page.keyboard.press('Escape');
+        await pm.dashboardPromQLEditor.dismissSuggestions();
       }
     }
   );

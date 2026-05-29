@@ -16,7 +16,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Hoist copyToClipboard mock so it can be referenced inside vi.mock factory below.
 const { mockCopyToClipboard } = vi.hoisted(() => ({
@@ -46,8 +45,12 @@ vi.mock("@tanstack/vue-virtual", () => ({
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn, copyToClipboard: mockCopyToClipboard };
+  return { ...actual, debounce: (fn: any) => fn };
 });
+
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockCopyToClipboard,
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -102,7 +105,6 @@ vi.stubGlobal("CSS", { supports: () => false });
 
 import TenstackTable from "@/components/TenstackTable.vue";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -265,7 +267,9 @@ describe("TenstackTable", () => {
         sortFieldMap: {},
       });
       expect(
-        wrapper.find('[data-test="tenstack-table-sort-icon-active"]').exists(),
+        wrapper
+          .find('[data-test-sort-state="active"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -279,7 +283,7 @@ describe("TenstackTable", () => {
       });
       // timestamp column is not active
       const inactiveIcons = wrapper.findAll(
-        '[data-test="tenstack-table-sort-icon-inactive"]',
+        '[data-test-sort-state="inactive"]',
       );
       expect(inactiveIcons.length).toBeGreaterThan(0);
     });
@@ -290,14 +294,10 @@ describe("TenstackTable", () => {
         rows: [],
       });
       expect(
-        wrapper
-          .find('[data-test="tenstack-table-sort-icon-active"]')
-          .exists(),
+        wrapper.find('[data-test-sort-state="active"]').exists(),
       ).toBe(false);
       expect(
-        wrapper
-          .find('[data-test="tenstack-table-sort-icon-inactive"]')
-          .exists(),
+        wrapper.find('[data-test-sort-state="inactive"]').exists(),
       ).toBe(false);
     });
 
@@ -318,7 +318,7 @@ describe("TenstackTable", () => {
       });
       // timestamp maps to start_time which equals sortBy → active icon
       expect(
-        wrapper.find('[data-test="tenstack-table-sort-icon-active"]').exists(),
+        wrapper.find('[data-test-sort-state="active"]').exists(),
       ).toBe(true);
     });
   });
@@ -327,11 +327,11 @@ describe("TenstackTable", () => {
   describe("loading state", () => {
     it("should show the default loading indicator when loading=true and no rows", () => {
       wrapper = mountTable({ rows: [], loading: true });
-      // Quasar renders q-spinner-hourglass as an SVG with class q-spinner
-      const tableHtml = wrapper.html();
-      expect(tableHtml).toContain("q-spinner");
+      expect(
+        wrapper.find('[data-test="tenstack-table-loading-indicator"]').exists(),
+      ).toBe(true);
       // i18n key is rendered as-is by the mock
-      expect(tableHtml).toContain("confirmDialog.loading");
+      expect(wrapper.html()).toContain("confirmDialog.loading");
     });
 
     it("should render a custom loading slot when loading=true and rows is empty", () => {
@@ -1163,6 +1163,54 @@ describe("TenstackTable", () => {
       const [, rowIndex] = wrapper.emitted("click:dataRow")![0] as any[];
       expect(rowIndex).toBe(1);
     });
+
+    it("should emit click:dataRow with the correct sorted row data in virtual scroll mode with server-side sorting", async () => {
+      // This tests the bug where virtual scroll emits original unsorted data instead of sorted data
+      const sortableCols = [
+        { id: "name", accessorKey: "name", header: "NAME", size: 200, meta: { sortable: true } },
+        { id: "spans", accessorKey: "spans", header: "SPANS", size: 100, meta: { sortable: true } },
+      ];
+
+      // Original rows in default order
+      const originalRows = [
+        { _timestamp: 1000, name: "alpha", spans: 10 },
+        { _timestamp: 2000, name: "beta", spans: 5 },
+        { _timestamp: 3000, name: "gamma", spans: 20 },
+      ];
+
+      // When sorted by spans desc, the order should be: gamma(20), alpha(10), beta(5)
+      const sortedRows = [
+        { _timestamp: 3000, name: "gamma", spans: 20 },  // First after sorting
+        { _timestamp: 1000, name: "alpha", spans: 10 },
+        { _timestamp: 2000, name: "beta", spans: 5 },
+      ];
+
+      wrapper = mountTable({
+        columns: sortableCols,
+        rows: sortedRows,  // Pass the server-sorted rows
+        sortBy: "spans",   // Indicate we're sorted by spans
+        sortOrder: "desc", // Descending order
+        sortFieldMap: {},  // No field mapping needed
+        useVirtualScroll: true, // Use virtual scroll (default but explicit)
+      });
+
+      // Click on the first virtual row (should be gamma with 20 spans)
+      const firstVirtualRow = wrapper.find('[data-test="o2-table-detail-3000"]');
+      expect(firstVirtualRow.exists()).toBe(true);
+      await firstVirtualRow.trigger("click");
+
+      // Should emit the correct sorted row data, not the original row at index 0
+      expect(wrapper.emitted("click:dataRow")).toBeTruthy();
+      const [emittedRow] = wrapper.emitted("click:dataRow")![0] as any[];
+
+      // Should emit gamma (first in sorted order), not alpha (first in original order)
+      expect(emittedRow).toMatchObject({
+        _timestamp: 3000,
+        name: "gamma",
+        spans: 20
+      });
+      expect(emittedRow.name).not.toBe("alpha"); // Should NOT be the original first row
+    });
   });
 
   // ── rowClass prop ─────────────────────────────────────────────────────────
@@ -1355,7 +1403,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should NOT pass the raw ISO 'T' separator to the clipboard when a timestamp format function is defined", async () => {
@@ -1408,7 +1458,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should copy the raw value unchanged when the column has no format function", async () => {
@@ -1426,7 +1478,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text", {
+        silent: true,
+      });
     });
 
     it("should copy the formatted value for a center-aligned timestamp column", async () => {
@@ -1450,7 +1504,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
   });
 
@@ -1506,7 +1562,9 @@ describe("TenstackTable", () => {
       await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should NOT contain the ISO 'T' separator in the copied pivot timestamp value", async () => {
@@ -1583,7 +1641,9 @@ describe("TenstackTable", () => {
       await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
   });
 });

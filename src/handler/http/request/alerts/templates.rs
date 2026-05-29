@@ -291,7 +291,19 @@ pub async fn delete_template_bulk(
 
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
-        if !check_permissions(name, &org_id, &_user_id, "templates", "DELETE", None).await {
+        if !check_permissions(
+            name,
+            &org_id,
+            &_user_id,
+            "templates",
+            "DELETE",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }

@@ -16,4 +16,6 @@ pub mod assume_service_account;
 pub mod es;
 pub mod org;
 pub mod settings;
+#[cfg(feature = "enterprise")]
+pub mod storage;
 pub mod system_settings;

@@ -4,7 +4,6 @@ import { nextTick } from "vue";
 import Group from "./Group.vue";
 import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
 
 // Mock AddCondition component
 vi.mock("./AddCondition.vue", () => ({
@@ -64,10 +63,11 @@ const createWrapper = (props = {}) => {
       ...props
     },
     global: {
-      plugins: [i18n, Quasar],
+      plugins: [i18n],
     }
   });
 };
+
 
 describe("Group.vue", () => {
   beforeEach(() => {
@@ -90,9 +90,9 @@ describe("Group.vue", () => {
         groupNestedIndex: 2
       });
       
-      const groupDiv = wrapper.find('.group');
+      const groupDiv = wrapper.find('[data-test="dashboard-group"]');
       expect(groupDiv.exists()).toBe(true);
-      expect(groupDiv.attributes('style')).toBe('--group-index: 2;');
+      expect(groupDiv.attributes('style')).toContain('--group-index: 2;');
     });
   });
 
@@ -192,10 +192,10 @@ describe("Group.vue", () => {
         }
       });
       
-      const groupConditions = wrapper.find('.group-conditions');
+      const groupConditions = wrapper.find('[data-test="dashboard-group-conditions"]');
       expect(groupConditions.exists()).toBe(true);
-      
-      const conditionGroups = wrapper.findAll('.condition-group');
+
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(1);
     });
 
@@ -220,7 +220,7 @@ describe("Group.vue", () => {
         }
       });
       
-      const conditionGroups = wrapper.findAll('.condition-group');
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(2);
     });
 
@@ -375,11 +375,12 @@ describe("Group.vue", () => {
         const wrapper = createWrapper();
         wrapper.vm.showAddMenu = true;
         await nextTick();
-        
+
         const addConditionItem = wrapper.find('[data-test="dashboard-add-group-add-condition"]');
         if (addConditionItem.exists()) {
-          const qItem = addConditionItem.closest('.q-item');
-          await qItem.trigger('click');
+          // After q-item -> ODropdownItem migration, click on the data-test
+          // element directly (ODropdownItem's @select wires up to its click).
+          await addConditionItem.trigger('click');
           expect(wrapper.emitted('add-condition')).toBeTruthy();
         } else {
           // Fallback - directly call the method
@@ -405,11 +406,12 @@ describe("Group.vue", () => {
         const wrapper = createWrapper();
         wrapper.vm.showAddMenu = true;
         await nextTick();
-        
+
         const addGroupItem = wrapper.find('[data-test="dashboard-add-group-add-group"]');
         if (addGroupItem.exists()) {
-          const qItem = addGroupItem.closest('.q-item');
-          await qItem.trigger('click');
+          // After q-item -> ODropdownItem migration, click on the data-test
+          // element directly (ODropdownItem's @select wires up to its click).
+          await addGroupItem.trigger('click');
           expect(wrapper.emitted('add-group')).toBeTruthy();
         } else {
           // Fallback - directly call the method
@@ -587,7 +589,7 @@ describe("Group.vue", () => {
         }
       });
       
-      const conditionGroups = wrapper.findAll('.condition-group');
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(0);
     });
 
@@ -684,7 +686,7 @@ describe("Group.vue", () => {
       const wrapper = createWrapper({ group: complexGroup });
       
       // Should render all condition groups (including nested ones)
-      const conditionGroups = wrapper.findAll('.condition-group');
+      const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBeGreaterThanOrEqual(3);
     });
 

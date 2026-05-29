@@ -17,21 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage" id="logPage">
+  <div class="tw:rounded-md logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
       class="full-height"
     >
-      <q-splitter
-        class="logs-horizontal-splitter full-height"
+      <OSplitter
+        class="full-height"
         v-model="splitterModel"
-        horizontal
+        :horizontal="true"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
           >
             <search-bar
               data-test="logs-search-bar"
@@ -54,17 +54,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
+            class="tw:flex scroll relative-position thirdlevel full-height tw:overflow-hidden logsPageMainSection tw:w-full"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
             "
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-            <q-splitter
+            <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="full-height full-width logs-splitter-smooth"
+              class="full-height tw:w-full logs-splitter-smooth"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
@@ -96,12 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   @click="collapseFieldList"
                   ><template #icon-left>
-                    <q-icon
+                    <OIcon
                       :name="
                         searchObj.meta.showFields
-                          ? 'chevron_left'
-                          : 'chevron_right'
-                      "
+                          ? 'chevron-left'
+                          : 'chevron-right'
+                      " size="sm"
                     />
                   </template>
                 </OButton>
@@ -118,12 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw:justify-center"
                     >
-                      <h5 class="text-center">
-                        <q-icon
-                          name="warning"
-                          color="warning"
-                          size="10rem"
-                        /><br />
+                      <h5 class="tw:text-center">
+                        <OIcon
+                          name="warning" style="width: 10rem; height: 10rem;" /><br />
                         <div
                           data-test="logs-search-filter-error-message"
                           style="white-space: pre-line"
@@ -139,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw:justify-center"
                     >
-                      <h5 class="text-center q-ma-none tw:pt-[2rem]">
+                      <h5 class="tw:text-center tw:m-0 tw:pt-[2rem]">
                         <div
                           data-test="logs-search-result-not-found-text"
-                          class="q-pt-lg"
+                          class="tw:pt-4"
                           v-if="
                             searchObj.data.errorCode == 0 &&
                             searchObj.data.errorMsg == ''
@@ -163,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div
                           data-test="logs-search-error-message"
-                          class="q-pt-lg"
+                          class="tw:pt-4"
                           v-else
                         >
                           Error occurred while retrieving search events.
@@ -196,9 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                           to configure a full text search field to the stream.
                         </div>
-                        <q-item-label>{{
+                        <span class="tw:text-sm">{{
                           searchObj.data.additionalErrorMsg
-                        }}</q-item-label>
+                        }}</span>
                       </h5>
                     </div>
                     <div
@@ -206,16 +203,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.selectedStream.length == 0 &&
                         searchObj.loading == false
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <div
                         data-test="logs-search-no-stream-selected-text"
-                        class="text-center col-10 q-mx-none tw:mt-none! tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.noStreamSelectedMessage") }}
-                      </h6>
+                      </div>
                     </div>
                     <div
                       v-else-if="
@@ -225,14 +221,13 @@ size="md" />
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <div
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.noRecordFound") }}
                         <OButton
                           v-if="
@@ -245,7 +240,7 @@ size="md" />
                           data-test="logs-page-result-error-details-btn-norecord"
                           >{{ t("search.functionErrorBtnLabel") }}</OButton
                         ><br />
-                      </h6>
+                      </div>
                     </div>
                     <div
                       v-else-if="
@@ -255,16 +250,15 @@ size="md" />
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == false
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <div
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.applySearch") }}
-                      </h6>
+                      </div>
                     </div>
                     <div
                       v-else-if="
@@ -273,16 +267,15 @@ size="md" />
                         searchObj.meta.searchApplied == false &&
                         searchObj.loading == false
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
-                      <h6
+                      <div
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.applySearch") }}
-                      </h6>
+                      </div>
                     </div>
                     <div
                       v-else
@@ -300,7 +293,7 @@ size="md" />
                         @run-query="searchData"
                       />
                     </div>
-                    <div class="text-center col-10 q-ma-none">
+                    <div class="tw:text-center tw:w-5/6 tw:mx-auto">
                       <h5 class="tw:my-none">
                         <span v-if="disableMoreErrorDetails">
                           <SanitizedHtmlRenderer
@@ -320,12 +313,12 @@ size="md" />
                   </div>
                 </div>
               </template>
-            </q-splitter>
+            </OSplitter>
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
             class="visualize-container"
-            :style="{ '--splitter-height': `${splitterModel}vh` }"
+            :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
@@ -334,14 +327,14 @@ size="md" />
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
-              class="tw:pb-[0.75rem]!"
+              class="tw:pb-2.5!"
             >
             </VisualizeLogsQuery>
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
             class="build-container"
-            :style="{ '--splitter-height': `${splitterModel}vh` }"
+            :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <BuildQueryPage
               ref="buildQueryPageRef"
@@ -351,7 +344,7 @@ size="md" />
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
               :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
-              class="tw:pb-[0.75rem]! tw:pr-[0.625rem]"
+              class="tw:pb-2.5!"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
@@ -360,7 +353,7 @@ size="md" />
             />
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
     <div v-show="showSearchHistory">
       <search-history
@@ -374,33 +367,30 @@ size="md" />
         class="search-history-empty"
       >
         <div
-          class="search-history-empty__content text-center q-pa-md flex flex-center"
+          class="search-history-empty__content tw:text-center tw:p-3 tw:flex flex-center"
         >
           <div>
             <div>
-              <q-icon
+              <OIcon
                 name="history"
-                size="100px"
-                color="gray"
-                class="search-history-empty__icon"
-              />
+                class="search-history-empty__icon" style="width: 100px; height: 100px;" />
             </div>
-            <div class="text-h4 search-history-empty__title">
+            <div class="tw:text-3xl tw:font-semibold search-history-empty__title">
               Search history is not enabled.
             </div>
             <div
-              class="search-history-empty__info q-mt-sm flex items-center justify-center"
+              class="search-history-empty__info tw:mt-2 tw:flex tw:items-center tw:justify-center"
             >
-              <q-icon name="info" class="q-mr-xs"
-size="20px" />
-              <span class="text-h6 text-center">
+              <OIcon name="info" class="tw:mr-1"
+size="md" />
+              <span class="tw:text-xl tw:font-semibold tw:text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
               >
             </div>
 
             <OButton
-              class="q-mt-xl"
+              class="tw:mt-6"
               variant="outline"
               size="sm-action"
               @click="redirectBackToLogs"
@@ -417,7 +407,7 @@ size="20px" />
         :isClicked="showSearchScheduler"
       />
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -439,7 +429,6 @@ import {
   onUnmounted,
   toRaw,
 } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -498,7 +487,8 @@ import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronRight, ChevronLeft } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -512,8 +502,6 @@ export default defineComponent({
     SearchBar,
     IndexList,
     OButton,
-    ChevronRight,
-    ChevronLeft,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
@@ -530,7 +518,9 @@ export default defineComponent({
     SearchHistory: defineAsyncComponent(
       () => import("@/plugins/logs/SearchHistory.vue"),
     ),
-  },
+    OIcon,
+    OSplitter,
+},
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
   methods: {
@@ -660,7 +650,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
     const {
@@ -831,6 +820,12 @@ export default defineComponent({
       clearAllTimeouts();
       try {
         if (searchObj) {
+          // Save visualization config so it can be restored when navigating back
+          if (searchObj.meta.logsVisualizeToggle === "visualize") {
+            searchObj.meta.savedVisualizationConfig =
+              getVisualizationConfig(dashboardPanelData);
+          }
+
           // Serialize breakdownSeries Map as entries array before JSON cloning
           const breakdownSeries = searchObj.data?.histogram?.breakdownSeries;
           const serializableSearchObj = {
@@ -1160,7 +1155,20 @@ export default defineComponent({
 
           searchObj.meta.showHistogram = isHistogramEnabled();
 
-          await restoreUrlQueryParams(dashboardPanelData);
+          // If the org in the URL doesn't match the currently selected org, the
+          // URL params are stale (race condition: router.push from updateOrganization
+          // hasn't finished when the new component mounts due to :key change).
+          // In that case skip URL param restoration so the old stream is not carried
+          // over to the new org.
+          const urlOrgId = router.currentRoute.value.query
+            .org_identifier as string;
+          const isOrgMismatch =
+            !!urlOrgId &&
+            urlOrgId !== store.state.selectedOrganization.identifier;
+
+          if (!isOrgMismatch) {
+            await restoreUrlQueryParams(dashboardPanelData);
+          }
 
           if (
             store.state.zoConfig?.auto_query_enabled &&
@@ -1335,6 +1343,7 @@ export default defineComponent({
     // Helper function for organization change
     function handleOrganizationChange() {
       searchObj.loading = true;
+      resetStreamData();
       loadLogsData();
     }
 
@@ -1868,53 +1877,63 @@ export default defineComponent({
             const queryParams = router.currentRoute.value.query;
             let preservedConfig = null;
             let shouldAutoSelectChartType = true;
-            // Always try to restore config from URL if present
+            // Try to restore config from URL first, then fall back to saved state
             const visualizationDataParam = queryParams.visualization_data;
+            let restoredData = null;
+
             if (
               visualizationDataParam &&
               typeof visualizationDataParam === "string"
             ) {
               try {
-                const restoredData = decodeVisualizationConfig(
+                restoredData = decodeVisualizationConfig(
                   visualizationDataParam,
                 );
-
-                if (restoredData && typeof restoredData === "object") {
-                  // Always restore config from URL on every toggle
-                  if (
-                    restoredData.config &&
-                    typeof restoredData.config === "object"
-                  ) {
-                    preservedConfig = { ...restoredData.config };
-                  }
-
-                  // Only check for chart type from URL on first visualization toggle
-                  if (
-                    isFirstVisualizationToggle.value &&
-                    restoredData.type &&
-                    typeof restoredData.type === "string"
-                  ) {
-                    const validLogsChartTypes = [
-                      "area",
-                      "bar",
-                      "h-bar",
-                      "line",
-                      "stacked",
-                      "scatter",
-                      "table",
-                    ];
-                    if (validLogsChartTypes.includes(restoredData.type)) {
-                      // Valid chart type found in URL - set it and disable auto-selection
-                      dashboardPanelData.data.type = restoredData.type;
-                      shouldAutoSelectChartType = false;
-                    }
-                  }
-                }
               } catch (error) {
                 console.warn(
                   "Failed to restore visualization config from URL:",
                   error,
                 );
+              }
+            }
+
+            // Fallback: use saved visualization config from store (preserved across navigation)
+            if (
+              !restoredData &&
+              searchObj.meta.savedVisualizationConfig
+            ) {
+              restoredData = searchObj.meta.savedVisualizationConfig;
+              searchObj.meta.savedVisualizationConfig = null;
+            }
+
+            if (restoredData && typeof restoredData === "object") {
+              // Always restore config on every toggle
+              if (
+                restoredData.config &&
+                typeof restoredData.config === "object"
+              ) {
+                preservedConfig = { ...restoredData.config };
+              }
+
+              // Only check for chart type on first visualization toggle
+              if (
+                isFirstVisualizationToggle.value &&
+                restoredData.type &&
+                typeof restoredData.type === "string"
+              ) {
+                const validLogsChartTypes = [
+                  "area",
+                  "bar",
+                  "h-bar",
+                  "line",
+                  "scatter",
+                  "table",
+                ];
+                if (validLogsChartTypes.includes(restoredData.type)) {
+                  // Valid chart type found - set it and disable auto-selection
+                  dashboardPanelData.data.type = restoredData.type;
+                  shouldAutoSelectChartType = false;
+                }
               }
             }
 
@@ -2059,7 +2078,10 @@ export default defineComponent({
                       dashboardPanelData.data.queries[0].vrlFunctionQuery;
                   }
                 }
-              } else {
+              } else if (
+                searchObj.data.queryResults?.hits?.length > 0 ||
+                searchObj.data.queryResults?.filteredHit?.length > 0
+              ) {
                 searchResponseForVisualization.value = {
                   ...searchObj.data.queryResults,
                   histogram_interval:
@@ -2081,7 +2103,16 @@ export default defineComponent({
             // reset old rendered chart
             visualizeChartData.value = {};
 
+            // Use customDownloadQueryObj time only when reusing cached results
+            // (the time must match the data). Otherwise use the user's current
+            // datetime selection — e.g. when navigating back to the page the
+            // user may have selected a different time range on the visualize tab
+            // than the last logs query used.
+            const hasReusableData =
+              searchResponseForVisualization.value?.hits?.length > 0;
+
             if (
+              hasReusableData &&
               searchObj?.data?.customDownloadQueryObj?.query?.start_time &&
               searchObj?.data?.customDownloadQueryObj?.query?.end_time
             ) {
@@ -2496,7 +2527,7 @@ export default defineComponent({
       }
 
       if (searchObj.meta.logsVisualizeToggle == "build") {
-        // Validate query before running - only block if in custom query mode with empty query.
+        // Validate query before running - only tw:block if in custom query mode with empty query.
         // In builder mode (non-custom), BuildQueryPage generates the query automatically.
         const isCustomQueryMode =
           buildDashboardPanelData.data.queries[0]?.customQuery === true;
@@ -2915,11 +2946,6 @@ export default defineComponent({
               : ["zo_sql_key", "zo_sql_num"], // histogram returns zo_sql_key and zo_sql_num
             timeseries_field: "zo_sql_key", // zo_sql_key is the time field in histogram
           };
-
-          if (histogramBreakdownField && autoSelectChartType) {
-            dashboardPanelData.data.type = "stacked";
-            shouldAutoSelectChartTypeForFields = false;
-          }
         }
 
         // Use the refactored functions
@@ -3453,10 +3479,6 @@ export default defineComponent({
     font-size: 12px !important;
   }
 
-  .q-splitter__after {
-    overflow: hidden;
-  }
-
   .q-table__top {
     padding: 0px !important;
   }
@@ -3475,12 +3497,7 @@ export default defineComponent({
     box-sizing: border-box !important;
     height: 100% !important;
     overflow: visible !important;
-    /* Changed from hidden to visible for button */
-  }
-
-  .logs-horizontal-splitter .q-splitter__before {
-    z-index: auto;
-    overflow: visible;
+    /* Changed from tw:hidden to visible for button */
   }
 
   // .search-result-container {

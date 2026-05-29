@@ -95,7 +95,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
 
   // Setup: Create patterns via browser-context API (sends cookies for cloud auth)
   test('setup: create patterns', {
-    tag: ['@sdr', '@cleanup', '@sdrMultiPattern']
+    tag: ['@sdr', '@setup', '@sdrMultiPattern']
   }, async ({ page }) => {
     testLogger.info(`=== SETUP: Creating 4 patterns via page.request, testRunId: ${testRunId} ===`);
     const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
@@ -130,7 +130,7 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   // Multiple patterns on ONE field (SEQUENTIAL FLOW)
   // This test has 10 steps with multiple navigations, so needs extended timeout
   test('should link 4 patterns to one field and verify with sequential ingestion', {
-    tag: ['@sdr', '@poc', '@sdrMultiPattern']
+    tag: ['@sdr', '@poc', '@sdrMultiPattern', '@slow']
   }, async ({ page }, testInfo) => {
     // Extend timeout to 7 minutes - 10 sequential steps with navigation + CI overhead
     test.setTimeout(420000);

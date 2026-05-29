@@ -15,11 +15,9 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createI18n } from "vue-i18n";
 import FilterCreatorPopup from "./FilterCreatorPopup.vue";
 
-installQuasar();
 
 const mockI18n = createI18n({
   locale: "en",
@@ -32,55 +30,50 @@ const mockI18n = createI18n({
 });
 
 const globalStubs = {
-  "q-dialog": { template: '<div class="q-dialog"><slot /></div>' },
-  "q-card": { template: '<div class="q-card"><slot /></div>' },
-  "q-card-section": { template: '<div class="q-card-section"><slot /></div>' },
-  "q-card-actions": {
-    template: '<div class="q-card-actions"><slot /></div>',
-    props: ["align"],
-  },
-  "q-select": {
+  ODialog: {
+    name: "ODialog",
     template:
-      '<select class="q-select"><option v-for="o in options" :key="o.value||o" :value="o.value||o">{{ o.label||o }}</option></select>',
+      '<div class="o-dialog"><slot name="header" /><slot /><slot name="footer" /></div>',
     props: [
-      "modelValue",
-      "options",
-      "label",
-      "rules",
-      "popupContentStyle",
-      "color",
-      "bgColor",
-      "stackLabel",
-      "outlined",
-      "filled",
-      "dense",
+      "open",
+      "size",
+      "title",
+      "subTitle",
+      "persistent",
+      "showClose",
+      "width",
+      "primaryButtonLabel",
+      "secondaryButtonLabel",
+      "neutralButtonLabel",
+      "primaryButtonVariant",
+      "secondaryButtonVariant",
+      "neutralButtonVariant",
+      "primaryButtonDisabled",
+      "secondaryButtonDisabled",
+      "neutralButtonDisabled",
+      "primaryButtonLoading",
+      "secondaryButtonLoading",
+      "neutralButtonLoading",
     ],
-  },
-  "q-list": { template: "<div><slot /></div>", props: ["dense"] },
-  "q-item": { template: "<div><slot /></div>", props: ["tag"] },
-  "q-item-section": { template: "<div><slot /></div>", props: ["avatar"] },
-  "q-item-label": {
-    template: "<span class='q-item-label'><slot /></span>",
-    props: ["class"],
-  },
-  "q-checkbox": {
-    template:
-      '<input type="checkbox" class="q-checkbox" :value="val" :checked="modelValue && modelValue.includes(val)" />',
-    props: ["modelValue", "val", "size", "dense"],
-    emits: ["update:modelValue"],
-  },
-  "q-btn": {
-    template:
-      '<button class="q-btn" :class="closePop ? \'close-btn\' : \'\'" @click="$emit(\'click\')">{{ label }}</button>',
-    props: ["label", "color", "flat", "noCaps", "class"],
-    attrs: { "v-close-popup": "" },
-    emits: ["click"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   },
   OButton: {
-    template:
-      '<button class="q-btn" @click="$emit(\'click\')"><slot></slot></button>',
+    template: '<button class="o-btn" @click="$emit(\'click\')"><slot /></button>',
     props: ["variant", "size"],
     emits: ["click"],
+  },
+  OCardSection: { template: '<div class="o-card-section"><slot /></div>' },
+  OSelect: {
+    template:
+      '<select class="o-select" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.value||o" :value="o.value||o">{{ o.label||o }}</option></select>',
+    props: ["modelValue", "options", "label", "error", "errorMessage"],
+    emits: ["update:modelValue"],
+  },
+  OCheckbox: {
+    template:
+      '<input type="checkbox" class="o-checkbox" :value="value" :checked="Array.isArray(modelValue) && modelValue.includes(value)" />',
+    props: ["modelValue", "value"],
+    emits: ["update:modelValue"],
   },
 };
 
@@ -121,12 +114,13 @@ describe("FilterCreatorPopup", () => {
 
     it("should display the field name as title", () => {
       wrapper = mountComponent({ fieldName: "custom_field" });
-      expect(wrapper.text()).toContain("custom_field");
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("title")).toBe("custom_field");
     });
 
-    it("should render q-select for operator", () => {
+    it("should render OSelect for operator", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".q-select").exists()).toBe(true);
+      expect(wrapper.find(".o-select").exists()).toBe(true);
     });
 
     it("should display Values section label", () => {
@@ -136,10 +130,9 @@ describe("FilterCreatorPopup", () => {
 
     it("should render cancel and apply buttons", () => {
       wrapper = mountComponent();
-      const buttons = wrapper.findAll(".q-btn");
-      expect(buttons.length).toBe(2);
-      expect(buttons[0].text()).toBe("Cancel");
-      expect(buttons[1].text()).toBe("Apply");
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("primaryButtonLabel")).toBe("Apply");
     });
   });
 
@@ -176,7 +169,7 @@ describe("FilterCreatorPopup", () => {
         fieldValues: ["a", "b", "c"],
         defaultValues: [],
       });
-      expect(wrapper.findAll(".q-checkbox")).toHaveLength(3);
+      expect(wrapper.findAll(".o-checkbox")).toHaveLength(3);
     });
 
     it("should show No values present when fieldValues is empty", () => {
@@ -204,7 +197,7 @@ describe("FilterCreatorPopup", () => {
         (_, i) => `value_${i}`,
       );
       wrapper = mountComponent({ fieldValues: longValues, defaultValues: [] });
-      expect(wrapper.findAll(".q-checkbox")).toHaveLength(100);
+      expect(wrapper.findAll(".o-checkbox")).toHaveLength(100);
     });
 
     it("should handle special characters in field values", () => {
@@ -249,9 +242,19 @@ describe("FilterCreatorPopup", () => {
 
     it("should emit apply when Apply button is clicked", async () => {
       wrapper = mountComponent();
-      const applyBtn = wrapper.findAll(".q-btn")[1];
-      await applyBtn.trigger("click");
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("click:primary");
       expect(wrapper.emitted("apply")).toBeTruthy();
+    });
+
+    it("should close dialog when Cancel button is clicked", async () => {
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.show).toBe(true);
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("click:secondary");
+      expect(vm.show).toBe(false);
+      expect(wrapper.emitted("apply")).toBeFalsy();
     });
 
     it("emitted filter object has correct shape", () => {
@@ -292,15 +295,15 @@ describe("FilterCreatorPopup", () => {
   });
 
   describe("component structure", () => {
-    it("should have a q-dialog as root", () => {
+    it("should have an ODialog as root", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".q-dialog").exists()).toBe(true);
+      expect(wrapper.find(".o-dialog").exists()).toBe(true);
     });
 
-    it("should have at least 3 q-card-section elements", () => {
+    it("should have at least 2 OCardSection elements", () => {
       wrapper = mountComponent();
-      expect(wrapper.findAll(".q-card-section").length).toBeGreaterThanOrEqual(
-        3,
+      expect(wrapper.findAll(".o-card-section").length).toBeGreaterThanOrEqual(
+        2,
       );
     });
 

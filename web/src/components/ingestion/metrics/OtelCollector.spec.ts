@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar } from 'quasar';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -46,6 +45,7 @@ const mockRouter = createRouter({
   routes: [{ path: '/', component: { template: '<div>Home</div>' } }],
 });
 
+
 describe('OtelCollector.vue', () => {
   let wrapper: VueWrapper;
 
@@ -62,7 +62,7 @@ describe('OtelCollector.vue', () => {
     return mount(OtelCollector, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar, mockI18n, mockRouter],
+        plugins: [mockI18n, mockRouter],
         provide: { store: mockStore },
         components: { CopyContent },
       },

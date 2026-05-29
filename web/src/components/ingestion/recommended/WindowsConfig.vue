@@ -1,14 +1,14 @@
 <template>
-  <div class="q-pa-md">
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
+  <div class="tw:p-3">
+    <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
       Run the powershell terminal as administrator and execute the following
       command:
     </div>
-    <ContentCopy class="q-mt-sm" :content="getCommand" />
+    <ContentCopy class="tw:mt-2" :content="getCommand" />
     <br />
     <hr />
     <div>
-      <div class="text-subtitle1 q-pl-xs q-mt-md">
+      <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
         Once you have installed the OpenObserve collector, it will:
         <ul class="tw:list-disc tw:ml-5">
           <li>Collect logs from Windows event log</li>

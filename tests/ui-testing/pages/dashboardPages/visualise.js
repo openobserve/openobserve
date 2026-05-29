@@ -18,21 +18,26 @@ export default class LogsVisualise {
       .first();
 
     // Dashboard locators
-    this.addToDashboardBtn = page.getByRole("button", {
-      name: "Add To Dashboard",
-    });
+    this.addToDashboardBtn = page.locator('[data-test="panel-editor-add-to-dashboard-btn"]');
     this.newDashboardBtn = page.locator(
       '[data-test="dashboard-dashboard-new-add"]'
     );
-    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
+    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name-field"]');
+    // Inner "New dashboard" ODrawer's Save action — the legacy
+    // `dashboard-add-submit` button was removed when AddDashboard.vue was
+    // migrated to ODrawer (SelectDashboardDropdown now hosts the form and
+    // the footer primary button calls addDashboardRef?.submit()).
     this.dashboardSubmitBtn = page.locator(
-      '[data-test="dashboard-add-submit"]'
+      '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
     );
     this.panelTitleInput = page.locator(
-      '[data-test="metrics-new-dashboard-panel-title"]'
+      '[data-test="metrics-new-dashboard-panel-title-field"]'
     );
+    // Outer "Add to Dashboard" ODrawer's Add action — the legacy
+    // `metrics-schema-update-settings-button` was removed when AddToDashboard.vue
+    // migrated to ODrawer (parent slug: add-to-dashboard-dialog).
     this.updateSettingsBtn = page.locator(
-      '[data-test="metrics-schema-update-settings-button"]'
+      '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]'
     );
 
     // Query editor locators
@@ -49,49 +54,22 @@ export default class LogsVisualise {
     // Open Visualise Tab
     await this.page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    // Wait for visualization tab to be fully loaded
-    // Check for chart selector OR error message (in case of query errors)
-    const chartSelector = this.page.locator('[data-test="selected-chart-table-item"], [data-test="selected-chart-bar-item"], [data-test="selected-chart-line-item"]').first();
-    const errorIndicator = this.page.locator('[data-test="dashboard-error"], .q-notification, .q-banner');
-
-    // Wait for either chart selectors or error indicator to appear
-    await Promise.race([
-      chartSelector.waitFor({ state: "visible", timeout: 10000 }).catch(() => {}),
-      errorIndicator.first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {}),
-      this.page.waitForTimeout(3000) // Fallback timeout if neither appears quickly
-    ]);
-
-    // Small buffer to ensure UI is stable
-    await this.page.waitForTimeout(500);
+    // Wait for the visualization panel editor to load by checking for chart selector
+    const chartSelector = this.page.locator('[data-test="dashboard-addpanel-chart-selection-item"]').first();
+    await chartSelector.waitFor({ state: "visible", timeout: 15000 });
   }
 
   // Open visualise tab and ensure table chart is selected when VRL is present
   async openVisualiseTabWithVrl() {
     await this.openVisualiseTab();
 
-    // When VRL is present, ensure table chart is selected
-    // Check if VRL warning is shown (indicating VRL is active but wrong chart selected)
-    const vrlWarning = this.page.getByText("VRL function is only supported for table chart");
-    const isVrlWarningVisible = await vrlWarning.isVisible().catch(() => false);
+    // Ensure table chart is selected (VRL only works with table chart type)
+    const tableChartItem = this.page.locator('[data-test="selected-chart-table-item"]');
+    await tableChartItem.waitFor({ state: "visible", timeout: 10000 });
 
-    if (isVrlWarningVisible) {
-      // VRL is present but table chart not selected - click table chart
-      const tableChartBtn = this.page.locator('[data-test="selected-chart-table-item"]');
-      await tableChartBtn.click();
-      await this.page.waitForTimeout(300);
-    }
-
-    // Also check if table chart is already selected
-    const tableChart = this.page.locator('[data-test="selected-chart-table-item"]');
-    const tableChartParent = tableChart.locator('..');
-    const isTableSelected = await tableChartParent.evaluate(el =>
-      el.classList.contains('bg-grey-3') || el.classList.contains('bg-grey-5')
-    ).catch(() => false);
-
-    if (!isTableSelected) {
-      // Table not selected, click to select it
-      await tableChart.click();
-      await this.page.waitForTimeout(300);
+    const isTableSelected = await tableChartItem.getAttribute("data-selected");
+    if (isTableSelected !== "true") {
+      await tableChartItem.click();
     }
   }
 
@@ -122,16 +100,13 @@ export default class LogsVisualise {
         const hasRunQueryText = btn.textContent?.includes('Run query');
 
         // Also check that no loading indicator is present
-        const hasLoadingClass = btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true' ||
-                                btn.querySelector('.q-spinner') !== null;
+        const hasLoadingClass = btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true';
 
         return isEnabled && hasRunQueryText && !hasLoadingClass;
       },
       { timeout }
     );
 
-    // Small buffer to ensure UI is stable after query completes
-    await this.page.waitForTimeout(300);
   }
 
   // Apply logs query and wait for completion
@@ -153,7 +128,7 @@ export default class LogsVisualise {
   //search and add fields
   async searchAndAddField(fieldName, target) {
     const searchInput = this.page.locator(
-      '[data-test="index-field-search-input"]'
+      '[data-test="o-field-list-search-field"]'
     );
     await searchInput.waitFor({ state: "visible", timeout: 5000 });
     await searchInput.click();
@@ -195,13 +170,14 @@ export default class LogsVisualise {
 
   //enable SQL Mode
   async enableSQLMode() {
-    await this.page
-      // .getByRole("switch", { name: "SQL Mode" })
-      // .locator("div")
-      // .nth(2)
-      // .click();
-      .getByRole("switch", { name: "SQL Mode" })
-      .click();
+    // SQL mode toggle is inside the utilities menu dropdown
+    const utilitiesBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+    await utilitiesBtn.waitFor({ state: "visible", timeout: 10000 });
+    await utilitiesBtn.click();
+    const sqlModeBtn = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+    await sqlModeBtn.waitFor({ state: "visible", timeout: 5000 });
+    await sqlModeBtn.click();
+    await this.page.keyboard.press("Escape");
   }
 
   //stream index list
@@ -215,9 +191,9 @@ export default class LogsVisualise {
     await this.page
       .locator('[data-test="log-search-index-list-select-stream"]')
       .click({ force: true });
+    // OSelect forwards parent data-test to ListboxItems (`*-option`).
     await this.page
-      .locator("div.q-item")
-      .getByText(`${stream}`)
+      .locator('[data-test="log-search-index-list-select-stream-option"]', { hasText: stream })
       .first()
       .click();
   }
@@ -325,9 +301,9 @@ export default class LogsVisualise {
     );
     await runBtn.waitFor({ state: "visible" });
     await runBtn.click();
-    await runBtn.waitFor({ state: "visible" });
-    // Optional: small buffer to ensure UI is stable
-    await this.page.waitForTimeout(300);
+    // Wait for query to start (cancel btn appears) then complete (cancel btn disappears)
+    await cancelBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    await cancelBtn.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {});
   }
 
   // Helper function to check for dashboard errors
@@ -533,13 +509,12 @@ export default class LogsVisualise {
 
   // Helper function to verify chart type selection
   async verifyChartTypeSelected(page, chartType, shouldBeSelected = true) {
-    const selector = `[data-test="selected-chart-${chartType}-item"]`;
-    const locator = page.locator(selector).locator("..");
+    const locator = page.locator(`[data-test="selected-chart-${chartType}-item"]`);
 
     if (shouldBeSelected) {
-      await expect(locator).toHaveClass(/bg-grey-[35]/);
+      await expect(locator).toHaveAttribute("data-selected", "true");
     } else {
-      await expect(locator).not.toHaveClass(/bg-grey-[35]/);
+      await expect(locator).toHaveAttribute("data-selected", "false");
     }
   }
 
@@ -548,8 +523,10 @@ export default class LogsVisualise {
     await this.addToDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.addToDashboardBtn.click();
 
-    // Wait for the "Add to Dashboard" side panel to fully load
-    const sidePanelTitle = this.page.locator('[data-test="schema-title-text"]');
+    // Wait for the "Add to Dashboard" side panel to fully load. The old
+    // `schema-title-text` element was removed when AddToDashboard.vue migrated
+    // to ODrawer — use the drawer's parent slug instead.
+    const sidePanelTitle = this.page.locator('[data-test="add-to-dashboard-dialog"]');
     await sidePanelTitle.waitFor({ state: "visible", timeout: 10000 });
     await sidePanelTitle.waitFor({ state: "attached", timeout: 5000 });
 
@@ -586,7 +563,13 @@ export default class LogsVisualise {
 
   //wait for query inspector to be visible
   async waitForQueryInspector(page) {
-    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-close-btn"]');
+    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
     await queryInspectorCloseBtn.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  async closeQueryInspector() {
+    const closeBtn = this.page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
+    await closeBtn.click();
+    await this.page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: 'hidden', timeout: 5000 });
   }
 }

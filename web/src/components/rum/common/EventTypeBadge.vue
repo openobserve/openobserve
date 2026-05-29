@@ -44,6 +44,6 @@ const getEventTypeClass = (type: string) => {
     resource:
       "tw:bg-purple-100 tw:text-purple-700 tw:border tw:border-solid tw:border-purple-300",
   };
-  return classes[type] || "tw:bg-grey-100 tw:text-grey-700";
+  return classes[type] || "tw:bg-gray-200 tw:text-gray-500-700";
 };
 </script>

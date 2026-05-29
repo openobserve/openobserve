@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`wildcard-value-include-${i}`"
             @click.stop="$emit('filter-value', item.value, 'include')"
           >
-            <q-icon name="add" size="xs" />
+            <OIcon name="add" size="xs" />
           </OButton>
           <OButton
             variant="ghost"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`wildcard-value-exclude-${i}`"
             @click.stop="$emit('filter-value', item.value, 'exclude')"
           >
-            <q-icon name="remove" size="xs" />
+            <OIcon name="remove" size="xs" />
           </OButton>
         </span>
       </div>
@@ -84,6 +84,7 @@ import { useI18n } from "vue-i18n";
 import { formatCount } from "@/utils/logs/convertLogData";
 import { wildcardChipColor, wildcardLabel } from "@/composables/useLogs/useTemplateTokenizer";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { WildcardDisplayValue } from "./useWildcardHover";
 
 const props = defineProps<{
@@ -212,7 +213,7 @@ watch(
 .wildcard-popover {
   min-width: 14rem;
   max-width: 24rem;
-  background: var(--o2-card-bg, #ffffff);
+  background: var(--o2-card-bg-solid, #ffffff);
   border: 1px solid var(--o2-border, #e5e7eb);
   border-radius: 0.5rem;
   box-shadow:

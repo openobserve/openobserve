@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="panel-title">
           <h2 class="edge-name" data-test="service-graph-edge-side-panel-route">
             <span class="from-service">{{ selectedEdge?.from }}</span>
-            <q-icon name="arrow_forward" size="14px" class="edge-arrow" />
+            <OIcon name="arrow-forward" size="xs" class="edge-arrow" />
             <span class="to-service">{{ selectedEdge?.to }}</span>
             <span class="health-badge" :class="edgeHealth.status">
               {{ edgeHealth.text }}
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleClose"
             data-test="service-graph-edge-side-panel-close-btn"
           >
-            <q-icon name="close" size="14px" />
+            <OIcon name="close" size="xs" />
           </OButton>
         </div>
       </div>
@@ -55,26 +55,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Traffic Summary: Total | Failed | Error Rate -->
             <div class="traffic-row">
               <div class="traffic-pill total" data-test="service-graph-edge-side-panel-total">
-                <q-icon name="swap_horiz" size="13px" />
+                <OIcon name="swap-horiz" size="xs" />
                 <span class="traffic-label">Total</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.total_requests ?? 0) }}</span>
-                <q-tooltip>Total requests flowing through this connection</q-tooltip>
+                <OTooltip content="Total requests flowing through this connection" />
               </div>
               <div class="traffic-pill failed" data-test="service-graph-edge-side-panel-failed">
-                <q-icon name="close" size="13px" />
+                <OIcon name="close" size="xs" />
                 <span class="traffic-label">Failed</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.failed_requests ?? 0) }}</span>
-                <q-tooltip>Number of failed requests on this connection</q-tooltip>
+                <OTooltip content="Number of failed requests on this connection" />
               </div>
               <div
                 class="traffic-pill error-rate"
                 :class="getErrorRateClass()"
                 data-test="service-graph-edge-side-panel-error-rate"
               >
-                <q-icon name="error_outline" size="13px" />
+                <OIcon name="error-outline" size="xs" />
                 <span class="traffic-label">Error Rate</span>
                 <span class="traffic-value">{{ errorRateFormatted }}</span>
-                <q-tooltip>Percentage of requests that failed</q-tooltip>
+                <OTooltip content="Percentage of requests that failed" />
               </div>
             </div>
 
@@ -100,9 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-baseline latency-baseline">{{ baselineP50 }}</span>
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p50DeltaPct)">
-                    <q-icon
-                      :name="p50DeltaPct > 2 ? 'arrow_upward' : p50DeltaPct < -2 ? 'arrow_downward' : 'remove'"
-                      size="10px"
+                    <OIcon
+                      :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                      size="xs"
                     />
                     {{ p50DeltaFormatted }}
                   </span>
@@ -120,9 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-baseline latency-baseline">{{ baselineP95 }}</span>
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p95DeltaPct)">
-                    <q-icon
-                      :name="p95DeltaPct > 2 ? 'arrow_upward' : p95DeltaPct < -2 ? 'arrow_downward' : 'remove'"
-                      size="10px"
+                    <OIcon
+                      :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                      size="xs"
                     />
                     {{ p95DeltaFormatted }}
                   </span>
@@ -140,9 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-baseline latency-baseline">{{ baselineP99 }}</span>
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p99DeltaPct)">
-                    <q-icon
-                      :name="p99DeltaPct > 2 ? 'arrow_upward' : p99DeltaPct < -2 ? 'arrow_downward' : 'remove'"
-                      size="10px"
+                    <OIcon
+                      :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                      size="xs"
                     />
                     {{ p99DeltaFormatted }}
                   </span>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="trendLoading"
               >
                 <template #icon-left>
-                  <q-icon name="refresh" size="12px" />
+                  <OIcon name="refresh" size="xs" />
                 </template>
                 Refresh
               </OButton>
@@ -189,19 +189,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Loading -->
           <div v-if="trendLoading" class="trend-state">
-            <q-spinner color="primary" size="sm" />
+            <OSpinner size="xs" />
             <span>Loading data…</span>
           </div>
 
           <!-- Error -->
           <div v-else-if="trendError" class="trend-state trend-error">
-            <q-icon name="warning" size="16px" />
+            <OIcon name="warning" size="sm" />
             <span>{{ trendError }}</span>
           </div>
 
           <!-- Empty -->
           <div v-else-if="!trendData || !trendDataPoints.length" class="trend-state trend-empty">
-            <q-icon name="show_chart" size="24px" class="trend-empty-icon" />
+            <OIcon name="show-chart" size="md" class="trend-empty-icon" />
             <span>No data available</span>
           </div>
 
@@ -230,18 +230,22 @@ import {
   type PropType,
 } from 'vue';
 import { useStore } from 'vuex';
-import { useQuasar } from 'quasar';
 import * as echarts from 'echarts';
 import serviceGraphService from '@/services/service_graph';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
-  components: { OButton, OToggleGroup, OToggleGroupItem },
+  components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner, OTooltip,
+    OIcon,
+},
   props: {
     selectedEdge: {
       type: Object as PropType<{
@@ -267,7 +271,6 @@ export default defineComponent({
   emits: ['close'],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
 
     const trendChartRef = ref<HTMLElement | null>(null);
     const trendLoading = ref(false);
@@ -422,7 +425,7 @@ export default defineComponent({
 
     /** Shared base: timestamps, colors, grid, tooltip base, legend, xAxis */
     const getSharedBase = (points: any[]) => {
-      const isDark = $q.dark.isActive;
+      const isDark = store.state.theme === 'dark';
       const textColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)';
       const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
       const tooltipBg = isDark ? 'rgba(22,22,26,0.92)' : 'rgba(255,255,255,0.96)';
@@ -732,7 +735,7 @@ export default defineComponent({
 
     // Re-render when dark mode toggles
     watch(
-      () => $q.dark.isActive,
+      () => store.state.theme === 'dark',
       async () => {
         if (!trendLoading.value && trendDataPoints.value.length) {
           await nextTick();
@@ -993,10 +996,7 @@ export default defineComponent({
         border: 1px solid transparent;
         transition: all 0.2s ease;
         cursor: default;
-
-        .q-icon { opacity: 0.8; }
-
-        .traffic-label {
+.traffic-label {
           font-size: 9px;
           font-weight: 700;
           text-transform: uppercase;

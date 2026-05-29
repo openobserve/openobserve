@@ -1,123 +1,53 @@
-import { useQuasar } from "quasar";
+// Copyright 2026 OpenObserve Inc.
+import { toast } from "@/lib/feedback/Toast/useToast";
+import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
+
+type NotificationOptions = Pick<ToastOptions, "timeout" | "position">;
 
 const useNotifications = () => {
-  const quasar = useQuasar();
-
-  const showErrorNotification = (message: string, options?: any) => {
-    return quasar.notify({
-      type: "negative",
-      message: message,
-      timeout: 5000,
-      actions: [
-        {
-          icon: "close",
-          color: "white",
-          round: true,
-          handler: () => {
-            /* ... */
-          },
-        },
-      ],
-      ...(options || {}),
-    });
+  const showErrorNotification = (
+    message: string,
+    options?: NotificationOptions,
+  ) => {
+    return toast({ variant: "error", message, ...options });
   };
 
   const showConfictErrorNotificationWithRefreshBtn = (
     message: string,
-    options?: any,
+    options?: NotificationOptions,
   ) => {
-    return quasar.notify({
-      type: "negative",
-      message: message,
-      multiLine: false,
+    return toast({
+      variant: "error",
+      message,
       timeout: 0,
-      actions: [
-        {
-          // icon: "refresh",
-          label: "Refresh",
-          color: "white",
-          style: "font-weight: bold",
-          padding: "4px",
-          handler: () => {
-            // refresh whole page
-            window.location.reload();
-          },
-        },
-        {
-          icon: "close",
-          padding: "4px",
-          style: "font-weight: bold",
-          color: "white",
-          handler: () => {
-            /* ... */
-          },
-        },
-      ],
-      ...(options || {}),
+      action: {
+        label: "Refresh",
+        handler: () => window.location.reload(),
+      },
+      ...options,
     });
   };
 
   const showAliasErrorForVisualization = (
     message: string,
-    options?: any,
+    options?: NotificationOptions,
   ) => {
-    return quasar.notify({
-      type: "negative",
-      message: message,
-      multiLine: false,
-      timeout: 0,
-      actions: [
-        {
-          icon: "close",
-          padding: "4px",
-          style: "font-weight: bold",
-          color: "white",
-          handler: () => {
-            /* ... */
-          },
-        },
-      ],
-      ...(options || {}),
-    });
+    return toast({ variant: "error", message, timeout: 0, ...options });
   };
 
-  const showPositiveNotification = (message: string, options?: any) => {
-    return quasar.notify({
-      type: "positive",
-      message: message,
-      timeout: 5000,
-      actions: [
-        {
-          icon: "close",
-          color: "white",
-          round: true,
-          handler: () => {
-            /* ... */
-          },
-        },
-      ],
-      ...(options || {}),
-    });
+  const showPositiveNotification = (
+    message: string,
+    options?: NotificationOptions,
+  ) => {
+    return toast({ variant: "success", message, timeout: 5000, ...options });
   };
 
-  const showInfoNotification = (message: string, options?: any) => {
-    return quasar.notify({
-      type: "info",
-      message: message,
-      timeout: 5000,
-      actions: [
-        {
-          icon: "close",
-          color: "white",
-          round: true,
-          handler: () => {
-            /* ... */
-          },
-        },
-      ],
-      ...(options || {}),
-    });
-  }
+  const showInfoNotification = (
+    message: string,
+    options?: NotificationOptions,
+  ) => {
+    return toast({ variant: "info", message, timeout: 5000, ...options });
+  };
 
   return {
     showErrorNotification,

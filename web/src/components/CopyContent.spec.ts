@@ -1,22 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { Quasar, copyToClipboard } from 'quasar';
 import CopyContent from './CopyContent.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { nextTick } from 'vue';
 
-// Mock quasar module
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    copyToClipboard: vi.fn(),
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
+// Mock clipboard utility (replaces old quasar copyToClipboard)
+const mockCopyToClipboard = vi.fn().mockResolvedValue(true);
+vi.mock('@/utils/clipboard', () => ({
+  copyToClipboard: (...args: any[]) => mockCopyToClipboard(...args),
+}));
 
 // Mock zincutils
 vi.mock('@/utils/zincutils', () => ({
@@ -42,22 +35,12 @@ const mockI18n = createI18n({
   },
 });
 
-describe('CopyContent.vue Branch Coverage', () => {
-  let mockCopyToClipboard: any;
-  let mockNotify: any;
 
-  beforeEach(async () => {
+describe('CopyContent.vue Branch Coverage', () => {
+
+  beforeEach(() => {
     vi.clearAllMocks();
-    
-    // Get references to the mocked functions
-    mockCopyToClipboard = vi.mocked(copyToClipboard);
-    mockNotify = vi.fn();
-    
-    // Setup useQuasar mock to return our mockNotify
-    const { useQuasar } = await import('quasar');
-    vi.mocked(useQuasar).mockReturnValue({
-      notify: mockNotify,
-    } as any);
+    mockCopyToClipboard.mockResolvedValue(true);
   });
 
   describe('ReplaceValues Function Branch Coverage', () => {
@@ -68,20 +51,19 @@ describe('CopyContent.vue Branch Coverage', () => {
           displayContent: 'Email: [EMAIL], Passcode: [PASSCODE], Basic: [BASIC_PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
         },
       });
 
-      // Branch: isMask = true (lines 74-77)
       const replaceValues = (wrapper.vm as any).replaceValues;
       const maskedResult = replaceValues('Email: [EMAIL], Passcode: [PASSCODE], Basic: [BASIC_PASSCODE]', true);
 
-      expect(maskedResult).toContain('****************'); // Masked email
-      expect(maskedResult).toContain('****************'); // Masked passcode
-      expect(maskedResult).toContain('***************************************'); // Masked basic passcode
+      expect(maskedResult).toContain('****************');
+      expect(maskedResult).toContain('****************');
+      expect(maskedResult).toContain('***************************************');
     });
 
     it('should replace values with actual text when isMask is false', async () => {
@@ -90,14 +72,13 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Email: [EMAIL], Passcode: [PASSCODE], Basic: [BASIC_PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
         },
       });
 
-      // Branch: isMask = false (lines 79-82)
       const replaceValues = (wrapper.vm as any).replaceValues;
       const actualResult = replaceValues('Email: [EMAIL], Passcode: [PASSCODE], Basic: [BASIC_PASSCODE]', false);
 
@@ -109,7 +90,6 @@ describe('CopyContent.vue Branch Coverage', () => {
 
   describe('CopyToClipboard Success Branch Coverage', () => {
     it('should show success notification when copy succeeds', async () => {
-      // Branch: copyToClipboard success (lines 88-94)
       mockCopyToClipboard.mockResolvedValueOnce(true);
 
       const wrapper = mount(CopyContent, {
@@ -117,7 +97,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Test content [EMAIL]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -127,22 +107,22 @@ describe('CopyContent.vue Branch Coverage', () => {
       const copyButton = wrapper.find('[data-test="rum-copy-btn"]');
       await copyButton.trigger('click');
 
-      // Wait for promise resolution
       await nextTick();
       await nextTick();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith('Test content test@example.com');
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'positive',
-        message: 'Content Copied Successfully!',
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        'Test content test@example.com',
+        {
+          successMessage: 'Content Copied Successfully!',
+          errorMessage: 'Error while copy content.',
+          timeout: 5000,
+        },
+      );
     });
   });
 
   describe('CopyToClipboard Error Branch Coverage', () => {
     it('should show error notification when copy fails', async () => {
-      // Branch: copyToClipboard error (lines 96-101)
       mockCopyToClipboard.mockRejectedValueOnce(new Error('Copy failed'));
 
       const wrapper = mount(CopyContent, {
@@ -150,7 +130,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Test content [EMAIL]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -160,29 +140,29 @@ describe('CopyContent.vue Branch Coverage', () => {
       const copyButton = wrapper.find('[data-test="rum-copy-btn"]');
       await copyButton.trigger('click');
 
-      // Wait for promise rejection
       await nextTick();
       await nextTick();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith('Test content test@example.com');
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: 'negative',
-        message: 'Error while copy content.',
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        'Test content test@example.com',
+        {
+          successMessage: 'Content Copied Successfully!',
+          errorMessage: 'Error while copy content.',
+          timeout: 5000,
+        },
+      );
     });
   });
 
   describe('DisplayContent Props Branch Coverage', () => {
     it('should use displayContent when provided', async () => {
-      // Branch: props.displayContent exists (line 105)
       const wrapper = mount(CopyContent, {
         props: {
           content: 'Original content [EMAIL]',
           displayContent: 'Display content [EMAIL]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -194,14 +174,13 @@ describe('CopyContent.vue Branch Coverage', () => {
     });
 
     it('should fallback to content when displayContent is not provided', async () => {
-      // Branch: props.displayContent is empty, fallback to props.content (line 105)
       const wrapper = mount(CopyContent, {
         props: {
           content: 'Original content [EMAIL]',
-          displayContent: '', // Empty displayContent
+          displayContent: '',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -213,14 +192,12 @@ describe('CopyContent.vue Branch Coverage', () => {
     });
 
     it('should fallback to content when displayContent prop is not provided at all', async () => {
-      // Branch: props.displayContent is undefined, fallback to props.content (line 105)
       const wrapper = mount(CopyContent, {
         props: {
           content: 'Fallback content [EMAIL]',
-          // displayContent not provided
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -244,7 +221,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           },
         },
         mutations: {
-          updatePasscode(state, newPasscode) {
+          updatePasscode(state: any, newPasscode: string) {
             state.organizationData.organizationPasscode = newPasscode;
           },
         },
@@ -255,7 +232,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Passcode: [PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: dynamicStore,
           },
@@ -263,15 +240,13 @@ describe('CopyContent.vue Branch Coverage', () => {
       });
 
       const contentText = wrapper.find('[data-test="rum-content-text"]');
-      expect(contentText.text()).toContain('****************'); // Initial masked passcode
+      expect(contentText.text()).toContain('****************');
 
-      // Branch: computedData watcher triggers refreshData (lines 129-130)
       dynamicStore.commit('updatePasscode', 'new-passcode-456');
       await nextTick();
       await nextTick();
 
-      // Content should be refreshed with new masked passcode
-      expect(contentText.text()).toContain('****************'); // New masked passcode
+      expect(contentText.text()).toContain('****************');
     });
   });
 
@@ -282,16 +257,13 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Test content [EMAIL] and [PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
         },
       });
 
-      // Test template rendering
-      expect(wrapper.find('.tabContent').exists()).toBe(true);
-      expect(wrapper.find('.copy_action').exists()).toBe(true);
       expect(wrapper.find('[data-test="rum-copy-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="rum-content-text"]').exists()).toBe(true);
     });
@@ -305,20 +277,19 @@ describe('CopyContent.vue Branch Coverage', () => {
           displayContent: 'Displayed User: [EMAIL], Auth: [BASIC_PASSCODE]',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
         },
       });
 
-      // Test that all replacement patterns work together
       const contentText = wrapper.find('[data-test="rum-content-text"]');
       const displayedText = contentText.text();
-      
+
       expect(displayedText).toContain('Displayed User:');
-      expect(displayedText).toContain('****************'); // Masked email
-      expect(displayedText).toContain('***************************************'); // Masked basic passcode
+      expect(displayedText).toContain('****************');
+      expect(displayedText).toContain('***************************************');
     });
 
     it('should handle content without any replacement patterns', async () => {
@@ -327,7 +298,7 @@ describe('CopyContent.vue Branch Coverage', () => {
           content: 'Simple content without any patterns',
         },
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [mockI18n],
           provide: {
             store: mockStore,
           },
@@ -337,12 +308,18 @@ describe('CopyContent.vue Branch Coverage', () => {
       const contentText = wrapper.find('[data-test="rum-content-text"]');
       expect(contentText.text()).toBe('Simple content without any patterns');
 
-      // Test copying content without patterns
       mockCopyToClipboard.mockResolvedValueOnce(true);
       const copyButton = wrapper.find('[data-test="rum-copy-btn"]');
       await copyButton.trigger('click');
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith('Simple content without any patterns');
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        'Simple content without any patterns',
+        {
+          successMessage: 'Content Copied Successfully!',
+          errorMessage: 'Error while copy content.',
+          timeout: 5000,
+        },
+      );
     });
   });
 });

@@ -1,80 +1,43 @@
-// Copyright 2026 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
 import i18n from "@/locales";
+
+// ---------------------------------------------------------------------------
+// DOM node for attachTo
+// ---------------------------------------------------------------------------
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
-});
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
 
-// Mock AppTable component
-vi.mock("@/components/AppTable.vue", () => ({
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "AppTable",
+    name: "OTable",
     template: `
-      <div data-test="app-table">
-        <div v-for="(column, index) in columns" :key="index" class="column">
-          {{ column.label }}
+      <div data-test="o-table">
+        <div v-for="(row, index) in data" :key="index" data-test="table-row">
+          <slot name="cell-type" :row="row" />
+          <slot name="cell-description" :row="row" />
         </div>
-        <div v-for="(row, index) in rows" :key="index" class="row-data">
-          {{ row.type }}
-        </div>
-        <template v-for="slot in Object.keys($slots)" :key="slot">
-          <div :data-test="'slot-' + slot">
-            <slot :name="slot" :column="{ row: mockRowData }" />
-          </div>
-        </template>
       </div>
     `,
-    props: ["columns", "rows"],
-    setup() {
-      return {
-        mockRowData: {
-          type: "error",
-          error_type: "TypeError",
-          _timestamp: 1704110400000000,
-        },
-      };
-    },
+    props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter"],
   },
 }));
 
-// Mock ErrorEventDescription
-vi.mock(
-  "@/components/rum/errorTracking/view/ErrorEventDescription.vue",
-  () => ({
-    default: {
-      name: "ErrorEventDescription",
-      template:
-        '<div data-test="error-event-description">{{ column.type }}</div>',
-      props: ["column"],
-    },
-  }),
-);
+vi.mock("@/components/rum/errorTracking/view/ErrorEventDescription.vue", () => ({
+  default: {
+    name: "ErrorEventDescription",
+    template: '<div data-test="error-event-description">{{ column.type }}</div>',
+    props: ["column"],
+  },
+}));
 
-// Mock ErrorTypeIcons
 vi.mock("@/components/rum/errorTracking/view/ErrorTypeIcons.vue", () => ({
   default: {
     name: "ErrorTypeIcons",
@@ -83,519 +46,569 @@ vi.mock("@/components/rum/errorTracking/view/ErrorTypeIcons.vue", () => ({
   },
 }));
 
-// Mock date formatting
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    date: {
-      formatDate: vi.fn((timestamp, format) => {
-        if (format === "MMM DD, YYYY HH:mm:ss Z") {
-          return "Jan 01, 2024 10:00:00 +0000";
-        }
-        return "Jan 01, 2024 10:00:00 +0000";
-      }),
+vi.mock("@/components/shared/grid/NoData.vue", () => ({
+  default: {
+    name: "NoData",
+    template: '<div data-test="no-data" />',
+  },
+}));
+
+vi.mock("@/utils/date", () => ({
+  formatDate: vi.fn((_timestamp: number, _format: string) => "Jan 01, 2024 10:00:00 +0000"),
+}));
+
+// ---------------------------------------------------------------------------
+// Test data
+// ---------------------------------------------------------------------------
+
+const mockError = {
+  events: [
+    {
+      type: "error",
+      error_type: "TypeError",
+      error_message: "Cannot read property 'foo' of undefined",
+      _timestamp: 1704110400000000,
     },
-  };
-});
+    {
+      type: "resource",
+      resource_type: "xhr",
+      resource_url: "https://api.example.com/data",
+      _timestamp: 1704110410000000,
+    },
+    {
+      type: "view",
+      view_loading_type: "route_change",
+      view_url: "/dashboard",
+      _timestamp: 1704110420000000,
+    },
+    {
+      type: "action",
+      action_type: "click",
+      _oo_action_target_text: "Submit Button",
+      _timestamp: 1704110430000000,
+    },
+  ],
+};
 
-describe("ErrorEvents Component", () => {
-  let wrapper: any;
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-  const mockError = {
-    events: [
-      {
-        type: "error",
-        error_type: "TypeError",
-        error_message: "Cannot read property 'foo' of undefined",
-        _timestamp: 1704110400000000,
-      },
-      {
-        type: "resource",
-        resource_type: "xhr",
-        resource_url: "https://api.example.com/data",
-        _timestamp: 1704110410000000,
-      },
-      {
-        type: "view",
-        view_loading_type: "route_change",
-        view_url: "/dashboard",
-        _timestamp: 1704110420000000,
-      },
-      {
-        type: "action",
-        action_type: "click",
-        _oo_action_target_text: "Submit Button",
-        _timestamp: 1704110430000000,
-      },
-    ],
-  };
+function mountComponent(props: Record<string, any> = {}) {
+  return mount(ErrorEvents, {
+    attachTo: "#app",
+    props: { error: mockError, ...props },
+    global: { plugins: [i18n] },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("ErrorEvents", () => {
+  let wrapper: ReturnType<typeof mountComponent>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-
-    wrapper = mount(ErrorEvents, {
-      attachTo: "#app",
-      props: {
-        error: mockError,
-      },
-      global: {
-        plugins: [i18n],
-      },
-    });
-
+    wrapper = mountComponent();
     await flushPromises();
     await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
     vi.clearAllTimers();
     vi.restoreAllMocks();
   });
 
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
+  // =========================================================================
+  // Component mounting
+  // =========================================================================
+
+  describe("component mounting", () => {
+    it("mounts successfully", () => {
+      // Assert
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should render main container with correct classes", () => {
-      const container = wrapper.find(".q-mt-lg");
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("q-mt-lg");
-    });
-
-    it("should render AppTable component", () => {
-      const appTable = wrapper.find('[data-test="app-table"]');
-      expect(appTable.exists()).toBe(true);
+    it("renders OTable component", () => {
+      // Assert
+      expect(wrapper.find('[data-test="o-table"]').exists()).toBe(true);
     });
   });
 
-  describe("Title Display", () => {
-    it("should display 'Events' title", () => {
+  // =========================================================================
+  // Title display
+  // =========================================================================
+
+  describe("title display", () => {
+    it("displays 'Events' title via the tags-title element", () => {
+      // Act
       const title = wrapper.find(".tags-title");
+
+      // Assert
       expect(title.exists()).toBe(true);
       expect(title.text()).toBe("Events");
     });
-
-    it("should have correct title styling", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-sm");
-      expect(title.classes()).toContain("q-ml-xs");
-    });
   });
 
-  describe("Column Configuration", () => {
-    it("should have correct number of columns", () => {
+  // =========================================================================
+  // Column configuration
+  // =========================================================================
+
+  describe("column configuration", () => {
+    it("has exactly 5 columns defined", () => {
+      // Assert
       expect(wrapper.vm.columns).toHaveLength(5);
     });
 
-    it("should have type column with slot", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      expect(typeColumn).toBeDefined();
-      expect(typeColumn.label).toBe("Type");
-      expect(typeColumn.slot).toBe(true);
-      expect(typeColumn.slotName).toBe("error-type");
+    it("has a 'type' column with cell slot marker", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "type");
+
+      // Assert
+      expect(col).toBeDefined();
+      expect(col.header).toBe("Type");
+      expect(col.cell).toBe(" ");
+      expect(col.accessorKey).toBe("type");
     });
 
-    it("should have category column with field function", () => {
-      const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
-      );
-      expect(categoryColumn).toBeDefined();
-      expect(categoryColumn.label).toBe("Category");
-      expect(typeof categoryColumn.field).toBe("function");
-      expect(typeof categoryColumn.prop).toBe("function");
+    it("has a 'category' column with accessorFn", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "category");
+
+      // Assert
+      expect(col).toBeDefined();
+      expect(col.header).toBe("Category");
+      expect(typeof col.accessorFn).toBe("function");
     });
 
-    it("should have description column with slot", () => {
-      const descColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "description",
-      );
-      expect(descColumn).toBeDefined();
-      expect(descColumn.label).toBe("Description");
-      expect(descColumn.slot).toBe(true);
-      expect(descColumn.slotName).toBe("description");
+    it("has a 'description' column with cell slot marker", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "description");
+
+      // Assert
+      expect(col).toBeDefined();
+      expect(col.header).toBe("Description");
+      expect(col.cell).toBe(" ");
     });
 
-    it("should have level column with field function", () => {
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
-      expect(levelColumn).toBeDefined();
-      expect(levelColumn.label).toBe("Level");
-      expect(typeof levelColumn.field).toBe("function");
+    it("has a 'level' column with accessorFn", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "level");
+
+      // Assert
+      expect(col).toBeDefined();
+      expect(col.header).toBe("Level");
+      expect(typeof col.accessorFn).toBe("function");
     });
 
-    it("should have timestamp column with field function", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      expect(timestampColumn).toBeDefined();
-      expect(timestampColumn.label).toBe("Timestamp");
-      expect(typeof timestampColumn.field).toBe("function");
+    it("has a 'timestamp' column with accessorFn", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "timestamp");
+
+      // Assert
+      expect(col).toBeDefined();
+      expect(col.header).toBe("Timestamp");
+      expect(typeof col.accessorFn).toBe("function");
     });
   });
 
-  describe("Error Category Logic", () => {
-    it("should return error type for error events", () => {
-      const mockRow = { type: "error", error_type: "TypeError" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
+  // =========================================================================
+  // Error category logic
+  // =========================================================================
+
+  describe("error category logic", () => {
+    it("returns error_type for error events", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "error", error_type: "TypeError" });
+
+      // Assert
       expect(result).toBe("TypeError");
     });
 
-    it("should return 'Error' for error events without error_type", () => {
-      const mockRow = { type: "error" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
+    it("returns 'Error' for error events without error_type", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "error" });
+
+      // Assert
       expect(result).toBe("Error");
     });
 
-    it("should return resource type for resource events", () => {
-      const mockRow = { type: "resource", resource_type: "xhr" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
+    it("returns resource_type for resource events", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "resource", resource_type: "xhr" });
+
+      // Assert
       expect(result).toBe("xhr");
     });
 
-    it("should return 'Navigation' for route change views", () => {
-      const mockRow = { type: "view", view_loading_type: "route_change" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
+    it("returns 'Navigation' for view events with view_loading_type=route_change", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "view", view_loading_type: "route_change" });
+
+      // Assert
       expect(result).toBe("Navigation");
     });
 
-    it("should return 'Reload' for non-route change views", () => {
-      const mockRow = { type: "view", view_loading_type: "initial_load" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
+    it("returns 'Reload' for view events with other view_loading_type", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "view", view_loading_type: "initial_load" });
+
+      // Assert
       expect(result).toBe("Reload");
     });
 
-    it("should return action type for action events", () => {
-      const mockRow = { type: "action", action_type: "click" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
+    it("returns action_type for action events", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "action", action_type: "click" });
+
+      // Assert
       expect(result).toBe("click");
     });
 
-    it("should return type for unknown event types", () => {
-      const mockRow = { type: "unknown_type" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
+    it("returns type field for unknown event types", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "unknown_type" });
+
+      // Assert
       expect(result).toBe("unknown_type");
     });
   });
 
-  describe("Column Field Functions", () => {
-    it("should compute category field correctly", () => {
-      const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
-      );
-      const mockRow = { type: "error", error_type: "ReferenceError" };
+  // =========================================================================
+  // Column accessor functions
+  // =========================================================================
 
-      const fieldResult = categoryColumn.field(mockRow);
-      const propResult = categoryColumn.prop(mockRow);
+  describe("column accessor functions", () => {
+    it("category accessorFn delegates to getErrorCategory", () => {
+      // Arrange
+      const col = wrapper.vm.columns.find((c: any) => c.id === "category");
+      const row = { type: "error", error_type: "ReferenceError" };
 
-      expect(fieldResult).toBe("ReferenceError");
-      expect(propResult).toBe("ReferenceError");
+      // Act
+      const result = col.accessorFn(row);
+
+      // Assert
+      expect(result).toBe("ReferenceError");
     });
 
-    it("should compute level field correctly for error events", () => {
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
+    it("level accessorFn returns 'error' for error type rows", () => {
+      // Arrange
+      const col = wrapper.vm.columns.find((c: any) => c.id === "level");
 
-      expect(levelColumn.field(errorRow)).toBe("error");
-      expect(levelColumn.field(nonErrorRow)).toBe("info");
-      expect(levelColumn.prop(errorRow)).toBe("error");
-      expect(levelColumn.prop(nonErrorRow)).toBe("info");
+      // Act + Assert
+      expect(col.accessorFn({ type: "error" })).toBe("error");
     });
 
-    it("should compute timestamp field correctly", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      const mockRow = { _timestamp: 1704110400000000 };
+    it("level accessorFn returns 'info' for non-error type rows", () => {
+      // Arrange
+      const col = wrapper.vm.columns.find((c: any) => c.id === "level");
 
-      const result = timestampColumn.field(mockRow);
+      // Act + Assert
+      expect(col.accessorFn({ type: "view" })).toBe("info");
+    });
+
+    it("timestamp accessorFn returns formatted date string", () => {
+      // Arrange
+      const col = wrapper.vm.columns.find((c: any) => c.id === "timestamp");
+
+      // Act
+      const result = col.accessorFn({ _timestamp: 1704110400000000 });
+
+      // Assert
       expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
     });
   });
 
-  describe("Column Styling", () => {
-    it("should apply error styling to error rows", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
+  // =========================================================================
+  // Column metadata
+  // =========================================================================
 
-      const errorStyle = typeColumn.style(errorRow);
-      const nonErrorStyle = typeColumn.style(nonErrorRow);
+  describe("column metadata", () => {
+    it("sets cellClass='error-type' for the type column", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "type");
 
-      expect(errorStyle).toBe("border-bottom: 1px solid red");
-      expect(nonErrorStyle).toBe("");
+      // Assert
+      expect(col.meta.cellClass).toBe("error-type");
     });
 
-    it("should apply error styling to level column with color", () => {
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
+    it("sets cellClass='description-column' for the description column", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "description");
 
-      const errorStyle = levelColumn.style(errorRow);
-      const nonErrorStyle = levelColumn.style(nonErrorRow);
-
-      expect(errorStyle).toBe("color: red; border-bottom: 1px solid red");
-      expect(nonErrorStyle).toBe("");
+      // Assert
+      expect(col.meta.cellClass).toBe("description-column");
     });
 
-    it("should apply consistent styling across all columns for error rows", () => {
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
+    it("sets cellClass='error-level' for the level column", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "level");
 
-      const columnsWithStyling = wrapper.vm.columns.filter(
-        (col: any) => col.style,
-      );
-
-      columnsWithStyling.forEach((column: any) => {
-        if (column.name === "level") {
-          expect(column.style(errorRow)).toContain("color: red");
-        } else {
-          expect(column.style(errorRow)).toBe("border-bottom: 1px solid red");
-        }
-        expect(column.style(nonErrorRow)).toBe("");
-      });
+      // Assert
+      expect(col.meta.cellClass).toBe("error-level");
     });
   });
 
-  describe("Slot Integration", () => {
-    it("should render error-type slot", () => {
-      const errorTypeSlot = wrapper.find('[data-test="slot-error-type"]');
-      expect(errorTypeSlot.exists()).toBe(true);
+  // =========================================================================
+  // Sortable columns
+  // =========================================================================
+
+  describe("sortable columns", () => {
+    it("marks type column as sortable", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "type");
+
+      // Assert
+      expect(col.sortable).toBe(true);
     });
 
-    it("should render description slot", () => {
-      const descriptionSlot = wrapper.find('[data-test="slot-description"]');
-      expect(descriptionSlot.exists()).toBe(true);
+    it("marks category column as sortable", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "category");
+
+      // Assert
+      expect(col.sortable).toBe(true);
     });
 
-    it("should pass correct data to error type slot", () => {
-      const errorTypeIcons = wrapper.findComponent({ name: "ErrorTypeIcons" });
-      expect(errorTypeIcons.exists()).toBe(true);
-      expect(errorTypeIcons.props("column")).toEqual({
-        type: "error",
-        error_type: "TypeError",
-        _timestamp: 1704110400000000,
-      });
+    it("marks description column as sortable", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "description");
+
+      // Assert
+      expect(col.sortable).toBe(true);
     });
 
-    it("should pass correct data to description slot", () => {
-      const errorEventDescription = wrapper.findComponent({
-        name: "ErrorEventDescription",
-      });
-      expect(errorEventDescription.exists()).toBe(true);
-      expect(errorEventDescription.props("column")).toEqual({
-        type: "error",
-        error_type: "TypeError",
-        _timestamp: 1704110400000000,
-      });
-    });
-  });
+    it("marks timestamp column as sortable", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "timestamp");
 
-  describe("Props Integration", () => {
-    it("should pass columns to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("columns")).toEqual(wrapper.vm.columns);
+      // Assert
+      expect(col.sortable).toBe(true);
     });
 
-    it("should pass events data to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(mockError.events);
-    });
+    it("does not mark level column as sortable", () => {
+      // Act
+      const col = wrapper.vm.columns.find((c: any) => c.id === "level");
 
-    it("should handle empty events array", async () => {
-      await wrapper.setProps({
-        error: { events: [] },
-      });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
-    });
-
-    it("should handle missing events property", async () => {
-      await wrapper.setProps({
-        error: {},
-      });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
-    });
-
-    it("should handle null events", async () => {
-      await wrapper.setProps({
-        error: { events: null },
-      });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
+      // Assert
+      expect(col.sortable).toBeFalsy();
     });
   });
 
-  describe("Date Formatting", () => {
-    it("should have getFormattedDate function", () => {
+  // =========================================================================
+  // Slot integration
+  // =========================================================================
+
+  describe("slot integration", () => {
+    it("renders ErrorTypeIcons inside cell-type slot", () => {
+      // Assert
+      expect(wrapper.findComponent({ name: "ErrorTypeIcons" }).exists()).toBe(true);
+    });
+
+    it("renders ErrorEventDescription inside cell-description slot", () => {
+      // Assert
+      expect(wrapper.findComponent({ name: "ErrorEventDescription" }).exists()).toBe(true);
+    });
+
+    it("passes first row data to ErrorTypeIcons via column prop", () => {
+      // Act
+      const icons = wrapper.findComponent({ name: "ErrorTypeIcons" });
+
+      // Assert
+      expect(icons.props("column")).toEqual(mockError.events[0]);
+    });
+
+    it("passes first row data to ErrorEventDescription via column prop", () => {
+      // Act
+      const desc = wrapper.findComponent({ name: "ErrorEventDescription" });
+
+      // Assert
+      expect(desc.props("column")).toEqual(mockError.events[0]);
+    });
+  });
+
+  // =========================================================================
+  // Props integration
+  // =========================================================================
+
+  describe("props integration", () => {
+    it("passes columns to OTable", () => {
+      // Act
+      const oTable = wrapper.findComponent({ name: "OTable" });
+
+      // Assert
+      expect(oTable.props("columns")).toEqual(wrapper.vm.columns);
+    });
+
+    it("passes events data to OTable", () => {
+      // Act
+      const oTable = wrapper.findComponent({ name: "OTable" });
+
+      // Assert
+      expect(oTable.props("data")).toEqual(mockError.events);
+    });
+
+    it("passes empty array to OTable when events array is empty", async () => {
+      // Act
+      await wrapper.setProps({ error: { events: [] } });
+      const oTable = wrapper.findComponent({ name: "OTable" });
+
+      // Assert
+      expect(oTable.props("data")).toEqual([]);
+    });
+
+    it("passes empty array to OTable when events property is missing", async () => {
+      // Act
+      await wrapper.setProps({ error: {} });
+      const oTable = wrapper.findComponent({ name: "OTable" });
+
+      // Assert
+      expect(oTable.props("data")).toEqual([]);
+    });
+
+    it("passes empty array to OTable when events is null", async () => {
+      // Act
+      await wrapper.setProps({ error: { events: null } });
+      const oTable = wrapper.findComponent({ name: "OTable" });
+
+      // Assert
+      expect(oTable.props("data")).toEqual([]);
+    });
+  });
+
+  // =========================================================================
+  // Date formatting
+  // =========================================================================
+
+  describe("date formatting", () => {
+    it("exposes getFormattedDate as a function", () => {
+      // Assert
       expect(typeof wrapper.vm.getFormattedDate).toBe("function");
     });
 
-    it("should format timestamps correctly", () => {
+    it("returns formatted date string from getFormattedDate", () => {
+      // Act
       const result = wrapper.vm.getFormattedDate(1704110400);
+
+      // Assert
       expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
     });
 
-    it("should handle different timestamp formats", () => {
+    it("handles millisecond timestamps by dividing by 1000", () => {
+      // Arrange
       const microseconds = 1704110400000000;
       const milliseconds = microseconds / 1000;
 
+      // Act
       const result = wrapper.vm.getFormattedDate(milliseconds);
+
+      // Assert
       expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
     });
   });
 
-  describe("Props Validation", () => {
-    it("should require error prop", () => {
-      expect(ErrorEvents.props?.error?.required).toBe(true);
-      expect(ErrorEvents.props?.error?.type).toBe(Object);
+  // =========================================================================
+  // Props validation
+  // =========================================================================
+
+  describe("props validation", () => {
+    it("error prop is required", () => {
+      // Assert
+      expect((ErrorEvents as any).props?.error?.required).toBe(true);
     });
 
-    it("should handle different error structures", async () => {
+    it("error prop type is Object", () => {
+      // Assert
+      expect((ErrorEvents as any).props?.error?.type).toBe(Object);
+    });
+
+    it("handles custom error structures (uses events array only)", async () => {
+      // Arrange
       const customError = {
-        events: [
-          {
-            type: "custom",
-            custom_field: "value",
-            _timestamp: 1704110500000000,
-          },
-        ],
+        events: [{ type: "custom", custom_field: "value", _timestamp: 1704110500000000 }],
         other_field: "ignored",
       };
 
+      // Act
       await wrapper.setProps({ error: customError });
+      const oTable = wrapper.findComponent({ name: "OTable" });
 
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(customError.events);
+      // Assert
+      expect(oTable.props("data")).toEqual(customError.events);
     });
   });
 
-  describe("Column Classes", () => {
-    it("should apply correct CSS classes to columns", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const descColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "description",
-      );
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
+  // =========================================================================
+  // Edge cases
+  // =========================================================================
 
-      expect(typeColumn.classes).toBe("error-type");
-      expect(descColumn.classes).toBe("description-column");
-      expect(levelColumn.classes).toBe("error-level");
+  describe("edge cases", () => {
+    it("getErrorCategory returns the type itself for incomplete row data", () => {
+      // Act
+      const result = wrapper.vm.getErrorCategory({ type: "incomplete" });
+
+      // Assert
+      expect(result).toBe("incomplete");
     });
 
-    it("should mark appropriate columns as sortable", () => {
-      const sortableColumns = wrapper.vm.columns.filter(
-        (col: any) => col.sortable,
-      );
-      const sortableNames = sortableColumns.map((col: any) => col.name);
+    it("timestamp accessorFn does not throw for invalid timestamp", () => {
+      // Arrange
+      const col = wrapper.vm.columns.find((c: any) => c.id === "timestamp");
 
-      expect(sortableNames).toContain("type");
-      expect(sortableNames).toContain("category");
-      expect(sortableNames).toContain("description");
-      expect(sortableNames).toContain("timestamp");
-      expect(sortableNames).not.toContain("level"); // level is not sortable
-    });
-  });
-
-  describe("Component Structure", () => {
-    it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const title = container.find(".tags-title");
-      const appTable = container.findComponent({ name: "AppTable" });
-
-      expect(container.exists()).toBe(true);
-      expect(title.exists()).toBe(true);
-      expect(appTable.exists()).toBe(true);
+      // Act + Assert
+      expect(() => col.accessorFn({ _timestamp: "invalid" })).not.toThrow();
     });
 
-    it("should maintain correct order of elements", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const children = Array.from(container.element.children);
+    it("category accessorFn throws when row is null (expected behaviour)", () => {
+      // Arrange
+      const col = wrapper.vm.columns.find((c: any) => c.id === "category");
 
-      expect(children[0].classList.contains("tags-title")).toBe(true);
-      expect(children[1].getAttribute("data-test")).toBe("app-table");
+      // Act + Assert
+      expect(() => col.accessorFn(null)).toThrow();
     });
   });
 
-  describe("Edge Cases", () => {
-    it("should handle events with missing fields", () => {
-      const incompleteRow = { type: "incomplete" };
+  // =========================================================================
+  // Performance
+  // =========================================================================
 
-      const categoryResult = wrapper.vm.getErrorCategory(incompleteRow);
-      expect(categoryResult).toBe("incomplete");
-    });
-
-    it("should handle malformed timestamps", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      const invalidRow = { _timestamp: "invalid" };
-
-      expect(() => timestampColumn.field(invalidRow)).not.toThrow();
-    });
-
-    it("should handle null row data", () => {
-      const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
-      );
-
-      // The actual component will error on null data - this reflects real behavior
-      expect(() => categoryColumn.field(null)).toThrow();
-    });
-  });
-
-  describe("Performance", () => {
-    it("should efficiently handle large event arrays", async () => {
-      const largeEvents = Array.from({ length: 1000 }, (_, index) => ({
-        type: index % 2 === 0 ? "error" : "view",
-        error_type: "TestError" + index,
-        _timestamp: 1704110400000000 + index,
+  describe("performance", () => {
+    it("handles 1000 events without errors", async () => {
+      // Arrange
+      const largeEvents = Array.from({ length: 1000 }, (_, i) => ({
+        type: i % 2 === 0 ? "error" : "view",
+        error_type: "TestError" + i,
+        _timestamp: 1704110400000000 + i,
       }));
 
-      await wrapper.setProps({
-        error: { events: largeEvents },
-      });
+      // Act
+      await wrapper.setProps({ error: { events: largeEvents } });
+      const oTable = wrapper.findComponent({ name: "OTable" });
 
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toHaveLength(1000);
+      // Assert
+      expect(oTable.props("data")).toHaveLength(1000);
     });
   });
 
-  describe("Component Lifecycle", () => {
-    it("should handle rapid prop changes", async () => {
+  // =========================================================================
+  // Component lifecycle
+  // =========================================================================
+
+  describe("component lifecycle", () => {
+    it("updates OTable data on rapid prop changes", async () => {
+      // Arrange
       const events1 = [{ type: "error", _timestamp: 1 }];
       const events2 = [{ type: "view", _timestamp: 2 }];
       const events3 = [{ type: "action", _timestamp: 3 }];
 
+      // Act + Assert
       for (const events of [events1, events2, events3]) {
         await wrapper.setProps({ error: { events } });
-        const appTable = wrapper.findComponent({ name: "AppTable" });
-        expect(appTable.props("rows")).toEqual(events);
+        const oTable = wrapper.findComponent({ name: "OTable" });
+        expect(oTable.props("data")).toEqual(events);
       }
     });
   });

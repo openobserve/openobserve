@@ -16,9 +16,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
-import { copyToClipboard, Notify } from "quasar";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { nextTick } from "vue";
+import { copyToClipboard } from "@/utils/clipboard";
+import { nextTick, ref } from "vue";
+import { createRouter, createMemoryHistory } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -47,17 +47,21 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-vi.mock("quasar", async () => {
-  const actual: any = await vi.importActual("quasar");
-  return {
-    ...actual,
-    copyToClipboard: vi.fn()
-  };
-});
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
 
-installQuasar({
-  plugins: [Notify]
-});
+// Keep a simple quasar mock to prevent import errors from transitive dependencies
+vi.mock("quasar", () => ({
+  copyToClipboard: vi.fn(),
+}));
+
+const mockCopyToClipboardOptions = {
+  successMessage: "Content Copied Successfully!",
+  errorMessage: "Error while copy content.",
+  timeout: 5000,
+};
+
 
 describe("IngestLogs Index Component", () => {
   let wrapper: any = null;
@@ -81,10 +85,10 @@ describe("IngestLogs Index Component", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          "q-splitter": true,
-          "q-tabs": true,
-          "q-route-tab": true,
-          "router-view": true
+          OSplitter: true,
+          OTabs: true,
+          ORouteTab: true,
+          RouterView: true,
         }
       }
     });
@@ -170,22 +174,18 @@ describe("IngestLogs Index Component", () => {
 
     it("should copy content to clipboard successfully", async () => {
       const mockContent = { innerText: "test content" };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content");
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test content",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle clipboard copy failure", () => {
       const mockContent = { innerText: "test content" };
-      (copyToClipboard as any).mockRejectedValue(new Error("Copy failed"));
+      (copyToClipboard as any).mockRejectedValueOnce(new Error("Copy failed"));
 
       // Test that the function doesn't throw when called
       expect(() => {
@@ -195,8 +195,7 @@ describe("IngestLogs Index Component", () => {
 
     it("should track segment analytics on copy", async () => {
       const mockContent = { innerText: "test content" };
-      (copyToClipboard as any).mockResolvedValue(true);
-      
+
       // Get the mocked segment analytics module
       const segmentModule = await import("@/services/segment_analytics");
       const mockSegmentAnalytics = segmentModule.default;
@@ -214,58 +213,61 @@ describe("IngestLogs Index Component", () => {
 
     it("should handle empty content", async () => {
       const mockContent = { innerText: "" };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("");
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with whitespace", async () => {
       const mockContent = { innerText: "  test content  " };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("  test content  ");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "  test content  ",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with special characters", async () => {
       const mockContent = { innerText: "test@#$%^&*()content" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test@#$%^&*()content");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test@#$%^&*()content",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with newlines", async () => {
       const mockContent = { innerText: "line1\nline2\nline3" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("line1\nline2\nline3");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "line1\nline2\nline3",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle content with HTML entities", async () => {
       const mockContent = { innerText: "test &amp; content &lt; &gt;" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test &amp; content &lt; &gt;");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test &amp; content &lt; &gt;",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should track analytics with correct current route name", async () => {
       const mockContent = { innerText: "test" };
-      (copyToClipboard as any).mockResolvedValue(true);
       wrapper.vm.router.currentRoute.value.name = "fluentbit";
 
       // Get the mocked segment analytics module
@@ -274,10 +276,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith("Button Click", 
+      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith(
+        "Button Click",
         expect.objectContaining({
-          ingestion: "fluentbit"
-        })
+          ingestion: "fluentbit",
+        }),
       );
     });
   });
@@ -333,7 +336,7 @@ describe("IngestLogs Index Component", () => {
   // Template and UI Tests
   describe("Template and UI", () => {
     it("should render splitter component", () => {
-      expect(wrapper.find('q-splitter-stub').exists()).toBe(true);
+      expect(wrapper.find("o-splitter-stub").exists()).toBe(true);
     });
 
     it("should have template structure", () => {
@@ -446,46 +449,47 @@ describe("IngestLogs Index Component", () => {
   describe("Edge Cases", () => {
     it("should handle null content in copyToClipboardFn", async () => {
       const mockContent = { innerText: null };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(null);
-      expect(notifySpy).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
-        timeout: 5000,
-      });
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        null,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle undefined content in copyToClipboardFn", async () => {
       const mockContent = { innerText: undefined };
-      (copyToClipboard as any).mockResolvedValue(true);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle missing innerText property", async () => {
       const mockContent = {};
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        undefined,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle very long content", async () => {
       const longContent = "a".repeat(10000);
       const mockContent = { innerText: longContent };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(longContent);
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        longContent,
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle rapid successive calls to showUpdateDialogFn", () => {
@@ -501,11 +505,13 @@ describe("IngestLogs Index Component", () => {
   describe("Event Handling", () => {
     it("should handle copy-to-clipboard functionality", async () => {
       const mockContent = { innerText: "test" };
-      (copyToClipboard as any).mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test",
+        mockCopyToClipboardOptions,
+      );
     });
 
     it("should handle component updates", async () => {
@@ -536,17 +542,88 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
-            "router-view": true
-          }
-        }
+            OSplitter: true,
+            OTabs: true,
+            ORouteTab: true,
+            RouterView: true,
+          },
+        },
       });
 
       expect(() => {
         testWrapper.unmount();
       }).not.toThrow();
+    });
+
+    it("should redirect to curl when route name is ingestLogs on beforeMount", async () => {
+      const pushSpy = vi.fn();
+      const mockIngestLogsRouter = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            name: "ingestLogs",
+          },
+        ],
+      });
+      // Push to set initial route synchronously before mounting
+      await mockIngestLogsRouter.push("/");
+      mockIngestLogsRouter.push = pushSpy;
+
+      const testWrapper = mount(Index, {
+        props: mockProps,
+        global: {
+          plugins: [store, mockIngestLogsRouter, i18n],
+          stubs: {
+            OSplitter: true,
+            OTabs: true,
+            ORouteTab: true,
+            RouterView: true,
+          },
+        },
+      });
+
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "curl" }),
+      );
+      testWrapper.unmount();
+    });
+
+    it("should redirect to curl when route name becomes ingestLogs on updated", async () => {
+      const DummyComponent = { template: "<div />" };
+      const mockIngestLogsRouter = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "curl", component: DummyComponent },
+          { path: "/ingest", name: "ingestLogs", component: DummyComponent },
+        ],
+      });
+      // Push to set initial route synchronously before mounting
+      await mockIngestLogsRouter.push("/");
+
+      const testWrapper = mount(Index, {
+        props: mockProps,
+        global: {
+          plugins: [store, mockIngestLogsRouter, i18n],
+          stubs: {
+            OSplitter: true,
+            OTabs: true,
+            ORouteTab: true,
+          },
+        },
+      });
+
+      // Navigate to ingestLogs route
+      await mockIngestLogsRouter.push({ name: "ingestLogs" });
+      await flushPromises();
+
+      // Trigger a component update via prop change so onUpdated fires
+      await testWrapper.setProps({ currOrgIdentifier: "triggered-org" });
+      await flushPromises();
+
+      // The onUpdated hook should have redirected to "curl"
+      expect(mockIngestLogsRouter.currentRoute.value.name).toBe("curl");
+      testWrapper.unmount();
     });
   });
 });

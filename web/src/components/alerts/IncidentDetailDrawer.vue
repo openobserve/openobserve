@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="incident-detail-page" class="q-pa-none" style="height: calc(100vh - 50px); overflow: hidden;">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
+  <div class="tw:rounded-md tw:p-0" data-test="incident-detail-page">
+    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pt-1 tw:pb-2.5">
     <!-- Header -->
-    <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
-      <div class="flex items-center tw:gap-3 tw:flex-1">
+    <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-2.5 tw:h-[68px] tw:px-2.5 tw:mb-2.5">
+      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1">
         <div
           data-test="incident-detail-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('alerts.incidents.goBack')"
           @click="close"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="text-h6">
+        <div class="tw:text-xl tw:font-semibold">
           {{ t('alerts.incidents.incident') }}
         </div>
         <!-- Incident name with colored indicator -->
@@ -61,60 +61,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="incident-detail-title"
         >
           {{ incidentDetails.title }}
-          <q-tooltip v-if="incidentDetails && incidentDetails.title.length > 35" class="tw:text-sm">
-            {{ incidentDetails.title }}
-          </q-tooltip>
+          <OTooltip v-if="incidentDetails && incidentDetails.title.length > 35" :content="incidentDetails.title" />
         </span>
       </div>
 
       <!-- Compact Status, Severity, Alerts badges at extreme right -->
       <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
         <!-- Status Badge -->
-        <q-badge
-          :color="getStatusColor(incidentDetails.status)"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          style="height: 33px;"
-          outline
+        <OBadge
+          :variant="getStatusVariant(incidentDetails.status)"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
-            <q-icon name="info" size="14px" />
+            <OIcon name="info" size="xs" />
             <span>{{ getStatusLabel(incidentDetails.status) }}</span>
           </div>
-          <q-tooltip :delay="200" class="tw:text-sm">
-            {{ t("alerts.incidents.status") }}: {{ getStatusLabel(incidentDetails.status) }}
-          </q-tooltip>
-        </q-badge>
+          <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
+        </OBadge>
 
         <!-- Severity Badge -->
-        <q-badge
-          :style="{ color: getSeverityColorHex(incidentDetails.severity), height: '33px' }"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          outline
+        <OBadge
+          :variant="getSeverityVariant(incidentDetails.severity)"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
-            <q-icon name="warning" size="14px" />
+            <OIcon name="warning" size="xs" />
             <span>{{ incidentDetails.severity }}</span>
           </div>
-          <q-tooltip :delay="200" class="tw:text-sm">
-            {{ t("alerts.incidents.severity") }}: {{ incidentDetails.severity }}
-          </q-tooltip>
-        </q-badge>
+          <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
+        </OBadge>
 
         <!-- Alert Count Badge -->
-        <q-badge
-          color="primary"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          style="height: 33px;"
-          outline
+        <OBadge
+          variant="primary-soft"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
-            <q-icon name="notifications_active" size="14px" />
+            <OIcon name="notifications-active" size="xs" />
             <span>{{ triggers.length }} Alerts</span>
           </div>
-          <q-tooltip :delay="200" class="tw:text-sm">
-            {{ t("alerts.incidents.alertCount") }}: {{ triggers.length }} correlated alerts
-          </q-tooltip>
-        </q-badge>
+          <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
+        </OBadge>
       </div>
 
       <!-- Save/Cancel buttons when editing -->
@@ -148,28 +135,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="updating"
           @click="acknowledgeIncident"
-        >{{ t("alerts.incidents.acknowledge") }}<q-tooltip :delay="500">{{ t("alerts.incidents.markAsAcknowledgedTooltip") }}</q-tooltip></OButton>
+        >{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status !== 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="resolveIncident"
-        >{{ t("alerts.incidents.resolve") }}<q-tooltip :delay="500">{{ t("alerts.incidents.markAsResolvedTooltip") }}</q-tooltip></OButton>
+        >{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status === 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="reopenIncident"
-        ><q-icon name="refresh" size="16px" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip></OButton>
+        ><OIcon name="refresh" size="sm" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
 
         <!-- Edit Title Button -->
         <OButton
           variant="outline"
           size="sm"
           @click="startTitleEdit"
-        >{{ t("alerts.edit") }}<q-tooltip :delay="500">{{ t("alerts.incidents.editIncidentTitleTooltip") }}</q-tooltip></OButton>
+        >{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
       </div>
     </div>
 
@@ -217,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTab>
 
-          <!-- Telemetry tabs always inline -->
+          <!-- Telemetry tabs always tw:inline -->
           <OTab
             name="logs"
             :label="t('common.logs')"
@@ -270,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Total Alerts
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-amber-500/10' : 'tw:bg-amber-50'">
-                  <q-icon name="bolt" :class="store.state.theme === 'dark' ? 'tw:text-amber-400' : 'tw:text-amber-600'" style="font-size: 20px;" />
+                  <OIcon name="bolt" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-amber-400' : 'tw:text-amber-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -290,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-blue-500/10' : 'tw:bg-blue-50'">
-                  <q-icon name="notifications_active" :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'" style="font-size: 20px;" />
+                  <OIcon name="notifications-active" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -310,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Affected Services
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-purple-500/10' : 'tw:bg-purple-50'">
-                  <q-icon name="dns" :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'" style="font-size: 20px;" />
+                  <OIcon name="dns" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -330,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Active Duration
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-green-500/10' : 'tw:bg-green-50'">
-                  <q-icon name="schedule" :class="store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'" style="font-size: 20px;" />
+                  <OIcon name="schedule" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -352,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Alert Frequency
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-rose-500/10' : 'tw:bg-rose-50'">
-                  <q-icon name="show_chart" :class="store.state.theme === 'dark' ? 'tw:text-rose-400' : 'tw:text-rose-600'" style="font-size: 20px;" />
+                  <OIcon name="show-chart" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-rose-400' : 'tw:text-rose-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -506,8 +493,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
-                        <q-icon
-                          :name="copiedField === 'incident_id' ? 'check' : 'content_copy'"
+                        <OIcon
+                          :name="copiedField === 'incident_id' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_id' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -530,8 +517,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
-                        <q-icon
-                          :name="copiedField === 'incident_title' ? 'check' : 'content_copy'"
+                        <OIcon
+                          :name="copiedField === 'incident_title' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_title' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -554,8 +541,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
-                        <q-icon
-                          :name="copiedField === 'key_type' ? 'check' : 'content_copy'"
+                        <OIcon
+                          :name="copiedField === 'key_type' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -804,9 +791,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ index + 1 }}.
                         </span>
                         <div class="tw:flex-1 tw:min-w-0">
-                          <q-tooltip v-if="alert.name.length > 30">
-                            {{ alert.name }}
-                          </q-tooltip>
+                          <OTooltip v-if="alert.name.length > 30" :content="alert.name" />
                           <span class="tw:font-medium tw:truncate tw:block">
                             {{ alert.name.length > 30 ? alert.name.substring(0, 30) + '...' : alert.name }}
                           </span>
@@ -889,7 +874,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:border-gray-200'
                 ]"
               >
-                <q-icon name="info" size="16px" class="tw:opacity-80" />
+                <OIcon name="info" size="sm" class="tw:opacity-80" />
                 <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
                   Alert Details
                 </span>
@@ -926,9 +911,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
-                          <q-badge :color="alerts[selectedAlertIndex]?.stream_type === 'logs' ? 'blue' : alerts[selectedAlertIndex]?.stream_type === 'metrics' ? 'purple' : 'teal'" outline class="tw:w-fit">
+                          <OBadge :variant="getStreamTypeVariant(alerts[selectedAlertIndex]?.stream_type)" class="tw:w-fit">
                             <span class="tw:text-[10px]">{{ alerts[selectedAlertIndex]?.stream_type || 'N/A' }}</span>
-                          </q-badge>
+                          </OBadge>
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
@@ -991,17 +976,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:p-2.5 tw:overflow-y-auto tw:flex-1">
                       <!-- SQL Query -->
                       <div v-if="alerts[selectedAlertIndex]?.query_condition?.sql">
-                        <pre :class="['tw:text-[10px] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
+                        <pre :class="['tw:text-[0.8rem] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                       </div>
 
                       <!-- PromQL Query -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.promql">
-                        <pre :class="['tw:text-[10px] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
+                        <pre :class="['tw:text-[0.8rem] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                       </div>
 
                       <!-- Custom Conditions -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.conditions">
-                        <pre :class="['tw:text-[10px] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
+                        <pre :class="['tw:text-[0.8rem] tw:overflow-x-auto tw:whitespace-pre-wrap tw:break-words', store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-800']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
                       </div>
 
                       <!-- No conditions -->
@@ -1017,23 +1002,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Logs Tab Content -->
-        <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
+        <div v-if="activeTab === 'logs'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:h-full">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
-            <q-icon
-              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
-              size="4rem"
-            />
-            <div class="text-h6 q-mt-md">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:gap-2 tw:h-full">
+            <OIcon
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
+              :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
+            <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated logs found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="tw:text-sm tw:text-gray-400 tw:mt-2" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1041,12 +1024,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="md"
               @click="refreshCorrelation"
-              class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+              class="tw:mt-3"
+            ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - CorrelatedLogsTable -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden tw:h-full">
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw:flex-1 tw:overflow-hidden tw:h-full">
             <CorrelatedLogsTable
               :service-name="correlationData.serviceName"
               :matched-dimensions="actualMatchedDimensions"
@@ -1067,24 +1050,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Metrics Tab Content -->
-        <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+        <div v-if="activeTab === 'metrics'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:h-full">
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
-            <div class="tw-text-base">Loading correlated metrics...</div>
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-full">
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
+            <div class="tw:text-base">Loading correlated metrics...</div>
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
-            <q-icon
-              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
-              size="4rem"
-            />
-            <div class="text-h6 q-mt-md">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:gap-2 tw:h-full">
+            <OIcon
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
+              :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
+            <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="tw:text-sm tw:text-gray-400 tw:mt-2" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1092,12 +1073,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="md"
               @click="refreshCorrelation"
-              class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+              class="tw:mt-3"
+            ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw:flex-1 tw:overflow-hidden">
             <TelemetryCorrelationDashboard
               mode="embedded-tabs"
               :externalActiveTab="'metrics'"
@@ -1114,35 +1095,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Traces Tab Content -->
-        <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+        <div v-if="activeTab === 'traces'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:h-full">
           <!-- Refresh Button (shown when traces data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:gap-2">
+            <span class="tw:text-xs">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
             <OButton
               variant="ghost"
               size="icon-sm"
               :disabled="correlationLoading"
               @click="refreshCorrelation"
-            ><q-icon name="refresh" size="16px" /><q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip></OButton>
+            ><OIcon name="refresh" size="sm" /><OTooltip :content="t('alerts.incidents.refreshCorrelatedData')" /></OButton>
           </div>
 
           <!-- Loading State -->
-          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
-            <div class="tw-text-base">Loading correlated traces...</div>
+          <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-full">
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
+            <div class="tw:text-base">Loading correlated traces...</div>
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
-            <q-icon
-              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
-              size="4rem"
-            />
-            <div class="text-h6 q-mt-md">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:gap-2 tw:h-full">
+            <OIcon
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
+              :class="['tw:w-16 tw:h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-negative)]') : 'tw:text-gray-400']" />
+            <div class="tw:text-xl tw:font-semibold tw:mt-3">
               {{ correlationError || 'No correlated traces found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="tw:text-sm tw:text-gray-400 tw:mt-2" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1150,12 +1129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="md"
               @click="refreshCorrelation"
-              class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+              class="tw:mt-3"
+            ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw:flex-1 tw:overflow-hidden">
             <TelemetryCorrelationDashboard
               mode="embedded-tabs"
               :externalActiveTab="'traces'"
@@ -1177,10 +1156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading state -->
     <div v-if="loading" class="tw:flex-1 tw:flex tw:items-center tw:justify-center">
-      <q-spinner-hourglass size="lg" color="primary" />
+      <OSpinner size="md" />
     </div>
   </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -1189,9 +1168,8 @@ import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import { date } from "quasar";
+import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -1214,6 +1192,14 @@ import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1229,13 +1215,17 @@ export default defineComponent({
     IncidentTimeline,
     CustomChartRenderer,
     OButton,
-  },
+    OSpinner,
+    OTooltip,
+    OIcon,
+    OBadge,
+},
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
+    const { confirm } = useConfirmDialog();
 
     // Copy to clipboard state
     const copiedField = ref<string | null>(null);
@@ -1244,27 +1234,18 @@ export default defineComponent({
     const copyToClipboard = (text: string, fieldName: string) => {
       if (!text) return;
 
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
+      copyToClipboardUtil(text, {
+        successMessage: "Copied to clipboard",
+        errorMessage: "Failed to copy to clipboard",
+      }).then((success) => {
+        if (success) {
           copiedField.value = fieldName;
-          $q.notify({
-            type: "positive",
-            message: "Copied to clipboard",
-            timeout: 2000,
-          });
           // Reset the icon after 2 seconds
           setTimeout(() => {
             copiedField.value = null;
           }, 2000);
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Failed to copy to clipboard",
-            timeout: 2000,
-          });
-        });
+        }
+      });
     };
 
     const loading = ref(false);
@@ -1987,8 +1968,8 @@ export default defineComponent({
         await checkAnalysisInFlight(incidentId);
       } catch (error) {
         console.error("Failed to load incident details:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to load incident details",
         });
       } finally {
@@ -2065,11 +2046,6 @@ export default defineComponent({
         if (isEditingTitle.value) {
           return;
         }
-        // Don't close if there are any open dialogs/menus (they should handle ESC first)
-        const hasOpenDialog = document.querySelector('.q-dialog, .q-menu');
-        if (hasOpenDialog) {
-          return;
-        }
         close();
       }
     };
@@ -2102,8 +2078,8 @@ export default defineComponent({
         incidentDetails.value.status = response.data.status;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
         // Mark data as stale so incident list will refresh when navigating back
@@ -2121,8 +2097,8 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("alerts.incidents.statusUpdateFailed"),
         });
       } finally {
@@ -2175,10 +2151,9 @@ export default defineComponent({
         incidentDetails.value.title = response.data.title;
         isEditingTitle.value = false;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
-          timeout: 2000,
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
@@ -2189,25 +2164,24 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update title:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident title",
-          timeout: 3000,
         });
         cancelTitleEdit();
       }
     };
 
-    const getStatusColor = (status: string) => {
+    const getStatusVariant = (status: string): BadgeVariant => {
       switch (status) {
         case "open":
-          return "negative";
+          return "error-soft";
         case "acknowledged":
-          return "orange";
+          return "warning-soft";
         case "resolved":
-          return "positive";
+          return "success-soft";
         default:
-          return "grey";
+          return "default-soft";
       }
     };
 
@@ -2236,6 +2210,36 @@ export default defineComponent({
           return "#6b7280"; // gray-500
         default:
           return "#6b7280"; // gray-500
+      }
+    };
+
+    const getStreamTypeVariant = (streamType: string): BadgeVariant => {
+      switch (streamType?.toLowerCase()) {
+        case "logs":
+          return "info-outline";
+        case "metrics":
+          return "purple-outline";
+        case "traces":
+          return "success-outline";
+        case "rum":
+          return "warning-outline";
+        default:
+          return "primary-outline";
+      }
+    };
+
+    const getSeverityVariant = (severity: string): BadgeVariant => {
+      switch (severity) {
+        case "P1":
+          return "error-soft";
+        case "P2":
+          return "warning-soft";
+        case "P3":
+          return "warning-soft";
+        case "P4":
+          return "default-soft";
+        default:
+          return "default-soft";
       }
     };
 
@@ -2340,10 +2344,9 @@ export default defineComponent({
         incidentDetails.value.status = response.data.status;
         editableStatus.value = response.data.status;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Incident status updated to ${response.data.status}`,
-          timeout: 2000,
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
@@ -2354,10 +2357,9 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update status:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident status",
-          timeout: 3000,
         });
         // Revert on error
         editableStatus.value = incidentDetails.value.status;
@@ -2394,10 +2396,9 @@ export default defineComponent({
         incidentDetails.value.severity = data.severity;
         editableSeverity.value = data.severity;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Incident severity updated to ${data.severity}`,
-          timeout: 2000,
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
@@ -2406,43 +2407,40 @@ export default defineComponent({
         if ('analysis_in_flight' in data) {
           analysisInFlight.value = !!data.analysis_in_flight;
           if (data.analysis_in_flight) {
-            $q.notify({
-              type: "info",
+            toast({
+              variant: "info",
               message: "AI analysis is already running for this incident",
-              timeout: 3000,
             });
           } else {
-            $q.dialog({
+            const ok = await confirm({
               title: "Re-run AI Analysis?",
               message: "Severity has changed. Would you like AI to re-analyze this incident?",
-              cancel: { label: "No thanks", flat: true },
-              ok: { label: "Re-run AI analysis", color: "primary" },
+              confirmLabel: "Re-run AI analysis",
+              cancelLabel: "No thanks",
               persistent: false,
-            }).onOk(async () => {
+            });
+            if (ok) {
               try {
                 await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
-                $q.notify({
-                  type: "positive",
+                toast({
+                  variant: "success",
                   message: "AI reanalysis started",
-                  timeout: 2000,
                 });
                 await loadDetails(incidentId);
               } catch (e: any) {
-                $q.notify({
-                  type: "negative",
+                toast({
+                  variant: "error",
                   message: e?.response?.data?.message || "Failed to start reanalysis",
-                  timeout: 3000,
                 });
               }
-            });
+            }
           }
         }
       } catch (error: any) {
         console.error("Failed to update severity:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident severity",
-          timeout: 3000,
         });
         // Revert on error
         editableSeverity.value = incidentDetails.value.severity;
@@ -2453,7 +2451,7 @@ export default defineComponent({
 
     const formatTimestamp = (timestamp: number) => {
       // Backend sends microseconds
-      return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+      return formatToReadable(timestamp);
     };
 
     const formatTimestampUTC = (timestamp: number) => {
@@ -2819,8 +2817,8 @@ export default defineComponent({
         // Set the RCA content immediately
         rcaStreamContent.value = response.data.rca_content;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.rcaCompleted"),
         });
 
@@ -2829,8 +2827,8 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to trigger RCA:", error);
         rcaStreamContent.value = "";
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || error?.message || "Failed to perform RCA analysis",
         });
       } finally {
@@ -2915,9 +2913,11 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
-      getStatusColor,
+      getStatusVariant,
       getStatusLabel,
       getSeverityColorHex,
+      getSeverityVariant,
+      getStreamTypeVariant,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

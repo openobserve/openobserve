@@ -10,7 +10,11 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
+const {
+    ingestForQueryBuilderTest,
+    setupQueryAndSwitchToBuild,
+    initQueryBuilderTest,
+} = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
 // Test Suite: P0 - Critical Tests (Smoke)
@@ -19,6 +23,10 @@ const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/q
 test.describe("Logs Query Builder - P0 Critical Tests", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -112,6 +120,10 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -202,6 +214,10 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
 test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -304,6 +320,10 @@ test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
 test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -455,6 +475,10 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
 test.describe("Logs Query Builder - Chart Auto-Selection", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);

@@ -32,7 +32,7 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     const setBtn = page.locator('[data-test="dashboard-config-set-panel-time"]');
 
     await expect(panelTimeToggle).toBeVisible();
-    await expect(panelTimeToggle).toHaveAttribute("aria-checked", "false");
+    await expect(panelTimeToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
     await expect(setBtn).not.toBeVisible();
 
     await pm.dashboardPanelTime.enablePanelTime();
@@ -155,7 +155,7 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying panel time toggle enabled persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-allow-panel-time"]')).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator('[data-test="dashboard-config-allow-panel-time"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

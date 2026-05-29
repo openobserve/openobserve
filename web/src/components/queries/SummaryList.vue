@@ -15,100 +15,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="running-queries-page" v-if="isMetaOrg">
-    <q-table
-      data-test="running-queries-table"
-      ref="qTable"
-      :rows="rows"
-      :columns="columns"
-      :pagination="pagination"
-      row-key="row_id"
-      style="width: 100%"
-      selection="multiple"
-      v-model:selected="selectedRow"
-      @row-click="getAllUserQueries"
-    >
-      <template #no-data>
-        <div v-if="!loadingState" class="text-center full-width full-height">
-          <NoData />
-        </div>
-        <div v-else class="text-center full-width full-height q-mt-lg">
-          <q-spinner-hourglass color="primary" size="lg" />
-        </div>
-      </template>
-      <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
-      </template>
-      <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
-      </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props">
-          <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            :title="t('queries.cancelQuery')"
-            data-test="cancelQuery-btn"
-            @click.stop="confirmDeleteAction(props)"
-          >
-            <X class="tw:size-4" />
-          </OButton>
-        </q-td>
-      </template>
-      <template #body-cell-duration="props">
-        <q-td :props="props">
-          {{ durationFormatter(props.row.duration) }}
-        </q-td>
-      </template>
-      <template #body-cell-queryRange="props">
-        <q-td :props="props">
-          {{ durationFormatter(props.row.queryRange) }}
-        </q-td>
-      </template>
+  <OTable
+    v-if="isMetaOrg"
+    data-test="running-queries-table"
+    :data="rows"
+    :columns="columns"
+    row-key="row_id"
+    :loading="loadingState"
+    pagination="client"
+    selection="multiple"
+    v-model:selected-ids="selectedIds"
+    @row-click="getAllUserQueries"
+    style="width: 100%"
+    :show-global-filter="false"
+  >
+    <template #empty>
+      <NoData />
+    </template>
+    <template #cell-actions="{ row }">
+      <OButton
+        variant="ghost-destructive"
+        size="icon-sm"
+        :title="t('queries.cancelQuery')"
+        data-test="cancelQuery-btn"
+        @click.stop="confirmDeleteAction({ row })"
+        icon-left="close"
+      />
+    </template>
+    <template #cell-duration="{ row }">
+      {{ durationFormatter(row.duration) }}
+    </template>
+    <template #cell-queryRange="{ row }">
+      {{ durationFormatter(row.queryRange) }}
+    </template>
 
-      <template #bottom="scope">
-        <OButton
-          data-test="qm-multiple-cancel-query-btn"
-          variant="outline-destructive"
-          size="sm-action"
-          :disabled="selectedRow.length === 0"
-          @click="handleMultiQueryCancel"
-        >
-          {{ t('queries.cancelQuery') }}
-        </OButton>
-        <q-space />
-        <div style="width: auto">
-          <q-table-pagination
-            data-test="query-stream-table-pagination"
-            :scope="scope"
-            :resultTotal="rows.length"
-            :perPageOptions="perPageOptions"
-            position="bottom"
-            @update:changeRecordPerPage="changePagination"
-            class="fit"
-          />
-        </div>
-      </template>
-    </q-table>
-  </div>
+    <template #bottom>
+      <OButton
+        data-test="qm-multiple-cancel-query-btn"
+        variant="outline-destructive"
+        size="sm-action"
+        :disabled="selectedRow.length === 0"
+        @click="handleMultiQueryCancel"
+      >
+        {{ t('queries.cancelQuery') }}
+      </OButton>
+    </template>
+  </OTable>
 </template>
 
 <script lang="ts">
 
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, type Ref, defineComponent, computed } from "vue";
-import { type QTableProps, QTable } from "quasar";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X } from 'lucide-vue-next';
 import { durationFormatter } from "@/utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QTablePagination, NoData, OButton, X },
+  components: { NoData, OTable, OButton, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
@@ -138,83 +108,31 @@ export default defineComponent({
       data: null as any,
     });
 
-    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-    ];
-    const selectedPerPage = ref(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
-    };
+    const pageSize = ref(20);
+    const pageSizeOptions = [5, 10, 20, 50, 100];
 
-    const columns = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
-      {
-        name: "user_id",
-        field: "user_id",
-        label: t("user.email"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "search_type_label",
-        field: "search_type_label",
-        label: t("queries.searchType"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "numOfQueries",
-        label: t("queries.numOfQueries"),
-        align: "left",
-        sortable: true,
-        field: "numOfQueries",
-      },
-      {
-        name: "duration",
-        label: t("queries.totalDuration"),
-        align: "left",
-        sortable: true,
-        field: "duration",
-      },
-      {
-        name: "queryRange",
-        label: t("queries.totalTimeRange"),
-        align: "left",
-        sortable: true,
-        field: "queryRange",
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("common.actions"),
-        align: "center",
-      },
+    const columns = ref<OTableColumnDef[]>([
+      { id: "#", header: "#", accessorKey: "#", size: 50, meta: { align: "left" } },
+      { id: "user_id", header: t("user.email"), accessorKey: "user_id", sortable: true, meta: { align: "left" , autoWidth: true } },
+      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", sortable: true, meta: { align: "left"  } },
+      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", sortable: true, meta: { align: "left" } },
+      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
     ]);
 
-    const selectedRow = computed({
-      get: () => props.selectedRows,
-      set: (value) => {
-        emit("update:selectedRows", value);
+    const selectedIds = computed({
+      get: () => (props.selectedRows as any[]).map((row: any) => row.row_id),
+      set: (ids: string[]) => {
+        const rows = (props.rows as any[]).filter((row: any) => ids.includes(row.row_id));
+        emit("update:selectedRows", rows);
       },
     });
+
+    const selectedRow = computed(() => props.selectedRows);
 
     const confirmDeleteAction = (props: any) => {
       emit("delete:queries", props.row.trace_ids || []);
@@ -233,18 +151,15 @@ export default defineComponent({
       columns,
       confirmDeleteAction,
       deleteDialog,
-      perPageOptions,
+      pageSize,
+      pageSizeOptions,
       showListSchemaDialog,
-      changePagination,
-      outlinedCancel,
+      "cancel": "cancel",
       loadingState,
       isMetaOrg,
-      resultTotal,
-      selectedPerPage,
-      qTable,
+      selectedIds,
       selectedRow,
       handleMultiQueryCancel,
-      pagination,
       getAllUserQueries,
       durationFormatter,
     };
@@ -257,6 +172,10 @@ export default defineComponent({
   :deep(.q-btn:before) {
     border: none !important;
   }
+}
+
+:deep(.no-data-image) {
+  margin-bottom: 0.5rem;
 }
 
 .label-container {

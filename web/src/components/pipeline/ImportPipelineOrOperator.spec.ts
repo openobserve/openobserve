@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
-import { Quasar } from 'quasar';
 import ImportPipeline from '@/components/pipeline/ImportPipeline.vue';
 import store from '@/test/unit/helpers/store';
 
@@ -78,6 +77,7 @@ const i18n = createI18n({
   }
 });
 
+
 describe('ImportPipeline.vue - OR Operator Tests', () => {
   let wrapper: VueWrapper<any>;
   let mockQuasar: any;
@@ -95,7 +95,7 @@ describe('ImportPipeline.vue - OR Operator Tests', () => {
         ...props
       },
       global: {
-        plugins: [i18n, Quasar, store],
+        plugins: [i18n, store],
         provide: {
           $q: mockQuasar
         },

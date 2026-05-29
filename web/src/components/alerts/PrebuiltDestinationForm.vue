@@ -17,402 +17,239 @@ limitations under the License.
   <div data-test="prebuilt-destination-form" class="prebuilt-destination-form">
     <!-- Slack Fields -->
     <template v-if="destinationType === 'slack'">
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.webhookUrl"
           data-test="slack-webhook-url-input"
           label="Slack Webhook URL *"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[
-            (val: any) => !!val || 'Webhook URL is required',
-            (val: any) => val.startsWith('https://hooks.slack.com/') || 'Invalid Slack webhook URL'
-          ]"
+          helpText="Get your webhook URL from Slack App settings"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Get your webhook URL from Slack App settings
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.webhookUrl"
+          :error-message="fieldErrors.webhookUrl"
+        />
       </div>
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.channel"
           data-test="slack-channel-input"
           label="Channel (optional)"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
+          helpText="e.g., #alerts"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              e.g., #alerts
-            </span>
-          </template>
-        </q-input>
+        />
       </div>
     </template>
 
     <!-- Discord Fields -->
     <template v-if="destinationType === 'discord'">
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.webhookUrl"
           data-test="discord-webhook-url-input"
           label="Discord Webhook URL *"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[
-            (val: any) => !!val || 'Webhook URL is required',
-            (val: any) => val.includes('discord.com/api/webhooks/') || 'Invalid Discord webhook URL'
-          ]"
+          helpText="Get your webhook URL from Discord channel settings"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Get your webhook URL from Discord channel settings
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.webhookUrl"
+          :error-message="fieldErrors.webhookUrl"
+        />
       </div>
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.username"
           data-test="discord-username-input"
           label="Bot Username (optional)"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
+          helpText="Custom username for the webhook bot"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Custom username for the webhook bot
-            </span>
-          </template>
-        </q-input>
+        />
       </div>
     </template>
 
     <!-- MS Teams Fields -->
     <template v-if="destinationType === 'msteams'">
-      <div class="col-12 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.webhookUrl"
           data-test="msteams-webhook-url-input"
           label="Microsoft Teams Webhook URL *"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[
-            (val: any) => !!val || 'Webhook URL is required',
-            (val: any) => (val.includes('outlook.office.com') || val.includes('webhook.office.com')) || 'Invalid Microsoft Teams webhook URL'
-          ]"
+          helpText="Get your webhook URL from Teams channel connectors"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Get your webhook URL from Teams channel connectors
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.webhookUrl"
+          :error-message="fieldErrors.webhookUrl"
+        />
       </div>
     </template>
 
     <!-- PagerDuty Fields -->
     <template v-if="destinationType === 'pagerduty'">
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.integrationKey"
           data-test="pagerduty-integration-key-input"
           label="Integration Key *"
           type="password"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[
-            (val: any) => !!val || 'Integration key is required',
-            (val: any) => val.length === 32 || 'PagerDuty integration key should be 32 characters'
-          ]"
+          helpText="Get your integration key from PagerDuty service settings"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Get your integration key from PagerDuty service settings
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.integrationKey"
+          :error-message="fieldErrors.integrationKey"
+        />
       </div>
-      <div class="col-6 q-py-xs">
-        <q-select
+      <div class="tw:w-1/2 tw:py-1">
+        <OSelect
           v-model="credentials.severity"
           data-test="pagerduty-severity-select"
           :options="severityOptions"
           label="Default Severity *"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          emit-value
-          map-options
-          :rules="[(val: any) => !!val || 'Severity is required']"
+          labelKey="label"
+          valueKey="value"
+          helpText="Select the default severity for PagerDuty incidents"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Select the default severity for PagerDuty incidents
-            </span>
-          </template>
-        </q-select>
+        />
       </div>
     </template>
 
     <!-- ServiceNow Fields -->
     <template v-if="destinationType === 'servicenow'">
-      <div class="col-12 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.instanceUrl"
           data-test="servicenow-instance-url-input"
           label="ServiceNow Instance URL *"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[
-            (val: any) => !!val || 'Instance URL is required',
-            (val: any) => (val.includes('.service-now.com') && val.includes('/api/now/table/incident')) || 'URL should be like https://instance.service-now.com/api/now/table/incident'
-          ]"
+          helpText="https://your-instance.service-now.com/api/now/table/incident"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              https://your-instance.service-now.com/api/now/table/incident
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.instanceUrl"
+          :error-message="fieldErrors.instanceUrl"
+        />
       </div>
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.username"
           data-test="servicenow-username-input"
           label="Username *"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[(val: any) => !!val || 'Username is required']"
+          helpText="ServiceNow username with incident creation permissions"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              ServiceNow username with incident creation permissions
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.username"
+          :error-message="fieldErrors.username"
+        />
       </div>
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.password"
           data-test="servicenow-password-input"
           label="Password *"
           type="password"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[(val: any) => !!val || 'Password is required']"
+          helpText="ServiceNow password or API token"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              ServiceNow password or API token
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.password"
+          :error-message="fieldErrors.password"
+        />
       </div>
-      <div class="col-12 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.assignmentGroup"
           data-test="servicenow-assignment-group-input"
           label="Assignment Group (optional)"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
+          helpText="Group to assign incidents to (e.g., IT Operations)"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Group to assign incidents to (e.g., IT Operations)
-            </span>
-          </template>
-        </q-input>
+        />
       </div>
     </template>
 
     <!-- Email Fields -->
     <template v-if="destinationType === 'email'">
-      <div class="col-12 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.recipients"
           data-test="email-recipients-input"
           label="Recipient Email Addresses *"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[
-            (val: any) => !!val || 'Recipients are required',
-            (val: any) => validateEmailList(val) || 'Please enter valid email addresses'
-          ]"
+          helpText="Comma-separated email addresses"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Comma-separated email addresses
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.recipients"
+          :error-message="fieldErrors.recipients"
+        />
       </div>
-      <!-- CC and Subject fields hidden - not supported by backend Email struct -->
-      <!-- <div class="col-6 q-py-xs">
-        <q-input
+      <!-- CC and Subject fields tw:hidden - not supported by backend Email struct -->
+      <!-- <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.ccRecipients"
           data-test="email-cc-input"
           label="CC Recipients (optional)"
           class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
           tabindex="0"
         >
           <template v-slot:hint>
-            <span class="text-caption text-grey-7">
+            <span class="tw:text-xs tw:text-gray-400">
               Comma-separated CC email addresses
             </span>
           </template>
-        </q-input>
+        </OInput>
       </div>
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.subject"
           data-test="email-subject-input"
           label="Email Subject (optional)"
           class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
           tabindex="0"
         >
           <template v-slot:hint>
-            <span class="text-caption text-grey-7">
+            <span class="tw:text-xs tw:text-gray-400">
               Custom subject line (defaults to alert name)
             </span>
           </template>
-        </q-input>
+        </OInput>
       </div> -->
     </template>
 
     <!-- Opsgenie Fields -->
     <template v-if="destinationType === 'opsgenie'">
-      <div class="col-6 q-py-xs">
-        <q-input
+      <div class="tw:w-1/2 tw:py-1">
+        <OInput
           v-model="credentials.apiKey"
           data-test="opsgenie-api-key-input"
           label="Opsgenie API Key *"
           type="password"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          :rules="[
-            (val: any) => !!val || 'API key is required',
-            (val: any) => val.length > 30 || 'Opsgenie API key should be longer than 30 characters'
-          ]"
+          helpText="Get your API key from Opsgenie integration settings"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Get your API key from Opsgenie integration settings
-            </span>
-          </template>
-        </q-input>
+          :error="!!fieldErrors.apiKey"
+          :error-message="fieldErrors.apiKey"
+        />
       </div>
-      <div class="col-6 q-py-xs">
-        <q-select
+      <div class="tw:w-1/2 tw:py-1">
+        <OSelect
           v-model="credentials.priority"
           data-test="opsgenie-priority-select"
           :options="priorityOptions"
           label="Default Priority"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
-          emit-value
-          map-options
+          labelKey="label"
+          valueKey="value"
+          helpText="Select the default priority for Opsgenie alerts"
           tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              Select the default priority for Opsgenie alerts
-            </span>
-          </template>
-        </q-select>
+        />
       </div>
-      <div class="col-12 q-py-xs">
-        <q-toggle
+      <div class="tw:w-full tw:py-1">
+        <OSwitch
           v-model="credentials.euRegion"
           data-test="opsgenie-eu-region-toggle"
           label="EU Region"
-          class="o2-toggle-button-lg"
-          size="lg"
         >
           <template v-slot:hint>
-            <span class="text-caption text-grey-7">
+            <span class="tw:text-xs tw:text-gray-400">
               Enable for EU-based Opsgenie instances
             </span>
           </template>
-        </q-toggle>
+        </OSwitch>
       </div>
     </template>
 
     <!-- Test and Preview Actions -->
-    <div v-if="!hideActions" class="col-12 q-py-md">
-      <div class="flex items-center q-gutter-sm">
+    <div v-if="!hideActions" class="tw:w-full tw:py-3">
+      <div class="tw:flex tw:items-center tw:gap-2">
         <OButton
           data-test="destination-preview-button"
           variant="outline"
           size="sm"
           @click="$emit('preview')"
+          icon-left="preview"
         >
-          <template #icon-left><q-icon name="preview" /></template>
           Preview
         </OButton>
         <OButton
@@ -421,8 +258,8 @@ limitations under the License.
           variant="outline"
           size="sm"
           @click="$emit('test')"
+          icon-left="send"
         >
-          <template #icon-left><q-icon name="send" /></template>
           Test
         </OButton>
       </div>
@@ -431,9 +268,14 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 import type { PropType } from 'vue';
+import { getPrebuiltConfig } from '@/utils/prebuilt-templates';
+import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
 
 const props = defineProps({
   destinationType: {
@@ -462,6 +304,29 @@ const credentials = computed({
   set: (value) => emit('update:modelValue', value)
 });
 
+const fieldErrors = reactive<Record<string, string>>({});
+
+function validate(): boolean {
+  Object.keys(fieldErrors).forEach((k) => delete fieldErrors[k]);
+  const config = getPrebuiltConfig(props.destinationType as PrebuiltTypeId);
+  if (!config) return true;
+  for (const field of config.credentialFields) {
+    const value = credentials.value[field.key];
+    if (field.required && (!value || value.toString().trim() === '')) {
+      fieldErrors[field.key] = `${field.label} is required`;
+      continue;
+    }
+    if (!field.required && (!value || value.toString().trim() === '')) continue;
+    if (field.validator && value) {
+      const result = field.validator(value.toString());
+      if (result !== true) fieldErrors[field.key] = result as string;
+    }
+  }
+  return Object.keys(fieldErrors).length === 0;
+}
+
+defineExpose({ validate });
+
 // PagerDuty severity options
 const severityOptions = [
   { label: 'Critical', value: 'critical' },
@@ -478,13 +343,6 @@ const priorityOptions = [
   { label: 'P4 (Low)', value: 'P4' },
   { label: 'P5 (Informational)', value: 'P5' }
 ];
-
-// Email validation function
-const validateEmailList = (emails: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const emailList = emails.split(',').map(e => e.trim());
-  return emailList.every(email => emailRegex.test(email));
-};
 </script>
 
 <style lang="scss" scoped>

@@ -15,33 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <ODrawer data-test="dashboard-settings-drawer"
+    :open="open"
+    :width="74"
+    title="Dashboard Settings"
+    @update:open="$emit('update:open', $event)"
+  >
   <div
-    class="q-pa-none"
-    :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+    data-test="dashboard-settings-main-container"
+    class="tw:p-0"
+    :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
     style="min-height: inherit"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("dashboard.setting") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <q-icon
-          data-test="dashboard-settings-close-btn"
-          name="cancel"
-          class="cursor-pointer tw:mr-5"
-          size="20px"
-          v-close-popup="true"
-        />
-      </div>
-    </div>
-    <q-separator></q-separator>
-    <q-splitter
+
+    <OSplitter
       v-model="splitterModel"
       unit="px"
       style="height: calc(100vh - 65px)"
-      disable
+      disabled
     >
       <template v-slot:before>
         <div class="functions-tabs" style="width: 100%">
@@ -57,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTab
               name="variableSettings"
-              icon="data_array"
+              icon="data-array"
               :label="t('dashboard.variableSettings')"
               data-test="dashboard-settings-variable-tab"
             />
@@ -71,13 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-sm q-my-sm scroll" style="width: 60vw">
+        <div class="tw:mx-2 tw:my-2 scroll">
           <OTabPanels
             v-model="activeTab"
             animated
           >
             <OTabPanel name="generalSettings" data-test="general-tab-panels-default">
-              <GeneralSettings @save="refreshRequired" />
+              <GeneralSettings @save="refreshRequired" @close="$emit('close')" />
             </OTabPanel>
 
             <OTabPanel name="variableSettings" data-test="variable-tab-panels-default">
@@ -90,15 +81,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabPanels>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -111,12 +105,18 @@ import { getImageURL } from "../../utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel,
+    ODrawer, OTabs, OTab, OTabPanels, OTabPanel, OSplitter,
     VariableSettings,
     GeneralSettings,
     TabsSettings,
   },
-  emits: ["refresh"],
+  emits: ["refresh", "close", "update:open"],
+  props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
+  },
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
@@ -184,17 +184,17 @@ export default defineComponent({
   }
 }
 
-:deep(.q-splitter__before) {
+:deep(.o-splitter__before) {
   border-right: 1px solid $border-color;
 }
 
 .dark-mode {
-  :deep(.q-splitter__before) {
+  :deep(.o-splitter__before) {
     border-right-color: rgba(255, 255, 255, 0.12);
   }
 }
 
-:deep(.q-splitter__separator) {
+:deep(.o-splitter__separator) {
   display: none !important;
 }
 </style>

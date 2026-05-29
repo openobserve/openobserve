@@ -21,9 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
       v-if="noResults"
-      class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
+      data-test="logs-search-result-not-found-text"
+      class="tw:text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
-      <q-icon name="info" color="primary" size="md" />
+      <OIcon name="info" size="md" />
       {{ t("traces.noTracesFoundAdjust") }}
     </div>
 
@@ -32,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="column tw:h-auto! traces-table-container"
+      class="tw:flex tw:flex-col tw:h-auto! traces-table-container"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
@@ -86,12 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #loading-banner>
             <div
               data-test="traces-table-loading-banner-row"
-              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
-              <q-spinner-hourglass
-                color="primary"
-                size="1.25rem"
+              <OSpinner
+                size="xs"
                 class="tw:mx-[0.25rem]"
+                data-test="traces-search-result-loading-indicator"
               />
               <span
                 class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
@@ -104,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #loading>
             <div
               data-test="traces-table-loading-row"
-              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
-              <q-spinner-hourglass
-                color="primary"
-                size="1.25rem"
+              <OSpinner
+                size="xs"
                 class="tw:mr-[0.25rem]"
+                data-test="traces-search-result-loading-indicator"
               />
               <span
                 class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
@@ -130,18 +131,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-operation_name="{ item }">
             <span
-              class="text-caption ellipsis tw:text-[var(--o2-text-1)]!"
+              class="tw:text-xs tw:truncate tw:text-[var(--o2-text-1)]!"
               data-test="trace-row-operation-name"
             >
               {{ item.operation_name }}
-              <q-tooltip anchor="bottom middle" self="top middle">
-                {{ item.operation_name }}
-              </q-tooltip>
+              <OTooltip :content="item.operation_name" side="bottom" align="center" />
             </span>
           </template>
 
           <template #cell-duration="{ item }">
-            <span class="text-caption" data-test="trace-row-duration">
+            <span class="tw:text-xs" data-test="trace-row-duration">
               {{ formatTimeWithSuffix(item.duration) || "0us" }}
             </span>
           </template>
@@ -162,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceStatusCell :item="item" />
           </template>
           <template #cell-input_tokens="{ item }">
-            <span class="text-caption" data-test="trace-row-input-tokens">
+            <span class="tw:text-xs" data-test="trace-row-input-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
@@ -172,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-output_tokens="{ item }">
-            <span class="text-caption" data-test="trace-row-output-tokens">
+            <span class="tw:text-xs" data-test="trace-row-output-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
@@ -182,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-cost="{ item }">
-            <span class="text-caption" data-test="trace-row-cost">
+            <span class="tw:text-xs" data-test="trace-row-cost">
               {{
                 isLLMTrace(item)
                   ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`
@@ -205,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard as qCopyToClipboard } from "quasar";
+import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
@@ -229,6 +228,9 @@ import {
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   hits: any[];

@@ -15,18 +15,23 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PredefinedThemes from "./PredefinedThemes.vue";
 import i18n from "@/locales";
-import { Notify } from "quasar";
 import { nextTick } from "vue";
 
-installQuasar({
-  plugins: [Notify],
-});
+// Use vi.hoisted so these variables are available inside vi.mock() factory functions
+// (vi.mock calls are hoisted to the top of the file before variable declarations)
+const { mockToast, mockNotify } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()),
+  mockNotify: vi.fn(() => vi.fn()),
+}));
+
+// Mock toast — resetToDefaultTheme calls toast(), not useQuasar().notify
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // Mock useQuasar
-const mockNotify = vi.fn(() => vi.fn());
 vi.mock("quasar", async () => {
   const actual = await vi.importActual("quasar");
   return {
@@ -116,8 +121,19 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QDialog: {
-          template: '<div data-test-stub="q-dialog"><slot></slot></div>',
+        // ODrawer stub (outer container, replaces q-dialog)
+        ODrawer: {
+          name: 'ODrawer',
+          template: '<div data-test-stub="o-drawer" :data-title="title"><span data-test-stub="o-drawer-title">{{ title }}</span><slot name="header-right"></slot><slot></slot></div>',
+          props: ['open', 'size', 'seamless', 'title'],
+          emits: ['update:open'],
+        },
+        // ODialog stub (inner color picker dialog, replaces q-dialog)
+        ODialog: {
+          name: 'ODialog',
+          template: '<div data-test-stub="o-dialog" :data-title="title"><span data-test-stub="o-dialog-title">{{ title }}</span><slot name="header"></slot><slot></slot><slot name="footer"></slot><button data-test-stub="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button></div>',
+          props: ['open', 'size', 'title', 'primaryButtonLabel'],
+          emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
         },
         QCard: {
           template: '<div data-test-stub="q-card"><slot></slot></div>',
@@ -168,13 +184,10 @@ const createWrapper = (props = {}, options = {}) => {
           emits: ['click'],
         },
         QIcon: {
-          template: '<i data-test-stub="q-icon"></i>',
+          template: '<i data-test-stub="OIcon"></i>',
         },
         QTooltip: {
           template: '<div data-test-stub="q-tooltip"><slot></slot></div>',
-        },
-        QBadge: {
-          template: '<span data-test-stub="q-badge"><slot></slot></span>',
         },
         QColor: {
           template: '<div data-test-stub="q-color"></div>',
@@ -190,6 +203,7 @@ const createWrapper = (props = {}, options = {}) => {
 describe("PredefinedThemes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockToast.mockReturnValue(vi.fn());
     mockLocalStorage.getItem.mockImplementation((key: string) => {
       if (key === 'appliedLightTheme') return null;
       if (key === 'appliedDarkTheme') return null;
@@ -205,9 +219,14 @@ describe("PredefinedThemes", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render dialog", () => {
+    it("should render drawer (ODrawer)", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test-stub="q-dialog"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
+    });
+
+    it("should render inner color picker ODialog", () => {
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test-stub="o-dialog"]').exists()).toBe(true);
     });
 
     it("should render light and dark mode tabs", () => {
@@ -377,7 +396,8 @@ describe("PredefinedThemes", () => {
       vm.resetToDefaultTheme();
       await nextTick();
 
-      expect(mockNotify).toHaveBeenCalled();
+      // resetToDefaultTheme calls toast() from @/lib/feedback/Toast/useToast, not useQuasar().notify
+      expect(mockToast).toHaveBeenCalled();
     });
   });
 
@@ -475,16 +495,36 @@ describe("PredefinedThemes", () => {
   });
 
   describe("Dialog Controls", () => {
-    it("should have close button", () => {
+    it("should pass title 'Predefined Themes' to ODrawer", () => {
       const wrapper = createWrapper();
-      // Find button with icon "close"
-      const buttons = wrapper.findAll('[data-test-stub="q-btn"]');
-      // The close button is the one without text (icon only)
-      const closeButtons = buttons.filter(btn => btn.text().trim() === '');
-      expect(closeButtons.length).toBeGreaterThan(0);
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.attributes("data-title")).toBe("Predefined Themes");
     });
 
-    it("should close dialog when dialogOpen is set to false", async () => {
+    it("should pass title 'Pick Custom Color' to inner ODialog", () => {
+      const wrapper = createWrapper();
+      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.attributes("data-title")).toBe("Pick Custom Color");
+    });
+
+    it("should close color picker when ODialog emits click:primary", async () => {
+      const wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      vm.showColorPicker = true;
+      await nextTick();
+      expect(vm.showColorPicker).toBe(true);
+
+      const primaryBtn = wrapper.find('[data-test-stub="o-dialog-primary"]');
+      await primaryBtn.trigger("click");
+      await nextTick();
+
+      expect(vm.showColorPicker).toBe(false);
+    });
+
+    it("should close drawer when dialogOpen is set to false", async () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 

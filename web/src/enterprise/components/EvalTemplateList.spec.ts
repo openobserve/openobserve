@@ -15,12 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar({ plugins: [Dialog, Notify] });
 
 const mockPush = vi.fn();
 
@@ -73,7 +69,6 @@ async function mountList() {
     global: {
       plugins: [i18n, store],
       stubs: {
-        QTablePagination: true,
         NoData: true,
         ConfirmDialog: true,
       },
@@ -153,12 +148,6 @@ describe("EvalTemplateList - data loading", () => {
     expect(wrapper.vm.rows.length).toBe(templatesDB.length);
   });
 
-  it("sets resultTotal to number of loaded templates", async () => {
-    const wrapper: any = await mountList();
-    await flushPromises();
-    expect(wrapper.vm.resultTotal).toBe(templatesDB.length);
-  });
-
   it("sets isLoading to false after load completes", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
@@ -171,52 +160,6 @@ describe("EvalTemplateList - data loading", () => {
     await wrapper.find('[data-test="eval-template-list-refresh-btn"]').trigger("click");
     await flushPromises();
     expect(evalTemplateService.listTemplates).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("EvalTemplateList - filtering", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    templatesDB = [
-      makeTemplate(1, { name: "Accuracy Check" }),
-      makeTemplate(2, { name: "Toxicity Filter" }),
-      makeTemplate(3, { name: "Accuracy Score" }),
-    ];
-    vi.mocked(evalTemplateService.listTemplates).mockResolvedValue(templatesDB as any);
-  });
-
-  afterEach(() => vi.restoreAllMocks());
-
-  it("returns all rows when filterQuery is empty", async () => {
-    const wrapper: any = await mountList();
-    await flushPromises();
-    expect(wrapper.vm.visibleRows.length).toBe(3);
-  });
-
-  it("filters rows by name when filterQuery is set", async () => {
-    const wrapper: any = await mountList();
-    await flushPromises();
-    wrapper.vm.filterQuery = "accuracy";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.visibleRows.every((r: any) =>
-      r.name.toLowerCase().includes("accuracy"),
-    )).toBe(true);
-  });
-
-  it("returns empty array when filterQuery matches nothing", async () => {
-    const wrapper: any = await mountList();
-    await flushPromises();
-    wrapper.vm.filterQuery = "zzznomatch";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.visibleRows.length).toBe(0);
-  });
-
-  it("updates resultTotal to reflect filtered count", async () => {
-    const wrapper: any = await mountList();
-    await flushPromises();
-    wrapper.vm.filterQuery = "accuracy";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.resultTotal).toBe(2);
   });
 });
 
@@ -290,7 +233,7 @@ describe("EvalTemplateList - delete", () => {
   it("bulk delete calls deleteTemplate for each selected item", async () => {
     const wrapper: any = await mountList();
     await flushPromises();
-    wrapper.vm.selectedItems = [templatesDB[0], templatesDB[1]];
+    wrapper.vm.selectedIds = [templatesDB[0].id, templatesDB[1].id];
     await wrapper.vm.bulkDeleteTemplates();
     await flushPromises();
     expect(evalTemplateService.deleteTemplate).toHaveBeenCalledTimes(2);

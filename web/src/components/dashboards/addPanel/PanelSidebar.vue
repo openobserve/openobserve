@@ -15,41 +15,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sidebar" :class="{ open: isOpen }">
-    <div v-if="!isOpen" class="sidebar-header-collapsed" @click="toggleSidebar">
+  <div
+    class="sidebar"
+    :class="{ open: isOpen }"
+    data-test="panel-sidebar-root"
+  >
+    <div
+      v-if="!isOpen"
+      class="sidebar-header-collapsed"
+      data-test="panel-sidebar-header-collapsed"
+      @click="toggleSidebar"
+    >
       <!-- <div class="collapsed-icon">+</div> -->
-      <q-icon
-        name="expand_all"
+      <OIcon
+        name="expand-all" size="sm"
         class="collapsed-icon rotate-90"
         data-test="dashboard-sidebar"
       />
-      <div class="collapsed-title">{{ title }}</div>
+      <div
+        class="collapsed-title"
+        data-test="panel-sidebar-collapsed-title"
+      >{{ title }}</div>
     </div>
-    <div v-else class="sidebar-header-expanded">
-      <div class="expanded-title">{{ title }}</div>
+    <div
+      v-else
+      class="sidebar-header-expanded"
+      data-test="panel-sidebar-header-expanded"
+    >
+      <div
+        class="expanded-title"
+        data-test="panel-sidebar-expanded-title"
+      >{{ title }}</div>
       <OButton
         variant="outline"
         size="icon-xs-sq"
         class="tw:rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
+        icon-left="unfold-less"
       >
-        <template #icon-left><q-icon name="unfold_less" /></template>
       </OButton>
     </div>
-    <q-separator style="margin-top: -1px; flex-shrink: 0" />
-    <div class="sidebar-content scroll" v-if="isOpen">
+    <OSeparator class="tw:-mt-px tw:shrink-0" data-test="panel-sidebar-separator" />
+    <div
+      class="sidebar-content scroll"
+      data-test="panel-sidebar-content"
+      v-if="isOpen"
+      @scroll.passive="onSidebarScroll"
+    >
       <slot></slot>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, provide } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
-  components: { OButton },
+  components: { OSeparator, OButton,
+    OIcon,
+},
   props: {
     title: {
       type: String,
@@ -63,10 +91,16 @@ export default defineComponent({
   emits: ["update:modelValue"],
   setup(props, { emit }) {
     const isOpen = ref(props.modelValue);
+    const sidebarScrollTick = ref(0);
+    provide('sidebarScrollTick', sidebarScrollTick);
 
     const toggleSidebar = () => {
       isOpen.value = !isOpen.value;
       emit("update:modelValue", isOpen.value);
+    };
+
+    const onSidebarScroll = () => {
+      sidebarScrollTick.value++;
     };
 
     watch(
@@ -79,6 +113,7 @@ export default defineComponent({
     return {
       isOpen,
       toggleSidebar,
+      onSidebarScroll,
     };
   },
 });

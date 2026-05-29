@@ -1,11 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Database from "@/components/ingestion/Database.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
@@ -73,7 +71,7 @@ describe("Database Component", () => {
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
           },
           'q-input': true,
-          'q-icon': true,
+          'OIcon': true,
           'q-tabs': true,
           'q-route-tab': true,
           'router-view': true
@@ -134,7 +132,7 @@ describe("Database Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
             'q-input': true,
-            'q-icon': true,
+            'OIcon': true,
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true
@@ -348,7 +346,7 @@ describe("Database Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
             'q-input': true,
-            'q-icon': true,
+            'OIcon': true,
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true
@@ -380,7 +378,7 @@ describe("Database Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
             'q-input': true,
-            'q-icon': true,
+            'OIcon': true,
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true
@@ -663,7 +661,7 @@ describe("Database Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
             'q-input': true,
-            'q-icon': true,
+            'OIcon': true,
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true

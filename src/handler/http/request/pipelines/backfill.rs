@@ -83,6 +83,14 @@ pub async fn create_backfill(
     Path((org_id, pipeline_id)): Path<(String, String)>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
+    }
+
     log::info!(
         "[BACKFILL API] Create backfill job request for pipeline {} in org {}, range: {}-{}, delete: {}",
         pipeline_id,

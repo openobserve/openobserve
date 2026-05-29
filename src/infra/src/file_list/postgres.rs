@@ -155,10 +155,10 @@ impl super::FileList for PostgresFileList {
             .with_label_values(&["insert", "file_list"])
             .inc();
         if let Err(e) = sqlx::query(
-            r#"INSERT INTO file_list 
-              (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at) 
-            VALUES 
-              ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
+            r#"INSERT INTO file_list
+              (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+            VALUES
+              ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT DO NOTHING"#
                 )
                 .bind(&dump_file.account)
@@ -173,6 +173,7 @@ impl super::FileList for PostgresFileList {
                 .bind(meta.original_size)
                 .bind(meta.compressed_size)
                 .bind(meta.index_size)
+                .bind(meta.bloom_ver)
                 .bind(meta.flattened)
                 .bind(now_ts)
                 .execute(&mut *tx).await
@@ -336,7 +337,7 @@ impl super::FileList for PostgresFileList {
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, file, date
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, file, date
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -416,6 +417,53 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         Ok(())
     }
 
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let pool = CLIENT.clone();
+        // Use ANY($2) with a bigint array — postgres handles arbitrary length
+        // without needing chunking, and the partition pruning works on the
+        // file_list_*_pkey index.
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "file_list"])
+            .inc();
+        sqlx::query("UPDATE file_list SET bloom_ver = $1 WHERE id = ANY($2)")
+            .bind(bloom_ver)
+            .bind(ids)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn bloom_ver_referenced(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+        bloom_ver: i64,
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["bloom_ver_referenced", "file_list"])
+            .inc();
+        // Index note: filters on (stream, date, bloom_ver). The existing
+        // (stream, date) index narrows it to one hour bucket (a few hundred
+        // rows at most), so the residual bloom_ver scan is cheap and LIMIT 1
+        // stops at the first hit — no dedicated composite index needed.
+        let found: Option<(i32,)> = sqlx::query_as(
+            r#"SELECT 1 FROM file_list WHERE stream = $1 AND date = $2 AND bloom_ver = $3 LIMIT 1;"#,
+        )
+        .bind(stream_key)
+        .bind(date)
+        .bind(bloom_ver)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(found.is_some())
+    }
+
     async fn list(&self) -> Result<Vec<FileKey>> {
         return Ok(vec![]); // disallow list all data
     }
@@ -439,7 +487,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#
@@ -452,7 +500,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             let (date_from, date_to) = derive_date_range(time_start, time_end);
             let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;
                 "#;
@@ -496,11 +544,10 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let cfg = get_config();
         let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#;
-
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
             .bind(date_start)
@@ -578,6 +625,36 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         Ok(ret?)
     }
 
+    async fn query_for_bloom(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+    ) -> Result<Vec<FileKey>> {
+        let start = std::time::Instant::now();
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["query_for_bloom", "file_list"])
+            .inc();
+
+        let sql = r#"
+SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
+                "#;
+        let ret = sqlx::query_as::<_, super::FileRecord>(sql)
+            .bind(stream_key)
+            .bind(date)
+            .fetch_all(&pool)
+            .await;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["query_for_bloom", "file_list"])
+            .observe(time);
+        Ok(ret?.iter().map(|r| r.into()).collect())
+    }
+
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>> {
         if ids.is_empty() {
             return Ok(Vec::default());
@@ -595,7 +672,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids})"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list"])
@@ -1037,23 +1114,27 @@ GROUP BY stream;
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if let Some(stream_type) = stream_type
-            && let Some(stream_name) = stream_name
-        {
-            format!(
-                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';",
-            )
-        } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
-        };
+        // SECURITY: bind parameters via sqlx to prevent SQL injection when
+        // org_id / stream_type / stream_name contain quotes or SQL metacharacters.
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["get_stream_stats", "stream_stats"])
             .inc();
         let start = std::time::Instant::now();
-        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let ret = if let Some(stream_type) = stream_type
+            && let Some(stream_name) = stream_name
+        {
+            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE stream = $1;")
+                .bind(&stream_key)
+                .fetch_all(&pool)
+                .await?
+        } else {
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE org = $1;")
+                .bind(org_id)
+                .fetch_all(&pool)
+                .await?
+        };
         let mut stats: HashMap<String, StreamStats> = HashMap::with_capacity(ret.len() / 2);
         for r in ret {
             match stats.get_mut(&r.stream) {
@@ -1294,7 +1375,12 @@ DO UPDATE SET
         Ok(id)
     }
 
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<super::MergeJobRecord>> {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";
@@ -1312,23 +1398,28 @@ DO UPDATE SET
             }
             return Err(e.into());
         }
-        // get pending jobs group by stream and order by num desc
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
-        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
+
+        // get pending jobs group by stream and order by num desc
+        let sql = if fast_mode {
+            r#"SELECT stream, id, 0 as num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
+        } else {
             r#"
-SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
-    FROM file_list_jobs
-    WHERE status = $1
-    GROUP BY stream
-    ORDER BY num DESC
-    LIMIT $2;"#,
-        )
-        .bind(super::FileListJobStatus::Pending)
-        .bind(limit)
-        .fetch_all(&mut *tx)
-        .await
+    SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
+        FROM file_list_jobs
+        WHERE status = $1
+        GROUP BY stream
+        ORDER BY num DESC
+        LIMIT $2;"#
+        };
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(sql)
+            .bind(super::FileListJobStatus::Pending)
+            .bind(limit)
+            .fetch_all(&mut *tx)
+            .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -1394,17 +1485,35 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         Ok(ret)
     }
 
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64> {
+    async fn set_job_pending(
+        &self,
+        ids: &[i64],
+        offsets: i64,
+        stream: Option<&str>,
+    ) -> Result<u64> {
         let pool = CLIENT.clone();
-        let sql = if ids.is_empty() {
-            "UPDATE file_list_jobs SET status = $1;".to_string()
-        } else {
-            format!(
-                "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
+        let mut conditions: Vec<String> = Vec::new();
+        if !ids.is_empty() {
+            conditions.push(format!(
+                "id IN ({})",
                 ids.iter()
                     .map(|id| id.to_string())
                     .collect::<Vec<_>>()
                     .join(",")
+            ));
+        }
+        if offsets > 0 {
+            conditions.push(format!("offsets >= {offsets}"));
+        }
+        if let Some(stream) = stream {
+            conditions.push(format!("stream = '{stream}'"));
+        }
+        let sql = if conditions.is_empty() {
+            "UPDATE file_list_jobs SET status = $1;".to_string()
+        } else {
+            format!(
+                "UPDATE file_list_jobs SET status = $1 WHERE {};",
+                conditions.join(" AND ")
             )
         };
         DB_QUERY_NUMS
@@ -1771,6 +1880,30 @@ GROUP BY stream;
             .observe(time);
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
+
+    // TODO: optimize with date from org_storage_settings
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = r#"SELECT 
+SUM(original_size)::BIGINT AS storage_size,
+SUM(index_size)::BIGINT AS index_size
+FROM file_list
+WHERE org = $1 AND account = $2;"#;
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .observe(time);
+        Ok(ret.unwrap_or_default())
+    }
 }
 
 impl PostgresFileList {
@@ -1794,8 +1927,8 @@ impl PostgresFileList {
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
             format!(
                 r#"
-INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     ON CONFLICT DO NOTHING
     RETURNING id;
                 "#
@@ -1813,6 +1946,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.original_size)
             .bind(meta.compressed_size)
             .bind(meta.index_size)
+            .bind(meta.bloom_ver)
             .bind(meta.flattened)
             .bind(now_ts)
             .fetch_one(&pool).await;
@@ -1857,7 +1991,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str()
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
@@ -1882,6 +2016,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.bloom_ver)
                         .push_bind(item.meta.flattened)
                         .push_bind(now_ts);
                 });
@@ -2200,7 +2335,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2219,7 +2354,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2237,7 +2372,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // 1. Ensure all columns exist
     sqlx::query(&format!(
-        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(32) DEFAULT '' NOT NULL"
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(128) DEFAULT '' NOT NULL"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2248,6 +2383,11 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .await?;
     sqlx::query(&format!(
         "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS index_size BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bloom_ver BIGINT DEFAULT 0 NOT NULL"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2388,7 +2528,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2410,7 +2550,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2587,6 +2727,15 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             Some("p") => {
                 // Already partitioned: just ensure partitions exist
                 log::info!("[POSTGRES] Table {table} already partitioned, ensuring partitions");
+                // Ensure newly-added columns exist on already-partitioned tables.
+                // PG declarative partitioning propagates ALTER on parent to all partitions.
+                if *table == "file_list" || *table == "file_list_history" {
+                    sqlx::query(&format!(
+                        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bloom_ver BIGINT DEFAULT 0 NOT NULL"
+                    ))
+                    .execute(pool)
+                    .await?;
+                }
             }
             Some("r") => {
                 // Regular table: needs migration
@@ -2601,7 +2750,7 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
                         "[POSTGRES] Table {table} is a regular table and needs to be converted to a partitioned table. \
                         Since ZO_PG_PARTITION_MODE is set to 'manual', auto-migration is skipped. \
                         Please migrate the table manually and then restart the node. \
-                        Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+                        Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
                     );
                     loop {
                         log::warn!(
@@ -2642,7 +2791,7 @@ fn file_list_partition_ddl(table: &str) -> String {
         r#"
 CREATE TABLE {table} (
     id              BIGINT GENERATED ALWAYS AS IDENTITY,
-    account         VARCHAR(32) NOT NULL,
+    account         VARCHAR(128) NOT NULL,
     org             VARCHAR(100) NOT NULL,
     stream          VARCHAR(256) NOT NULL,
     date            VARCHAR(16) NOT NULL,
@@ -2655,6 +2804,7 @@ CREATE TABLE {table} (
     original_size   BIGINT NOT NULL,
     compressed_size BIGINT NOT NULL,
     index_size      BIGINT NOT NULL,
+    bloom_ver       BIGINT DEFAULT 0 NOT NULL,
     updated_at      BIGINT NOT NULL
 ) PARTITION BY RANGE (date)
         "#
@@ -2732,7 +2882,7 @@ pub async fn create_table() -> Result<()> {
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account    VARCHAR(32)  not null,
+    account    VARCHAR(128)  not null,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -2802,7 +2952,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(
         "file_list_deleted",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
@@ -2819,6 +2969,18 @@ CREATE TABLE IF NOT EXISTS stream_stats
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;
+    }
+
+    // after introducing org_storage, the account can have value of org_id:default,
+    // and we restrict org_id to 100 characters so here we change it to 256 from original 32
+    for table in &["file_list", "file_list_history", "file_list_deleted"] {
+        log::info!("[POSTGRES] updating account col to 128 for table {table}");
+        sqlx::query(&format!(
+            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
+        ))
+        .execute(&pool)
+        .await?;
+        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
     }
 
     Ok(())
@@ -3203,7 +3365,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3227,7 +3389,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_history (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3251,7 +3413,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_deleted (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3315,6 +3477,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            bloom_ver: 0,
         }
     }
 
@@ -3326,6 +3489,7 @@ mod tests {
             deleted,
             id: 0,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::Ordering, collections::BinaryHeap};
+
 use config::{
     meta::{search::Response, sql::OrderBy},
     utils::json::Value,
@@ -207,6 +209,158 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
     }
     log::warn!("No suitable sort column found in results");
     None
+}
+
+/// Incremental top-k heap for merging hits across partitions.
+///
+/// Feed one partition at a time via `push_hits` — the heap never exceeds k elements
+/// regardless of how many partitions exist. Peak memory = k + one_partition_size,
+/// not total_partitions × partition_size.
+///
+/// Honors all N ORDER BY columns in order: primary sort first, secondary as tiebreaker,
+/// and so on — matching the SQL semantics of multi-column ORDER BY.
+pub struct TopKHeap {
+    heap: BinaryHeap<std::cmp::Reverse<HeapHit>>,
+    k: usize,
+    /// (col_name, is_descending, is_numeric) — is_numeric detected lazily from first non-null
+    /// value.
+    cols: Vec<(String, bool, Option<bool>)>,
+}
+
+impl TopKHeap {
+    /// `order_by_cols`: all ORDER BY columns as (name, is_descending), in query order.
+    /// `k=0` is invalid (heap would never accept any row); falls back to `ZO_QUERY_DEFAULT_LIMIT`.
+    pub fn new(k: usize, order_by_cols: &[(String, bool)]) -> Self {
+        let k = if k == 0 {
+            config::get_config().limit.query_default_limit as usize
+        } else {
+            k
+        };
+        Self {
+            heap: BinaryHeap::with_capacity(k + 1),
+            k,
+            cols: order_by_cols
+                .iter()
+                .map(|(col, desc)| (col.clone(), *desc, None))
+                .collect(),
+        }
+    }
+
+    /// Feed one partition's hits into the heap. Hits that don't make the top-k are
+    /// dropped immediately — only k elements are retained in memory at any time.
+    pub fn push_hits(&mut self, hits: Vec<Value>) {
+        for hit in hits {
+            // Detect is_numeric lazily per column from the first non-null value seen.
+            for (col, _, is_numeric) in &mut self.cols {
+                if is_numeric.is_none()
+                    && let Some(v) = hit.get(col.as_str())
+                    && !v.is_null()
+                {
+                    *is_numeric = Some(v.is_number());
+                }
+            }
+
+            let resolved: Vec<(String, bool, bool)> = self
+                .cols
+                .iter()
+                .map(|(col, desc, is_num)| (col.clone(), *desc, is_num.unwrap_or(false)))
+                .collect();
+            let candidate = HeapHit {
+                hit,
+                cols: resolved,
+            };
+
+            if self.heap.len() < self.k {
+                self.heap.push(std::cmp::Reverse(candidate));
+            } else if let Some(std::cmp::Reverse(min)) = self.heap.peek()
+                && candidate > *min
+            {
+                self.heap.pop();
+                self.heap.push(std::cmp::Reverse(candidate));
+            }
+        }
+    }
+
+    /// Drain the heap into a sorted vec and apply the `from` offset.
+    pub fn into_sorted_vec(self, from: usize) -> Vec<Value> {
+        let cols: Vec<(String, bool, bool)> = self
+            .cols
+            .iter()
+            .map(|(col, desc, is_num)| (col.clone(), *desc, is_num.unwrap_or(false)))
+            .collect();
+
+        let mut result: Vec<Value> = self
+            .heap
+            .into_iter()
+            .map(|std::cmp::Reverse(h)| h.hit)
+            .collect();
+
+        result.sort_by(|a, b| {
+            for (col, is_desc, is_numeric) in &cols {
+                let ord = if *is_numeric {
+                    compare_numeric_values(a, b, col)
+                } else {
+                    compare_string_values(a, b, col)
+                };
+                // DESC: sort descending (largest first)
+                let ord = if *is_desc { ord.reverse() } else { ord };
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            Ordering::Equal
+        });
+
+        if from >= result.len() {
+            return vec![];
+        }
+        result[from..].to_vec()
+    }
+}
+
+/// Wrapper around a JSON hit that implements `Ord` across all ORDER BY columns.
+///
+/// Direction-aware so that `Reverse<HeapHit>` always evicts the "current worst":
+/// - DESC col: ascending cmp → `Reverse` = min-heap → evicts smallest → keeps k largest
+/// - ASC  col: descending cmp → `Reverse` = max-heap → evicts largest  → keeps k smallest
+///
+/// Tiebreaking proceeds to the next column just as SQL does.
+struct HeapHit {
+    hit: Value,
+    /// (col_name, is_descending, is_numeric) in ORDER BY order.
+    cols: Vec<(String, bool, bool)>,
+}
+
+impl PartialEq for HeapHit {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for HeapHit {}
+
+impl PartialOrd for HeapHit {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for HeapHit {
+    fn cmp(&self, other: &Self) -> Ordering {
+        for (col, is_desc, is_numeric) in &self.cols {
+            let ord = if *is_numeric {
+                compare_numeric_values(&self.hit, &other.hit, col)
+            } else {
+                compare_string_values(&self.hit, &other.hit, col)
+            };
+            // See struct doc: flip direction so Reverse<HeapHit> evicts the right element.
+            let ord = if *is_desc { ord } else { ord.reverse() };
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        Ordering::Equal
+    }
 }
 
 #[cfg(test)]
@@ -601,5 +755,100 @@ mod tests {
             .collect();
 
         assert_eq!(timestamps, vec![3000, 2000, 1000]);
+    }
+
+    // ── TopKHeap tests ────────────────────────────────────────────────────────
+
+    fn make_hits(pairs: &[(&str, i64)]) -> Vec<Value> {
+        pairs
+            .iter()
+            .map(|(level, cnt)| json!({"level": level, "cnt": cnt}))
+            .collect()
+    }
+
+    #[test]
+    fn test_topk_heap_zero_k_falls_back_to_default_limit() {
+        // k=0 is invalid — heap would never accept rows. Must fall back to query_default_limit.
+        let mut heap = TopKHeap::new(0, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 100)]));
+        let result = heap.into_sorted_vec(0);
+        assert!(
+            !result.is_empty(),
+            "k=0 must fall back to default limit, not drop all rows"
+        );
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_bounded_keeps_top_k() {
+        // k=2 DESC: should keep the 2 largest cnt values
+        let mut heap = TopKHeap::new(2, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 382)]));
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+        assert_eq!(result[1]["cnt"].as_i64().unwrap(), 382);
+    }
+
+    #[test]
+    fn test_topk_heap_unlimited_keeps_all() {
+        // size==-1 path: heap_k == query_default_limit (e.g. 1000), all 3 hits fit
+        let k = 1000; // mirrors ZO_QUERY_DEFAULT_LIMIT default
+        let mut heap = TopKHeap::new(k, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 382)]));
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_from_skips_correctly() {
+        // from=1: skip first sorted row
+        let k = 1000;
+        let mut heap = TopKHeap::new(k, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 100)]));
+        let result = heap.into_sorted_vec(1); // skip rank-0 (955)
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 382);
+    }
+
+    #[test]
+    fn test_topk_heap_asc_order() {
+        // is_descending=false → ASC sort
+        let mut heap = TopKHeap::new(1000, &[("cnt".to_string(), false)]);
+        heap.push_hits(make_hits(&[("info", 955), ("error", 382), ("warn", 100)]));
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 100);
+        assert_eq!(result[2]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_multiple_partitions_unlimited() {
+        // Simulates multi-partition push with size==-1 (k = default limit)
+        let mut heap = TopKHeap::new(1000, &[("cnt".to_string(), true)]);
+        heap.push_hits(make_hits(&[("info", 955)])); // partition 1
+        heap.push_hits(make_hits(&[("error", 382)])); // partition 2
+        heap.push_hits(make_hits(&[("warn", 100)])); // partition 3
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
+    }
+
+    #[test]
+    fn test_topk_heap_unlimited_non_ts_order_by() {
+        // Non-ts ORDER BY with size==-1 (e.g. plain aggregate query, not CTE):
+        // heap_k == query_default_limit, all rows from all partitions must survive.
+        // Note: CTE queries now short-circuit via is_aggregate=true and never reach
+        // the TopKHeap path.
+        let mut heap = TopKHeap::new(1000, &[("level_count".to_string(), true)]);
+        heap.push_hits(vec![
+            json!({"level": "info",  "level_count": 955}),
+            json!({"level": "error", "level_count": 382}),
+        ]);
+        heap.push_hits(vec![json!({"level": "warn", "level_count": 100})]);
+        let result = heap.into_sorted_vec(0);
+        assert_eq!(result.len(), 3, "all rows must survive with unlimited size");
+        assert_eq!(result[0]["level"].as_str().unwrap(), "info");
+        assert_eq!(result[0]["level_count"].as_i64().unwrap(), 955);
     }
 }

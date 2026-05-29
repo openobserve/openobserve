@@ -16,16 +16,24 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Plans from "./plans.vue";
-import { Quasar } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";
 import config from "@/aws-exports";
 import * as zincutils from "@/utils/zincutils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
-installQuasar();
+// Mock toast
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()), // Returns dismiss function
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+  useToast: () => ({
+    toast: mockToast,
+    toasts: [],
+  }),
+}));
 
 // Mock BillingService
 vi.mock("@/services/billings", () => ({
@@ -245,8 +253,8 @@ describe("Plans Component", () => {
 
     await wrapper.vm.loadSubscription();
 
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "warning",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "warning",
       message: "Please subscribe to one of the plan.",
       timeout: 5000,
     });
@@ -261,8 +269,8 @@ describe("Plans Component", () => {
 
     expect(wrapper.vm.loading).toBe(false);
     expect(wrapper.vm.proLoading).toBe(false);
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Network error",
       timeout: 5000,
     });
@@ -310,8 +318,8 @@ describe("Plans Component", () => {
     await flushPromises();
 
     expect(wrapper.vm.proLoading).toBe(false);
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Resume failed",
       timeout: 5000,
     });
@@ -329,8 +337,8 @@ describe("Plans Component", () => {
     // Wait for all pending promises to resolve
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Hosted URL failed",
       timeout: 5000,
     });
@@ -381,8 +389,8 @@ describe("Plans Component", () => {
     // Wait for async operations to complete
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Session URL failed",
       timeout: 5000,
     });
@@ -617,8 +625,8 @@ describe("Plans Component", () => {
 
       await freshWrapper.vm.loadSubscription();
 
-      expect(mockNotify).toHaveBeenNthCalledWith(i + 1, {
-        type: "negative",
+      expect(mockToast).toHaveBeenNthCalledWith(i + 1, {
+        variant: "error",
         message: errorType.expectedMessage,
         timeout: 5000,
       });

@@ -28,7 +28,8 @@ use {
     crate::common::meta::organization::OrganizationInvites,
     crate::common::meta::organization::{
         AllOrgListDetails, AllOrganizationResponse, CreateExternalContractRequest,
-        ExtendExternalContractRequest, ExtendTrialPeriodRequest, OrganizationInviteUserRecord,
+        EnableOrgStorageRequest, ExtendExternalContractRequest, ExtendTrialPeriodRequest,
+        OrganizationInviteUserRecord,
     },
     axum::body::Body,
     axum::http::StatusCode,
@@ -219,6 +220,9 @@ pub async fn all_organizations(
                 None
             }
         });
+        let settings = crate::service::db::organization::get_org_setting(&org.identifier)
+            .await
+            .unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
@@ -234,6 +238,7 @@ pub async fn all_organizations(
             billing_provider: billing_info
                 .map(|(_, _, provider)| provider.clone())
                 .unwrap_or_default(),
+            org_storage_enabled: settings.org_storage_enabled,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());
@@ -786,6 +791,59 @@ pub async fn revoke_external_contract(
             MetaHttpResponse::internal_error(format!("Failed to revoke external contract: {e}"))
         }
     }
+}
+
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/enable_org_storage",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "EnableOrgStorage",
+    summary = "Enable Org storage for an org",
+    description = "Enables org level storage for an org.",
+    security(
+        ("Authorization"= [])
+    ),
+    request_body(content = inline(EnableOrgStorageRequest), description = "Enable org storage request", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "text", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn enable_org_storage(
+    Path(org_id): Path<String>,
+    Json(req): Json<EnableOrgStorageRequest>,
+) -> Response {
+    if org_id != "_meta" {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+
+    let target_org_id = req.org_id;
+
+    let mut org_settings =
+        match crate::service::db::organization::get_org_setting(&target_org_id).await {
+            Ok(org) => org,
+            Err(e) => {
+                return MetaHttpResponse::not_found(e.to_string());
+            }
+        };
+    if org_settings.org_storage_enabled {
+        return MetaHttpResponse::bad_request("org storage already enabled for this org");
+    }
+    org_settings.org_storage_enabled = true;
+
+    if let Err(e) =
+        crate::service::db::organization::set_org_setting(&target_org_id, &org_settings).await
+    {
+        return MetaHttpResponse::internal_error(format!(
+            "error while saving settings for org {target_org_id} : {e}"
+        ));
+    }
+
+    MetaHttpResponse::ok("successfully enabled org storage")
 }
 
 /// RenameOrganization
