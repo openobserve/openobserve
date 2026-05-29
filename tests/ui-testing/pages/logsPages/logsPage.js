@@ -7596,11 +7596,14 @@ export class LogsPage {
         if (!isOn) {
             // force: true bypasses actionability checks — ODropdown portal transiently detaches items on render
             await this.page.locator(this.menuSqlModeBtn).click({ force: true });
-            // Dropdown stays open (ODropdownItem has @select.prevent) — poll the inner button directly
+            // In CI the dropdown may close after the click, making stateEl detached/hidden.
+            // Re-open the menu on each poll iteration so the state element is always visible.
             await expect.poll(async () => {
-                const s = await stateEl.getAttribute('data-state').catch(() => null);
+                await this._openUtilitiesMenuForSqlMode();
+                const s = await this.page.locator(this.menuSqlModeBtnState).first()
+                    .getAttribute('data-state').catch(() => null);
                 return s === 'checked';
-            }, { timeout: 10000 }).toBe(true);
+            }, { timeout: 15000 }).toBe(true);
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
@@ -7618,11 +7621,15 @@ export class LogsPage {
         await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (isOn) {
-            await this.page.locator(this.menuSqlModeBtn).click();
+            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
+            // In CI the dropdown may close after the click, making stateEl detached/hidden.
+            // Re-open the menu on each poll iteration so the state element is always visible.
             await expect.poll(async () => {
-                const s = await stateEl.getAttribute('data-state').catch(() => null);
+                await this._openUtilitiesMenuForSqlMode();
+                const s = await this.page.locator(this.menuSqlModeBtnState).first()
+                    .getAttribute('data-state').catch(() => null);
                 return s === 'unchecked';
-            }, { timeout: 10000 }).toBe(true);
+            }, { timeout: 15000 }).toBe(true);
             testLogger.info('SQL mode disabled');
         } else {
             testLogger.info('SQL mode already disabled');
