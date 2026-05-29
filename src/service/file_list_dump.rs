@@ -53,6 +53,7 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("original_size", DataType::Int64, false),
         Field::new("compressed_size", DataType::Int64, false),
         Field::new("index_size", DataType::Int64, false),
+        Field::new("bloom_ver", DataType::Int64, false),
         Field::new("updated_at", DataType::Int64, false),
     ]))
 });
@@ -89,6 +90,13 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
     get_col!(updated_at_col, "updated_at", Int64Array, rb);
+    // bloom_ver is OPTIONAL on read — dump parquets written before the
+    // bloom-filter pruning layer was added don't have this column.
+    // Missing → 0 (the "no .bf" sentinel), so search for those legacy
+    // rows falls through to the original tantivy path.
+    let bloom_ver_col = rb
+        .column_by_name("bloom_ver")
+        .and_then(|c| c.as_any().downcast_ref::<Int64Array>());
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
         let t = FileRecord {
@@ -106,6 +114,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
+            bloom_ver: bloom_ver_col.map(|c| c.value(idx)).unwrap_or(0),
             updated_at: updated_at_col.value(idx),
         };
         ret.push(t);
@@ -486,7 +495,7 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
-            Field::new("created_at", DataType::Int64, false),
+            Field::new("bloom_ver", DataType::Int64, false),
             Field::new("updated_at", DataType::Int64, false),
         ]));
 
@@ -512,7 +521,7 @@ mod tests {
         let original_size_array = Arc::new(Int64Array::from(vec![1000, 2000, 3000]));
         let compressed_size_array = Arc::new(Int64Array::from(vec![500, 1000, 1500]));
         let index_size_array = Arc::new(Int64Array::from(vec![50, 100, 150]));
-        let created_at_array = Arc::new(Int64Array::from(vec![1000, 2000, 3000]));
+        let bloom_ver_array = Arc::new(Int64Array::from(vec![0, 0, 0]));
         let updated_at_array = Arc::new(Int64Array::from(vec![1100, 2100, 3100]));
 
         RecordBatch::try_new(
@@ -532,7 +541,7 @@ mod tests {
                 original_size_array,
                 compressed_size_array,
                 index_size_array,
-                created_at_array,
+                bloom_ver_array,
                 updated_at_array,
             ],
         )
@@ -586,7 +595,7 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
-            Field::new("created_at", DataType::Int64, false),
+            Field::new("bloom_ver", DataType::Int64, false),
             Field::new("updated_at", DataType::Int64, false),
         ]));
 
@@ -611,7 +620,7 @@ mod tests {
                 Arc::new(Int64Array::from(vec![1000, 1000, 2000])),
                 Arc::new(Int64Array::from(vec![500, 500, 1000])),
                 Arc::new(Int64Array::from(vec![50, 50, 100])),
-                Arc::new(Int64Array::from(vec![1000, 1000, 2000])),
+                Arc::new(Int64Array::from(vec![0, 0, 0])), // bloom_ver
                 Arc::new(Int64Array::from(vec![1100, 1100, 2100])),
             ],
         )
@@ -749,7 +758,9 @@ mod tests {
 
     #[test]
     fn test_empty_record_batch_conversion() {
-        // Test with empty record batches
+        // Test with empty record batches. Schema must match what
+        // `record_batch_to_file_record` expects to read by name (incl.
+        // `bloom_ver`); the historical `created_at` column is gone.
         let schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("account", DataType::Utf8, false),
@@ -765,7 +776,7 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
-            Field::new("created_at", DataType::Int64, false),
+            Field::new("bloom_ver", DataType::Int64, false),
             Field::new("updated_at", DataType::Int64, false),
         ]));
 
@@ -796,6 +807,58 @@ mod tests {
         assert_eq!(records.len(), 0);
     }
 
+    /// A dump parquet written before the bloom-filter pruning layer was
+    /// added has no `bloom_ver` column. The reader must tolerate that and
+    /// default the field to 0 so search just falls back to tantivy for
+    /// those legacy rows instead of panicking.
+    #[test]
+    fn test_legacy_dump_without_bloom_ver_column_reads_with_zero() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("account", DataType::Utf8, false),
+            Field::new("org", DataType::Utf8, false),
+            Field::new("stream", DataType::Utf8, false),
+            Field::new("date", DataType::Utf8, false),
+            Field::new("file", DataType::Utf8, false),
+            Field::new("deleted", DataType::Boolean, false),
+            Field::new("flattened", DataType::Boolean, false),
+            Field::new("min_ts", DataType::Int64, false),
+            Field::new("max_ts", DataType::Int64, false),
+            Field::new("records", DataType::Int64, false),
+            Field::new("original_size", DataType::Int64, false),
+            Field::new("compressed_size", DataType::Int64, false),
+            Field::new("index_size", DataType::Int64, false),
+            Field::new("updated_at", DataType::Int64, false),
+            // intentionally NO bloom_ver column
+        ]));
+        let rb = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(vec![7])),
+                Arc::new(StringArray::from(vec!["acct"])),
+                Arc::new(StringArray::from(vec!["org"])),
+                Arc::new(StringArray::from(vec!["s/logs/x"])),
+                Arc::new(StringArray::from(vec!["2025/01/01/00"])),
+                Arc::new(StringArray::from(vec!["legacy.parquet"])),
+                Arc::new(BooleanArray::from(vec![false])),
+                Arc::new(BooleanArray::from(vec![false])),
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(Int64Array::from(vec![2])),
+                Arc::new(Int64Array::from(vec![3])),
+                Arc::new(Int64Array::from(vec![4])),
+                Arc::new(Int64Array::from(vec![5])),
+                Arc::new(Int64Array::from(vec![6])),
+                Arc::new(Int64Array::from(vec![100])),
+            ],
+        )
+        .unwrap();
+
+        let records = record_batch_to_file_record(rb);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].id, 7);
+        assert_eq!(records[0].bloom_ver, 0);
+    }
+
     #[test]
     fn test_generate_dump_stream_name() {
         // Test with different stream types
@@ -822,7 +885,8 @@ mod tests {
         // Verify the schema has the expected fields
         let schema = FILE_LIST_SCHEMA.clone();
 
-        assert_eq!(schema.fields().len(), 15);
+        // 14 historical fields + bloom_ver + updated_at = 16
+        assert_eq!(schema.fields().len(), 16);
 
         // Check key field names and types
         assert_eq!(schema.field(0).name(), "id");
@@ -959,7 +1023,9 @@ mod tests {
     fn test_file_list_schema_field_ordering() {
         let schema = FILE_LIST_SCHEMA.clone();
 
-        // Verify the exact order of fields
+        // Verify the exact order of fields. `bloom_ver` was inserted
+        // between `index_size` and `updated_at` when the bloom-filter
+        // pruning layer landed.
         let expected_fields = vec![
             ("id", DataType::Int64),
             ("account", DataType::Utf8),
@@ -975,6 +1041,7 @@ mod tests {
             ("original_size", DataType::Int64),
             ("compressed_size", DataType::Int64),
             ("index_size", DataType::Int64),
+            ("bloom_ver", DataType::Int64),
             ("updated_at", DataType::Int64),
         ];
 

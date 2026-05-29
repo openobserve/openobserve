@@ -747,6 +747,13 @@ export default defineComponent({
     );
 
     watch(searchQuery, async (newQuery) => {
+      if (newQuery) {
+        loading.value = true;
+      } else {
+        // Query cleared — reset state and stop the skeleton.
+        filteredResults.value = [];
+        loading.value = false;
+      }
       await debouncedSearch(newQuery);
       if (searchQuery.value == "") {
         filteredResults.value = [];
@@ -761,8 +768,7 @@ export default defineComponent({
           filterQuery.value = "";
         }
         if (searchQuery.value) {
-          // const searchResults = await fetchSearchResults.execute(searchQuery.value);
-          // filteredResults.value = toRaw(searchResults);
+          loading.value = true;
           try {
             // Cancel any in-flight search
             if (currentSearchAbortController) {
@@ -778,6 +784,8 @@ export default defineComponent({
               filteredResults.value = [];
               // Handle error state
             }
+          } finally {
+            loading.value = false;
           }
         } else {
           // If no search query, clear filtered results
@@ -869,8 +877,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
-      });
+              timeout: 0,
+});
 
       try {
         // Get the dashboard
@@ -923,7 +931,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading dashboards...",
-      });
+              timeout: 0,
+});
       loading.value = true;
       try {
         const response = await getAllDashboards(
@@ -1006,7 +1015,6 @@ export default defineComponent({
           showPositiveNotification("Dashboard deleted successfully.");
         } catch (err) {
           showErrorNotification(err?.message ?? "Dashboard deletion failed", {
-            timeout: 2000,
           });
         }
       }
@@ -1055,7 +1063,6 @@ export default defineComponent({
             activeFolderId.value = "default";
 
           showPositiveNotification("Folder deleted successfully.", {
-            timeout: 2000,
           });
         } catch (err) {
           showErrorNotification(
@@ -1063,7 +1070,6 @@ export default defineComponent({
               err?.message ||
               "Folder deletion failed",
             {
-              timeout: 2000,
             },
           );
         } finally {
@@ -1127,13 +1133,13 @@ export default defineComponent({
 
     const debouncedSearch = debounce(async (query) => {
       if (!query) return;
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while searching for dashboards...",
-      });
-      const results = await fetchSearchResults.execute(query);
-      dismiss();
-      filteredResults.value = toRaw(results);
+      loading.value = true;
+      try {
+        const results = await fetchSearchResults.execute(query);
+        filteredResults.value = toRaw(results);
+      } finally {
+        loading.value = false;
+      }
     }, 600);
 
     const activeFolderToMove = computed(() => {
@@ -1219,7 +1225,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "No dashboards selected for deletion",
-            timeout: 2000,
           });
           dismiss();
           return;
@@ -1256,14 +1261,12 @@ export default defineComponent({
             toast({
               variant: "error",
               message: `Failed to delete ${failCount} dashboard(s)`,
-              timeout: 3000,
             });
           } else {
             // All successful
             toast({
               variant: "success",
               message: `${successCount} dashboard(s) deleted successfully`,
-              timeout: 2000,
             });
           }
         } else {
@@ -1271,7 +1274,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: `${selectedIds.value.length} dashboard(s) deleted successfully`,
-            timeout: 2000,
           });
         }
 
@@ -1291,7 +1293,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: errorMessage,
-            timeout: 3000,
           });
         }
       }

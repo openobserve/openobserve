@@ -687,7 +687,6 @@ describe("SearchSchedulersList Component", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
         message: "Search Job have been applied successfully",
-        timeout: 2000,
       });
     });
 

@@ -327,6 +327,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           message: error.data.message || "Error fetching regex patterns",
+          variant: "error",
         });
       } finally {
         listLoading.value = false;
@@ -353,7 +354,7 @@ export default defineComponent({
         getRegexPatterns();
         toast({
           message: "Regex pattern deleted successfully.",
-          timeout: 1500,
+          variant: "success",
         });
       } catch (error: any) {
         toast({
@@ -361,7 +362,7 @@ export default defineComponent({
             error?.data?.message ||
             error?.response?.data?.message ||
             "Error deleting regex pattern",
-          timeout: 1500,
+          variant: "error",
         });
       }
     };
@@ -401,10 +402,12 @@ export default defineComponent({
         link.click();
         toast({
           message: "Regex pattern exported successfully",
+          variant: "success",
         });
       } catch (error: any) {
         toast({
           message: error.data.message || "Error exporting regex pattern",
+          variant: "error",
         });
       } finally {
         if (url) {
@@ -448,17 +451,17 @@ export default defineComponent({
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
             message: `Successfully deleted ${successful.length} regex pattern(s)`,
-            timeout: 2000,
+            variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: `Deleted ${successful.length} regex pattern(s), but ${unsuccessful.length} failed`,
-            timeout: 3000,
+            variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
             message: `Failed to delete ${unsuccessful.length} regex pattern(s)`,
-            timeout: 2000,
+            variant: "error",
           });
         }
 
@@ -473,7 +476,7 @@ export default defineComponent({
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             message: errorMessage,
-            timeout: 2000,
+            variant: "error",
           });
         }
       }

@@ -96,8 +96,8 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Toast notifications (OToast)
         // ────────────────────────────────────────────────────────────────────
-        this.toastError = page.locator('[data-test="o-toast-error"]');
-        this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+        this.toastError = page.locator('[data-test-variant="error"]');
+        this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
         // ────────────────────────────────────────────────────────────────────

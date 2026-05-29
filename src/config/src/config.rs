@@ -1087,16 +1087,20 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_DISABLED_ON_SEARCH", default = false)]
-    pub bloom_filter_disabled_on_search: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
-        name = "ZO_BLOOM_FILTER_NDV_RATIO",
-        default = 100,
-        help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
+        name = "ZO_BLOOM_FILTER_FPP",
+        default = 0.01,
+        help = "Target false-positive probability for the bloom filter layer. Smaller = fewer false survivors but larger `.bf` files (sizes the SBBF block count). Must be in (0, 1); out-of-range falls back to 0.01."
     )]
-    pub bloom_filter_ndv_ratio: u64,
+    pub bloom_filter_fpp: f64,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_MAX_FILES_PER_BF",
+        default = 256,
+        help = "Max number of files packed into one `.bf` (transposed bloom layout). A bigger value means fewer `.bf` reads per query but more compactor memory at build time (≈ files × per-file-SBBF). One hour bucket is split into ceil(files / this) `.bf` files."
+    )]
+    pub bloom_filter_max_files_per_bf: usize,
     #[env_config(
         name = "ZO_SEARCH_AROUND_DEFAULT_FIELDS",
         default = "",
@@ -1803,6 +1807,12 @@ pub struct Limit {
         help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
     pub inverted_index_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
+        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
+    )]
+    pub bloom_footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -2870,9 +2880,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    // check bloom filter ndv ratio
-    if cfg.common.bloom_filter_ndv_ratio == 0 {
-        cfg.common.bloom_filter_ndv_ratio = 100;
+    // check bloom filter fpp: must be a probability in (0, 1)
+    if cfg.common.bloom_filter_fpp <= 0.0 || cfg.common.bloom_filter_fpp >= 1.0 {
+        log::warn!(
+            "ZO_BLOOM_FILTER_FPP={} is out of range (0, 1); falling back to default 0.01",
+            cfg.common.bloom_filter_fpp
+        );
+        cfg.common.bloom_filter_fpp = 0.01;
     }
 
     // check for join match one
@@ -3110,6 +3124,17 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+    }
+    if cfg.limit.bloom_footer_cache_max_size == 0 {
+        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // order of magnitude smaller than tantivy footers (footer payload
+        // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
+        // `.bf`), so the cache holds 4-32 K entries at this size.
+        cfg.limit.bloom_footer_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {

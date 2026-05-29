@@ -449,7 +449,6 @@ const fetchAlerts = async () => {
     toast({
       variant: "error",
       message: "Failed to load alerts",
-      timeout: 2000,
     });
   }
 };
@@ -606,7 +605,6 @@ const handleConfigureDedup = async (alertName: string) => {
       toast({
         variant: "error",
         message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
-        timeout: 3000,
       });
       return;
     }
@@ -627,7 +625,6 @@ const handleConfigureDedup = async (alertName: string) => {
     toast({
       variant: "error",
       message: "Failed to navigate to alert",
-      timeout: 2000,
     });
   }
 };
@@ -641,7 +638,6 @@ const handleEditAlert = async (alertName: string) => {
       toast({
         variant: "error",
         message: "Alert not found",
-        timeout: 2000,
       });
       return;
     }
@@ -660,7 +656,6 @@ const handleEditAlert = async (alertName: string) => {
     toast({
       variant: "error",
       message: "Failed to navigate to alert",
-      timeout: 2000,
     });
   }
 };

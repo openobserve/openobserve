@@ -315,7 +315,7 @@ const selectTransform = (item: any, isSelected: boolean) => {
 const updateActionSelection = (item: any) => {
   toast({
     message: `${item?.name} action applied successfully`,
-    timeout: 3000,
+    variant: "success",
   });
 };
 

@@ -360,6 +360,7 @@ describe("CipherKeys", () => {
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while loading data...",
+        timeout: 0,
       });
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "error",
@@ -382,6 +383,7 @@ describe("CipherKeys", () => {
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while loading data...",
+        timeout: 0,
       });
     });
   });
@@ -523,7 +525,6 @@ describe("CipherKeys", () => {
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "success",
         message: "Cipher Key deleted successfully",
-        timeout: 2000,
       });
     });
 
@@ -547,11 +548,11 @@ describe("CipherKeys", () => {
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while processing delete request...",
+        timeout: 0,
       });
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "error",
         message: "Key is in use",
-        timeout: 2000,
       });
     });
 
@@ -576,11 +577,11 @@ describe("CipherKeys", () => {
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while processing delete request...",
+        timeout: 0,
       });
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "error",
         message: "Server error",
-        timeout: 2000,
       });
     });
 
@@ -604,6 +605,7 @@ describe("CipherKeys", () => {
       expect(mockToastFn).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while processing delete request...",
+        timeout: 0,
       });
     });
   });

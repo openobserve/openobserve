@@ -265,7 +265,7 @@ const saveStream = async () => {
     .then(() => {
       toast({
         message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
-        timeout: 4000,
+        variant: "warning",
       });
       isStreamPresent = true;
     })
@@ -284,7 +284,7 @@ const saveStream = async () => {
     .then(() => {
       toast({
         message: "Stream created successfully",
-        timeout: 4000,
+        variant: "success",
       });
 
       streamService
@@ -304,7 +304,7 @@ const saveStream = async () => {
       if(err.response.status != 403){
         toast({
         message: err.response?.data?.message || "Failed to create stream",
-        timeout: 4000,
+        variant: "error",
       });
       }
     });
@@ -341,7 +341,7 @@ const getStreamPayload = () => {
     toast({
       message:
         "Invalid Data Retention Period: Retention period must be at least 1 day.",
-      timeout: 4000,
+      variant: "error",
     });
     return;
   }

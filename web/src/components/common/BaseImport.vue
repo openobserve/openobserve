@@ -436,8 +436,7 @@ export default defineComponent({
                 } catch (error) {
                   toast({
                     message: `Error parsing JSON from file ${file.name}`,
-                    position: "bottom-right",
-                    timeout: 2000,
+                    variant: "error",
                   });
                   resolve([]);
                 }
@@ -480,23 +479,20 @@ export default defineComponent({
             } else {
               toast({
                 message: "Invalid JSON format in the URL",
-                position: "bottom-right",
-                timeout: 2000,
+                variant: "error",
               });
             }
           } catch (parseError) {
             toast({
               message: "Invalid JSON format",
-              position: "bottom-right",
-              timeout: 2000,
+              variant: "error",
             });
           }
         }
       } catch (error) {
         toast({
           message: "Error fetching data",
-          position: "bottom-right",
-          timeout: 2000,
+          variant: "error",
         });
       }
     });

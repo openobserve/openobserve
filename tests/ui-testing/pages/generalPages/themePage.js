@@ -49,7 +49,7 @@ export class ThemePage {
         this.bodyDarkClass = 'body--dark';
 
         // Notification — OToast surfaces success/error toasts under stable data-test slugs
-        this.successToast = page.locator('[data-test="o-toast-success"]');
+        this.successToast = page.locator('[data-test-variant="success"]');
     }
 
     // ==================== Locator factories ====================

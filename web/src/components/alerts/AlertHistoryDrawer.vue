@@ -408,7 +408,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : alertDetails.type === 'promql'
                               ? t('alerts.alertDetails.promqlQuery')
                               : t('alerts.alertDetails.conditions')) + ' Copied Successfully!',
-                          timeout: 3000
                         },
                       )
                     "

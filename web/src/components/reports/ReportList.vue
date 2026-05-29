@@ -407,7 +407,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while fetching reports...",
-    timeout: 2000,
+    timeout: 0,
   });
 
   try {
@@ -452,7 +452,6 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
       toast({
         variant: "error",
         message: err?.data?.message || "Error while fetching reports!",
-        timeout: 3000,
       });
     }
   } finally {
@@ -612,7 +611,7 @@ const editReport = (report: any) => {
 // Toggle enable/disable — uses report_id (v2)
 const toggleReportState = (report: any) => {
   const state = report.enabled ? "Stopping" : "Starting";
-  const dismiss = toast({ message: `${state} report "${report.name}"` });
+  const dismiss = toast({ variant: "loading", message: `${state} report "${report.name}"`, timeout: 0 });
   reportsStateLoadingMap.value[report.report_id] = true;
 
   reports
@@ -630,7 +629,6 @@ const toggleReportState = (report: any) => {
       toast({
         variant: "success",
         message: `${!report.enabled ? "Started" : "Stopped"} report successfully.`,
-        timeout: 2000,
       });
     })
     .catch((err) => {
@@ -638,7 +636,6 @@ const toggleReportState = (report: any) => {
         toast({
           variant: "error",
           message: err?.data?.message || "Error while updating report state!",
-          timeout: 4000,
         });
       }
     })
@@ -657,7 +654,7 @@ const confirmDeleteReport = (report: any) => {
 
 const deleteReport = () => {
   const { report_id, name } = deleteDialog.value.data;
-  const dismiss = toast({ message: `Deleting report "${name}"` });
+  const dismiss = toast({ variant: "loading", message: `Deleting report "${name}"`, timeout: 0 });
 
   reports
     .deleteReportById(store.state.selectedOrganization.identifier, report_id)
@@ -667,14 +664,13 @@ const deleteReport = () => {
       );
       invalidateFolderCache(activeFolderId.value);
       filterReports();
-      toast({ variant: "success", message: "Report deleted successfully.", timeout: 3000 });
+      toast({ variant: "success", message: "Report deleted successfully." });
     })
     .catch((err: any) => {
       if (err?.response?.status !== 403) {
         toast({
           variant: "error",
           message: err?.data?.message || "Error while deleting report!",
-          timeout: 4000,
         });
       }
     })
@@ -688,7 +684,7 @@ const bulkDeleteReports = async () => {
   const dismiss = toast({ variant: "loading", message: "Deleting reports...", timeout: 0 });
   try {
     if (!selectedReports.value.length) {
-      toast({ variant: "error", message: "No reports selected for deletion", timeout: 2000 });
+      toast({ variant: "error", message: "No reports selected for deletion" });
       dismiss();
       return;
     }
@@ -704,9 +700,9 @@ const bulkDeleteReports = async () => {
     if (unsuccessful.length && successful.length) {
       toast({ variant: "warning", message: `${successful.length} deleted, ${unsuccessful.length} failed`, timeout: 5000 });
     } else if (unsuccessful.length) {
-      toast({ variant: "error", message: `Failed to delete ${unsuccessful.length} report(s)`, timeout: 3000 });
+      toast({ variant: "error", message: `Failed to delete ${unsuccessful.length} report(s)` });
     } else {
-      toast({ variant: "success", message: `${successful.length} report(s) deleted successfully`, timeout: 2000 });
+      toast({ variant: "success", message: `${successful.length} report(s) deleted successfully` });
     }
 
     const successfulIds = new Set(successful);
@@ -720,7 +716,7 @@ const bulkDeleteReports = async () => {
     dismiss();
     const msg = error.response?.data?.message || error?.message || "Error deleting reports.";
     if (error.response?.status !== 403) {
-      toast({ variant: "error", message: msg, timeout: 3000 });
+      toast({ variant: "error", message: msg });
     }
   }
   confirmBulkDelete.value = false;

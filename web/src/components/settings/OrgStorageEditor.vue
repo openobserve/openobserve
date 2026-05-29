@@ -585,8 +585,8 @@ async function submitStorage() {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
 
   const orgId = store.state.selectedOrganization.identifier;
   const payload = {

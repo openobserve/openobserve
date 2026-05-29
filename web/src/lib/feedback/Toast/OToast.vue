@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import type { ToastProps, ToastEmits } from "./OToast.types"
-import { computed } from "vue"
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { computed, ref } from "vue"
+import OIcon from "@/lib/core/Icon/OIcon.vue"
+import { pauseTimer, resumeTimer } from "./useToast"
 import {
   ToastRoot,
   ToastTitle,
@@ -84,6 +85,27 @@ const badgeColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
   default: "tw:bg-toast-default-border tw:text-toast-fg",
 }
 
+const progressBarColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
+  success: "tw:bg-toast-success-icon",
+  error: "tw:bg-toast-error-icon",
+  warning: "tw:bg-toast-warning-icon",
+  info: "tw:bg-toast-info-icon",
+  loading: "tw:bg-toast-loading-icon",
+  default: "tw:bg-toast-default-border",
+}
+
+const isPaused = ref(false)
+
+function onMouseEnter() {
+  isPaused.value = true
+  pauseTimer(props.id)
+}
+
+function onMouseLeave() {
+  isPaused.value = false
+  resumeTimer(props.id)
+}
+
 // ── Computed ─────────────────────────────────────────────────────────────────
 
 const rootRole = computed<"alert" | "status">(() =>
@@ -95,6 +117,10 @@ const hasIcon = computed(() => props.variant !== "default")
 const screenReaderTitle = computed(() =>
   props.title ? props.title : props.message,
 )
+
+const isTopPosition = computed(() =>
+  props.position.startsWith("top-"),
+)
 </script>
 
 <template>
@@ -102,17 +128,21 @@ const screenReaderTitle = computed(() =>
     :open="open"
     :duration="0"
     :class="[
-      'tw:relative tw:pointer-events-auto tw:flex tw:gap-3 tw:items-start tw:rounded-lg tw:p-4 tw:shadow-toast',
-      // Normal toasts keep the original fixed width; only toasts with an action
-      // button grow to fit so the button can sit inline beside short messages.
-      action ? 'tw:w-fit tw:min-w-[20rem] tw:max-w-md' : 'tw:w-80 tw:max-w-sm',
-      'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:slide-in-from-bottom-4',
-      'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-bottom-4',
+      'tw:relative tw:pointer-events-auto tw:flex tw:gap-2 tw:rounded-lg tw:p-3 tw:shadow-toast',
+      title ? 'tw:items-start' : 'tw:items-center',
+      'tw:w-fit tw:min-w-[16rem] tw:max-w-[28rem]',
+      'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
+      isTopPosition ? 'tw:data-[state=open]:slide-in-from-top-4' : 'tw:data-[state=open]:slide-in-from-bottom-4',
+      'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
+      isTopPosition ? 'tw:data-[state=closed]:slide-out-to-top-4' : 'tw:data-[state=closed]:slide-out-to-bottom-4',
       variantClasses[variant ?? 'default'],
     ]"
     :role="rootRole"
-    :data-test="`o-toast-${variant ?? 'default'}`"
+    :data-test="`o-toast-${id}`"
+    :data-test-variant="variant ?? 'default'"
     :data-test-message="message"
+    @mouseenter="onMouseEnter"
+    @mouseleave="onMouseLeave"
     @update:open="(val) => emit('openChange', val)"
   >
     <!-- Count badge — shown when identical toasts are collapsed together -->
@@ -129,7 +159,7 @@ const screenReaderTitle = computed(() =>
     <!-- Icon -->
     <div
       v-if="hasIcon"
-      :class="['tw:shrink-0 tw:flex tw:items-center tw:h-[1.375em] tw:text-sm tw:leading-snug', iconColorClasses[variant ?? 'default']]"
+      :class="['tw:shrink-0 tw:flex tw:items-center', iconColorClasses[variant ?? 'default']]"
       aria-hidden="true"
     >
       <OIcon name="autorenew" size="sm" v-if="variant === 'loading'"
@@ -193,10 +223,40 @@ const screenReaderTitle = computed(() =>
 
     <!-- Dismiss button -->
     <ToastClose
-      class="tw:shrink-0 tw:mt-0.5 tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border"
+      :class="['tw:shrink-0 tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border', title ? 'tw:self-start' : '']"
       aria-label="Dismiss notification"
     >
       <OIcon name="close" size="sm" class="tw:size-4" aria-hidden="true" />
     </ToastClose>
+
+    <!-- Timeout progress bar — shrinks from full to empty over the toast's lifetime -->
+    <div
+      v-if="timeout > 0"
+      class="tw:absolute tw:bottom-0 tw:left-0 tw:right-0 tw:h-0.5 tw:rounded-b-lg tw:overflow-hidden"
+      aria-hidden="true"
+    >
+      <div
+        :class="['tw:h-full tw:w-full tw:origin-left toast-progress-fill', progressBarColorClasses[variant ?? 'default']]"
+        :style="{
+          animationDuration: `${timeout}ms`,
+          animationPlayState: isPaused ? 'paused' : 'running',
+        }"
+      />
+    </div>
   </ToastRoot>
 </template>
+
+<style scoped>
+.toast-progress-fill {
+  animation: toast-shrink linear forwards;
+}
+
+@keyframes toast-shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+</style>

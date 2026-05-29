@@ -293,23 +293,23 @@
 
   /* ── Toast ─────────────────────────────────────────────── */
   /* success */
-  --color-toast-success-bg:     var(--color-success-50);
+  --color-toast-success-bg:     var(--color-success-100);
   --color-toast-success-border: var(--color-success-500);
   --color-toast-success-icon:   var(--color-success-700);
 
   /* error */
-  --color-toast-error-bg:       var(--color-error-50);
+  --color-toast-error-bg:       var(--color-error-100);
   --color-toast-error-border:   var(--color-error-400);
   --color-toast-error-icon:     var(--color-error-600);
 
   /* warning */
-  --color-toast-warning-bg:     var(--color-warning-50);
+  --color-toast-warning-bg:     var(--color-warning-100);
   --color-toast-warning-border: var(--color-warning-400);
   --color-toast-warning-icon:   var(--color-warning-600);
 
   /* info */
-  --color-toast-info-bg:        var(--color-primary-50);
-  --color-toast-info-border:    var(--color-primary-300);
+  --color-toast-info-bg:        var(--color-primary-100);
+  --color-toast-info-border:    var(--color-primary-400);
   --color-toast-info-icon:      var(--color-primary-600);
 
   /* loading / default */

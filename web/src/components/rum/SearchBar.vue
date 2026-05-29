@@ -226,7 +226,7 @@ export default defineComponent({
               searchObj.data.stream.selectedStreamFields = [];
               toast({
                 message: "Stream not found",
-                timeout: 2000,
+                variant: "warning",
               });
             }
           }

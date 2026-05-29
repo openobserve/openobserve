@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
         :class="[
           'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text',
           isActive ? 'tw:font-semibold tw:text-tabs-active-text!' : 'tw:font-normal'
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250"
+        class="nav-menu-item-label tw:text-[11px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
         :class="[
           'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text',
           isActive ? 'tw:font-semibold tw:text-tabs-active-text!' : 'tw:font-normal'

@@ -34,16 +34,16 @@ const http = () => {
         switch (error.response.status) {
           case 400:
             toast({
-              position: "bottom-right",
               message: JSON.stringify(
                 error.response.data["error"] || "Bad Request"
               ),
+              variant: "error",
             });
             break;
           case 401:
             toast({
-              position: "bottom-right",
               message: error.response.data["error"] || "Invalid credentials",
+              variant: "error",
             });
             store.dispatch("logout");
             localStorage.clear();
@@ -52,16 +52,16 @@ const http = () => {
             break;
           case 404:
             toast({
-              position: "bottom-right",
               message: error.response.data["error"] || "Not Found",
+              variant: "error",
             });
             break;
           case 500:
             toast({
-              position: "bottom-right",
               message: JSON.stringify(
                 error.response.data["error"] || "Internal ServerError"
               ),
+              variant: "error",
             });
             break;
           default:

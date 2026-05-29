@@ -114,8 +114,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait...",
-          timeout: 2000,
-        });
+                  timeout: 0,
+});
 
         organizationsService
           .add_members(

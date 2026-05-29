@@ -611,8 +611,6 @@ describe("AddRole Component", () => {
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: `Role "${roleName}" Created Successfully!`,
-          position: "bottom-right",
-          timeout: 3000,
         }),
       );
     });
@@ -634,8 +632,6 @@ describe("AddRole Component", () => {
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: errorMessage,
-          position: "bottom-right",
-          timeout: 3000,
         }),
       );
     });
