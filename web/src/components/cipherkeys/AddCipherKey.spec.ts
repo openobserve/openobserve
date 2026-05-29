@@ -3,7 +3,6 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
 import AddCipherKey from '@/components/cipherkeys/AddCipherKey.vue';
-import { Quasar } from 'quasar';
 
 // Mock dependencies
 vi.mock('@/services/cipher_keys');
@@ -27,6 +26,7 @@ vi.mock('quasar', async () => {
     })
   };
 });
+
 
 describe('AddCipherKey.vue', () => {
   let wrapper: VueWrapper;
@@ -73,53 +73,41 @@ describe('AddCipherKey.vue', () => {
 
     return mount(AddCipherKey, {
       global: {
-        plugins: [store, router, Quasar],
+        plugins: [store, router],
         provide: {
           $q: mockQuasar
         },
         stubs: {
-          'q-page': {
-            template: '<div class="q-page-stub"><slot></slot></div>'
-          },
-          'q-icon': {
-            template: '<div class="q-icon-stub">{{ name }}</div>',
+          'OIcon': {
+            template: '<div class="OIcon-stub">{{ name }}</div>',
             props: ['name', 'size']
           },
-          'q-separator': {
-            template: '<div class="q-separator-stub"></div>'
+          'OSeparator': {
+            template: '<hr class="o-separator-stub" />'
           },
-          'q-form': {
-            template: '<form class="q-form-stub" @submit.prevent="$emit(\'submit\')"><slot></slot></form>',
-            methods: {
-              validate: vi.fn().mockResolvedValue(true)
-            }
-          },
-          'q-input': {
-            template: '<input class="q-input-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue" />',
-            props: ['modelValue', 'label', 'readonly', 'disable', 'rules']
-          },
-          'q-select': {
-            template: '<select class="q-select-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue"><slot></slot></select>',
-            props: ['modelValue', 'options', 'label']
-          },
-          'q-stepper': {
-            template: '<div class="q-stepper-stub"><slot></slot></div>',
+          'OStepper': {
+            template: '<div class="o-stepper-stub"><slot /></div>',
             props: ['modelValue']
           },
-          'q-step': {
-            template: '<div class="q-step-stub" :data-test="$attrs[\'data-test\']"><slot></slot></div>',
+          'OStep': {
+            template: '<div class="o-step-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
             props: ['name', 'title', 'icon', 'done']
           },
-          'q-stepper-navigation': {
-            template: '<div class="q-stepper-navigation-stub"><slot></slot></div>'
+          'OInput': {
+            template: '<input class="o-input-stub" :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+            props: ['modelValue', 'label', 'readonly', 'disable', 'error', 'errorMessage']
           },
-          'q-btn': {
-            template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :disabled="disable">{{ label }}</button>',
-            props: ['label', 'color', 'disable', 'type']
+          'OSelect': {
+            template: '<select class="o-select-stub" :data-test="$attrs[\'data-test\']" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
+            props: ['modelValue', 'options', 'label', 'error', 'errorMessage']
+          },
+          'OButton': {
+            template: '<button class="o-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :disabled="disabled"><slot /></button>',
+            props: ['variant', 'size', 'disabled', 'label']
           },
           'AddOpenobserveType': {
             template: '<div class="add-openobserve-type-stub"></div>',
-            props: ['formData']
+            props: ['formData', 'submitAttempted']
           },
           'AddAkeylessType': {
             template: '<div class="add-akeyless-type-stub"></div>',
@@ -162,7 +150,7 @@ describe('AddCipherKey.vue', () => {
 
     it('renders back button correctly', () => {
       wrapper = createWrapper();
-      const backButton = wrapper.find('.cursor-pointer');
+      const backButton = wrapper.find('[title="Go Back"]');
       expect(backButton.exists()).toBe(true);
     });
 
@@ -180,7 +168,7 @@ describe('AddCipherKey.vue', () => {
 
     it('renders stepper component', () => {
       wrapper = createWrapper();
-      const stepper = wrapper.find('.q-stepper-stub');
+      const stepper = wrapper.find('.o-stepper-stub');
       expect(stepper.exists()).toBe(true);
     });
 
@@ -244,10 +232,16 @@ describe('AddCipherKey.vue', () => {
     it('validates form and moves to next step', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
+
+      // Set valid form data so validation passes
+      vm.formData.name = 'test-key';
+      vm.formData.key.store.type = 'local';
+      vm.formData.key.store.local = 'test-secret';
+      await wrapper.vm.$nextTick();
+
       const continueBtn = wrapper.find('[data-test="add-report-step1-continue-btn"]');
-      
       await continueBtn.trigger('click');
-      
+
       expect(vm.step).toBe(2);
     });
 
@@ -330,10 +324,10 @@ describe('AddCipherKey.vue', () => {
   describe('Event Handling', () => {
     it('emits cancel event when back button is clicked', async () => {
       wrapper = createWrapper();
-      const backButton = wrapper.find('.cursor-pointer');
-      
+      const backButton = wrapper.find('[title="Go Back"]');
+
       await backButton.trigger('click');
-      
+
       expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
 
@@ -363,11 +357,12 @@ describe('AddCipherKey.vue', () => {
     it('handles form submission correctly', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const form = wrapper.find('.q-form-stub');
-      
-      await form.trigger('submit');
-      
-      expect(vm.isSubmitting).toBe(false); // Will be reset after validation
+
+      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
+      await saveBtn.trigger('click');
+
+      // onSubmit validates and fails on empty name, so isSubmitting stays false
+      expect(vm.isSubmitting).toBe(false);
     });
   });
 
@@ -579,15 +574,11 @@ describe('AddCipherKey.vue', () => {
     it('handles validation errors correctly', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      
-      // Mock form validation to reject
-      vm.addCipherKeyFormRef = {
-        validate: vi.fn().mockRejectedValue(new Error('Validation failed'))
-      };
-      
+
+      // Submit with empty name should trigger validation error
       await vm.onSubmit();
-      
-      expect(vm.addCipherKeyFormRef.validate).toHaveBeenCalled();
+
+      expect(vm.nameError).toBe('Name is required');
     });
   });
 
@@ -626,10 +617,10 @@ describe('AddCipherKey.vue', () => {
   describe('Component Structure', () => {
     it('has correct main structure', () => {
       wrapper = createWrapper();
-      
-      expect(wrapper.find('.q-page-stub').exists()).toBe(true);
-      expect(wrapper.find('.q-form-stub').exists()).toBe(true);
-      expect(wrapper.find('.q-stepper-stub').exists()).toBe(true);
+
+      expect(wrapper.find('[data-test="add-template-title"]').exists()).toBe(true);
+      expect(wrapper.find('.create-cipher-form').exists()).toBe(true);
+      expect(wrapper.find('.o-stepper-stub').exists()).toBe(true);
     });
 
     it('renders all required form elements', () => {
@@ -643,11 +634,11 @@ describe('AddCipherKey.vue', () => {
 
     it('maintains proper component hierarchy', () => {
       wrapper = createWrapper();
-      
-      const form = wrapper.find('.q-form-stub');
-      const stepper = form.find('.q-stepper-stub');
-      const steps = stepper.findAll('.q-step-stub');
-      
+
+      const form = wrapper.find('.create-cipher-form');
+      const stepper = form.find('.o-stepper-stub');
+      const steps = stepper.findAll('.o-step-stub');
+
       expect(form.exists()).toBe(true);
       expect(stepper.exists()).toBe(true);
       expect(steps.length).toBeGreaterThan(0);

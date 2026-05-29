@@ -69,7 +69,10 @@ fn deserialize_headers<T: DeserializeOwned>(headers: &HeaderMap) -> Result<T, St
     let map = serde_json::Map::from_iter(iter);
 
     let val = serde_json::json!(map);
-    serde_json::from_value(val).map_err(|e| format!("Header deserialization error: {e}"))
+    serde_json::from_value(val).map_err(|e| {
+        log::warn!("Header deserialization error: {e}");
+        "Invalid request".to_string()
+    })
 }
 
 #[cfg(test)]
@@ -117,7 +120,7 @@ mod tests {
 
         let result: Result<TestHeaders, String> = deserialize_headers(&headers);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("deserialization error"));
+        assert!(result.unwrap_err().contains("Invalid request"));
     }
 
     #[test]

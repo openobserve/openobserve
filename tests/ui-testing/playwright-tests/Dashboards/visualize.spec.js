@@ -36,14 +36,23 @@ const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubern
 
 // Helper function to enable VRL editor with deterministic wait
 async function enableVrlEditor(page) {
-  const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-  await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
+  // VRL toggle lives inside the utilities menu dropdown
+  const utilitiesBtn = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+  await utilitiesBtn.waitFor({ state: "visible", timeout: 10000 });
+  await utilitiesBtn.click();
 
-  const isChecked = await vrlToggle.getAttribute("aria-checked");
+  const vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+  await vrlToggleBtn.waitFor({ state: "visible", timeout: 10000 });
 
-  if (isChecked === "false") {
-    await vrlToggle.click();
-    await page.waitForTimeout(1000);
+  const dataState = await vrlToggleBtn.getAttribute("data-state");
+
+  if (dataState === "unchecked") {
+    await vrlToggleBtn.click();
+    await page.keyboard.press("Escape");
+    const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+    await vrlEditor.first().waitFor({ state: "visible", timeout: 10000 });
+  } else {
+    await page.keyboard.press("Escape");
   }
 }
 
@@ -73,20 +82,8 @@ test.describe("VRL visualization support testcases", () => {
     // Open visualization tab
     await pm.logsVisualise.openVisualiseTabWithVrl();
 
-    // Verify VRL toggle button is visible in the toolbar
-    const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-    await expect(vrlToggle).toBeVisible();
-
-    // Check if toggle is already on (aria-checked="true")
-    const isChecked = await vrlToggle.getAttribute("aria-checked");
-
-    if (isChecked === "false") {
-      // Click VRL toggle to show editor
-      await vrlToggle.click();
-      // Wait for VRL editor to appear
-      const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
-      await vrlEditor.first().waitFor({ state: "visible", timeout: 10000 });
-    }
+    // Enable VRL editor via the utilities dropdown
+    await enableVrlEditor(page);
 
     // Verify VRL editor is visible
     const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
@@ -248,7 +245,7 @@ test.describe("VRL visualization support testcases", () => {
     );
 
     // Verify success
-    const successMessage = page.getByText("Panel added to dashboard");
+    const successMessage = page.locator('[data-test="o-toast-message"]').filter({ hasText: "Panel added to dashboard" });
     await expect(successMessage).toBeVisible({ timeout: 10000 });
 
     // Verify table chart is displayed on dashboard
@@ -288,7 +285,7 @@ test.describe("VRL visualization support testcases", () => {
     await page.locator('[data-test="dashboard-panel-discard"]').click();
 
     // Handle discard confirmation if it appears
-    const discardConfirm = page.locator('[data-test="confirm-button"]');
+    const discardConfirm = page.locator('[data-test="o-dialog-primary-btn"]');
     if (await discardConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
       await discardConfirm.click();
     }
@@ -330,10 +327,16 @@ test.describe("VRL visualization support testcases", () => {
     const rowCount = await tableRows.count();
     expect(rowCount).toBeGreaterThan(0);
 
-    // Verify VRL toggle is enabled (confirming VRL is active)
-    const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-    const isVrlEnabled = await vrlToggle.getAttribute("aria-checked").catch(() => "false");
-    expect(isVrlEnabled).toBe("true");
+    // Verify VRL toggle is enabled (confirming VRL is active) - open utilities dropdown to check
+    {
+      const utilitiesBtn = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+      await utilitiesBtn.click();
+      const vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+      await vrlToggleBtn.waitFor({ state: "visible", timeout: 5000 });
+      const dataState = await vrlToggleBtn.getAttribute("data-state");
+      expect(dataState).toBe("checked");
+      await page.keyboard.press("Escape");
+    }
 
     // Verify at least one VRL-generated field is visible in the Fields list (left sidebar)
     // The complexVrlFunction creates: vrl_status, vrl_count, vrl_flag
@@ -365,10 +368,15 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.setRelative("8", "h");
     await pm.logsVisualise.logsApplyQueryAndWait();
 
-    // Verify VRL toggle is enabled before switching
-    const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-    let isChecked = await vrlToggle.getAttribute("aria-checked");
-    expect(isChecked).toBe("true");
+    // Verify VRL toggle is enabled before switching - open utilities dropdown to check
+    {
+      const utilitiesBtn = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+      await utilitiesBtn.click();
+      const vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+      await vrlToggleBtn.waitFor({ state: "visible", timeout: 5000 });
+      expect(await vrlToggleBtn.getAttribute("data-state")).toBe("checked");
+      await page.keyboard.press("Escape");
+    }
 
     // Switch to visualization
     await pm.logsVisualise.openVisualiseTabWithVrl();
@@ -390,12 +398,15 @@ test.describe("VRL visualization support testcases", () => {
     // Switch back to logs
     await pm.logsVisualise.backToLogs();
 
-    // Wait for VRL toggle to be visible in logs tab
-    await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
-
-    // ASSERT: Verify VRL toggle is still enabled after switching back to logs
-    isChecked = await vrlToggle.getAttribute("aria-checked");
-    expect(isChecked).toBe("true");
+    // ASSERT: Verify VRL toggle is still enabled after switching back to logs - open utilities dropdown
+    {
+      const utilitiesBtn = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+      await utilitiesBtn.click();
+      const vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+      await vrlToggleBtn.waitFor({ state: "visible", timeout: 5000 });
+      expect(await vrlToggleBtn.getAttribute("data-state")).toBe("checked");
+      await page.keyboard.press("Escape");
+    }
 
     // ASSERT: Verify VRL editor is still visible
     const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
@@ -485,7 +496,7 @@ test.describe("VRL visualization support testcases", () => {
     expect(rowCount).toBeGreaterThan(0);
 
     // Verify table has headers (columns)
-    const headers = page.locator('[data-test="dashboard-panel-table"] thead th');
+    const headers = page.locator('[data-test^="o2-table-th-"]');
     const headerCount = await headers.count();
     expect(headerCount).toBeGreaterThan(0);
   });
@@ -570,7 +581,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     // Verify "Allow Dynamic Columns" toggle is enabled
-    const dynamicColumnsToggle = page.locator('[data-test="dashboard-config-table_dynamic_columns"]');
+    const dynamicColumnsToggle = page.locator('[data-test="dashboard-config-table_dynamic_columns-btn"]');
     await dynamicColumnsToggle.waitFor({ state: "visible", timeout: 10000 });
 
     const isChecked = await dynamicColumnsToggle.getAttribute("aria-checked");
@@ -605,16 +616,21 @@ test.describe("VRL visualization support testcases", () => {
     // Switch back to logs tab
     await pm.logsVisualise.backToLogs();
 
-    // Disable VRL toggle - wait for it to be visible first
-    const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
-    await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
-    const isChecked = await vrlToggle.getAttribute("aria-checked");
+    // Disable VRL toggle via utilities dropdown
+    const utilitiesBtn = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+    await utilitiesBtn.click();
+    const vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+    await vrlToggleBtn.waitFor({ state: "visible", timeout: 10000 });
+    const isChecked = await vrlToggleBtn.getAttribute("data-state");
 
-    if (isChecked === "true") {
-      await vrlToggle.click();
+    if (isChecked === "checked") {
+      await vrlToggleBtn.click();
+      await page.keyboard.press("Escape");
       // Wait for VRL editor to be hidden or disabled
       const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"]');
       await vrlEditor.first().waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    } else {
+      await page.keyboard.press("Escape");
     }
 
     // Clear the VRL function editor

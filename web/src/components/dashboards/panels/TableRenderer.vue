@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="table-wrapper">
+  <div class="table-wrapper" data-test="dashboard-table-renderer-wrapper">
     <TenstackTable
       ref="tableRef"
       :rows="sortedRows"
@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
           <!-- Default: dashboard pagination controls -->
-          <div class="row items-center full-width" data-test="dashboard-table-pagination">
-            <q-space />
+          <div class="tw:flex tw:items-center tw:w-full tw:pr-2" data-test="dashboard-table-pagination">
+            <div class="tw:flex-1" />
             <TablePaginationControls
               :show-pagination="showPagination"
               :pagination="scope.pagination"
@@ -292,8 +292,16 @@ export default defineComponent({
   border-bottom: 2px solid rgba(0, 0, 0, 0.12);
 }
 
+.body--dark :deep(.pivot-group-header) {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
 :deep(.pivot-section-border) {
   border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+.body--dark :deep(.pivot-section-border) {
+  border-left-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 :deep(.pivot-value-header) {

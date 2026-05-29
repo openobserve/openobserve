@@ -65,7 +65,6 @@ test.describe("Schema testcases", () => {
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(testStreamName);
-        await page.waitForTimeout(1000);
 
         const allsearch = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();

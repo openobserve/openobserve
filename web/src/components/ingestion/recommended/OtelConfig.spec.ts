@@ -15,12 +15,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, VueWrapper } from '@vue/test-utils'
-import { installQuasar } from '@/test/unit/helpers'
-import { Quasar } from 'quasar'
+
 import store from '@/test/unit/helpers/store'
 import OtelConfig from './OtelConfig.vue'
 
-installQuasar()
 
 // Mock the zincutils functions
 vi.mock('@/utils/zincutils', () => ({
@@ -84,7 +82,7 @@ describe('OtelConfig.vue', () => {
       props: { ...defaultProps, ...props },
       global: {
         plugins: [
-          [Quasar, {}],
+          [{}],
           [store]
         ],
         provide: {
@@ -103,7 +101,7 @@ describe('OtelConfig.vue', () => {
     it('should render OTLP HTTP and gRPC sections', () => {
       wrapper = createWrapper()
       
-      const subtitleElements = wrapper.findAll('.text-subtitle1')
+      const subtitleElements = wrapper.findAll('.tw\\:font-bold')
       expect(subtitleElements.length).toBeGreaterThanOrEqual(2)
       
       // Check that OTLP sections exist in the rendered content

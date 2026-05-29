@@ -27,7 +27,9 @@ export default class DashboardPanel {
     this.moveTab = page.locator(
       '[data-test="dashboard-move-to-another-panel"]'
     );
-    this.deleteConfirmBtn = page.locator('[data-test="confirm-button"]');
+    this.deleteConfirmBtn = page.locator(
+      '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
     this.fullscreen = page.locator(
       '[data-test="dashboard-panel-fullscreen-btn"]'
     );
@@ -231,9 +233,9 @@ export default class DashboardPanel {
     try {
       await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
     } catch (e) {
-      // Menu may not have opened, retry click
-      await this.page.keyboard.press('Escape');
-      await this.queryInspector.waitFor({ state: "hidden", timeout: 5000 });
+      // Menu may not have opened, retry click — click outside to dismiss any open dropdown
+      await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+      await this.queryInspector.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
       await dropdownBtn.click();
       await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
     }

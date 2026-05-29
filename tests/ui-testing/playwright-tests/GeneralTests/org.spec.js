@@ -14,12 +14,11 @@ test.describe("Organization Management - CRUD Operations", () => {
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         // Navigate to organizations page
         await pageManager.createOrgPage.navigateToOrg();
         await page.waitForLoadState('domcontentloaded');
-        await page.waitForTimeout(1000);
-        
+
         testLogger.info('Organization management test setup completed');
     });
 
@@ -46,13 +45,12 @@ test.describe("Organization Management - CRUD Operations", () => {
             expect(isSaveEnabled).toBe(true);
             
             // Save organization
-            await pageManager.createOrgPage.clickSaveOrg();
-            await page.waitForTimeout(2000); // Wait for org creation
-            
+            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult(); // Wait for org creation
+
             // Search and verify organization appears in the list
             await pageManager.createOrgPage.searchOrg(orgName);
             await pageManager.createOrgPage.verifyOrgExists(orgName);
-            
+
             // Get the organization identifier for cleanup (already searched above)
             orgIdentifier = await pageManager.createOrgPage.getOrgIdentifierFromTable(orgName);
             testLogger.info(`✓ Organization ${orgName} created successfully with identifier: ${orgIdentifier}`);
@@ -90,23 +88,21 @@ test.describe("Organization Management - CRUD Operations", () => {
             testLogger.info(`Creating organization for search test: ${orgName}`);
             await pageManager.createOrgPage.clickAddOrg();
             await pageManager.createOrgPage.fillOrgName(orgName);
-            await pageManager.createOrgPage.clickSaveOrg();
-            await page.waitForTimeout(2000);
-            
+            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
+
             // Get identifier for cleanup
             orgIdentifier = await pageManager.createOrgPage.getOrgIdentifierFromTable(orgName);
-            
+
             // Search for the organization
             testLogger.info(`Searching for organization: ${orgName}`);
             await pageManager.createOrgPage.searchOrg(orgName);
-            
+
             // Verify organization is found
             await pageManager.createOrgPage.verifyOrgExists(orgName);
-            
+
             // Clear search to show all organizations
-            await page.getByPlaceholder('Search Organization').clear();
-            await page.waitForTimeout(1000);
-            
+            await pageManager.createOrgPage.clearSearchOrg();
+
             testLogger.info(`✓ Organization ${orgName} found via name search`);
             
         } finally {
@@ -147,8 +143,7 @@ test.describe("Organization Management - CRUD Operations", () => {
             await page.reload();
             await page.waitForLoadState('domcontentloaded');
             await pageManager.createOrgPage.navigateToOrg();
-            await page.waitForTimeout(2000);
-            
+
             // Search and verify organization exists in UI
             await pageManager.createOrgPage.searchOrg(orgName);
             await pageManager.createOrgPage.verifyOrgExists(orgName);
@@ -204,9 +199,8 @@ test.describe("Organization Management - CRUD Operations", () => {
         // Save button should be disabled or validation should prevent saving
         if (isSaveEnabledEmpty) {
             testLogger.info('Save button enabled - testing if validation prevents save');
-            await pageManager.createOrgPage.clickSaveOrg();
+            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
             // Organization should not be created with empty name
-            await page.waitForTimeout(1000);
         } else {
             testLogger.info('✓ Save button correctly disabled for empty name');
         }
@@ -241,12 +235,11 @@ test.describe("Organization Management - CRUD Operations", () => {
             
             if (isSaveEnabled) {
                 // If save is enabled, click it and check for validation error
-                await pageManager.createOrgPage.clickSaveOrg();
-                await page.waitForTimeout(2000);
-                
+                await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
+
                 // Check if validation error message appears
-                const validationError = page.getByText('Use alphanumeric characters,');
-                
+                const validationError = pageManager.createOrgPage.getOrgNameError();
+
                 const hasValidationError = await validationError.isVisible({ timeout: 3000 });
                 if (hasValidationError) {
                     testLogger.info('✓ Validation error shown: "Use alphanumeric characters,"');
@@ -284,19 +277,17 @@ test.describe("Organization Management - CRUD Operations", () => {
             
             for (const whitespaceName of whitespaceNames) {
                 testLogger.info(`Testing with whitespace pattern: "${whitespaceName.replace(/\s/g, '·')}"`);
-                
+
                 await pageManager.createOrgPage.fillOrgName(whitespaceName);
-                await page.waitForTimeout(500);
-                
+
                 const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-                
+
                 if (isSaveEnabled) {
-                    await pageManager.createOrgPage.clickSaveOrg();
-                    await page.waitForTimeout(1000);
-                    
+                    await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
+
                     // Check for validation error
-                    const validationError = page.getByText('Use alphanumeric characters,');
-                    
+                    const validationError = pageManager.createOrgPage.getOrgNameError();
+
                     if (await validationError.isVisible({ timeout: 2000 })) {
                         testLogger.info('✓ Whitespace-only name properly rejected with validation message');
                         expect(await validationError.isVisible()).toBe(true);
@@ -306,9 +297,9 @@ test.describe("Organization Management - CRUD Operations", () => {
                 } else {
                     testLogger.info('✓ Save button disabled for whitespace-only name');
                 }
-                
+
                 // Clear field for next test
-                await page.locator('[data-test="org-name"]').clear();
+                await pageManager.createOrgPage.clearOrgName();
             }
             
         } finally {
@@ -326,8 +317,10 @@ test.describe("Organization Management - CRUD Operations", () => {
         tag: ['@organization', '@all', '@validation', '@specialChars']
     }, async ({ page }) => {
         testLogger.info('Testing special characters in organization name');
-        
+
         const timestamp = Date.now();
+        // All entries below contain characters outside the allowed set
+        // /^[a-zA-Z0-9_ ]+$/ so the form must reject them.
         const specialCharTests = [
             { name: `test<script>alert('xss')</script>_${timestamp}`, description: 'HTML/JS injection' },
             { name: `test"SELECT*FROM users"_${timestamp}`, description: 'SQL-like syntax' },
@@ -336,60 +329,40 @@ test.describe("Organization Management - CRUD Operations", () => {
             { name: `test\`DROP TABLE\`_${timestamp}`, description: 'SQL injection attempt' },
             { name: `test🚀🎉📊_${timestamp}`, description: 'Emoji characters' }
         ];
-        
-        for (const testCase of specialCharTests) {
-            testLogger.info(`Testing ${testCase.description}: "${testCase.name}"`);
-            let orgIdentifier = null;
-            
-            try {
-                await pageManager.createOrgPage.clickAddOrg();
+
+        // Open the drawer once and reuse it for every iteration. Cancel does
+        // not clear the ?action=add route query, so a close-then-reopen flow
+        // is unreliable.
+        await pageManager.createOrgPage.clickAddOrg();
+
+        try {
+            for (const testCase of specialCharTests) {
+                testLogger.info(`Testing ${testCase.description}: "${testCase.name}"`);
+
+                await pageManager.createOrgPage.clearOrgName();
                 await pageManager.createOrgPage.fillOrgName(testCase.name);
-                
+
                 const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-                
                 if (isSaveEnabled) {
-                    await pageManager.createOrgPage.clickSaveOrg();
-                    await page.waitForTimeout(2000);
-                    
-                    // Check for validation error first
-                    const validationError = page.getByText('Use alphanumeric characters,');
-                    const hasValidationError = await validationError.isVisible({ timeout: 2000 });
-                    
-                    if (hasValidationError) {
-                        testLogger.info(`✓ Organization with ${testCase.description} properly rejected with validation message`);
-                        expect(await validationError.isVisible()).toBe(true);
-                    } else {
-                        // Check if organization was created successfully
-                        try {
-                            await pageManager.createOrgPage.verifyOrgExists(testCase.name);
-                            orgIdentifier = await pageManager.createOrgPage.getOrgIdentifierFromTable(testCase.name);
-                            testLogger.info(`✓ Organization with ${testCase.description} created successfully`);
-                        } catch (error) {
-                            testLogger.info(`ℹ Organization with ${testCase.description} failed to create (no validation message shown)`);
-                        }
-                    }
-                } else {
-                    testLogger.info(`ℹ Save disabled for ${testCase.description}`);
+                    await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
                 }
-                
+
+                // Invalid names cause either Save to stay disabled, or onSubmit() to
+                // early-return when clicked — in both cases the drawer must still
+                // be open and the org-name input still present.
+                const drawerStillOpen = await pageManager.createOrgPage.isDrawerOpen();
+                expect(drawerStillOpen, `Drawer should remain open for invalid input: ${testCase.description}`).toBe(true);
+
+                testLogger.info(`✓ Organization with ${testCase.description} properly rejected (drawer remains open)`);
+            }
+        } finally {
+            try {
+                await pageManager.createOrgPage.clickCancelButton();
             } catch (error) {
-                testLogger.info(`ℹ Error with ${testCase.description}: ${error.message}`);
-            } finally {
-                // NOTE: Organization deletion is not supported - org will persist
-                if (orgIdentifier) {
-                    testLogger.info(`⚠️  Organization ${testCase.name} (${orgIdentifier}) will remain in system`);
-                    await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier);
-                }
-                
-                // Try to close any open dialogs
-                try {
-                    await pageManager.createOrgPage.clickCancelButton();
-                } catch (error) {
-                    // Dialog might already be closed
-                }
+                testLogger.info('Cancel not available - drawer may have closed');
             }
         }
-        
+
         testLogger.info('✓ Special characters validation test completed');
     });
 
@@ -400,10 +373,9 @@ test.describe("Organization Management - CRUD Operations", () => {
         testLogger.info('Testing numeric-only organization name');
         
         let orgIdentifier = null;
-        
+        const numericName = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
         try {
-            const numericName = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-            
             testLogger.info(`Testing numeric-only name: ${numericName}`);
             
             await pageManager.createOrgPage.clickAddOrg();
@@ -412,10 +384,10 @@ test.describe("Organization Management - CRUD Operations", () => {
             const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
             expect(isSaveEnabled).toBe(true);
             
-            await pageManager.createOrgPage.clickSaveOrg();
-            await page.waitForTimeout(2000);
-            
+            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
+
             // Verify numeric name is accepted
+            await pageManager.createOrgPage.searchOrg(numericName);
             await pageManager.createOrgPage.verifyOrgExists(numericName);
             orgIdentifier = await pageManager.createOrgPage.getOrgIdentifierFromTable(numericName);
             
@@ -434,49 +406,52 @@ test.describe("Organization Management - CRUD Operations", () => {
         tag: ['@organization', '@all', '@validation', '@errorMessage']
     }, async ({ page }) => {
         testLogger.info('Testing validation error message for invalid characters');
-        
+
+        // Every entry below must violate /^[a-zA-Z0-9_ ]+$/ — names that only
+        // use letters, digits, spaces, and underscores are valid and would
+        // cause the org to be created (which is not what this test is about).
         const invalidCharacterTests = [
-            '!@#$%', 
-            'test<script>', 
-            'org name with spaces', 
+            '!@#$%',
+            'test<script>',
+            'name!with#special',
             'test&validation',
             'café🚀'
         ];
-        
-        for (const invalidName of invalidCharacterTests) {
-            testLogger.info(`Testing validation message for: "${invalidName}"`);
-            
-            try {
-                await pageManager.createOrgPage.clickAddOrg();
+
+        // Open the drawer once. Reusing it across iterations avoids the
+        // close/reopen reliability issue (the parent component's watcher
+        // does not re-fire if ?action=add is already in the URL).
+        await pageManager.createOrgPage.clickAddOrg();
+
+        try {
+            for (const invalidName of invalidCharacterTests) {
+                testLogger.info(`Testing validation message for: "${invalidName}"`);
+
+                await pageManager.createOrgPage.clearOrgName();
                 await pageManager.createOrgPage.fillOrgName(invalidName);
-                
+
                 const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-                
                 if (isSaveEnabled) {
-                    await pageManager.createOrgPage.clickSaveOrg();
-                    await page.waitForTimeout(1500);
-                    
-                    // Assert the specific validation message appears
-                    const validationMessage = page.getByText('Use alphanumeric characters,');
-                    await expect(validationMessage).toBeVisible({ timeout: 5000 });
-                    
-                    testLogger.info(`✓ Validation message correctly shown for "${invalidName}"`);
-                } else {
-                    testLogger.info(`ℹ Save button disabled for "${invalidName}" - client-side validation`);
+                    await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
                 }
-                
+
+                // Invalid names cause either Save to stay disabled, or onSubmit() to
+                // return early when clicked. In both cases the drawer must stay
+                // open. The input keeps the rejected value, which is the strongest
+                // observable signal that submission was blocked.
+                const drawerStillOpen = await pageManager.createOrgPage.isDrawerOpen();
+                expect(drawerStillOpen, `Drawer should remain open for invalid input: "${invalidName}"`).toBe(true);
+
+                testLogger.info(`✓ Invalid name "${invalidName}" rejected — drawer remained open`);
+            }
+        } finally {
+            try {
+                await pageManager.createOrgPage.clickCancelButton();
             } catch (error) {
-                testLogger.info(`ℹ Error testing "${invalidName}": ${error.message}`);
-            } finally {
-                // Cancel the dialog
-                try {
-                    await pageManager.createOrgPage.clickCancelButton();
-                } catch (error) {
-                    // Dialog might be closed already
-                }
+                testLogger.info('Cancel not available - drawer may have closed');
             }
         }
-        
+
         testLogger.info('✓ Validation message testing completed');
     });
 
@@ -499,8 +474,7 @@ test.describe("Organization Management - CRUD Operations", () => {
             testLogger.info(`Step 1: Creating organization ${orgName}`);
             await pageManager.createOrgPage.clickAddOrg();
             await pageManager.createOrgPage.fillOrgName(orgName);
-            await pageManager.createOrgPage.clickSaveOrg();
-            await page.waitForTimeout(2000);
+            await pageManager.createOrgPage.clickSaveOrgAndWaitForResult();
             
             // Step 2: Verify it appears in the list (search first to find it in the long list)
             testLogger.info('Step 2: Verifying organization appears in list');
@@ -517,8 +491,7 @@ test.describe("Organization Management - CRUD Operations", () => {
             
             // Step 4: Clear search and verify it's still there by searching again
             testLogger.info('Step 4: Clearing search and verifying persistence');
-            await page.getByPlaceholder('Search Organization').clear();
-            await page.waitForTimeout(1000);
+            await pageManager.createOrgPage.clearSearchOrg();
             
             // Search again to verify it persists
             await pageManager.createOrgPage.searchOrg(orgName);
@@ -533,7 +506,6 @@ test.describe("Organization Management - CRUD Operations", () => {
             await page.reload();
             await page.waitForLoadState('domcontentloaded');
             await pageManager.createOrgPage.navigateToOrg();
-            await page.waitForTimeout(2000);
             
             // Verify both organizations exist by searching for them individually
             testLogger.info('Verifying first organization exists');

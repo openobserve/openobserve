@@ -495,7 +495,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await kebabButton.click();
       await page.getByText("Delete", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
       await page.getByText("Delete", { exact: true }).click();
-      await page.locator('[data-test="confirm-button"]').click();
+      await page.locator('[data-test="o-dialog-primary-btn"]').click();
       await expect(page.getByText("Alert deleted")).toBeVisible({ timeout: 10000 });
       testLogger.info("Alert deleted", { alertName });
 

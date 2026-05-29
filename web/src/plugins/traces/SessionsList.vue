@@ -1,0 +1,548 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div
+    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
+  >
+    <!-- Toolbar: stream selector + count pill + pagination -->
+    <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
+      <!-- Stream selector -->
+      <div
+        data-test="sessions-list-stream-selector"
+        class="tw:w-[14rem] tw:flex-shrink-0"
+      >
+        <OSelect
+          v-model="activeStream"
+          :options="
+            availableStreams.length > 0
+              ? availableStreams.map((s) => ({ label: s, value: s }))
+              : []
+          "
+          size="sm"
+          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          @update:model-value="onStreamChange"
+          :disabled="availableStreams.length === 0"
+        >
+          <OTooltip v-if="availableStreams.length === 0" :content="t('traces.sessionsList.noStreamsTooltip')" />
+        </OSelect>
+      </div>
+
+      <!-- Count pill -->
+      <template v-if="!loading && sessions.length > 0">
+        <div
+          class="tw:flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
+          data-test="sessions-list-count-pill"
+        >
+          {{ t('traces.sessionsList.countPill', { count: sessions.length, total, unit: total === 1 ? t('traces.sessionsList.session') : t('traces.sessionsList.sessions') }) }}
+        </div>
+      </template>
+
+      <!-- Pagination controls -->
+      <div
+        v-if="total > 0"
+        class="tw:flex tw:items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
+        data-test="sessions-list-pagination-bar"
+      >
+        <OSelect
+          v-model="rowsPerPage"
+          :options="rowsPerPageOptions"
+          class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
+          size="sm"
+          data-test="sessions-list-records-per-page"
+          @update:model-value="changeRowsPerPage"
+        />
+        <OPagination
+          v-model="currentPage"
+          :max="totalPages"
+          :max-pages="5"
+          class="float-right paginator-section tw:mt-0!"
+          data-test="sessions-list-pagination"
+          @update:model-value="changePage"
+        />
+      </div>
+    </div>
+
+    <!-- No LLM streams in this org -->
+    <div
+      v-if="streamsLoaded && availableStreams.length === 0"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)] tw:text-center"
+    >
+      <OIcon name="forum" size="xl" class="tw:mb-3 tw:opacity-40" />
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+        {{ t('traces.sessionsList.noStreamsFound') }}
+      </div>
+      <p class="tw:text-sm tw:max-w-[30rem]">
+        {{ t('traces.sessionsList.noStreamsDescription1') }} <code>gen_ai_conversation_id</code> {{ t('traces.sessionsList.noStreamsDescription2') }}
+      </p>
+    </div>
+
+    <!-- Generic error -->
+    <div
+      v-else-if="error && hasLoadedOnce"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
+    >
+      <OIcon
+        name="error-outline"
+        size="xl"
+        class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
+      />
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+        {{ t('traces.sessionsList.failedToLoad') }}
+      </div>
+      <div
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
+      >
+        {{ error }}
+      </div>
+      <OButton variant="outline" size="sm" @click="loadSessions()">
+        {{ t('traces.sessionsList.retry') }}
+      </OButton>
+    </div>
+
+    <!-- Empty state — query succeeded but no sessions in this window -->
+    <div
+      v-else-if="hasLoadedOnce && !loading && sessions.length === 0"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
+    >
+      <OIcon
+        name="forum"
+        size="xl"
+        class="tw:mb-3 tw:opacity-40 tw:text-[var(--o2-text-muted)]"
+      />
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+        {{ t('traces.sessionsList.noSessionsFound') }}
+      </div>
+      <p
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:max-w-[30rem]"
+      >
+        {{ t('traces.sessionsList.noSessionsDescription', { stream: activeStream }) }}
+      </p>
+    </div>
+
+    <!-- Table -->
+    <div
+      v-else
+      class="tw:w-full tw:h-auto! tw:overflow-x-auto tw:relative tw:flex-1"
+    >
+      <TenstackTable
+        class="tw:h-auto!"
+        :rows="sessions"
+        :columns="tableColumns"
+        :loading="loading"
+        :row-height="32"
+        :enable-column-reorder="true"
+        :enable-row-expand="false"
+        :enable-text-highlight="false"
+        :enable-status-bar="false"
+        :default-columns="false"
+        data-test="sessions-list-table"
+        @click:dataRow="handleRowClick"
+      >
+        <!-- Timestamp -->
+        <template #cell-firstSeenNanos="{ item }">
+          <span class="tw:font-mono tw:text-[0.75rem]">
+            {{ formatTimestamp(item.firstSeenNanos) }}
+          </span>
+        </template>
+
+        <!-- Session ID -->
+        <template #cell-sessionId="{ item }">
+          <span class="tw:font-mono tw:text-[0.75rem]">
+            {{ shortId(item.sessionId) }}
+            <OTooltip :content="item.sessionId" />
+          </span>
+        </template>
+
+        <!-- User -->
+        <template #cell-userId="{ item }">
+          <span
+            v-if="item.userId"
+            class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[160px] tw:block"
+          >
+            {{ item.userId }}
+          </span>
+          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
+            {{ t('traces.sessionsList.unknownUser') }}
+          </span>
+        </template>
+
+        <!-- First user message -->
+        <template #cell-firstUserMessage="{ item }">
+          <span
+            v-if="item.firstUserMessage"
+            class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
+          >
+            {{ item.firstUserMessage.length > 30 ? item.firstUserMessage.slice(0, 30) + '…' : item.firstUserMessage }}
+            <OTooltip v-if="item.firstUserMessage.length > 30" :content="item.firstUserMessage" />
+          </span>
+          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">—</span>
+        </template>
+
+        <!-- Turns -->
+        <template #cell-turns="{ item }">
+          <span class="tw:text-[0.75rem]">{{ item.turns }}</span>
+        </template>
+
+        <!-- Duration -->
+        <template #cell-durationNanos="{ item }">
+          <span class="tw:text-[0.75rem]">
+            {{ formatDuration(item.durationNanos) }}
+            <OTooltip :content="`${item.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
+          </span>
+        </template>
+
+        <!-- Tokens -->
+        <template #cell-tokens="{ item }">
+          <span class="tw:text-[0.75rem] tw:tabular-nums">
+            {{ formatTokens(item.inputTokens) }} → {{ formatTokens(item.outputTokens) }} (Σ {{ formatTokens(item.tokens) }})
+            <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: item.inputTokens.toLocaleString(), output: item.outputTokens.toLocaleString(), total: item.tokens.toLocaleString() })" />
+          </span>
+        </template>
+
+        <!-- Cost -->
+        <template #cell-cost="{ item }">
+          <span class="tw:text-[0.75rem]">${{ item.cost.toFixed(4) }}</span>
+        </template>
+
+        <!-- Status (derived from error_count) -->
+        <template #cell-status="{ item }">
+          <span
+            class="tw:rounded tw:px-[0.5rem] tw:py-[0.125rem] tw:inline-flex tw:items-center tw:gap-[0.25rem] tw:w-fit tw:text-[0.7rem] tw:font-semibold tw:capitalize"
+            :class="statusBadgeClass(item.status)"
+            :data-test="`sessions-list-status-${item.sessionId}`"
+          >
+            <span
+              class="tw:w-[6px] tw:h-[6px] tw:rounded-full"
+              :class="statusDotClass(item.status)"
+            />
+            {{ item.status }}
+          </span>
+        </template>
+
+        <!-- Initial loading -->
+        <template #loading>
+          <div
+            data-test="sessions-list-loading"
+            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+          >
+            <OSpinner
+              size="sm"
+              class="tw:mr-[0.25rem]"
+            />
+            <span
+              class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
+            >
+              {{ t('traces.sessionsList.loading') }}
+            </span>
+          </div>
+        </template>
+
+        <template #empty />
+      </TenstackTable>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
+import { formatDate } from "@/utils/date";
+import { useI18n } from "vue-i18n";
+import TenstackTable from "@/components/TenstackTable.vue";
+import useStreams from "@/composables/useStreams";
+import { useSessions, type SessionRow } from "./composables/useSessions";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import {
+  splitNumberWithUnit,
+  splitDuration,
+} from "./llmInsightsDashboard.utils";
+
+interface Props {
+  streamName: string;
+  startTime: number; // microseconds
+  endTime: number; // microseconds
+}
+
+const props = defineProps<Props>();
+const emit = defineEmits<{
+  (e: "sessionSelected", session: SessionRow): void;
+}>();
+
+const STREAM_LS_KEY = "sessionsList_streamFilter";
+
+const { t } = useI18n();
+const router = useRouter();
+const store = useStore();
+const { getStreams } = useStreams();
+const {
+  sessions,
+  total,
+  loading,
+  error,
+  hasLoadedOnce,
+  fetchPage,
+  cancelAll,
+} = useSessions();
+
+const availableStreams = ref<string[]>([]);
+const streamsLoaded = ref(false);
+const activeStream = ref<string>(
+  localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+);
+
+// Server-side pagination state (1-indexed for q-pagination).
+const currentPage = ref(1);
+const rowsPerPage = ref(25);
+const rowsPerPageOptions = [10, 25, 50, 100];
+
+const totalPages = computed(() =>
+  total.value && rowsPerPage.value
+    ? Math.max(1, Math.ceil(total.value / rowsPerPage.value))
+    : 1,
+);
+
+watch(totalPages, (n) => {
+  // Clamp the page when the total shrinks (e.g. after a re-fetch with
+  // fewer matches than before).
+  if (currentPage.value > n) currentPage.value = n;
+});
+
+const tableColumns = computed(() => [
+  {
+    id: "firstSeenNanos",
+    header: t('traces.sessionsList.columns.timestamp'),
+    accessorKey: "firstSeenNanos",
+    size: 170,
+    enableSorting: false,
+    meta: { slot: true, align: "left" },
+  },
+  {
+    id: "sessionId",
+    header: t('traces.sessionsList.columns.sessionId'),
+    accessorKey: "sessionId",
+    size: 160,
+    enableSorting: false,
+    meta: { slot: true, align: "left" },
+  },
+  {
+    id: "userId",
+    header: t('traces.sessionsList.columns.user'),
+    accessorKey: "userId",
+    size: 180,
+    enableSorting: false,
+    meta: { slot: true, align: "left" },
+  },
+  {
+    id: "firstUserMessage",
+    header: t('traces.sessionsList.columns.firstMessage'),
+    accessorKey: "firstUserMessage",
+    size: 200,
+    enableSorting: false,
+    meta: { slot: true, align: "left" },
+  },
+  {
+    id: "turns",
+    header: t('traces.sessionsList.columns.turns'),
+    accessorKey: "turns",
+    size: 90,
+    enableSorting: false,
+    meta: { slot: true, align: "center" },
+  },
+  {
+    id: "durationNanos",
+    header: t('traces.sessionsList.columns.duration'),
+    accessorKey: "durationNanos",
+    size: 120,
+    enableSorting: false,
+    meta: { slot: true, align: "center" },
+  },
+  {
+    id: "tokens",
+    header: t('traces.sessionsList.columns.tokens'),
+    accessorKey: "tokens",
+    size: 250,
+    enableSorting: false,
+    meta: { slot: true, align: "center" },
+  },
+  {
+    id: "cost",
+    header: t('traces.sessionsList.columns.cost'),
+    accessorKey: "cost",
+    size: 100,
+    enableSorting: false,
+    meta: { slot: true, align: "center" },
+  },
+  {
+    id: "status",
+    header: t('traces.sessionsList.columns.status'),
+    accessorKey: "status",
+    size: 100,
+    enableSorting: false,
+    meta: { slot: true, align: "center", disableCellAction: true },
+  },
+]);
+
+function formatTimestamp(nanos: number): string {
+  if (!nanos) return "—";
+  // Backend ships timestamps as nanoseconds — quasar's date wants ms.
+  return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
+}
+
+function shortId(id: string): string {
+  if (!id) return "—";
+  if (id.length <= 16) return id;
+  return `${id.slice(0, 8)}…${id.slice(-5)}`;
+}
+
+function formatDuration(nanos: number): string {
+  if (!nanos) return "—";
+  // splitDuration expects microseconds.
+  const d = splitDuration(nanos / 1000);
+  return `${d.value}${d.unit}`;
+}
+
+function formatTokens(n: number): string {
+  if (!n) return "0";
+  const t = splitNumberWithUnit(n);
+  return `${t.value}${t.unit}`;
+}
+
+function statusBadgeClass(s: SessionRow["status"]): string {
+  switch (s) {
+    case "error":
+      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] tw:text-[var(--o2-service-health-critical)]";
+    default:
+      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy,#16a34a)_12%,transparent)] tw:text-[var(--o2-service-health-healthy,#16a34a)]";
+  }
+}
+
+function statusDotClass(s: SessionRow["status"]): string {
+  switch (s) {
+    case "error":
+      return "tw:bg-[var(--o2-service-health-critical)]";
+    default:
+      return "tw:bg-emerald-500";
+  }
+}
+
+async function loadTraceStreams() {
+  streamsLoaded.value = false;
+  try {
+    const res = await getStreams("traces", false, false);
+    const list = res?.list || [];
+    const llmStreams = list.filter(
+      (stream: any) => stream?.settings?.is_llm_stream !== false,
+    );
+    availableStreams.value = llmStreams.map((stream: any) => stream.name);
+    if (!availableStreams.value.includes(activeStream.value)) {
+      activeStream.value = availableStreams.value[0] || "";
+    }
+  } catch (e) {
+    console.error("Error loading trace streams:", e);
+    availableStreams.value = [];
+    activeStream.value = "";
+  } finally {
+    streamsLoaded.value = true;
+  }
+}
+
+async function loadSessions(startTime?: number, endTime?: number) {
+  const start = startTime ?? props.startTime;
+  const end = endTime ?? props.endTime;
+  if (!activeStream.value || !start || !end) return;
+  localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+  await fetchPage(
+    activeStream.value,
+    start,
+    end,
+    currentPage.value - 1,
+    rowsPerPage.value,
+  );
+}
+
+function onStreamChange() {
+  currentPage.value = 1;
+  loadSessions();
+}
+
+function changePage(page: number) {
+  currentPage.value = page;
+  loadSessions();
+}
+
+function changeRowsPerPage(val: number) {
+  rowsPerPage.value = val;
+  currentPage.value = 1;
+  loadSessions();
+}
+
+function handleRowClick(row: SessionRow) {
+  emit("sessionSelected", row);
+  router.push({
+    name: "sessionDetails",
+    query: {
+      stream: activeStream.value,
+      session_id: row.sessionId,
+      from: props.startTime,
+      to: props.endTime,
+      org_identifier: store.state.selectedOrganization?.identifier,
+      user_id: row.userId || undefined,
+    },
+  });
+}
+
+async function refresh(startTime?: number, endTime?: number) {
+  currentPage.value = 1;
+  await loadSessions(startTime, endTime);
+}
+
+defineExpose({ refresh });
+
+onMounted(async () => {
+  if (!streamsLoaded.value) {
+    await loadTraceStreams();
+  }
+  if (activeStream.value) {
+    loadSessions();
+  }
+});
+
+onUnmounted(() => {
+  cancelAll();
+});
+</script>
+
+<style lang="scss" scoped>
+.sessions-list {
+  // Match ServicesCatalog: card surface, scoped paginator + selector
+  // styles so we inherit the global table theme from TenstackTable.
+  :deep(.paginator-section .q-btn) {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+  }
+
+  :deep(.select-pagination .q-field__control) {
+    min-height: 1.75rem;
+  }
+}
+</style>

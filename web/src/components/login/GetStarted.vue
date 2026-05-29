@@ -35,41 +35,28 @@
 <!-- Form Section -->
 <div class="tw:w-full tw:flex tw:justify-center">
   <div class="tw:w-full tw:max-w-[500px] tw:flex tw:flex-col tw:items-center tw:gap-y-2 tw:px-4">
-    <q-input
-      class="showLabelOnTop no-case input-field o2-input"
+    <OInput
+      class="o2-input"
       v-model="hearAboutUs"
-      outlined
       :label="`How did you hear about us? *`"
       placeholder="Eg. From a friend"
-      dense
-      stack-label
-      filled
-      color="primary"
       style="width: 100%;"
-      required
-      :rules="[(val) => val.length > 0 || 'This field is required']"
     />
-    <q-input
-      class="showLabelOnTop no-case -tw:mt-2"
+    <OInput
+      class="tw:-mt-2"
       v-model="whereDoYouWork"
-      outlined
       :label="`Where do you work? *`"
       placeholder="Company Name"
-      dense
-      stack-label
-      filled
       style="width: 100%;"
-      required
-      :rules="[(val) => val.length > 0 || 'This field is required']"
     />
-    <div class="tw:w-full tw:flex tw:items-center tw:ml-[-18px]">
-      <q-checkbox v-model="isAgree" class="tw:items-center">
+    <div class="tw:w-full tw:flex tw:items-center">
+      <OCheckbox v-model="isAgree">
         <span class="tw:text-sm">
           I have read and agree with the
           <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
           <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
         </span>
-      </q-checkbox>
+      </OCheckbox>
     </div>
     <div class="tw:w-full tw:mt-4">
       <OButton
@@ -103,15 +90,16 @@
 <script setup>
 import { ref } from 'vue'
 import OButton from '@/lib/core/Button/OButton.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 import { useStore } from 'vuex'
-import { useQuasar } from 'quasar'
   import billings from '@/services/billings'
+import { toast } from "@/lib/feedback/Toast/useToast";
 const hearAboutUs = ref('')
 const whereDoYouWork = ref('')
 const isAgree = ref(false)
 const store = useStore()
 const emit = defineEmits(['removeFirstTimeLogin'])
-const $q = useQuasar();
 const isSubmitting = ref(false);
 
 const validateForm = () => {
@@ -124,9 +112,9 @@ const onSubmit = async () => {
 
   isSubmitting.value = true
   if(!validateForm()) {
-    $q.notify({
+    toast({
       message: 'Please fill all the fields',
-      color: 'negative',
+      variant: 'warning',
     })
     isSubmitting.value = false
     return
@@ -139,15 +127,15 @@ const onSubmit = async () => {
   if(res.status == 200) {
     localStorage.removeItem("isFirstTimeLogin");
     emit("removeFirstTimeLogin",false);
-    $q.notify({
+    toast({
       message: 'Thank you for your feedback',
-      color: 'positive',
+      variant: 'success',
     })
     isSubmitting.value = false
   } else {
-    $q.notify({
+    toast({
       message: 'Something went wrong',
-      color: 'negative',
+      variant: 'error',
     })
     isSubmitting.value = false
   }

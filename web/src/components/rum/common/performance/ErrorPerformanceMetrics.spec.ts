@@ -13,23 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ErrorPerformanceMetrics from "./ErrorPerformanceMetrics.vue";
 
-installQuasar();
-
-function createMetrics(errorOverrides: Record<string, any> = {}, viewOverrides: Record<string, any> = {}) {
+function createMetrics(
+  errorOverrides: Record<string, any> = {},
+  viewOverrides: Record<string, any> = {},
+) {
   return {
     error: {
-      handling_duration: 250000000,   // 250ms
+      handling_duration: 250000000, // 250ms
       resource_status: 200,
       ...errorOverrides,
     },
     view: {
-      time_spent: 5000000000,         // 5s
-      dom_interactive: 1500000000,    // 1.5s
+      time_spent: 5000000000, // 5s
+      dom_interactive: 1500000000, // 1.5s
       ...viewOverrides,
     },
   };
@@ -39,119 +39,222 @@ describe("ErrorPerformanceMetrics", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
-    wrapper?.unmount();
+    if (wrapper) wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
   describe("initial render", () => {
-    it("should render without errors", () => {
-      wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders without errors when valid metrics are provided", () => {
+      // Arrange + Act
+      wrapper = mount(ErrorPerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have data-test=error-performance-metrics on root", () => {
-      wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.find('[data-test="error-performance-metrics"]').exists()).toBe(true);
+    it("renders root container with data-test=error-performance-metrics", () => {
+      // Arrange
+      wrapper = mount(ErrorPerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="error-performance-metrics"]').exists(),
+      ).toBe(true);
     });
 
-    it("should use grid layout", () => {
-      wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.classes().join(" ")).toContain("tw:grid");
+    it("renders root container as a div element", () => {
+      // Arrange
+      wrapper = mount(ErrorPerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
+      expect(wrapper.find("div").exists()).toBe(true);
     });
   });
 
   describe("conditional rendering", () => {
-    it("should render handling duration when available", () => {
-      wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.find('[data-test="metric-handling-duration"]').exists()).toBe(true);
+    it("renders handling-duration card when error.handling_duration is present", () => {
+      // Arrange
+      wrapper = mount(ErrorPerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-handling-duration"]').exists(),
+      ).toBe(true);
     });
 
-    it("should not render handling duration when missing", () => {
+    it("does not render handling-duration card when error.handling_duration is missing", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({ handling_duration: undefined }) },
       });
-      expect(wrapper.find('[data-test="metric-handling-duration"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-handling-duration"]').exists(),
+      ).toBe(false);
     });
 
-    it("should render time on page when view.time_spent is available", () => {
-      wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.find('[data-test="metric-time-spent"]').exists()).toBe(true);
+    it("renders time-spent card when view.time_spent is present", () => {
+      // Arrange
+      wrapper = mount(ErrorPerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
+      expect(wrapper.find('[data-test="metric-time-spent"]').exists()).toBe(
+        true,
+      );
     });
 
-    it("should not render time on page when view.time_spent is missing", () => {
+    it("does not render time-spent card when view.time_spent is missing", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({}, { time_spent: undefined }) },
       });
-      expect(wrapper.find('[data-test="metric-time-spent"]').exists()).toBe(false);
+
+      // Assert
+      expect(wrapper.find('[data-test="metric-time-spent"]').exists()).toBe(
+        false,
+      );
     });
 
-    it("should render DOM interactive when view.dom_interactive is available", () => {
-      wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.find('[data-test="metric-dom-interactive"]').exists()).toBe(true);
+    it("renders dom-interactive card when view.dom_interactive is present", () => {
+      // Arrange
+      wrapper = mount(ErrorPerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
+      expect(wrapper.find('[data-test="metric-dom-interactive"]').exists()).toBe(
+        true,
+      );
     });
 
-    it("should not render DOM interactive when view.dom_interactive is missing", () => {
+    it("does not render dom-interactive card when view.dom_interactive is missing", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({}, { dom_interactive: undefined }) },
       });
-      expect(wrapper.find('[data-test="metric-dom-interactive"]').exists()).toBe(false);
+
+      // Assert
+      expect(wrapper.find('[data-test="metric-dom-interactive"]').exists()).toBe(
+        false,
+      );
     });
 
-    it("should render resource status when error.resource_status is not undefined", () => {
-      wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(true);
-    });
-
-    it("should not render resource status when error.resource_status is undefined", () => {
+    it("renders resource-status card when error.resource_status is a defined value", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
-        props: { metrics: createMetrics({ resource_status: undefined }) },
+        props: { metrics: createMetrics() },
       });
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(true);
     });
 
-    it("should render resource status when status is 0", () => {
+    it("does not render resource-status card when error.resource_status is undefined", () => {
+      // Arrange
+      wrapper = mount(ErrorPerformanceMetrics, {
+        props: {
+          metrics: createMetrics({ resource_status: undefined }),
+        },
+      });
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(false);
+    });
+
+    it("renders resource-status card when error.resource_status is 0 (truthy check uses !== undefined)", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({ resource_status: 0 }) },
       });
-      // 0 !== undefined, so card should render
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(true);
+
+      // Assert — 0 !== undefined so the card should appear
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(true);
     });
 
-    it("should show no metrics when metrics is empty object", () => {
+    it("renders no metric cards when metrics is an empty object", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, { props: { metrics: {} } });
-      expect(wrapper.find('[data-test="metric-handling-duration"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="metric-time-spent"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="metric-dom-interactive"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-handling-duration"]').exists(),
+      ).toBe(false);
+      expect(wrapper.find('[data-test="metric-time-spent"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="metric-dom-interactive"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(false);
     });
   });
 
   describe("resource status thresholds", () => {
-    it("should show good status for 2xx status codes", () => {
+    it("shows resource-status card for 2xx status codes", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({ resource_status: 200 }) },
       });
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(true);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(true);
     });
 
-    it("should show needs-improvement for 3xx status codes", () => {
+    it("shows resource-status card for 3xx status codes", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({ resource_status: 301 }) },
       });
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(true);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(true);
     });
 
-    it("should show poor status for 4xx status codes", () => {
+    it("shows resource-status card for 4xx status codes", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({ resource_status: 404 }) },
       });
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(true);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(true);
     });
 
-    it("should show poor status for 5xx status codes", () => {
+    it("shows resource-status card for 5xx status codes", () => {
+      // Arrange
       wrapper = mount(ErrorPerformanceMetrics, {
         props: { metrics: createMetrics({ resource_status: 500 }) },
       });
-      expect(wrapper.find('[data-test="metric-resource-status"]').exists()).toBe(true);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="metric-resource-status"]').exists(),
+      ).toBe(true);
     });
   });
 });

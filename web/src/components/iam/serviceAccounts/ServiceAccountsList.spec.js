@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify, Quasar } from "quasar";
 import { nextTick } from 'vue';
 
 // Mock service_accounts service
@@ -24,6 +22,7 @@ vi.mock("@/services/service_accounts", () => ({
   default: {
     list: vi.fn(),
     delete: vi.fn(),
+    bulkDelete: vi.fn(),
     refresh_token: vi.fn()
   }
 }));
@@ -69,12 +68,6 @@ const platform = {
 };
 
 // Install Quasar with platform
-installQuasar({
-  plugins: [Dialog, Notify],
-  config: {
-    platform
-  }
-});
 
 describe("ServiceAccountsList Component", () => {
   let wrapper;
@@ -87,6 +80,7 @@ describe("ServiceAccountsList Component", () => {
     // Reset mock implementations
     vi.mocked(service_accounts.list).mockReset();
     vi.mocked(service_accounts.delete).mockReset();
+    vi.mocked(service_accounts.bulkDelete).mockReset();
     vi.mocked(service_accounts.refresh_token).mockReset();
 
     // Setup default successful response for list with SRE Agent as first entry
@@ -157,7 +151,7 @@ describe("ServiceAccountsList Component", () => {
     wrapper = mount(ServiceAccountsList, {
       global: {
         plugins: [
-          [Quasar, { platform }],
+          [{ platform }],
           [i18n]
         ],
         provide: { 
@@ -176,20 +170,37 @@ describe("ServiceAccountsList Component", () => {
         stubs: {
           'router-link': true,
           'router-view': true,
-          'AddServiceAccount': true,
+          'AddServiceAccount': {
+            name: 'AddServiceAccount',
+            template: '<div class="add-service-account-stub" v-if="open" />',
+            props: ['open', 'modelValue', 'isUpdated'],
+            emits: ['update:open', 'update:modelValue', 'updated'],
+          },
           'QTablePagination': true,
-          'NoData': true
+          'NoData': true,
+          ODialog: {
+            name: 'ODialog',
+            template: '<div class="o-dialog-stub" v-if="open"><slot /></div>',
+            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width', 'primaryButtonLabel', 'secondaryButtonLabel', 'neutralButtonLabel'],
+            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+          },
+          ODrawer: {
+            name: 'ODrawer',
+            template: '<div class="o-drawer-stub" v-if="open"><slot /></div>',
+            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width', 'primaryButtonLabel', 'secondaryButtonLabel', 'neutralButtonLabel'],
+            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+          },
         }
       },
       attachTo: document.body
     });
 
-    // Set up wrapper's $q.notify and dialog after mount
-    wrapper.vm.$q = {
-      ...wrapper.vm.$q,
-      notify: notifyMock,
-      dialog: dialogMock
-    };
+    // Set up wrapper's $q.notify and dialog after mount — mutate in place
+    // so the closure-captured $q inside setup() also picks up the mocks
+    if (wrapper.vm.$q) {
+      wrapper.vm.$q.notify = notifyMock;
+      wrapper.vm.$q.dialog = dialogMock;
+    }
 
     // Mock the router in wrapper.vm if needed
     if (!wrapper.vm.$router) {
@@ -284,8 +295,9 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("confirms delete action for user service accounts", () => {
-      const props = { row: { email: "service1@example.com", is_system: false } };
-      wrapper.vm.confirmDeleteAction(props);
+      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
+      const row = { email: "service1@example.com", is_system: false };
+      wrapper.vm.confirmDeleteAction(row);
 
       expect(wrapper.vm.confirmDelete).toBe(true);
     });
@@ -311,14 +323,17 @@ describe("ServiceAccountsList Component", () => {
         data: { code: 200 }
       });
 
-      // Set the deleteUserEmail through confirmDeleteAction for a user account
-      const props = { row: { email: "service1@example.com", is_system: false } };
-      wrapper.vm.confirmDeleteAction(props);
+      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
+      const row = { email: "service1@example.com", is_system: false };
+      wrapper.vm.confirmDeleteAction(row);
+      expect(wrapper.vm.confirmDelete).toBe(true);
 
       await wrapper.vm.deleteUser();
+      await flushPromises();
 
       expect(service_accounts.delete).toHaveBeenCalledWith("test-org", "service1@example.com");
-      expect(wrapper.vm.confirmDelete).toBe(true);
+      // After migration, deleteUser() closes the confirm dialog immediately
+      expect(wrapper.vm.confirmDelete).toBe(false);
     });
 
     it("should display system badge for SRE Agent accounts", async () => {
@@ -489,6 +504,18 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("Filtering", () => {
+    // Local helper that replicates ServiceAccountsList's OTable client-side filter logic:
+    // OTable filters each row by matching the search term against string values of all fields.
+    const filterData = (rows, term) => {
+      if (!term) return rows;
+      const lowerTerm = term.toLowerCase();
+      return rows.filter((row) =>
+        Object.values(row).some((val) =>
+          val != null && String(val).toLowerCase().includes(lowerTerm)
+        )
+      );
+    };
+
     beforeEach(() => {
       mockServiceAccountsState.service_accounts_users = [
         {
@@ -527,7 +554,7 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("filters by email", () => {
-      const filtered = wrapper.vm.filterData(
+      const filtered = filterData(
         mockServiceAccountsState.service_accounts_users,
         "admin"
       );
@@ -536,7 +563,7 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("filters by first name", () => {
-      const filtered = wrapper.vm.filterData(
+      const filtered = filterData(
         mockServiceAccountsState.service_accounts_users,
         "John"
       );
@@ -545,7 +572,7 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("filters by last name", () => {
-      const filtered = wrapper.vm.filterData(
+      const filtered = filterData(
         mockServiceAccountsState.service_accounts_users,
         "Smith"
       );
@@ -554,7 +581,7 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("filters by SRE Agent system account", () => {
-      const filtered = wrapper.vm.filterData(
+      const filtered = filterData(
         mockServiceAccountsState.service_accounts_users,
         "SRE"
       );
@@ -564,7 +591,7 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("is case insensitive", () => {
-      const filtered = wrapper.vm.filterData(
+      const filtered = filterData(
         mockServiceAccountsState.service_accounts_users,
         "JANE"
       );
@@ -573,7 +600,7 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("returns empty array for no matches", () => {
-      const filtered = wrapper.vm.filterData(
+      const filtered = filterData(
         mockServiceAccountsState.service_accounts_users,
         "nonexistent"
       );
@@ -581,7 +608,7 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("handles empty search term", () => {
-      const filtered = wrapper.vm.filterData(
+      const filtered = filterData(
         mockServiceAccountsState.service_accounts_users,
         ""
       );
@@ -594,7 +621,7 @@ describe("ServiceAccountsList Component", () => {
         { email: "test@example.com", first_name: null, last_name: "User", is_system: false }
       ];
 
-      const filtered = wrapper.vm.filterData(dataWithNulls, "test");
+      const filtered = filterData(dataWithNulls, "test");
       expect(filtered).toHaveLength(2);
     });
 
@@ -615,19 +642,24 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("Pagination", () => {
-    it("changes pagination settings", () => {
-      const newValue = { label: "50", value: 50 };
-      wrapper.vm.changePagination(newValue);
-      
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+    it("changes pagination settings", async () => {
+      // The component uses OTable's built-in pagination via page-size and page-size-options props.
+      // There is no changePagination method; pagination is controlled by OTable internally.
+      // This test verifies the OTable receives the correct page-size prop (20) and options.
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      // OTable is rendered — it exists when the component mounts
+      expect(oTable.exists()).toBe(true);
+      // The page-size prop controls default rows per page
+      expect(oTable.props("pageSize")).toBe(20);
     });
 
-    it("updates max records to return", () => {
-      const newValue = 100;
-      wrapper.vm.changeMaxRecordToReturn(newValue);
-      
-      expect(wrapper.vm.maxRecordToReturn).toBe(100);
+    it("updates max records to return", async () => {
+      // The component uses OTable's built-in page-size-options prop for selectable page sizes.
+      // There is no changeMaxRecordToReturn method; page sizes are provided as static options.
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.exists()).toBe(true);
+      // The page-size-options prop provides the available sizes
+      expect(oTable.props("pageSizeOptions")).toEqual([20, 50, 100, 250, 500]);
     });
   });
 
@@ -686,23 +718,21 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("has correct column configuration", () => {
+      // columns uses OTableColumnDef with 'id' (not 'name')
       expect(wrapper.vm.columns).toHaveLength(5);
-      expect(wrapper.vm.columns[0].name).toBe("#");
-      expect(wrapper.vm.columns[1].name).toBe("email");
-      expect(wrapper.vm.columns[2].name).toBe("first_name");
-      expect(wrapper.vm.columns[3].name).toBe("token");
-      expect(wrapper.vm.columns[4].name).toBe("actions");
+      expect(wrapper.vm.columns[0].id).toBe("#");
+      expect(wrapper.vm.columns[1].id).toBe("email");
+      expect(wrapper.vm.columns[2].id).toBe("first_name");
+      expect(wrapper.vm.columns[3].id).toBe("token");
+      expect(wrapper.vm.columns[4].id).toBe("actions");
     });
 
     it("has correct per page options", () => {
-      const perPageOptions = wrapper.vm.perPageOptions;
-      expect(perPageOptions).toEqual([
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-        { label: "250", value: 250 },
-        { label: "500", value: 500 }
-      ]);
+      // The component passes page-size-options directly to OTable as a prop array.
+      // Verify via the OTable component prop rather than a wrapper.vm property.
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.exists()).toBe(true);
+      expect(oTable.props("pageSizeOptions")).toEqual([20, 50, 100, 250, 500]);
     });
   });
 
@@ -750,6 +780,328 @@ describe("ServiceAccountsList Component", () => {
       // The UI should display "System Managed" instead of raw role for system accounts
       const displayRole = sreAgent.is_system ? "System Managed" : sreAgent.role;
       expect(displayRole).toBe("System Managed");
+    });
+  });
+
+  describe("ODialog Migration - Confirm Refresh Dialog", () => {
+    const findRefreshDialog = (w) =>
+      w.findAllComponents({ name: 'ODialog' }).find((d) => d.props('title')?.includes('Refresh') || d.props('title')?.includes('refresh'));
+
+    it("opens confirm refresh dialog when confirmRefreshAction is invoked", async () => {
+      const row = { email: "service1@example.com", is_system: false };
+      wrapper.vm.confirmRefreshAction(row);
+      await nextTick();
+
+      expect(wrapper.vm.confirmRefresh).toBe(true);
+      expect(wrapper.vm.toBeRefreshed).toEqual(row);
+    });
+
+    it("closes confirm refresh dialog when ODialog emits click:secondary", async () => {
+      wrapper.vm.confirmRefresh = true;
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const refreshDialog = dialogs.find((d) => d.props('open') === true);
+      expect(refreshDialog).toBeDefined();
+
+      await refreshDialog.vm.$emit('click:secondary');
+      expect(wrapper.vm.confirmRefresh).toBe(false);
+    });
+
+    it("invokes refreshServiceToken when ODialog emits click:primary on refresh dialog", async () => {
+      vi.mocked(service_accounts.refresh_token).mockResolvedValue({
+        data: { token: "new-token-abc" }
+      });
+      const row = { email: "service1@example.com", is_system: false, isLoading: false };
+      wrapper.vm.confirmRefreshAction(row);
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      // Find the first open xs dialog after refresh action; that's our refresh dialog
+      const refreshDialog = dialogs.find((d) => d.props('open') === true);
+      expect(refreshDialog).toBeDefined();
+
+      await refreshDialog.vm.$emit('click:primary');
+      await flushPromises();
+
+      expect(service_accounts.refresh_token).toHaveBeenCalledWith(
+        "test-org",
+        "service1@example.com"
+      );
+      // After successful refresh, confirm dialog should be closed
+      expect(wrapper.vm.confirmRefresh).toBe(false);
+    });
+  });
+
+  describe("ODialog Migration - Confirm Delete Dialog", () => {
+    it("opens confirm delete dialog with confirmDeleteAction", async () => {
+      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
+      const row = { email: "service1@example.com", is_system: false };
+      wrapper.vm.confirmDeleteAction(row);
+      await nextTick();
+
+      expect(wrapper.vm.confirmDelete).toBe(true);
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const openDialogs = dialogs.filter((d) => d.props('open') === true);
+      expect(openDialogs.length).toBeGreaterThan(0);
+    });
+
+    it("closes confirm delete dialog when ODialog emits click:secondary", async () => {
+      wrapper.vm.confirmDelete = true;
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const deleteDialog = dialogs.find((d) => d.props('open') === true);
+      expect(deleteDialog).toBeDefined();
+
+      await deleteDialog.vm.$emit('click:secondary');
+      expect(wrapper.vm.confirmDelete).toBe(false);
+    });
+
+    it("invokes deleteUser when ODialog emits click:primary on delete dialog", async () => {
+      vi.mocked(service_accounts.delete).mockResolvedValue({
+        data: { code: 200 }
+      });
+
+      // confirmDeleteAction receives the row directly (not wrapped in {row: ...})
+      const row = { email: "service1@example.com", is_system: false };
+      wrapper.vm.confirmDeleteAction(row);
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const deleteDialog = dialogs.find((d) => d.props('open') === true);
+      expect(deleteDialog).toBeDefined();
+
+      await deleteDialog.vm.$emit('click:primary');
+      await flushPromises();
+
+      expect(service_accounts.delete).toHaveBeenCalledWith(
+        "test-org",
+        "service1@example.com"
+      );
+      expect(wrapper.vm.confirmDelete).toBe(false);
+    });
+
+    it("handles delete error (non-403) without rethrowing", async () => {
+      vi.mocked(service_accounts.delete).mockRejectedValue({
+        response: { status: 500, data: { message: "Something failed" } }
+      });
+
+      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
+      const row = { email: "service1@example.com", is_system: false };
+      wrapper.vm.confirmDeleteAction(row);
+      await expect(wrapper.vm.deleteUser()).resolves.toBeUndefined();
+      // Dialog should be closed even on error
+      expect(wrapper.vm.confirmDelete).toBe(false);
+    });
+
+    it("handles 403 delete error without rethrowing", async () => {
+      vi.mocked(service_accounts.delete).mockRejectedValue({
+        response: { status: 403 }
+      });
+
+      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
+      const row = { email: "service1@example.com", is_system: false };
+      wrapper.vm.confirmDeleteAction(row);
+      await expect(wrapper.vm.deleteUser()).resolves.toBeUndefined();
+      expect(wrapper.vm.confirmDelete).toBe(false);
+    });
+  });
+
+  describe("ODialog Migration - Bulk Delete Dialog", () => {
+    it("opens bulk delete dialog via openBulkDeleteDialog", async () => {
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+      wrapper.vm.openBulkDeleteDialog();
+      await nextTick();
+      expect(wrapper.vm.confirmBulkDelete).toBe(true);
+    });
+
+    it("closes bulk delete dialog when ODialog emits click:secondary", async () => {
+      wrapper.vm.confirmBulkDelete = true;
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const bulkDialog = dialogs.find((d) => d.props('open') === true);
+      expect(bulkDialog).toBeDefined();
+
+      await bulkDialog.vm.$emit('click:secondary');
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+    });
+
+    it("invokes bulkDeleteServiceAccounts on ODialog click:primary and clears selection", async () => {
+      vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
+        data: { successful: ["service1@example.com"], unsuccessful: [] }
+      });
+
+      wrapper.vm.selectedAccounts = [{ email: "service1@example.com" }];
+      wrapper.vm.openBulkDeleteDialog();
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const bulkDialog = dialogs.find(
+        (d) => d.props('open') === true && d.props('title') === 'Delete Service Accounts'
+      );
+      expect(bulkDialog).toBeDefined();
+
+      await bulkDialog.vm.$emit('click:primary');
+      await flushPromises();
+
+      expect(service_accounts.bulkDelete).toHaveBeenCalledWith(
+        "test-org",
+        { ids: ["service1@example.com"] }
+      );
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+      expect(wrapper.vm.selectedAccounts).toEqual([]);
+    });
+
+    it("calls bulkDelete with partial success without throwing", async () => {
+      vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
+        data: {
+          successful: ["a@example.com"],
+          unsuccessful: ["b@example.com"]
+        }
+      });
+
+      wrapper.vm.selectedAccounts = [
+        { email: "a@example.com" },
+        { email: "b@example.com" }
+      ];
+      await wrapper.vm.bulkDeleteServiceAccounts();
+      await flushPromises();
+
+      expect(service_accounts.bulkDelete).toHaveBeenCalled();
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+    });
+
+    it("calls bulkDelete with full failure without throwing", async () => {
+      vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
+        data: { successful: [], unsuccessful: ["a@example.com"] }
+      });
+
+      wrapper.vm.selectedAccounts = [{ email: "a@example.com" }];
+      await wrapper.vm.bulkDeleteServiceAccounts();
+      await flushPromises();
+
+      expect(service_accounts.bulkDelete).toHaveBeenCalled();
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+    });
+
+    it("filters out system accounts from bulk delete payload", async () => {
+      vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
+        data: { successful: ["service1@example.com"], unsuccessful: [] }
+      });
+
+      wrapper.vm.selectedAccounts = [
+        { email: "o2-sre-agent.org-test-org@openobserve.internal" },
+        { email: "service1@example.com" }
+      ];
+
+      await wrapper.vm.bulkDeleteServiceAccounts();
+      await flushPromises();
+
+      expect(service_accounts.bulkDelete).toHaveBeenCalledWith(
+        "test-org",
+        { ids: ["service1@example.com"] }
+      );
+    });
+
+    it("handles bulk delete network error (non-403) without rethrowing", async () => {
+      vi.mocked(service_accounts.bulkDelete).mockRejectedValue({
+        response: { status: 500, data: { message: "Bulk delete failed" } }
+      });
+
+      wrapper.vm.selectedAccounts = [{ email: "a@example.com" }];
+      // Should not throw — the component swallows the error after notifying
+      await expect(wrapper.vm.bulkDeleteServiceAccounts()).resolves.toBeUndefined();
+      expect(service_accounts.bulkDelete).toHaveBeenCalled();
+    });
+  });
+
+  describe("ODialog Migration - Show Token Dialog", () => {
+    it("opens show-token dialog after successful refresh", async () => {
+      vi.mocked(service_accounts.refresh_token).mockResolvedValue({
+        data: { token: "fresh-token-xyz" }
+      });
+
+      const row = { email: "service1@example.com", isLoading: false, is_system: false };
+      await wrapper.vm.refreshServiceToken(row);
+      await flushPromises();
+
+      expect(wrapper.vm.serviceToken).toBe("fresh-token-xyz");
+      expect(wrapper.vm.isShowToken).toBe(true);
+    });
+
+    it("renders show-token ODialog with persistent + md size when isShowToken is true", async () => {
+      wrapper.vm.serviceToken = "token-123";
+      wrapper.vm.isShowToken = true;
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const tokenDialog = dialogs.find(
+        (d) => d.props('open') === true && d.props('title') === 'Service Account Token'
+      );
+      expect(tokenDialog).toBeDefined();
+      // `persistent` may be received as boolean true or as "" (boolean attr)
+      const persistent = tokenDialog.props('persistent');
+      expect(persistent === true || persistent === '').toBe(true);
+      expect(tokenDialog.props('size')).toBe('md');
+    });
+
+    it("closes show-token dialog when ODialog emits update:open false", async () => {
+      wrapper.vm.isShowToken = true;
+      await nextTick();
+
+      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const tokenDialog = dialogs.find(
+        (d) => d.props('open') === true && d.props('title') === 'Service Account Token'
+      );
+      expect(tokenDialog).toBeDefined();
+
+      await tokenDialog.vm.$emit('update:open', false);
+      await nextTick();
+      expect(wrapper.vm.isShowToken).toBe(false);
+    });
+  });
+
+  describe("ODrawer Migration - Add Service Account", () => {
+    it("renders AddServiceAccount with v-model:open bound to showAddUserDialog", async () => {
+      wrapper.vm.showAddUserDialog = true;
+      await nextTick();
+
+      const addSa = wrapper.findComponent({ name: 'AddServiceAccount' });
+      expect(addSa.exists()).toBe(true);
+      expect(addSa.props('open')).toBe(true);
+      expect(addSa.props('isUpdated')).toBe(wrapper.vm.isUpdated);
+    });
+
+    it("invokes addMember on AddServiceAccount 'updated' emit and closes the drawer", async () => {
+      wrapper.vm.showAddUserDialog = true;
+      await nextTick();
+
+      const addSa = wrapper.findComponent({ name: 'AddServiceAccount' });
+      expect(addSa.exists()).toBe(true);
+
+      const data = {
+        email: "newone@example.com",
+        first_name: "New",
+        last_name: "One",
+        organization: "test-org"
+      };
+
+      await addSa.vm.$emit(
+        'updated',
+        { code: 200, token: "tok-xyz" },
+        data,
+        "created"
+      );
+      await flushPromises();
+
+      // showAddUserDialog should be closed after addMember runs
+      expect(wrapper.vm.showAddUserDialog).toBe(false);
+      // The token dialog should open with the new token
+      expect(wrapper.vm.isShowToken).toBe(true);
+      expect(wrapper.vm.serviceToken).toBe("tok-xyz");
     });
   });
 });

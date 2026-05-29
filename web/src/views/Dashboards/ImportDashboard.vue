@@ -14,22 +14,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="q-mx-sm q-pt-xs">
+  <div class="tw:mx-2 tw:pt-1">
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
-        <div class="col">
-          <div class="flex">
-            <OButton variant="outline" size="icon-xs" @click="goBack()">
-              <template #icon-left
-                ><q-icon name="arrow_back_ios_new"
-              /></template>
-            </OButton>
-            <div class="text-h6 q-ml-md">
+      <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
+        <div class="tw:flex tw:flex-col tw:flex-1">
+          <div class="tw:flex">
+            <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
+
+            <div class="tw:text-xl tw:font-semibold tw:ml-3">
               {{ t("dashboard.importDashboard") }}
             </div>
           </div>
         </div>
-        <div class="flex justify-center tw:gap-2">
+        <div class="tw:flex tw:justify-center tw:gap-2">
           <OButton
             variant="outline"
             size="sm-action"
@@ -41,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             v-close-popup
+            data-test="dashboard-import-cancel-btn"
             @click="goBack()"
             >{{ t("function.cancel") }}</OButton
           >
@@ -56,12 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="flex">
-      <div class="flex">
-        <q-splitter
-          no-scroll
+    <div class="tw:flex">
+      <div class="tw:flex">
+        <OSplitter
           v-model="splitterModel"
-          :limits="[40, 80]"
           style="width: calc(100vw - 100px)"
         >
           <template #before>
@@ -83,27 +79,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab == 'import_json_url'"
                 class="editor-container-url card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
-                  <div style="width: calc(100% - 10px)" class="flex full-width">
+                <div class="tw:mx-2 my-2">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:mt-2 tw:w-full tw:items-center">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
-                      class="q-pr-sm"
                     >
-                      <q-input
+                      <OInput
+                        data-test="dashboard-import-url-control"
                         v-model="url"
-                        :label="t('dashboard.addURL')"
-                        style="padding: 10px"
-                        stack-label
-                        label-slot
-                        :loading="isLoading == ImportType.URL"
-                        borderless
-                        hide-bottom-space
+                        label="URL"
+                        :placeholder="t('dashboard.addURL')"
                       />
                     </div>
 
                     <div
-                      style="width: calc(30%); position: relative; bottom: 21px"
+                      style="width: calc(30%)"
                       data-test="dashboard-folder-dropdown"
                       class="import-folder-dropdown-container"
                     >
@@ -117,48 +108,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-url-editor"
                     ref="queryEditorFileRef"
                     editor-id="dashboards-query-editor-file"
-                    class="monaco-editor tw:mx-2"
+                    class="monaco-editor tw:my-4"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
                   />
-                </q-form>
+                </div>
               </div>
               <div
                 v-if="activeTab == 'import_json_file'"
                 class="dashboard-import-json-container card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
-                  <div style="width: calc(100% - 10px)" class="flex full-width">
+                <div class="tw:mx-2 tw:my-2">
+                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:w-full tw:items-center">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
-                      class="q-pr-sm"
                     >
-                      <q-file
+                      <OFile
+                        data-test="dashboard-import-file-control"
                         v-model="jsonFiles"
-                        bottom-slots
-                        :label="t('dashboard.dropFileMsg')"
+                        :label="t('dashboard.selectFile')"
+                        :placeholder="t('dashboard.dropFileMsg')"
                         accept=".json"
                         multiple
-                        filled
-                        :disable="!!isLoading"
-                      >
-                        <template v-slot:prepend>
-                          <q-icon name="cloud_upload" @click.stop.prevent />
-                        </template>
-                        <template v-slot:append>
-                          <q-icon
-                            name="close"
-                            @click.stop.prevent="jsonFiles = null"
-                            class="cursor-pointer"
-                          />
-                        </template>
-                        <template v-slot:hint> .json files only </template>
-                      </q-file>
+                        dropZone
+                        :disabled="!!isLoading"
+                      />
                     </div>
                     <div
-                      style="width: calc(30%); position: relative; bottom: 21px"
+                      style="width: calc(30%)"
                       class="import-folder-dropdown-container"
                     >
                       <select-folder-dropdown
@@ -166,11 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :activeFolderId="selectedFolder.value"
                       />
                     </div>
-                    <div v-if="filesImportResults.length" class="q-py-sm">
+                    <div v-if="filesImportResults.length" class="tw:py-2" data-test="dashboard-import-file-results">
                       <div v-for="importResult in filesImportResults">
                         <span
                           v-if="importResult.status == 'rejected'"
                           class="text-red"
+                          data-test="dashboard-import-file-rejected"
                         >
                           <code
                             style="background-color: #f2f1f1; padding: 3px"
@@ -185,14 +165,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-json-file-editor"
                     ref="queryEditorJsonRef"
                     editor-id="dashboards-query-editor-json"
-                    class="monaco-editor tw:mx-2"
+                    class="monaco-editor tw:my-4"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
                   />
 
                   <div></div>
-                </q-form>
+                </div>
               </div>
             </div>
           </template>
@@ -201,8 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-import-error-container"
               class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
             >
-              <div class="text-center text-h6 tw:py-2">Error Validations</div>
-              <q-separator class="q-mt-md" />
+              <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Error Validations</div>
+              <OSeparator class="tw:mt-4" />
               <div
                 class="error-section"
                 v-if="dashboardErrorsToDisplay.length > 0"
@@ -221,26 +201,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"
                       class="text-red"
+                      data-test="dashboard-import-error-title-message"
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
-                        <q-input
+                      <div
+                        style="width: 300px"
+                        data-test="dashboard-import-error-title-input"
+                      >
+                        <OInput
+                          data-test="dashboard-import-error-title-control"
                           v-model="dashboardTitles[errorIndex]"
-                          :label="'Dashboard Title'"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop"
-                          stack-label
-                          dense
-                          tabindex="0"
+                          label="Dashboard Title"
                           @update:model-value="
                             updateDashboardTitle(
                               dashboardTitles[errorIndex],
                               errorMessage.dashboardIndex,
                             )
                           "
-                          borderless
-                          hide-bottom-space
                         />
                       </div>
                     </span>
@@ -250,22 +227,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorMessage.message }}
                       <div style="width: 300px">
-                        <q-select
+                        <OSelect
                           v-model="streamTypes[errorIndex]"
-                          :options="streamTypeOptions"
-                          :label="'Stream Type'"
-                          :popup-content-style="{
-                            textTransform: 'lowercase',
-                          }"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="q-py-sm showLabelOnTop no-case"
-                          stack-label
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
+                          :options="streamTypeSelectOptions"
+                          label="Stream Type"
                           @update:model-value="
                             updateStreamType(
                               streamTypes[errorIndex],
@@ -275,9 +240,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               errorMessage.queryIndex,
                             )
                           "
-                          behavior="menu"
-                          borderless
-                          hide-bottom-space
                         />
                       </div>
                     </span>
@@ -285,11 +247,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-else-if="errorMessage.field == 'dashboard_validation'"
                       class="text-red"
+                      data-test="dashboard-import-error-validation-message"
                     >
                       {{ errorMessage.message }}
                     </span>
 
-                    <span v-else>{{
+                    <span
+                      v-else
+                      data-test="dashboard-import-error-message"
+                    >{{
                       errorMessage.message || errorMessage
                     }}</span>
                   </div>
@@ -297,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
     </div>
 
@@ -318,8 +284,14 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Upload, Link } from "lucide-vue-next";
+
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -352,12 +324,12 @@ export default defineComponent({
       {
         label: "File Upload / JSON",
         value: "import_json_file",
-        icon: Upload,
+        icon: "upload",
       },
       {
         label: "URL Import",
         value: "import_json_url",
-        icon: Link,
+        icon: "link",
       },
     ]);
     const activeTab = ref("import_json_file");
@@ -371,6 +343,7 @@ export default defineComponent({
     const dashboardTitles = reactive({});
     const streamTypes = reactive({});
     const streamTypeOptions = ["logs", "metrics", "traces"];
+    const streamTypeSelectOptions = streamTypeOptions.map((t) => ({ label: t, value: t }));
     // import type values
     const ImportType = {
       FILES: "files",
@@ -875,11 +848,14 @@ export default defineComponent({
       updateDashboardTitle,
       updateStreamType,
       streamTypeOptions,
+      streamTypeSelectOptions,
       dashboardTitles,
       streamTypes,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton },
+  components: { OSeparator, SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect, OFile,
+    OIcon, OSplitter,
+},
 });
 </script>
 
@@ -889,14 +865,14 @@ export default defineComponent({
 }
 .editor-container-url {
   :deep(.monaco-editor) {
-    height: calc(100vh - 310px) !important;
+    height: calc(100vh - 302px) !important;
     overflow: hidden;
     resize: none;
   }
 }
 .dashboard-import-json-container {
   :deep(.monaco-editor) {
-    height: calc(100vh - 310px) !important;
+    height: calc(100vh - 302px) !important;
     overflow: hidden;
     resize: none;
   }

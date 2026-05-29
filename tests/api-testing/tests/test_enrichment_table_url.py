@@ -143,8 +143,12 @@ class TestEnrichmentTableURL:
         assert status["status"] in ["pending", "processing", "completed", "failed"], \
             f"Unexpected status value: {status['status']}"
 
-    def test_create_with_append_true(self):
-        """Test creating enrichment table with append=True."""
+    def test_append_duplicate_url_blocked(self):
+        """Test that appending the same URL again is blocked.
+
+        RULE 3 in the backend blocks adding a URL that already exists
+        in the table's jobs when append=true. This prevents duplicate data.
+        """
         # First create the table (200 means job saved, runs async)
         response1 = self.enrichment_page.create_enrichment_table_from_url(
             session=self.session,
@@ -158,7 +162,7 @@ class TestEnrichmentTableURL:
         )
         assert response1.status_code == 200
 
-        # Wait for first job to complete before appending
+        # Wait for first job to complete before testing append
         first_job_result = self.enrichment_page.wait_for_url_enrichment_job(
             session=self.session,
             base_url=self.base_url,
@@ -170,7 +174,6 @@ class TestEnrichmentTableURL:
             delay=5
         )
 
-        # Check job result
         if first_job_result == "failed":
             status = self.enrichment_page.get_enrichment_table_url_status(
                 session=self.session,
@@ -182,7 +185,6 @@ class TestEnrichmentTableURL:
             )
             pytest.fail(f"First job failed: {status.get('error_message', 'unknown error') if status else 'unknown'}")
         elif first_job_result == "timeout":
-            # Check if job is still processing - if so, we can't append yet
             status = self.enrichment_page.get_enrichment_table_url_status(
                 session=self.session,
                 base_url=self.base_url,
@@ -194,28 +196,20 @@ class TestEnrichmentTableURL:
             if status and status.get("status") in ["pending", "processing"]:
                 pytest.skip("First job still processing after timeout - cannot test append")
 
-        # Wait a bit after first job completes to allow backend to fully process
+        # Wait a bit after first job completes
         time.sleep(5)
 
-        # Now append more data
-        # Note: Append might fail with "Failed to save job" if there's a timing issue
-        # or if the API doesn't support append for URL-based tables in certain states
-        try:
-            response2 = self.enrichment_page.create_enrichment_table_from_url(
-                session=self.session,
-                base_url=self.base_url,
-                user_email=self.user_email,
-                user_password=self.user_password,
-                org_id=self.ORG_ID,
-                table_name=self.table_name,
-                csv_url=self.TEST_CSV_URL,
-                append=True
-            )
-            assert response2.status_code == 200, f"Append failed: {response2.status_code} {response2.text}"
-        except AssertionError as e:
-            if "Failed to save job" in str(e):
-                pytest.skip("Append failed with 'Failed to save job' - may be timing issue or API limitation")
-            raise
+        # Try to append with the SAME URL - should be blocked (RULE 3)
+        # Use direct HTTP request (not page object) because page object asserts 200
+        session = self.session
+        session.auth = (self.user_email, self.user_password)
+        url = f"{self.base_url}api/{self.ORG_ID}/enrichment_tables/{self.table_name}/url?append=true"
+        payload = {"url": self.TEST_CSV_URL, "replace_failed": False}
+        response2 = session.post(url, json=payload, headers={"Content-Type": "application/json"})
+        assert response2.status_code == 400, \
+            f"Expected 400 for duplicate URL append, got {response2.status_code}: {response2.text}"
+        assert "URL already exists" in response2.text, \
+            f"Expected 'URL already exists' in response. Got: {response2.text}"
 
     def test_create_with_replace_failed_true(self):
         """Test creating enrichment table with replace_failed=True.
@@ -317,3 +311,80 @@ class TestEnrichmentTableURL:
         # Job should fail for invalid URL - distinguish from timeout
         assert job_result == "failed", \
             f"Expected job to fail for invalid URL, got: {job_result}"
+
+    def test_reload_enrichment_table_url(self):
+        """Test reloading enrichment table URLs with retry=true.
+
+        Regression test for the bug where retry mode was blocked by URL validation
+        (commit 85d261b5d0 removed the !retry guard). The frontend sends an empty URL
+        with retry=true to reprocess existing URLs from the database.
+        """
+        # Step 1: Create the enrichment table
+        self.enrichment_page.create_enrichment_table_from_url(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            csv_url=self.TEST_CSV_URL,
+            append=False
+        )
+
+        # Step 2: Wait for initial job to complete
+        result = self.enrichment_page.wait_for_url_enrichment_job(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            max_retries=24,
+            delay=5
+        )
+        assert result == "completed", f"Initial job did not complete: {result}"
+
+        # Step 3: Reload with retry=true and empty URL
+        # This is the key test - before the fix, this would return 400 with
+        # "URL cannot be empty". After the fix, it should return 200.
+        response = self.enrichment_page.create_enrichment_table_from_url(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            csv_url="",  # Empty URL is valid for retry mode
+            append=False,
+            retry=True
+        )
+        assert response.status_code == 200, \
+            f"Reload (retry=true) should return 200. Got {response.status_code}: {response.text}"
+
+        # Step 4: Wait for reload job to complete
+        reload_result = self.enrichment_page.wait_for_url_enrichment_job(
+            session=self.session,
+            base_url=self.base_url,
+            user_email=self.user_email,
+            user_password=self.user_password,
+            org_id=self.ORG_ID,
+            table_name=self.table_name,
+            max_retries=24,
+            delay=5
+        )
+        assert reload_result == "completed", f"Reload job did not complete: {reload_result}"
+
+    def test_empty_url_without_retry_fails(self):
+        """Test that empty URL without retry=true still returns 400.
+
+        Ensures the URL validation is still enforced for non-retry modes.
+        Only retry mode should allow an empty URL.
+        """
+        url = f"{self.base_url}api/{self.ORG_ID}/enrichment_tables/{self.table_name}/url?append=false"
+        payload = {"url": "", "replace_failed": False}
+
+        response = self.session.post(url, json=payload)
+        assert response.status_code == 400, \
+            f"Empty URL without retry should return 400. Got {response.status_code}: {response.text}"
+        assert "URL cannot be empty" in response.text, \
+            f"Expected 'URL cannot be empty' in response. Got: {response.text}"

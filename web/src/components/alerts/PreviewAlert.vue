@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
         class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2"
       >
-        <q-icon name="edit" size="40px" class="tw:opacity-20" />
+        <OIcon name="edit" size="xl" class="tw:opacity-20" />
         <span class="tw:text-sm tw:opacity-40">Write a query to see preview</span>
       </div>
       <PanelSchemaRenderer
@@ -72,6 +72,7 @@ import {
   b64DecodeUnicode,
   smartDecodeVrlFunction,
 } from "@/utils/zincutils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
@@ -610,7 +611,18 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queries[0].fields.stream_type =
       props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
-    dashboardPanelData.data.config.mark_line = [];
+    dashboardPanelData.data.config.mark_line = props.formData
+      .trigger_condition?.threshold
+      ? [
+          {
+            name: "Threshold",
+            type: "yAxis",
+            value: String(
+              props.formData.trigger_condition.threshold,
+            ),
+          },
+        ]
+      : [];
 
     // Set the fields from schema
     dashboardPanelData.data.queries[0].fields.x = fields.x;
@@ -1121,9 +1133,20 @@ const refreshData = () => {
       props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type =
       props.formData.stream_type;
+    const thresholdValue =
+      props.formData.trigger_condition?.threshold;
+
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    dashboardPanelData.data.config.mark_line = [];
+    dashboardPanelData.data.config.mark_line = thresholdValue
+      ? [
+          {
+            name: "Threshold",
+            type: "yAxis",
+            value: String(thresholdValue),
+          },
+        ]
+      : [];
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);

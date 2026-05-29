@@ -70,3 +70,4 @@ tests/ui-testing/.env.old
 /test-assist-results/
 /tests/ui-testing/test-output/
 **/debug-login-page.png
+/.opencode

@@ -1845,8 +1845,6 @@ async fn handle_derived_stream_triggers(
             ..Default::default()
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
-        new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream);
         return Ok(());

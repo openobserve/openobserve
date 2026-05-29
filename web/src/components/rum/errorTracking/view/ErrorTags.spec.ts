@@ -15,616 +15,487 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
 import i18n from "@/locales";
 
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
-});
-
-// Mock ErrorTag component
-vi.mock("@/components/rum/errorTracking/view/ErrorTag.vue", () => ({
-  default: {
-    name: "ErrorTag",
-    template: '<div data-test="error-tag">{{ tag.key }}: {{ tag.value }}</div>',
-    props: ["tag"],
-  },
-}));
-
-// Mock image imports
-vi.mock("@/assets/images/rum/chrome.png", () => ({
-  default: "/mock/chrome.png",
-}));
-vi.mock("@/assets/images/rum/firefox.png", () => ({
-  default: "/mock/firefox.png",
-}));
-vi.mock("@/assets/images/rum/safari.png", () => ({
-  default: "/mock/safari.png",
-}));
-vi.mock("@/assets/images/rum/opera.png", () => ({
-  default: "/mock/opera.png",
-}));
+vi.mock("@/assets/images/rum/chrome.png", () => ({ default: "/mock/chrome.png" }));
+vi.mock("@/assets/images/rum/firefox.png", () => ({ default: "/mock/firefox.png" }));
+vi.mock("@/assets/images/rum/safari.png", () => ({ default: "/mock/safari.png" }));
+vi.mock("@/assets/images/rum/opera.png", () => ({ default: "/mock/opera.png" }));
 vi.mock("@/assets/images/rum/edge.png", () => ({ default: "/mock/edge.png" }));
 vi.mock("@/assets/images/rum/ip_ad.png", () => ({ default: "/mock/ip.png" }));
-vi.mock("@/assets/images/rum/windows.png", () => ({
-  default: "/mock/windows.png",
-}));
+vi.mock("@/assets/images/rum/windows.png", () => ({ default: "/mock/windows.png" }));
 vi.mock("@/assets/images/rum/mac.png", () => ({ default: "/mock/mac.png" }));
-vi.mock("@/assets/images/rum/linux.png", () => ({
-  default: "/mock/linux.png",
-}));
+vi.mock("@/assets/images/rum/linux.png", () => ({ default: "/mock/linux.png" }));
+
+const mockError = {
+  ip: "192.168.1.1",
+  user_agent_user_agent_family: "Chrome",
+  user_agent_user_agent_major: "120",
+  user_agent_user_agent_minor: "0",
+  user_agent_user_agent_patch: "0",
+  user_agent_os_family: "Windows",
+  user_agent_os_major: "10",
+  user_agent_os_minor: "0",
+  user_agent_os_patch: "19045",
+  view_url: "https://example.com/dashboard",
+  error_handling: "unhandled",
+  service: "web-app",
+  source: "browser",
+  user_agent_device_brand: "Dell",
+  user_agent_device_family: "Desktop",
+  sdk_version: "1.2.3",
+  usr_email: "user@example.com",
+  geo_info_country: "United States",
+  geo_info_city: "New York",
+};
+
+function mountComponent(error = mockError) {
+  return mount(ErrorTags, {
+    props: { error },
+    global: {
+      plugins: [i18n],
+      stubs: {
+        OSeparator: {
+          template: '<div data-test="separator" />',
+          props: ["vertical"],
+        },
+        ErrorTag: {
+          name: "ErrorTag",
+          template: '<div data-test="error-tag">{{ tag.key }}: {{ tag.value }}</div>',
+          props: ["tag"],
+        },
+      },
+    },
+  });
+}
 
 describe("ErrorTags Component", () => {
   let wrapper: any;
 
-  const mockError = {
-    ip: "192.168.1.1",
-    user_agent_user_agent_family: "Chrome",
-    user_agent_user_agent_major: "120",
-    user_agent_user_agent_minor: "0",
-    user_agent_user_agent_patch: "0",
-    user_agent_os_family: "Windows",
-    user_agent_os_major: "10",
-    user_agent_os_minor: "0",
-    user_agent_os_patch: "19045",
-    view_url: "https://example.com/dashboard",
-    error_handling: "unhandled",
-    service: "web-app",
-    source: "browser",
-    user_agent_device_brand: "Dell",
-    user_agent_device_family: "Desktop",
-    sdk_version: "1.2.3",
-    usr_email: "user@example.com",
-    geo_info_country: "United States",
-    geo_info_city: "New York",
-  };
-
   beforeEach(async () => {
-    vi.clearAllMocks();
-
-    wrapper = mount(ErrorTags, {
-      attachTo: "#app",
-      props: {
-        error: mockError,
-      },
-      global: {
-        plugins: [i18n],
-        stubs: {
-          "q-separator": {
-            template: '<div data-test="separator" />',
-            props: ["vertical"],
-          },
-        },
-      },
-    });
-
+    wrapper = mountComponent();
     await flushPromises();
-    await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllTimers();
+    wrapper.unmount();
     vi.restoreAllMocks();
   });
 
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
+  it("mounts successfully", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render tags title", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.exists()).toBe(true);
-      expect(title.text()).toBe("Tags");
-    });
+    // Assert
+    expect(wrapper.exists()).toBe(true);
   });
 
-  describe("IP Address Display", () => {
-    it("should display IP address with icon", () => {
-      const ipSection = wrapper.find(".q-mr-lg.items-center");
-      expect(ipSection.exists()).toBe(true);
-      expect(ipSection.text()).toContain("192.168.1.1");
-    });
+  it("shows the Tags section title", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render IP icon", () => {
-      const ipIcon = wrapper.find("img[src='/mock/ip.png']");
-      expect(ipIcon.exists()).toBe(true);
-      expect(ipIcon.attributes("alt")).toBe("IP");
-      expect(ipIcon.classes()).toContain("tw:w-[1.875rem]!");
-      expect(ipIcon.classes()).toContain("tw:h-auto!");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Tags");
   });
 
-  describe("Browser Information", () => {
-    it("should display browser information", () => {
-      const browserSection = wrapper.find(".q-mx-lg.items-center");
-      expect(browserSection.exists()).toBe(true);
-      expect(browserSection.text()).toContain("Chrome");
-      expect(browserSection.text()).toContain("Version 120.0.0");
-    });
+  it("displays the IP address", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render correct browser icon for Chrome", () => {
-      const browserIcon = wrapper.find("img[src='/mock/chrome.png']");
-      expect(browserIcon.exists()).toBe(true);
-      expect(browserIcon.classes()).toContain("inline-block");
-    });
-
-    it("should render Firefox icon for Firefox", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_family: "Firefox",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      // The component sets icons only on mount, not reactively
-      // So we need to check the computed method result instead
-      expect(wrapper.vm.getBrowserIcon()).toBe("/mock/firefox.png");
-    });
-
-    it("should render Safari icon for Safari", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_family: "Safari",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.getBrowserIcon()).toBe("/mock/safari.png");
-    });
-
-    it("should render Opera icon for Opera", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_family: "Opera",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.getBrowserIcon()).toBe("/mock/opera.png");
-    });
-
-    it("should render Edge icon for Edge", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_family: "Edge",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.getBrowserIcon()).toBe("/mock/edge.png");
-    });
-
-    it("should default to Chrome icon for unknown browser", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_family: "UnknownBrowser",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const browserIcon = wrapper.find("img[src='/mock/chrome.png']");
-      expect(browserIcon.exists()).toBe(true);
-    });
+    // Assert
+    expect(wrapper.text()).toContain("192.168.1.1");
   });
 
-  describe("Operating System Information", () => {
-    it("should display OS information", () => {
-      const osElements = wrapper.findAll(".q-mx-lg.items-center");
-      const osSection = osElements[1]; // Second section is OS
-      expect(osSection.text()).toContain("Windows");
-      expect(osSection.text()).toContain("Version 10.0.19045");
-    });
+  it("renders the IP icon image", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render Windows icon for Windows", () => {
-      const osIcon = wrapper.find("img[src='/mock/windows.png']");
-      expect(osIcon.exists()).toBe(true);
-    });
-
-    it("should render Mac icon for Mac", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_os_family: "Mac OS X",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.getOsIcon()).toBe("/mock/mac.png");
-    });
-
-    it("should render Linux icon for Linux", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_os_family: "Linux",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.getOsIcon()).toBe("/mock/linux.png");
-    });
-
-    it("should default to Windows icon for unknown OS", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_os_family: "UnknownOS",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const osIcon = wrapper.find("img[src='/mock/windows.png']");
-      expect(osIcon.exists()).toBe(true);
-    });
+    // Assert
+    const img = wrapper.find('img[alt="IP"]');
+    expect(img.exists()).toBe(true);
+    expect(img.attributes("src")).toBe("/mock/ip.png");
   });
 
-  describe("Version Computations", () => {
-    it("should compute browser version correctly", () => {
-      expect(wrapper.vm.getBrowserVersion).toBe("Version 120.0.0");
-    });
+  it("displays the browser family name", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should handle missing browser version info", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_major: null,
-        },
-      });
-
-      expect(wrapper.vm.getBrowserVersion).toBe("Version Unknown");
-    });
-
-    it("should handle partial browser version info", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_major: "119",
-          user_agent_user_agent_minor: null,
-          user_agent_user_agent_patch: null,
-        },
-      });
-
-      expect(wrapper.vm.getBrowserVersion).toBe("Version 119");
-    });
-
-    it("should compute OS version correctly", () => {
-      expect(wrapper.vm.getOsVersion).toBe("Version 10.0.19045");
-    });
-
-    it("should handle missing OS version info", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_os_major: null,
-        },
-      });
-
-      expect(wrapper.vm.getOsVersion).toBe("Version Unknown");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Chrome");
   });
 
-  describe("Tags Generation", () => {
-    it("should generate correct tags", () => {
-      const tags = wrapper.vm.getTags;
+  it("displays the browser version", () => {
+    // Arrange + Act handled in beforeEach
 
-      expect(tags.ip).toBe("192.168.1.1");
-      expect(tags.url).toBe("https://example.com/dashboard");
-      expect(tags.handled).toBe(false);
-      expect(tags.location).toBe("United States, New York");
-      expect(tags.service).toBe("web-app");
-      expect(tags.source).toBe("browser");
-      expect(tags.device).toBe("Dell Desktop");
-      expect(tags.browser).toBe("Chrome");
-      expect(tags.level).toBe("error");
-      expect(tags.sdk_version).toBe("1.2.3");
-      expect(tags.user_email).toBe("user@example.com");
-    });
-
-    it("should handle handled errors", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          error_handling: "handled",
-        },
-      });
-
-      const tags = wrapper.vm.getTags;
-      expect(tags.handled).toBe(true);
-    });
-
-    it("should provide defaults for missing values", async () => {
-      await wrapper.setProps({
-        error: {
-          ip: "127.0.0.1",
-        },
-      });
-
-      const tags = wrapper.vm.getTags;
-      expect(tags.service).toBe("Unknown");
-      expect(tags.source).toBe("Unknown");
-      expect(tags.user_email).toBe("Unknown User");
-      expect(tags.location).toBe("Unknown");
-      expect(tags.device).toBe("Unknown");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Version 120.0.0");
   });
 
-  describe("Device Information", () => {
-    it("should combine device brand and family", () => {
-      expect(wrapper.vm.getDevice()).toBe("Dell Desktop");
-    });
+  it("renders the Chrome browser icon on mount", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should handle missing device brand", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_device_brand: null,
-        },
-      });
-
-      expect(wrapper.vm.getDevice()).toBe("Desktop");
-    });
-
-    it("should handle missing device family", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_device_family: null,
-        },
-      });
-
-      expect(wrapper.vm.getDevice()).toBe("Dell");
-    });
-
-    it("should handle missing device info", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_device_brand: null,
-          user_agent_device_family: null,
-        },
-      });
-
-      expect(wrapper.vm.getDevice()).toBe("Unknown");
-    });
+    // Assert
+    const img = wrapper.find('img[src="/mock/chrome.png"]');
+    expect(img.exists()).toBe(true);
   });
 
-  describe("Location Information", () => {
-    it("should combine country and city", () => {
-      expect(wrapper.vm.getLocation()).toBe("United States, New York");
-    });
+  it("displays the OS family name", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should handle missing country", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          geo_info_country: null,
-        },
-      });
-
-      expect(wrapper.vm.getLocation()).toBe("New York");
-    });
-
-    it("should handle missing city", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          geo_info_city: null,
-        },
-      });
-
-      expect(wrapper.vm.getLocation()).toBe("United States");
-    });
-
-    it("should handle missing location info", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          geo_info_country: null,
-          geo_info_city: null,
-        },
-      });
-
-      expect(wrapper.vm.getLocation()).toBe("Unknown");
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Windows");
   });
 
-  describe("Error Tags Rendering", () => {
-    it("should render multiple ErrorTag components", () => {
-      const errorTags = wrapper.findAllComponents({ name: "ErrorTag" });
-      expect(errorTags.length).toBeGreaterThan(0);
-    });
+  it("displays the OS version", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should pass correct props to ErrorTag components", () => {
-      const errorTags = wrapper.findAllComponents({ name: "ErrorTag" });
-
-      const ipTag = errorTags.find(
-        (tag) =>
-          tag.props("tag").key === "ip" &&
-          tag.props("tag").value === "192.168.1.1",
-      );
-
-      expect(ipTag).toBeDefined();
-    });
-
-    it("should render tags in correct container", () => {
-      const tagsContainer = wrapper.find(".row.items-center.wrap.q-mt-md");
-      expect(tagsContainer.exists()).toBe(true);
-    });
+    // Assert
+    expect(wrapper.text()).toContain("Version 10.0.19045");
   });
 
-  describe("Separators", () => {
-    it("should render vertical separators", () => {
-      const separators = wrapper.findAll('[data-test="separator"]');
-      expect(separators.length).toBeGreaterThan(0);
-    });
+  it("renders the Windows OS icon on mount", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should have proper separator placement", () => {
-      const separators = wrapper.findAllComponents({ name: "q-separator" });
-      separators.forEach((separator: any) => {
-        if (separator.exists()) {
-          expect(separator.props("vertical")).toBe(true);
-        }
-      });
-    });
+    // Assert
+    const img = wrapper.find('img[src="/mock/windows.png"]');
+    expect(img.exists()).toBe(true);
   });
 
-  describe("Component Lifecycle", () => {
-    it("should call onMounted hook", () => {
-      expect(wrapper.vm.osIcon).toBeDefined();
-      expect(wrapper.vm.browserIcon).toBeDefined();
-    });
+  it("renders ErrorTag components for all tags", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should set icons on mount", () => {
-      expect(wrapper.vm.osIcon).toBe("/mock/windows.png");
-      expect(wrapper.vm.browserIcon).toBe("/mock/chrome.png");
-    });
-
-    it("should update icons when props change", async () => {
-      await wrapper.setProps({
-        error: {
-          ...mockError,
-          user_agent_user_agent_family: "Firefox",
-          user_agent_os_family: "Mac OS X",
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      // Icons are set only on mount, but methods return correct values
-      expect(wrapper.vm.getBrowserIcon()).toBe("/mock/firefox.png");
-      expect(wrapper.vm.getOsIcon()).toBe("/mock/mac.png");
-    });
+    // Assert
+    const errorTags = wrapper.findAll('[data-test="error-tag"]');
+    expect(errorTags.length).toBeGreaterThan(0);
   });
 
-  describe("Browser Icon Methods", () => {
-    it("should return correct icons for different browsers", async () => {
-      const testCases = [
-        { family: "Chrome Mobile", expected: "/mock/chrome.png" },
-        { family: "Firefox Mobile", expected: "/mock/firefox.png" },
-        { family: "Safari Mobile", expected: "/mock/safari.png" },
-        { family: "Opera Mini", expected: "/mock/opera.png" },
-        { family: "Microsoft Edge", expected: "/mock/edge.png" },
-      ];
+  it("renders an ErrorTag with the ip value", () => {
+    // Arrange + Act handled in beforeEach
 
-      for (const { family, expected } of testCases) {
-        await wrapper.setProps({
-          error: { ...mockError, user_agent_user_agent_family: family },
-        });
-        const result = wrapper.vm.getBrowserIcon();
-        expect(result).toBe(expected);
-      }
-    });
-
-    it("should handle case-insensitive browser matching", async () => {
-      const testCases = [
-        { family: "CHROME", expected: "/mock/chrome.png" },
-        { family: "firefox", expected: "/mock/firefox.png" },
-        { family: "Safari", expected: "/mock/safari.png" },
-      ];
-
-      for (const { family, expected } of testCases) {
-        await wrapper.setProps({
-          error: { ...mockError, user_agent_user_agent_family: family },
-        });
-        const result = wrapper.vm.getBrowserIcon();
-        expect(result).toBe(expected);
-      }
-    });
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const ipTag = tags.find((t: any) => t.text().includes("ip"));
+    expect(ipTag).toBeDefined();
+    expect(ipTag!.text()).toContain("192.168.1.1");
   });
 
-  describe("OS Icon Methods", () => {
-    it("should return correct icons for different OS", async () => {
-      const testCases = [
-        { family: "Windows 10", expected: "/mock/windows.png" },
-        { family: "Mac OS X", expected: "/mock/mac.png" },
-        { family: "Ubuntu Linux", expected: "/mock/linux.png" },
-      ];
+  it("renders an ErrorTag with the service value", () => {
+    // Arrange + Act handled in beforeEach
 
-      for (const { family, expected } of testCases) {
-        await wrapper.setProps({
-          error: { ...mockError, user_agent_os_family: family },
-        });
-        const result = wrapper.vm.getOsIcon();
-        expect(result).toBe(expected);
-      }
-    });
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const serviceTag = tags.find((t: any) => t.text().includes("service"));
+    expect(serviceTag).toBeDefined();
+    expect(serviceTag!.text()).toContain("web-app");
   });
 
-  describe("Edge Cases", () => {
-    it("should handle null error object", () => {
-      // Component expects an object, so this test should validate prop type requirement
-      expect(ErrorTags.props?.error?.required).toBe(true);
-      expect(ErrorTags.props?.error?.type).toBe(Object);
-    });
+  it("renders an ErrorTag with the location value", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should handle empty error object", async () => {
-      await wrapper.setProps({
-        error: {},
-      });
-
-      const tags = wrapper.vm.getTags;
-      expect(tags.service).toBe("Unknown");
-      expect(tags.user_email).toBe("Unknown User");
-    });
-
-    it("should handle undefined user agent fields", async () => {
-      await wrapper.setProps({
-        error: {
-          ip: "127.0.0.1",
-          user_agent_user_agent_family: undefined,
-        },
-      });
-
-      expect(wrapper.vm.getBrowserIcon()).toBe("/mock/chrome.png");
-      expect(wrapper.vm.getBrowserVersion).toBe("Version Unknown");
-    });
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const locationTag = tags.find((t: any) => t.text().includes("location"));
+    expect(locationTag).toBeDefined();
+    expect(locationTag!.text()).toContain("United States, New York");
   });
 
-  describe("CSS Classes", () => {
-    it("should apply correct styling classes", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.classes()).toContain("tags-title");
+  it("renders an ErrorTag with handled: false for unhandled errors", () => {
+    // Arrange + Act handled in beforeEach
 
-      const mainRow = wrapper.find(".row.items-center");
-      expect(mainRow.classes()).toContain("row");
-      expect(mainRow.classes()).toContain("items-center");
-    });
-
-    it("should apply inline-block classes", () => {
-      const inlineElements = wrapper.findAll(".inline-block");
-      expect(inlineElements.length).toBeGreaterThan(0);
-    });
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const handledTag = tags.find((t: any) => t.text().includes("handled"));
+    expect(handledTag).toBeDefined();
+    expect(handledTag!.text()).toContain("false");
   });
 
-  describe("Props Validation", () => {
-    it("should require error prop", () => {
-      expect(ErrorTags.props?.error?.required).toBe(true);
-      expect(ErrorTags.props?.error?.type).toBe(Object);
+  it("renders an ErrorTag with handled: true for handled errors", async () => {
+    // Arrange
+    await wrapper.setProps({ error: { ...mockError, error_handling: "handled" } });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const handledTag = tags.find((t: any) => t.text().includes("handled"));
+    expect(handledTag).toBeDefined();
+    expect(handledTag!.text()).toContain("true");
+  });
+
+  it("shows Unknown for missing service", async () => {
+    // Arrange
+    await wrapper.setProps({ error: { ip: "127.0.0.1" } });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const serviceTag = tags.find((t: any) => t.text().includes("service"));
+    expect(serviceTag!.text()).toContain("Unknown");
+  });
+
+  it("shows Unknown for missing source", async () => {
+    // Arrange
+    await wrapper.setProps({ error: { ip: "127.0.0.1" } });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const sourceTag = tags.find((t: any) => t.text().includes("source"));
+    expect(sourceTag!.text()).toContain("Unknown");
+  });
+
+  it("shows Unknown User for missing user email", async () => {
+    // Arrange
+    await wrapper.setProps({ error: { ip: "127.0.0.1" } });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const emailTag = tags.find((t: any) => t.text().includes("user_email"));
+    expect(emailTag!.text()).toContain("Unknown User");
+  });
+
+  it("shows Unknown location when both country and city are missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: { ...mockError, geo_info_country: null, geo_info_city: null },
     });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const locationTag = tags.find((t: any) => t.text().includes("location"));
+    expect(locationTag!.text()).toContain("Unknown");
+  });
+
+  it("shows only city when country is missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: { ...mockError, geo_info_country: null },
+    });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const locationTag = tags.find((t: any) => t.text().includes("location"));
+    expect(locationTag!.text()).toContain("New York");
+  });
+
+  it("shows only country when city is missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: { ...mockError, geo_info_city: null },
+    });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const locationTag = tags.find((t: any) => t.text().includes("location"));
+    expect(locationTag!.text()).toContain("United States");
+  });
+
+  it("shows device brand and family combined", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+    expect(deviceTag!.text()).toContain("Dell Desktop");
+  });
+
+  it("shows only device family when brand is missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: { ...mockError, user_agent_device_brand: null },
+    });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+    expect(deviceTag!.text()).toContain("Desktop");
+  });
+
+  it("shows only device brand when family is missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: { ...mockError, user_agent_device_family: null },
+    });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+    expect(deviceTag!.text()).toContain("Dell");
+  });
+
+  it("shows Unknown device when both brand and family are missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: {
+        ...mockError,
+        user_agent_device_brand: null,
+        user_agent_device_family: null,
+      },
+    });
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+    expect(deviceTag!.text()).toContain("Unknown");
+  });
+
+  it("shows Version Unknown when browser major version is missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: { ...mockError, user_agent_user_agent_major: null },
+    });
+
+    // Assert
+    expect(wrapper.text()).toContain("Version Unknown");
+  });
+
+  it("shows partial browser version when only major is present", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: {
+        ...mockError,
+        user_agent_user_agent_major: "119",
+        user_agent_user_agent_minor: null,
+        user_agent_user_agent_patch: null,
+      },
+    });
+
+    // Assert
+    expect(wrapper.text()).toContain("Version 119");
+  });
+
+  it("shows Version Unknown when OS major version is missing", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: { ...mockError, user_agent_os_major: null },
+    });
+
+    // Assert
+    expect(wrapper.text()).toContain("Version Unknown");
+  });
+
+  it("shows partial OS version when only major is present", async () => {
+    // Arrange
+    await wrapper.setProps({
+      error: {
+        ...mockError,
+        user_agent_os_major: "14",
+        user_agent_os_minor: null,
+        user_agent_os_patch: null,
+      },
+    });
+
+    // Assert
+    expect(wrapper.text()).toContain("Version 14");
+  });
+
+  it("renders Firefox browser icon when browser family contains 'Firefox'", async () => {
+    // Arrange — remount with Firefox to capture onMounted icon selection
+    const firefoxWrapper = mountComponent({
+      ...mockError,
+      user_agent_user_agent_family: "Firefox",
+    });
+    await flushPromises();
+
+    // Assert
+    const img = firefoxWrapper.find('img[src="/mock/firefox.png"]');
+    expect(img.exists()).toBe(true);
+    firefoxWrapper.unmount();
+  });
+
+  it("renders Safari browser icon when browser family contains 'Safari'", async () => {
+    // Arrange
+    const safariWrapper = mountComponent({
+      ...mockError,
+      user_agent_user_agent_family: "Safari",
+    });
+    await flushPromises();
+
+    // Assert
+    const img = safariWrapper.find('img[src="/mock/safari.png"]');
+    expect(img.exists()).toBe(true);
+    safariWrapper.unmount();
+  });
+
+  it("renders Opera browser icon when browser family contains 'Opera'", async () => {
+    // Arrange
+    const operaWrapper = mountComponent({
+      ...mockError,
+      user_agent_user_agent_family: "Opera",
+    });
+    await flushPromises();
+
+    // Assert
+    const img = operaWrapper.find('img[src="/mock/opera.png"]');
+    expect(img.exists()).toBe(true);
+    operaWrapper.unmount();
+  });
+
+  it("renders Edge browser icon when browser family contains 'Edge'", async () => {
+    // Arrange
+    const edgeWrapper = mountComponent({
+      ...mockError,
+      user_agent_user_agent_family: "Edge",
+    });
+    await flushPromises();
+
+    // Assert
+    const img = edgeWrapper.find('img[src="/mock/edge.png"]');
+    expect(img.exists()).toBe(true);
+    edgeWrapper.unmount();
+  });
+
+  it("renders Mac OS icon when OS family contains 'Mac'", async () => {
+    // Arrange
+    const macWrapper = mountComponent({
+      ...mockError,
+      user_agent_os_family: "Mac OS X",
+    });
+    await flushPromises();
+
+    // Assert
+    const img = macWrapper.find('img[src="/mock/mac.png"]');
+    expect(img.exists()).toBe(true);
+    macWrapper.unmount();
+  });
+
+  it("renders Linux OS icon when OS family contains 'Linux'", async () => {
+    // Arrange
+    const linuxWrapper = mountComponent({
+      ...mockError,
+      user_agent_os_family: "Ubuntu Linux",
+    });
+    await flushPromises();
+
+    // Assert
+    const img = linuxWrapper.find('img[src="/mock/linux.png"]');
+    expect(img.exists()).toBe(true);
+    linuxWrapper.unmount();
+  });
+
+  it("renders an ErrorTag with the url value", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const urlTag = tags.find((t: any) => t.text().includes("url"));
+    expect(urlTag).toBeDefined();
+    expect(urlTag!.text()).toContain("https://example.com/dashboard");
+  });
+
+  it("renders an ErrorTag with level: error", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const tags = wrapper.findAll('[data-test="error-tag"]');
+    const levelTag = tags.find((t: any) => t.text().includes("level"));
+    expect(levelTag).toBeDefined();
+    expect(levelTag!.text()).toContain("error");
+  });
+
+  it("renders vertical separators between info sections", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const separators = wrapper.findAll('[data-test="separator"]');
+    expect(separators.length).toBeGreaterThan(0);
+  });
+
+  it("requires the error prop", () => {
+    // Assert
+    expect(ErrorTags.props?.error?.required).toBe(true);
+    expect(ErrorTags.props?.error?.type).toBe(Object);
   });
 });

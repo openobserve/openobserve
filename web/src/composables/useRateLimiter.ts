@@ -16,11 +16,9 @@
 import { useStore } from "vuex";
 import { reactive } from "vue";
 import { ref } from "vue";
-import { useQuasar } from "quasar";
 import rateLimiterService from "@/services/rate_limit";
  const  useRateLimiter = () => {
     const store = useStore();
-    const q = useQuasar();
     let isApiLimitsLoading = ref<boolean>(false);
     let isRoleLimitsLoading = ref<boolean>(false);
 

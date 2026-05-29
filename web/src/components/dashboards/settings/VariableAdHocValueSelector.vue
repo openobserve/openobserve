@@ -1,46 +1,32 @@
 <template>
-  <div class="row items-center">
-    <!-- <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
+  <div class="tw:flex tw:items-center">
+    <!-- <div class="tw:mb-2 title" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
-      class="row no-wrap items-center q-mb-xs"
+      class="tw:flex tw:flex-nowrap tw:items-center tw:mb-1 tw:gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
-      <q-input
-        dense
+      <OInput
         v-model="adhocVariables[index].name"
-        debounce="1000"
+        :debounce="1000"
         data-test="dashboard-variable-adhoc-name-selector"
         placeholder="Enter Name"
         @update:model-value="updateModelValueOfSelect(index, $event)"
-        class="textbox col no-case q-ml-sm"
-        borderless
-        hide-bottom-space
-      >
-      </q-input>
-      <q-select
-        dense
+        class="tw:flex-1"
+      />
+      <OSelect
         v-model="adhocVariables[index].operator"
-        :display-value="
-          adhocVariables[index].operator ? adhocVariables[index].operator : ''
-        "
         :options="operatorOptions"
         style="width: auto"
-        class="operator"
         data-test="dashboard-variable-adhoc-operator-selector"
-        borderless
-        hide-bottom-space
       />
-      <q-input
+      <OInput
         v-model="adhocVariables[index].value"
         placeholder="Enter Value"
-        dense
-        debounce="1000"
+        :debounce="1000"
         style="width: 125px"
-        class=""
         data-test="dashboard-variable-adhoc-value-selector"
-        borderless
-        hide-bottom-space
+        @update:model-value="emitValue()"
       />
       <OButton
         variant="ghost"
@@ -48,20 +34,20 @@
         class="tw:ml-1"
         @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
+        icon-left="close"
       >
-        <template #icon-left><q-icon name="close" /></template>
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="tw:ml-2 and-border" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'">AND</div> -->
     </div>
     <OButton
       variant="ghost"
       size="sm"
-      class="q-ml-xs q-mb-sm hideOnPrintMode"
+      class="tw:ml-1 tw:mb-2 hideOnPrintMode"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >
       <DynamicFilterIcon />
-      <q-tooltip>Add Dynamic Filter</q-tooltip>
+      <OTooltip content="Add Dynamic Filter" />
     </OButton>
   </div>
 </template>
@@ -72,16 +58,22 @@ import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplet
 import { useStore } from "vuex";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "VariableAdHocValueSelector",
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
-  components: { DynamicFilterIcon, OButton },
+  components: { DynamicFilterIcon, OButton, OInput, OSelect, OTooltip },
 
   setup(props: any, { emit }) {
     const store = useStore();
-    const operatorOptions = ["=", "!="];
+    const operatorOptions = [
+      { label: "=", value: "=" },
+      { label: "!=", value: "!=" },
+    ];
     const options = toRef(props.variableItem, "options");
     const { modelValue: adhocVariables } = toRefs(props);
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
@@ -95,7 +87,7 @@ export default defineComponent({
       const adhocVariablesTemp = adhocVariables.value;
       adhocVariablesTemp.push({
         name: "",
-        operator: operatorOptions[0],
+        operator: operatorOptions[0].value,
         value: "",
         streams: [],
       });

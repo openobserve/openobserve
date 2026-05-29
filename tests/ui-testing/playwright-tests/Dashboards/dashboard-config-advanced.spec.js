@@ -66,7 +66,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    await expect(page.locator('.q-field--disabled:has([data-test="dashboard-trellis-chart"])')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-trellis-chart-trigger"]')).toBeDisabled();
     testLogger.info("Trellis disabled with time shifts active");
 
     await pm.dashboardPanelActions.savePanel();
@@ -125,8 +125,16 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelConfigs.overrideConfig.click();
     const fieldSelect = page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
     await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
-    await expect(fieldSelect).not.toContainText("Field");
-    await page.keyboard.press("Escape");
+    // Verify a field was persisted — trigger's data-test-selected-value is non-empty when a value is selected
+    await expect(fieldSelect.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0-trigger"]')).not.toHaveAttribute("data-test-selected-value", "");
+    // Close via the ODialog × button; Escape doesn't reliably bubble to reka-ui's
+    // DialogContent when q-select pickers steal focus.
+    await page
+      .locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-close-btn"]')
+      .click();
+    await page
+      .locator('[data-test="override-config-popup-dialog"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -151,8 +159,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Verifying value mapping persists after save");
     await reopenPanelConfig(page, pm);
     const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
-    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]')).toHaveValue("test_value");
-    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]')).toHaveValue("Mapped!");
+    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]').locator('[data-test$="-field"]')).toHaveValue("test_value");
+    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]').locator('[data-test$="-field"]')).toHaveValue("Mapped!");
     testLogger.info("Value mapping persisted after save");
     await pm.dashboardPanelConfigs.closeValueMappingPopup();
 
@@ -188,8 +196,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
     await expect(topNInput).toBeVisible();
-    await topNInput.click();
-    await topNInput.fill("5");
+    await topNInput.locator('[data-test$="-field"]').fill("5");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Top N set to 5");
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -198,7 +205,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying top N value persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-top_results"]')).toHaveValue("5");
+    await expect(page.locator('[data-test="dashboard-config-top_results"]').locator('[data-test$="-field"]')).toHaveValue("5");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -212,8 +219,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     // Set top N to make the "Others" toggle appear
     const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
     await expect(topNInput).toBeVisible();
-    await topNInput.click();
-    await topNInput.fill("5");
+    await topNInput.locator('[data-test$="-field"]').fill("5");
 
     // Others toggle should now be visible
     const othersToggle = page.locator('[data-test="dashboard-config-top_results_others"]');
@@ -258,7 +264,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Click dropdown and pick the first available option
     await alignDropdown.click();
-    const options = page.locator('[role="listbox"] [role="option"]');
+    const options = page.locator('[data-test="dashboard-config-chart-align-option"]');
     await options.first().waitFor({ state: "visible", timeout: 5000 });
     const firstOptionText = await options.first().textContent();
     await options.first().click();

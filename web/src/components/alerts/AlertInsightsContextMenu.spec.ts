@@ -15,12 +15,9 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 import AlertInsightsContextMenu from "@/components/alerts/AlertInsightsContextMenu.vue";
 

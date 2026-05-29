@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import ActionScripts from "@/components/actionScripts/ActionScripts.vue";
 import i18n from "@/locales";
@@ -35,9 +34,6 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
-});
 
 const mockActionScripts = [
   {
@@ -123,6 +119,72 @@ describe("ActionScripts", () => {
               "perPageOptions",
             ],
             emits: ["update:changeRecordPerPage"],
+          },
+          OTable: {
+            name: "OTable",
+            inheritAttrs: false,
+            template: `
+              <div data-test="action-scripts-table">
+                <table>
+                  <tbody>
+                    <tr v-for="(row, i) in data" :key="i">
+                      <td><slot name="cell-actions" :row="row" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <slot name="bottom" />
+                <slot name="empty" />
+              </div>
+            `,
+            props: [
+              "data",
+              "columns",
+              "rowKey",
+              "loading",
+              "selectedIds",
+              "selection",
+              "pagination",
+              "pageSize",
+              "pageSizeOptions",
+              "sorting",
+              "filterMode",
+              "defaultColumns",
+              "showGlobalFilter",
+            ],
+            emits: ["update:selected-ids"],
+          },
+          ODialog: {
+            name: "ODialog",
+            inheritAttrs: false,
+            template:
+              '<div data-test="o-dialog" :data-open="open ? \'true\' : \'false\'"><slot name="header-left" /><slot name="header" /><slot /><slot name="footer" /></div>',
+            props: [
+              "open",
+              "persistent",
+              "size",
+              "title",
+              "subTitle",
+              "showClose",
+              "width",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+              "primaryButtonVariant",
+              "secondaryButtonVariant",
+              "neutralButtonVariant",
+              "primaryButtonDisabled",
+              "secondaryButtonDisabled",
+              "neutralButtonDisabled",
+              "primaryButtonLoading",
+              "secondaryButtonLoading",
+              "neutralButtonLoading",
+            ],
+            emits: [
+              "update:open",
+              "click:primary",
+              "click:secondary",
+              "click:neutral",
+            ],
           },
         },
       },
@@ -507,17 +569,36 @@ describe("ActionScripts", () => {
   });
 
   describe("Pagination", () => {
-    it("should handle pagination changes", async () => {
-      const mockVal = { label: "10", value: 10 };
-      wrapper.vm.changePagination(mockVal);
+    // The component uses OTable with built-in client-side pagination (pagination="client").
+    // There is no changePagination method or QTablePagination component in this version.
+    // The OTable component handles all pagination state internally.
 
-      expect(wrapper.vm.selectedPerPage).toBe(10);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
+    it("should display the action scripts table which owns pagination", () => {
+      // Pagination is handled by OTable internally; verify the table is rendered
+      const table = wrapper.find('[data-test="action-scripts-table"]');
+      expect(table.exists()).toBe(true);
     });
 
-    it("should display pagination components", () => {
-      const topPagination = wrapper.find('[data-test="table-pagination"]');
-      expect(topPagination.exists()).toBe(true);
+    it("should show correct row count in footer when rows are present", async () => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+      ];
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
+
+      // resultTotal should be 1
+      expect(wrapper.vm.resultTotal).toBe(1);
     });
   });
 
@@ -908,6 +989,102 @@ describe("ActionScripts", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.resultTotal).toBe(1);
+    });
+  });
+
+  describe("Clone ODialog migration", () => {
+    const findODialog = () => wrapper.findComponent({ name: "ODialog" });
+
+    it("should mount the ODialog component (Quasar q-dialog migration)", () => {
+      const dialog = findODialog();
+      expect(dialog.exists()).toBe(true);
+      // The stub renders regardless of `open` so we can verify slot wiring.
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(true);
+    });
+
+    it("should pass the persistent, size and showClose migration props", () => {
+      const dialog = findODialog();
+      // `persistent` is a boolean shorthand attribute → Vue passes "" to a stub
+      // that declares it as an untyped prop. Both truthy values are acceptable.
+      expect(["", true]).toContain(dialog.props("persistent"));
+      expect(dialog.props("size")).toBe("md");
+      expect(dialog.props("showClose")).toBe(false);
+    });
+
+    it("should pass i18n-resolved title and button label props", () => {
+      const dialog = findODialog();
+      expect(typeof dialog.props("title")).toBe("string");
+      expect((dialog.props("title") as string).length).toBeGreaterThan(0);
+      expect(typeof dialog.props("primaryButtonLabel")).toBe("string");
+      expect((dialog.props("primaryButtonLabel") as string).length).toBeGreaterThan(0);
+      expect(typeof dialog.props("secondaryButtonLabel")).toBe("string");
+      expect((dialog.props("secondaryButtonLabel") as string).length).toBeGreaterThan(0);
+    });
+
+    it("should reflect isSubmitting via primaryButtonDisabled prop", async () => {
+      wrapper.vm.isSubmitting = true;
+      await wrapper.vm.$nextTick();
+      expect(findODialog().props("primaryButtonDisabled")).toBe(true);
+
+      wrapper.vm.isSubmitting = false;
+      await wrapper.vm.$nextTick();
+      expect(findODialog().props("primaryButtonDisabled")).toBe(false);
+    });
+
+    it("should declare the expected ODialog migration emits", () => {
+      const dialog = findODialog();
+      const emitsOption = (dialog.vm.$options as any).emits;
+      expect(emitsOption).toEqual(
+        expect.arrayContaining([
+          "update:open",
+          "click:primary",
+          "click:secondary",
+        ]),
+      );
+    });
+
+    it("should not throw when click:primary is emitted from ODialog", async () => {
+      const dialog = findODialog();
+      expect(() => dialog.vm.$emit("click:primary")).not.toThrow();
+      await wrapper.vm.$nextTick();
+      // Component should remain mounted regardless
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should not throw when click:secondary is emitted from ODialog", async () => {
+      const dialog = findODialog();
+      await dialog.vm.$emit("click:secondary");
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should not throw when update:open is emitted from ODialog", async () => {
+      const dialog = findODialog();
+      await dialog.vm.$emit("update:open", false);
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should render the back button inside the header-left slot", () => {
+      const backBtn = wrapper.find('[data-test="add-action-back-btn"]');
+      expect(backBtn.exists()).toBe(true);
+    });
+
+    it("should keep component mounted when back button in header-left is clicked", async () => {
+      const backBtn = wrapper.find('[data-test="add-action-back-btn"]');
+      expect(backBtn.exists()).toBe(true);
+      await backBtn.trigger("click");
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should render clone form fields inside the ODialog default slot", () => {
+      expect(
+        wrapper.find('[data-test="to-be-clone-action-name"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="to-be-clone-stream-type"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="to-be-clone-stream-name"]').exists(),
+      ).toBe(true);
     });
   });
 

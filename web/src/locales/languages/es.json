@@ -396,7 +396,10 @@
     "traces": "Huellas",
     "switchToLogs": "haga clic para volver a Registros",
     "patternNoValuesAvailable": "No hay valores disponibles",
-    "selectLogStream": "Seleccione la secuencia de registros"
+    "selectLogStream": "Seleccione la secuencia de registros",
+    "noData": "No hay datos disponibles",
+    "functionEditorLabel": "Editor de funciones",
+    "loadingStream": "Cargando Stream..."
   },
   "menu": {
     "home": "Inicio",
@@ -790,7 +793,8 @@
     "no_keep_current": "No, mantente al día",
     "feature_correlation_management": "Gestión de correlaciones",
     "feature_log_patterns": "Patrones de registro",
-    "environment_type": "Tipo de entorno"
+    "environment_type": "Tipo de entorno",
+    "license_allows_unlimited_ingestion": "La licencia actual permite la ingesta ilimitada de datos."
   },
   "login": {
     "userid": "ID de usuario",
@@ -856,7 +860,12 @@
     "groups": "Grupos",
     "customRole": "Funciones personalizadas",
     "description": "Descripción",
-    "revoke_invite": "Revocar invitación"
+    "revoke_invite": "Revocar invitación",
+    "authType": "Autenticación",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Nativo",
+    "noCustomRolesHint": "No hay roles personalizados definidos: cree uno en IAM → Roles",
+    "externalUserCustomRoleHint": "Los usuarios externos solo se pueden modificar a través del sistema fuente"
   },
   "ticket": {
     "header": "Tickets de soporte",
@@ -1411,7 +1420,7 @@
     "markLineYAxis": "Eje Y",
     "colorPalette": "Paleta de colores",
     "colorSeriesBy": "Serie de colores de:",
-    "colorBySeries": "<b>Por serie</b>",
+    "colorBySeries": "Por serie",
     "colorDefaultPaletteBySeries": "Paleta predeterminada (por serie)",
     "colorDefaultPaletteBySeriesSubLabel": "Las series con el mismo nombre usarán el mismo color",
     "colorPaletteClassic": "Palette-Classic",
@@ -1420,7 +1429,7 @@
     "colorSingleColorSubLabel": "Establece un color específico para todas las series",
     "colorShadesOfSpecificColor": "Tonos de color específico",
     "colorShadesOfSpecificColorSubLabel": "Diferentes tonalidades de color específico",
-    "colorByValue": "<b>Por valor</b>",
+    "colorByValue": "Por valor",
     "colorGreenYellowRed": "Verde-amarillo-rojo (por valor)",
     "colorRedYellowGreen": "Rojo-Amarillo-Verde (por valor)",
     "colorTemperature": "Temperatura (por valor)",
@@ -1590,7 +1599,9 @@
     "axisLabelRotateTooltipText": "Gire el texto de la etiqueta del eje x en un ángulo elegido (en grados) para mejorar la legibilidad cuando las etiquetas son largas o están abarrotadas.",
     "axisLabelTruncateTooltipText": "Trunque las etiquetas del eje x al ancho especificado (en píxeles).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales."
+    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales.",
+    "allFolders": "Todas las carpetas",
+    "selectFile": "Seleccione un archivo"
   },
   "panel": {
     "header": "Panel",
@@ -2617,6 +2628,7 @@
     "serviceAccounts": "Cuentas de servicio",
     "serviceAccountsName": "Nombre de las cuentas de servicio",
     "basicUsers": "Usuarios",
+    "organizationMembers": "Miembros de la Organización",
     "quota": "Cuotas",
     "externalUserWarningTitle": "Advertencia de usuario externo",
     "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios.",
@@ -2933,7 +2945,75 @@
     "copyStacktrace": "Copiar stacktrace",
     "noStacktraceAvailable": "No hay stacktrace disponible",
     "stacktraceCopied": "Stacktrace copiado al portapapeles",
-    "stacktraceCopyFailed": "No se pudo copiar stacktrace"
+    "stacktraceCopyFailed": "No se pudo copiar stacktrace",
+    "sessionsList": {
+      "noStreamsTooltip": "No hay transmisiones de LLM disponibles.",
+      "session": "sesión",
+      "sessions": "sesiones",
+      "countPill": "{count} de {total} {unit}",
+      "noStreamsFound": "No se han encontrado transmisiones de LLM",
+      "noStreamsDescription1": "Los grupos de sesiones se extienden por",
+      "noStreamsDescription2": "a través de flujos de rastreo marcados como flujos LLM. O no existe tal transmisión o aún no se ha ingerido ningún tramo.",
+      "failedToLoad": "No se pudieron cargar las sesiones",
+      "retry": "Reintentar",
+      "noSessionsFound": "No se encontró ninguna sesión",
+      "noSessionsDescription": "No se grabó ninguna sesión de LLM en este intervalo de tiempo en {stream}. Intenta ampliar el intervalo de tiempo o cambiar a una transmisión diferente.",
+      "loading": "Cargando sesiones...",
+      "tokenTooltip": "Entrada: {entrada} · Salida: {salida} · Total: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Marca de tiempo",
+        "sessionId": "ID de sesión",
+        "turns": "Turnos",
+        "duration": "Duración",
+        "tokens": "Fichas",
+        "cost": "Coste",
+        "status": "Estado"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Volver a las sesiones",
+      "pageTitle": "Detalle de la sesión",
+      "failedToLoad": "No se pudo cargar la sesión",
+      "retry": "Reintentar",
+      "sessionNotFound": "No se encontró la sesión",
+      "noSpansFound": "No se han encontrado intervalos para {id} en el intervalo de tiempo actual.",
+      "searchPlaceholder": "Busque rastros en esta sesión...",
+      "turn": "giro",
+      "turns": "giros",
+      "turnsShown": "Se muestra {filtrado} de {total} {unidad}",
+      "userBadge": "Usuario",
+      "sessionPrefix": "sesión",
+      "copySessionId": "Copiar identificador de sesión",
+      "openInTraceExplorer": "Abrir en Trace Explorer",
+      "unknownUser": "Usuario desconocido",
+      "kpi": {
+        "turns": "Turnos",
+        "duration": "Duración",
+        "inputTokens": "Tokens de entrada",
+        "outputTokens": "Tokens de salida",
+        "cost": "Coste"
+      },
+      "conversation": "Conversación",
+      "turnLabel": "Turno",
+      "openTrace": "Traza abierta",
+      "noUserMessage": "No se capturó ningún mensaje de usuario para este turno.",
+      "noAssistantMessage": "No se capturó ninguna respuesta del asistente para este turno.",
+      "roles": {
+        "user": "Usuario",
+        "assistant": "Asistente"
+      },
+      "stats": {
+        "status": "Estado",
+        "model": "modelo",
+        "tokens": "Fichas",
+        "input": "Entrada",
+        "output": "Salida",
+        "total": "Total",
+        "cost": "Coste",
+        "spans": "Vanos"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3017,7 +3097,10 @@
     "algorithm": "Algoritmo",
     "storeType": "Tipo de tienda",
     "mechanismType": "Tipo de mecanismo",
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "providerTypeRequired": "El tipo de proveedor es obligatorio",
+    "algorithmRequired": "Se requiere un algoritmo",
+    "secretRequired": "El secreto es obligatorio"
   },
   "quota": {
     "header": "Cuotas",
@@ -3337,7 +3420,8 @@
     "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados.",
     "noDataFound": "No se han encontrado datos",
     "isWorkloadType": "Identificador de servicio",
-    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos."
+    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos.",
+    "loadingCorrelation": "Cargando datos de correlación..."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
@@ -3674,7 +3758,8 @@
     "errSave": "No se pudo guardar",
     "errLoadModel": "No se pudo cargar el modelo",
     "tierDefaultName": "Predeterminado",
-    "tierConditionalName": "Nivel condicional"
+    "tierConditionalName": "Nivel condicional",
+    "shadowedWarningBanner": "Las reglas siguientes aparecen sombreadas por «{name}», lo que las anula una regla de mayor prioridad y no se utilizará para los cálculos de costos."
   },
   "overview": {
     "title": "Descripción general del sistema",
@@ -3700,5 +3785,52 @@
     "clearAll": "Borrar todo",
     "clearAllTitle": "Borrar todos los chats",
     "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer."
+  },
+  "storage_settings": {
+    "tabLabel": "Almacenamiento organizacional",
+    "title": "Almacenamiento organizacional",
+    "notEnabled": "el almacenamiento de la organización no está habilitado para esta organización",
+    "notConfigured": "configurar un proveedor de almacenamiento personalizado para los datos de esta organización",
+    "configured": "configurado",
+    "heroHeadline": "Traiga su propio almacenamiento a",
+    "heroSub": "Conecta tu propio depósito en la nube y los datos permanecen en tu infraestructura: control total, sin bloqueos.",
+    "configureStorage": "Configurar el almacenamiento",
+    "supportedProviders": "Proveedores compatibles",
+    "noStorageConfigured": "No hay almacenamiento configurado",
+    "routeDataDesc": "Dirija los datos de esta organización a un depósito dedicado, independientemente de los valores predeterminados globales y de otras organizaciones.",
+    "perOrgIsolation": "Aislamiento por organización",
+    "appliesImmediately": "Se aplica inmediatamente a los datos nuevos",
+    "usesOrgCredentials": "Utiliza credenciales de ámbito orgánico",
+    "updateStorage": "Actualizar almacenamiento",
+    "active": "activo",
+    "bucketName": "nombre del depósito",
+    "region": "región",
+    "serverUrl": "URL del servidor",
+    "accessKey": "clave de acceso",
+    "secretKey": "clave secreta",
+    "roleArn": "hilo de rol",
+    "createdAt": "creado en",
+    "updatedAt": "actualizado en",
+    "featureOwnDataTitle": "Sea dueño de sus datos de principio a fin",
+    "featureOwnDataDesc": "Almacena los datos ingeridos directamente en tu propio depósito y mantén el control total de quién puede acceder a ellos.",
+    "featureSecureTitle": "Seguro y compatible",
+    "featureSecureDesc": "Con claves de acceso detalladas, sus datos confidenciales permanecen en su infraestructura.",
+    "goBack": "Regresar",
+    "newStorageConfiguration": "Nueva configuración de almacenamiento",
+    "selectProviderDesc": "seleccione un proveedor de almacenamiento en la nube para almacenar los datos de esta organización.",
+    "bucketNameRequired": "El nombre del bucket es obligatorio",
+    "accessKeyRequired": "Se requiere una clave de acceso",
+    "secretKeyRequired": "Se requiere una clave secreta",
+    "serverURLRequired": "La URL del servidor es obligatoria",
+    "regionRequired": "La región es obligatoria",
+    "roleARNRequired": "El ARN del rol es obligatorio",
+    "back": "Atrás",
+    "continue": "Continuar",
+    "save": "Guardar",
+    "update": "Actualización",
+    "awsStsCloudInfo": "Esto utiliza AWS sts para asumir funciones y realizar operaciones. Debe añadir la cuenta AWS de Openobserve como tipo de entidad de confianza para este rol en la consola de AWS. Póngase en contacto con el equipo de Openobserve para obtener la información de la cuenta o para obtener más ayuda para configurarla.",
+    "awsStsSelfHostedInfo": "Esto utiliza AWS sts para asumir funciones y realizar operaciones. Asegúrese de haber configurado las credenciales de AWS en el entorno de instalación que tienen acceso a esta función.",
+    "externalIdRequired": "Se requiere un identificador externo",
+    "storageAccountRequired": "El nombre de la cuenta de almacenamiento es obligatorio"
   }
 }

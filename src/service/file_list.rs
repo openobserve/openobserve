@@ -350,9 +350,11 @@ mod tests {
                 compressed_size,
                 index_size,
                 flattened: false,
+                bloom_ver: 0,
             },
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 

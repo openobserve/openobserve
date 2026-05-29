@@ -8,16 +8,28 @@ export default class DashboardCreate {
   constructor(page) {
     this.page = page;
     this.dashCreateBtn = this.page.locator('[data-test="dashboard-new"]');
-    this.dashName = this.page.locator('[data-test="add-dashboard-name"]');
-    this.submitBtn = this.page.locator('[data-test="dashboard-add-submit"]');
+    this.dashName = this.page.locator('[data-test="add-dashboard-name"] input');
+    this.submitBtn = this.page.locator(
+      '[data-test="dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+    );
     this.deleteIcon = this.page.locator('[data-test="dashboard-delete"]');
-    this.confirmDelete = this.page.locator('[data-test="confirm-button"]');
+    this.confirmDelete = this.page.locator(
+      '[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
     this.searchDash = this.page.locator('[data-test="dashboard-search"]');
     this.addPanelIfEmptyBtn = this.page.locator(
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
     this.applyQueryBtn = this.page.locator('[data-test="dashboard-apply"]');
     this.backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
+    this.defaultFolderTab = this.page.locator(
+      'button[data-test="dashboard-folder-tab-default"]'
+    );
+  }
+
+  // Wait for the default folder tab on the dashboard list to be visible
+  async waitForDefaultFolderTabVisible() {
+    await this.defaultFolderTab.waitFor({ state: "visible" });
   }
 
   // Wait for dashboard UI to be fully stable before any interaction
@@ -34,9 +46,6 @@ export default class DashboardCreate {
     const importBtn = this.page.locator('[data-test="dashboard-import"]');
     await importBtn.waitFor({ state: "visible", timeout: 10000 });
     await importBtn.waitFor({ state: "attached", timeout: 5000 });
-
-    // Small wait for any animations to complete
-    await this.page.waitForTimeout(500);
   }
 
   //Create Dashboard
@@ -67,7 +76,7 @@ export default class DashboardCreate {
         const element = document.querySelector(selector);
         return element && !element.disabled && element.offsetParent !== null;
       },
-      '[data-test="add-dashboard-name"]',
+      '[data-test="add-dashboard-name"] input',
       { timeout: 10000 }
     );
 
@@ -79,7 +88,12 @@ export default class DashboardCreate {
     await this.submitBtn.click();
 
     // Wait for the success notification to confirm dashboard was created
-    await this.page.getByText('Dashboard added successfully.').waitFor({ state: 'visible', timeout: 15000 });
+    // OToast root carries both data-test="o-toast-success" and data-test-message="<text>"
+    // so we can assert type + content in one selector (getByText is banned per selector policy)
+    await this.page.locator('[data-test-variant="success"][data-test-message="Dashboard added successfully."]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+      // Toast may have appeared and disappeared before waitFor evaluated — the
+      // waitForURL check below is the real gate for whether creation succeeded.
+    });
 
     // Wait for navigation to the new dashboard view page
     await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
@@ -89,8 +103,8 @@ export default class DashboardCreate {
       // Ignore timeout - continue anyway
     });
 
-    // Additional wait for Vue components to mount
-    await this.page.waitForTimeout(2000);
+    // Wait for Vue components to mount — use deterministic check on panel editor or back button
+    await this.page.locator('[data-test="dashboard-back-btn"]').waitFor({ state: 'visible', timeout: 15000 });
   }
 
   //back to dashboard list
@@ -99,20 +113,25 @@ export default class DashboardCreate {
     await this.backBtn.click();
   }
 
+  //wait for back button to be visible (no click)
+  async waitForBackBtnVisible() {
+    await this.backBtn.waitFor({ state: "visible" });
+  }
+
   //Search the Folder
   async searchDashboard(dashboardName) {
     await this.page
-      .locator('[data-test="dashboard-folder-tab-default"]')
+      .locator('button[data-test="dashboard-folder-tab-default"]')
       .waitFor({ state: "visible" });
 
-    await this.searchDash.click();
-    await this.searchDash.fill(dashboardName);
+    await this.searchDash.locator('input').click();
+    await this.searchDash.locator('input').fill(dashboardName);
   }
 
   //Delete Dashboard
   async deleteDashboard() {
     await this.page
-      .locator('[data-test="dashboard-folder-tab-default"]')
+      .locator('button[data-test="dashboard-folder-tab-default"]')
       .waitFor({ state: "visible" });
     const dashboardRow = this.page.locator('[data-test="dashboard-table"]');
     await dashboardRow.waitFor({ state: "visible" });
@@ -122,7 +141,7 @@ export default class DashboardCreate {
     );
     await confirmDialog.waitFor({ state: "visible" });
     const confirmDeleteButton = confirmDialog.locator(
-      '[data-test="confirm-button"]'
+      '[data-test="o-dialog-primary-btn"]'
     );
     await confirmDeleteButton.waitFor({ state: "visible" });
     await confirmDeleteButton.click();
@@ -135,7 +154,6 @@ export default class DashboardCreate {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
       await this.addPanelIfEmptyBtn.scrollIntoViewIfNeeded();
-      await this.page.waitForTimeout(200); // Brief pause for stability
 
       // Click the button
       await this.addPanelIfEmptyBtn.click();
@@ -149,7 +167,6 @@ export default class DashboardCreate {
           throw new Error(`addPanel: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
         }
         // Retry - the click may not have worked
-        await this.page.waitForTimeout(500);
       }
     }
 
@@ -168,7 +185,6 @@ export default class DashboardCreate {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       await addPanelBtn.waitFor({ state: "visible", timeout: 15000 });
       await addPanelBtn.scrollIntoViewIfNeeded();
-      await this.page.waitForTimeout(200); // Brief pause for stability
 
       // Click the button
       await addPanelBtn.click();
@@ -182,7 +198,6 @@ export default class DashboardCreate {
           throw new Error(`addPanelToExistingDashboard: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
         }
         // Retry - the click may not have worked
-        await this.page.waitForTimeout(500);
       }
     }
 
@@ -206,7 +221,6 @@ export default class DashboardCreate {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       await targetBtn.waitFor({ state: "visible", timeout: 15000 });
       await targetBtn.scrollIntoViewIfNeeded();
-      await this.page.waitForTimeout(200); // Brief pause for stability
 
       // Click the button
       await targetBtn.click();
@@ -220,7 +234,6 @@ export default class DashboardCreate {
           throw new Error(`addPanelSmart: Failed to navigate to add_panel after ${maxRetries} attempts. Last error: ${e.message}`);
         }
         // Retry - the click may not have worked
-        await this.page.waitForTimeout(500);
       }
     }
 

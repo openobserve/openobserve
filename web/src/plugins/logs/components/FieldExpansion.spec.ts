@@ -15,16 +15,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import FieldExpansion from "./FieldExpansion.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedAdd: "add",
-  outlinedVisibility: "visibility",
-  outlinedVisibilityOff: "visibility_off",
+  "add": "add",
+  "visibility": "visibility",
+  "visibility-off": "visibility_off",
 }));
 
 vi.mock("@/components/common/FieldValuesPanel.vue", () => ({
@@ -83,31 +83,23 @@ function createWrapper(props = {}) {
     props: { ...defaultProps, ...props },
     global: {
       stubs: {
-        QExpansionItem: {
-          name: "QExpansionItem",
+        OCollapsible: {
+          name: "OCollapsible",
           template:
-            '<div class="q-expansion-item-stub"><slot name="header" /><slot /></div>',
+            '<div class="q-expansion-item-stub"><slot name="trigger" /><slot /></div>',
           props: ["modelValue", "label", "dense", "hideExpandIcon"],
           emits: ["before-show", "before-hide", "update:modelValue"],
         },
-        QCard: {
-          name: "QCard",
-          template: '<div class="q-card-stub"><slot /></div>',
-        },
-        QCardSection: {
-          name: "QCardSection",
-          template: '<div class="q-card-section-stub"><slot /></div>',
-        },
-        QBtn: {
-          name: "QBtn",
+        OButton: {
+          name: "OButton",
           template:
             '<button class="q-btn-stub" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
           emits: ["click"],
         },
-        QIcon: {
-          name: "QIcon",
+        OIcon: {
+          name: "OIcon",
           template:
-            '<span class="q-icon-stub" :data-name="name" v-bind="$attrs" @click="$emit(\'click\', $event)"></span>',
+            '<span class="OIcon-stub" :data-name="name" v-bind="$attrs" @click="$emit(\'click\', $event)"></span>',
           props: ["name", "size"],
           emits: ["click"],
         },
@@ -159,9 +151,9 @@ describe("FieldExpansion", () => {
     it("renders expand icon when field has dataType and is not expanded", () => {
       const wrapper = createWrapper();
       // The chevron_right icon is shown when not expanded
-      const icons = wrapper.findAll(".q-icon-stub");
+      const icons = wrapper.findAll(".OIcon-stub");
       const expandIcon = icons.find(
-        (i) => i.attributes("data-name") === "chevron_right"
+        (i) => i.attributes("data-name") === "chevron-right"
       );
       expect(expandIcon).toBeDefined();
     });
@@ -227,11 +219,11 @@ describe("FieldExpansion", () => {
         showQuickMode: true,
         field: { ...defaultField, isInterestingField: true },
       });
-      const icons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      );
-      const infoIcon = icons.find(
-        (i) => i.attributes("data-name") === "info"
+      // The OIcon stub renders data-name on a span inside the OButton stub.
+      // Find all OIcon stubs whose data-name is "info-filled".
+      const iconSpans = wrapper.findAll(".OIcon-stub");
+      const infoIcon = iconSpans.find(
+        (i) => i.attributes("data-name") === "info-filled"
       );
       expect(infoIcon).toBeDefined();
     });
@@ -241,11 +233,11 @@ describe("FieldExpansion", () => {
         showQuickMode: true,
         field: { ...defaultField, isInterestingField: false },
       });
-      const icons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      );
-      const outlineIcon = icons.find(
-        (i) => i.attributes("data-name") === "info_outline"
+      // The OIcon stub renders data-name on a span inside the OButton stub.
+      // Find all OIcon stubs whose data-name is "info-outline".
+      const iconSpans = wrapper.findAll(".OIcon-stub");
+      const outlineIcon = iconSpans.find(
+        (i) => i.attributes("data-name") === "info-outline"
       );
       expect(outlineIcon).toBeDefined();
     });
@@ -340,9 +332,9 @@ describe("FieldExpansion", () => {
       const wrapper = createWrapper();
       // The expansion item stub gets modelValue from isExpanded ref
       // We verify the chevron_right icon is shown (not expanded)
-      const icons = wrapper.findAll(".q-icon-stub");
+      const icons = wrapper.findAll(".OIcon-stub");
       const chevronIcon = icons.find(
-        (i) => i.attributes("data-name") === "chevron_right"
+        (i) => i.attributes("data-name") === "chevron-right"
       );
       expect(chevronIcon).toBeDefined();
     });
@@ -363,12 +355,12 @@ describe("FieldExpansion", () => {
       expect(expandIconSpan.exists()).toBe(true);
     });
 
-    it("does not render expand icon span when field has no dataType", () => {
+    it("renders expand icon span even when field has no dataType", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, dataType: undefined },
       });
       const expandIconSpan = wrapper.find(".field-type-container");
-      expect(expandIconSpan.exists()).toBe(false);
+      expect(expandIconSpan.exists()).toBe(true);
     });
   });
 

@@ -119,8 +119,8 @@ impl super::FileList for SqliteFileList {
         let meta = &file.meta;
         let now_ts = now_micros();
 
-        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);"#)
+        if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
         .bind(&file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -133,6 +133,7 @@ impl super::FileList for SqliteFileList {
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
         .execute(&mut *tx)
@@ -272,7 +273,7 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, file, date
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, file, date
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -336,10 +337,53 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         Ok(())
     }
 
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        // Chunk in case of very long lists; SQLite caps placeholders at 999
+        // and we'd rather not blow it up unexpectedly.
+        for chunk in ids.chunks(900) {
+            let placeholders = std::iter::repeat_n("?", chunk.len())
+                .collect::<Vec<_>>()
+                .join(",");
+            let sql = format!("UPDATE file_list SET bloom_ver = ? WHERE id IN ({placeholders});");
+            let mut q = sqlx::query(&sql).bind(bloom_ver);
+            for id in chunk {
+                q = q.bind(*id);
+            }
+            q.execute(&*client).await?;
+        }
+        Ok(())
+    }
+
+    async fn bloom_ver_referenced(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+        bloom_ver: i64,
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let pool = CLIENT_RO.clone();
+        let found: Option<(i64,)> = sqlx::query_as(
+            r#"SELECT 1 FROM file_list WHERE stream = $1 AND date = $2 AND bloom_ver = $3 LIMIT 1;"#,
+        )
+        .bind(stream_key)
+        .bind(date)
+        .bind(bloom_ver)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(found.is_some())
+    }
+
     async fn list(&self) -> Result<Vec<FileKey>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened FROM file_list;"#,
+            r#"SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened FROM file_list;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -361,7 +405,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -375,7 +419,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#,
@@ -403,12 +447,12 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         }
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let pool = CLIENT_RO.clone();
         let cfg = get_config();
         let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
+        let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#,
@@ -466,6 +510,27 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         Ok(ret?)
     }
 
+    async fn query_for_bloom(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+    ) -> Result<Vec<FileKey>> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT_RO.clone();
+        let sql = r#"
+SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE stream = $1 AND date = $2 AND index_size > 0 AND bloom_ver = 0;
+                "#;
+        let ret = sqlx::query_as::<_, super::FileRecord>(sql)
+            .bind(stream_key)
+            .bind(date)
+            .fetch_all(&pool)
+            .await;
+        Ok(ret?.iter().map(|r| r.into()).collect())
+    }
+
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>> {
         if ids.is_empty() {
             return Ok(Vec::default());
@@ -484,7 +549,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids})"
             );
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
                 .fetch_all(&pool)
@@ -800,19 +865,23 @@ GROUP BY stream;
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if let Some(stream_type) = stream_type
+        // SECURITY: bind parameters to prevent SQL injection when any of the
+        // inputs contain quotes or SQL metacharacters (GHSA-5x2v-jg9q-g8qc).
+        let pool = CLIENT_RO.clone();
+        let ret = if let Some(stream_type) = stream_type
             && let Some(stream_name) = stream_name
         {
-            format!(
-                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';",
-            )
+            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE stream = ?;")
+                .bind(&stream_key)
+                .fetch_all(&pool)
+                .await?
         } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE org = ?;")
+                .bind(org_id)
+                .fetch_all(&pool)
+                .await?
         };
-        let pool = CLIENT_RO.clone();
-        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
         let mut stats: HashMap<String, StreamStats> = HashMap::with_capacity(ret.len() / 2);
         for r in ret {
             match stats.get_mut(&r.stream) {
@@ -1025,24 +1094,33 @@ DO UPDATE SET
         Ok(id)
     }
 
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<super::MergeJobRecord>> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
+
         // get pending jobs group by stream and order by num desc
-        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
+        let sql = if fast_mode {
+            r#"SELECT stream, id, 0 as num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
+        } else {
             r#"
 SELECT stream, max(id) as id, COUNT(*) AS num
     FROM file_list_jobs
     WHERE status = $1
     GROUP BY stream
     ORDER BY num DESC
-    LIMIT $2;"#,
-        )
-        .bind(super::FileListJobStatus::Pending)
-        .bind(limit)
-        .fetch_all(&mut *tx)
-        .await
+    LIMIT $2;"#
+        };
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(sql)
+            .bind(super::FileListJobStatus::Pending)
+            .bind(limit)
+            .fetch_all(&mut *tx)
+            .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -1102,18 +1180,36 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(ret)
     }
 
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64> {
+    async fn set_job_pending(
+        &self,
+        ids: &[i64],
+        offsets: i64,
+        stream: Option<&str>,
+    ) -> Result<u64> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        let sql = if ids.is_empty() {
-            "UPDATE file_list_jobs SET status = $1;".to_string()
-        } else {
-            format!(
-                "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
+        let mut conditions: Vec<String> = Vec::new();
+        if !ids.is_empty() {
+            conditions.push(format!(
+                "id IN ({})",
                 ids.iter()
                     .map(|id| id.to_string())
                     .collect::<Vec<_>>()
                     .join(",")
+            ));
+        }
+        if offsets > 0 {
+            conditions.push(format!("offsets >= {offsets}"));
+        }
+        if let Some(stream) = stream {
+            conditions.push(format!("stream = '{stream}'"));
+        }
+        let sql = if conditions.is_empty() {
+            "UPDATE file_list_jobs SET status = $1;".to_string()
+        } else {
+            format!(
+                "UPDATE file_list_jobs SET status = $1 WHERE {};",
+                conditions.join(" AND ")
             )
         };
         let ret = sqlx::query(&sql)
@@ -1421,6 +1517,21 @@ GROUP BY stream;
             .await?;
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
+
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = r#"SELECT 
+SUM(original_size) AS original_size,
+SUM(index_size) AS index_size
+FROM file_list
+WHERE org = $1 AND account = $2;"#;
+        let pool = CLIENT_RO.clone();
+        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        Ok(ret.unwrap_or_default())
+    }
 }
 
 impl SqliteFileList {
@@ -1454,8 +1565,8 @@ impl SqliteFileList {
         }
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
+INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
         "#).as_str(),
     )
         .bind(id)
@@ -1471,6 +1582,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         .bind(meta.original_size)
         .bind(meta.compressed_size)
         .bind(meta.index_size)
+        .bind(meta.bloom_ver)
         .bind(meta.flattened)
         .bind(now_ts)
         .execute(&*client)
@@ -1500,7 +1612,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
+                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
@@ -1527,6 +1639,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
+                        .push_bind(item.meta.bloom_ver)
                         .push_bind(item.meta.flattened)
                         .push_bind(now_ts);
                 });
@@ -1629,6 +1742,7 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1654,6 +1768,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    bloom_ver       BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1778,26 +1893,32 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
         &client,
         "file_list",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column(
         &client,
         "file_list_history",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column(
         &client,
         "file_list_deleted",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
 
     // create column updated_at for version >= 0.14.7
     let column = "updated_at";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+
+    // create column bloom_ver for bloom filter pruning above tantivy
+    let column = "bloom_ver";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
@@ -1978,6 +2099,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            bloom_ver: 0,
         }
     }
 
@@ -1989,6 +2111,7 @@ mod tests {
             deleted,
             id: 0,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 
@@ -2383,5 +2506,152 @@ mod tests {
 
         // Should attempt the query (may fail due to no database, but shouldn't short-circuit)
         let _ = result;
+    }
+
+    // ── bloom_ver schema migration + round-trip on a fresh in-memory DB ──────
+    //
+    // These tests exercise the column add path and the FromRow mapping without
+    // touching the global CLIENT_RW.
+
+    async fn fresh_in_memory_pool() -> sqlx::Pool<sqlx::Sqlite> {
+        sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory sqlite")
+    }
+
+    /// Old-shape file_list table that pre-dates the bloom_ver column.
+    /// Mirrors the historical DDL plus all columns the migration block adds in order.
+    async fn create_legacy_file_list_table(pool: &sqlx::Pool<sqlx::Sqlite>) {
+        sqlx::query(
+            r#"
+            CREATE TABLE file_list (
+                id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                account         VARCHAR DEFAULT '' NOT NULL,
+                org             VARCHAR NOT NULL,
+                stream          VARCHAR NOT NULL,
+                date            VARCHAR NOT NULL,
+                file            VARCHAR NOT NULL,
+                deleted         BOOLEAN DEFAULT false NOT NULL,
+                flattened       BOOLEAN DEFAULT false NOT NULL,
+                min_ts          BIGINT NOT NULL,
+                max_ts          BIGINT NOT NULL,
+                records         BIGINT NOT NULL,
+                original_size   BIGINT NOT NULL,
+                compressed_size BIGINT NOT NULL,
+                index_size      BIGINT DEFAULT 0 NOT NULL,
+                updated_at      BIGINT DEFAULT 0 NOT NULL
+            );
+            "#,
+        )
+        .execute(pool)
+        .await
+        .expect("legacy table");
+    }
+
+    async fn column_exists(pool: &sqlx::Pool<sqlx::Sqlite>, table: &str, col: &str) -> bool {
+        let rows: Vec<(i64, String, String, i64, Option<String>, i64)> =
+            sqlx::query_as(&format!("PRAGMA table_info({table});"))
+                .fetch_all(pool)
+                .await
+                .unwrap();
+        rows.iter().any(|(_, name, ..)| name == col)
+    }
+
+    #[tokio::test]
+    async fn test_add_column_bloom_ver_migration_idempotent() {
+        let pool = fresh_in_memory_pool().await;
+        create_legacy_file_list_table(&pool).await;
+
+        // Pre-state: bloom_ver does not exist.
+        assert!(!column_exists(&pool, "file_list", "bloom_ver").await);
+
+        // Apply the migration once — should add the column.
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .expect("first add_column");
+        assert!(column_exists(&pool, "file_list", "bloom_ver").await);
+
+        // Apply again — must be idempotent (no error, no duplicate column).
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .expect("second add_column should be idempotent");
+        assert!(column_exists(&pool, "file_list", "bloom_ver").await);
+    }
+
+    #[tokio::test]
+    async fn test_legacy_rows_default_to_bloom_ver_zero_after_migration() {
+        let pool = fresh_in_memory_pool().await;
+        create_legacy_file_list_table(&pool).await;
+
+        // Insert a row in the legacy schema (no bloom_ver column).
+        sqlx::query(
+            r#"INSERT INTO file_list
+                (account, org, stream, date, file, deleted, flattened,
+                 min_ts, max_ts, records, original_size, compressed_size,
+                 index_size, updated_at)
+               VALUES ('a', 'o', 's/logs/x', '2026/05/08/00', 'legacy.parquet',
+                       false, false, 1, 2, 3, 4, 5, 6, 7);"#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Migrate.
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .unwrap();
+
+        // FromRow reads — legacy row should expose bloom_ver = 0.
+        let rec: FileRecord = sqlx::query_as(
+            r#"SELECT id, account, stream, date, file, deleted, flattened,
+                       min_ts, max_ts, records, original_size, compressed_size,
+                       index_size, bloom_ver, updated_at
+               FROM file_list WHERE file = 'legacy.parquet';"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rec.bloom_ver, 0);
+    }
+
+    #[tokio::test]
+    async fn test_bloom_ver_round_trip_through_sqlite() {
+        // End-to-end: write a row with non-zero bloom_ver, read it back, confirm value preserved.
+        let pool = fresh_in_memory_pool().await;
+        create_legacy_file_list_table(&pool).await;
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .unwrap();
+
+        let bv: i64 = 1_715_000_000_000_000;
+        sqlx::query(
+            r#"INSERT INTO file_list
+                (account, org, stream, date, file, deleted, flattened,
+                 min_ts, max_ts, records, original_size, compressed_size,
+                 index_size, bloom_ver, updated_at)
+               VALUES ('a', 'o', 's/logs/x', '2026/05/08/00', 'with_bv.parquet',
+                       false, false, 1, 2, 3, 4, 5, 6, ?, 7);"#,
+        )
+        .bind(bv)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let rec: FileRecord = sqlx::query_as(
+            r#"SELECT id, account, stream, date, file, deleted, flattened,
+                       min_ts, max_ts, records, original_size, compressed_size,
+                       index_size, bloom_ver, updated_at
+               FROM file_list WHERE file = 'with_bv.parquet';"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rec.bloom_ver, bv);
+
+        // Conversion to FileMeta must carry the value through.
+        let meta = FileMeta::from(&rec);
+        assert_eq!(meta.bloom_ver, bv);
     }
 }

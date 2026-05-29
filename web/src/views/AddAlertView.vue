@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import destinationService from "@/services/alert_destination";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -44,7 +44,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const $q = useQuasar();
     const destinations = ref([]);
     const isUpdated = ref(false);
 
@@ -56,10 +55,9 @@ export default defineComponent({
         });
         destinations.value = res.data;
       } catch (error) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling destinations.",
-          timeout: 2000,
         });
       }
     };
@@ -94,11 +92,10 @@ export default defineComponent({
     onBeforeMount(async () => {
       await getDestinations();
       if (!destinations.value.length) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message:
             "No destinations found. Please create a destination first.",
-          timeout: 3000,
         });
         router.push({
           name: "alertList",

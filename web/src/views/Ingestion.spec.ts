@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import Ingestion from "@/views/Ingestion.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -26,9 +24,6 @@ import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
 
 // Install Quasar plugins
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock services with default resolved values
 vi.mock("@/services/organizations", () => ({
@@ -101,20 +96,16 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
-// Mock Quasar's copyToClipboard and useQuasar
+// Mock clipboard and toast (replaces deprecated Quasar mock)
 const mockNotify = vi.fn();
-const mockQ = {
-  notify: mockNotify,
-};
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    copyToClipboard: vi.fn(),
-    useQuasar: () => mockQ,
-  };
-});
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 describe("Ingestion", () => {
   let wrapper: any;
@@ -136,8 +127,7 @@ describe("Ingestion", () => {
               props: ['title', 'message', 'modelValue'],
               emits: ['update:ok', 'update:cancel']
             },
-            'q-page': { template: '<div class="q-page"><slot /></div>' },
-            'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
+                        'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
             'q-tabs': { template: '<div class="q-tabs"><slot /></div>' },
             'q-route-tab': { template: '<div class="q-route-tab"><slot /></div>' },
             OTabs: { template: '<div class="o-tabs-stub"><slot /></div>', props: ['modelValue', 'horizontal', 'align'], emits: ['update:modelValue'] },
@@ -151,11 +141,6 @@ describe("Ingestion", () => {
         }
       });
       await flushPromises();
-      
-      // Ensure the component has access to our mocked q
-      if (wrapper && wrapper.vm) {
-        wrapper.vm.q = mockQ;
-      }
     } catch (error) {
       console.error('Error mounting component:', error);
       wrapper = null;
@@ -176,7 +161,7 @@ describe("Ingestion", () => {
         return;
       }
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".q-page").exists()).toBe(true);
+      expect(wrapper.find('.ingestionPage').exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
@@ -248,7 +233,7 @@ describe("Ingestion", () => {
       expect(apiKeysService.createRUMToken).toHaveBeenCalledWith("default");
       expect(dispatchSpy).toHaveBeenCalledWith("setRUMToken", { rum_token: "test-rum-token-123" });
       expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+        variant: "success",
         message: "RUM Token generated successfully.",
         timeout: 5000,
       });
@@ -357,7 +342,7 @@ describe("Ingestion", () => {
         "rum-token-id-123"
       );
       expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+        variant: "success",
         message: "RUM Token updated successfully.",
         timeout: 5000,
       });
@@ -486,7 +471,7 @@ describe("Ingestion", () => {
       await wrapper.vm.getOrganizationPasscode();
 
       expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+        variant: "error",
         message: "API Key not found.",
         timeout: 5000,
       });
@@ -543,7 +528,7 @@ describe("Ingestion", () => {
       expect(organizationsService.update_organization_passcode).toHaveBeenCalledWith("default");
       expect(dispatchSpy).toHaveBeenCalledWith("setOrganizationPasscode", "new-passcode-123");
       expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+        variant: "success",
         message: "Token reset successfully.",
         timeout: 5000,
       });
@@ -575,7 +560,7 @@ describe("Ingestion", () => {
       await wrapper.vm.updatePasscode();
 
       expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+        variant: "error",
         message: "API Key not found.",
         timeout: 5000,
       });
@@ -660,15 +645,15 @@ describe("Ingestion", () => {
         innerText: "test content to copy"
       };
 
-      const { copyToClipboard } = await import("quasar");
+      const { copyToClipboard } = await import("@/utils/clipboard");
       copyToClipboard.mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
+      await flushPromises();
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
         timeout: 5000,
       });
     });
@@ -683,17 +668,20 @@ describe("Ingestion", () => {
         innerText: "test content to copy"
       };
 
-      const { copyToClipboard } = await import("quasar");
+      const { copyToClipboard } = await import("@/utils/clipboard");
       copyToClipboard.mockRejectedValue(new Error("Copy failed"));
 
       // Test that the function executes without throwing an error
       expect(() => wrapper.vm.copyToClipboardFn(mockContent)).not.toThrow();
-      
-      // Wait a bit for async operations
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
+
+      await flushPromises();
+
       // Verify that copyToClipboard was called
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy");
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     });
   });
 
@@ -1011,10 +999,11 @@ describe("Ingestion", () => {
       wrapper.vm.router.currentRoute.value.name = "custom";
       
       const mockContent = { innerText: "test content" };
-      const { copyToClipboard } = await import("quasar");
+      const { copyToClipboard } = await import("@/utils/clipboard");
       copyToClipboard.mockResolvedValue(true);
 
       await wrapper.vm.copyToClipboardFn(mockContent);
+      await flushPromises();
 
       expect(segment.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",

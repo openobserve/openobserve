@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar } from 'quasar';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import SsoLogin from './SsoLogin.vue';
@@ -29,6 +28,7 @@ const mockI18n = createI18n({
   },
 });
 
+
 describe('SsoLogin.vue', () => {
   let wrapper: VueWrapper;
 
@@ -45,7 +45,7 @@ describe('SsoLogin.vue', () => {
   const createWrapper = (storeOverride?: any) => {
     return mount(SsoLogin, {
       global: {
-        plugins: [Quasar, mockI18n, storeOverride || mockStore],
+        plugins: [mockI18n, storeOverride || mockStore],
       },
     });
   };

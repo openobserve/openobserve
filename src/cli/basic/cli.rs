@@ -51,8 +51,9 @@ fn create_cli_app() -> Command {
         .subcommands(&[
             Command::new("reset")
                 .about("reset openobserve data")
-                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs", true))
-                .arg(arg!("time", 't', "time", "timestamp in microseconds, only used by file-list-jobs (default: 0)")),
+                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs, index-updated-at", true))
+                .arg(arg!("time", 't', "time", "timestamp in microseconds, used by file-list-jobs (default: 0) and index-updated-at (default: stream min data date)"))
+                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, used by file-list-jobs and index-updated-at (default: all streams)")),
             Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
@@ -99,11 +100,18 @@ fn create_cli_app() -> Command {
                     arg!("account", 'a', "account", "the account name", false).value_name("account"),
                     arg!("file", 'f', "file", "the parquet file name", true).value_name("file"),
                 ]),
-            Command::new("recover-file-list").about("recover file list from s3")
+            Command::new("recover-file-list").about("recover file list from remote object store")
                 .args([
                     arg!("account", 'a', "account", "the account name", true).value_name("account"),
                     arg!("prefix", 'p', "prefix", "only migrate specified prefix", true).value_name("prefix"),
                     arg!("insert", 'i', "insert", "insert file list into db", false).value_name("insert").action(ArgAction::SetTrue),
+                ]),
+            Command::new("gc-file-list")
+                .about("delete stale stream files from remote storage that are past data retention")
+                .args([
+                    arg!("account", 'a', "account", "override storage account to list/delete, required for file_hash multi-account setups (default: resolve per stream)", false).value_name("account"),
+                    arg!("stream", 's', "stream", "only clean a specific stream, format: org/stream_type/stream_name (default: all streams)", false).value_name("stream"),
+                    arg!("dry-run", 'd', "dry-run", "only print what would be deleted, don't touch storage", false).action(ArgAction::SetTrue),
                 ]),
                 Command::new("node").about("node command").subcommands([
                 Command::new("offline").about("offline node"),
@@ -146,7 +154,10 @@ fn create_cli_app() -> Command {
                     arg!("stream-name", 's', "stream-name", "stream-name"),
                     arg!("top-x", 'x', "top-x", "top-x").default_value("5"),
                     arg!("org-id", 'o', "org-id", "org-id").default_value("default"),
-            ])
+            ]),
+            Command::new("bloom-inspect").about("dump fields + file names of a `.bf` file").args([
+                arg!("file", 'f', "file", "path to a `.bf` file (e.g. data/.../bloom/.../{ver}.bf)", true),
+            ]),
         ])
 }
 
@@ -179,6 +190,18 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             .ok_or_else(|| anyhow::anyhow!("please set data path"))?;
         set_permission(path, 0o777)?;
         println!("init dir {path} successfully");
+        return Ok(true);
+    }
+    if name == "bloom-inspect" {
+        let file = command
+            .get_one::<String>("file")
+            .ok_or_else(|| anyhow::anyhow!("please set --file"))?;
+        // Resolving file_list ids → file names needs the DB; best-effort so
+        // the tool still works (showing bare ids) where it isn't reachable.
+        if let Err(e) = infra::init().await {
+            eprintln!("warning: infra init failed ({e}); file names will not be resolved");
+        }
+        super::bloom::inspect(file).await?;
         return Ok(true);
     }
 
@@ -254,6 +277,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .get_one::<String>("time")
                         .map(|s| s.parse::<i64>().unwrap_or(0))
                         .unwrap_or(0);
+                    let stream = command.get_one::<String>("stream").map(|s| s.as_str());
                     // check if any compactor node is running in the cluster
                     let nodes = infra::cluster::list_nodes().await.unwrap_or_default();
                     let compactor_nodes: Vec<_> = nodes
@@ -283,11 +307,27 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         );
                     }
                     // 1. reset file offset in meta table
-                    let n = db::compact::files::reset_offset(time).await?;
-                    println!("reset {n} compact file offsets to {time}");
-                    // 2. set all file list jobs to pending
-                    let rows = infra_file_list::set_job_pending(&[]).await?;
-                    println!("reset {rows} file_list_jobs to pending");
+                    let n = db::compact::files::reset_offset(time, stream).await?;
+                    println!(
+                        "reset {n} compact file offsets to {time} (stream: {})",
+                        stream.unwrap_or("*")
+                    );
+                    // 2. set file list jobs to pending
+                    let rows = infra_file_list::set_job_pending(&[], time, stream).await?;
+                    println!(
+                        "reset {rows} file_list_jobs to pending (offsets >= {time}, stream: {})",
+                        stream.unwrap_or("*")
+                    );
+                }
+                "index-updated-at" => {
+                    let time = command
+                        .get_one::<String>("time")
+                        .map(|s| s.parse::<i64>().unwrap_or(0));
+                    let stream = command
+                        .get_one::<String>("stream")
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    super::stream::reset_index_updated_at(stream, time).await?;
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -398,6 +438,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let prefix = command.get_one::<String>("prefix").unwrap();
             let insert = command.get_flag("insert");
             super::load::load_file_list_from_s3(&account, prefix, insert).await?;
+        }
+        "gc-file-list" => {
+            let account = command.get_one::<String>("account").map(|s| s.as_str());
+            let stream = command.get_one::<String>("stream").map(|s| s.as_str());
+            let dry_run = command.get_flag("dry-run");
+            super::gc::run(account, stream, dry_run).await?;
         }
         "node" => {
             let command = command.subcommand();
@@ -930,6 +976,54 @@ mod tests {
             sub_sub_matches.get_one::<String>("group_size").unwrap(),
             "5"
         );
+    }
+
+    #[test]
+    fn test_reset_index_updated_at_component_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "reset",
+                "--component",
+                "index-updated-at",
+                "--stream",
+                "default/logs/test",
+                "--time",
+                "1700000000000000",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "reset");
+        assert_eq!(
+            sub_matches.get_one::<String>("component").unwrap(),
+            "index-updated-at"
+        );
+        assert_eq!(
+            sub_matches.get_one::<String>("stream").unwrap(),
+            "default/logs/test"
+        );
+        assert_eq!(
+            sub_matches.get_one::<String>("time").unwrap(),
+            "1700000000000000"
+        );
+    }
+
+    #[test]
+    fn test_reset_index_updated_at_component_defaults() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "reset", "--component", "index-updated-at"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "reset");
+        assert_eq!(
+            sub_matches.get_one::<String>("component").unwrap(),
+            "index-updated-at"
+        );
+        // stream and time are unset: all streams, use min date
+        assert!(sub_matches.get_one::<String>("stream").is_none());
+        assert!(sub_matches.get_one::<String>("time").is_none());
     }
 
     #[test]

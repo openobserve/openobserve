@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative"
+    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative tw:py-1"
     :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
@@ -27,15 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{ backgroundColor: statusColor }"
     />
     <!-- Pattern Column -->
-    <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:px-2">
+    <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:pl-3" :class="wrap ? '' : 'tw:overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:w-full"
+        class="pattern-template-text tw:w-full"
         :class="[
-          store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8',
+          store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
           wrap
-            ? 'tw:flex-wrap tw:break-all'
-            : 'tw:flex-nowrap tw:overflow-hidden',
+            ? 'tw:break-all'
+            : 'tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
       >
@@ -59,12 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
             @mouseleave="onMouseLeave"
           >
-            <q-chip
-              class="wildcard-chip q-my-none q-mx-none"
+            <OBadge
+              size="sm"
+              class="wildcard-chip tw:my-0 tw:mx-0"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
               {{ wildcardLabel(tok.value, tok.sampleValues) }}
-            </q-chip>
+            </OBadge>
           </span>
         </template>
       </div>
@@ -72,13 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[0.625rem] tw:cursor-help"
+        class="tw:text-badge-error-ol-text text-weight-bold tw:text-[0.7rem] tw:cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
-        <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
-          <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
-        </q-tooltip>
+        <OTooltip :content="anomalyExplanationText" max-width="22rem" />
       </span>
     </div>
 
@@ -92,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="tw:text-[0.6875rem] tw:opacity-80"
-        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
         :data-test="`pattern-card-${index}-percentage`"
       >
         {{ pattern.percentage.toFixed(2) }}%
@@ -111,9 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('search.includePatternInSearch')"
         :data-test="`pattern-card-${index}-include-btn`"
       >
-        <q-icon style="height: 8px; width: 8px">
+        <OIcon style="height: 8px; width: 8px">
           <EqualIcon />
-        </q-icon>
+        </OIcon>
       </OButton>
       <OButton
         variant="ghost"
@@ -122,9 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('search.excludePatternFromSearch')"
         :data-test="`pattern-card-${index}-exclude-btn`"
       >
-        <q-icon style="height: 8px; width: 8px">
+        <OIcon style="height: 8px; width: 8px">
           <NotEqualIcon />
-        </q-icon>
+        </OIcon>
       </OButton>
       <OButton
         variant="ghost"
@@ -132,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="$emit('create-alert', pattern)"
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
-        <q-icon name="notifications" size="15px" />
-        <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
+        <OIcon name="notifications" size="sm" />
+        <OTooltip :content="t('search.createAlertFromPattern')" />
       </OButton>
     </div>
   </div>
@@ -146,6 +145,9 @@ import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,
@@ -241,7 +243,7 @@ function highlightLevels(text: string): HighlightSegment[] {
   padding: 0 0.3125rem;
   border-radius: 0.1875rem;
   line-height: 1.125rem;
-  // Prevent chips from inheriting the truncate overflow of the parent row
+  // Prevent chips from inheriting the truncate overflow of the parent "row"
   flex-shrink: 0;
 }
 </style>

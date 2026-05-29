@@ -16,254 +16,197 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column index-menu"
+    class="tw:flex tw:flex-col index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <q-select
+    <OSelect
       data-test="log-search-index-list-select-stream"
       v-model="selectedMetric"
       :label="selectedMetric ? '' : t('search.selectIndex')"
       :options="streamOptions"
       data-cy="index-dropdown"
-      input-debounce="0"
-      behavior="menu"
-      filled
-      borderless
-      dense
-      use-input
-      hide-selected
-      fill-input
       class="metric-select-input"
-      @filter="filterMetrics"
       @update:model-value="onMetricChange"
     >
-      <template v-if="selectedMetric?.type" v-slot:prepend>
-        <q-icon
+      <template v-if="selectedMetric?.type" #icon-left>
+        <OIcon
           :title="selectedMetric?.type"
           size="xs"
           :name="metricsIconMapping[selectedMetric?.type || '']"
         />
       </template>
-      <template v-slot:option="scope">
-        <q-item
-          :class="
-            store.state.theme === 'dark' &&
-            selectedMetric?.value !== scope.opt.value
-              ? 'text-white'
-              : ''
-          "
-          v-bind="scope.itemProps"
-        >
-          <q-item-section
-            :title="scope?.opt?.type"
-            class="metric-explore-metric-icon"
-            avatar
-          >
-            <q-icon
-              size="xs"
-              :name="metricsIconMapping[scope?.opt?.type] || ''"
-            />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>{{ scope.opt.label }}</q-item-label>
-          </q-item-section>
-        </q-item>
+      <template #empty>
+        <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">{{ t("search.noResult") }}</div>
+        </li>
       </template>
-      <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
-      </template>
-    </q-select>
+    </OSelect>
     <div class="metric-list">
-      <div class="metrics-label-table q-mt-xs">
-        <q-table
-          data-test="log-search-index-list-fields-table"
-          :visible-columns="['name']"
-          :rows="filteredMetricLabels"
-          :row-key="(row: any) => row.name"
-          :filter="searchMetricLabel"
-          :filter-method="filterMetricLabels"
-          :pagination="{ rowsPerPage: 10000 }"
-          hide-header
-          hide-bottom
+      <div
+        class="metrics-label-table tw:mt-1"
+        data-test="log-search-index-list-fields-table"
+      >
+        <OTable
+          :data="visibleMetricLabels"
+          :columns="metricColumns"
+          row-key="name"
+          pagination="none"
+          :show-global-filter="false"
           class="field-table"
-          id="fieldList"
         >
-          <template #body-cell-name="props">
-            <q-tr :props="props">
-              <q-td :props="props" class="field_list">
-                <!-- TODO OK : Repeated code make separate component to display field  -->
-                <template
-                  v-if="
-                    props.row.name === store.state.zoConfig.timestamp_column
-                  "
+          <template #cell-name="{ row }">
+            <div class="field_list">
+              <!-- TODO OK : Repeated code make separate component to display field  -->
+              <template
+                v-if="
+                  row.name === store.state.zoConfig.timestamp_column
+                "
+              >
+                <OFieldLabel :field="row" class="tw:pl-4" />
+              </template>
+              <template v-else>
+                <OCollapsible
+                  variant="sidebar"
+                  class="metric-expansion-item"
+                  :model-value="openMetricRows[row.name] === true"
+                  @update:model-value="(v) => { openMetricRows[row.name] = v; if (v) openFilterCreator(null, row); }"
                 >
-                  <div class="field_label ellipsis q-pl-lg">
-                    {{ props.row.name }}
-                  </div>
-                </template>
-                <template v-else>
-                  <q-expansion-item
-                    dense
-                    switch-toggle-side
-                    :label="props.row.name"
-                    expand-icon-class="field-expansion-icon"
-                    expand-icon="expand_more"
-                    expanded-icon="expand_less"
-                    @before-show="
-                      (event: any) => openFilterCreator(event, props.row)
-                    "
-                  >
-                    <template v-slot:header>
-                      <div
-                        class="flex content-center ellipsis"
-                        :title="props.row.name"
-                      >
-                        <div class="field_label ellipsis">
-                          {{ props.row.name }}
+                  <template #trigger>
+                    <div class="tw:flex tw:items-center tw:min-w-0">
+                      <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
+                      <div class="field_overlay">
+                        <OButton
+                          icon-left="add"
+                          :data-test="`metrics-list-add-${row.name}-label-btn`"
+                          variant="ghost"
+                          size="icon-xs"
+                          class="tw:mr-0"
+                          @click.stop="addValueToEditor(row.name, '', '=')"
+                        />
+                      </div>
+                    </div>
+                  </template>
+                  <div class="tw:pl-3 tw:pr-1 tw:py-1">
+                      <div class="filter-values-container">
+                        <div
+                          v-show="
+                            metricLabelValues[row.name]?.isLoading
+                          "
+                          class="tw:pl-3 tw:py-1"
+                          style="height: 60px"
+                        >
+                          <OInnerLoading
+                            :showing="
+                              metricLabelValues[row.name]?.isLoading
+                            "
+                            label="Fetching values..."
+                            size="xs"
+                          />
                         </div>
-                        <div class="field_overlay">
-                          <OButton
-                            :data-test="`metrics-list-add-${props.row.name}-label-btn`"
-                            variant="ghost"
-                            size="icon-xs"
-                            class="q-mr-none"
-                            @click.stop="addValueToEditor(props.row.name, '', '=')"
-                          >
-                            <Plus class="tw:size-3" />
-                          </OButton>
+                        <div
+                          v-show="
+                            !metricLabelValues[row.name]?.values
+                              ?.length &&
+                            !metricLabelValues[row.name]?.isLoading
+                          "
+                          class="tw:pl-3 tw:py-1 tw:text-sm tw:font-medium"
+                        >
+                          No values found
+                        </div>
+                        <div
+                          v-for="value in metricLabelValues[row.name]
+                            ?.values || []"
+                          :key="value.key + value.count"
+                        >
+                          <ul>
+                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 tw:pr-0">
+                              <div
+                                class="tw:flex tw:flex wrap tw:justify-between"
+                                style="width: calc(100% - 46px)"
+                                :class="
+                                  store.state.theme === 'dark'
+                                    ? 'tw:text-gray-300'
+                                    : 'tw:text-gray-500'
+                                "
+                              >
+                                <div
+                                  :title="value.key"
+                                  class="tw:truncate tw:pr-1"
+                                  style="width: calc(100% - 50px)"
+                                >
+                                  {{ value.key }}
+                                </div>
+                                <div
+                                  :title="value.count?.toString()"
+                                  class="tw:truncate tw:text-right tw:pr-2"
+                                  style="width: 50px"
+                                >
+                                  {{ value.count }}
+                                </div>
+                              </div>
+                              <div
+                                class="tw:flex tw:flex"
+                                :class="
+                                  store.state.theme === 'dark'
+                                    ? 'text-white'
+                                    : 'text-black'
+                                "
+                              >
+                                <OButton
+                                  class="tw:mr-1"
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  title="Include Term"
+                                  @click="
+                                    addValueToEditor(
+                                      row.name,
+                                      value.key,
+                                      '=',
+                                    )
+                                  "
+                                >
+                                  <EqualIcon class="tw:size-3" />
+                                </OButton>
+                                <OButton
+                                  class="tw:mr-1"
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  title="Exclude Term"
+                                  @click="
+                                    addValueToEditor(
+                                      row.name,
+                                      value.key,
+                                      '!=',
+                                    )
+                                  "
+                                >
+                                  <NotEqualIcon class="tw:size-3" />
+                                </OButton>
+                              </div>
+                            </label>
+                          </ul>
                         </div>
                       </div>
-                    </template>
-                    <q-card>
-                      <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-                        <div class="filter-values-container">
-                          <div
-                            v-show="
-                              metricLabelValues[props.row.name]?.isLoading
-                            "
-                            class="q-pl-md q-py-xs"
-                            style="height: 60px"
-                          >
-                            <q-inner-loading
-                              size="xs"
-                              :showing="
-                                metricLabelValues[props.row.name]?.isLoading
-                              "
-                              label="Fetching values..."
-                              label-style="font-size: 1.1em"
-                            />
-                          </div>
-                          <div
-                            v-show="
-                              !metricLabelValues[props.row.name]?.values
-                                ?.length &&
-                              !metricLabelValues[props.row.name]?.isLoading
-                            "
-                            class="q-pl-md q-py-xs text-subtitle2"
-                          >
-                            No values found
-                          </div>
-                          <div
-                            v-for="value in metricLabelValues[props.row.name]
-                              ?.values || []"
-                            :key="value.key + value.count"
-                          >
-                            <q-list dense>
-                              <q-item tag="label" class="q-pr-none">
-                                <div
-                                  class="flex row wrap justify-between"
-                                  style="width: calc(100% - 46px)"
-                                  :class="
-                                    store.state.theme === 'dark'
-                                      ? 'text-grey-4'
-                                      : 'text-grey-8'
-                                  "
-                                >
-                                  <div
-                                    :title="value.key"
-                                    class="ellipsis q-pr-xs"
-                                    style="width: calc(100% - 50px)"
-                                  >
-                                    {{ value.key }}
-                                  </div>
-                                  <div
-                                    :title="value.count?.toString()"
-                                    class="ellipsis text-right q-pr-sm"
-                                    style="width: 50px"
-                                  >
-                                    {{ value.count }}
-                                  </div>
-                                </div>
-                                <div
-                                  class="flex row"
-                                  :class="
-                                    store.state.theme === 'dark'
-                                      ? 'text-white'
-                                      : 'text-black'
-                                  "
-                                >
-                                  <OButton
-                                    class="q-mr-xs"
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    title="Include Term"
-                                    @click="
-                                      addValueToEditor(
-                                        props.row.name,
-                                        value.key,
-                                        '=',
-                                      )
-                                    "
-                                  >
-                                    <EqualIcon class="tw:size-3" />
-                                  </OButton>
-                                  <OButton
-                                    class="q-mr-xs"
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    title="Exclude Term"
-                                    @click="
-                                      addValueToEditor(
-                                        props.row.name,
-                                        value.key,
-                                        '!=',
-                                      )
-                                    "
-                                  >
-                                    <NotEqualIcon class="tw:size-3" />
-                                  </OButton>
-                                </div>
-                              </q-item>
-                            </q-list>
-                          </div>
-                        </div>
-                      </q-card-section>
-                    </q-card>
-                  </q-expansion-item>
-                </template>
-              </q-td>
-            </q-tr>
+                  </div>
+                </OCollapsible>
+              </template>
+            </div>
           </template>
-          <template #top-right>
-            <q-input
+          <template #top>
+            <OInput
               data-test="log-search-index-list-field-search-input"
               v-model="searchMetricLabel"
               data-cy="index-field-search-input"
-              filled
-              borderless
-              dense
               clearable
-              debounce="1"
+              :debounce="1"
               :placeholder="t('search.searchField')"
             >
-              <template #prepend>
-                <q-icon name="search" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           </template>
-        </q-table>
+        </OTable>
       </div>
     </div>
   </div>
@@ -278,34 +221,41 @@ import {
   onMounted,
   computed,
   nextTick,
+  reactive,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import stream from "@/services/stream";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import metricService from "@/services/metrics";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
+import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Plus } from 'lucide-vue-next';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon, OButton, Plus },
+  components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
+    OIcon, OTable, OCollapsible, OFieldLabel,
+},
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const quasar = useQuasar();
     const { searchObj } = useMetrics();
     const streamOptions: any = ref(props.metricsList || []);
     const selectedMetricLabels = ref([]);
@@ -323,8 +273,8 @@ export default defineComponent({
     const metricsIconMapping: any = {
       summary: "description",
       gauge: "speed",
-      histogram: "bar_chart",
-      counter: "pin",
+      histogram: "bar-chart",
+      counter: "tag",
     };
     const { parsePromQlQuery } = usePromqlSuggestions();
     const { getStream } = useStreams();
@@ -375,6 +325,13 @@ export default defineComponent({
       },
       { immediate: true, deep: true },
     );
+    const metricColumns = [{ id: "name", header: "", accessorKey: "name" }];
+
+    const visibleMetricLabels = computed(() => {
+      if (!searchMetricLabel.value) return filteredMetricLabels.value;
+      return filterMetricLabels(filteredMetricLabels.value, searchMetricLabel.value);
+    });
+
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
       if (terms != "") {
@@ -419,8 +376,8 @@ export default defineComponent({
             }
           })
           .catch(() => {
-            quasar.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while fetching field values",
             });
           })
@@ -428,8 +385,8 @@ export default defineComponent({
             metricLabelValues.value[name]["isLoading"] = false;
           });
       } catch (err) {
-        quasar.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while fetching field values",
         });
       }
@@ -478,6 +435,7 @@ export default defineComponent({
         });
     };
 
+    const openMetricRows = reactive<Record<string, boolean>>({});
     const openFilterCreator = (event: any, { name }: any) => {
       metricLabelValues.value[name] = {
         isLoading: true,
@@ -515,23 +473,24 @@ export default defineComponent({
       addLabelToEditor(`${label}${operator}"${value}"`);
     };
     return {
-      quasar,
       t,
       store,
       router,
       searchObj,
       streamOptions,
       getImageURL,
-      filterMetrics,
       filteredMetricLabels,
       searchMetricLabel,
+      metricColumns,
+      visibleMetricLabels,
       filterMetricLabels,
       openFilterCreator,
+      openMetricRows,
       metricLabelValues,
       onMetricChange,
       metricsIconMapping,
       setSelectedMetricType,
-      outlinedAdd,
+      "add": "add",
       addLabelToEditor,
       addValueToEditor,
       selectedMetric,
@@ -546,15 +505,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-  }
-}
 .index-menu {
   width: 100%;
 
@@ -577,31 +527,6 @@ export default defineComponent({
   }
 }
 
-.q-item {
-  color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
-  }
-}
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
@@ -623,16 +548,6 @@ export default defineComponent({
 </style>
 
 <style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-  }
-}
-
 .index-menu {
   width: 100%;
 
@@ -654,38 +569,37 @@ export default defineComponent({
 
   .metrics-label-table {
     width: 100%;
-    // border: 1px solid rgba(0, 0, 0, 0.02);
 
-    .q-table {
+    :deep(table) {
       display: table;
       table-layout: fixed !important;
     }
 
-    tr {
+    :deep(thead) {
+      display: none;
+    }
+
+    :deep(tr) {
       margin-bottom: 1px;
     }
 
-    tbody,
-    tr,
-    td {
+    :deep(tbody),
+    :deep(tr),
+    :deep(td) {
       width: 100%;
       display: block;
       height: fit-content;
       overflow: hidden;
     }
 
-    .q-table__control,
+    :deep(.q-table__control),
     label.q-field {
       width: 100%;
     }
 
-    .q-table thead tr,
-    .q-table tbody td {
+    :deep(thead tr),
+    :deep(tbody td) {
       height: auto;
-    }
-
-    .q-table__top {
-      border-bottom: unset;
     }
   }
 
@@ -699,16 +613,6 @@ export default defineComponent({
     position: relative;
     overflow: visible;
     cursor: default;
-
-    .field_label {
-      pointer-events: none;
-      font-size: 0.825rem;
-      position: relative;
-      display: inline;
-      z-index: 2;
-      left: 0;
-      // text-transform: capitalize;
-    }
 
     .field-container {
       height: 25px;
@@ -725,13 +629,7 @@ export default defineComponent({
       visibility: hidden;
       display: flex;
       align-items: center;
-
-      .q-icon {
-        cursor: pointer;
-        opacity: 0;
-        margin: 0 1px;
-      }
-    }
+}
 
     &.selected {
       .field_overlay {
@@ -748,32 +646,6 @@ export default defineComponent({
         background-color: #e8e8e8;
       }
     }
-  }
-}
-
-.q-item {
-  color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
   }
 }
 
@@ -801,70 +673,30 @@ export default defineComponent({
 
 <style lang="scss">
 .metrics-label-table {
-  .q-table {
+  table {
     width: 100%;
     table-layout: fixed;
 
-    .q-expansion-item {
-      .q-item {
-        display: flex;
-        align-items: center;
-        padding: 0;
-        height: 25px !important;
-        min-height: 25px !important;
+    .metric-expansion-item {
+      &:hover {
+        .field_overlay {
+          visibility: visible;
+}
       }
 
-      .q-item__section--avatar {
-        min-width: 12px;
-        max-width: 12px;
-        margin-right: 8px;
-      }
-
-      .filter-values-container {
-        .q-item {
-          padding-left: 4px;
-
-          .q-focus-helper {
-            background: none !important;
-          }
-        }
-      }
-
-      .q-item-type {
-        &:hover {
-          .field_overlay {
-            visibility: visible;
-
-            .q-icon {
-              opacity: 1;
-            }
-          }
-        }
-      }
-
-      .field-expansion-icon {
-        img {
-          width: 12px;
-          height: 12px;
-        }
-      }
     }
 
     .field-container {
       &:hover {
         .field_overlay {
           visibility: visible;
-
-          .q-icon {
-            opacity: 1;
-          }
-        }
+}
       }
     }
 
     .field_list {
       &.selected {
-        .q-expansion-item {
+        .metric-expansion-item {
           background-color: rgba(89, 96, 178, 0.3);
         }
 

@@ -14,9 +14,10 @@ test.describe("Theme Management Tests", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Post-authentication stabilization wait
+    // Post-authentication stabilization wait — keyed on the profile button which
+    // is the first user-actionable element to mount after layout shell hydrates.
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
+    await expect(pm.themePage.profileMenuBtn).toBeVisible({ timeout: 10000 });
 
     testLogger.info('Theme management test setup completed');
   });
@@ -85,11 +86,11 @@ test.describe("Theme Management Tests", () => {
       testLogger.info('Predefined themes dialog opened');
 
       // Verify light mode tab is visible
-      await expect(page.locator(pm.themePage.lightModeTab)).toBeVisible();
+      await pm.themePage.expectLightModeTabVisible();
       testLogger.info('Light Mode tab visible');
 
       // Verify dark mode tab is visible
-      await expect(page.locator(pm.themePage.darkModeTab)).toBeVisible();
+      await pm.themePage.expectDarkModeTabVisible();
       testLogger.info('Dark Mode tab visible');
 
       // Switch between tabs
@@ -99,17 +100,15 @@ test.describe("Theme Management Tests", () => {
       await pm.themePage.selectLightModeTab();
       testLogger.info('Switched back to Light Mode tab');
 
-      // Verify predefined theme options (use .first() as themes exist in both Light and Dark tabs)
+      // Verify predefined theme options (Light tab is currently active)
       const expectedThemes = ['Ocean Breeze', 'Purple Dream', 'Indigo Night', 'Sky Blue'];
       for (const themeName of expectedThemes) {
-        const themeCard = page.locator(pm.themePage.themeCard).filter({ hasText: themeName }).first();
-        await expect(themeCard).toBeVisible();
+        await pm.themePage.expectThemeCardVisible(themeName, 'light');
         testLogger.info(`Theme "${themeName}" is visible`);
       }
 
       // Verify Custom Color option exists
-      const customCard = page.locator(pm.themePage.themeCard).filter({ hasText: 'Custom Color' }).first();
-      await expect(customCard).toBeVisible();
+      await pm.themePage.expectCustomColorCardVisible('light');
       testLogger.info('Custom Color option is visible');
 
       // Close dialog
@@ -180,7 +179,7 @@ test.describe("Theme Management Tests", () => {
       await pm.themePage.selectDarkModeTab();
 
       // Apply "Sky Blue" theme for dark mode
-      await pm.themePage.applyThemeByName('Sky Blue');
+      await pm.themePage.applyThemeByName('Sky Blue', 'dark');
       testLogger.info('Applied Sky Blue theme in dark mode');
 
       // Verify notification
@@ -210,7 +209,7 @@ test.describe("Theme Management Tests", () => {
       testLogger.info('Custom color picker opened');
 
       // Verify color picker is visible
-      await expect(page.locator(pm.themePage.colorPickerDialog).first()).toBeVisible();
+      await pm.themePage.expectColorPickerDialogVisible();
       testLogger.info('Color picker dialog is visible');
 
       // Close color picker

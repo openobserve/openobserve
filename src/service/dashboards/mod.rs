@@ -450,6 +450,13 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         return Err(DashboardError::DashboardNotFound);
     };
     table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    if let Err(e) = infra::coordinator::dashboards::emit_delete_event(org_id, dashboard_id).await {
+        log::error!("[Dashboard] error emitting coordinator delete event for {dashboard_id}: {e}");
+    }
+    crate::common::infra::config::DASHBOARD_ID_TO_ORG
+        .write()
+        .await
+        .remove(dashboard_id);
     distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?;
     remove_ownership(
         org_id,
@@ -501,6 +508,9 @@ pub async fn move_dashboard(
             "dashboards",
             "PUT",
             Some(&curr_folder.folder_id),
+            false,
+            true,
+            false,
         )
         .await
         {
@@ -612,6 +622,15 @@ async fn put(
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
     let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
+    if let Some(id) = dash.dashboard_id() {
+        if let Err(e) = infra::coordinator::dashboards::emit_put_event(org_id, id).await {
+            log::error!("[Dashboard] error emitting coordinator put event for {id}: {e}");
+        }
+        crate::common::infra::config::DASHBOARD_ID_TO_ORG
+            .write()
+            .await
+            .insert(id.to_string(), org_id.to_string());
+    }
     Ok(dash)
 }
 
@@ -976,6 +995,9 @@ async fn filter_permitted_dashboards(
                 method: "GET".to_string(),
                 bypass_check: false,
                 parent_id: "".to_string(),
+                use_all_org: false,
+                use_self_context: false,
+                use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
             },
             user_role,

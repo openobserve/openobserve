@@ -297,7 +297,7 @@ test.describe("Alerts Regression Bugs", () => {
     await groupBySelect.click();
     await page.waitForTimeout(1000);
 
-    const suggestions = page.locator('.q-menu:visible .q-item');
+    const suggestions = page.locator('[data-test^="alert-group-by-select-"][data-test$="-option"]');
     const suggestionCount = await suggestions.count();
     testLogger.info(`Autocomplete suggestions: ${suggestionCount}`);
 

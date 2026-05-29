@@ -15,30 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height ">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div v-if="beingUpdated" style="font-size: 18px">
-            {{ t("user.editUser") }}
-          </div>
-          <div v-else style="font-size: 18px">{{ t("user.add") }}</div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-user-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="$emit('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
-      <div>
-        <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
+  <ODrawer data-test="add-user-dialog"
+    :open="open"
+    :width="30"
+    :title="beingUpdated ? t('user.editUser') : t('user.add')"
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4 tw:w-full">
+        <OForm ref="updateUserForm" @submit="onSubmit">
+          <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
           </p>
@@ -54,75 +39,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("user.customRole") }} :
             <strong>{{ formData.custom_role.join(", ") }}</strong>
           </p>
-          <q-input
+          <OInput
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
-            class="showLabelOnTop tw:mt-2"
-            stack-label
-            hide-bottom-space
-            dense
-            borderless
-            :rules="[
-              (val: any, rules: any) =>
-                rules.email(val) || 'Please enter a valid email address',
-            ]"
+            class="showLabelOnTop"
             maxlength="100"
             data-test="user-email-field"
+            :error="!!emailError"
+            :error-message="emailError"
+            @update:model-value="emailError = ''"
           />
 
           <div v-if="!beingUpdated && !existingUser" class="tw:mt-2">
-            <q-input
+            <OInput
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
               :label="t('user.password') + ' *'"
               class="showLabelOnTop"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
               data-test="user-password-field"
+              :error="!!passwordError"
+              :error-message="passwordError"
+              @update:model-value="passwordError = ''"
             >
-              <template v-slot:append>
-                <q-icon
-                  :name="isPwd ? 'visibility_off' : 'visibility'"
-                  class="cursor-pointer"
+              <template #icon-right>
+                <OIcon
+                  :name="isPwd ? 'visibility-off' : 'visibility'" size="sm"
+                  class="tw:cursor-pointer"
                   @click="isPwd = !isPwd"
                 />
               </template>
-            </q-input>
+            </OInput>
           </div>
 
-          <q-input
+          <OInput
             v-if="!existingUser"
             v-model="formData.first_name"
             :label="t('user.firstName')"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            dense
-            hide-bottom-space
-            borderless
             data-test="user-first-name-field"
           />
 
-          <q-input
+          <OInput
             v-if="!existingUser"
             v-model="formData.last_name"
             :label="t('user.lastName')"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            dense
-            hide-bottom-space
-            borderless
             data-test="user-last-name-field"
           />
-          <q-select
+          <OSelect
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
@@ -132,16 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('user.role') + ' *'"
             :options="roles"
             class="showLabelOnTop tw:mt-2"
-            emit-value
-            map-options
-            stack-label
-            dense
-            hide-bottom-space
-            borderless
-            :rules="[(val: any) => !!val || 'Field is required']"
             data-test="user-role-field"
+            :error="!!roleError"
+            :error-message="roleError"
+            @update:model-value="roleError = ''"
           />
-          <q-select
+          <OSelect
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
@@ -153,32 +114,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="filterdOption"
             class="showLabelOnTop tw:mt-2"
             multiple
-            emit-value
-            map-options
-            stack-label
-            dense
-            borderless
-            hide-bottom-space
-            use-input
-            @filter="filterFn"
             data-test="user-custom-role-field"
-            :disable="filterdOption.length === 0"
+            :disable="filterdOption.length === 0 || !!formData.is_external"
+            :hint="
+              formData.is_external
+                ? t('user.externalUserCustomRoleHint')
+                : filterdOption.length === 0
+                  ? t('user.noCustomRolesHint')
+                  : ''
+            "
           />
           <div v-if="beingUpdated" class="tw:mt-2">
-            <q-toggle
+            <OSwitch
               v-model="formData.change_password"
               :label="t('user.changePassword')"
-              stack-label
-              outlined
-              filled
-              hide-bottom-space
-              class="o2-toggle-button-lg -tw:ml-4"
               size="lg"
-              :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
               data-test="user-change-password-field"
             />
 
-            <q-input
+            <OInput
               v-if="
                 formData.change_password &&
                 (userRole == 'member' ||
@@ -188,55 +142,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
               class="showLabelOnTop tw:mt-2"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
               data-test="user-old-passoword-field"
             >
-              <template v-slot:append>
-                <q-icon
-                  :name="isOldPwd ? 'visibility_off' : 'visibility'"
-                  class="cursor-pointer"
+              <template #icon-right>
+                <OIcon
+                  :name="isOldPwd ? 'visibility-off' : 'visibility'" size="sm"
+                  class="tw:cursor-pointer"
                   @click="isOldPwd = !isOldPwd"
                 />
               </template>
-            </q-input>
+            </OInput>
 
-            <q-input
+            <OInput
               v-if="formData.change_password"
               :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
               class="showLabelOnTop tw:mt-2"
-              stack-label
-              dense
-              hide-bottom-space
-              borderless
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
               data-test="user-new-password-field"
             >
-              <template v-slot:append>
-                <q-icon
-                  :name="isNewPwd ? 'visibility_off' : 'visibility'"
-                  class="cursor-pointer"
+              <template #icon-right>
+                <OIcon
+                  :name="isNewPwd ? 'visibility-off' : 'visibility'" size="sm"
+                  class="tw:cursor-pointer"
                   @click="isNewPwd = !isNewPwd"
                 />
               </template>
-            </q-input>
+            </OInput>
           </div>
-          <q-input
+          <OInput
             v-if="
               !beingUpdated &&
               userRole != 'member' &&
@@ -245,23 +179,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.other_organization"
             :label="t('user.otherOrganization')"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            dense
-            borderless
-            hide-bottom-space
-            :rules="[
-              (val: any) =>
-                /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
-                'Input must start with a letter and be alphanumeric _ or -',
-            ]"
             maxlength="100"
           />
 
-          <div class="flex justify-start tw:mt-6 tw:gap-2">
+          <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
             <OButton
               variant="outline"
               size="sm-action"
-              @click="$emit('cancel:hideform')"
+            @click="$emit('update:open', false)"
               data-test="cancel-user-button"
             >
               {{ t('user.cancel') }}
@@ -275,34 +200,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('user.save') }}
             </OButton>
           </div>
-        </q-form>
+        </OForm>
+    </div>
+  </ODrawer>
+  <ODialog data-test="add-user-logout-confirm-dialog"
+    v-model:open="logout_confirm"
+    persistent
+    size="xs"
+    title="Password Changed"
+    primary-button-label="Ok"
+    @click:primary="signout"
+  >
+    <div class="tw:flex tw:items-center tw:gap-3">
+      <div class="tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-10 tw:h-10 tw:rounded-full tw:shrink-0">
+        <OIcon name="info" size="sm" />
       </div>
-    </q-card-section>
-  </q-card>
-  <q-dialog v-model="logout_confirm" persistent>
-    <q-card>
-      <q-card-section class="row items-center">
-        <q-avatar icon="info" color="primary" text-color="white" />
-        <span class="q-ml-sm"
-          >As you've chosen to change your password, you'll be automatically
-          logged out.</span
-        >
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <OButton variant="ghost-primary" @click="signout">Ok</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      <span>As you've chosen to change your password, you'll be automatically
+        logged out.</span
+      >
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import userServiece from "@/services/users";
 import {
   getImageURL,
@@ -313,10 +240,16 @@ import {
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
-    role: "admin",
+    role: "",
     first_name: "",
     last_name: "",
     email: "",
@@ -330,8 +263,18 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton },
+  components: { OButton, ODialog, ODrawer,
+    OIcon,
+    OSwitch,
+    OInput,
+    OSelect,
+    OForm,
+},
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -358,13 +301,12 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["update:modelValue", "updated", "cancel:hideform"],
+  emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
@@ -376,7 +318,17 @@ export default defineComponent({
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
     const loggedInUserEmail = ref(store.state.userInfo.email);
-    const filterdOption = ref(props.customRoles);
+    const filterdOption = ref([...props.customRoles]);
+    const emailError = ref('');
+    const roleError = ref('');
+    const passwordError = ref('');
+
+    watch(
+      () => props.customRoles,
+      (next) => {
+        filterdOption.value = [...next];
+      },
+    );
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
@@ -388,6 +340,54 @@ export default defineComponent({
       () => store.state.organizations,
       () => setOrganizationOptions(),
       { deep: true },
+    );
+
+    // Reset form state only when the dialog transitions from closed → open.
+    // Previously this was a deep watch on modelValue, but parent-side mutations
+    // of selectedUser caused it to fire mid-flight and reset existingUser back
+    // to true, undoing the 422-catch transition from "add existing user" to
+    // "create new user" and hiding the password/name fields.
+    const resetFormFromModelValue = (newVal: any) => {
+      if (newVal && newVal.email != undefined && newVal.email != "") {
+        beingUpdated.value = true;
+        existingUser.value = false;
+        // Row data from the users list doesn't include `organization`; fall back
+        // to the active org so the subsequent PUT lands on the right endpoint.
+        formData.value = {
+          ...newVal,
+          organization:
+            newVal.organization || store.state.selectedOrganization.identifier,
+          change_password: false,
+          password: "",
+        };
+        if (config.isEnterprise == "true" || config.isCloud == true) {
+          const orgId = store.state.selectedOrganization.identifier;
+          userServiece
+            .getUserRoles(orgId, newVal.email)
+            .then((response: any) => {
+              formData.value.custom_role = response.data;
+            })
+            .catch((error: any) => {
+              console.error("Error fetching user roles:", error);
+            });
+        }
+      } else {
+        beingUpdated.value = props.isUpdated;
+        existingUser.value = true;
+        formData.value = defaultValue();
+        formData.value.organization =
+          store.state.selectedOrganization.identifier;
+      }
+    };
+
+    watch(
+      () => props.open,
+      (isOpen, wasOpen) => {
+        if (isOpen && !wasOpen) {
+          resetFormFromModelValue(props.modelValue);
+        }
+      },
+      { immediate: true },
     );
 
     const setOrganizationOptions = () => {
@@ -411,7 +411,6 @@ export default defineComponent({
 
     return {
       t,
-      q,
       store,
       router,
       formData,
@@ -427,6 +426,9 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
+      emailError,
+      roleError,
+      passwordError,
       invalidateLoginData,
       config,
       filterFn(val: any, update: any) {
@@ -444,25 +446,6 @@ export default defineComponent({
       track,
     };
   },
-  created() {
-    this.formData = { ...defaultValue, ...this.modelValue };
-    this.beingUpdated = this.isUpdated;
-
-    if (
-      this.modelValue &&
-      this.modelValue.email != undefined &&
-      this.modelValue.email != ""
-    ) {
-      this.existingUser = false;
-      this.beingUpdated = true;
-      this.formData = { ...this.modelValue };
-      this.formData.change_password = false;
-      this.formData.password = "";
-      if (config.isEnterprise == "true" || config.isCloud == true) {
-        this.fetchUserRoles(this.modelValue.email);
-      }
-    }
-  },
   methods: {
     signout() {
       // Always call backend logout to clear auth cookies (#10900)
@@ -476,10 +459,73 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     onSubmit() {
-      const dismiss = this.q.notify({
-        spinner: true,
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const pwdMinLen = 8;
+
+      if (this.existingUser && !this.beingUpdated) {
+        if (!this.formData.email || !emailRegex.test(this.formData.email)) {
+          this.emailError = 'Please enter a valid email address.';
+          return;
+        }
+        if (
+          this.userRole !== 'member' &&
+          this.store.state.userInfo.email !== this.formData.email &&
+          !this.formData.role
+        ) {
+          this.roleError = 'Field is required';
+          return;
+        }
+      }
+
+      if (!this.existingUser && !this.beingUpdated) {
+        if (!this.formData.password) {
+          this.passwordError = 'Password is required.';
+          return;
+        }
+        if (this.formData.password.length < pwdMinLen) {
+          this.passwordError = 'Password must be at least 8 characters long.';
+          return;
+        }
+      }
+
+      if (this.beingUpdated && this.formData.change_password) {
+        const needsOldPwd =
+          this.userRole === 'member' ||
+          this.store.state.userInfo.email === this.modelValue?.email;
+        if (needsOldPwd) {
+          if (!this.formData.old_password) {
+            toast({ variant: "error", message: 'Current password is required.' });
+            return;
+          }
+          if (this.formData.old_password.length < pwdMinLen) {
+            toast({ variant: "error", message: 'Password must be at least 8 characters long.' });
+            return;
+          }
+        }
+        if (!this.formData.new_password) {
+          toast({ variant: "error", message: 'New password is required.' });
+          return;
+        }
+        if (this.formData.new_password.length < pwdMinLen) {
+          toast({ variant: "error", message: 'New password must be at least 8 characters long.' });
+          return;
+        }
+      }
+
+      if (
+        !this.beingUpdated &&
+        this.userRole !== 'member' &&
+        this.formData.organization === 'other' &&
+        !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(this.formData.other_organization)
+      ) {
+        toast({ variant: "error", message: 'Organization name must start with a letter and be alphanumeric, _ or -.' });
+        return;
+      }
+
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
+        timeout: 0,
       });
 
       let selectedOrg = this.formData.organization;
@@ -506,13 +552,13 @@ export default defineComponent({
               dismiss();
               this.formData.email = userEmail;
               this.$emit("updated", res.data, this.formData, "updated");
+              this.$emit("update:open", false);
             }
           })
           .catch((err: any) => {
-            this.q.notify({
-              color: "negative",
+            toast({
+              variant: "error",
               message: err.response.data.message,
-              timeout: 2000,
             });
             dismiss();
             this.formData.email = userEmail;
@@ -539,23 +585,23 @@ export default defineComponent({
               this.formData.email = userEmail;
               this.existingUser = true;
               this.$emit("updated", res.data, this.formData, "created");
+              this.$emit("update:open", false);
               // }
             })
             .catch((err: any) => {
               if (err.response.data.code === 422) {
-                // this.q.notify({
+                // toast({
                 //   color: "positive",
-                //   type: 'positive',
+                //   variant: "success",
                 //   message: "User added successfully.",
                 // });
                 dismiss();
                 this.existingUser = false;
               } else {
               if (err.response?.status != 403 || err?.status != 403) {
-                this.q.notify({
-                  color: "negative",
+                toast({
+                  variant: "error",
                   message: err.response.data.message,
-                  timeout: 2000,
                 });
                 dismiss();
               }
@@ -572,12 +618,12 @@ export default defineComponent({
             .then((res: any) => {
               dismiss();
               this.$emit("updated", res.data, this.formData, "created");
+              this.$emit("update:open", false);
             })
             .catch((err: any) => {
-              this.q.notify({
-                color: "negative",
+              toast({
+                variant: "error",
                 message: err.response.data.message,
-                timeout: 2000,
               });
               dismiss();
             });

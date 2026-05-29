@@ -760,10 +760,9 @@ pub async fn check_range_support_for_url(
     let cfg = get_config();
     let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
-    let client = Client::builder()
-        .timeout(timeout)
-        .build()
-        .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
+    let client =
+        crate::common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
+            .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
 
     check_range_support(&client, url, org_id, table_name).await
 }
@@ -952,10 +951,9 @@ impl UrlCsvProcessor {
         let chunk_size = cfg.enrichment_table.url_fetch_max_size_mb * 1024 * 1024;
         let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
-        let client = Client::builder()
-            .timeout(timeout)
-            .build()
-            .expect("Failed to create HTTP client");
+        let client =
+            crate::common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
+                .expect("Failed to create HTTP client");
 
         Self {
             client,
@@ -984,6 +982,15 @@ impl UrlCsvProcessor {
     /// `None` if the header is missing (common with dynamic/chunked responses).
     /// The size can be logged for monitoring but isn't required for processing.
     pub async fn validate_url(&self) -> Result<Option<u64>> {
+        // SSRF protection: resolve and validate the URL (literal-IP, hostname,
+        // and every resolved A/AAAA record) before issuing any request.
+        if let Err(e) =
+            crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&self.url)
+                .await
+        {
+            return Err(anyhow!("URL blocked by SSRF guard: {}", e));
+        }
+
         let response = self.client.head(&self.url).send().await?;
 
         // Check HTTP status. Anything outside 2xx range is a failure.

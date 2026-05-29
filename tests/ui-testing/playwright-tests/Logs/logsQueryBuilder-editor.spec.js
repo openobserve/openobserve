@@ -11,7 +11,11 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
+const {
+    ingestForQueryBuilderTest,
+    setupQueryAndSwitchToBuild,
+    initQueryBuilderTest,
+} = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
 // Test Suite: P1 - Builder Tab Improvement
@@ -20,6 +24,10 @@ const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/q
 test.describe("Logs Query Builder - Builder Tab Improvement", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -143,6 +151,10 @@ test.describe("Logs Query Builder - Edge Cases", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -176,6 +188,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         const windowQuery = 'SELECT *, ROW_NUMBER() OVER (ORDER BY _timestamp DESC) as rn FROM "e2e_automate" LIMIT 10';
         await setupQueryAndSwitchToBuild(pm, page, windowQuery);
 
+        await pm.logsPage.expectDashboardPanelTableVisible();
         await pm.logsPage.verifyChartTypeSelected('table');
 
         testLogger.info('Window function → table chart - PASSED');
@@ -189,6 +202,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         const multiGroupByQuery = 'SELECT code, method, level, count(*) as "y_axis_1" FROM "e2e_automate" GROUP BY code, method, level';
         await setupQueryAndSwitchToBuild(pm, page, multiGroupByQuery);
 
+        await pm.logsPage.expectDashboardPanelTableVisible();
         await pm.logsPage.verifyChartTypeSelected('table');
 
         testLogger.info('Case 7: >2 GROUP BY → table chart - PASSED');
@@ -216,6 +230,10 @@ test.describe("Logs Query Builder - Edge Cases", () => {
 test.describe("Logs Query Builder - Query Mode Toggle", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -275,6 +293,10 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -328,6 +350,10 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
 test.describe("Logs Query Builder - Search Bar Editor State", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -400,6 +426,10 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
 test.describe("Logs Query Builder — Bare Field Select defaults (Case 3a)", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -481,6 +511,10 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -519,7 +553,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await setupQueryAndSwitchToBuild(pm, page, 'SELECT kubernetes_container_name, kubernetes_host FROM "e2e_automate"');
         await pm.logsPage.clickCustomQueryType();
 
-        await pm.logsPage.searchFieldInBuilder('kubernetes');
+        await pm.logsPage.searchFieldInBuilder('axis');
 
         const buttonCount = await pm.logsPage.getAddXButtonCount();
         testLogger.info(`Custom mode + search: ${buttonCount} +X buttons`);

@@ -16,7 +16,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -45,7 +44,6 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-installQuasar();
 
 describe("OpenTelemetry Component", () => {
   let wrapper: any = null;

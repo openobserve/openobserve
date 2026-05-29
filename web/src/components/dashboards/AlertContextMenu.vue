@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'hovered': hoveredItem === 'above' }"
         data-test="alert-context-menu-above"
       >
-        <q-icon name="arrow_upward" size="xs" class="q-mr-sm" />
+        <OIcon name="arrow-upward" size="sm" class="tw:mr-2" />
         <span>Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'hovered': hoveredItem === 'below' }"
         data-test="alert-context-menu-below"
       >
-        <q-icon name="arrow_downward" size="xs" class="q-mr-sm" />
+        <OIcon name="arrow-downward" size="sm" class="tw:mr-2" />
         <span>Create Alert with threshold below {{ formattedValue }}</span>
       </div>
     </div>
@@ -52,9 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: 'AlertContextMenu',
+  components: {
+    OIcon,
+  },
   props: {
     visible: {
       type: Boolean,

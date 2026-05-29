@@ -15,14 +15,12 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import QueryList from "@/components/queries/QueryList.vue";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { createI18n } from "vue-i18n";
 
-installQuasar();
 
 const i18n = createI18n({
   locale: "en-us",
@@ -135,10 +133,6 @@ describe("QueryList", () => {
     });
     expect(wrapperNoData.vm.queryData).toEqual([]);
     wrapperNoData.unmount();
-  });
-
-  it("should initialize pagination with rowsPerPage 0", () => {
-    expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
   });
 
   it("should expose t function for translations", () => {

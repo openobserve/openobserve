@@ -13,6 +13,7 @@ const { safeWaitForHidden, safeWaitForNetworkIdle, safeWaitForDOMContentLoaded }
 const {
   SELECTORS,
   getVariableSelector,
+  getVariableSelectorInner,
   getEditVariableBtn,
   getTabSelector,
 } = require("../../pages/dashboardPages/dashboard-selectors.js");
@@ -129,7 +130,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
       await pm.dashboardPanelActions.addPanelName(`DummyPanel${i + 1}`);
       await pm.dashboardPanelActions.savePanel();
-      await page.locator(SELECTORS.PANEL_ANY).nth(i).waitFor({ state: "visible", timeout: 10000 });
+      await page.locator(SELECTORS.PANEL_CONTAINER).nth(i).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     }
 
@@ -142,7 +143,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added and rendered
-    await page.locator(SELECTORS.PANEL_ANY).nth(6).waitFor({ state: "visible", timeout: 15000 });
+    await page.locator(SELECTORS.PANEL_CONTAINER).nth(6).waitFor({ state: "visible", timeout: 15000 });
     await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
 
@@ -378,28 +379,30 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     // Try to add panel variable for Panel2 and check if Panel1's variable appears in dependency options
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(panelVar2);
+    await page.locator('[data-test="dashboard-variable-name-field"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-name-field"]').fill(panelVar2);
 
     // Select scope as panels
     await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-scope-select-option"][data-test-value="panels"]').click();
+    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select default tab
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Default$/ }).click();
-    await page.keyboard.press('Escape');
-    await safeWaitForNetworkIdle(page, { timeout: 2000 });
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Default"]').click();
+    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
+    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select Panel2
     await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).waitFor({ state: "visible", timeout: 5000 });
     await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).click();
-    await page.keyboard.press('Escape');
-    await safeWaitForNetworkIdle(page, { timeout: 2000 });
+    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel2"]').click();
+    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
+    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
 
     // Select stream type, stream, and field using shared utilities
     await selectStreamType(page, "logs");
@@ -412,21 +415,23 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
     await filterNameSelector.waitFor({ state: "visible", timeout: 5000 });
     await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').fill("kubernetes_namespace_name");
+    await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
 
     const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
     await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
 
-    // Click on the value autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.click();
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput = page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput.click();
 
-    // Get all available variable options
-    const options = page.locator(SELECTORS.OPTION);
-    const optionTexts = await options.allTextContents();
+    // OCombobox opens on focus; wait briefly for options to appear
+    const hasDropdown = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').first().isVisible({ timeout: 2000 }).catch(() => false);
+    const optionTexts = hasDropdown
+      ? await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').allTextContents()
+      : [];
 
     // Panel1's variable should NOT be in the list
     expect(optionTexts).not.toContain(panelVar1);
@@ -594,26 +599,22 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Set variable value
-    const varDropdown = page.getByLabel(variableName, { exact: true });
+    const varDropdown = page.locator(getVariableSelectorInner(variableName));
     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
 
     // Ensure network is idle before clicking dropdown
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    // Wait extra time for variable to fully initialize
-    await page.waitForTimeout(1000);
 
     await varDropdown.click();
     // Wait for dropdown menu to open
     await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 10000 });
-    // Wait for options to load
-    await page.waitForTimeout(1000);
 
     const option = page.locator(SELECTORS.OPTION).first();
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
 
     // Wait for dropdown to close
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Trigger panel refresh
     await page.locator(SELECTORS.PANEL_REFRESH_BTN).first().click();
@@ -692,12 +693,12 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Verify variable appears in Panel1
-    const panel1Container = page.locator(SELECTORS.PANEL_ANY).filter({ hasText: "Panel1" }).first();
+    const panel1Container = page.locator('[data-test="dashboard-panel-container"][data-test-panel-title="Panel1"]');
     const panel1Variable = panel1Container.locator(`[data-test="variable-selector-${variableName}"]`);
     await expect(panel1Variable).toBeVisible({ timeout: 10000 });
 
     // Verify variable appears in Panel2
-    const panel2Container = page.locator(SELECTORS.PANEL_ANY).filter({ hasText: "Panel2" }).first();
+    const panel2Container = page.locator('[data-test="dashboard-panel-container"][data-test-panel-title="Panel2"]');
     const panel2Variable = panel2Container.locator(`[data-test="variable-selector-${variableName}"]`);
     await expect(panel2Variable).toBeVisible({ timeout: 10000 });
 

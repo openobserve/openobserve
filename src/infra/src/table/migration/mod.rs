@@ -109,6 +109,7 @@ mod m20260318_000004_add_set_id_to_service_streams;
 mod m20260318_000005_add_all_dimensions_to_service_streams;
 mod m20260326_000001_add_field_name_mapping_to_service_streams;
 mod m20260331_000001_create_sys_rca_agent_service_accounts;
+mod m20260401_00001_create_org_s3_table;
 mod m20260402_000001_reports_add_image_fields;
 mod m20260414_000001_add_is_system_to_cipher_keys;
 mod m20260414_000002_create_org_ai_toolsets;
@@ -219,6 +220,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260415_000001_create_model_pricing_table::Migration),
             Box::new(m20260415_000002_add_source_to_model_pricing::Migration),
             Box::new(m20260504_000001_add_anomaly_detection_config_folder_fk::Migration),
+            Box::new(m20260401_00001_create_org_s3_table::Migration),
         ]
     }
 }

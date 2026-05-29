@@ -13,16 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
-
-installQuasar({ plugins: [Dialog, Notify] });
 
 import PrebuiltDestinationForm from "@/components/alerts/PrebuiltDestinationForm.vue";
+
+let wrapper: ReturnType<typeof mount> | null = null;
+
+afterEach(() => {
+  wrapper?.unmount();
+  wrapper = null;
+});
 
 async function mountComp(props: Record<string, any> = {}) {
   return mount(PrebuiltDestinationForm, {
@@ -33,170 +35,254 @@ async function mountComp(props: Record<string, any> = {}) {
       hideActions: false,
       ...props,
     },
-    global: { plugins: [i18n, store] },
+    global: { plugins: [i18n] },
   });
 }
 
 describe("PrebuiltDestinationForm - base rendering", () => {
   it("renders the form wrapper", async () => {
-    const w = await mountComp();
-    expect(w.find('[data-test="prebuilt-destination-form"]').exists()).toBe(true);
+    wrapper = await mountComp();
+
+    expect(wrapper.find('[data-test="prebuilt-destination-form"]').exists()).toBe(true);
   });
 
   it("shows preview and test buttons when hideActions=false", async () => {
-    const w = await mountComp({ destinationType: "slack", hideActions: false });
-    expect(w.find('[data-test="destination-preview-button"]').exists()).toBe(true);
-    expect(w.find('[data-test="destination-test-button"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "slack", hideActions: false });
+
+    expect(wrapper.find('[data-test="destination-preview-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="destination-test-button"]').exists()).toBe(true);
   });
 
   it("hides preview and test buttons when hideActions=true", async () => {
-    const w = await mountComp({ destinationType: "slack", hideActions: true });
-    expect(w.find('[data-test="destination-preview-button"]').exists()).toBe(false);
-    expect(w.find('[data-test="destination-test-button"]').exists()).toBe(false);
+    wrapper = await mountComp({ destinationType: "slack", hideActions: true });
+
+    expect(wrapper.find('[data-test="destination-preview-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="destination-test-button"]').exists()).toBe(false);
   });
 
   it("preview button emits preview event", async () => {
-    const w = await mountComp({ destinationType: "slack" });
-    await w.find('[data-test="destination-preview-button"]').trigger("click");
-    expect(w.emitted("preview")).toBeTruthy();
+    wrapper = await mountComp({ destinationType: "slack" });
+
+    await wrapper.find('[data-test="destination-preview-button"]').trigger("click");
+
+    expect(wrapper.emitted("preview")).toBeTruthy();
   });
 
   it("test button emits test event", async () => {
-    const w = await mountComp({ destinationType: "slack" });
-    await w.find('[data-test="destination-test-button"]').trigger("click");
-    expect(w.emitted("test")).toBeTruthy();
+    wrapper = await mountComp({ destinationType: "slack" });
+
+    await wrapper.find('[data-test="destination-test-button"]').trigger("click");
+
+    expect(wrapper.emitted("test")).toBeTruthy();
   });
 });
 
 describe("PrebuiltDestinationForm - Slack type", () => {
   it("renders webhook URL input for slack", async () => {
-    const w = await mountComp({ destinationType: "slack" });
-    expect(w.find('[data-test="slack-webhook-url-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "slack" });
+
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(true);
   });
 
   it("renders channel input for slack", async () => {
-    const w = await mountComp({ destinationType: "slack" });
-    expect(w.find('[data-test="slack-channel-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "slack" });
+
+    expect(wrapper.find('[data-test="slack-channel-input"]').exists()).toBe(true);
   });
 
   it("does not render discord fields for slack", async () => {
-    const w = await mountComp({ destinationType: "slack" });
-    expect(w.find('[data-test="discord-webhook-url-input"]').exists()).toBe(false);
+    wrapper = await mountComp({ destinationType: "slack" });
+
+    expect(wrapper.find('[data-test="discord-webhook-url-input"]').exists()).toBe(false);
   });
 });
 
 describe("PrebuiltDestinationForm - Discord type", () => {
   it("renders discord webhook URL input", async () => {
-    const w = await mountComp({ destinationType: "discord" });
-    expect(w.find('[data-test="discord-webhook-url-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "discord" });
+
+    expect(wrapper.find('[data-test="discord-webhook-url-input"]').exists()).toBe(true);
   });
 
   it("renders discord username input", async () => {
-    const w = await mountComp({ destinationType: "discord" });
-    expect(w.find('[data-test="discord-username-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "discord" });
+
+    expect(wrapper.find('[data-test="discord-username-input"]').exists()).toBe(true);
   });
 
   it("does not render slack fields for discord", async () => {
-    const w = await mountComp({ destinationType: "discord" });
-    expect(w.find('[data-test="slack-webhook-url-input"]').exists()).toBe(false);
+    wrapper = await mountComp({ destinationType: "discord" });
+
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(false);
   });
 });
 
 describe("PrebuiltDestinationForm - MS Teams type", () => {
   it("renders msteams webhook URL input", async () => {
-    const w = await mountComp({ destinationType: "msteams" });
-    expect(w.find('[data-test="msteams-webhook-url-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "msteams" });
+
+    expect(wrapper.find('[data-test="msteams-webhook-url-input"]').exists()).toBe(true);
+  });
+
+  it("does not render slack fields for msteams", async () => {
+    wrapper = await mountComp({ destinationType: "msteams" });
+
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(false);
   });
 });
 
 describe("PrebuiltDestinationForm - PagerDuty type", () => {
   it("renders integration key input for pagerduty", async () => {
-    const w = await mountComp({ destinationType: "pagerduty" });
-    expect(w.find('[data-test="pagerduty-integration-key-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "pagerduty" });
+
+    expect(wrapper.find('[data-test="pagerduty-integration-key-input"]').exists()).toBe(true);
   });
 
   it("renders severity select for pagerduty", async () => {
-    const w = await mountComp({ destinationType: "pagerduty" });
-    expect(w.find('[data-test="pagerduty-severity-select"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "pagerduty" });
+
+    expect(wrapper.find('[data-test="pagerduty-severity-select"]').exists()).toBe(true);
   });
 });
 
 describe("PrebuiltDestinationForm - Email type", () => {
   it("renders email recipients input", async () => {
-    const w = await mountComp({ destinationType: "email" });
-    expect(w.find('[data-test="email-recipients-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "email" });
+
+    expect(wrapper.find('[data-test="email-recipients-input"]').exists()).toBe(true);
+  });
+
+  it("does not render slack fields for email", async () => {
+    wrapper = await mountComp({ destinationType: "email" });
+
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(false);
   });
 });
 
 describe("PrebuiltDestinationForm - Opsgenie type", () => {
   it("renders opsgenie api key input", async () => {
-    const w = await mountComp({ destinationType: "opsgenie" });
-    expect(w.find('[data-test="opsgenie-api-key-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "opsgenie" });
+
+    expect(wrapper.find('[data-test="opsgenie-api-key-input"]').exists()).toBe(true);
   });
 
   it("renders opsgenie priority select", async () => {
-    const w = await mountComp({ destinationType: "opsgenie" });
-    expect(w.find('[data-test="opsgenie-priority-select"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "opsgenie" });
+
+    expect(wrapper.find('[data-test="opsgenie-priority-select"]').exists()).toBe(true);
   });
 
   it("renders opsgenie EU region toggle", async () => {
-    const w = await mountComp({ destinationType: "opsgenie" });
-    expect(w.find('[data-test="opsgenie-eu-region-toggle"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "opsgenie" });
+
+    expect(wrapper.find('[data-test="opsgenie-eu-region-toggle"]').exists()).toBe(true);
   });
 });
 
 describe("PrebuiltDestinationForm - ServiceNow type", () => {
   it("renders servicenow instance URL input", async () => {
-    const w = await mountComp({ destinationType: "servicenow" });
-    expect(w.find('[data-test="servicenow-instance-url-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "servicenow" });
+
+    expect(wrapper.find('[data-test="servicenow-instance-url-input"]').exists()).toBe(true);
   });
 
   it("renders servicenow username input", async () => {
-    const w = await mountComp({ destinationType: "servicenow" });
-    expect(w.find('[data-test="servicenow-username-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "servicenow" });
+
+    expect(wrapper.find('[data-test="servicenow-username-input"]').exists()).toBe(true);
   });
 
   it("renders servicenow password input", async () => {
-    const w = await mountComp({ destinationType: "servicenow" });
-    expect(w.find('[data-test="servicenow-password-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "servicenow" });
+
+    expect(wrapper.find('[data-test="servicenow-password-input"]').exists()).toBe(true);
   });
 
   it("renders servicenow assignment group input", async () => {
-    const w = await mountComp({ destinationType: "servicenow" });
-    expect(w.find('[data-test="servicenow-assignment-group-input"]').exists()).toBe(true);
+    wrapper = await mountComp({ destinationType: "servicenow" });
+
+    expect(wrapper.find('[data-test="servicenow-assignment-group-input"]').exists()).toBe(true);
   });
 });
 
-describe("PrebuiltDestinationForm - validateEmailList", () => {
-  it("accepts single valid email", async () => {
-    const w = await mountComp({ destinationType: "email" });
-    expect((w.vm as any).validateEmailList("test@example.com")).toBe(true);
+describe("PrebuiltDestinationForm - validate()", () => {
+  it("returns false when required slack webhookUrl is empty", async () => {
+    wrapper = await mountComp({ destinationType: "slack", modelValue: {} });
+
+    const result = (wrapper.vm as any).validate();
+
+    expect(result).toBe(false);
   });
 
-  it("accepts comma-separated valid emails", async () => {
-    const w = await mountComp({ destinationType: "email" });
-    expect((w.vm as any).validateEmailList("a@example.com, b@example.com")).toBe(true);
+  it("returns true when all required slack fields are provided", async () => {
+    wrapper = await mountComp({
+      destinationType: "slack",
+      modelValue: { webhookUrl: "https://hooks.slack.com/test" },
+    });
+
+    const result = (wrapper.vm as any).validate();
+
+    expect(result).toBe(true);
   });
 
-  it("rejects invalid email", async () => {
-    const w = await mountComp({ destinationType: "email" });
-    expect((w.vm as any).validateEmailList("notanemail")).toBe(false);
+  it("returns false for pagerduty when integrationKey is empty", async () => {
+    wrapper = await mountComp({
+      destinationType: "pagerduty",
+      modelValue: {},
+    });
+
+    const result = (wrapper.vm as any).validate();
+
+    expect(result).toBe(false);
   });
 
-  it("rejects list with one invalid email", async () => {
-    const w = await mountComp({ destinationType: "email" });
-    expect((w.vm as any).validateEmailList("good@example.com, bad")).toBe(false);
+  it("returns false for email when recipients is empty", async () => {
+    wrapper = await mountComp({
+      destinationType: "email",
+      modelValue: {},
+    });
+
+    const result = (wrapper.vm as any).validate();
+
+    expect(result).toBe(false);
+  });
+
+  it("returns true for email when recipients is provided", async () => {
+    wrapper = await mountComp({
+      destinationType: "email",
+      modelValue: { recipients: "user@example.com" },
+    });
+
+    const result = (wrapper.vm as any).validate();
+
+    expect(result).toBe(true);
   });
 });
 
 describe("PrebuiltDestinationForm - severityOptions and priorityOptions", () => {
   it("severityOptions has 4 entries", async () => {
-    const w = await mountComp({ destinationType: "pagerduty" });
-    expect((w.vm as any).severityOptions).toHaveLength(4);
+    wrapper = await mountComp({ destinationType: "pagerduty" });
+
+    expect((wrapper.vm as any).severityOptions).toHaveLength(4);
   });
 
   it("priorityOptions has 5 entries", async () => {
-    const w = await mountComp({ destinationType: "opsgenie" });
-    expect((w.vm as any).priorityOptions).toHaveLength(5);
+    wrapper = await mountComp({ destinationType: "opsgenie" });
+
+    expect((wrapper.vm as any).priorityOptions).toHaveLength(5);
+  });
+});
+
+describe("PrebuiltDestinationForm - v-model sync", () => {
+  it("emits update:modelValue when credentials change", async () => {
+    wrapper = await mountComp({
+      destinationType: "slack",
+      modelValue: { webhookUrl: "" },
+    });
+
+    // Directly trigger update through computed setter
+    (wrapper.vm as any).credentials = { webhookUrl: "https://hooks.slack.com/new" };
+
+    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
   });
 });

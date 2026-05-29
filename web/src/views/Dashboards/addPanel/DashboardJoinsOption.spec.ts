@@ -2,7 +2,6 @@ import { mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import { createI18n } from "vue-i18n";
 
 // Mock composables
@@ -37,6 +36,7 @@ const i18n = createI18n({
   },
 });
 
+
 describe("DashboardJoinsOption", () => {
   let wrapper: any;
   let store: any;
@@ -53,7 +53,7 @@ describe("DashboardJoinsOption", () => {
 
     wrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -62,7 +62,9 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("renders correctly when joins are allowed", () => {
-    expect(wrapper.find(".joins-container").exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="dashboard-joins-container"]').exists(),
+    ).toBe(true);
   });
 
   it("adds a new join when add button is clicked", async () => {
@@ -232,7 +234,7 @@ describe("DashboardJoinsOption", () => {
 
     const newWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -247,7 +249,7 @@ describe("DashboardJoinsOption", () => {
 
     const sqlWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -263,7 +265,7 @@ describe("DashboardJoinsOption", () => {
 
     const undefinedWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
@@ -281,14 +283,16 @@ describe("DashboardJoinsOption", () => {
 
     const defaultWrapper = mount(DashboardJoinsOption, {
       global: {
-        plugins: [Quasar, store, i18n],
+        plugins: [store, i18n],
         stubs: {
           AddJoinPopUp: true,
         },
       },
     });
 
-    expect(defaultWrapper.find(".joins-container").exists()).toBe(true);
+    expect(
+      defaultWrapper.find('[data-test="dashboard-joins-container"]').exists(),
+    ).toBe(true);
   });
 
   it("handles stream with special characters", async () => {

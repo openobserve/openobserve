@@ -281,6 +281,10 @@ pub struct FileKey {
     pub meta: FileMeta,
     pub deleted: bool,
     pub segment_ids: Option<Arc<BitVec>>,
+    /// Parquet row group size that was in effect when the tantivy index for
+    /// this file was built. Set together with `segment_ids` after tantivy
+    /// search runs locally; not serialized over gRPC.
+    pub row_group_size: Option<u32>,
 }
 
 impl FileKey {
@@ -292,6 +296,7 @@ impl FileKey {
             meta,
             deleted,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 
@@ -303,11 +308,13 @@ impl FileKey {
             meta: FileMeta::default(),
             deleted: false,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 
-    pub fn with_segment_ids(&mut self, segment_ids: BitVec) {
+    pub fn with_segment_ids(&mut self, segment_ids: BitVec, row_group_size: Option<u32>) {
         self.segment_ids = Some(Arc::new(segment_ids));
+        self.row_group_size = row_group_size;
     }
 }
 
@@ -319,6 +326,8 @@ pub struct FileMeta {
     pub original_size: i64,
     pub compressed_size: i64,
     pub index_size: i64,
+    #[serde(default)]
+    pub bloom_ver: i64, // 0 = no .bf; otherwise = microsecond ts encoded in .bf filename
     pub flattened: bool,
 }
 
@@ -643,6 +652,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             compressed_size: req.compressed_size,
             flattened: false,
             index_size: req.index_size,
+            bloom_ver: 0,
         }
     }
 }
@@ -669,6 +679,7 @@ impl From<&cluster_rpc::FileKey> for FileKey {
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
             segment_ids: None,
+            row_group_size: None,
         }
     }
 }
@@ -818,6 +829,16 @@ pub struct CrossLink {
     pub fields: Vec<CrossLinkField>,
 }
 
+impl Display for CrossLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "name: {}, url: {}, fields: {:?}",
+            self.name, self.url, self.fields
+        )
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct CrossLinkField {
     pub name: String,
@@ -921,23 +942,21 @@ pub struct StreamSettings {
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
     #[serde(default)]
+    pub defined_schema_fields: Vec<String>,
+    #[serde(default)]
+    pub storage_type: StorageType,
+    #[serde(default)]
     pub data_retention: i64,
     #[serde(default)]
-    pub flatten_level: Option<i64>,
+    pub extended_retention_days: Vec<TimeRange>,
     #[serde(default)]
-    pub defined_schema_fields: Vec<String>,
+    pub flatten_level: Option<i64>,
     #[serde(default)]
     pub max_query_range: i64, // hours
     #[serde(default)]
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(default)]
-    pub distinct_value_fields: Vec<DistinctField>,
-    #[serde(default)]
-    pub index_updated_at: i64,
-    #[serde(default)]
-    pub extended_retention_days: Vec<TimeRange>,
     #[serde(default)]
     pub index_original_data: bool,
     #[serde(default)]
@@ -949,9 +968,11 @@ pub struct StreamSettings {
     #[serde(default)]
     pub is_llm_stream: bool,
     #[serde(default)]
+    pub distinct_value_fields: Vec<DistinctField>,
+    #[serde(default)]
     pub cross_links: Vec<CrossLink>,
     #[serde(default)]
-    pub storage_type: StorageType,
+    pub index_updated_at: i64,
 }
 
 impl Default for StreamSettings {
@@ -1364,6 +1385,7 @@ mod tests {
             compressed_size: 1,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
@@ -1382,6 +1404,7 @@ mod tests {
             compressed_size: 500,
             index_size: 50,
             flattened: false,
+            bloom_ver: 0,
         };
 
         stats.add_file_meta(&meta);
@@ -1869,6 +1892,7 @@ mod tests {
             compressed_size: 512,
             index_size: 0,
             flattened: false,
+            bloom_ver: 0,
         };
         let key = FileKey::new(
             42,
@@ -1890,8 +1914,9 @@ mod tests {
         let mut key = FileKey::from_file_name("files/k.parquet");
         assert!(key.segment_ids.is_none());
         let bv = BitVec::new();
-        key.with_segment_ids(bv);
+        key.with_segment_ids(bv, Some(1024));
         assert!(key.segment_ids.is_some());
+        assert_eq!(key.row_group_size, Some(1024));
     }
 
     #[test]
@@ -2259,5 +2284,73 @@ mod tests {
         let a = TimeRange::new(0, 30);
         let b = TimeRange::new(50, 100);
         assert!(!a.intersects(&b));
+    }
+
+    // ── bloom_ver coverage on FileMeta ─────────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_default_bloom_ver_is_zero() {
+        let m = FileMeta::default();
+        assert_eq!(m.bloom_ver, 0);
+    }
+
+    #[test]
+    fn test_file_meta_serde_json_roundtrip_with_bloom_ver() {
+        let m = FileMeta {
+            min_ts: 1,
+            max_ts: 2,
+            records: 3,
+            original_size: 4,
+            compressed_size: 5,
+            index_size: 6,
+            flattened: true,
+            bloom_ver: 42,
+        };
+        let s = serde_json::to_string(&m).unwrap();
+        assert!(s.contains("\"bloom_ver\":42"));
+        let parsed: FileMeta = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed, m);
+    }
+
+    #[test]
+    fn test_file_meta_serde_json_legacy_without_bloom_ver_defaults_to_zero() {
+        // Old payloads written before bloom_ver was added must still deserialize.
+        let legacy = r#"{
+            "min_ts": 1,
+            "max_ts": 2,
+            "records": 3,
+            "original_size": 4,
+            "compressed_size": 5,
+            "index_size": 6,
+            "flattened": false
+        }"#;
+        let parsed: FileMeta = serde_json::from_str(legacy).unwrap();
+        assert_eq!(parsed.bloom_ver, 0);
+    }
+
+    #[test]
+    fn test_file_meta_is_empty_independent_of_bloom_ver() {
+        // bloom_ver should not affect emptiness.
+        let mut m = FileMeta::default();
+        assert!(m.is_empty());
+        m.bloom_ver = 99;
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn test_kv_metadata_to_file_meta_leaves_bloom_ver_zero() {
+        // Parquet KV metadata never carries bloom_ver — it must default to 0.
+        use parquet::file::metadata::KeyValue;
+        let kvs = vec![
+            KeyValue::new("min_ts".to_string(), "10".to_string()),
+            KeyValue::new("max_ts".to_string(), "20".to_string()),
+            KeyValue::new("records".to_string(), "5".to_string()),
+            KeyValue::new("original_size".to_string(), "100".to_string()),
+            KeyValue::new("compressed_size".to_string(), "50".to_string()),
+        ];
+        let m: FileMeta = (kvs.as_slice()).into();
+        assert_eq!(m.min_ts, 10);
+        assert_eq!(m.max_ts, 20);
+        assert_eq!(m.bloom_ver, 0);
     }
 }

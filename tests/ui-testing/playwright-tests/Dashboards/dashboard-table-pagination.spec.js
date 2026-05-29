@@ -190,8 +190,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await rowsPerPageInput.waitFor({ state: "visible" });
 
     // Set custom rows per page value
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("25");
+    await pm.dashboardPanelConfigs.setRowsPerPage("25");
 
     testLogger.info('Set custom rows per page value to 25');
 
@@ -200,7 +199,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify the input value is preserved
-    const inputValue = await rowsPerPageInput.inputValue();
+    const inputValue = await pm.dashboardPanelConfigs.getRowsPerPageValue();
     expect(inputValue).toBe("25");
 
     testLogger.info('Verified rows per page value is preserved after apply');
@@ -245,9 +244,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await paginationToggle.click();
 
     // Set rows per page to 10
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("10");
+    await pm.dashboardPanelConfigs.setRowsPerPage("10");
 
     // Apply changes
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -302,15 +299,15 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
 
     // Verify pagination is disabled
     const paginationToggle = page.locator('[data-test="dashboard-config-show-pagination"]');
-    const isChecked = await paginationToggle.getAttribute('aria-checked');
-    expect(isChecked).toBe('false');
+    const isChecked = await pm.dashboardPanelConfigs.isPaginationEnabled();
+    expect(isChecked).toBe(false);
 
     // Apply to ensure table renders with pagination disabled
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify "Records per page" text is NOT visible
-    const rowsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
+    const rowsPerPageText = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
     await expect(rowsPerPageText).not.toBeVisible();
 
     testLogger.info('Verified pagination controls are hidden when disabled');
@@ -352,8 +349,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
 
     const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
     await rowsPerPageInput.waitFor({ state: "visible" });
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("50");
+    await pm.dashboardPanelConfigs.setRowsPerPage("50");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -376,13 +372,11 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     // Verify pagination is still enabled
-    const paginationToggleAfter = page.locator('[data-test="dashboard-config-show-pagination"]');
-    const isChecked = await paginationToggleAfter.getAttribute('aria-checked');
-    expect(isChecked).toBe('true');
+    const isChecked = await pm.dashboardPanelConfigs.isPaginationEnabled();
+    expect(isChecked).toBe(true);
 
     // Verify rows per page value
-    const rowsPerPageAfter = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    const value = await rowsPerPageAfter.inputValue();
+    const value = await pm.dashboardPanelConfigs.getRowsPerPageValue();
     expect(value).toBe('50');
 
     testLogger.info('Verified pagination settings persisted after save');
@@ -487,9 +481,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await paginationToggle.click();
 
     // Set rows per page to 10
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("10");
+    await pm.dashboardPanelConfigs.setRowsPerPage("10");
 
     // Apply changes
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -608,9 +600,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await paginationToggle.click();
 
     // Set rows per page
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("20");
+    await pm.dashboardPanelConfigs.setRowsPerPage("20");
 
     // Also enable wrap cells
     await pm.dashboardPanelConfigs.selectWrapCell();
@@ -620,8 +610,8 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify both options are active
-    const paginationChecked = await paginationToggle.getAttribute('aria-checked');
-    expect(paginationChecked).toBe('true');
+    const paginationChecked = await pm.dashboardPanelConfigs.isPaginationEnabled();
+    expect(paginationChecked).toBe(true);
 
     // Verify table wrapper has wrap-enabled class (set by TenstackTable when wrap=true)
     const tableWrapper = page.locator('[data-test="dashboard-panel-table"]');
@@ -667,9 +657,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await paginationToggle.click();
 
     // Set rows per page
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("15");
+    await pm.dashboardPanelConfigs.setRowsPerPage("15");
 
     // Also enable transpose
     await pm.dashboardPanelConfigs.selectTranspose();
@@ -679,8 +667,8 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify both settings are active
-    const paginationChecked = await paginationToggle.getAttribute('aria-checked');
-    expect(paginationChecked).toBe('true');
+    const paginationChecked = await pm.dashboardPanelConfigs.isPaginationEnabled();
+    expect(paginationChecked).toBe(true);
 
     testLogger.info('Verified pagination works with transpose option');
 
@@ -766,9 +754,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await paginationToggle.click();
 
     // Leave rows per page empty (clear any default)
-    const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("");
+    await pm.dashboardPanelConfigs.setRowsPerPage("");
 
     // Apply changes
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -818,8 +804,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
 
     const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
     await rowsPerPageInput.waitFor({ state: "visible" });
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("30");
+    await pm.dashboardPanelConfigs.setRowsPerPage("30");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -841,10 +826,10 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await expect(paginationToggle).toBeVisible();
 
     // Verify the pagination settings are preserved
-    const isChecked = await paginationToggle.getAttribute('aria-checked');
-    expect(isChecked).toBe('true');
+    const isChecked = await pm.dashboardPanelConfigs.isPaginationEnabled();
+    expect(isChecked).toBe(true);
 
-    const value = await rowsPerPageInput.inputValue();
+    const value = await pm.dashboardPanelConfigs.getRowsPerPageValue();
     expect(value).toBe('30');
 
     testLogger.info('Verified pagination settings preserved when switching chart types');
@@ -894,7 +879,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await infoIcon.hover();
 
     // Verify tooltip appears with expected text
-    const tooltip = page.locator('.q-tooltip');
+    const tooltip = page.locator('[role="tooltip"]');
     await expect(tooltip).toBeVisible();
     const tooltipText = await tooltip.textContent();
     expect(tooltipText).toContain('default number of records');
@@ -925,21 +910,25 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // Open Custom SQL editor
+    // Select table chart type and stream first in builder mode.
+    // searchAndAddField requires builder mode — in custom SQL mode, showStandardActions()
+    // hides action buttons for fields not yet in customQueryFields (populated only after apply).
+    // The Y-axis field added here persists when switching to custom SQL mode because
+    // removeXYFilters() skips clearing when customQuery is already true.
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
+
+    // Switch to Custom SQL editor (Y field from builder mode is preserved)
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
 
-    // Focus on the editor
+    // Fill the SQL query
     await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('code').click();
     await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill(
       'SELECT kubernetes_container_name, count(*) as count FROM "e2e_automate" GROUP BY kubernetes_container_name'
     );
-
-    // Select table chart type
-    await pm.chartTypeSelector.selectChartType("table");
-
-    // Add field for table
-    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Apply
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -955,14 +944,13 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
     await rowsPerPageInput.waitFor({ state: "visible" });
     await expect(rowsPerPageInput).toBeVisible();
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("5");
+    await pm.dashboardPanelConfigs.setRowsPerPage("5");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify pagination controls are visible
-    const rowsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
+    const rowsPerPageText = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
     await rowsPerPageText.waitFor({ state: "visible" });
     await expect(rowsPerPageText).toBeVisible();
 
@@ -1055,14 +1043,13 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     // Enable pagination
     await paginationToggle.click();
 
-    // Verify rows per page input appears
+    // Set rows per page
     const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
     await rowsPerPageInput.waitFor({ state: "visible" });
     await expect(rowsPerPageInput).toBeVisible();
 
     // Set rows per page
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("20");
+    await pm.dashboardPanelConfigs.setRowsPerPage("20");
 
     // Apply changes
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1144,8 +1131,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     // Set rows per page
     const rowsPerPageInput = page.locator('[data-test="dashboard-config-rows-per-page"]');
-    await rowsPerPageInput.click();
-    await rowsPerPageInput.fill("10");
+    await pm.dashboardPanelConfigs.setRowsPerPage("10");
 
     // Apply changes and wait for table data to load
     await pm.dashboardPanelActions.applyDashboardBtn();

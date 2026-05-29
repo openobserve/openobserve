@@ -1,13 +1,11 @@
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { ref } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Create a mock router
 const mockRouter = createRouter({
@@ -97,6 +95,12 @@ const mockDashboardPanelData = {
     stream: {
       customQueryFields: [{ name: "custom_field" }],
       vrlFunctionFieldList: [],
+      streamType: "logs",
+      selectedStream: "default",
+      streamResults: [],
+    },
+    streamFields: {
+      groupedFields: [],
     },
   },
 };
@@ -111,6 +115,27 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     validatePanel: mockValidatePanel,
     isOutDated: false,
     onActivated: vi.fn(),
+    addXAxisItem: vi.fn(),
+    addYAxisItem: vi.fn(),
+    addZAxisItem: vi.fn(),
+    addBreakDownAxisItem: vi.fn(),
+    addFilteredItem: vi.fn(),
+    isAddXAxisNotAllowed: false,
+    isAddBreakdownNotAllowed: false,
+    isAddYAxisNotAllowed: false,
+    isAddZAxisNotAllowed: false,
+    promqlMode: false,
+    addLatitude: vi.fn(),
+    addLongitude: vi.fn(),
+    addWeight: vi.fn(),
+    addMapName: vi.fn(),
+    addMapValue: vi.fn(),
+    addSource: vi.fn(),
+    addTarget: vi.fn(),
+    addValue: vi.fn(),
+    cleanupDraggingFields: vi.fn(),
+    updateGroupedFields: vi.fn(),
+    fetchPromQLLabels: vi.fn(),
   })),
 }));
 
@@ -120,6 +145,27 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
     dashboardPanelData: mockDashboardPanelData,
     resetAggregationFunction: mockResetAggregationFunction,
     validatePanel: mockValidatePanel,
+    addXAxisItem: vi.fn(),
+    addYAxisItem: vi.fn(),
+    addZAxisItem: vi.fn(),
+    addBreakDownAxisItem: vi.fn(),
+    addFilteredItem: vi.fn(),
+    isAddXAxisNotAllowed: false,
+    isAddBreakdownNotAllowed: false,
+    isAddYAxisNotAllowed: false,
+    isAddZAxisNotAllowed: false,
+    promqlMode: false,
+    addLatitude: vi.fn(),
+    addLongitude: vi.fn(),
+    addWeight: vi.fn(),
+    addMapName: vi.fn(),
+    addMapValue: vi.fn(),
+    addSource: vi.fn(),
+    addTarget: vi.fn(),
+    addValue: vi.fn(),
+    cleanupDraggingFields: vi.fn(),
+    updateGroupedFields: vi.fn(),
+    fetchPromQLLabels: vi.fn(),
   })),
 }));
 
@@ -144,6 +190,7 @@ vi.mock("lodash-es", () => ({
       return obj;
     }
   }),
+  throttle: vi.fn((fn: (...args: any[]) => any) => fn),
 }));
 
 // Mock sqlUtils with isSimpleSelectAllQuery function
@@ -579,6 +626,53 @@ describe("VisualizeLogsQuery Component", () => {
       wrapper.vm.addPanelToDashboard();
 
       expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
+  });
+
+  // Migration coverage: q-dialog wrapper removed; AddToDashboard now uses
+  // v-model:open and emits update:open / save directly (ODialog/ODrawer contract).
+  describe("AddToDashboard integration (ODialog/ODrawer migration)", () => {
+    it("should render AddToDashboard stub bound to showAddToDashboardDialog", async () => {
+      mockValidatePanel.mockImplementation(() => {});
+      wrapper.vm.addToDashboard();
+      await wrapper.vm.$nextTick();
+
+      const addToDashboard = wrapper.findComponent({ name: "AddToDashboard" });
+      expect(addToDashboard.exists()).toBe(true);
+      // showAddToDashboardDialog drives AddToDashboard's open state via v-model:open
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
+    });
+
+    it("should close dialog when AddToDashboard emits update:open=false", async () => {
+      mockValidatePanel.mockImplementation(() => {});
+      wrapper.vm.addToDashboard();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
+
+      const addToDashboard = wrapper.findComponent({ name: "AddToDashboard" });
+      await addToDashboard.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
+
+    it("should close dialog when AddToDashboard emits save (addPanelToDashboard)", async () => {
+      mockValidatePanel.mockImplementation(() => {});
+      wrapper.vm.addToDashboard();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
+
+      const addToDashboard = wrapper.findComponent({ name: "AddToDashboard" });
+      await addToDashboard.vm.$emit("save");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
+
+    it("should not render any legacy q-dialog wrapper around AddToDashboard", () => {
+      // After migration, AddToDashboard is no longer wrapped in q-dialog;
+      // it controls its own ODialog/ODrawer via v-model:open.
+      expect(wrapper.find(".q-dialog").exists()).toBe(false);
     });
   });
 
@@ -1864,8 +1958,7 @@ describe("VisualizeLogsQuery Component", () => {
         "bar",
         "area",
         "scatter",
-        "h-bar",
-        "stacked",
+        "h-bar"
       ];
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {

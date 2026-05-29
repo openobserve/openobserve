@@ -4,6 +4,7 @@
  */
 
 import type { PrimitiveProps } from "reka-ui";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 /** Visual style variant — design is baked in, no style override props */
 export type ButtonVariant =
@@ -41,7 +42,9 @@ export type ButtonVariant =
   // Webinar banner dismiss — inline text-link style button for the top bar banner
   | "webinar-dismiss"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
-  | "pricing-chip";
+  | "pricing-chip"
+  // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
+  | "outline-primary";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
@@ -86,8 +89,16 @@ export interface ButtonProps extends PrimitiveProps {
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
   /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
-  block?: boolean;
-}
+  block?: boolean;  /**
+   * Renders an OIcon to the left of the label.
+   * If the #icon-left slot is also provided, the slot takes precedence.
+   */
+  iconLeft?: IconName;
+  /**
+   * Renders an OIcon to the right of the label.
+   * If the #icon-right slot is also provided, the slot takes precedence.
+   */
+  iconRight?: IconName;}
 
 export interface ButtonEmits {
   (e: "click", event: MouseEvent): void;

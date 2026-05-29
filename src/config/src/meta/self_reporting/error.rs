@@ -41,6 +41,7 @@ pub enum ErrorSource {
     SsoClaimParser(SsoClaimParserError),
     Search,
     Other,
+    OrgStorage(OrgStorageError),
 }
 
 impl Serialize for ErrorSource {
@@ -88,6 +89,11 @@ impl Serialize for ErrorSource {
                         &claims.truncate_utf8(PIPELINE_ERROR_MAX_SIZE),
                     )?;
                 }
+            }
+            ErrorSource::OrgStorage(ose) => {
+                state.serialize_field("error_source", "org_storage")?;
+                state.serialize_field("org_id", &ose.org_id)?;
+                state.serialize_field("error", &ose.error)?;
             }
         }
         state.end()
@@ -205,6 +211,12 @@ impl SsoClaimParserError {
         self.claims_json = Some(claims_json);
         self
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrgStorageError {
+    pub org_id: String,
+    pub error: String,
 }
 
 #[cfg(test)]

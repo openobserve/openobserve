@@ -17,11 +17,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import BaseImport from "@/components/common/BaseImport.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
-
-installQuasar({ plugins: [Dialog, Notify] });
 
 // ─── Mock heavy dependencies ──────────────────────────────────────────────────
 
@@ -32,16 +28,6 @@ vi.mock("vue-i18n", async (importOriginal) => {
   return {
     ...actual,
     useI18n: () => ({ t: (key: string) => key }),
-  };
-});
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<typeof import("quasar")>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
   };
 });
 
@@ -58,27 +44,27 @@ const globalConfig = {
       props: ["tabs", "activeTab"],
       emits: ["update:active-tab"],
     },
-    "q-btn": {
+    OButton: {
       template:
-        '<button :data-test="$attrs[\'data-test\']" :disabled="disable || loading" @click="$emit(\'click\')">{{ label }}<slot /></button>',
-      props: ["label", "disable", "loading"],
+        '<button :data-test="$attrs[\'data-test\']" :disabled="disabled || loading" @click="$emit(\'click\')">{{ label }}<slot /></button>',
+      props: ["label", "disabled", "loading", "variant", "size", "type"],
     },
-    "q-splitter": {
-      template: '<div class="q-splitter-stub"><slot name="before" /><slot name="after" /></div>',
+    OSplitter: {
+      template: '<div data-test="o-splitter-stub"><slot name="before" /><slot name="after" /></div>',
+      props: ["modelValue", "limits", "horizontal"],
+      emits: ["update:modelValue"],
     },
-    "q-form": {
-      template: '<form @submit.prevent="$emit(\'submit\')"><slot /></form>',
-    },
-    "q-input": {
+    OInput: {
       template:
         '<input :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-      props: ["modelValue"],
+      props: ["modelValue", "placeholder"],
     },
-    "q-file": {
-      template: '<div class="q-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
+    OFile: {
+      template: '<div class="o-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
+      props: ["modelValue", "label", "accept", "multiple", "bottomSlots"],
     },
-    "q-icon": { template: '<i :class="name" />', props: ["name"] },
-    "q-separator": { template: "<hr />" },
+    OIcon: { template: '<i :data-test="$attrs[\'data-test\']" :class="name" />', props: ["name", "size"] },
+    OSeparator: { template: "<hr />" },
   },
   plugins: [i18n],
 };
@@ -161,12 +147,14 @@ describe("BaseImport.vue", () => {
 
     it("renders splitter when showSplitter is true", () => {
       wrapper = createWrapper({ showSplitter: true });
-      expect(wrapper.find(".q-splitter-stub").exists()).toBe(true);
+      // OSplitter stub renders with data-test="o-splitter-stub"
+      // Check that the before-slot content (tabs section) is present
+      expect(wrapper.find('[data-test="o-splitter-stub"]').exists()).toBe(true);
     });
 
     it("does not render splitter when showSplitter is false", () => {
       wrapper = createWrapper({ showSplitter: false });
-      expect(wrapper.find(".q-splitter-stub").exists()).toBe(false);
+      expect(wrapper.find('[data-test="o-splitter-stub"]').exists()).toBe(false);
     });
 
     it("defaults activeTab to import_json_file when defaultActiveTab is omitted", () => {
@@ -220,12 +208,14 @@ describe("BaseImport.vue", () => {
   describe("Tab management", () => {
     it("shows file upload section when activeTab is import_json_file", async () => {
       wrapper = createWrapper({ defaultActiveTab: "import_json_file" });
-      expect(wrapper.find(".editor-container-json").exists()).toBe(true);
+      // When file tab is active, OFile component is rendered with its data-test
+      expect(wrapper.find('[data-test="dashboard-import-json-file-input"]').exists()).toBe(true);
     });
 
     it("shows URL import section when activeTab is import_json_url", async () => {
       wrapper = createWrapper({ defaultActiveTab: "import_json_url" });
-      expect(wrapper.find(".editor-container-url").exists()).toBe(true);
+      // When URL tab is active, OInput component is rendered with its data-test
+      expect(wrapper.find('[data-test="dashboard-import-url-input"]').exists()).toBe(true);
     });
 
     it("handleTabChange updates activeTab", async () => {

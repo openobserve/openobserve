@@ -127,7 +127,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             "q-tooltip": true,
@@ -156,7 +156,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -184,7 +184,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -212,7 +212,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -239,7 +239,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -268,7 +268,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -301,7 +301,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -331,7 +331,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -377,7 +377,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -405,7 +405,7 @@ describe("CustomNode.vue", () => {
               template: '<div class="handle" :type="type" :id="id" />',
               props: ["type", "id"],
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -431,7 +431,7 @@ describe("CustomNode.vue", () => {
               template: '<div class="handle" :type="type" :id="id" />',
               props: ["type", "id"],
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -457,7 +457,7 @@ describe("CustomNode.vue", () => {
               template: '<div class="handle" :type="type" :id="id" />',
               props: ["type", "id"],
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -482,7 +482,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -505,7 +505,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -528,7 +528,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             ConfirmDialog: true,
@@ -581,7 +581,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             "q-tooltip": true,
@@ -631,7 +631,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             "q-tooltip": true,
@@ -660,7 +660,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
@@ -691,7 +691,7 @@ describe("CustomNode.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             Handle: true,
-            "q-icon": true,
+            "OIcon": true,
             "q-separator": true,
             "q-btn": true,
             "confirm-dialog": {

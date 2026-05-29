@@ -15,50 +15,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="filter-values-container">
+  <div class="filter-values-container tw:py-2">
     <!-- Value search input — only when fetched count hits the limit -->
-    <div v-if="showValueSearch" class="value-search-container q-mb-xs">
+    <div v-if="showValueSearch" class="value-search-container tw:mb-1">
       <div class="value-search-input-wrap">
-        <q-input
+        <OInput
           v-model="valueSearchTerm"
-          dense
-          borderless
           clearable
+          size="sm"
           :placeholder="`Search ${fieldName} values…`"
           @clear="valueSearchTerm = ''"
         >
-          <template #prepend>
-            <q-icon name="search" size="0.875rem" />
+          <template #icon-left>
+            <OIcon name="search" size="sm" />
           </template>
-        </q-input>
+        </OInput>
       </div>
     </div>
 
     <!-- Filter mode toggle + selection count -->
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar q-px-sm q-py-xs tw:flex tw:items-center tw:justify-between"
+      class="filter-mode-bar tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1"
       data-test="field-values-panel-filter-mode-bar"
     >
-      <div class="tw:flex tw:items-center tw:gap-[0.25rem]">
+      <div class="tw:flex tw:items-center tw:gap-1 ">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count"
+          class="selection-count tw:text-3!"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint">Select to filter</span>
+        <span v-else class="selection-hint  tw:text-3!">Select to filter</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
-          size="icon-xs-circle"
+          size="icon"
           title="Clear selection"
           class="selection-clear-btn"
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
         >
-          <q-icon name="close" size="0.6rem" />
+          <OIcon name="close" size="xs" />
         </OButton>
       </div>
       <div
@@ -74,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
             <EqualIcon />
-          </q-icon>
+          </OIcon>
         </OButton>
         <OButton
           :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
@@ -87,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
             <NotEqualIcon />
-          </q-icon>
+          </OIcon>
         </OButton>
       </div>
     </div>
@@ -99,93 +98,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading state (only shown when there are no interim cached results) -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
-        class="q-pl-md q-py-xs"
+        class="tw:pl-3 tw:py-1"
         style="height: 3.75rem"
       >
-        <q-inner-loading
-          size="xs"
+        <OInnerLoading
           :showing="fieldValues?.isLoading && !displayValues.length"
           label="Fetching values..."
-          label-style="font-size: 1.1em"
+          size="xs"
+          data-test="field-values-panel-loading-indicator"
         />
       </div>
 
       <!-- No values found -->
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
-        class="q-pl-md q-py-xs text-subtitle2"
+        class="tw:pl-3 tw:py-1 tw:text-sm tw:text-o2-text-secondary"
         data-test="field-values-panel-no-values-msg"
       >
         {{ fieldValues?.errMsg || "No values found" }}
       </div>
 
+      <!-- Selected values with no count data available (synthetic fallback) -->
+      <div
+        v-if="displayValues.length > 0 && (displayValues[0] as any)?.synthetic && !fieldValues?.isLoading"
+        class="tw:pl-3 tw:pb-1 tw:text-xs tw:text-o2-text-secondary tw:italic"
+        data-test="field-values-panel-no-count-msg"
+      >
+        No data in range — values from active filter
+      </div>
+
       <!-- Field values list -->
-      <div v-for="value in displayValues" :key="value.key">
-        <q-list dense>
-          <q-item
-            tag="label"
-            class="q-pr-none"
+      <ul
+        class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none"
+        data-test="field-values-panel-values-list"
+      >
+        <li v-for="value in displayValues" :key="value.key" class="tw:py-1">
+          <label
+            class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
           >
             <!-- Checkbox for multi-select — uses :model-value + @update to
                  separate user-initiated changes from parent-sync updates,
                  preventing re-emit loops when the parent reflects query state. -->
-            <q-checkbox
+            <OCheckbox
               v-if="showMultiSelect"
               :model-value="selectedValues"
-              :val="value.key"
-              :color="checkboxColor(value.key)"
+              :value="value.key"
               size="xs"
-              dense
-              class="q-mr-xs"
+              class="tw:shrink-0"
               @update:model-value="handleUserCheckboxChange"
               @click.stop
             />
 
             <div
-              class="flex row wrap justify-between"
+              class="tw:flex tw:flex-row tw:flex-wrap tw:justify-between tw:min-w-0 tw:pl-1"
               :style="
                 showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
               "
             >
               <div
                 :title="value.key"
-                class="ellipsis q-pr-xs"
+                class="tw:truncate tw:pr-1 tw:text-field-list-label-text tw:text-3!"
                 style="width: calc(100% - 3.125rem)"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
+                v-if="value.count != null"
                 :title="String(value.count)"
-                class="ellipsis text-right q-pr-sm"
+                class="tw:truncate tw:text-right tw:pr-0 tw:text-3!"
                 style="display: contents"
                 :style="showMultiSelect ? 'width: 3.125rem' : ''"
               >
                 {{ formatLargeNumber(value.count) }}
               </div>
             </div>
-          </q-item>
-        </q-list>
-      </div>
+          </label>
+        </li>
+      </ul>
     </div>
 
     <!-- View more values / loading more indicator -->
     <div
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="view-more-container q-px-sm q-pt-xs"
+      class="view-more-container tw:w-full tw:flex tw:justify-center"
     >
-      <OButton
-        variant="ghost-primary"
-        size="xs"
-        :block="true"
-        class="view-more-btn"
+      <button
+        class="view-more-link"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
-        <q-spinner-dots v-if="isLoadingMore" color="primary" size="1em" />
+        <OSpinner variant="dots" v-if="isLoadingMore" size="xs" />
         <span v-else>View more values</span>
-      </OButton>
+      </button>
     </div>
   </div>
 </template>
@@ -197,6 +203,11 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface FieldValues {
   isLoading: boolean;
@@ -280,6 +291,10 @@ watch(
 );
 
 // Show interim locally-filtered cache while the API responds to a search term.
+// When the API returns no values but there are selected values (e.g. after page
+// refresh where the filter exists in the URL but the time range yields no data),
+// synthesise the selected values as items so the user can see and deselect them
+// instead of seeing a contradictory "N selected / No values found" state.
 const displayValues = computed(() => {
   if (
     props.fieldValues?.isLoading &&
@@ -291,7 +306,17 @@ const displayValues = computed(() => {
       String(v.key).toLowerCase().includes(term),
     );
   }
-  return props.fieldValues?.values || [];
+
+  const apiValues = props.fieldValues?.values || [];
+  if (apiValues.length > 0) return apiValues;
+
+  // No API values — fall back to synthetic entries for each selected value so
+  // they remain visible and removable (count: null signals no data available).
+  if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
+    return selectedValues.value.map((v) => ({ key: v, count: null as unknown as number, synthetic: true }));
+  }
+
+  return [];
 });
 
 // Show search box whenever there are values to search.
@@ -438,24 +463,30 @@ defineExpose({ reset });
 </script>
 
 <style scoped lang="scss">
+// ---------- compact filter panel ----------
+
+.filter-values-container {
+  font-size: 0.75rem;
+}
+
 .filter-mode-bar {
   border-bottom: 1px solid var(--o2-border-color);
 
   .selection-count {
     font-size: 0.625rem;
     font-weight: 500;
-    color: var(--q-primary);
+    color: var(--o2-primary-color);
   }
 
   .selection-hint {
     font-size: 0.625rem;
-    color: var(--o2-text-secondary, #888);
+    color: var(--o2-text-secondary);
   }
 
   .filter-mode-toggle {
     display: flex;
     border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
+    border-radius: 0.25rem;
     overflow: hidden;
   }
 
@@ -467,26 +498,21 @@ defineExpose({ reset });
   }
 }
 
-.value-search-container {
-  border-bottom: 1px solid var(--o2-border-color);
-}
 
 .value-search-input-wrap {
-  font-size: 0.75rem;
-
   &:deep(.q-field__control) {
-    height: 1.65rem;
-    min-height: 1.65rem;
+    height: 1.5rem;
+    min-height: 1.5rem;
     padding: 0 0.25rem;
     display: flex;
     align-items: center;
     border: 1px solid var(--o2-border-color);
-    border-radius: 0.25rem;
+    border-radius: 0.1875rem;
   }
 
   &:deep(.q-field__prepend),
   &:deep(.q-field__append) {
-    height: 1.65rem;
+    height: 1.5rem;
     display: flex;
     align-items: center;
     padding-right: 0.25rem;
@@ -495,15 +521,12 @@ defineExpose({ reset });
   &:deep(.q-field__native) {
     padding: 0;
     line-height: 1.3;
-    height: 1.65rem !important;
+    height: 1.5rem !important;
+    font-size: 0.6875rem;
   }
 
-  &:deep(.q-field__append .q-icon) {
-    font-size: 0.875rem;
-  }
-
-  .q-icon {
-    line-height: 1.3;
+  &:deep(.q-field__append .OIcon) {
+    font-size: 0.75rem;
   }
 }
 
@@ -512,21 +535,76 @@ defineExpose({ reset });
   overflow-y: auto;
 }
 
-.view-more-container {
-  border-top: 1px solid var(--o2-border-color);
+// ---------- value rows ----------
+.value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0.25rem;
+  border-radius: 0.1875rem;
+  cursor: pointer;
+  font-size: 0.6875rem;
+  min-height: 1.5rem;
 }
 
-.view-more-btn {
-  color: var(--q-primary) !important;
-  font-size: 0.625rem !important;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  width: 100%;
-  border-radius: 0 0 0.25rem 0.25rem !important;
-  transition: opacity 0.15s;
+.value-row-checkbox {
+  flex-shrink: 0;
+}
 
-  &:hover {
-    opacity: 0.8;
-  }
+.value-row-checkbox :deep(button) {
+  border-color: var(--o2-border-input) !important;
+}
+
+.value-row-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--o2-text-primary);
+}
+
+.value-row-null {
+  font-style: italic;
+  color: var(--o2-text-muted);
+}
+
+.value-row-count {
+  flex-shrink: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--o2-text-secondary);
+  min-width: 3.5rem;
+}
+
+// ---------- view more ----------
+.view-more-container {
+  border-top: 1px solid var(--o2-border-color);
+  padding: 0.25rem 0.25rem 0;
+}
+
+.view-more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  color: var(--o2-primary-color, #58c5d8);
+  font-size: 0.6875rem;
+  font-family: inherit;
+  padding: 0.125rem 0.25rem;
+  cursor: pointer;
+  border-radius: 0.1875rem;
+  transition: opacity 0.15s;
+}
+
+.view-more-link:hover {
+  opacity: 0.8;
+  background-color: var(--o2-hover-accent);
+}
+
+.view-more-link:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 </style>

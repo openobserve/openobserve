@@ -409,7 +409,27 @@ pub async fn get_metrics() -> impl IntoResponse {
 
 /// Proxy handler
 pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
-    let client = reqwest::Client::new();
+    // SSRF protection: validate the target URL (incl. DNS resolution) before issuing
+    // the proxied request. The reqwest client is built via `build_safe_client` so
+    // redirect chains and connect-time DNS are re-validated too.
+    if let Err(e) = crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
+        &params.target_url,
+    )
+    .await
+    {
+        return (StatusCode::BAD_REQUEST, format!("URL blocked: {e}")).into_response();
+    }
+    let client =
+        match crate::common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
+            Ok(c) => c,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to build HTTP client: {e}"),
+                )
+                    .into_response();
+            }
+        };
     match client.get(&params.target_url).send().await {
         Ok(resp) => {
             let status = StatusCode::from_u16(resp.status().as_u16())
@@ -532,8 +552,6 @@ pub fn config_routes() -> Router {
     Router::new()
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
-        .route("/runtime", get(status::config_runtime))
-        .route("/reload", get(status::config_reload))
 }
 
 #[cfg(feature = "enterprise")]
@@ -541,8 +559,6 @@ pub fn config_routes() -> Router {
     Router::new()
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
-        .route("/runtime", get(status::config_runtime))
-        .route("/reload", get(status::config_reload))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
         .route("/dex_refresh", get(status::refresh_token_with_dex))
@@ -766,7 +782,8 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
             .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
-            .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history));
+            .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
     }
 
     router = router
@@ -906,7 +923,8 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
-            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services));
+            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
+            .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
     }
 
     #[cfg(feature = "cloud")]
@@ -986,6 +1004,10 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/azure-marketplace/link-subscription",
                 post(cloud::azure_marketplace::link_subscription),
+            )
+            .route(
+                "/{org_id}/enable_org_storage",
+                put(organization::org::enable_org_storage),
             );
     }
 

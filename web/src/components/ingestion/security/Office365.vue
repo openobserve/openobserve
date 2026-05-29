@@ -26,7 +26,7 @@ const docURL = securityDocURLs[name];
 </script>
 
 <template>
-  <div class="q-pa-sm">
+  <div class="tw:p-2">
     <div class="tw:text-[16px]">
       <CopyContent :content="content" />
       <div class="tw:font-bold tw:pt-6 tw:pb-2">

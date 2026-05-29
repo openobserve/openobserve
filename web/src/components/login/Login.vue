@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="card-container tw:w-[100vw] tw:h-[100vh]">
-    <div style="max-width: 400px; padding-top: 100px" class="q-mx-auto q-pa-md">
+    <div style="max-width: 400px; padding-top: 100px" class="tw:mx-auto tw:p-3">
       <div
-        class="flex justify-center text-center"
+        class="tw:flex tw:justify-center tw:text-center"
         v-if="
           (config.isEnterprise == 'true' &&
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
+          class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:w-full"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
-        <span class="full-width flex justify-center">
+        <span class="tw:w-full tw:flex tw:justify-center">
           <img
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </div>
-      <div class="flex justify-center q-mb-lg" v-else>
+      <div class="tw:flex tw:justify-center tw:mb-4" v-else>
         <img
           class="appLogo"
           style="height: auto"
@@ -82,16 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="autoRedirectDexLogin">
         <p>
           Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="cursor-pointer tw:underline">click here</a>.
+          <a href="#" @click="loginWithSSo" class="tw:cursor-pointer tw:underline">click here</a>.
         </p>
       </div>
 
       <div v-else>
-        <div style="font-size: 22px" class="full-width text-center q-pb-md">
+        <div style="font-size: 22px" class="tw:w-full tw:text-center tw:pb-3">
           Login
         </div>
 
-        <div v-if="showSSO" class="flex justify-center">
+        <div v-if="showSSO" class="tw:flex tw:justify-center">
           <OButton
             data-test="sso-login-btn"
             variant="primary"
@@ -100,22 +100,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="loginWithSSo"
           >
             <div
-              class="flex items-center justify-center full-width text-center relative"
+              class="tw:flex tw:items-center tw:justify-center tw:w-full tw:text-center tw:relative"
             >
               <img
-                class="absolute"
+                class="tw:absolute"
                 style="width: 30px; left: 16px"
                 :src="getImageURL('images/common/sso.svg')"
               />
-              <span class="text-center"> Login with SSO</span>
+              <span class="tw:text-center"> Login with SSO</span>
             </div>
           </OButton>
         </div>
 
-        <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
+        <div v-if="showSSO && showInternalLogin" class="tw:py-3 tw:text-center">
           <a
-            class="cursor-pointer login-internal-link q-py-md"
+            class="tw:cursor-pointer login-internal-link tw:py-3"
             style="text-decoration: underline"
+            data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
             >Login as internal user</a
           >
@@ -123,52 +124,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
-          class="o2-input login-inputs"
+          class="login-inputs"
         >
-          <q-form ref="loginform"
-  class="q-gutter-md" @submit.prevent="">
-            <q-input
+          <div class="tw:flex tw:flex-col tw:gap-3">
+            <OInput
               v-model="name"
               data-cy="login-user-id"
               data-test="login-user-id"
-              outlined
               :label="`${t('login.userEmail')} *`"
               placeholder="Email"
-              class="showLabelOnTop no-case"
               type="email"
-              dense
-              stack-label
-              filled
             />
 
-            <q-input
+            <OInput
               v-model="password"
               data-cy="login-password"
               data-test="login-password"
-              outlined
               :label="`${t('login.password')} *`"
               placeholder="Password"
-              class="showLabelOnTop no-case"
               type="password"
-              dense
-              stack-label
-              filled
             />
 
-            <div class="q-mt-lg q-mb-xl">
-              <OButton
-                data-cy="login-sign-in"
-                variant="primary"
-                size="sm-action"
-                block
-                type="submit"
-                :loading="submitting"
-                @click="onSignIn()"
-              >
-                {{ t('login.login') }}
-              </OButton>
-            </div>
-          </q-form>
+            <OButton
+              data-cy="login-sign-in"
+              data-test="login-sign-in"
+              variant="primary"
+              size="sm-action"
+              block
+              type="submit"
+              :loading="submitting"
+              @click="onSignIn()"
+            >
+              {{ t('login.login') }}
+            </OButton>
+          </div>
         </div>
       </div>
     </div>
@@ -178,7 +167,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 
 import { useI18n } from "vue-i18n";
@@ -196,17 +184,18 @@ import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import config from "@/aws-exports";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton },
+  components: { OButton, OInput },
 
   setup() {
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const { t } = useI18n();
     const name = ref("");
     const password = ref("");
@@ -260,11 +249,8 @@ export default defineComponent({
 
     const onSignIn = () => {
       if (name.value == "" || password.value == "") {
-        $q.notify({
-          position: "top",
-          color: "warning",
-          textColor: "white",
-          icon: "warning",
+        toast({
+          variant: "warning",
           message: "Please input valid username or password.",
         });
       } else {
@@ -411,9 +397,8 @@ export default defineComponent({
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;
-                loginform.value.resetValidation();
-                $q.notify({
-                  color: "negative",
+                toast({
+                  variant: "error",
                   message: res.data.message,
                 });
               }
@@ -421,19 +406,16 @@ export default defineComponent({
             .catch((e: Error) => {
               //if any error occurs, show error message and reset form.
               submitting.value = false;
-              loginform.value.resetValidation();
-              $q.notify({
-                color: "negative",
+              toast({
+                variant: "error",
                 message: "Invalid username or password",
-                timeout: 4000,
               });
               console.log(e);
             });
         } catch (e) {
           submitting.value = false;
-          loginform.value.resetValidation();
-          $q.notify({
-            color: "negative",
+          toast({
+            variant: "warning",
             message: "Please fill all the fields and try again.",
           });
           console.log(e);
@@ -447,7 +429,6 @@ export default defineComponent({
       password,
       confirmpassword,
       email,
-      loginform,
       submitting,
       onSignIn,
       tab: ref("signin"),
@@ -464,7 +445,7 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      this.$q.notify(`Selected suggestion "${item.label}"`);
+      toast(`Selected suggestion "${item.label}"`);
     },
   },
 });
@@ -482,13 +463,4 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
-.login-inputs {
-  .q-field__label {
-    font-weight: normal !important;
-    font-size: 12px;
-    transform: translate(-0.75rem, -155%);
-    color: #3a3a3a;
-  }
-}
-</style>
+

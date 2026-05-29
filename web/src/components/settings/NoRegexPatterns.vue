@@ -16,17 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="full-width column flex-center q-gutter-sm q-mt-xs tw:h-full"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-2"
       style="font-size: 1.5rem"
     >
-      <q-img
+      <img
+        data-test="no-regex-patterns-image"
         :src="getImageURL('images/regex_pattern/no_data_regex_pattern.svg')"
-        style="width: 125px; margin: 20vh auto 1rem"
+        style="width: 125px; margin: 0 auto 1rem"
+        alt=""
       />
       <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
         <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
-        <div class="import-button-container">
-            <OButton variant="outline" size="sm" class="tw:mt-2" @click="importRegexPattern">
+        <div class="import-button-container" style="font-size: 1rem">
+            <OButton variant="outline" size="xs" class="tw:mt-2" @click="importRegexPattern">
               {{ t("regex_patterns.import_title") }}
             </OButton>
         </div>    

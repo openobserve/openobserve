@@ -135,6 +135,16 @@ pub async fn post_user(
         is_allowed
     };
 
+    // At most one Root user may ever exist. Creating a Root account is only permitted
+    // during initial bootstrap (when no Root user exists yet). Without this guard, an
+    // Admin who passes the `is_allowed` check above could elevate themselves by creating
+    // a second Root account whose credentials they control.
+    if usr_req.role.base_role.eq(&UserRole::Root) && db::user::root_user_exists().await {
+        return Ok(MetaHttpResponse::forbidden(
+            "A Root user already exists; only one Root user is permitted",
+        ));
+    }
+
     if is_allowed {
         let existing_user = if is_root_user(&usr_req.email) {
             db::user::get(None, &usr_req.email).await

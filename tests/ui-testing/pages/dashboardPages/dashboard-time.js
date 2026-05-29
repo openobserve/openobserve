@@ -25,9 +25,10 @@ export default class DateTimeHelper {
     );
     await this.timePickerBtn.click();
 
-    await this.page
-      .locator(`[data-test="date-time-relative-${rangeCode}-btn"]`)
-      .click();
-    await this.applyTimeBtn.click();
+    // Use JS click — the dropdown can extend outside the viewport in the new layout
+    const relBtn = this.page.locator(`[data-test="date-time-relative-${rangeCode}-btn"]`);
+    await relBtn.waitFor({ state: "attached" });
+    await relBtn.evaluate((el) => el.click());
+    await this.applyTimeBtn.evaluate((el) => el.click());
   }
 }

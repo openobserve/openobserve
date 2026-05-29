@@ -17,7 +17,7 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { useStore } from "vuex";
 import userService from "@/services/users";
 import organizationService from "@/services/organizations";
@@ -461,6 +461,8 @@ export const routeGuard = async (to: any, from: any, next: any) => {
 
   if (
     to.path.indexOf("/ingestion") == -1 &&
+    to.path.indexOf("/iam") == -1 &&
+    to.name !== "iam" &&
     trialPeriodAllowedPath.indexOf(to.name) == -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data == true &&
@@ -1213,7 +1215,7 @@ export function convertUnixToQuasarFormat(unixMicroseconds: any) {
   const unixSeconds = unixMicroseconds / 1e6;
   const dateToFormat = new Date(unixSeconds * 1000);
   const formattedDate = dateToFormat.toISOString();
-  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+  return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 }
 
 export function getCronIntervalDifferenceInSeconds(cronExpression: string) {

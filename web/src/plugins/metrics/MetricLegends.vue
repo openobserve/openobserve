@@ -1,34 +1,35 @@
 <template>
-  <OButton
-    data-cy="metric-legends-button"
-    variant="ghost"
-    size="sm-action"
-    class="metric-legends-button"
-  >
-    <q-icon name="category" class="q-mr-sm" />
-    <span>{{ t("search.legendLabel") }}</span>
-
-    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
-      <q-card flat>
-        <q-card-section class="metric-legends-title">
-          <div class="label">{{ t("search.legendLabel") }}</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none legends">
-          <div class="legend-grid">
-            <div
-              class="legend-item"
-              v-for="(icon, metric) in metricsIconMapping"
-              :key="metric"
-            >
-              <q-icon :name="icon" class="q-mr-sm" />
-              <span>{{ metric }}</span>
-            </div>
+  <ODropdown side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        data-cy="metric-legends-button"
+        variant="ghost"
+        size="sm-action"
+        class="metric-legends-button"
+      >
+        <OIcon name="category" size="sm" />
+        <span>{{ t("search.legendLabel") }}</span>
+      </OButton>
+    </template>
+    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'" class="tw:px-2 tw:pt-1.5 tw:pb-1">
+      <div class="metric-legends-title">
+        <div class="label">{{ t("search.legendLabel") }}</div>
+      </div>
+      <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+      <div class="legends">
+        <div class="legend-grid">
+          <div
+            v-for="(icon, metric) in metricsIconMapping"
+            :key="metric"
+            :data-test="`metrics-legends-item-${metric}`"
+          >
+            <OIcon :name="icon" size="md" class="tw:mr-1" />
+            <span>{{ metric }}</span>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-menu>
-  </OButton>
+        </div>
+      </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
@@ -36,10 +37,14 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default defineComponent({
   name: "MetricLegends",
-  components: { OButton },
+  components: { OButton, OIcon, ODropdown },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -47,8 +52,8 @@ export default defineComponent({
     const metricsIconMapping: Record<string, string> = {
       Summary: "description",
       Gauge: "speed",
-      Histogram: "bar_chart",
-      Counter: "pin",
+      Histogram: "bar-chart",
+      Counter: "tag",
     };
 
     return {
@@ -66,12 +71,7 @@ export default defineComponent({
   grid-template-columns: repeat(2, 1fr); /* Two columns */
   gap: 10px; /* Space between items */
 }
-.legend-item {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  padding: 6px 0;
-}
+
 .q-btn:before {
   border: 0px solid #d5d5d5;
 }
@@ -80,13 +80,7 @@ export default defineComponent({
   text-transform: capitalize;
   padding: 5px 5px;
   height: 30px;
-  font-weight: bold;
+  font-weight: 600;
   border: 1px solid rgba(89, 96, 178, 0.3);
-}
-.theme-dark .legend-item {
-  color: white;
-}
-.theme-light .legend-item {
-  color: black;
 }
 </style>

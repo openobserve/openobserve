@@ -240,7 +240,7 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     await pageManager.pipelinesPage.selectFirstOption();
 
     // Dismiss any open dropdown overlay
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(500);
 
     // Click search button to apply filter
@@ -269,10 +269,11 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
     if (statusBadgeCount > 0) {
       testLogger.info(`Found ${statusBadgeCount} status elements`);
 
-      // Get status counts using POM method
+      // Get status counts using POM method — include all recognized status families
       const statusCounts = await pageManager.pipelinesPage.getStatusCounts();
-      expect(statusCounts.success + statusCounts.error + statusCounts.warning).toBeGreaterThan(0);
-      testLogger.info(`Status counts - Success: ${statusCounts.success}, Error: ${statusCounts.error}, Warning: ${statusCounts.warning}`);
+      const totalRecognized = statusCounts.success + statusCounts.error + statusCounts.warning + (statusCounts.skipped ?? 0);
+      expect(totalRecognized).toBeGreaterThan(0);
+      testLogger.info(`Status counts - Success: ${statusCounts.success}, Error: ${statusCounts.error}, Warning: ${statusCounts.warning}, Skipped: ${statusCounts.skipped}`);
     } else {
       testLogger.info('No status elements found - history may be empty');
     }

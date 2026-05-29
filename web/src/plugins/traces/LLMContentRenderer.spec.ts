@@ -17,10 +17,8 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 
-installQuasar();
 
 // Mock DOMPurify
 vi.mock("dompurify", () => ({

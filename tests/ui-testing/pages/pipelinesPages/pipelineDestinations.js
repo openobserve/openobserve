@@ -6,7 +6,7 @@ export class PipelineDestinations {
     constructor(page) {
         this.page = page;
 
-        this.pipelineDestinationsTabSelector = '[data-test="pipeline-destinations-tab"]';
+        this.pipelineDestinationsTabSelector = 'button[data-test="pipeline-destinations-tab"]';
     }
 
     async navigateToManagement() {

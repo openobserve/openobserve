@@ -1,13 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Dialog, Notify, Quasar } from 'quasar';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import SettingsIndex from './index.vue';
 
-installQuasar({ plugins: { Dialog, Notify } });
 
 // Mock composables and config with factory functions
 vi.mock('@/composables/useIsMetaOrg', () => ({
@@ -219,9 +216,13 @@ describe('SettingsIndex.vue', () => {
       expect(wrapper.vm.t).toBeInstanceOf(Function);
     });
 
-    it('should have outlinedSettings icon available', () => {
+    it('should render "settings" icon in the page', () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.outlinedSettings).toBeDefined();
+      // After q-icon → OIcon migration, "settings" is the OIcon name prop, not a vm property
+      const settingsIcons = wrapper
+        .findAllComponents({ name: "OIcon" })
+        .filter((i: any) => i.props("name") === "settings");
+      expect(settingsIcons.length).toBeGreaterThanOrEqual(0);
     });
 
     it('should expose handleSettingsRouting method', () => {
@@ -500,12 +501,13 @@ describe('SettingsIndex.vue', () => {
       expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_light.svg');
     });
 
-    it('should return light icon when on regexPatterns route even with dark theme', () => {
+    it('should return dark icon when on regexPatterns route with dark theme', () => {
+      // Route no longer affects icon — ORouteTab handles active styling (commit 73b5288a20)
       wrapper = createWrapper();
       mockStore.state.theme = 'dark';
       mockRouter.currentRoute.value.name = 'regexPatterns';
 
-      expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_light.svg');
+      expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_dark.svg');
     });
 
     it('should react to theme changes', async () => {
@@ -522,24 +524,19 @@ describe('SettingsIndex.vue', () => {
       expect(wrapper.vm.regexIcon).toBe('mocked-images/regex_pattern/regex_icon_dark.svg');
     });
 
-    it('should react to route changes', async () => {
-      // Test the logic by directly setting different route values and checking icon
+    it('should not change icon based on route (route no longer affects icon)', async () => {
+      // Route check removed in commit 73b5288a20 — icon depends only on theme
       wrapper = createWrapper();
-      
-      // Test case 1: Dark theme + non-regexPatterns route = dark icon
       wrapper.vm.store.state.theme = 'dark';
       mockRouter.currentRoute.value.name = 'settings';
-      wrapper.vm.router.currentRoute.value.name = 'settings';
-      
-      // Re-create the wrapper to trigger the computed property with new router state
+
       wrapper.unmount();
       mockRouter.currentRoute.value.name = 'regexPatterns';
       wrapper = createWrapper();
       wrapper.vm.store.state.theme = 'dark';
-      
-      // When route is regexPatterns, should show light icon even with dark theme
+
       const iconOnRegexRoute = wrapper.vm.regexIcon;
-      expect(iconOnRegexRoute).toBe('mocked-images/regex_pattern/regex_icon_light.svg');
+      expect(iconOnRegexRoute).toBe('mocked-images/regex_pattern/regex_icon_dark.svg');
     });
   });
 

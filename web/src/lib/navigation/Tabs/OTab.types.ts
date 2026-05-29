@@ -12,6 +12,8 @@ export interface OTabProps {
   icon?: string
   /** Prevents interaction with this tab */
   disable?: boolean
+  /** Tooltip shown on hover — especially useful when disable is true to explain why */
+  tooltip?: string
 }
 
 export interface OTabSlots {
