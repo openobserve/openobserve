@@ -368,8 +368,8 @@ class TestStreamSettingsDedupEdgeCases:
             assert field_b in idx_keys, f"'{field_b}' should be present"
             assert idx_keys.count(field_a) == 1
             assert idx_keys.count(field_b) == 1
-            assert len(idx_keys) == len(original_idx) + 1, \
-                f"Expected {len(original_idx) + 1}, got {len(idx_keys)}"
+            assert len(idx_keys) == len(original_idx) + 2, \
+                f"Expected {len(original_idx) + 2}, got {len(idx_keys)}"
 
             logger.info("=== PASSED ===")
         finally:
