@@ -1848,7 +1848,8 @@ async fn process_dest_template(
         }
     }
 
-    // Substitute endpoint metadata variables (e.g., credential_assignmentGroup, credential_priority)
+    // Substitute endpoint metadata variables (e.g., credential_assignmentGroup,
+    // credential_priority)
     for (key, value) in metadata.iter() {
         resp = resp.replace(&format!("{{{}}}", key), value);
     }
@@ -3124,9 +3125,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         // The result should be valid JSON with rows as a JSON array of objects
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -3163,9 +3171,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let data = &parsed["data"];
@@ -3196,9 +3211,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let fields = &parsed["embeds"][0]["fields"];
@@ -3235,9 +3257,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         // String values should be joined with \n (non-email), not injected as JSON array
         assert!(result.contains("Alert 1: user Alice"));
@@ -3314,9 +3343,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let fields = &parsed["embeds"][0]["fields"];
@@ -3362,9 +3398,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let fields = &parsed["fields"];
@@ -3397,9 +3440,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let data = &parsed["data"];
@@ -3919,9 +3969,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["text"], "stacktrace: NullPointe");
@@ -3945,9 +4002,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options, &hashbrown::HashMap::new())
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["full"], "hello world");
