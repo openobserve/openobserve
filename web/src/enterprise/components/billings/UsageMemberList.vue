@@ -241,7 +241,11 @@ export default defineComponent({
   text-align: left;
 
   &:hover {
-    background-color: var(--o2-hover-bg, rgba(0, 0, 0, 0.04));
+    background-color: var(--o2-hover-bg, rgba(0, 0, 0, 0.06));
+  }
+
+  .member-header-dark &:hover {
+    background-color: rgba(255, 255, 255, 0.08);
   }
 
   &--active {
