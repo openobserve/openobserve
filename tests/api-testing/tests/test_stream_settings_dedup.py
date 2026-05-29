@@ -337,11 +337,11 @@ class TestStreamSettingsDedupEdgeCases:
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         field_a = get_field_for_index(settings)
         # Get a second field different from field_a
-        available = [f for f in INDEX_SAFE_FIELDS if f != field_a]
+        original_idx = list(settings.get("index_fields", []))
+        available = [f for f in INDEX_SAFE_FIELDS if f != field_a and f not in set(original_idx)]
         filtered = [f for f in available if f not in set(settings.get("full_text_search_keys", []))]
         candidates = filtered if filtered else available
         field_b = candidates[0] if candidates else pytest.skip("Only one index-safe field available")
-        original_idx = list(settings.get("index_fields", []))
         logger.info(f"Original index fields: {original_idx}")
 
         try:
