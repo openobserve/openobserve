@@ -112,6 +112,29 @@ pub async fn watch_id_to_org() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Returns true iff every ID in `dashboard_ids` belongs to `org_id`.
+/// Uses a single read-lock on the in-memory cache; only falls back to individual
+/// DB lookups for IDs that are absent from the cache.
+pub async fn all_dashboards_in_org(org_id: &str, dashboard_ids: &[String]) -> bool {
+    let cache = DASHBOARD_ID_TO_ORG.read().await;
+    let mut missing: Vec<&str> = Vec::new();
+    for id in dashboard_ids {
+        match cache.get(id.as_str()) {
+            Some(org) if org == org_id => {}
+            Some(_) => return false, // belongs to a different org
+            None => missing.push(id.as_str()),
+        }
+    }
+    drop(cache);
+    // For cache misses fall back to individual DB lookups (warms the cache as a side effect).
+    for id in missing {
+        if !dashboard_in_org(org_id, id).await {
+            return false;
+        }
+    }
+    true
+}
+
 /// Parses `/dashboards/{org}/{dashboard_id}` into `(org, dashboard_id)`.
 fn parse_key(key: &str) -> Option<(&str, &str)> {
     let rest = key.strip_prefix(DASHBOARDS_WATCH_PREFIX)?;

@@ -373,10 +373,8 @@ pub async fn delete_dashboard_bulk(
     let _user_id = user_email.user_id;
     let _folder_id = crate::common::utils::http::get_folder(&query);
 
-    for id in &req.ids {
-        if !ensure_dashboard_in_org(&org_id, id).await {
-            return MetaHttpResponse::not_found("Dashboard not found");
-        }
+    if !dashboards_db::all_dashboards_in_org(&org_id, &req.ids).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
     }
 
     #[cfg(feature = "enterprise")]
@@ -507,10 +505,8 @@ pub async fn move_dashboards(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<MoveDashboardsRequestBody>,
 ) -> Response {
-    for dashboard_id in &req_body.dashboard_ids {
-        if !ensure_dashboard_in_org(&org_id, dashboard_id).await {
-            return MetaHttpResponse::not_found("Dashboard not found");
-        }
+    if !dashboards_db::all_dashboards_in_org(&org_id, &req_body.dashboard_ids).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
     }
     // For this endpoint, openfga check is needed here, as we don't do openfga check in the
     // middleware for this api endpoint, because it includes a batch of dashboards
