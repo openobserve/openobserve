@@ -135,10 +135,9 @@ fn build_tantivy_schema(
     let fts_fields_filtered = fts_fields
         .iter()
         .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
-                .is_some()
+            schema_fields.get(f).is_some_and(|v| {
+                v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8
+            })
         })
         .map(String::from)
         .collect::<HashSet<_>>();
@@ -147,10 +146,7 @@ fn build_tantivy_schema(
         .filter(|f| schema_fields.contains_key(f))
         .map(String::from)
         .collect::<HashSet<_>>();
-    let tantivy_fields = fts_fields_filtered
-        .union(&index_fields_filtered)
-        .cloned()
-        .collect::<HashSet<_>>();
+    let tantivy_fields: HashSet<_> = &fts_fields_filtered | &index_fields_filtered;
 
     if tantivy_fields.is_empty() {
         return None;
@@ -260,14 +256,10 @@ pub(super) fn convert_batch_to_docs_sync(
         }
     }
 
-    // _timestamp field, should we report error when _timestamp not found
-    let ts_data: &Int64Array = match batch.column_by_name(TIMESTAMP_COL_NAME) {
-        Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
-            Some(ts) => ts,
-            None => &Int64Array::from(vec![0; num_rows]),
-        },
-        None => &Int64Array::from(vec![0; num_rows]),
-    };
+    let ts_data: &Int64Array = batch
+        .column_by_name(TIMESTAMP_COL_NAME)
+        .and_then(|c| c.as_any().downcast_ref::<Int64Array>())
+        .expect("batch must contain a valid Int64 _timestamp column");
     let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap();
     for (i, doc) in docs.iter_mut().enumerate() {
         doc.add_i64(ts_field, ts_data.value(i));

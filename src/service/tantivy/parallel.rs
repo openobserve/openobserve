@@ -162,11 +162,12 @@ where
         }));
     }
 
-    // Await all tasks concurrently, then sort to restore chunk order.
-    let mut indexed: Vec<SegmentOutput> = Vec::with_capacity(tasks.len());
-    for r in join_all(tasks).await {
-        indexed.push(r??);
-    }
+    // await all tasks concurrently, then sort to restore chunk order.
+    let mut indexed: Vec<SegmentOutput> = join_all(tasks)
+        .await
+        .into_iter()
+        .map(|r| -> Result<SegmentOutput, Error> { r? })
+        .collect::<Result<_, _>>()?;
     indexed.sort_by_key(|s| s.chunk_idx);
     let total_rows: usize = indexed.iter().map(|s| s.row_count).sum();
     let indices: Vec<tantivy::Index> = indexed.into_iter().map(|s| s.index).collect();
@@ -229,7 +230,7 @@ fn build_segment<D: tantivy::Directory>(
 
     let mut row_count: usize = 0;
     for batch_res in iter {
-        let batch = batch_res.with_context(|| format!("chunk {chunk_idx}: scan failed"))?;
+        let batch = batch_res?;
         if batch.num_rows() == 0 {
             continue;
         }

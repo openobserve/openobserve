@@ -18,15 +18,13 @@ use arrow::array::RecordBatch;
 use bytes::Bytes;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME,
-    utils::{
-        parquet::RecordBatchStream,
-        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
-    },
+    utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
 use futures::TryStreamExt;
 use tokio::task::JoinHandle;
 
-use super::{TantivyIndexSchema, convert_batch_to_docs_sync, reader::file_stream};
+use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
+use crate::service::tantivy::reader::file_stream;
 
 /// Create a tantivy index in the given directory for the input file bytes.
 pub(super) async fn build_index<D: tantivy::Directory>(
@@ -36,7 +34,9 @@ pub(super) async fn build_index<D: tantivy::Directory>(
     index_schema: TantivyIndexSchema,
 ) -> Result<Option<tantivy::Index>, anyhow::Error> {
     let start = std::time::Instant::now();
-    let reader = open_reader(file_format, buf, &index_schema).await?;
+    let mut projection: Vec<String> = index_schema.fields.iter().cloned().collect();
+    projection.push(TIMESTAMP_COL_NAME.to_string());
+    let reader = file_stream(file_format, buf, Some(&projection)).await?;
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let index_writer = tantivy::IndexBuilder::new()
@@ -45,7 +45,7 @@ pub(super) async fn build_index<D: tantivy::Directory>(
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
-    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
 
     let producer: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
         let mut total_num_rows = 0usize;
@@ -64,7 +64,6 @@ pub(super) async fn build_index<D: tantivy::Directory>(
         Ok(total_num_rows)
     });
 
-    let mut rx = rx;
     let writer_task: JoinHandle<Result<_, anyhow::Error>> =
         tokio::task::spawn_blocking(move || {
             let mut writer = index_writer;
@@ -79,7 +78,7 @@ pub(super) async fn build_index<D: tantivy::Directory>(
             Ok(writer)
         });
 
-    let _total_num_rows = producer.await??;
+    producer.await??;
     let index_writer = writer_task.await??;
 
     log::info!(
@@ -102,18 +101,6 @@ pub(super) async fn build_index<D: tantivy::Directory>(
     );
 
     Ok(Some(index))
-}
-
-/// Open a `RecordBatch` stream that only decodes the columns we will index.
-async fn open_reader(
-    file_format: FileFormat,
-    buf: Bytes,
-    index_schema: &TantivyIndexSchema,
-) -> Result<RecordBatchStream, anyhow::Error> {
-    let mut projection: Vec<String> = index_schema.fields.iter().cloned().collect();
-    projection.push(TIMESTAMP_COL_NAME.to_string());
-    let reader = file_stream(file_format, buf, Some(&projection)).await?;
-    Ok(reader)
 }
 
 #[cfg(test)]
