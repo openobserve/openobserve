@@ -14,16 +14,14 @@
 
 use std::{ops::Range, sync::Arc};
 
-use arrow::{
-    array::StructArray, datatypes::DataType, error::ArrowError, record_batch::RecordBatch,
-};
+use arrow::{datatypes::DataType, error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use bytes::Bytes;
-use config::utils::parquet::RecordBatchStream;
+use config::utils::parquet::{RecordBatchStream, vortex_array_to_record_batch};
 use futures::StreamExt;
 use vortex::{
     VortexSessionDefault,
-    array::{ArrayRef, arrow::IntoArrowArray},
+    array::ArrayRef,
     error::VortexResult,
     expr::{root, select},
     file::OpenOptionsSessionExt,
@@ -53,27 +51,14 @@ pub(super) async fn read_vortex_with_projection(
     }
     let stream_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
 
-    let arrow_data_type = DataType::Struct(stream_schema.fields().clone());
+    let data_type = DataType::Struct(stream_schema.fields().clone());
     let vortex_stream = scan.into_array_stream()?;
 
     let stream = vortex_stream.then(move |result| {
-        let arrow_data_type = arrow_data_type.clone();
+        let data_type = data_type.clone();
         async move {
             match result {
-                Ok(vortex_array) => {
-                    let arrow_array = vortex_array
-                        .into_arrow(&arrow_data_type)
-                        .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
-                    let struct_array = arrow_array
-                        .as_any()
-                        .downcast_ref::<StructArray>()
-                        .ok_or_else(|| {
-                            ArrowError::InvalidArgumentError(
-                                "Expected struct array from vortex".to_string(),
-                            )
-                        })?;
-                    Ok(RecordBatch::from(struct_array))
-                }
+                Ok(array) => vortex_array_to_record_batch(array, &data_type),
                 Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
             }
         }
@@ -104,7 +89,7 @@ pub(super) fn build_vortex_sync_iter(
     let scan = scan.with_row_range(row_range);
 
     let projected_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
-    let arrow_data_type = DataType::Struct(projected_schema.fields().clone());
+    let data_type = DataType::Struct(projected_schema.fields().clone());
 
     // The borrow of `runtime` ends here; the returned iterator is 'static.
     let iter_inner = scan.into_array_iter(&runtime)?;
@@ -112,7 +97,7 @@ pub(super) fn build_vortex_sync_iter(
 
     Ok(VortexRowRangeIter {
         iter,
-        arrow_data_type,
+        data_type,
         _runtime: runtime,
     })
 }
@@ -120,7 +105,7 @@ pub(super) fn build_vortex_sync_iter(
 /// Lazy sync iterator over one vortex row range.
 pub(in crate::service::tantivy) struct VortexRowRangeIter {
     iter: Box<dyn Iterator<Item = VortexResult<ArrayRef>> + 'static>,
-    arrow_data_type: DataType,
+    data_type: DataType,
     _runtime: SingleThreadRuntime, // dropped last — keeps Arc<Sender> alive
 }
 
@@ -129,20 +114,7 @@ impl Iterator for VortexRowRangeIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(match self.iter.next()? {
-            Ok(vortex_array) => vortex_array
-                .into_arrow(&self.arrow_data_type)
-                .map_err(|e| ArrowError::ExternalError(Box::new(e)))
-                .and_then(|arrow_array| {
-                    let struct_array = arrow_array
-                        .as_any()
-                        .downcast_ref::<StructArray>()
-                        .ok_or_else(|| {
-                            ArrowError::InvalidArgumentError(
-                                "Expected struct array from vortex".to_string(),
-                            )
-                        })?;
-                    Ok(RecordBatch::from(struct_array))
-                }),
+            Ok(array) => vortex_array_to_record_batch(array, &self.data_type),
             Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
         })
     }

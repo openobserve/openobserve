@@ -29,8 +29,12 @@ use parquet::{
 };
 #[cfg(feature = "vortex")]
 use vortex::{
-    VortexSessionDefault, array::arrow::IntoArrowArray, buffer::Buffer,
-    file::OpenOptionsSessionExt, io::session::RuntimeSessionExt, session::VortexSession,
+    VortexSessionDefault,
+    array::{ArrayRef, arrow::IntoArrowArray},
+    buffer::Buffer,
+    file::OpenOptionsSessionExt,
+    io::session::RuntimeSessionExt,
+    session::VortexSession,
 };
 
 use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
@@ -109,6 +113,24 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
 /// Unified stream type that supports both Vortex and Parquet formats
 pub type RecordBatchStream = Pin<Box<dyn Stream<Item = Result<RecordBatch, ArrowError>> + Send>>;
 
+/// Convert a single vortex [`ArrayRef`] to an Arrow [`RecordBatch`].
+#[cfg(feature = "vortex")]
+pub fn vortex_array_to_record_batch(
+    array: ArrayRef,
+    data_type: &DataType,
+) -> Result<RecordBatch, ArrowError> {
+    let array = array
+        .into_arrow(data_type)
+        .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
+    let struct_array = array
+        .as_any()
+        .downcast_ref::<StructArray>()
+        .ok_or_else(|| {
+            ArrowError::InvalidArgumentError("Expected struct array from vortex".to_string())
+        })?;
+    Ok(RecordBatch::from(struct_array))
+}
+
 pub async fn get_recordbatch_reader_from_bytes(
     file_format: FileFormat,
     data: bytes::Bytes,
@@ -135,20 +157,7 @@ pub async fn get_recordbatch_reader_from_bytes(
                 let arrow_data_type = arrow_data_type.clone();
                 async move {
                     match result {
-                        Ok(vortex_array) => {
-                            let arrow_array = vortex_array
-                                .into_arrow(&arrow_data_type)
-                                .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
-                            let struct_array = arrow_array
-                                .as_any()
-                                .downcast_ref::<StructArray>()
-                                .ok_or_else(|| {
-                                ArrowError::InvalidArgumentError(
-                                    "Expected struct array from vortex".to_string(),
-                                )
-                            })?;
-                            Ok(RecordBatch::from(struct_array))
-                        }
+                        Ok(array) => vortex_array_to_record_batch(array, &arrow_data_type),
                         Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
                     }
                 }
