@@ -223,7 +223,7 @@ const isTopPosition = computed(() =>
 
     <!-- Dismiss button -->
     <ToastClose
-      :class="['tw:shrink-0 tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border', title ? 'tw:self-start' : '']"
+      :class="['tw:shrink-0 tw:flex tw:items-center tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border', title ? 'tw:self-start' : 'tw:self-center']"
       aria-label="Dismiss notification"
     >
       <OIcon name="close" size="sm" class="tw:size-4" aria-hidden="true" />
