@@ -181,12 +181,13 @@ export default defineComponent({
         return null;
       }
       const currentOrg = store.state.selectedOrganization;
+      const orgName = currentOrg.label || currentOrg.name;
       return {
         value: "current",
-        primary: currentOrg.name || currentOrg.identifier,
-        secondary: currentOrg.name ? currentOrg.identifier : "",
-        title: currentOrg.name
-          ? `${currentOrg.name} | ${currentOrg.identifier}`
+        primary: orgName || currentOrg.identifier,
+        secondary: orgName ? currentOrg.identifier : "",
+        title: orgName
+          ? `${orgName} | ${currentOrg.identifier}`
           : currentOrg.identifier,
       };
     });
