@@ -82,7 +82,7 @@ test.describe("logs testcases", () => {
   }) => {
     const pm = new PageManager(page);
 
-    // Step 1: Open Logs page and query editor
+    // Step 1: Open Logs page and query editor.
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.openQueryEditor();
 
