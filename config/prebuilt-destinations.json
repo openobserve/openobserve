@@ -202,7 +202,7 @@
       },
       "template": {
         "name": "prebuilt_opsgenie",
-        "body": "{\n  \"message\": \"OpenObserve Alert: {alert_name}\",\n  \"alias\": \"{alert_name}_{stream_name}\",\n  \"description\": \"Alert triggered from OpenObserve\",\n  \"priority\": \"P2\",\n  \"details\": {\n    \"alert_name\": \"{alert_name}\",\n    \"stream_name\": \"{stream_name}\",\n    \"stream_type\": \"{stream_type}\",\n    \"alert_count\": \"{alert_count}\",\n    \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n    \"alert_time\": \"{alert_time}\",\n    \"alert_url\": \"{alert_url}\"\n  },\n  \"source\": \"OpenObserve\",\n  \"tags\": [\"openobserve\", \"{stream_type}\"]\n}"
+        "body": "{\n  \"message\": \"OpenObserve Alert: {alert_name}\",\n  \"alias\": \"{alert_name}_{stream_name}\",\n  \"description\": \"Alert triggered from OpenObserve\",\n  \"priority\": \"{credential_priority}\",\n  \"details\": {\n    \"alert_name\": \"{alert_name}\",\n    \"stream_name\": \"{stream_name}\",\n    \"stream_type\": \"{stream_type}\",\n    \"alert_count\": \"{alert_count}\",\n    \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n    \"alert_time\": \"{alert_time}\",\n    \"alert_url\": \"{alert_url}\"\n  },\n  \"source\": \"OpenObserve\",\n  \"tags\": [\"openobserve\", \"{stream_type}\"]\n}"
       },
       "credential_fields": [
         {
@@ -253,7 +253,7 @@
       },
       "template": {
         "name": "prebuilt_servicenow",
-        "body": "{\n  \"short_description\": \"OpenObserve Alert: {alert_name}\",\n  \"description\": \"Alert triggered from OpenObserve\\n\\nStream: {stream_name}\\nType: {stream_type}\\nCount: {alert_count}\\nThreshold: {alert_operator} {alert_threshold}\\nTime: {alert_time}\\nURL: {alert_url}\",\n  \"urgency\": \"2\",\n  \"impact\": \"2\",\n  \"category\": \"monitoring\",\n  \"subcategory\": \"alert\",\n  \"assignment_group\": \"Network\",\n  \"caller_id\": \"openobserve\"\n}"
+        "body": "{\n  \"short_description\": \"OpenObserve Alert: {alert_name}\",\n  \"description\": \"Alert triggered from OpenObserve\\n\\nStream: {stream_name}\\nType: {stream_type}\\nCount: {alert_count}\\nThreshold: {alert_operator} {alert_threshold}\\nTime: {alert_time}\\nURL: {alert_url}\",\n  \"urgency\": \"2\",\n  \"impact\": \"2\",\n  \"category\": \"monitoring\",\n  \"subcategory\": \"alert\",\n  \"assignment_group\": \"{credential_assignmentGroup}\",\n  \"caller_id\": \"openobserve\"\n}"
       },
       "credential_fields": [
         {
