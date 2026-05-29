@@ -854,8 +854,7 @@ ORDER BY _time ASC`
     );
 
     // Wait for the SQL parser to extract fields and render them in the field list
-    await page.locator('[data-test="o-field-list-row-_time"]').first()
-      .waitFor({ state: "visible", timeout: 10000 });
+    await pm.chartTypeSelector.waitForFieldListRow("_time");
 
     await pm.chartTypeSelector.searchAndAddField("_time", "x");
     await pm.chartTypeSelector.searchAndAddField("4xxErrorCount", "y");
@@ -877,7 +876,7 @@ ORDER BY _time ASC`
     // Wait for chart to fully render: either a canvas appears (data rendered)
     // or the chart-renderer is visible with content. ECharts mounts its canvas
     // inside a child div, so look for canvas anywhere inside chart-renderer.
-    const chartContainer = page.locator('[data-test="chart-renderer"]');
+    const chartContainer = pm.dashboardPanelActions.getChartRendererCanvas();
     await expect(chartContainer).toBeVisible({ timeout: 15000 });
 
     // Wait for canvas inside the chart-renderer (ECharts renders asynchronously).
@@ -889,7 +888,7 @@ ORDER BY _time ASC`
     const boundingBox = await chartContainer.boundingBox();
     expect(boundingBox.width).toBeGreaterThan(100);
     expect(boundingBox.height).toBeGreaterThan(50);
-    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelActions.getNoDataLocator()).not.toBeVisible();
 
     // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();
