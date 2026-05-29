@@ -3554,13 +3554,16 @@ export class AlertsPage {
 
     /**
      * Get the locator for the aggregation field dropdown (the field selector next to
-     * the aggregation function dropdown in the "Alert if" row). This is the second
-     * .alert-v3-select in the alert-condition-row that contains "Alert if".
+     * the aggregation function dropdown in the "Alert if" row). After the O2 migration
+     * the OSelect has no data-test so we locate it as the second <button> trigger in
+     * the alert-if-row-logs container.
      * @returns {Locator}
      */
     getAggregationFieldSelect() {
-        const alertIfSection = this.page.locator('.alert-condition-row').filter({ hasText: 'Alert if' }).first();
-        return alertIfSection.locator('.alert-v3-select').nth(1);
+        // O2: the field OSelect has no data-test. Its trigger is the second
+        // <button type="button"> inside the "Alert if" row (the first is the
+        // aggregation function selector).
+        return this.page.locator('[data-test="alert-if-row-logs"] button[type="button"]').nth(1);
     }
 
     /**
@@ -3575,7 +3578,13 @@ export class AlertsPage {
         await fieldSelect.click();
         await this.page.waitForTimeout(500);
 
-        const menuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        // O2: when parent OSelect has no data-test, the popover lacks the -popover
+        // suffix and options lack the -option suffix. Fall back to role-based locators.
+        let menuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        const hasSuffixedOptions = await menuItems.first().isVisible({ timeout: 2000 }).catch(() => false);
+        if (!hasSuffixedOptions) {
+            menuItems = this.page.locator('[role="option"]');
+        }
         const count = await menuItems.count();
         const fields = [];
         for (let i = 0; i < count; i++) {

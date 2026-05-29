@@ -437,8 +437,9 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     // === SAVE + VERIFY: Full alert creation flow ===
 
-    // Capture the alert name that setupToQueryConfig filled
-    const alertNameInput = page.locator(pm.alertsPage.alertNameInput);
+    // Capture the alert name that setupToQueryConfig filled.
+    // O2: OInput wraps the native <input>; use alertNameInputField to hit the real <input>.
+    const alertNameInput = page.locator(pm.alertsPage.alertNameInputField);
     const alertName = await alertNameInput.inputValue();
     testLogger.info(`Saving alert: ${alertName}`);
 
