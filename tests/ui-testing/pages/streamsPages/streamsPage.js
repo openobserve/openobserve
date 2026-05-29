@@ -322,7 +322,7 @@ export class StreamsPage {
         await expect(
             this.page
                 .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: /field \[.*\] cannot be both/ })
+                .filter({ hasText: /field \[.*\] cannot be both/i })
                 .first(),
         ).toBeVisible({ timeout: 30000 });
     }
