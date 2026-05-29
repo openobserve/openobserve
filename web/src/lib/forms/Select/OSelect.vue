@@ -1085,7 +1085,7 @@ const fieldWidthClass = computed(() => {
             "
             :class="[
               'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
-              'tw:overflow-hidden',
+              'tw:overflow-hidden tw:flex tw:flex-col',
               'tw:rounded-md tw:shadow-lg',
               'tw:bg-select-content-bg',
             ]"
@@ -1097,13 +1097,14 @@ const fieldWidthClass = computed(() => {
               :model-value="listboxStringModelValue"
               :multiple="multiple"
               :disabled="disabled"
+              class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
               @update:model-value="handleListboxUpdate"
             >
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
                   'tw:rounded-md tw:border tw:border-input-border tw:overflow-hidden',
-                  'tw:bg-select-content-bg',
+                  'tw:bg-select-content-bg tw:flex tw:flex-col tw:flex-1 tw:min-h-0',
                 ]"
               >
                 <ListboxFilter
@@ -1114,7 +1115,7 @@ const fieldWidthClass = computed(() => {
                     parentDataTest ? `${parentDataTest}-search` : undefined
                   "
                   :class="[
-                    'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text',
+                    'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text tw:shrink-0',
                     'tw:placeholder:text-input-placeholder tw:outline-none',
                     'tw:border-b tw:border-input-border',
                     heightClasses[size ?? 'md'],
@@ -1139,7 +1140,7 @@ const fieldWidthClass = computed(() => {
                     allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'
                   "
                   :class="[
-                    'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2',
+                    'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2 tw:shrink-0',
                     'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
                     'tw:text-select-item-text tw:rounded-sm',
                     'tw:cursor-pointer tw:select-none tw:outline-none',
@@ -1185,7 +1186,7 @@ const fieldWidthClass = computed(() => {
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
                    on the ListboxFilter input above. Items are index-highlighted reactively. -->
-                <div ref="listboxScrollEl" class="tw:max-h-60 tw:overflow-auto">
+                <div ref="listboxScrollEl" class="tw:flex-1 tw:min-h-[6rem] tw:overflow-auto">
                   <div
                     v-if="filteredOptions.length === 0"
                     class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
@@ -1383,37 +1384,37 @@ const fieldWidthClass = computed(() => {
                     </div>
                   </div>
                 </div>
-                <!-- rowClickSingleSelect hint bar — always visible at the bottom of the dropdown -->
-                <div
-                  v-if="multiple && rowClickSingleSelect"
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-t tw:border-input-border tw:bg-select-content-bg tw:select-none tw:pointer-events-none"
-                >
-                  <!-- Checkbox zone hint -->
-                  <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
-                    <span
-                      class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
-                      aria-hidden="true"
-                    >
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
-                        <polyline points="1.5,5 4,8 8.5,2" />
-                      </svg>
-                    </span>
-                    <span>Multi select</span>
-                  </span>
-
-                  <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
-
-                  <!-- Name zone hint -->
-                  <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
-                    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
-                      <path d="M4 2h6M4 5h6M4 8h3" />
-                    </svg>
-                    <span>Single select</span>
-                  </span>
-                </div>
               </div>
               <!-- end bordered container -->
             </ListboxRoot>
+            <!-- rowClickSingleSelect hint bar — pinned below the list, never clipped -->
+            <div
+              v-if="multiple && rowClickSingleSelect"
+              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-t tw:border-input-border tw:bg-select-content-bg tw:select-none tw:pointer-events-none tw:shrink-0"
+            >
+              <!-- Checkbox zone hint -->
+              <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                <span
+                  class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
+                    <polyline points="1.5,5 4,8 8.5,2" />
+                  </svg>
+                </span>
+                <span>Multi select</span>
+              </span>
+
+              <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+
+              <!-- Name zone hint -->
+              <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
+                  <path d="M4 2h6M4 5h6M4 8h3" />
+                </svg>
+                <span>Single select</span>
+              </span>
+            </div>
           </PopoverContent>
         </PopoverPortal>
       </PopoverRoot>
