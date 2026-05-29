@@ -51,8 +51,7 @@
                 <span
                   v-if="showQueryPlaceholder"
                   class="query-editor__placeholder"
-                  :style="{ left: queryEditorContentLeft + 'px', opacity: queryEditorContentLeft > 0 ? 1 : 0 }"
-                  :data-test="`${dataTestPrefix}-placeholder`"
+                                    :data-test="`${dataTestPrefix}-placeholder`"
                   aria-hidden="true"
                 >
                   {{ queryPlaceholderText }}<span class="query-editor__caret" />
@@ -82,78 +81,70 @@
                 :data-test="`${dataTestPrefix}-footer`"
               >
                 <template #left>
-                  <OToggleGroup
-                    type="single"
-                    :model-value="currentMode"
-                    :disabled="modeDisabled"
-                    :data-test="`${dataTestPrefix}-mode-toggle`"
-                    @update:model-value="(v: any) => v && (currentMode = String(v))"
-                  >
-                    <OToggleGroupItem
-                      v-for="opt in modeOptions"
-                      :key="opt.value"
-                      :value="opt.value"
-                      size="xs"
-                      :disabled="modeDisabled"
-                      :tooltip="modeDisabled && modeDisabledReason ? modeDisabledReason : undefined"
-                      :data-test="`${dataTestPrefix}-mode-${opt.value}`"
+                  <!-- AI mode: inline bar covers full footer width -->
+                  <template v-if="isAIMode">
+                    <OButton size="icon-chip" variant="ghost" icon-left="close" :data-test="`${dataTestPrefix}-ai-close-btn`" @click="dismissAIMode">
+                      <OTooltip :content="t('common.close')" />
+                    </OButton>
+                    <template v-if="isGenerating">
+                      <img :src="nlpIcon" alt="" class="tw:w-[13px] tw:h-[13px] tw:shrink-0" />
+                      <OSpinner variant="dots" size="xs" />
+                      <span class="query-editor__ai-status">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+                      <OButton variant="ghost-destructive" size="icon-chip" icon-left="stop" :data-test="`${dataTestPrefix}-ai-stop-btn`" @click="cancelGeneration">
+                        <OTooltip :content="t('common.stopGenerating')" />
+                      </OButton>
+                    </template>
+                    <template v-else>
+                      <OToggleGroup v-if="enableFunctionPane && functionPaneOpenState" type="single" :model-value="aiTarget" :data-test="`${dataTestPrefix}-ai-target`" @update:model-value="(v: any) => v && (aiTarget = v as ('query' | 'function'))">
+                        <OToggleGroupItem value="query" size="xs">{{ t('common.query') }}</OToggleGroupItem>
+                        <OToggleGroupItem value="function" size="xs" :disabled="!functionPaneOpenState">{{ functionLabel || 'fx' }}</OToggleGroupItem>
+                      </OToggleGroup>
+                      <input :ref="(el: any) => (aiInputRef = el)" v-model="aiInputText" type="text" class="query-editor__ai-input" :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')" :data-test="`${dataTestPrefix}-ai-input-field`" @keydown.enter="handleAIInputEnter" @keydown.escape="dismissAIMode" />
+                      <span class="query-editor__ai-badge" aria-hidden="true">{{ aiTarget === 'function' ? functionLanguage.toUpperCase() : currentLanguage.toUpperCase() }}</span>
+                      <OButton variant="ai-gradient" size="xs" icon-left="send" :disabled="!aiInputText.trim() || (aiTarget === 'function' ? functionDisableAi : props.disableAi)" :data-test="`${dataTestPrefix}-ai-send-btn`" @click="handleAIGenerate">{{ t('search.generate') }}</OButton>
+                    </template>
+                  </template>
+
+                  <!-- Normal mode -->
+                  <template v-else>
+                    <OButton
+                      v-if="showFooterAi && aiEnabledInEnv && !hideNlToggle"
+                      :data-test="`${dataTestPrefix}-footer-ai-btn`"
+                      variant="ghost"
+                      size="icon-chip"
+                      class="ai-hover-btn"
+                      :disabled="props.disableAi"
+                      @mouseenter="aiHoveredMain = true"
+                      @mouseleave="aiHoveredMain = false"
+                      @click="onMainAiClick"
                     >
-                      <template v-if="opt.icon" #icon-left>
-                        <OIcon :name="opt.icon" size="xs" />
-                      </template>
-                      {{ opt.label }}
-                    </OToggleGroupItem>
-                  </OToggleGroup>
-
-                  <span
-                    v-if="validation"
-                    class="query-editor__validation"
-                    :class="{ 'query-editor__validation--error': !validation.valid }"
-                    :data-test="`${dataTestPrefix}-validation`"
-                  >
-                    <span class="query-editor__validation-dot" />
-                    {{ validation.message || (validation.valid ? t('search.validSql') : t('search.invalidSql')) }}
-                  </span>
-
-                  <slot name="footer-left" />
+                      <img :src="mainAiIconSrc" alt="AI" class="tw:w-[12px] tw:h-[12px] ai-icon" />
+                      <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
+                    </OButton>
+                    <OToggleGroup type="single" :model-value="currentMode" :disabled="modeDisabled" :data-test="`${dataTestPrefix}-mode-toggle`" @update:model-value="(v: any) => v && (currentMode = String(v))">
+                      <OToggleGroupItem v-for="opt in modeOptions" :key="opt.value" :value="opt.value" size="xs" :disabled="modeDisabled" :tooltip="modeDisabled && modeDisabledReason ? modeDisabledReason : undefined" :data-test="`${dataTestPrefix}-mode-${opt.value}`">
+                        <template v-if="opt.icon" #icon-left><OIcon :name="opt.icon" size="xs" /></template>
+                        {{ opt.label }}
+                      </OToggleGroupItem>
+                    </OToggleGroup>
+                    <span v-if="validation" class="query-editor__validation" :class="{ 'query-editor__validation--error': !validation.valid }" :data-test="`${dataTestPrefix}-validation`">
+                      <span class="query-editor__validation-dot" />
+                      {{ validation.message || (validation.valid ? t('search.validSql') : t('search.invalidSql')) }}
+                    </span>
+                    <slot name="footer-left" />
+                  </template>
                 </template>
 
                 <template #right>
-                  <slot name="footer-right" />
-
-                  <OButton
-                    v-if="showFooterAi && aiEnabledInEnv && !hideNlToggle"
-                    :data-test="`${dataTestPrefix}-footer-ai-btn`"
-                    variant="ai-gradient"
-                    size="icon-chip"
-                    :disabled="props.disableAi"
-                    @click="onMainAiClick"
-                  >
-                    <img :src="nlpIcon" alt="AI" class="tw:w-[12px] tw:h-[12px] query-editor__ai-icon-invert" />
-                    <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
-                  </OButton>
-
-                  <OButton
-                    v-if="showFullscreen"
-                    :data-test="`${dataTestPrefix}-footer-fullscreen-btn`"
-                    variant="ghost"
-                    size="icon-chip"
-                    :icon-left="fullscreenState ? 'fullscreen-exit' : 'fullscreen'"
-                    @click="toggleFullscreen"
-                  >
-                    <OTooltip :content="fullscreenState ? t('search.collapse') : t('search.expand')" />
-                  </OButton>
-
-                  <OButton
-                    v-if="showFooterToggle"
-                    :data-test="`${dataTestPrefix}-footer-hide-btn`"
-                    variant="ghost"
-                    size="icon-chip"
-                    icon-left="expand-more"
-                    @click="hideBottomBar"
-                  >
-                    <OTooltip :content="t('common.hide')" />
-                  </OButton>
+                  <template v-if="!isAIMode">
+                    <slot name="footer-right" />
+                    <OButton v-if="showFullscreen" :data-test="`${dataTestPrefix}-footer-fullscreen-btn`" variant="ghost" size="icon-chip" :icon-left="fullscreenState ? 'fullscreen-exit' : 'fullscreen'" @click="toggleFullscreen">
+                      <OTooltip :content="fullscreenState ? t('search.collapse') : t('search.expand')" />
+                    </OButton>
+                    <OButton v-if="showFooterToggle" :data-test="`${dataTestPrefix}-footer-hide-btn`" variant="ghost" size="icon-chip" icon-left="expand-more" @click="hideBottomBar">
+                      <OTooltip :content="t('common.hide')" />
+                    </OButton>
+                  </template>
                 </template>
               </QueryEditorFooter>
             </div>
@@ -181,8 +172,7 @@
                 <span
                   v-if="showFunctionPlaceholder"
                   class="query-editor__placeholder"
-                  :style="{ left: fnEditorContentLeft + 'px', opacity: fnEditorContentLeft > 0 ? 1 : 0 }"
-                  :data-test="`${functionDataTestPrefix}-placeholder`"
+                                    :data-test="`${functionDataTestPrefix}-placeholder`"
                   aria-hidden="true"
                 >
                   {{ functionPlaceholderText }}<span class="query-editor__caret" />
@@ -195,81 +185,45 @@
                 :data-test="`${functionDataTestPrefix}-footer`"
               >
                 <template #left>
-                  <!-- Built-in O2 dropdown picker -->
-                  <ODropdown
-                    v-if="!$slots['function-footer-left']"
-                    side="top"
-                    align="start"
+                  <!-- AI button on the left of function footer -->
+                  <OButton
+                    v-if="showFooterAi && aiEnabledInEnv"
+                    :data-test="`${functionDataTestPrefix}-ai-btn`"
+                    variant="ghost"
+                    size="icon-chip"
+                    class="ai-hover-btn"
+                    :disabled="functionDisableAi"
+                    @mouseenter="aiHoveredFn = true"
+                    @mouseleave="aiHoveredFn = false"
+                    @click="onFunctionAiClick"
                   >
+                    <img :src="fnAiIconSrc" alt="AI" class="tw:w-[12px] tw:h-[12px] ai-icon" />
+                    <OTooltip :content="functionDisableAi && functionDisableAiReason ? functionDisableAiReason : t('nlMode.toggle')" />
+                  </OButton>
+                  <!-- Built-in O2 dropdown picker -->
+                  <ODropdown v-if="!$slots['function-footer-left']" side="top" align="start">
                     <template #trigger>
-                      <OButton
-                        variant="outline"
-                        size="chip"
-                        icon-right="expand-more"
-                        :disabled="functionReadOnly || functionOptions.length === 0"
-                        :data-test="`${functionDataTestPrefix}-picker-btn`"
-                        class="query-editor__fx-trigger"
-                      >
+                      <OButton variant="outline" size="chip" icon-right="expand-more" :disabled="functionReadOnly || functionOptions.length === 0" :data-test="`${functionDataTestPrefix}-picker-btn`" class="query-editor__fx-trigger">
                         <span class="query-editor__fx-pill">
                           <span class="query-editor__fx-mark" aria-hidden="true">fx</span>
-                          <span class="query-editor__fx-name">
-                            {{ selectedFunction || functionPlaceholder || t('search.selectFunction') }}
-                          </span>
+                          <span class="query-editor__fx-name">{{ selectedFunction || functionPlaceholder || t('search.selectFunction') }}</span>
                         </span>
                       </OButton>
                     </template>
-                    <ODropdownItem
-                      v-for="opt in functionOptions"
-                      :key="opt.value"
-                      :data-test="`${functionDataTestPrefix}-picker-item-${opt.value}`"
-                      @select="onSelectFunction(opt)"
-                    >
-                      {{ opt.label }}
-                    </ODropdownItem>
+                    <ODropdownItem v-for="opt in functionOptions" :key="opt.value" :data-test="`${functionDataTestPrefix}-picker-item-${opt.value}`" @select="onSelectFunction(opt)">{{ opt.label }}</ODropdownItem>
                   </ODropdown>
                   <slot name="function-footer-left" />
                 </template>
 
                 <template #right>
                   <slot name="function-footer-right" />
-
-                  <OButton
-                    v-if="showFooterAi && aiEnabledInEnv"
-                    :data-test="`${functionDataTestPrefix}-ai-btn`"
-                    variant="ai-gradient"
-                    size="icon-chip"
-                    :disabled="functionDisableAi"
-                    @click="onFunctionAiClick"
-                  >
-                    <img :src="nlpIcon" alt="AI" class="tw:w-[12px] tw:h-[12px] query-editor__ai-icon-invert" />
-                    <OTooltip :content="functionDisableAi && functionDisableAiReason ? functionDisableAiReason : t('nlMode.toggle')" />
-                  </OButton>
-
-                  <OButton
-                    :data-test="`${functionDataTestPrefix}-save-btn`"
-                    variant="outline"
-                    size="chip"
-                    icon-left="save"
-                    :disabled="functionSaveDisabled"
-                    @click="onFunctionSave"
-                  >
+                  <OButton :data-test="`${functionDataTestPrefix}-save-btn`" variant="outline" size="chip" icon-left="save" :disabled="functionSaveDisabled" @click="onFunctionSave">
                     <span class="tw:inline-flex tw:items-center tw:gap-1">
-                      <span
-                        v-if="functionDirty"
-                        class="query-editor__dirty-dot"
-                        aria-hidden="true"
-                      />
+                      <span v-if="functionDirty" class="query-editor__dirty-dot" aria-hidden="true" />
                       {{ t('common.save') }}
                     </span>
                   </OButton>
-
-                  <OButton
-                    :data-test="`${functionDataTestPrefix}-close-btn`"
-                    variant="ghost"
-                    size="icon-chip"
-                    icon-left="close"
-                    @click="closeFunctionPane"
-                  >
+                  <OButton :data-test="`${functionDataTestPrefix}-close-btn`" variant="ghost" size="icon-chip" icon-left="close" @click="closeFunctionPane">
                     <OTooltip :content="t('search.hideFunctionEditor')" />
                   </OButton>
                 </template>
@@ -307,8 +261,7 @@
             <span
               v-if="showQueryPlaceholder"
               class="query-editor__placeholder"
-              :style="{ left: queryEditorContentLeft + 'px', opacity: queryEditorContentLeft > 0 ? 1 : 0 }"
-              :data-test="`${dataTestPrefix}-placeholder`"
+                            :data-test="`${dataTestPrefix}-placeholder`"
               aria-hidden="true"
             >
               {{ queryPlaceholderText }}<span class="query-editor__caret" />
@@ -338,78 +291,70 @@
             :data-test="`${dataTestPrefix}-footer`"
           >
             <template #left>
-              <OToggleGroup
-                type="single"
-                :model-value="currentMode"
-                :disabled="modeDisabled"
-                :data-test="`${dataTestPrefix}-mode-toggle`"
-                @update:model-value="(v: any) => v && (currentMode = String(v))"
-              >
-                <OToggleGroupItem
-                  v-for="opt in modeOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                  size="xs"
-                  :disabled="modeDisabled"
-                  :tooltip="modeDisabled && modeDisabledReason ? modeDisabledReason : undefined"
-                  :data-test="`${dataTestPrefix}-mode-${opt.value}`"
+              <!-- AI mode: inline bar covers full footer width -->
+              <template v-if="isAIMode">
+                <OButton size="icon-chip" variant="ghost" icon-left="close" :data-test="`${dataTestPrefix}-ai-close-btn`" @click="dismissAIMode">
+                  <OTooltip :content="t('common.close')" />
+                </OButton>
+                <template v-if="isGenerating">
+                  <img :src="nlpIcon" alt="" class="tw:w-[13px] tw:h-[13px] tw:shrink-0" />
+                  <OSpinner variant="dots" size="xs" />
+                  <span class="query-editor__ai-status">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+                  <OButton variant="ghost-destructive" size="icon-chip" icon-left="stop" :data-test="`${dataTestPrefix}-ai-stop-btn`" @click="cancelGeneration">
+                    <OTooltip :content="t('common.stopGenerating')" />
+                  </OButton>
+                </template>
+                <template v-else>
+                  <OToggleGroup v-if="enableFunctionPane && functionPaneOpenState" type="single" :model-value="aiTarget" :data-test="`${dataTestPrefix}-ai-target`" @update:model-value="(v: any) => v && (aiTarget = v as ('query' | 'function'))">
+                    <OToggleGroupItem value="query" size="xs">{{ t('common.query') }}</OToggleGroupItem>
+                    <OToggleGroupItem value="function" size="xs" :disabled="!functionPaneOpenState">{{ functionLabel || 'fx' }}</OToggleGroupItem>
+                  </OToggleGroup>
+                  <input :ref="(el: any) => (aiInputRef = el)" v-model="aiInputText" type="text" class="query-editor__ai-input" :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')" :data-test="`${dataTestPrefix}-ai-input-field`" @keydown.enter="handleAIInputEnter" @keydown.escape="dismissAIMode" />
+                  <span class="query-editor__ai-badge" aria-hidden="true">{{ aiTarget === 'function' ? functionLanguage.toUpperCase() : currentLanguage.toUpperCase() }}</span>
+                  <OButton variant="ai-gradient" size="xs" icon-left="send" :disabled="!aiInputText.trim() || (aiTarget === 'function' ? functionDisableAi : props.disableAi)" :data-test="`${dataTestPrefix}-ai-send-btn`" @click="handleAIGenerate">{{ t('search.generate') }}</OButton>
+                </template>
+              </template>
+
+              <!-- Normal mode -->
+              <template v-else>
+                <OButton
+                  v-if="showFooterAi && aiEnabledInEnv && !hideNlToggle"
+                  :data-test="`${dataTestPrefix}-footer-ai-btn`"
+                  variant="ghost"
+                  size="icon-chip"
+                  class="ai-hover-btn"
+                  :disabled="props.disableAi"
+                  @mouseenter="aiHoveredMain = true"
+                  @mouseleave="aiHoveredMain = false"
+                  @click="onMainAiClick"
                 >
-                  <template v-if="opt.icon" #icon-left>
-                    <OIcon :name="opt.icon" size="xs" />
-                  </template>
-                  {{ opt.label }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-
-              <span
-                v-if="validation"
-                class="query-editor__validation"
-                :class="{ 'query-editor__validation--error': !validation.valid }"
-                :data-test="`${dataTestPrefix}-validation`"
-              >
-                <span class="query-editor__validation-dot" />
-                {{ validation.message || (validation.valid ? t('search.validSql') : t('search.invalidSql')) }}
-              </span>
-
-              <slot name="footer-left" />
+                  <img :src="mainAiIconSrc" alt="AI" class="tw:w-[12px] tw:h-[12px] ai-icon" />
+                  <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
+                </OButton>
+                <OToggleGroup type="single" :model-value="currentMode" :disabled="modeDisabled" :data-test="`${dataTestPrefix}-mode-toggle`" @update:model-value="(v: any) => v && (currentMode = String(v))">
+                  <OToggleGroupItem v-for="opt in modeOptions" :key="opt.value" :value="opt.value" size="xs" :disabled="modeDisabled" :tooltip="modeDisabled && modeDisabledReason ? modeDisabledReason : undefined" :data-test="`${dataTestPrefix}-mode-${opt.value}`">
+                    <template v-if="opt.icon" #icon-left><OIcon :name="opt.icon" size="xs" /></template>
+                    {{ opt.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+                <span v-if="validation" class="query-editor__validation" :class="{ 'query-editor__validation--error': !validation.valid }" :data-test="`${dataTestPrefix}-validation`">
+                  <span class="query-editor__validation-dot" />
+                  {{ validation.message || (validation.valid ? t('search.validSql') : t('search.invalidSql')) }}
+                </span>
+                <slot name="footer-left" />
+              </template>
             </template>
 
             <template #right>
-              <slot name="footer-right" />
-
-              <OButton
-                v-if="showFooterAi && aiEnabledInEnv && !hideNlToggle"
-                :data-test="`${dataTestPrefix}-footer-ai-btn`"
-                variant="ai-gradient"
-                size="icon-chip"
-                :disabled="props.disableAi"
-                @click="onMainAiClick"
-              >
-                <img :src="nlpIcon" alt="AI" class="tw:w-[12px] tw:h-[12px] query-editor__ai-icon-invert" />
-                <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
-              </OButton>
-
-              <OButton
-                v-if="showFullscreen"
-                :data-test="`${dataTestPrefix}-footer-fullscreen-btn`"
-                variant="ghost"
-                size="icon-chip"
-                :icon-left="fullscreenState ? 'fullscreen-exit' : 'fullscreen'"
-                @click="toggleFullscreen"
-              >
-                <OTooltip :content="fullscreenState ? t('search.collapse') : t('search.expand')" />
-              </OButton>
-
-              <OButton
-                v-if="showFooterToggle"
-                :data-test="`${dataTestPrefix}-footer-hide-btn`"
-                variant="ghost"
-                size="icon-chip"
-                icon-left="expand-more"
-                @click="hideBottomBar"
-              >
-                <OTooltip :content="t('common.hide')" />
-              </OButton>
+              <template v-if="!isAIMode">
+                <slot name="footer-right" />
+                <OButton v-if="showFullscreen" :data-test="`${dataTestPrefix}-footer-fullscreen-btn`" variant="ghost" size="icon-chip" :icon-left="fullscreenState ? 'fullscreen-exit' : 'fullscreen'" @click="toggleFullscreen">
+                  <OTooltip :content="fullscreenState ? t('search.collapse') : t('search.expand')" />
+                </OButton>
+                <OButton v-if="showFooterToggle" :data-test="`${dataTestPrefix}-footer-hide-btn`" variant="ghost" size="icon-chip" icon-left="expand-more" @click="hideBottomBar">
+                  <OTooltip :content="t('common.hide')" />
+                </OButton>
+              </template>
             </template>
           </QueryEditorFooter>
 
@@ -438,90 +383,11 @@
       </template>
     </div>
 
-    <!-- Inline AI strip (docked inside editor card, below the body) -->
-    <div
-      v-if="isAIMode"
-      class="query-editor__ai-strip"
-      :data-test="`${dataTestPrefix}-ai-strip`"
-    >
-      <div v-if="isGenerating" class="query-editor__ai-streaming">
-        <img :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px]" />
-        <OSpinner variant="dots" size="xs" />
-        <span class="tw:flex-1 tw:text-xs">
-          {{ streamingText || aiStatusText || t('search.analyzingQuery') }}
-        </span>
-        <OButton
-          variant="ghost-destructive"
-          size="icon-xs"
-          icon-left="stop"
-          :data-test="`${dataTestPrefix}-ai-stop-btn`"
-          @click="cancelGeneration"
-        >
-          <OTooltip :content="t('common.stopGenerating')" />
-        </OButton>
-      </div>
-      <div v-else class="query-editor__ai-row">
-        <!-- Target toggle: Query | Function -->
-        <OToggleGroup
-          v-if="enableFunctionPane"
-          type="single"
-          :model-value="aiTarget"
-          class="query-editor__ai-target"
-          :data-test="`${dataTestPrefix}-ai-target`"
-          @update:model-value="(v: any) => v && (aiTarget = v as ('query' | 'function'))"
-        >
-          <OToggleGroupItem value="query" size="xs">
-            {{ t('common.query') }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="function" size="xs" :disabled="!functionPaneOpenState">
-            {{ functionLabel || 'fx' }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-
-        <OInput
-          v-model="aiInputText"
-          :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
-          :class="aiInputFieldClass"
-          :data-test="`${dataTestPrefix}-ai-input-field`"
-          @keydown.enter="handleAIInputEnter"
-        >
-          <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px]" />
-          </template>
-        </OInput>
-
-        <!-- Output language badge -->
-        <span class="query-editor__ai-badge" aria-hidden="true">
-          {{ aiTarget === 'function' ? functionLanguage.toUpperCase() : currentLanguage.toUpperCase() }}
-        </span>
-
-        <OButton
-          variant="ai-gradient"
-          size="xs"
-          icon-left="send"
-          :disabled="!aiInputText.trim() || (aiTarget === 'function' ? functionDisableAi : props.disableAi)"
-          :data-test="`${dataTestPrefix}-ai-send-btn`"
-          @click="handleAIGenerate"
-        >
-          {{ t('search.generate') }}
-        </OButton>
-
-        <OButton
-          variant="ghost-muted"
-          size="icon-xs"
-          icon-left="close"
-          :data-test="`${dataTestPrefix}-ai-close-btn`"
-          @click="dismissAIMode"
-        >
-          <OTooltip :content="t('common.close')" />
-        </OButton>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
@@ -727,35 +593,6 @@ const chatMessages = ref<ChatMessage[]>([]);
 // Matches the ai-hover-btn logic in Header.vue / app.scss exactly.
 const aiHoveredMain = ref(false);
 const aiHoveredFn = ref(false);
-
-// Tooltip auto-hide: show tooltip on hover, dismiss after 2 s so it doesn't obscure the editor.
-const showMainAiTooltip = ref(true);
-const showFnAiTooltip = ref(true);
-let mainAiTooltipTimer: ReturnType<typeof setTimeout> | null = null;
-let fnAiTooltipTimer: ReturnType<typeof setTimeout> | null = null;
-
-const onMainAiBtnMouseenter = () => {
-  aiHoveredMain.value = true;
-  showMainAiTooltip.value = true;
-  if (mainAiTooltipTimer) clearTimeout(mainAiTooltipTimer);
-  mainAiTooltipTimer = setTimeout(() => { showMainAiTooltip.value = false; }, 2000);
-};
-const onMainAiBtnMouseleave = () => {
-  aiHoveredMain.value = false;
-  if (mainAiTooltipTimer) { clearTimeout(mainAiTooltipTimer); mainAiTooltipTimer = null; }
-  showMainAiTooltip.value = true;
-};
-const onFnAiBtnMouseenter = () => {
-  aiHoveredFn.value = true;
-  showFnAiTooltip.value = true;
-  if (fnAiTooltipTimer) clearTimeout(fnAiTooltipTimer);
-  fnAiTooltipTimer = setTimeout(() => { showFnAiTooltip.value = false; }, 2000);
-};
-const onFnAiBtnMouseleave = () => {
-  aiHoveredFn.value = false;
-  if (fnAiTooltipTimer) { clearTimeout(fnAiTooltipTimer); fnAiTooltipTimer = null; }
-  showFnAiTooltip.value = true;
-};
 
 const nlpIcon = computed(() => {
   return store.state.theme === 'dark'
@@ -1111,6 +948,16 @@ const fnEditorFocused = ref(false);
 // AI target: which pane the inline AI strip generates for
 const aiTarget = ref<'query' | 'function'>('query');
 
+// Ref to the native AI input element — used to auto-focus when the bar opens.
+const aiInputRef = ref<HTMLInputElement | null>(null);
+
+// Auto-focus the AI input whenever the AI bar becomes visible.
+watch(isAIMode, (val) => {
+  if (val && !isGenerating.value) {
+    nextTick(() => aiInputRef.value?.focus());
+  }
+});
+
 const openFunctionPane = () => {
   functionPaneOpenState.value = true;
 };
@@ -1188,29 +1035,6 @@ const showQueryPlaceholder = computed(
 const showFunctionPlaceholder = computed(
   () => !fnEditorFocused.value && functionPaneOpenState.value && (!props.functionQuery || !props.functionQuery.trim()),
 );
-
-// Monaco contentLeft (px) — updates when the editor layout changes (e.g. line-number width).
-// Used to pin the placeholder exactly where Monaco places its first character.
-// Start at 0; Monaco reports the real value immediately after mount via onDidLayoutChange.
-const queryEditorContentLeft = ref(0);
-const fnEditorContentLeft = ref(0);
-
-const trackLayout = (
-  editorTarget: typeof editorRef,
-  leftTarget: typeof queryEditorContentLeft,
-) => {
-  watch(editorTarget, (inst) => {
-    const monaco = inst?.editorObj;
-    if (!monaco) return;
-    leftTarget.value = monaco.getLayoutInfo().contentLeft;
-    monaco.onDidLayoutChange((info: any) => {
-      leftTarget.value = info.contentLeft;
-    });
-  }, { immediate: true });
-};
-
-trackLayout(editorRef, queryEditorContentLeft);
-trackLayout(fnEditorRef, fnEditorContentLeft);
 
 // Accepts a phrases getter so the typewriter reacts to mode changes at runtime.
 const createTypewriter = (
@@ -1441,20 +1265,20 @@ defineExpose({
 }
 
 /* Floating typewriter placeholder shown when the editor is empty.
-   `left` and `opacity` are set via :style — once Monaco reports its contentLeft
-   the placeholder fades in aligned exactly with the first character. */
+   Font + left position match Monaco's actual render settings:
+   glyphMargin:false, lineDecorationsWidth:3, lineNumbersMinChars:0 → ~32px gutter. */
 .query-editor__placeholder {
   position: absolute;
-  top: 0.5rem;
+  top: 0.375rem;
+  left: 2rem; /* Monaco gutter: no glyph margin + 1-digit line numbers ≈ 32px */
   pointer-events: none;
   user-select: none;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.8125rem;
+  font-family: var(--font-mono, 'Menlo', 'Monaco', 'Courier New', monospace);
+  font-size: 0.875rem; /* matches Monaco default 14px */
   line-height: 1.375rem;
   color: var(--o2-text-placeholder, var(--o2-text-muted));
   white-space: nowrap;
   z-index: 10;
-  transition: opacity 0.15s ease;
 }
 
 .query-editor__caret {
@@ -1643,168 +1467,6 @@ defineExpose({
   flex-shrink: 0;
 }
 
-.query-editor__ai-badge {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--text-2xs, 0.625rem);
-  font-weight: var(--font-semibold);
-  letter-spacing: 0.05em;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.1875rem;
-  border: 0.0625rem solid var(--o2-border);
-  color: var(--o2-text-code);
-  background: var(--o2-card-bg-solid);
-}
-
-.query-editor__reveal-footer {
-  position: absolute;
-  right: 0.5rem;
-  bottom: 0.25rem;
-  z-index: 5;
-}
-
-.query-editor--fullscreen {
-  position: fixed !important;
-  inset: 4rem 1rem 1rem 1rem;
-  z-index: 50;
-  background: var(--o2-card-bg-solid);
-  border: 0.0625rem solid var(--o2-border);
-  border-radius: 0.375rem;
-  box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.25);
-}
-
-/* ───── Layout: body, panes, splitter ───── */
-.query-editor--bordered {
-  border: 0.0625rem solid var(--o2-border);
-  border-radius: 0.375rem;
-  overflow: hidden;
-  background: var(--o2-card-bg-solid);
-}
-
-.query-editor__body {
-  width: 100%;
-  /* Floor based on minLines var so SearchBar can shrink with empty queries. */
-  min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem + 2rem);
-}
-
-.query-editor__pane {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.query-editor__pane .editor-container {
-  min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem);
-  max-height: calc(var(--query-editor-max-lines, 12) * 1.375rem);
-}
-
-.query-editor__splitter {
-  width: 100%;
-}
-
-/* Validation badge */
-.query-editor__validation {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: var(--text-xs);
-  color: var(--o2-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 18rem;
-}
-.query-editor__validation-dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 9999px;
-  background: var(--o2-status-success, #16a34a);
-  flex-shrink: 0;
-}
-.query-editor__validation--error {
-  color: var(--o2-status-error, #ef4444);
-}
-.query-editor__validation--error .query-editor__validation-dot {
-  background: var(--o2-status-error, #ef4444);
-}
-
-/* Function-side zone (faint iris tint) */
-.query-editor__fn-zone {
-  background: color-mix(in srgb, var(--o2-primary-color) 5%, var(--o2-section-header-bg));
-}
-
-/* fx <name> ▾ pill content inside the picker trigger */
-.query-editor__fx-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-.query-editor__fx-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.125rem;
-  height: 1.125rem;
-  padding: 0 0.25rem;
-  font-style: italic;
-  font-weight: var(--font-semibold);
-  font-size: var(--text-2xs, 0.625rem);
-  letter-spacing: 0.02em;
-  color: var(--o2-primary-color);
-  background: color-mix(in srgb, var(--o2-primary-color) 14%, transparent);
-  border-radius: 0.25rem;
-}
-.query-editor__fx-name {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  color: var(--o2-text-body);
-}
-
-/* Bordered trigger that matches OSelect dropdown chrome */
-.query-editor__fx-trigger {
-  background: var(--o2-card-bg-solid) !important;
-  border-color: var(--o2-border) !important;
-}
-
-.query-editor__dirty-dot {
-  width: 0.4375rem;
-  height: 0.4375rem;
-  border-radius: 9999px;
-  background: var(--o2-status-warning, #f59e0b);
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-/* AI icons rendered as <img> turn white on the gradient AI button. */
-.query-editor__ai-icon-invert {
-  filter: brightness(0) invert(1);
-}
-
-/* ───── Inline AI strip (docked at bottom of editor card) ───── */
-.query-editor__ai-strip {
-  border-top: 0.0625rem solid var(--o2-border);
-  background: color-mix(in srgb, var(--o2-primary-color) 6%, transparent);
-  padding: 0.375rem 0.5rem;
-}
-.query-editor__ai-row {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-height: 2rem;
-}
-.query-editor__ai-streaming {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2rem;
-  font-size: var(--text-xs);
-  color: var(--o2-text-body);
-}
-.query-editor__ai-target {
-  flex-shrink: 0;
-}
 .query-editor__ai-badge {
   font-family: var(--font-mono, monospace);
   font-size: var(--text-2xs, 0.625rem);

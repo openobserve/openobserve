@@ -52,6 +52,17 @@ const emit = defineEmits<{
 </script>
 
 <style scoped lang="scss">
+@keyframes fx-rail-pulse {
+  0%, 100% {
+    background: color-mix(in srgb, var(--o2-primary-color) 8%, var(--o2-card-bg-solid));
+    border-left-color: color-mix(in srgb, var(--o2-primary-color) 35%, var(--o2-card-bg-solid));
+  }
+  50% {
+    background: color-mix(in srgb, var(--o2-primary-color) 18%, var(--o2-card-bg-solid));
+    border-left-color: var(--o2-primary-color);
+  }
+}
+
 .add-function-rail {
   display: flex;
   flex-direction: column;
@@ -61,15 +72,18 @@ const emit = defineEmits<{
   width: 1.625rem;
   height: 100%;
   padding: 0.5rem 0;
-  background: color-mix(in srgb, var(--o2-primary-color) 6%, transparent);
+  background: color-mix(in srgb, var(--o2-primary-color) 8%, var(--o2-card-bg-solid));
   border: 0;
-  border-left: 0.0625rem solid var(--o2-border);
+  border-left: 0.125rem solid color-mix(in srgb, var(--o2-primary-color) 35%, var(--o2-card-bg-solid));
   cursor: pointer;
   color: var(--o2-text-secondary);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  animation: fx-rail-pulse 2.4s ease-in-out infinite;
+  transition: background-color 0.15s ease, color 0.15s ease, border-left-color 0.15s ease;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--o2-primary-color) 14%, transparent);
+    background: color-mix(in srgb, var(--o2-primary-color) 22%, var(--o2-card-bg-solid));
+    border-left-color: var(--o2-primary-color);
+    animation: none;
     color: var(--o2-primary-color);
   }
 
@@ -80,6 +94,7 @@ const emit = defineEmits<{
   &:disabled {
     cursor: not-allowed;
     opacity: 0.5;
+    animation: none;
   }
 
   &__icon {
