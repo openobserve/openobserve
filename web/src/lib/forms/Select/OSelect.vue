@@ -976,7 +976,7 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
+                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:leading-none tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
                       >
                         {{ labelText }}
                       </span>
@@ -1384,37 +1384,39 @@ const fieldWidthClass = computed(() => {
                     </div>
                   </div>
                 </div>
+              <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
+              <template v-if="multiple && rowClickSingleSelect">
+              <div class="tw:mx-2 tw:mt-1 tw:h-px tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+              <div
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:select-none tw:pointer-events-none tw:shrink-0"
+              >
+                <!-- Checkbox zone hint -->
+                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                  <span
+                    class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
+                    aria-hidden="true"
+                  >
+                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
+                      <polyline points="1.5,5 4,8 8.5,2" />
+                    </svg>
+                  </span>
+                  <span>Multi select</span>
+                </span>
+
+                <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+
+                <!-- Name zone hint -->
+                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
+                    <path d="M4 2h6M4 5h6M4 8h3" />
+                  </svg>
+                  <span>Single select</span>
+                </span>
+              </div>
+              </template>
               </div>
               <!-- end bordered container -->
             </ListboxRoot>
-            <!-- rowClickSingleSelect hint bar — pinned below the list, never clipped -->
-            <div
-              v-if="multiple && rowClickSingleSelect"
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-t tw:border-input-border tw:bg-select-content-bg tw:select-none tw:pointer-events-none tw:shrink-0"
-            >
-              <!-- Checkbox zone hint -->
-              <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
-                <span
-                  class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
-                    <polyline points="1.5,5 4,8 8.5,2" />
-                  </svg>
-                </span>
-                <span>Multi select</span>
-              </span>
-
-              <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
-
-              <!-- Name zone hint -->
-              <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
-                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
-                  <path d="M4 2h6M4 5h6M4 8h3" />
-                </svg>
-                <span>Single select</span>
-              </span>
-            </div>
           </PopoverContent>
         </PopoverPortal>
       </PopoverRoot>
