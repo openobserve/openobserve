@@ -874,8 +874,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden">
       <div
         class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0 tw:px-[0.0625rem]"
-        :class="{ 'expand-on-focus': isFocused }"
-        :style="backgroundColorStyle"
       >
         <!-- Unified Query Editor — embeds function pane + footer + fullscreen -->
         <unified-query-editor
@@ -4230,24 +4228,6 @@ export default defineComponent({
 
       return searchIds;
     });
-    const backgroundColorStyle = computed(() => {
-      return {
-        backgroundColor:
-          searchObj.data.transformType === "function" && isFocused.value
-            ? "var(--o2-card-bg)"
-            : "",
-        borderBottom:
-          searchObj.data.transformType === "function" && isFocused.value
-            ? "0.375rem solid var(--o2-card-bg)"
-            : "none",
-        // Conditional width when focused (expand-on-focus active)
-        width: isFocused.value
-          ? store.state.isAiChatEnabled
-            ? "calc(75% - 104px)" // AI chat enabled: 75% minus nav width
-            : "calc(100% - 104px)" // AI chat disabled: full width minus nav
-          : undefined,
-      };
-    });
     const editorWidthToggleFunction = computed(() => {
       if (!searchObj.data.transformType === "function" && isFocused.value) {
         return {
@@ -4590,7 +4570,6 @@ export default defineComponent({
       disable,
       cancelVisualizeQueries,
       isFocused,
-      backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
       fnUnparsedSQL,
@@ -5061,13 +5040,6 @@ export default defineComponent({
   }
 }
 
-.expand-on-focus {
-  position: fixed !important;
-  height: calc(100vh - 12.5rem) !important;
-  z-index: 20 !important;
-  max-width: 100vw;
-  /* Width is now handled dynamically via backgroundColorStyle computed property */
-}
 
 .file-type label {
   font-weight: 600;

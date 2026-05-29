@@ -5,6 +5,7 @@
 
 <template>
   <div
+    ref="containerRef"
     class="query-editor tw:w-full tw:relative"
     :class="{
       'query-editor--fullscreen': fullscreenState,
@@ -670,6 +671,21 @@ const rootStyle = computed(() => {
     ['--query-editor-min-lines' as any]: String(props.minLines ?? 2),
     ['--query-editor-max-lines' as any]: String(props.maxLines ?? 12),
   };
+
+  // Fullscreen: same left/width as normal, height = 60vh.
+  // --qe-start-h drives the CSS keyframe animation start point.
+  if (fullscreenState.value && fullscreenRect.value) {
+    const { left, width, top, startHeight } = fullscreenRect.value;
+    return {
+      ...base,
+      left: `${left}px`,
+      width: `${width}px`,
+      top: `${top}px`,
+      height: `${Math.round(window.innerHeight * 0.6)}px`,
+      ['--qe-start-h' as any]: `${startHeight}px`,
+    };
+  }
+
   // editorHeight: '100%' → let parent decide; otherwise use the supplied size.
   if (props.editorHeight === '100%') {
     return { ...base, height: '100%' };
@@ -926,6 +942,8 @@ const functionPaneOpenState = computed({
 
 // Fullscreen (controlled or self-managed)
 const internalFullscreen = ref<boolean>(!!props.isFullscreen);
+const containerRef = ref<HTMLElement | null>(null);
+const fullscreenRect = ref<{ left: number; width: number; top: number; startHeight: number } | null>(null);
 const fullscreenState = computed({
   get: () => (props.isFullscreen !== undefined ? props.isFullscreen : internalFullscreen.value),
   set: (val: boolean) => {
@@ -1001,7 +1019,19 @@ const closeFunctionPane = () => {
   functionPaneOpenState.value = false;
 };
 const toggleFullscreen = () => {
-  fullscreenState.value = !fullscreenState.value;
+  if (!fullscreenState.value) {
+    // Capture dimensions synchronously before DOM changes
+    const el = containerRef.value;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top, startHeight: rect.height };
+    }
+    fullscreenState.value = true;
+    // Height is set to 60vh immediately; CSS @keyframes animates max-height from startHeight → 60vh
+  } else {
+    fullscreenState.value = false;
+    fullscreenRect.value = null;
+  }
 };
 const hideBottomBar = () => {
   showBottomBarState.value = false;
@@ -1410,6 +1440,10 @@ defineExpose({
   min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem + 2rem);
 }
 
+.query-editor--fullscreen .query-editor__body {
+  min-height: 0;
+}
+
 .query-editor__pane {
   display: flex;
   flex-direction: column;
@@ -1422,6 +1456,20 @@ defineExpose({
 .query-editor__pane .editor-container {
   min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem);
   max-height: calc(var(--query-editor-max-lines, 12) * 1.375rem);
+}
+
+/* In fullscreen the editor must fill all available height — lift the max-height cap
+   so Monaco grows to fill the pane and the footer stays sticky at the very bottom. */
+.query-editor--fullscreen .query-editor__pane .editor-container {
+  max-height: none;
+  flex: 1 1 0%;
+}
+
+/* Fullscreen: make pane a proper flex column so the footer is pushed to bottom */
+.query-editor--fullscreen .query-editor__pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .query-editor__splitter {
@@ -1520,13 +1568,21 @@ defineExpose({
   z-index: 5;
 }
 
+/* clip-path animation: element always has full height (background fully painted/opaque),
+   only the VISIBLE region grows — no transparent layer at any point during the expand. */
+@keyframes query-editor-expand {
+  from { clip-path: inset(0 0 calc(100% - var(--qe-start-h, 3rem)) 0 round 0.375rem); }
+  to   { clip-path: inset(0 round 0.375rem); }
+}
+
 .query-editor--fullscreen {
   position: fixed !important;
-  inset: 4rem 1rem 1rem 1rem;
+  /* left / width / top / height driven by rootStyle (JS-captured rect) */
   z-index: 50;
   background: var(--o2-card-bg-solid);
   border: 0.0625rem solid var(--o2-border);
   border-radius: 0.375rem;
   box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.25);
+  animation: query-editor-expand 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 </style>
