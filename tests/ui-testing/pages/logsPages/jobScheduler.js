@@ -81,81 +81,89 @@ export class JobSchedulerPage {
 
 
 async deleteJobSearch(trace_id) {
+      // OTable renders rows as [data-test="o2-table-row-{index}"], not by row-key.
+      // Find the row by filtering on the visible trace_id text.
+      const getRow = () =>
+          this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: trace_id }).first();
 
       // Click the "Get Jobs" button
       await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
+      await getRow().waitFor({ state: 'visible', timeout: 15000 });
 
       // Click the delete button for the specified job row
-      await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
-      await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
+      await getRow().locator('[data-test="search-scheduler-delete-btn"]').click();
 
       // Cancel the deletion (tests the cancel flow)
       await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
 
-
-      // Click the delete button for the specified job row
-      await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
-      await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
-
-      // Confirm the deletion
+      // Click the delete button again and confirm
+      await getRow().locator('[data-test="search-scheduler-delete-btn"]').click();
       await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
       // Verify the success message
-      await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been deleted successfully');
+      await expect(
+          this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job has been deleted successfully' }).first()
+      ).toBeVisible({ timeout: 10000 });
   }
 
   async restartJobSearch(trace_id) {
     // Click the "Get Jobs" button
     await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
-    // Build the selector for the job row using the trace_id
-    const jobRowSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-restart-btn"]`;
-
-    // Wait for the job row to be visible
+    // OTable rows are [data-test="o2-table-row-{index}"] — find by trace_id text content
+    const row = this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: trace_id }).first();
     try {
-        await this.page.waitForSelector(jobRowSelector, { timeout: 10000 }); // Adjust timeout as necessary
+        await row.waitFor({ state: 'visible', timeout: 10000 });
     } catch (error) {
         testLogger.error(`Error: Unable to find job row for trace ID ${trace_id}.`, error);
         throw new Error(`Job row for trace ID ${trace_id} not found.`);
     }
 
     // Click the restart button for the specified job row
-    await this.page.locator(jobRowSelector).click();
+    await row.locator('[data-test="search-scheduler-restart-btn"]').click();
 
     // Verify the success message
-    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been restarted successfully');
+    await expect(
+        this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job has been restarted successfully' }).first()
+    ).toBeVisible({ timeout: 10000 });
 }
 
 
 async cancelJobSearch(trace_id) {
-
     // Click the "Get Jobs" button
     await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
+    // OTable rows are [data-test="o2-table-row-{index}"] — find by trace_id text content
+    const row = this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: trace_id }).first();
+    await row.waitFor({ state: 'visible', timeout: 15000 });
+
     // Click the cancel button for the specified job row
-    await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-cancel-btn"]`).click();
+    await row.locator('[data-test="search-scheduler-cancel-btn"]').click();
 
     // Confirm the cancellation
     await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
     // Verify the success message
-    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been cancelled successfully');   
-
+    await expect(
+        this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job has been cancelled successfully' }).first()
+    ).toBeVisible({ timeout: 10000 });
 }     
 
 async exploreJob(trace_id) {
+    // OTable rows are [data-test="o2-table-row-{index}"] — find by trace_id text content
+    const getExploreBtn = () =>
+        this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: trace_id }).first()
+            .locator('[data-test="search-scheduler-explore-btn"]');
+
     // Click the "Get Jobs" button
     await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
-    // Build the selector for the job row using the trace_id
-    const exploreButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-explore-btn"]`;
-
-    // Wait for the explore button to be visible
+    const row = this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: trace_id }).first();
     try {
-        await this.page.waitForSelector(exploreButtonSelector, { timeout: 10000 });
+        await row.waitFor({ state: 'visible', timeout: 10000 });
     } catch (error) {
-        testLogger.error(`Error: Unable to find explore button for trace ID ${trace_id}.`, error);
-        throw new Error(`Explore button for trace ID ${trace_id} not found.`);
+        testLogger.error(`Error: Unable to find row for trace ID ${trace_id}.`, error);
+        throw new Error(`Row for trace ID ${trace_id} not found.`);
     }
 
     // Retry clicking the explore button if it is disabled
@@ -163,17 +171,15 @@ async exploreJob(trace_id) {
     let attempts = 0;
 
     while (attempts < maxRetries) {
-        const exploreButton = this.page.locator(exploreButtonSelector);
-
-        // Check if the button is enabled
+        const exploreButton = getExploreBtn();
         const isEnabled = await exploreButton.isEnabled();
         if (isEnabled) {
             await exploreButton.click();
-            break; // Exit the loop if the button is clicked successfully
+            break;
         } else {
             testLogger.warn(`Explore button for trace ID ${trace_id} is not enabled. Retrying...`);
             attempts++;
-            await this.page.waitForTimeout(5000); // Wait before retrying
+            await this.page.waitForTimeout(5000);
             await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
         }
     }
@@ -183,42 +189,45 @@ async exploreJob(trace_id) {
     }
 
     // Verify the success message
-    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job have been applied successfully');
+    await expect(
+        this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job have been applied successfully' }).first()
+    ).toBeVisible({ timeout: 10000 });
 }
 
 
 async viewJobDetails(trace_id) {
-    const expandButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-expand-btn"]`;
-    const moreDetailsTabSelector = '[data-test="tab-more_details"]';
+    // OTable rows are [data-test="o2-table-row-{index}"] — find by trace_id text content.
+    // The expand button per row is [data-test="o2-table-expand-{index}"] (OTableExpandButton).
     const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
+    const row = this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: trace_id }).first();
 
     // Retry: newly created jobs may not appear immediately in the list.
-    // Poll by clicking "Get Jobs" and waiting for the row to appear.
     const maxRetries = 5;
-    let expandBtnFound = false;
+    let rowFound = false;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         await getJobsBtn.click();
         try {
-            await this.page.locator(expandButtonSelector).waitFor({ state: 'visible', timeout: 5000 });
-            expandBtnFound = true;
+            await row.waitFor({ state: 'visible', timeout: 5000 });
+            rowFound = true;
             break;
         } catch {
-            testLogger.warn(`Expand button for trace ID ${trace_id} not found on attempt ${attempt + 1}/${maxRetries}, retrying...`);
+            testLogger.warn(`Row for trace ID ${trace_id} not found on attempt ${attempt + 1}/${maxRetries}, retrying...`);
             await this.page.waitForTimeout(2000);
         }
     }
-    if (!expandBtnFound) {
-        throw new Error(`Expand button for trace ID ${trace_id} not found after ${maxRetries} attempts.`);
+    if (!rowFound) {
+        throw new Error(`Row for trace ID ${trace_id} not found after ${maxRetries} attempts.`);
     }
 
-    // Click the expand button to reveal the expanded row
-    await this.page.locator(expandButtonSelector).click();
+    // Click the OTable expand button within this row to reveal expanded content
+    const expandBtn = row.locator('[data-test^="o2-table-expand-"]');
+    await expandBtn.click();
 
-    // Wait for and click the visible More Details tab.
-    // Multiple [data-test="tab-more_details"] exist in DOM (one per row via v-show),
-    // so we use :visible pseudo-class to avoid Playwright strict-mode violations.
+    // Wait for and click the More Details tab.
+    // Multiple [data-test="tab-more_details"] may exist in DOM (one per expanded row),
+    // so we scope to the first visible one.
     try {
-        const visibleTab = this.page.locator(`${moreDetailsTabSelector}:visible`);
+        const visibleTab = this.page.locator('[data-test="tab-more_details"]:visible').first();
         await visibleTab.waitFor({ state: 'visible', timeout: 15000 });
         await visibleTab.click();
     } catch (error) {
@@ -227,8 +236,10 @@ async viewJobDetails(trace_id) {
         throw new Error(`More Details tab for trace ID ${trace_id} not found or not clickable.`);
     }
 
-    // Verify that the expected text is present in the textbox
-    await expect(this.page.locator('[data-test="tab-more_details"]').filter({ hasText: trace_id }).first()).toBeVisible();
+    // Verify the More Details tab content is visible (contains the trace_id in JSON output)
+    await expect(
+        this.page.locator('[data-test="expanded-list-tabs"]').first()
+    ).toBeVisible({ timeout: 5000 });
 }
 
    

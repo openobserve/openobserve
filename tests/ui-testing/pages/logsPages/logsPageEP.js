@@ -30,11 +30,12 @@ async searchSchedulerCreate() {
 }
 
 async searchSchedulerSubmit() {
-  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
-
-  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]');
-  await inputField.click();
-  await inputField.fill('1000');
+  // OInput: outer wrapper has data-test="search-scheuduler-max-number-of-records-input";
+  // inner native <input> has data-test="search-scheuduler-max-number-of-records-input-field".
+  // fill() requires the native input, not the wrapper div.
+  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input-field"]');
+  await inputField.waitFor({ state: 'attached', timeout: 10000 });
+  await inputField.fill('1000', { force: true });
 
   const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
   await this.page.waitForSelector(submitBtn);
@@ -54,14 +55,16 @@ async searchSchedulerSubmit() {
 
 async validateAddJob(jobId) {
   // Wait for the notification — it fires only after the job creation API call succeeds
-  await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Job Added Succesfully', { timeout: 15000 });
+  await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job Added Succesfully' }).first()).toBeVisible({ timeout: 15000 });
 
   // Navigate to the scheduler list
   await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
-  // Resolve trace_id for the specific job we created, then assert that exact row
+  // Resolve trace_id for the specific job we created, then assert that exact row.
+  // OTable rows render as [data-test="o2-table-row-{index}"], not by row-key.
+  // We find the row by filtering on the visible trace_id text instead.
   const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
   const orgId = getOrgIdentifier();
   const listResponse = await this.page.request.get(
@@ -71,7 +74,9 @@ async validateAddJob(jobId) {
   const jobs = await listResponse.json();
   const job = jobs.find(j => j.id === jobId);
   if (!job?.trace_id) throw new Error(`Job with id "${jobId}" not found in scheduler list`);
-  await expect(this.page.locator(`[data-test="search-scheduler-table-${job.trace_id}-row"]`)).toBeVisible({ timeout: 15000 });
+  await expect(
+    this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: job.trace_id }).first()
+  ).toBeVisible({ timeout: 15000 });
 }
 
 async queryJobSearch() {
@@ -135,10 +140,11 @@ async clickJobID () {
 
 
 async searchSchedulerInvalid() {
-  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').click();
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').fill('100000000');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').press('Enter');
+  // OInput: use the inner native input (-field suffix) for fill/press operations
+  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input-field"]');
+  await inputField.waitFor({ state: 'attached', timeout: 10000 });
+  await inputField.fill('100000000', { force: true });
+  await inputField.press('Enter');
   const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
   await this.page.waitForSelector(submitBtn);
   await this.page.locator(submitBtn).click();
@@ -146,9 +152,9 @@ async searchSchedulerInvalid() {
 
 
 async validateInvalidData() {
-  await expect(this.page.locator('[data-test-variant="error"]')).toContainText('Job Scheduler should be between 1 and 100000');
-  
-  
+  await expect(
+    this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job Scheduler should be between 1 and 100000' }).first()
+  ).toBeVisible({ timeout: 10000 });
 }
 
 
