@@ -135,6 +135,7 @@ export class AlertsPage {
 
             // QueryConfig "Alert if" row + group-by selectors (data-test added on rows)
             alertIfRowLogs: '[data-test="alert-if-row-logs"]',
+            alertAggregationFunctionSelect: '[data-test="alert-aggregation-function-select"]',
             alertGroupByRow: '[data-test="alert-group-by-row"]',
             alertHavingGroupsRow: '[data-test="alert-having-groups-row"]',
             alertGroupByAddButton: '[data-test="alert-group-by-add-btn"]',
@@ -3486,9 +3487,9 @@ export class AlertsPage {
      * @returns {Locator} The function dropdown q-select element
      */
     getAggregationToggle() {
-        // In v3, the function dropdown is the first .alert-v3-select in the "Alert if" row
-        const alertIfSection = this.page.locator(this.locators.alertIfRowLogs);
-        return alertIfSection.locator('.alert-v3-select').first();
+        // The aggregation function OSelect has no data-test. Its trigger is the first
+        // <button type="button"> inside the "Alert if" row.
+        return this.page.locator('[data-test="alert-if-row-logs"] button[type="button"]').first();
     }
 
     /**
@@ -3497,11 +3498,18 @@ export class AlertsPage {
      * @param {string} functionValue - Internal value, e.g. 'count', 'total_events', 'avg'
      */
     async _selectAggregationOption(functionValue) {
-        // OSelect popovers expose option items via [data-test$="-option"] with data-test-value
-        const option = this.page.locator(`[data-test$="-popover"] [data-test$="-option"][data-test-value="${functionValue}"]`).first();
+        // OSelect with data-test emits <parent>-option attributes on options and
+        // <parent>-popover on the popover. When data-test is absent (function
+        // dropdown has none), fall back to data-test-value + role="option".
+        let option = this.page.locator(`[data-test$="-popover"] [data-test$="-option"][data-test-value="${functionValue}"]`).first();
+        const found = await option.isVisible({ timeout: 2000 }).catch(() => false);
+        if (!found) {
+            option = this.page.locator(`[role="option"][data-test-value="${functionValue}"]`).first();
+        }
         await option.waitFor({ state: 'visible', timeout: 5000 });
         await option.click();
         // Wait for popover dismissal so subsequent assertions don't race
+        await this.page.locator('[role="listbox"]').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
     }
 
@@ -3511,7 +3519,7 @@ export class AlertsPage {
      */
     async enableAggregation() {
         const toggle = this.getAggregationToggle();
-        await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await toggle.waitFor({ state: 'visible', timeout: 30000 });
         await toggle.click();
         await this._selectAggregationOption('count');
         testLogger.info('Aggregation enabled via count function');

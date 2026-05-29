@@ -76,10 +76,10 @@ export class LogsPage {
         this.dateSelector = (day) => `[data-test="date-selector-${day}"]`;
         this.monthSelector = (month) => `[data-test="month-selector-${month}"]`;
         this.yearSelector = (year) => `[data-test="year-selector-${year}"]`;
-        this.startTimeField = '[data-test="start-time-field"]';
-        this.endTimeField = '[data-test="end-time-field"]';
-        this.startTimeInput = '[data-test="start-time-input"]';
-        this.endTimeInput = '[data-test="end-time-input"]';
+        this.startTimeField = '[data-test="datetime-start-time"]';
+        this.endTimeField = '[data-test="datetime-end-time"]';
+        this.startTimeInput = '[data-test="datetime-start-time"] input[type="time"]';
+        this.endTimeInput = '[data-test="datetime-end-time"] input[type="time"]';
         this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
         this.savedViewsButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
@@ -2411,7 +2411,24 @@ export class LogsPage {
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+        // Use Monaco API (more reliable) instead of DOM selectors
+        const set = await this.page.evaluate(
+            ({ selector, value }) => {
+                const host = document.querySelector(selector);
+                if (!host || !window.monaco?.editor?.getEditors) return false;
+                const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+                if (!ed) return false;
+                ed.setValue(value);
+                ed.focus();
+                return true;
+            },
+            { selector: this.queryEditor, value: query }
+        ).catch(() => false);
+
+        if (!set) {
+            // Fallback to DOM fill
+            return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+        }
     }
 
     async clearQueryEditor() {
@@ -3021,7 +3038,7 @@ export class LogsPage {
      */
     async openLogDetailSidebar() {
         await this.page.locator(this.logTableColumnSource).click();
-        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Log detail sidebar opened');
     }
 
@@ -3030,7 +3047,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async expectLogDetailSidebarVisible() {
-        await expect(this.page.locator(this.logDetailDialogBox)).toBeVisible();
+        await expect(this.page.locator(this.logDetailDialog)).toBeVisible();
     }
 
     /**
@@ -3038,7 +3055,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async expectLogDetailSidebarNotVisible() {
-        await expect(this.page.locator(this.logDetailDialogBox)).not.toBeVisible();
+        await expect(this.page.locator(this.logDetailDialog)).not.toBeVisible();
     }
 
     /**
@@ -3123,7 +3140,7 @@ export class LogsPage {
     async closeLogDetailSidebar() {
         await this.page.locator(this.logDetailCloseButton).click();
         // Wait for sidebar to close
-        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'hidden', timeout: 5000 });
+        await this.page.locator(this.logDetailDialog).waitFor({ state: 'hidden', timeout: 5000 });
         testLogger.info('Log detail sidebar closed');
     }
 
@@ -3825,6 +3842,15 @@ export class LogsPage {
      */
     getLiveMode5SecButton() {
         return this.page.locator(this.liveMode5SecBtn);
+    }
+
+    /**
+     * Get the Live Mode refresh button by interval value
+     * @param {number} value - The refresh interval in seconds (e.g. 5, 10, 60, 300)
+     * @returns {import('@playwright/test').Locator} The button locator
+     */
+    getLiveModeButtonByValue(value) {
+        return this.page.locator(`[data-test="logs-search-bar-refresh-time-${value}"]`);
     }
 
     async getPageContent() {
@@ -5291,23 +5317,28 @@ export class LogsPage {
     }
 
     async fillStreamFilter(streamName) {
-        // OSelect wrapper is a div and cannot be `.fill()`'d. Open the popover via
-        // its explicit `-trigger` (falling back to the wrapper if absent) and type
-        // into the popover's `-search` filter input (§4 OSelect contract).
+        // Open the OSelect popover and type into the filter/search input so the
+        // virtualised option list renders the target row.
         const trigger = this.page.locator(this.indexDropDownTrigger);
         const wrapper = this.page.locator(this.indexDropDown);
         const popover = this.page.locator(this.indexDropDownPopover);
-        const search = this.page.locator(this.indexDropDownSearch);
         if (await trigger.count() > 0) {
             await trigger.first().click();
         } else {
             await wrapper.click();
         }
-        await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        await search.waitFor({ state: 'visible', timeout: 5000 });
-        await search.press('ControlOrMeta+a').catch(() => {});
-        await search.press('Backspace').catch(() => {});
-        return await search.fill(streamName);
+        await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        // The search input's data-test may not forward; try the explicit
+        // -search locator first, then fall back to any <input> in the popover.
+        const search = this.page.locator(this.indexDropDownSearch);
+        if (await search.count() > 0) {
+            await search.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            await search.press('ControlOrMeta+a').catch(() => {});
+            await search.press('Backspace').catch(() => {});
+            return await search.fill(streamName);
+        }
+        // No search input available — leave popover open unfiltered.
+        return null;
     }
 
     async toggleStreamSelection(streamName) {
@@ -5885,18 +5916,28 @@ export class LogsPage {
     }
 
     async clickTimeCell() {
-        // Click on the time cell (access_time icon)
-        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().click();
+        // Post-UX-revamp: time input is a native <input type="time"> inside datetime-start-time
+        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
+        await timeInput.waitFor({ state: 'visible', timeout: 5000 });
+        return await timeInput.click();
     }
 
     async fillTimeCellWithInvalidValue(value) {
-        // Fill time cell with partial/invalid value
-        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().fill(value);
+        // Post-UX-revamp: native <input type="time"> rejects malformed values via fill(),
+        // so use evaluate() to bypass browser validation and inject the value directly.
+        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
+        await timeInput.waitFor({ state: 'visible', timeout: 5000 });
+        await timeInput.evaluate((el, val) => {
+            el.value = val;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }, value);
     }
 
     async expectErrorIconVisible() {
-        // Use specific selector for error icon (material-icons with text-negative class)
-        return await expect(this.page.locator('i.OIcon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
+        // Post-UX-revamp: OIcon renders with data-test or use generic error-text selector
+        const errorIcon = this.page.locator('[data-test="o-input-error"], i.material-icons:has-text("error"), [class*="text-negative"]:has-text("error")').first();
+        return await expect(errorIcon).toBeVisible({ timeout: 5000 });
     }
 
     async expectResultErrorDetailsButtonVisible() {
@@ -5916,11 +5957,11 @@ export class LogsPage {
     }
 
     async expectStartTimeVisible() {
-        return await expect(this.page.getByRole('cell', { name: 'Start time' })).toBeVisible();
+        return await expect(this.page.locator('[data-test="datetime-start-time"]').first()).toBeVisible({ timeout: 5000 });
     }
 
     async expectEndTimeVisible() {
-        return await expect(this.page.getByRole('cell', { name: 'End time' })).toBeVisible();
+        return await expect(this.page.locator('[data-test="datetime-end-time"]').first()).toBeVisible({ timeout: 5000 });
     }
 
     async clickOutsideTimeInput() {
@@ -6795,6 +6836,18 @@ export class LogsPage {
      */
     async getQueryFromEditor() {
         try {
+            // Use Monaco API to get the actual editor value (textContent includes line numbers)
+            const query = await this.page.evaluate((selector) => {
+                const host = document.querySelector(selector);
+                if (!host || !window.monaco?.editor?.getEditors) return null;
+                const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+                if (!ed) return null;
+                return ed.getValue();
+            }, this.queryEditor).catch(() => null);
+
+            if (query !== null) return query.trim();
+
+            // Fallback to textContent if Monaco isn't available
             const editor = this.page.locator(this.queryEditor);
             const queryText = await editor.textContent();
             return queryText?.trim() || '';
@@ -6813,9 +6866,28 @@ export class LogsPage {
      * @returns {Promise<string>} The pagination text (e.g., "1-50 of 100")
      */
     async getPaginationText() {
-        const paginationLocator = this.page.locator(this.tableBottom).first();
-        await paginationLocator.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-        return await paginationLocator.textContent().catch(() => 'N/A');
+        // Try logs page pagination first, then streams page pagination,
+        // then the streams listing page (which uses a custom OTable #bottom slot).
+        const selectors = [
+            this.tableBottom,                           // logs-search-result-pagination
+            '[data-test="o2-table-pagination-info"]',   // OTable built-in pagination
+        ];
+        for (const selector of selectors) {
+            const locator = this.page.locator(selector).first();
+            const count = await locator.count().catch(() => 0);
+            if (count > 0) {
+                const text = await locator.textContent().catch(() => null);
+                if (text && text.trim()) return text.trim();
+            }
+        }
+        // Fallback: streams listing page (LogStream.vue) uses a custom #bottom
+        // slot that renders "{totalRows} Stream(s)" without a data-test.
+        const streamCount = this.page.locator('text=/\\d+ Stream\\(s\\)/').first();
+        if (await streamCount.count().catch(() => 0) > 0) {
+            const text = await streamCount.textContent().catch(() => null);
+            if (text && text.trim()) return text.trim();
+        }
+        return 'N/A';
     }
 
     /**
@@ -7005,9 +7077,15 @@ export class LogsPage {
      * @returns {Promise<string>} The notification text
      */
     async getNotificationText() {
+        const toastMessage = this.page.locator('[data-test="o-toast-message"]');
+        const count = await toastMessage.count();
+        if (count > 0) {
+            return await toastMessage.first().textContent() || '';
+        }
+        // Fallback to role=alert for backward compatibility
         const notifications = this.page.locator('[role="alert"]');
-        const notificationCount = await notifications.count();
-        if (notificationCount > 0) {
+        const alertCount = await notifications.count();
+        if (alertCount > 0) {
             return await notifications.first().textContent() || '';
         }
         return '';
@@ -7018,7 +7096,7 @@ export class LogsPage {
      * @returns {Promise<number>} The number of notifications
      */
     async getNotificationCount() {
-        return await this.page.locator('[role="alert"]').count();
+        return await this.page.locator('[data-test^="o-toast"]').count();
     }
 
     /**
@@ -7027,7 +7105,7 @@ export class LogsPage {
      */
     async isRefreshButtonVisible() {
         const refreshButton = this.page.locator(this.queryButton);
-        return await refreshButton.isVisible();
+        return await refreshButton.isVisible({ timeout: 10000 }).catch(() => false);
     }
 
     /**

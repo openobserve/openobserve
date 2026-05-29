@@ -74,6 +74,8 @@ export default class DashboardListPage {
   async menuItem(item) {
     const menuItem = this.page.locator(`[data-test="menu-link-/${item}"]`);
     await menuItem.click();
+    await this.page.waitForURL(`**/${item.replace('-item', '')}**`, { timeout: 15000 }).catch(() => {});
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   // Click on a dashboard by name to open it. The dashboard list table
