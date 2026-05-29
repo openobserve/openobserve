@@ -24,31 +24,24 @@ use vortex::{
     array::ArrayRef,
     error::VortexResult,
     expr::{root, select},
-    file::OpenOptionsSessionExt,
+    file::{OpenOptionsSessionExt, VortexFile},
     io::{
         runtime::{BlockingRuntime, single::SingleThreadRuntime},
         session::RuntimeSessionExt,
     },
+    layout::scan::scan_builder::ScanBuilder,
     session::VortexSession,
 };
 
 /// Open a vortex file, apply an optional projection, and return an async
 /// record batch stream over all rows.
-pub(super) async fn read_vortex_with_projection(
+pub(super) async fn scan_vortex_async(
     data: Bytes,
     projection: Option<&[String]>,
 ) -> Result<RecordBatchStream, anyhow::Error> {
     let session = VortexSession::default().with_tokio();
     let vxf = session.open_options().open_buffer(data)?;
-    let full_schema = vxf.dtype().to_arrow_schema()?;
-
-    let projected_names = vortex_projection_names(&full_schema, projection);
-
-    let mut scan = vxf.scan()?;
-    if let Some(names) = projected_names.as_deref() {
-        let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
-        scan = scan.with_projection(select(name_refs, root()));
-    }
+    let scan = open_projected_scan(&vxf, projection)?;
     let stream_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
 
     let data_type = DataType::Struct(stream_schema.fields().clone());
@@ -69,7 +62,7 @@ pub(super) async fn read_vortex_with_projection(
 }
 
 /// Build a lazy sync iterator for one vortex row range.
-pub(super) fn build_vortex_sync_iter(
+pub(super) fn scan_vortex_row_range(
     data: Bytes,
     projection: Option<&[String]>,
     row_range: Range<u64>,
@@ -77,16 +70,7 @@ pub(super) fn build_vortex_sync_iter(
     let runtime = SingleThreadRuntime::default();
     let session = VortexSession::default().with_handle(runtime.handle());
     let vxf = session.open_options().open_buffer(data)?;
-    let full_schema = vxf.dtype().to_arrow_schema()?;
-
-    let projected_names = vortex_projection_names(&full_schema, projection);
-
-    let mut scan = vxf.scan()?;
-    if let Some(names) = projected_names.as_deref() {
-        let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
-        scan = scan.with_projection(select(name_refs, root()));
-    }
-    let scan = scan.with_row_range(row_range);
+    let scan = open_projected_scan(&vxf, projection)?.with_row_range(row_range);
 
     let projected_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
     let data_type = DataType::Struct(projected_schema.fields().clone());
@@ -120,19 +104,21 @@ impl Iterator for VortexRowRangeIter {
     }
 }
 
-/// Intersection of `projection` with the file's actual columns; returns
-/// `None` when the result would be empty (so the caller skips applying the
-/// projection at all rather than producing a 0-column struct).
-fn vortex_projection_names(
-    full_schema: &Schema,
+fn open_projected_scan(
+    vxf: &VortexFile,
     projection: Option<&[String]>,
-) -> Option<Vec<String>> {
-    projection.and_then(|cols| {
-        let kept: Vec<String> = cols
+) -> Result<ScanBuilder<ArrayRef>, anyhow::Error> {
+    let full_schema = vxf.dtype().to_arrow_schema()?;
+    let mut scan = vxf.scan()?;
+    if let Some(cols) = projection {
+        let kept: Vec<&str> = cols
             .iter()
             .filter(|c| full_schema.field_with_name(c).is_ok())
-            .cloned()
+            .map(String::as_str)
             .collect();
-        (!kept.is_empty()).then_some(kept)
-    })
+        if !kept.is_empty() {
+            scan = scan.with_projection(select(kept, root()));
+        }
+    }
+    Ok(scan)
 }

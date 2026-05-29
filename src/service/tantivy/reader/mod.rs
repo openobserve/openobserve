@@ -58,7 +58,7 @@ pub(super) async fn file_stream(
             Ok(stream)
         }
         #[cfg(all(feature = "vortex", feature = "enterprise"))]
-        FileFormat::Vortex => vortex::read_vortex_with_projection(data, projection).await,
+        FileFormat::Vortex => vortex::scan_vortex_async(data, projection).await,
         #[cfg(not(all(feature = "vortex", feature = "enterprise")))]
         FileFormat::Vortex => Err(anyhow::anyhow!(
             "Vortex file format requires the vortex feature"
@@ -86,7 +86,7 @@ pub(super) fn chunk_iter(
         }
         #[cfg(all(feature = "vortex", feature = "enterprise"))]
         ChunkSelector::Vortex(row_range) => {
-            let iter = vortex::build_vortex_sync_iter(data, projection, row_range)?;
+            let iter = vortex::scan_vortex_row_range(data, projection, row_range)?;
             Ok(ChunkBatchIter::Vortex(iter))
         }
     }
