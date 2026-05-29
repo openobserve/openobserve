@@ -557,6 +557,11 @@ jobs:
           install_browser "chromium_headless_shell" "headless_shell" \
             "chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip"
 
+          # ffmpeg is required for video recording (video: retain-on-failure in playwright.config.js)
+          # The custom install_browser uses CHROMIUM_REV which doesn't match ffmpeg's own revision,
+          # so use the standard playwright install for ffmpeg only (small binary, fast download).
+          npx playwright install ffmpeg
+
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
           RERUN_TYPE="${{ steps.check_rerun.outputs.rerun_type }}"
