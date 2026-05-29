@@ -290,13 +290,7 @@ test.describe("Alerts & Incidents Page Navigation", { tag: '@enterprise' }, () =
         // config API on ENT builds). We detect it by checking whether the incidents
         // sidebar menu item is visible — it is added dynamically after the config loads.
         // waitForAlertListPageReady() above ensures config has already been processed.
-        let isEnterprise = false;
-        try {
-            await page.locator(pm.alertsPage.locators.incidentsMenuItem).waitFor({ state: 'visible', timeout: 5000 });
-            isEnterprise = true;
-        } catch {
-            isEnterprise = false;
-        }
+        const isEnterprise = await pm.alertsPage.isIncidentsFeatureEnabled(5000);
 
         if (!isEnterprise) {
             test.skip(true, 'incidents_enabled is false — enterprise feature, skipping on OSS');
