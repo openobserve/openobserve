@@ -559,8 +559,8 @@ jobs:
 
           # ffmpeg is required for video recording (video: retain-on-failure in playwright.config.js)
           # The custom install_browser uses CHROMIUM_REV which doesn't match ffmpeg's own revision,
-          # so use the standard playwright install for ffmpeg only (small binary, fast download).
-          npx playwright install ffmpeg
+          # so use the local playwright binary (pinned via package-lock.json) to install ffmpeg only.
+          ./node_modules/.bin/playwright install ffmpeg
 
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
