@@ -15,8 +15,6 @@
 
 pub mod bloom_builder;
 mod parallel;
-pub mod puffin;
-pub mod puffin_directory;
 mod reader;
 mod sequential;
 use std::{collections::HashMap, sync::Arc};
@@ -36,8 +34,7 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::storage;
-use puffin_directory::writer::PuffinDirWriter;
-use tantivy_utils::puffin_directory::PROP_ROW_GROUP_SIZE;
+use tantivy_utils::puffin_directory::{PROP_ROW_GROUP_SIZE, writer::PuffinDirWriter};
 
 pub(crate) async fn create_tantivy_index(
     caller: &str,

@@ -62,12 +62,12 @@ use crate::service::{
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
-    tantivy::puffin_directory::{
-        PROP_ROW_GROUP_SIZE,
-        caching_directory::CachingDirectory,
-        footer_cache::FooterCache,
-        reader::{PuffinDirReader, warm_up_terms},
-    },
+};
+use tantivy_utils::puffin_directory::{
+    PROP_ROW_GROUP_SIZE,
+    caching_directory::CachingDirectory,
+    footer_cache::FooterCache,
+    reader::{PuffinDirReader, warm_up_terms},
 };
 
 /// search in remote object storage
