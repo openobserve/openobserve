@@ -28,9 +28,7 @@ use bytes::Bytes;
 use config::{
     FileFormat, INDEX_FIELD_NAME_FOR_ALL, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
     get_config,
-    utils::{
-        inverted_index::convert_parquet_file_name_to_tantivy_file, tantivy::tokenizer::O2_TOKENIZER,
-    },
+    utils::{inverted_index::to_tantivy_name, tantivy::tokenizer::O2_TOKENIZER},
 };
 use hashbrown::HashSet;
 use infra::storage;
@@ -72,7 +70,7 @@ pub(crate) async fn create_tantivy_index(
     let index_size = puffin_bytes.len();
 
     // write fst bytes into disk
-    let Some(idx_file_name) = convert_parquet_file_name_to_tantivy_file(parquet_file_name) else {
+    let Some(idx_file_name) = to_tantivy_name(parquet_file_name) else {
         return Ok(0);
     };
 

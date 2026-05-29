@@ -28,7 +28,7 @@ use config::{
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::{
-        inverted_index::convert_parquet_file_name_to_tantivy_file,
+        inverted_index::to_tantivy_name,
         size::bytes_to_human_readable,
         tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
@@ -47,6 +47,12 @@ use tantivy::{
     Directory, Term,
     query::{BooleanQuery, Occur, Query, RangeQuery},
 };
+use tantivy_utils::puffin_directory::{
+    PROP_ROW_GROUP_SIZE,
+    caching_directory::CachingDirectory,
+    footer_cache::FooterCache,
+    reader::{PuffinDirReader, warm_up_terms},
+};
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
 use tracing::Instrument;
@@ -62,12 +68,6 @@ use crate::service::{
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
-};
-use tantivy_utils::puffin_directory::{
-    PROP_ROW_GROUP_SIZE,
-    caching_directory::CachingDirectory,
-    footer_cache::FooterCache,
-    reader::{PuffinDirReader, warm_up_terms},
 };
 
 /// search in remote object storage
@@ -518,8 +518,7 @@ pub async fn tantivy_search(
         .filter_map(|(_, f)| {
             scan_stats.compressed_size += f.meta.index_size;
             if f.meta.index_size > 0 {
-                convert_parquet_file_name_to_tantivy_file(&f.key)
-                    .map(|ttv_file| (ttv_file, f.clone()))
+                to_tantivy_name(&f.key).map(|ttv_file| (ttv_file, f.clone()))
             } else {
                 None
             }
@@ -808,7 +807,7 @@ async fn search_tantivy_index(
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult, bool)> {
     let file_account = parquet_file.account.clone();
-    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
+    let Some(ttv_file_name) = to_tantivy_name(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
             parquet_file.key.clone()
