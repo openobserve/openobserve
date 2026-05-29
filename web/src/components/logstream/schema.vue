@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- we will show loading state here -->
           <div
             v-if="loadingState"
-            class="tw:pt-3 tw:text-center q-w-md tw:mx-4 tw:flex tw:justify-center"
-            style="max-width: 450px"
+            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full"
+            style="min-height: calc(100vh - 3.75rem)"
           >
             <OSpinner size="md" />
           </div>
