@@ -89,10 +89,7 @@ impl RumExtraData {
         if body.is_empty() || body[0] != b'{' {
             return None;
         }
-        let end = body
-            .iter()
-            .position(|&b| b == b'\n')
-            .unwrap_or(body.len());
+        let end = body.iter().position(|&b| b == b'\n').unwrap_or(body.len());
         let json: serde_json::Value = serde_json::from_slice(&body[..end]).ok()?;
         let obj = json.as_object()?;
         obj.get("ootags")
