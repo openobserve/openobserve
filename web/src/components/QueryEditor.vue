@@ -51,6 +51,7 @@
                 <span
                   v-if="showQueryPlaceholder"
                   class="query-editor__placeholder"
+                  :style="{ left: queryEditorContentLeft + 'px', opacity: queryEditorContentLeft > 0 ? 1 : 0 }"
                   :data-test="`${dataTestPrefix}-placeholder`"
                   aria-hidden="true"
                 >
@@ -180,6 +181,7 @@
                 <span
                   v-if="showFunctionPlaceholder"
                   class="query-editor__placeholder"
+                  :style="{ left: fnEditorContentLeft + 'px', opacity: fnEditorContentLeft > 0 ? 1 : 0 }"
                   :data-test="`${functionDataTestPrefix}-placeholder`"
                   aria-hidden="true"
                 >
@@ -294,8 +296,8 @@
               :debounce-time="debounceTime"
               @update:query="handleQueryUpdate"
               @run-query="emit('run-query')"
-              @focus="() => { queryEditorFocused = true; emit('focus') }"
-              @blur="() => { queryEditorFocused = false; emit('blur') }"
+              @focus="() => { queryEditorFocused.value = true; emit('focus') }"
+              @blur="() => { queryEditorFocused.value = false; emit('blur') }"
               @nlpModeDetected="handleNlpModeDetected"
               @generation-start="handleGenerationStart"
               @generation-end="handleGenerationEnd"
@@ -305,6 +307,7 @@
             <span
               v-if="showQueryPlaceholder"
               class="query-editor__placeholder"
+              :style="{ left: queryEditorContentLeft + 'px', opacity: queryEditorContentLeft > 0 ? 1 : 0 }"
               :data-test="`${dataTestPrefix}-placeholder`"
               aria-hidden="true"
             >
@@ -1088,21 +1091,55 @@ watch(() => props.defaultLanguage, (newLang) => {
 
 // ───── Typewriter placeholder ─────
 // Floating placeholder rendered over Monaco when the editor is empty.
-// Cycles through the three modes a user can author in.
+// Text is mode-aware: Filter, SQL, and VRL each show a relevant example.
 const queryPlaceholderText = ref('');
 const functionPlaceholderText = ref('');
-const queryPlaceholderPhrases = ['Write SQL query', 'Write filter criteria', 'Write VRL function'];
-const functionPlaceholderPhrases = ['Write VRL function'];
+
+// Phrases change based on the active query mode so the example always makes sense.
+const queryPlaceholderPhrases = computed<string[]>(() => {
+  if (currentMode.value === 'sql') {
+    return ["Write a SQL query (e.g. SELECT * FROM 'logs' WHERE status=500 LIMIT 100)"];
+  }
+  return ["Add filter conditions (e.g. status=200 AND method='GET' AND level='error')"];
+});
+
+const functionPlaceholderPhrases: string[] = [
+  "Write a VRL function (e.g. .status = to_int!(.status))",
+];
 
 const showQueryPlaceholder = computed(
-  () => !queryEditorFocused && (!props.query || !props.query.trim()),
+  () => !queryEditorFocused.value && (!props.query || !props.query.trim()),
 );
 const showFunctionPlaceholder = computed(
-  () => !fnEditorFocused && functionPaneOpenState.value && (!props.functionQuery || !props.functionQuery.trim()),
+  () => !fnEditorFocused.value && functionPaneOpenState.value && (!props.functionQuery || !props.functionQuery.trim()),
 );
 
+// Monaco contentLeft (px) — updates when the editor layout changes (e.g. line-number width).
+// Used to pin the placeholder exactly where Monaco places its first character.
+// Start at 0; Monaco reports the real value immediately after mount via onDidLayoutChange.
+const queryEditorContentLeft = ref(0);
+const fnEditorContentLeft = ref(0);
+
+const trackLayout = (
+  editorTarget: typeof editorRef,
+  leftTarget: typeof queryEditorContentLeft,
+) => {
+  watch(editorTarget, (inst) => {
+    const monaco = inst?.editorObj;
+    if (!monaco) return;
+    leftTarget.value = monaco.getLayoutInfo().contentLeft;
+    monaco.onDidLayoutChange((info: any) => {
+      leftTarget.value = info.contentLeft;
+    });
+  }, { immediate: true });
+};
+
+trackLayout(editorRef, queryEditorContentLeft);
+trackLayout(fnEditorRef, fnEditorContentLeft);
+
+// Accepts a phrases getter so the typewriter reacts to mode changes at runtime.
 const createTypewriter = (
-  phrases: string[],
+  getPhrases: () => string[],
   target: { value: string },
   isActive: () => boolean,
 ) => {
@@ -1117,6 +1154,8 @@ const createTypewriter = (
       timer = setTimeout(tick, 400);
       return;
     }
+    const phrases = getPhrases();
+    phraseIdx = phraseIdx % phrases.length; // clamp after a phrases change
     const current = phrases[phraseIdx];
     if (mode === 'typing') {
       charIdx++;
@@ -1125,11 +1164,12 @@ const createTypewriter = (
         mode = 'pausing';
         timer = setTimeout(() => {
           mode = phrases.length > 1 ? 'deleting' : 'typing';
+          charIdx = phrases.length > 1 ? charIdx : 0;
           tick();
         }, 1800);
         return;
       }
-      timer = setTimeout(tick, 70);
+      timer = setTimeout(tick, 60);
     } else if (mode === 'deleting') {
       charIdx--;
       target.value = current.slice(0, charIdx);
@@ -1137,7 +1177,7 @@ const createTypewriter = (
         phraseIdx = (phraseIdx + 1) % phrases.length;
         mode = 'typing';
       }
-      timer = setTimeout(tick, 35);
+      timer = setTimeout(tick, 30);
     }
   };
 
@@ -1150,19 +1190,33 @@ const createTypewriter = (
       if (timer) clearTimeout(timer);
       timer = null;
     },
+    restart: () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      phraseIdx = 0;
+      charIdx = 0;
+      mode = 'typing';
+      target.value = '';
+      tick();
+    },
   };
 };
 
 const queryTypewriter = createTypewriter(
-  queryPlaceholderPhrases,
+  () => queryPlaceholderPhrases.value,
   queryPlaceholderText,
   () => showQueryPlaceholder.value,
 );
 const functionTypewriter = createTypewriter(
-  functionPlaceholderPhrases,
+  () => functionPlaceholderPhrases,
   functionPlaceholderText,
   () => showFunctionPlaceholder.value,
 );
+
+// Restart the query typewriter when the user switches between Filter and SQL.
+watch(currentMode, () => {
+  queryTypewriter.restart();
+});
 
 onMounted(() => {
   queryTypewriter.start();
@@ -1311,11 +1365,12 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Floating typewriter placeholder shown when the editor is empty. */
+/* Floating typewriter placeholder shown when the editor is empty.
+   `left` and `opacity` are set via :style — once Monaco reports its contentLeft
+   the placeholder fades in aligned exactly with the first character. */
 .query-editor__placeholder {
   position: absolute;
   top: 0.5rem;
-  left: 4rem; /* clear Monaco's gutter (line numbers + glyph margin) */
   pointer-events: none;
   user-select: none;
   font-family: var(--font-mono, monospace);
@@ -1323,7 +1378,8 @@ defineExpose({
   line-height: 1.375rem;
   color: var(--o2-text-placeholder, var(--o2-text-muted));
   white-space: nowrap;
-  z-index: 1;
+  z-index: 10;
+  transition: opacity 0.15s ease;
 }
 
 .query-editor__caret {
