@@ -704,7 +704,7 @@ export default defineComponent({
         pointer-events: none;
         position: absolute;
         left: 0;
-        top: 0;
+        top: 4px;
       }
     }
 
