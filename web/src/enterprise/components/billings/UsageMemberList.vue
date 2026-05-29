@@ -181,12 +181,13 @@ export default defineComponent({
         return null;
       }
       const currentOrg = store.state.selectedOrganization;
+      const orgName = currentOrg.label || currentOrg.name;
       return {
         value: "current",
-        primary: currentOrg.name || currentOrg.identifier,
-        secondary: currentOrg.name ? currentOrg.identifier : "",
-        title: currentOrg.name
-          ? `${currentOrg.name} | ${currentOrg.identifier}`
+        primary: orgName || currentOrg.identifier,
+        secondary: orgName ? currentOrg.identifier : "",
+        title: orgName
+          ? `${orgName} | ${currentOrg.identifier}`
           : currentOrg.identifier,
       };
     });
@@ -240,16 +241,31 @@ export default defineComponent({
   text-align: left;
 
   &:hover {
-    background-color: var(--o2-hover-bg, rgba(0, 0, 0, 0.04));
+    background-color: var(--o2-hover-bg, rgba(0, 0, 0, 0.06));
   }
 
   &--active {
     background-color: var(--o2-primary-btn-bg);
     color: white;
 
+    &:hover {
+      background-color: var(--o2-primary-btn-bg);
+    }
+
     .member-id {
       opacity: 0.85;
     }
+  }
+
+  // Dark mode overrides — hover is invisible on #1a1a1a without these
+  .member-header-dark &:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .member-header-dark &--active,
+  .member-header-dark &--active:hover {
+    background-color: var(--o2-primary-btn-bg);
+    color: white;
   }
 
   .member-name {
