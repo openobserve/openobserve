@@ -50,10 +50,10 @@ test.describe("logs testcases", () => {
     await ingestion(page);
 
     // Navigate to logs page
-    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"] ?? "default"}`;
 
     await page.goto(logsUrl);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
@@ -81,7 +81,6 @@ test.describe("logs testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-    // const logsVisualise = new LogsVisualise(page);
 
     // Step 1: Open Logs page and query editor
     await pm.logsVisualise.openLogs();
@@ -93,12 +92,8 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
     await pm.logsVisualise.openVisualiseTab();
 
-    // Check for any error messages or indicators
-    const errorMessage = page.locator('[data-test="error-message"]');
-    const errorCount = await errorMessage.count();
-
     // Assert that no error messages are displayed
-    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
+    await expect(page.locator('[data-test="error-message"]')).toHaveCount(0);
   });
   test("should redirect the correct chart type when added the aggregation query", async ({
     page,
