@@ -1,12 +1,12 @@
 <template>
     <div class="pipeline-view-tooltip container">
-      <VueFlow 
-      ref="vueFlowRef"
+      <VueFlow
+        ref="vueFlowRef"
         v-model:nodes="lockedNodes"
         v-model:edges="edges"
         :options="{ readOnly: true }"
-        :default-viewport="{ zoom: 0 }"
-
+        :min-zoom="0.1"
+        @nodes-initialized="onNodesReady"
        >
        <DropzoneBackground
         :style="{
@@ -50,7 +50,7 @@ import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { defineComponent, computed, watch } from 'vue';
   import { ControlButton, Controls } from '@vue-flow/controls'
   import { VueFlow } from "@vue-flow/core";
-  import { ref, onMounted } from "vue";
+  import { ref, onMounted, nextTick } from "vue";
   import { useStore } from "vuex";
   import config from "@/aws-exports";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
@@ -92,11 +92,15 @@ const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
       });
   
 
-      onMounted(async () => {
-      if (vueFlowRef.value) {
-        vueFlowRef.value.fitView({ padding: 0.1});
-      }
+      const onNodesReady = () => {
+        nextTick(() => {
+          if (vueFlowRef.value) {
+            vueFlowRef.value.fitView({ padding: 0.1 });
+          }
+        });
+      };
 
+      onMounted(async () => {
         pipelineObj.nodeTypes = [
   {
     label: "Source",
@@ -179,11 +183,6 @@ const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
           }
         }
 
-        setTimeout(() => {
-          if(vueFlowRef.value)
-          vueFlowRef.value.fitView({ padding: 0.1});
-        }, 100);
-
       })
 
       // Watch for pipeline prop changes to update error information
@@ -200,12 +199,13 @@ const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
         vueFlowRef,
         pipelineObj,
         streamImage,
+        onNodesReady,
       };
 
     }
   });
   </script>
-  
+    
   <style lang="scss">
   /* Simple tooltip styling - let CustomNode handle everything else */
   .pipeline-view-tooltip {
