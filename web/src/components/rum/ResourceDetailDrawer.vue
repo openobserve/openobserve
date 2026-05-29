@@ -280,7 +280,6 @@ const viewSessionEvents = () => {
   toast({
     variant: "info",
     message: "Session events view coming soon",
-    timeout: 2000,
   });
 };
 

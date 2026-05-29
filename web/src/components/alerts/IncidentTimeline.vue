@@ -380,13 +380,11 @@ const submitComment = async () => {
     toast({
       variant: "success",
       message: "Comment posted successfully",
-      timeout: 2000,
     });
   } catch (e: any) {
     toast({
       variant: "error",
       message: "Failed to post comment",
-      timeout: 2000,
     });
   } finally {
     submitting.value = false;

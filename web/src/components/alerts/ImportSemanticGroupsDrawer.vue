@@ -415,8 +415,7 @@ const loadFile = async (file: File | null) => {
   } catch (error: any) {
     toast({
       message: `Failed to parse JSON: ${error.message}`,
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "error",
     });
     clearFile();
   } finally {
@@ -449,8 +448,7 @@ const previewDiff = async (groups: SemanticGroup[]) => {
   } catch (error: any) {
     toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "error",
     });
   }
 };
@@ -539,8 +537,7 @@ const handleApply = () => {
 
   toast({
     message: `Applied ${changeCount} changes`,
-    position: "bottom-right",
-    timeout: 2000,
+    variant: "success",
   });
 };
 

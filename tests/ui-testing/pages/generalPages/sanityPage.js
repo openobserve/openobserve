@@ -158,7 +158,7 @@ export class SanityPage {
         // ============================================================
         // Toast locators (used for success / error verification)
         // ============================================================
-        this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+        this.toastSuccess = page.locator('[data-test-variant="success"]');
 
         // ============================================================
         // Per-name factory helpers (runtime-dynamic, return Locator)

@@ -221,7 +221,6 @@ const http = ({ headers } = {} as any) => {
                 message: notifyMessage,
                 timeout: 0, // This ensures the notification does not close automatically
                 variant: "error",
-                position: "bottom-right",
               });
             }
             console.log(

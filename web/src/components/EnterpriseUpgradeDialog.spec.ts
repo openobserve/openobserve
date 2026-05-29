@@ -592,7 +592,7 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(mockRouterPush).not.toHaveBeenCalled();
       expect(mockNotify).toHaveBeenCalledTimes(1);
       const arg = mockNotify.mock.calls[0][0];
-      expect(arg).toMatchObject({ color: "negative", timeout: 5000 });
+      expect(arg).toMatchObject({ variant: "error" });
     });
 
     it("handles a missing organizations array without crashing", () => {

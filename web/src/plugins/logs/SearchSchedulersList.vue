@@ -479,7 +479,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: t('search_scheduler_job.job_cancelled_success'),
-            timeout: 2000,
           });
         })
         .catch((e) => {
@@ -488,7 +487,6 @@ export default defineComponent({
               variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_cancel_failed'),
-              timeout: 2000,
             });
           }
         })
@@ -506,7 +504,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: t('search_scheduler_job.job_restarted_success'),
-            timeout: 2000,
           });
         })
         .catch((e) => {
@@ -515,7 +512,6 @@ export default defineComponent({
               variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_restart_failed'),
-              timeout: 2000,
             });
           }
         })
@@ -542,7 +538,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: t('search_scheduler_job.job_deleted_success'),
-            timeout: 2000,
           });
         })
         .catch((e) => {
@@ -551,7 +546,6 @@ export default defineComponent({
               variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_delete_failed'),
-              timeout: 2000,
             });
           }
         })
@@ -680,7 +674,6 @@ export default defineComponent({
       toast({
         variant: "success",
         message: t('search_scheduler_job.job_applied_success'),
-        timeout: 2000,
       });
 
       router.push({

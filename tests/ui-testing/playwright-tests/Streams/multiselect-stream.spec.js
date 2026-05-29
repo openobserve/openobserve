@@ -416,7 +416,7 @@ async function multistreamselect(page) {
     
     // Wait for success message with timeout constant
     try {
-      await page.locator('[data-test="o-toast-success"]').waitFor({
+      await page.locator('[data-test-variant="success"]').waitFor({
         state: 'visible',
         timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING
       });

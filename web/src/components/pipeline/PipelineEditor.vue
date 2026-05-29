@@ -290,7 +290,6 @@ const plotChart: any = ref({
         roam: false,
         label: {
           show: true,
-          position: "bottom-right",
         },
         draggable: true,
         edgeSymbol: ["arrow"],
@@ -649,8 +648,7 @@ const getPipeline = () => {
       if (!_pipeline) {
         toast({
           message: t("pipeline.pipelineNotFound"),
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "warning",
         });
         router.replace({
           name: "pipelines",
@@ -689,8 +687,7 @@ const getPipeline = () => {
     .catch((error) => {
       toast({
         message: error?.message || t("pipeline.failedToLoadPipeline"),
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "error",
       });
       router.replace({
         name: "pipelines",
@@ -750,8 +747,7 @@ const savePipeline = async () => {
 
     toast({
       message: t("pipeline.pipelineNameRequired"),
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "warning",
     });
     return;
   }
@@ -773,8 +769,7 @@ const savePipeline = async () => {
   if (inputNodeIndex === -1) {
     toast({
       message: t("pipeline.sourceNodeRequired"),
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "warning",
     });
     if(showJsonEditorDialog.value == true){
       validationErrors.value = [t("pipeline.sourceNodeRequired")];
@@ -783,8 +778,7 @@ const savePipeline = async () => {
   } else if (outputNodeIndex === -1) {
     toast({
       message: t("pipeline.destinationNodeRequired"),
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "warning",
     });
     if(showJsonEditorDialog.value == true){
       validationErrors.value = [t("pipeline.destinationNodeRequired")];
@@ -816,8 +810,7 @@ const savePipeline = async () => {
   if (findMissingEdges()) {
     toast({
       message: t("pipeline.connectAllNodes"),
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "warning",
     });
     if(showJsonEditorDialog.value == true){
       validationErrors.value = [t("pipeline.connectAllNodes")];
@@ -856,8 +849,7 @@ const validatePipeline = () => {
   ) {
     toast({
       message: t("pipeline.enrichmentTablesScheduledOnly"),
-      position: "bottom-right",
-      timeout: 2000,
+      variant: "warning",
     });
     return false;
   }
@@ -879,9 +871,9 @@ const onSubmitPipeline = async () => {
   }
   const dismiss = toast({
     message: t("pipeline.savingPipeline"),
-    position: "bottom-right",
     variant: "loading",
-  });
+      timeout: 0,
+});
 
   const saveOperation = pipelineObj.isEditPipeline
     ? pipelineService.updatePipeline({
@@ -906,8 +898,7 @@ const onSubmitPipeline = async () => {
       });
       toast({
         message: t("pipeline.pipelineUpdated"),
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "success",
       });
       }
       else if (!pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
@@ -920,16 +911,14 @@ const onSubmitPipeline = async () => {
       });
         toast({
           message: t("pipeline.pipelineSaved"),
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "success",
         });
       }
       else if(pipelineObj.isEditPipeline && showJsonEditorDialog.value == true){
         showJsonEditorDialog.value = false;
         toast({
           message: t("pipeline.pipelineUpdated"),
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "success",
         });
       }
       else{
@@ -942,8 +931,7 @@ const onSubmitPipeline = async () => {
         });
         toast({
           message: t("pipeline.pipelineSaved"),
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "success",
         });
       }
 
@@ -959,8 +947,7 @@ const onSubmitPipeline = async () => {
       ) {
         toast({
           message: t("pipeline.connectAllNodesShort"),
-          position: "bottom-right",
-          timeout: 3000,
+          variant: "warning",
         });
         if(showJsonEditorDialog.value == true){
           validationErrors.value = [t("pipeline.connectAllNodes")];
@@ -970,8 +957,7 @@ const onSubmitPipeline = async () => {
           toast({
             message:
               error.response?.data?.message || t("pipeline.errorSavingPipeline"),
-            position: "bottom-right",
-            timeout: 3000,
+            variant: "error",
           });
           if(showJsonEditorDialog.value == true){
             validationErrors.value = [error.response?.data?.message || t("pipeline.errorSavingPipeline")];

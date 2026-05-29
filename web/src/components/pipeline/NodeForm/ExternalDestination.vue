@@ -143,7 +143,8 @@ const getDestinations = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while loading destinations...",
-  });
+      timeout: 0,
+});
   destinationService
     .list({
       page_num: 1,
@@ -161,7 +162,6 @@ const getDestinations = () => {
         toast({
           variant: "error",
           message: "Error while pulling destinations.",
-          timeout: 2000,
         });
       }
       dismiss();
@@ -180,7 +180,6 @@ const saveDestination = () => {
     toast({
       variant: "warning",
       message: "Please select External destination from the list",
-      timeout: 2000,
     });
     return;
   }

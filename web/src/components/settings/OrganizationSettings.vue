@@ -207,14 +207,12 @@ const saveOrgSettings = async () => {
 
     toast({
       message: "Organization settings updated successfully",
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "success",
     });
   } catch (e: any) {
     toast({
       message: e?.message || "Error saving organization settings",
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "error",
     });
   }
 };

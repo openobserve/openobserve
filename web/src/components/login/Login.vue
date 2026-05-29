@@ -409,7 +409,6 @@ export default defineComponent({
               toast({
                 variant: "error",
                 message: "Invalid username or password",
-                timeout: 4000,
               });
               console.log(e);
             });

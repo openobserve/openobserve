@@ -188,8 +188,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
-      });
+              timeout: 0,
+});
       const organizationId = this.organizationData.id;
         //here we will check if organizationId is there or not because we only get org id when we are updating the organization
         //if organizationId is not there we will create a new organization else we will update the existing organization

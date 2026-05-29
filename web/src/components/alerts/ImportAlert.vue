@@ -513,9 +513,8 @@ export default defineComponent({
           : [parsedJson];
       } catch (e: any) {
         toast({
+          variant: "error",
           message: e.message || "Invalid JSON format",
-          position: "bottom-right",
-          timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -537,9 +536,8 @@ export default defineComponent({
 
       if (allAlertsCreated) {
         toast({
+          variant: "success",
           message: "Alert(s) imported successfully",
-          position: "bottom-right",
-          timeout: 2000,
         });
 
         // Delay navigation to allow Monaco editor to complete all debounced operations
@@ -622,9 +620,8 @@ export default defineComponent({
         }
       } catch (e: any) {
         toast({
+          variant: "error",
           message: "Error importing Alert(s) please check the JSON",
-          position: "bottom-right",
-          timeout: 2000,
         });
         return false;
       }

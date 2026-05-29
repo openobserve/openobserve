@@ -644,8 +644,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
-      });
+              timeout: 0,
+});
 
       // Generate a unique panel ID.
       const panelId =
@@ -933,7 +933,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: this.t("panel.noQueriesToCreateAlert"),
-          timeout: 2000,
         });
         return;
       }
@@ -943,7 +942,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: this.t("panel.panelQueryMustHaveStream"),
-          timeout: 2000,
         });
         return;
       }
@@ -955,7 +953,6 @@ export default defineComponent({
           message: this.t("panel.unsupportedPanelTypeAlert", {
             type: this.props.data.type,
           }),
-          timeout: 3000,
         });
       }
 

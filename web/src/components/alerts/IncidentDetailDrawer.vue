@@ -1237,7 +1237,6 @@ export default defineComponent({
       copyToClipboardUtil(text, {
         successMessage: "Copied to clipboard",
         errorMessage: "Failed to copy to clipboard",
-        timeout: 2000,
       }).then((success) => {
         if (success) {
           copiedField.value = fieldName;
@@ -2155,7 +2154,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
-          timeout: 2000,
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
@@ -2169,7 +2167,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: error?.response?.data?.message || "Failed to update incident title",
-          timeout: 3000,
         });
         cancelTitleEdit();
       }
@@ -2350,7 +2347,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: `Incident status updated to ${response.data.status}`,
-          timeout: 2000,
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
@@ -2364,7 +2360,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: error?.response?.data?.message || "Failed to update incident status",
-          timeout: 3000,
         });
         // Revert on error
         editableStatus.value = incidentDetails.value.status;
@@ -2404,7 +2399,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: `Incident severity updated to ${data.severity}`,
-          timeout: 2000,
         });
         // Mark data as stale so incident list will refresh
         store.dispatch('incidents/setShouldRefresh', true);
@@ -2416,7 +2410,6 @@ export default defineComponent({
             toast({
               variant: "info",
               message: "AI analysis is already running for this incident",
-              timeout: 3000,
             });
           } else {
             const ok = await confirm({
@@ -2432,14 +2425,12 @@ export default defineComponent({
                 toast({
                   variant: "success",
                   message: "AI reanalysis started",
-                  timeout: 2000,
                 });
                 await loadDetails(incidentId);
               } catch (e: any) {
                 toast({
                   variant: "error",
                   message: e?.response?.data?.message || "Failed to start reanalysis",
-                  timeout: 3000,
                 });
               }
             }
@@ -2450,7 +2441,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: error?.response?.data?.message || "Failed to update incident severity",
-          timeout: 3000,
         });
         // Revert on error
         editableSeverity.value = incidentDetails.value.severity;

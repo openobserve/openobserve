@@ -1005,7 +1005,6 @@ onBeforeMount(async () => {
             variant: "error",
             message:
               err.response?.data?.message || "Error while fetching report!",
-            timeout: 4000,
           });
         }
       })
@@ -1396,8 +1395,8 @@ const saveReport = async () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
 
   savePromise
     .then(() => {
@@ -1414,7 +1413,6 @@ const saveReport = async () => {
         message: `Report ${
           isEditingReport.value ? "updated" : "saved"
         } successfully.`,
-        timeout: 3000,
       });
       goToReports();
     })
@@ -1427,7 +1425,6 @@ const saveReport = async () => {
             `Error while ${
               isEditingReport.value ? "updating" : "saving"
             } report.`,
-          timeout: 4000,
         });
       }
     })
@@ -1725,7 +1722,6 @@ const setupEditingReport = async (report: any) => {
     toast({
       variant: "error",
       message: "Selected folder has been deleted!",
-      timeout: 4000,
     });
   }
 
@@ -1741,7 +1737,6 @@ const setupEditingReport = async (report: any) => {
     toast({
       variant: "error",
       message: "Selected dashboard has been deleted!",
-      timeout: 4000,
     });
   }
 
@@ -1758,7 +1753,6 @@ const setupEditingReport = async (report: any) => {
     toast({
       variant: "error",
       message: "Selected dashboard tab has been deleted!",
-      timeout: 4000,
     });
     formData.value.dashboards[0].tabs = "";
   }

@@ -310,7 +310,6 @@ const updateBackfillJobRequest = async () => {
     toast({
       variant: "success",
       message: "Backfill job updated successfully",
-      timeout: 3000,
     });
 
     emit("job-updated");

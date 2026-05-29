@@ -1028,7 +1028,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             toast({
               variant: "error",
               message: errorMsg,
-              timeout: 2000,
             });
           }
           return false;
@@ -1100,7 +1099,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // 1. Alert name — empty check
     if (!formData.value.name?.trim()) {
       alertNameError.value = true;
-      toast({ variant: "error", message: t("alerts.nameRequired"), timeout: 2000 });
+      toast({ variant: "error", message: t("alerts.nameRequired") });
       focusTopbarField(step1Ref);
       return false;
     }
@@ -1110,7 +1109,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       toast({
         variant: "error",
         message: t("alerts.nameNoSpecialChars"),
-        timeout: 4000,
       });
       focusTopbarField(step1Ref);
       return false;
@@ -1120,7 +1118,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // 2. Stream Type
     if (!formData.value.stream_type) {
       streamTypeError.value = true;
-      toast({ variant: "error", message: "Stream type is required.", timeout: 2000 });
+      toast({ variant: "error", message: "Stream type is required." });
       focusTopbarField(streamTypeRef);
       return false;
     }
@@ -1129,7 +1127,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // 3. Stream Name
     if (!formData.value.stream_name) {
       streamNameError.value = true;
-      toast({ variant: "error", message: "Stream name is required.", timeout: 2000 });
+      toast({ variant: "error", message: "Stream name is required." });
       focusTopbarField(streamNameRef);
       return false;
     }
@@ -1155,7 +1153,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       if (!isValid) {
         activeTab.value = "condition";
         await nextTick();
-        if (message) toast({ variant: "error", message, timeout: 2000 });
+        if (message) toast({ variant: "error", message });
         if (shouldFocusDestination && (step4Ref.value as any).focusDestination) {
           (step4Ref.value as any).focusDestination();
         } else {
@@ -1451,7 +1449,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             message: t("alerts.importedFromPanel", {
               panelTitle: panelData.panelTitle,
             }),
-            timeout: 3000,
           });
 
           if (query.fields?.stream_type) {
@@ -1647,7 +1644,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         toast({
           variant: "error",
           message: "Failed to load panel data",
-          timeout: 2000,
         });
       } finally {
         isLoadingPanelData.value = false;
@@ -1730,7 +1726,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       toast({
         variant: "error",
         message: "Anomaly name is required.",
-        timeout: 2000,
       });
       return;
     }
@@ -1879,7 +1874,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         toast({
           variant: "error",
           message: "Anomaly detection name is required.",
-          timeout: 2000,
         });
         focusTopbarField(anomalyNameRef);
         return false;
@@ -1955,7 +1949,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const dismiss = toast({
       variant: "loading",
       message: "Please wait...",
-      timeout: 2000,
+      timeout: 0,
     });
 
     if (

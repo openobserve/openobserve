@@ -388,7 +388,6 @@ const loadJobs = async () => {
     toast({
       variant: "error",
       message: "Failed to load backfill jobs",
-      timeout: 3000,
     });
   } finally {
     loading.value = false;
@@ -555,7 +554,6 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
     toast({
       variant: "success",
       message: "Backfill job paused successfully",
-      timeout: 3000,
     });
 
     loadJobs();
@@ -581,7 +579,6 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
     toast({
       variant: "success",
       message: "Backfill job resumed successfully",
-      timeout: 3000,
     });
 
     loadJobs();
@@ -606,7 +603,6 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
     toast({
       variant: "success",
       message: "Backfill job deleted successfully",
-      timeout: 3000,
     });
 
     loadJobs();

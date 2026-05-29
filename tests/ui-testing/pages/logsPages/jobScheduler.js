@@ -101,7 +101,7 @@ async deleteJobSearch(trace_id) {
       await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
       // Verify the success message
-      await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Search Job has been deleted successfully');
+      await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been deleted successfully');
   }
 
   async restartJobSearch(trace_id) {
@@ -123,7 +123,7 @@ async deleteJobSearch(trace_id) {
     await this.page.locator(jobRowSelector).click();
 
     // Verify the success message
-    await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Search Job has been restarted successfully');
+    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been restarted successfully');
 }
 
 
@@ -139,7 +139,7 @@ async cancelJobSearch(trace_id) {
     await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
     // Verify the success message
-    await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Search Job has been cancelled successfully');   
+    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been cancelled successfully');   
 
 }     
 
@@ -183,7 +183,7 @@ async exploreJob(trace_id) {
     }
 
     // Verify the success message
-    await expect(this.page.locator('[data-test="o-toast"]')).toContainText('Search Job have been applied successfully');
+    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job have been applied successfully');
 }
 
 

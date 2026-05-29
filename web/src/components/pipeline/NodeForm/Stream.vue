@@ -241,8 +241,7 @@ function sanitizeStreamName(input: string): string {
   if (input.length > 100) {
     toast({
       message: "Stream name should be less than 100 characters",
-      position: "bottom-right",
-      timeout: 2000,
+      variant: "warning",
     });
     //return empty string so that stream name is not saved and user will be notifid and
     //will be able to add another stream name

@@ -14,17 +14,30 @@ interface ToastRecord {
   action?: ToastOptions["action"]
   count: number // number of identical toasts collapsed into this one
   timer?: ReturnType<typeof setTimeout> // auto-dismiss handle, reset on dedup
+  timerStart?: number                   // epoch ms when the current timer was started
+  remainingTimeout?: number             // ms left when the timer was last paused
 }
 
 // ── Default timeouts per variant ─────────────────────────────────────────────
 
 const defaultTimeouts: Record<ToastVariant, number> = {
-  success: 3000,
-  error: 5000,
-  warning: 4000,
-  info: 4000,
+  success: 5000,
+  error: 30000,
+  warning: 30000,
+  info: 5000,
   loading: 0,
-  default: 3000,
+  default: 5000,
+}
+
+// ── Default positions per variant ────────────────────────────────────────────
+
+const defaultPositions: Record<ToastVariant, ToastPosition> = {
+  success: "bottom-center",
+  error: "bottom-center",
+  warning: "bottom-center",
+  info: "bottom-center",
+  loading: "bottom-center",
+  default: "bottom-center",
 }
 
 // ── Module-level singleton — survives outside Vue lifecycle ──────────────────
@@ -39,19 +52,46 @@ type DismissFn = (replacement?: Pick<ToastOptions, "variant" | "message" | "titl
 
 // ── Core toast() function ────────────────────────────────────────────────────
 
-function scheduleAutoDismiss(record: ToastRecord): void {
+function scheduleAutoDismiss(record: ToastRecord, delay?: number): void {
   if (record.timer) {
     clearTimeout(record.timer)
     record.timer = undefined
   }
-  if (record.timeout > 0) {
-    record.timer = setTimeout(() => dismiss(record.id), record.timeout)
+  const ms = delay ?? record.timeout
+  if (ms > 0) {
+    record.timerStart = Date.now()
+    record.remainingTimeout = ms
+    record.timer = setTimeout(() => dismiss(record.id), ms)
   }
+}
+
+function pauseTimer(id: string): void {
+  const record = toastRecords.find((r) => r.id === id)
+  if (!record?.timer || !record.timerStart) return
+  clearTimeout(record.timer)
+  record.timer = undefined
+  record.remainingTimeout = Math.max(
+    0,
+    (record.remainingTimeout ?? record.timeout) - (Date.now() - record.timerStart),
+  )
+  record.timerStart = undefined
+}
+
+function resumeTimer(id: string): void {
+  const record = toastRecords.find((r) => r.id === id)
+  if (!record || record.timer || !record.remainingTimeout) return
+  record.timerStart = Date.now()
+  record.timer = setTimeout(() => dismiss(record.id), record.remainingTimeout)
+}
+
+function capitalizeFirst(str: string): string {
+  if (!str) return str
+  return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
 function toast(options: ToastOptions): DismissFn {
   const variant: ToastVariant = options.variant ?? "default"
-  const position: ToastPosition = options.position ?? "bottom-right"
+  const position: ToastPosition = options.position ?? defaultPositions[variant]
   const timeout =
     options.timeout !== undefined ? options.timeout : defaultTimeouts[variant]
 
@@ -77,8 +117,8 @@ function toast(options: ToastOptions): DismissFn {
   const record: ToastRecord = {
     id,
     variant,
-    message: options.message,
-    title: options.title,
+    message: capitalizeFirst(options.message),
+    title: options.title ? capitalizeFirst(options.title) : undefined,
     timeout,
     position,
     open: true,
@@ -86,8 +126,12 @@ function toast(options: ToastOptions): DismissFn {
     count: 1,
   }
 
-  toastRecords.push(record)
-  scheduleAutoDismiss(record)
+  // Loading variant is suppressed — callers use the returned dismiss fn to
+  // swap in a success/error result toast; no spinner is shown in the UI.
+  if (variant !== "loading") {
+    toastRecords.push(record)
+    scheduleAutoDismiss(record)
+  }
 
   return makeDismissFn(id, position)
 }
@@ -146,5 +190,5 @@ export function useToast(): UseToastReturn {
 }
 
 // ── Direct export — for use outside Vue tree (services, main.ts) ─────────────
-export { toast, toastRecords, dismissAll }
+export { toast, toastRecords, dismissAll, pauseTimer, resumeTimer }
 export type { ToastRecord, DismissFn }

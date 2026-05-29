@@ -232,7 +232,6 @@ const saveSettings = async () => {
       toast({
         variant: "error",
         message: "Please select at least one semantic group for cross-alert deduplication",
-        timeout: 3000,
       });
       return;
     }
@@ -258,7 +257,6 @@ const saveSettings = async () => {
       variant: "success",
       message:
         "Organization deduplication settings saved successfully",
-      timeout: 2000,
     });
 
     emit("saved");
@@ -267,7 +265,6 @@ const saveSettings = async () => {
     toast({
       variant: "error",
       message: error?.message || "Failed to save settings",
-      timeout: 3000,
     });
   } finally {
     saving.value = false;

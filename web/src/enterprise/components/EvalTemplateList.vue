@@ -287,7 +287,6 @@ const loadTemplates = async () => {
       toast({
         variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.loadFailed"),
-        timeout: 3000,
       });
     }
   } finally {
@@ -326,7 +325,6 @@ const deleteTemplate = async () => {
     toast({
       variant: "success",
       message: t("evalTemplate.deleteSuccess"),
-      timeout: 2000,
     });
     await loadTemplates();
   } catch (err: any) {
@@ -337,7 +335,6 @@ const deleteTemplate = async () => {
           err?.response?.data?.message ||
           err?.message ||
           t("evalTemplate.deleteFailed"),
-        timeout: 3000,
       });
     }
   } finally {
@@ -365,7 +362,7 @@ const bulkDeleteTemplates = async () => {
         evalTemplateService.deleteTemplate(orgId, item.id),
       ),
     );
-    toast({ variant: "success", message: t("evalTemplate.deleteSuccess"), timeout: 2000 });
+    toast({ variant: "success", message: t("evalTemplate.deleteSuccess") });
     selectedItems.value = [];
     await loadTemplates();
   } catch (err: any) {
@@ -373,7 +370,6 @@ const bulkDeleteTemplates = async () => {
       toast({
         variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.deleteFailed"),
-        timeout: 3000,
       });
     }
   } finally {

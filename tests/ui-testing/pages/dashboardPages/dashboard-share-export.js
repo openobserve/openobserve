@@ -13,14 +13,14 @@ export default class DashboardShareExportPage {
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
     this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
-    this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+    this.toastSuccess = page.locator('[data-test-variant="success"]');
     // Scoped success toast for the share-link "Link Copied Successfully!" message —
     // multiple success toasts can coexist (e.g. "Dashboard added successfully."
     // and "Link Copied Successfully!"), so we key off OToast's data-test-message
     // attribute (set in `web/src/lib/feedback/Toast/OToast.vue`) to avoid the
     // strict-mode "resolves to 2 elements" error.
     this.toastSuccessShareLink = page.locator(
-      '[data-test="o-toast-success"][data-test-message*="Link Copied"]'
+      '[data-test-variant="success"][data-test-message*="Link Copied"]'
     );
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');

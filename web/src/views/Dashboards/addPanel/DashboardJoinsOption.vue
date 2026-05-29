@@ -47,7 +47,6 @@
                 :data-test="`dashboard-join-menu-${index}`"
               >
                 <AddJoinPopUp
-                  :class="themeClass"
                   v-model="currentJoins[index]"
                   :joinIndex="index"
                   :mainStream="mainStreamName"
@@ -88,7 +87,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import AddJoinPopUp from "./AddJoinPopUp.vue";
@@ -171,7 +169,6 @@ export default defineComponent({
     );
 
     const { t } = useI18n();
-    const store = useStore();
 
     /**
      * Determines if joins section should be displayed
@@ -198,13 +195,6 @@ export default defineComponent({
      */
     const mainStreamName = computed(() => {
       return getCurrentQuery()?.fields?.stream ?? "";
-    });
-
-    /**
-     * Returns theme class based on current theme
-     */
-    const themeClass = computed(() => {
-      return store.state.theme === "dark" ? "dark-mode" : "tw:bg-white";
     });
 
     /**
@@ -359,12 +349,10 @@ export default defineComponent({
 
     return {
       t,
-      store,
       dashboardPanelData,
       shouldShowJoins,
       currentJoins,
       mainStreamName,
-      themeClass,
       handleAddJoin,
       handleRemoveJoin,
     };
