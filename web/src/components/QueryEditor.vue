@@ -815,12 +815,20 @@ const dismissAIMode = () => {
   currentSessionId.value = null;
   currentChatId.value = null;
   chatMessages.value = [];
+  // Reset hover state — the AI button disappears when the strip opens so mouseleave never fires.
+  aiHoveredMain.value = false;
+  showMainAiTooltip.value = true;
+  if (mainAiTooltipTimer) { clearTimeout(mainAiTooltipTimer); mainAiTooltipTimer = null; }
 };
 
 // Dismiss function AI bar
 const dismissFnAIMode = () => {
   isFnAIMode.value = false;
   fnAiInputText.value = '';
+  // Reset hover state — fn AI button disappears when strip opens so mouseleave never fires.
+  aiHoveredFn.value = false;
+  showFnAiTooltip.value = true;
+  if (fnAiTooltipTimer) { clearTimeout(fnAiTooltipTimer); fnAiTooltipTimer = null; }
 };
 
 // Generate using the function editor's AI
@@ -1295,12 +1303,12 @@ defineExpose({
    glyphMargin:false, lineDecorationsWidth:3, lineNumbersMinChars:0 → ~30px gutter. */
 .query-editor__placeholder {
   position: absolute;
-  top: 0.125rem;
-  left: 1.75rem; /* Monaco gutter: no glyph margin + 1-digit line numbers */
+  top: 0;
+  left: 0.8rem; /* tight to Monaco gutter edge */
   pointer-events: none;
   user-select: none;
   font-family: var(--font-mono, 'Menlo', 'Monaco', 'Courier New', monospace);
-  font-size: 0.6875rem; /* 11px — intentionally smaller than Monaco text */
+  font-size: 0.7875rem; /* 11px — intentionally smaller than Monaco text */
   line-height: 1.375rem;
   color: var(--o2-text-placeholder, var(--o2-text-muted));
   white-space: nowrap;
