@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('pipeline.view')"
                   icon-left="visibility"
                 >
-                  <OTooltip>
+                  <OTooltip max-width="none">
                     <template #content
                       ><PipelineView :pipeline="row"
                     /></template>
