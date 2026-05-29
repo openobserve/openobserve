@@ -569,7 +569,7 @@ export default defineComponent({
     const payerName = computed(() => {
       const name = membership.value?.payer_org_name || "";
       if (!name) return membership.value?.payer_org_id || "";
-      return name.length > 10 ? `${name.substring(0, 10)}...` : name;
+      return name.length > 100 ? `${name.substring(0, 100)}...` : name;
     });
 
 
