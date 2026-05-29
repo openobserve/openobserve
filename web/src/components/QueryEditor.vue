@@ -1018,6 +1018,32 @@ const openFunctionPane = () => {
 const closeFunctionPane = () => {
   functionPaneOpenState.value = false;
 };
+// Keep fullscreenRect in sync with the parent container's layout while fullscreen is active.
+// This handles cases like the AI chat panel opening/closing which shifts the container's position.
+let fullscreenResizeObserver: ResizeObserver | null = null;
+
+const syncFullscreenRect = () => {
+  const parent = containerRef.value?.parentElement;
+  if (!parent || !fullscreenState.value || !fullscreenRect.value) return;
+  const rect = parent.getBoundingClientRect();
+  fullscreenRect.value = { ...fullscreenRect.value, left: rect.left, width: rect.width };
+};
+
+watch(fullscreenState, (active) => {
+  if (active) {
+    const parent = containerRef.value?.parentElement;
+    if (parent) {
+      fullscreenResizeObserver = new ResizeObserver(syncFullscreenRect);
+      fullscreenResizeObserver.observe(parent);
+      window.addEventListener('resize', syncFullscreenRect);
+    }
+  } else {
+    fullscreenResizeObserver?.disconnect();
+    fullscreenResizeObserver = null;
+    window.removeEventListener('resize', syncFullscreenRect);
+  }
+});
+
 const toggleFullscreen = () => {
   if (!fullscreenState.value) {
     // Capture dimensions synchronously before DOM changes
@@ -1027,7 +1053,6 @@ const toggleFullscreen = () => {
       fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top, startHeight: rect.height };
     }
     fullscreenState.value = true;
-    // Height is set to 60vh immediately; CSS @keyframes animates max-height from startHeight → 60vh
   } else {
     fullscreenState.value = false;
     fullscreenRect.value = null;
@@ -1188,6 +1213,8 @@ onBeforeUnmount(() => {
   functionTypewriter.stop();
   if (mainAiTooltipTimer) clearTimeout(mainAiTooltipTimer);
   if (fnAiTooltipTimer) clearTimeout(fnAiTooltipTimer);
+  fullscreenResizeObserver?.disconnect();
+  window.removeEventListener('resize', syncFullscreenRect);
 });
 
 // Keep internal mirrors in sync with controlled props
