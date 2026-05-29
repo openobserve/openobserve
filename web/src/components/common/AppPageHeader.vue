@@ -15,20 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  AppPageHeader — the standard, compact page header used across the app
-  (dashboards, logs, metrics, …). One <h1> title with an optional brand-tinted
-  page-icon tile, an optional subtitle/breadcrumb line, and a right-aligned
-  actions area. Reusable as-is on dense data pages.
+  AppPageHeader — the standard page header used across the app (dashboards,
+  logs, metrics, …). One <h1> title with an optional brand-tinted page-icon
+  tile, an optional subtitle/breadcrumb line, and a right-aligned actions area.
 
   Fixed height + items-center: the icon and title stay perfectly still even
   while the title/subtitle load asynchronously (no layout shift).
+
+  Two-level navigation: pass a #tabs slot to render module tabs inline, just to
+  the right of the title (Level-2 nav). Omit #tabs and drive #title (the current
+  item) + #subtitle (a breadcrumb back to the parent list) for the Level-3
+  detail context. The two are never shown together.
 
   NOTE: title/heading font sizes use `!important` because the app defines
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
   Props: title | subtitle | icon
-  Slots: title-prefix | title | subtitle | actions
+  Slots: title-prefix | title | subtitle | actions | tabs
 -->
 <template>
   <!-- No overflow-hidden here: it clipped the focus ring of the right-most
@@ -37,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <header
     class="app-page-header tw:shrink-0 tw:h-14 tw:flex tw:items-center tw:justify-between tw:gap-4"
   >
-    <div class="tw:flex tw:items-center tw:gap-3 tw:min-w-0 tw:h-full">
+    <div class="tw:flex tw:items-center tw:gap-3 tw:min-w-0 tw:h-full tw:flex-1">
       <slot name="title-prefix" />
 
       <span
@@ -48,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon :name="icon" size="md" />
       </span>
 
-      <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0">
+      <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink-0">
         <h1
           class="tw:text-base! tw:font-semibold! tw:leading-tight! tw:tracking-[-0.01em]! tw:text-text-primary tw:truncate tw:min-h-5"
           :title="title"
@@ -60,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              (detail view), so the title doesn't appear to shift when navigating
              between the two. Content is vertically centered within the band. -->
         <div
-          v-if="subtitle || $slots.subtitle"
+          v-if="hasSubtitle"
           class="tw:flex tw:items-center tw:h-5 tw:min-w-0 tw:text-xs tw:text-text-secondary"
         >
           <slot name="subtitle"
@@ -68,10 +72,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </div>
+
+      <!-- Module tabs (Level-2 nav), inline to the right of the title. -->
+      <div
+        v-if="hasTabs"
+        class="tw:flex tw:items-center tw:min-w-0 tw:flex-1 tw:h-full"
+      >
+        <slot name="tabs" />
+      </div>
     </div>
 
     <div
-      v-if="$slots.actions"
+      v-if="hasActions"
       class="tw:flex tw:items-center tw:gap-2 tw:shrink-0"
     >
       <slot name="actions" />
@@ -80,10 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { Comment, Text, computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title?: string;
     subtitle?: string;
@@ -94,4 +107,27 @@ withDefaults(
     subtitle: "",
   },
 );
+
+const slots = useSlots();
+
+// A slot passed with an always-present <template> but a falsy inner v-if still
+// yields a comment placeholder node — so checking `$slots.x` is truthy even
+// when there's nothing to show. Detect *real* content instead, so we never
+// render an empty subtitle band / tabs strip / actions group.
+const slotHasContent = (name: string): boolean => {
+  const fn = slots[name];
+  if (!fn) return false;
+  return fn().some((node) => {
+    if (node.type === Comment) return false;
+    if (node.type === Text)
+      return typeof node.children === "string" && node.children.trim() !== "";
+    return true;
+  });
+};
+
+const hasSubtitle = computed(
+  () => Boolean(props.subtitle) || slotHasContent("subtitle"),
+);
+const hasTabs = computed(() => slotHasContent("tabs"));
+const hasActions = computed(() => slotHasContent("actions"));
 </script>

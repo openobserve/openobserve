@@ -17,17 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
+  <PageLayout
     :key="store.state.selectedOrganization.identifier"
-    class="tw:flex tw:flex-col tw:h-full"
+    :sidebar-width="200"
   >
-      <!-- ── Page header section ──────────────────────────────────── -->
-      <div class="tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default">
-        <AppPageHeader
-          icon="dashboard"
-          :title="t('dashboard.header')"
-          subtitle="Create, organize, and explore your observability dashboards."
-        >
+    <!-- ── Page header ──────────────────────────────────────────── -->
+    <template #header>
+      <AppPageHeader
+        icon="dashboard"
+        :title="t('dashboard.header')"
+        subtitle="Create, organize, and explore your observability dashboards."
+      >
       <template #actions>
         <!-- import dashboard button with dropdown -->
         <ODropdown side="bottom" align="end">
@@ -77,16 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
         </AppPageHeader>
-      </div>
+    </template>
 
-      <!-- ── Body: folder rail + table, each as an internal section ─ -->
-      <div class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2 tw:pb-2 tw:pt-1 tw:gap-2">
-        <!-- ── Left: Folder rail section ───────────────────────── -->
-        <aside
-          class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border tw:border-border-default tw:rounded-lg"
-          :style="{ width: splitterModel + 'px' }"
-        >
-        <div
+    <!-- ── Folder rail ──────────────────────────────────────────── -->
+    <template #sidebar>
+      <div
           class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-2 tw:pb-2"
         >
           <h2
@@ -187,11 +182,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
         </nav>
-      </aside>
+    </template>
 
-        <!-- ── Right: Table section ──────────────────────────────── -->
-        <section class="tw:flex-1 tw:min-w-0 tw:h-full tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden">
-          <div class="tw:h-full tw:overflow-hidden">
+    <!-- ── Table + dialogs ──────────────────────────────────────── -->
+    <div class="tw:h-full tw:overflow-hidden">
           <OTable
             ref="oTableRef"
             :data="dashboards"
@@ -521,12 +515,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:cancel="confirmBulkDelete = false"
             v-model="confirmBulkDelete"
           />
-        </section>
-      </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
+import PageLayout from "@/components/common/PageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -592,6 +585,7 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
 export default defineComponent({
   name: "Dashboards",
   components: {
+    PageLayout,
     AppPageHeader,
     NoDashboards,
     OButton,
@@ -624,7 +618,6 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
-    const splitterModel = ref(200);
     const activeFolderId = ref(null);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
@@ -1380,7 +1373,6 @@ export default defineComponent({
       getDashboards,
       getImageURL,
       verifyOrganizationStatus,
-      splitterModel,
       activeFolderId,
       addFolder,
       showAddFolderDialog,

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,342 +17,244 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
     v-if="currentRouteName === 'pipelines'"
   >
-    <div class="tw:shrink-0">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-          <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-            data-test="pipeline-list-title"
+    <div class="tw:flex-1 tw:min-h-0">
+      <OTable
+        :key="activeTab"
+        data-test="pipeline-list-table"
+        :data="filteredPipelines"
+        :columns="otableColumns"
+        row-key="pipeline_id"
+        :loading="loading"
+        :global-filter="filterQuery"
+        :show-global-filter="false"
+        :page-size="20"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        selection="multiple"
+        v-model:selected-ids="selectedPipelineIds"
+        :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
+        :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
+        :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
+        v-model:expanded-ids="expandedId"
+        width="100%"
+        class="tw:w-full tw:h-full"
+      >
+        <template #toolbar>
+          <OToggleGroup
+            :model-value="activeTab"
+            @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
+            data-test="pipeline-list-tabs"
           >
-            {{ t("pipeline.header") }}
-          </div>
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
-              class="tw:mr-2"
-              data-test="pipeline-list-tabs"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left
-                  ><OIcon name="format-list-bulleted" size="sm"
-                /></template>
-                {{ t("pipeline_list.tab_all") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                {{ t("pipeline_list.tab_scheduled") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
-                <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                {{ t("pipeline_list.tab_realtime") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-
-            <OInput
-              data-test="pipeline-list-search-input"
-              v-model="filterQuery"
-              class="tw:ml-2 tw:w-[200px]"
-              :placeholder="t('pipeline.search')"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
-            <!-- Full buttons visible at wide widths -->
-            <template v-if="!shouldCollapseToolbar">
-              <OButton
-                data-test="pipeline-list-history-btn"
-                class="tw:ml-2"
-                variant="outline"
-                size="sm"
-                icon-left="history"
-                @click="goToPipelineHistory"
-              >
-                {{ t(`pipeline.history`) }}
-              </OButton>
-              <OButton
-                v-if="config.isEnterprise == 'true'"
-                data-test="pipeline-list-backfill-btn"
-                class="tw:ml-2"
-                variant="outline"
-                size="sm"
-                icon-left="refresh"
-                @click="goToBackfillJobs"
-              >
-                {{ t("pipeline.backfill") }}
-              </OButton>
-              <OButton
-                data-test="pipeline-list-import-pipeline-btn"
-                class="tw:ml-2"
-                variant="outline"
-                size="sm"
-                icon-left="upload-file"
-                @click="routeToImportPipeline"
-              >
-                {{ t(`pipeline.import`) }}
-              </OButton>
+            <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+              {{ t("pipeline_list.tab_all") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+              <template #icon-left><OIcon name="schedule" size="sm" /></template>
+              {{ t("pipeline_list.tab_scheduled") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
+              <template #icon-left><OIcon name="bolt" size="sm" /></template>
+              {{ t("pipeline_list.tab_realtime") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OInput
+            data-test="pipeline-list-search-input"
+            v-model="filterQuery"
+            class="tw:ml-2 tw:w-50"
+            :placeholder="t('pipeline.search')"
+          >
+            <template #icon-left>
+              <OIcon name="search" size="sm" />
             </template>
+          </OInput>
+        </template>
 
+        <template #cell-actions="{ row }">
+          <div class="tw:flex tw:items-center actions-container">
             <OButton
-              data-test="pipeline-list-add-pipeline-btn"
-              class="tw:ml-2"
-              variant="primary"
-              size="sm"
-              @click="routeToAddPipeline"
+              :data-test="`pipeline-list-${row.name}-pause-start-action`"
+              variant="ghost"
+              size="icon-sm"
+              :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              @click.stop="togglePipeline(row)"
+            />
+            <OButton
+              :data-test="`pipeline-list-${row.name}-view-pipeline`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('pipeline.view')"
+              icon-left="visibility"
             >
-              {{ t(`pipeline.addPipeline`) }}
+              <OTooltip>
+                <template #content
+                  ><PipelineView :pipeline="row"
+                /></template>
+              </OTooltip>
             </OButton>
-
-            <!-- Overflow menu at narrow widths — after New Pipeline -->
-            <ODropdown v-if="shouldCollapseToolbar">
+            <OButton
+              :data-test="`pipeline-list-${row.name}-update-pipeline`"
+              variant="ghost"
+              size="icon-sm"
+              @click.stop="editPipeline(row)"
+              icon-left="edit"
+            />
+            <ODropdown align="end">
               <template #trigger>
                 <OButton
-                  class="tw:ml-2"
-                  variant="outline"
-                  size="sm"
-                  data-test="pipeline-list-overflow-menu-btn"
-                  icon-left="menu"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click.stop
+                  :data-test="`pipeline-list-${row.name}-more-options`"
+                  icon-left="more-vert"
                 />
               </template>
               <ODropdownItem
-                data-test="pipeline-list-menu-history-btn"
-                @select="goToPipelineHistory"
+                :data-test="`pipeline-list-${row.name}-export-action`"
+                @select="exportPipeline(row)"
               >
-                {{ t("pipeline.history") }}
+                <template #icon-left>
+                  <OIcon size="sm" name="download" />
+                </template>
+                {{ t("pipeline.export") }}
               </ODropdownItem>
+              <ODropdownSeparator />
               <ODropdownItem
-                v-if="config.isEnterprise == 'true'"
-                data-test="pipeline-list-menu-backfill-btn"
-                @select="goToBackfillJobs"
+                :data-test="`pipeline-list-${row.name}-delete-pipeline`"
+                @select="openDeleteDialog(row)"
+                variant="destructive"
               >
-                {{ t("pipeline.backfill") }}
+                <template #icon-left>
+                  <OIcon size="sm" name="delete" />
+                </template>
+                {{ t("pipeline.delete") }}
               </ODropdownItem>
+              <ODropdownSeparator
+                v-if="
+                  row.source.source_type === 'scheduled' &&
+                  config.isEnterprise == 'true'
+                "
+              />
               <ODropdownItem
-                data-test="pipeline-list-menu-import-btn"
-                @select="routeToImportPipeline"
+                v-if="
+                  row.source.source_type === 'scheduled' &&
+                  config.isEnterprise == 'true'
+                "
+                :data-test="`pipeline-list-${row.name}-backfill-action`"
+                @select="openBackfillDialog(row)"
               >
-                {{ t("pipeline.import") }}
+                <template #icon-left>
+                  <OIcon size="sm" name="refresh" />
+                </template>
+                Create Backfill
+              </ODropdownItem>
+              <ODropdownSeparator v-if="row.last_error" />
+              <ODropdownItem
+                v-if="row.last_error"
+                :data-test="`pipeline-list-${row.name}-view-error-action`"
+                @select="showErrorDialog(row)"
+              >
+                <template #icon-left>
+                  <OIcon size="sm" name="error" />
+                </template>
+                <div class="tw:flex tw:flex-col">
+                  <div>View Error</div>
+                  <div class="tw:text-xs tw:text-gray-500">
+                    {{
+                      new Date(
+                        row.last_error.last_error_timestamp / 1000,
+                      ).toLocaleString()
+                    }}
+                  </div>
+                </div>
               </ODropdownItem>
             </ODropdown>
           </div>
-        </div>
-      </div>
+        </template>
 
-    </div>
-    <div
-      class="tw:flex-1 tw:min-h-0"
-    >
-      <div class="card-container tw:h-full">
-        <OTable
-            :key="activeTab"
-            data-test="pipeline-list-table"
-            :data="filteredPipelines"
-            :columns="otableColumns"
-            row-key="pipeline_id"
-            :loading="loading"
-            :global-filter="filterQuery"
-            :show-global-filter="false"
-            :page-size="20"
-            :page-size-options="[20, 50, 100, 250, 500]"
-            selection="multiple"
-            v-model:selected-ids="selectedPipelineIds"
-            :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
-            :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
-            :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
-            v-model:expanded-ids="expandedId"
-            width="100%"
-            class="tw:w-full tw:h-full"
+        <template #expansion="{ row }">
+          <div
+            v-if="row?.sql_query"
+            data-test="scheduled-pipeline-expanded-content"
+            class="tw:text-left tw:px-2 tw:mb-2 expanded-content"
           >
-            <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center actions-container">
-                <OButton
-                  :data-test="`pipeline-list-${row.name}-pause-start-action`"
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                  @click.stop="togglePipeline(row)"
-                />
-                <OButton
-                  :data-test="`pipeline-list-${row.name}-view-pipeline`"
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="t('pipeline.view')"
-                  icon-left="visibility"
-                >
-                  <OTooltip>
-                    <template #content
-                      ><PipelineView :pipeline="row"
-                    /></template>
-                  </OTooltip>
-                </OButton>
-                <OButton
-                  :data-test="`pipeline-list-${row.name}-update-pipeline`"
-                  variant="ghost"
-                  size="icon-sm"
-                  @click.stop="editPipeline(row)"
-                  icon-left="edit"
-                />
-                <ODropdown align="end">
-                  <template #trigger>
-                    <OButton
-                      variant="ghost"
-                      size="icon-sm"
-                      @click.stop
-                      :data-test="`pipeline-list-${row.name}-more-options`"
-                      icon-left="more-vert"
-                    />
-                  </template>
-                  <ODropdownItem
-                    :data-test="`pipeline-list-${row.name}-export-action`"
-                    @select="exportPipeline(row)"
-                  >
-                    <template #icon-left>
-                      <OIcon size="sm" name="download" />
-                    </template>
-                    {{ t("pipeline.export") }}
-                  </ODropdownItem>
-                  <ODropdownSeparator />
-                  <ODropdownItem
-                    :data-test="`pipeline-list-${row.name}-delete-pipeline`"
-                    @select="openDeleteDialog(row)"
-                    variant="destructive"
-                  >
-                    <template #icon-left>
-                      <OIcon size="sm" name="delete" />
-                    </template>
-                    {{ t("pipeline.delete") }}
-                  </ODropdownItem>
-                  <ODropdownSeparator
-                    v-if="
-                      row.source.source_type === 'scheduled' &&
-                      config.isEnterprise == 'true'
-                    "
-                  />
-                  <ODropdownItem
-                    v-if="
-                      row.source.source_type === 'scheduled' &&
-                      config.isEnterprise == 'true'
-                    "
-                    :data-test="`pipeline-list-${row.name}-backfill-action`"
-                    @select="openBackfillDialog(row)"
-                  >
-                    <template #icon-left>
-                      <OIcon size="sm" name="refresh" />
-                    </template>
-                    Create Backfill
-                  </ODropdownItem>
-                  <ODropdownSeparator v-if="row.last_error" />
-                  <ODropdownItem
-                    v-if="row.last_error"
-                    :data-test="`pipeline-list-${row.name}-view-error-action`"
-                    @select="showErrorDialog(row)"
-                  >
-                    <template #icon-left>
-                      <OIcon size="sm" name="error" />
-                    </template>
-                    <div class="tw:flex tw:flex-col">
-                      <div>View Error</div>
-                      <div class="tw:text-xs tw:text-gray-500">
-                        {{
-                          new Date(
-                            row.last_error.last_error_timestamp / 1000,
-                          ).toLocaleString()
-                        }}
-                      </div>
-                    </div>
-                  </ODropdownItem>
-                </ODropdown>
-              </div>
-            </template>
-
-            <template #expansion="{ row }">
+            <div class="tw:flex tw:items-center tw:py-2">
+              <strong
+                >{{ t("pipeline_list.sql_query") }} : <span></span
+              ></strong>
+            </div>
+            <div class="tw:flex tw:items-start tw:justify-center">
               <div
-                v-if="row?.sql_query"
-                data-test="scheduled-pipeline-expanded-content"
-                class="tw:text-left tw:px-2 tw:mb-2 expanded-content"
+                data-test="scheduled-pipeline-expanded-sql"
+                class="scrollable-content expanded-sql"
               >
-                <div class="tw:flex tw:items-center tw:py-2">
-                  <strong
-                    >{{ t("pipeline_list.sql_query") }} : <span></span
-                  ></strong>
-                </div>
-                <div class="tw:flex tw:items-start tw:justify-center">
-                  <div
-                    data-test="scheduled-pipeline-expanded-sql"
-                    class="scrollable-content expanded-sql"
-                  >
-                    <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
-                  </div>
-                </div>
+                <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
               </div>
-            </template>
+            </div>
+          </div>
+        </template>
 
-            <template #empty>
-              <no-data />
-            </template>
+        <template #empty>
+          <no-data />
+        </template>
 
-            <template #bottom="bottomProps">
-              <div
-                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+        <template #bottom="bottomProps">
+          <div
+            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+          >
+            <div
+              class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+            >
+              {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
+            </div>
+            <div
+              v-if="selectedPipelineIds.length > 0"
+              class="tw:flex tw:items-center tw:gap-2"
+            >
+              <OButton
+                data-test="pipeline-list-export-pipelines-btn"
+                variant="outline"
+                size="sm"
+                @click="exportBulkPipelines"
+                icon-left="download"
               >
-                <div
-                  class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
-                >
-                  {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
-                </div>
-                <div
-                  v-if="selectedPipelineIds.length > 0"
-                  class="tw:flex tw:items-center tw:gap-2"
-                >
-                  <OButton
-                    data-test="pipeline-list-export-pipelines-btn"
-                    variant="outline"
-                    size="sm"
-                    @click="exportBulkPipelines"
-                    icon-left="download"
-                  >
-                    {{ t("pipeline_list.export") }}
-                  </OButton>
-                  <OButton
-                    data-test="pipeline-list-pause-pipelines-btn"
-                    variant="outline"
-                    size="sm"
-                    @click="bulkTogglePipelines('pause')"
-                    icon-left="pause"
-                  >
-                    {{ t("pipeline_list.pause") }}
-                  </OButton>
-                  <OButton
-                    data-test="pipeline-list-resume-pipelines-btn"
-                    variant="outline"
-                    size="sm"
-                    @click="bulkTogglePipelines('resume')"
-                    icon-left="play-arrow"
-                  >
-                    {{ t("pipeline_list.resume") }}
-                  </OButton>
-                  <OButton
-                    data-test="pipeline-list-delete-pipelines-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    @click="openBulkDeleteDialog"
-                    icon-left="delete"
-                  >
-                    Delete
-                  </OButton>
-                </div>
-              </div>
-            </template>
-          </OTable>
-        </div>
-      </div>
+                {{ t("pipeline_list.export") }}
+              </OButton>
+              <OButton
+                data-test="pipeline-list-pause-pipelines-btn"
+                variant="outline"
+                size="sm"
+                @click="bulkTogglePipelines('pause')"
+                icon-left="pause"
+              >
+                {{ t("pipeline_list.pause") }}
+              </OButton>
+              <OButton
+                data-test="pipeline-list-resume-pipelines-btn"
+                variant="outline"
+                size="sm"
+                @click="bulkTogglePipelines('resume')"
+                icon-left="play-arrow"
+              >
+                {{ t("pipeline_list.resume") }}
+              </OButton>
+              <OButton
+                data-test="pipeline-list-delete-pipelines-btn"
+                variant="outline-destructive"
+                size="sm"
+                @click="openBulkDeleteDialog"
+                icon-left="delete"
+              >
+                Delete
+              </OButton>
+            </div>
+          </div>
+        </template>
+      </OTable>
+    </div>
   </div>
 
   <router-view v-else />
@@ -462,14 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 </template>
 <script setup lang="ts">
-import {
-  ref,
-  onBeforeMount,
-  computed,
-  watch,
-  onMounted,
-  onUnmounted,
-} from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { MarkerType } from "@vue-flow/core";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -504,20 +399,6 @@ const router = useRouter();
 
 
 const filterQuery = ref("");
-
-// Responsive toolbar: move secondary actions into overflow menu at narrow widths
-const windowWidth = ref(window.innerWidth);
-const onWindowResize = () => {
-  windowWidth.value = window.innerWidth;
-};
-const shouldCollapseToolbar = computed(() => windowWidth.value <= 1440);
-
-onMounted(() => {
-  window.addEventListener("resize", onWindowResize);
-});
-onUnmounted(() => {
-  window.removeEventListener("resize", onWindowResize);
-});
 
 const showCreatePipeline = ref(false);
 
@@ -932,15 +813,6 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
-const routeToAddPipeline = () => {
-  router.push({
-    name: "createPipeline",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
-};
-
 const exportPipeline = (row: any) => {
   const pipelineToBeExported = row.name;
 
@@ -963,15 +835,6 @@ const exportPipeline = (row: any) => {
 
   // Clean up the URL object after download
   URL.revokeObjectURL(url);
-};
-
-const routeToImportPipeline = () => {
-  router.push({
-    name: "importPipeline",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 };
 
 const exportBulkPipelines = () => {
@@ -1019,15 +882,6 @@ const showErrorDialog = (pipeline: any) => {
 const closeErrorDialog = () => {
   errorDialog.value.show = false;
   errorDialog.value.data = null;
-};
-
-const goToPipelineHistory = () => {
-  router.push({
-    name: "pipelineHistory",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 };
 
 const goToBackfillJobs = () => {

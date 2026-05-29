@@ -1,52 +1,33 @@
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:pt-1 tw:px-2.5 tw:pb-2.5" data-test="iam-page">
-    <OSplitter
-      v-model="splitterModel"
-      unit="px"
-      :limits="[0, 300]"
-      :horizontal="false"
-      class="tw:overflow-hidden"
-      style="height: 100%;"
-    >
-      <template v-slot:before>
-        <div class="tw:w-full tw:h-full">
-        <div v-if="showSidebar" class="iam-tabs spitter-container card-container tw:h-full">
-          <route-tabs
-            ref="iamRouteTabsRef"
-            dataTest="iam-tabs"
-            :tabs="tabs"
-            :activeTab="activeTab"
-            @update:activeTab="updateActiveTab"
-          />
-          </div>
-        </div>
-      </template>
-      <template #separator>
-          <OButton
-            data-test="logs-search-field-list-collapse-btn"
-            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-            variant="sidebar-button"
-            size="sidebar-button"
-            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            @click="collapseSidebar"
-          >
-            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="xs" />
-          </OButton>
-      </template>
-      <template v-slot:after>
-        <div class="tw:w-full tw:h-full">
-          <div class="tw:overflow-hidden tw:h-full">
-            <RouterView />
-          </div>
-        </div>
-      </template>
-    </OSplitter>
-  </div>
+  <PageLayout
+    data-test="iam-page"
+    resizable
+    :sidebar-width="220"
+    :splitter-limits="[0, 300]"
+  >
+    <template #header>
+      <AppPageHeader icon="shield" title="Identity &amp; Access" />
+    </template>
+
+    <template #sidebar>
+      <route-tabs
+        ref="iamRouteTabsRef"
+        dataTest="iam-tabs"
+        :tabs="tabs"
+        :activeTab="activeTab"
+        @update:activeTab="updateActiveTab"
+      />
+    </template>
+
+    <RouterView />
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import RouteTabs from "@/components/RouteTabs.vue";
-import { ref, watch, computed } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -54,9 +35,6 @@ import { useRouter } from "vue-router";
 import { nextTick } from "vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { resolveTab } from "@/utils/routeTabMaps";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 const store = useStore();
 const { t } = useI18n();
 
@@ -67,16 +45,6 @@ const activeTab = ref(resolveTab("iam", router.currentRoute.value.name as string
 const iamRouteTabsRef: any = ref(null);
 
 const { isMetaOrg } = useIsMetaOrg();
-
-const splitterModel = ref(220);
-const lastSplitterPosition = ref(splitterModel.value);
-const showSidebar = ref(true);
-
-const collapseSidebar = () => {
-  if (showSidebar.value) lastSplitterPosition.value = splitterModel.value;
-  showSidebar.value = !showSidebar.value;
-  splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
-};
 
 const allTabs = [
   {
@@ -276,20 +244,3 @@ const updateActiveTab = (tab: string) => {
 };
 </script>
 
-<style scoped lang="scss">
-:deep(.q-splitter__before) {
-  overflow: visible;
-}
-
-.splitter-icon-collapse {
-  position: absolute !important;
-  top: 0.25rem !important;
-  left: 0 !important;
-}
-
-.splitter-icon-expand {
-  position: absolute !important;
-  top: 0.25rem !important;
-  left: 0 !important;
-}
-</style>

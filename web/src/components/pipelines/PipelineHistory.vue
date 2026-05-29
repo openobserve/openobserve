@@ -24,28 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-2 tw:h-[68px]"
         >
-          <div class="tw:flex tw:items-center">
-            <OButton
-              variant="ghost"
-              size="icon-xs-sq"
-              class="hideOnPrintMode"
-              @click="goBack"
-              data-test="alert-history-back-btn"
-              icon-left="chevron-left"
-            />
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
-              data-test="pipeline-history-title"
-            >
-              {{ t(`pipeline.history`) }}
-              <OIcon name="info" size="sm">
-                <OTooltip
-                  content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
-                  side="top"
-                />
-              </OIcon>
-            </div>
-          </div>
           <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
             <div class="tw:mr-2">
               <DateTime
@@ -491,7 +469,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import * as dateUtils from "@/utils/date";
@@ -511,7 +488,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
-const router = useRouter();
 
 // Data
 const loading = ref(false);
@@ -889,15 +865,6 @@ const showErrorDialog = (error: any) => {
 const closeErrorDialog = () => {
   errorDialog.value = false;
   errorMessage.value = null;
-};
-
-const goBack = () => {
-  router.push({
-    name: "pipelines",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 };
 
 // Lifecycle

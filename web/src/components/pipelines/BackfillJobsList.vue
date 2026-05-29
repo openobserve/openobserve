@@ -25,18 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]"
         >
-          <div class="tw:flex tw:items-center">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              @click="goBack"
-              data-test="backfill-jobs-back-btn"
-              icon-left="chevron-left"
-            />
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2">
-              Backfill Jobs
-            </div>
-          </div>
           <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center tw:gap-2">
             <!-- Filters -->
             <OSelect
@@ -304,7 +292,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import { formatDate } from "@/utils/date";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
@@ -323,7 +310,6 @@ import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const router = useRouter();
 const store = useStore();
 
 // Refs
@@ -462,10 +448,6 @@ const clearFilters = () => {
 
 const refreshJobs = () => {
   loadJobs();
-};
-
-const goBack = () => {
-  router.back();
 };
 
 const viewJob = (job: BackfillJob) => {
