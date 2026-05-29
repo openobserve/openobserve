@@ -936,7 +936,7 @@ const fieldWidthClass = computed(() => {
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               labelPosition === 'inside' && label
                 ? [
-                    'tw:flex-col tw:justify-between tw:py-0.5 tw:min-w-max',
+                    'tw:flex-col tw:justify-between tw:py-0.5',
                     heightClasses[size ?? 'md'],
                   ]
                 : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
@@ -1455,7 +1455,7 @@ const fieldWidthClass = computed(() => {
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             labelPosition === 'inside' && label
               ? [
-                  'tw:flex-col tw:justify-between tw:py-0.5 tw:min-w-max',
+                  'tw:flex-col tw:justify-between tw:py-0.5',
                   heightClasses[size ?? 'md'],
                 ]
               : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
