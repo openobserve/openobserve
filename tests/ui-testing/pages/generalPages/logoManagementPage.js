@@ -1,6 +1,5 @@
 import { expect } from '@playwright/test';
-
-export const path = require('path');
+import path from 'path';
 
 export
     class LogoManagementPage {

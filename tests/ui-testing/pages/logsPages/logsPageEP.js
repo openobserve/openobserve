@@ -1,6 +1,6 @@
 // logsPageEP.js
 import { expect } from '@playwright/test';
-const { chromium } = require('playwright');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class LogsPageEP {
   constructor(page) {
@@ -96,49 +96,6 @@ async queryJobSearch() {
 
 
 
-async clickJobID () {
-  const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
-  const orgId = getOrgIdentifier();
-
-  // Intercept the network request and capture the response
-  await this.page.route(
-    `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
-    async (route) => {
-      const response = await route.continue();
-      const responseBody = await response.body();
-      const jsonResponse = JSON.parse(responseBody.toString());
-
-      // Assuming the ID is in the response JSON
-      const idJob = jsonResponse.trace_id; // Adjust this according to your response structure
-      console.log("Job ID Created", idJob);
-
-      // Use the ID to construct the selector
-      const rowSelector = `tr[data-test="search-scheduler-table-${idJob}-row"]`;
-      const cancelBtnSelector = `${rowSelector} [data-test="search-scheduler-cancel-btn"]`;
-      const restartBtnSelector = `${rowSelector} [data-test="search-scheduler-restart-btn"]`;
-
-      // Wait for the row to be visible before clicking
-      await this.page.waitForSelector(rowSelector);
-      
-      // Click the cancel button
-      await this.page.locator(cancelBtnSelector).click();
-      await this.page.waitForTimeout(2000);
-      // Click the confirm button
-      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
-      await this.page.waitForTimeout(2000);
-      // Click the restart button
-      await this.page.locator(restartBtnSelector).click();
-      await this.page.waitForTimeout(2000);
-      // Continue with your automation steps...
-    }
-  )
-
-}
-
-
-
- 
-
 
 async searchSchedulerInvalid() {
   // OInput: use the inner native input (-field suffix) for fill/press operations
@@ -174,12 +131,12 @@ async decryptLogSQL(cipherName) {
     // Wait for the locator to be visible and enabled
     const editorLocator = this.page.locator('[data-test="logs-search-bar-query-editor-input"]');
     await editorLocator.waitFor({ state: 'visible', timeout: 10000 });
-    console.log("SQL Query", sqlQuery);
+    testLogger.info(`SQL Query: ${sqlQuery}`);
     // Fill the query editor with the constructed SQL query
     await editorLocator.fill(sqlQuery);
     await this.page.waitForTimeout(5000);
   } catch (error) {
-    console.error('Error during SQL decryption process:', error);
+    testLogger.error(`Error during SQL decryption process: ${error}`);
     throw error; // Re-throw the error if needed for further handling
   }
 }

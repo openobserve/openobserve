@@ -88,7 +88,9 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
 
 
 
-  test("Error Message displayed if Simple cipher keys created with invalid secret", async ({ page }) => {
+  test("Error Message displayed if Simple cipher keys created with invalid secret", {
+    tag: ['@cipherKeys', '@enterprise', '@P1', '@negative']
+  }, async ({ page }) => {
     await cipherKeys.navigateToSettingsMenu();
     // Navigate to Cipher Key Management
     await cipherKeys.navigateToCipherKeyTab();
@@ -156,7 +158,9 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
   });
 
-  test("Error Message displayed if Tink cipher keys created with invalid json", async ({ page }) => {
+  test("Error Message displayed if Tink cipher keys created with invalid json", {
+    tag: ['@cipherKeys', '@enterprise', '@P1', '@negative']
+  }, async ({ page }) => {
     test.skip(!process.env['PRIMARY_KEY_ID_VAL'], 'Requires PRIMARY_KEY_ID_VAL env var');
 
     await cipherKeys.navigateToSettingsMenu();
@@ -230,7 +234,9 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
   });
 
 
-  test("Error Message displayed if Cipher Key Name Blank", async ({ page }) => {
+  test("Error Message displayed if Cipher Key Name Blank", {
+    tag: ['@cipherKeys', '@enterprise', '@P2', '@validation']
+  }, async ({ page }) => {
     await cipherKeys.navigateToSettingsMenu();
     // Navigate to Cipher Key Management
     await cipherKeys.navigateToCipherKeyTab();
@@ -241,7 +247,9 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     testLogger.info('Test completed successfully');
   });
 
-  test("Error Message displayed if Cipher Key Secret Blank", async ({ page }) => {
+  test("Error Message displayed if Cipher Key Secret Blank", {
+    tag: ['@cipherKeys', '@enterprise', '@P2', '@validation']
+  }, async ({ page }) => {
     await cipherKeys.navigateToSettingsMenu();
     // Navigate to Cipher Key Management
     await cipherKeys.navigateToCipherKeyTab();
@@ -253,7 +261,9 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     testLogger.info('Test completed successfully');
   });
 
-  test("Error Message displayed if Cipher Key Secret Invalid", async ({ page }) => {
+  test("Error Message displayed if Cipher Key Secret Invalid", {
+    tag: ['@cipherKeys', '@enterprise', '@P2', '@negative']
+  }, async ({ page }) => {
     await cipherKeys.navigateToSettingsMenu();
     // Navigate to Cipher Key Management
     await cipherKeys.navigateToCipherKeyTab();
@@ -370,7 +380,9 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
   });
 
-  test("Error Message displayed if DFC Encrypted Data Invalid at Akeyless", async ({ page }) => {
+  test("Error Message displayed if DFC Encrypted Data Invalid at Akeyless", {
+    tag: ['@cipherKeys', '@enterprise', '@P1', '@negative']
+  }, async ({ page }) => {
     test.skip(!process.env['AKEYLESS_URL'], 'Requires AKEYLESS env vars');
 
     await cipherKeys.navigateToSettingsMenu();
