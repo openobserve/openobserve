@@ -336,9 +336,10 @@ class TestStreamSettingsDedupEdgeCases:
 
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         field_a = get_field_for_index(settings)
-        # Get a second field different from field_a
+        # Get a second field different from field_a that is also not already indexed
+        current_idx = set(settings.get("index_fields", []))
         available = [f for f in INDEX_SAFE_FIELDS if f != field_a]
-        filtered = [f for f in available if f not in set(settings.get("full_text_search_keys", []))]
+        filtered = [f for f in available if f not in set(settings.get("full_text_search_keys", [])) and f not in current_idx]
         candidates = filtered if filtered else available
         field_b = candidates[0] if candidates else pytest.skip("Only one index-safe field available")
         original_idx = list(settings.get("index_fields", []))
@@ -368,8 +369,8 @@ class TestStreamSettingsDedupEdgeCases:
             assert field_b in idx_keys, f"'{field_b}' should be present"
             assert idx_keys.count(field_a) == 1
             assert idx_keys.count(field_b) == 1
-            assert len(idx_keys) == len(original_idx) + 1, \
-                f"Expected {len(original_idx) + 1}, got {len(idx_keys)}"
+            assert len(idx_keys) == len(original_idx) + 2, \
+                f"Expected {len(original_idx) + 2}, got {len(idx_keys)}"
 
             logger.info("=== PASSED ===")
         finally:
