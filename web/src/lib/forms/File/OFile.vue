@@ -65,7 +65,6 @@ function emitFiles(fileList: FileList | File[] | null) {
       toast({
         message: `"${names}" is not a supported file type. Only ${allowed} files are allowed.`,
         variant: "error",
-        timeout: 3000,
       });
       emit("type-error", rejected);
     }
