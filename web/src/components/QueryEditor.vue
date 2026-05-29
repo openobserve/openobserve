@@ -860,41 +860,6 @@ const handleFnAIGenerate = async () => {
   emit('ask-ai', naturalLanguage, props.functionLanguage as Language);
 };
 
-// Dismiss function AI bar
-const dismissFnAIMode = () => {
-  isFnAIMode.value = false;
-  fnAiInputText.value = '';
-};
-
-// Generate using the function editor's AI
-const handleFnAIGenerate = async () => {
-  const userInput = fnAiInputText.value.trim();
-  if (!userInput || isFnGenerating.value) return;
-
-  const target = fnEditorRef.value;
-  const currentQuery = target?.getValue?.() ?? props.functionQuery ?? '';
-
-  const naturalLanguage = currentQuery.trim()
-    ? `Modify this ${String(props.functionLanguage).toUpperCase()} function to ${userInput}:\n\n${currentQuery}`
-    : userInput;
-
-  if (target && typeof target.handleGenerateSQL === 'function') {
-    isFnGenerating.value = true;
-    try {
-      await target.handleGenerateSQL(naturalLanguage);
-      fnAiInputText.value = '';
-    } catch (error) {
-      if ((error as Error)?.name !== 'AbortError') {
-        console.error('[QueryEditor] Function generation failed:', error);
-      }
-    } finally {
-      isFnGenerating.value = false;
-    }
-  }
-
-  emit('ask-ai', naturalLanguage, props.functionLanguage as Language);
-};
-
 // Handle generation lifecycle events
 const handleGenerationStart = () => {
   isGenerating.value = true;
@@ -1338,12 +1303,12 @@ defineExpose({
    glyphMargin:false, lineDecorationsWidth:3, lineNumbersMinChars:0 → ~30px gutter. */
 .query-editor__placeholder {
   position: absolute;
-  top: 0.125rem;
-  left: 1.75rem; /* Monaco gutter: no glyph margin + 1-digit line numbers */
+  top: 0;
+  left: 0.8rem; /* tight to Monaco gutter edge */
   pointer-events: none;
   user-select: none;
   font-family: var(--font-mono, 'Menlo', 'Monaco', 'Courier New', monospace);
-  font-size: 0.6875rem; /* 11px — intentionally smaller than Monaco text */
+  font-size: 0.7875rem; /* 11px — intentionally smaller than Monaco text */
   line-height: 1.375rem;
   color: var(--o2-text-placeholder, var(--o2-text-muted));
   white-space: nowrap;
