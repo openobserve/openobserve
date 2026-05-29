@@ -146,7 +146,7 @@ jobs:
     needs: [build_binary]
     if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: ubicloud-standard-8
     permissions:
       contents: read
       actions: read
@@ -848,7 +848,7 @@ jobs:
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: repo-openobserve-standard-4
+      labels: ubicloud-standard-4
     permissions:
       contents: read
       actions: read
@@ -1035,7 +1035,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: repo-openobserve-standard-4
+      labels: ubicloud-standard-4
     permissions: {}
     needs:
       [
