@@ -117,6 +117,11 @@ mod m20260415_000001_create_model_pricing_table;
 mod m20260415_000002_add_source_to_model_pricing;
 mod m20260504_000001_add_anomaly_detection_config_folder_fk;
 mod m20260506_000001_create_org_ingestion_tokens_table;
+mod m20260520_000001_create_providers_table;
+mod m20260520_000002_create_score_configs_table;
+mod m20260520_000003_create_scorers_table;
+mod m20260520_000004_create_online_eval_jobs_table;
+mod m20260520_000005_drop_eval_templates_table;
 
 pub struct Migrator;
 
@@ -223,6 +228,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20260504_000001_add_anomaly_detection_config_folder_fk::Migration),
             Box::new(m20260506_000001_create_org_ingestion_tokens_table::Migration),
             Box::new(m20260401_00001_create_org_s3_table::Migration),
+            Box::new(m20260520_000001_create_providers_table::Migration),
+            Box::new(m20260520_000002_create_score_configs_table::Migration),
+            Box::new(m20260520_000003_create_scorers_table::Migration),
+            Box::new(m20260520_000004_create_online_eval_jobs_table::Migration),
+            Box::new(m20260520_000005_drop_eval_templates_table::Migration),
         ]
     }
 }
