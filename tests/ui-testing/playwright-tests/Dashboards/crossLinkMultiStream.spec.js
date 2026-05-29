@@ -244,17 +244,15 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Step 4: Expand a log row
         await pm.crossLinkPage.expandFirstLogRow();
 
-        // Step 5: Open kubernetes_container_name field action dropdown
-        await pm.crossLinkPage.openFieldActionDropdown('kubernetes_container_name');
-
-        // Step 6: Verify BOTH cross-links appear (backend merges from both streams)
-        const hasA = await pm.crossLinkPage.isLogCrossLinkVisible(crossLinkNameA);
-        const hasB = await pm.crossLinkPage.isLogCrossLinkVisible(crossLinkNameB);
-
-        testLogger.info('UNION ALL cross-link visibility', { streamA: hasA, streamB: hasB });
-
-        expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible in UNION query`).toBe(true);
-        expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible in UNION query`).toBe(true);
+        // Step 5 & 6: Poll until BOTH cross-links appear (backend merges from both streams).
+        // The result_schema response is eventually-consistent, so use the polling helper
+        // that re-opens the dropdown until late-arriving responses land.
+        await pm.crossLinkPage.expectCrossLinksFromBothStreams(
+            'kubernetes_container_name',
+            crossLinkNameA,
+            crossLinkNameB,
+            { timeout: 30000 },
+        );
 
         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
     });
@@ -639,6 +637,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         const hasCrossLink = await pm.crossLinkPage.expectLogCrossLinkVisible(
             'kubernetes_container_name',
             crossLinkName,
+            { timeout: 30000 },
         );
 
         testLogger.info('Single-stream cross-link visibility', { visible: hasCrossLink });

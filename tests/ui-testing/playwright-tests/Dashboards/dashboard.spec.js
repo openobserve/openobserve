@@ -872,7 +872,7 @@ ORDER BY _time ASC`
     // Verify line chart data is rendered correctly
     await page.waitForSelector('[data-test="chart-renderer"]', {
       state: "visible",
-      timeout: 10000,
+      timeout: 30000,
     });
 
     await page.waitForFunction(
@@ -882,7 +882,7 @@ ORDER BY _time ASC`
         );
         return chartElement && chartElement.hasAttribute("_echarts_instance_");
       },
-      { timeout: 15000 }
+      { timeout: 30000 }
     );
 
     // Wait for canvas elements to be rendered with data

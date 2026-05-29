@@ -705,7 +705,9 @@ test.describe("Cross-Linking testcases", () => {
 
         // Verify the cross-link survived the reload
         await pm.crossLinkPage.expectCrossLinkListVisible();
-        const itemText = await pm.crossLinkPage.getCrossLinkItemText(0);
+        const idx = await pm.crossLinkPage.findCrossLinkItemIndexByName(linkName);
+        expect(idx, `Cross-link "${linkName}" should exist after reload`).toBeGreaterThanOrEqual(0);
+        const itemText = await pm.crossLinkPage.getCrossLinkItemText(idx);
         expect(itemText).toContain(linkName);
         expect(itemText).toContain('persist.example.com');
 
