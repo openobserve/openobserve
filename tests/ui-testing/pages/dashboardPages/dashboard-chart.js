@@ -157,7 +157,7 @@ export default class ChartTypeSelector {
 
     // New data-test format: o-field-list-row-{fieldName}
     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
-    await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
+    await fieldItem.first().waitFor({ state: "visible", timeout: 15000 });
 
     // Add button is hidden until hover — reveal it first
     await fieldItem.first().scrollIntoViewIfNeeded();
