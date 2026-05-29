@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-if="!isRUMPage"
           >
-            <OButton variant="primary" size="sm" icon="vpn_key" @click="navigateToIngestionTokens">
+            <OButton variant="primary" size="sm" icon-left="key" @click="navigateToIngestionTokens">
               {{ t('ingestion.manageTokensBtnLabel') }}
             </OButton>
           </span>

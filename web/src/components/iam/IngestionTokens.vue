@@ -80,18 +80,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-token="{ row }">
-                <code
-                  class="tw:font-mono tw:px-2 tw:py-1 tw:rounded tw:text-sm"
-                  style="background: rgba(0,0,0,0.06);"
-                >{{ row.token }}</code>
-                <OButton
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  icon="content-copy"
-                  class="tw:ml-2"
-                  :title="t('ingestion.copyTokenBtn')"
-                  @click="copyToken(row.token)"
-                />
+                <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-full">
+                  <code
+                    class="tw:font-mono tw:px-2 tw:py-1 tw:rounded tw:text-sm tw:truncate tw:max-w-[280px] tw:inline-block"
+                    style="background: rgba(0,0,0,0.06);"
+                  >{{ row.token }}</code>
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="content-copy"
+                    class="tw:shrink-0"
+                    :title="t('ingestion.copyTokenBtn')"
+                    @click="copyToken(row.token)"
+                  />
+                </div>
               </template>
 
               <template #cell-created_by="{ row }">
@@ -101,15 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-actions="{ row }">
                 <OButton
                   :data-test="`ingestion-token-${row.name}-toggle`"
-                  class="material-symbols-outlined"
+                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-circle-sm"
+                  size="icon-sm"
                   :title="row.enabled ? t('common.disable') : t('common.enable')"
                   :disabled="loading"
                   @click.stop="toggleEnabled(row.name, !row.enabled)"
-                >
-                  <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" />
-                </OButton>
+                />
               </template>
             </OTable>
           </div>
@@ -325,13 +325,8 @@ export default defineComponent({
       }
     };
 
-    const copyToken = async (token: string) => {
-      await copyToClipboard(token);
-      toast({
-        variant: "success",
-        message: t("common.copied") || "Copied!",
-        timeout: 3000,
-      });
+    const copyToken = (token: string) => {
+      copyToClipboard(token);
     };
 
     onBeforeMount(() => {
