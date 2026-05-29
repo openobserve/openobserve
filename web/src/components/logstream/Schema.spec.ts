@@ -1084,7 +1084,6 @@ describe("Schema Component Tests", () => {
         expect.objectContaining({
           variant: "error",
           message: expect.stringContaining("Maximum allowed fields"),
-          timeout: 3000,
         })
       );
       expect(wrapper.vm.selectedFields).toEqual([]);

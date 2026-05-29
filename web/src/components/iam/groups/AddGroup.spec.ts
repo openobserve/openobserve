@@ -298,8 +298,7 @@ describe("AddGroup Component", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: 'User Group "test_group" Created Successfully!',
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "success",
       });
     });
 
@@ -315,8 +314,7 @@ describe("AddGroup Component", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: "Error while creating group",
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "error",
       });
     });
 

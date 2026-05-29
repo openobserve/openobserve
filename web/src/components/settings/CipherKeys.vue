@@ -278,7 +278,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading data...",
-      });
+              timeout: 0,
+});
 
       CipherKeysService.list(store.state.selectedOrganization.identifier)
         .then((response) => {
@@ -331,7 +332,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait while processing delete request...",
-        });
+                  timeout: 0,
+});
         CipherKeysService.delete(
           store.state.selectedOrganization.identifier,
           confirmDelete.value.data.name,
@@ -341,7 +343,6 @@ export default defineComponent({
             toast({
               variant: "success",
               message: `Cipher Key deleted successfully`,
-              timeout: 2000,
             });
 
             getData();
@@ -352,14 +353,12 @@ export default defineComponent({
               toast({
                 variant: "error",
                 message: err.response.data.message,
-                timeout: 2000,
               });
             } else {
               if (err?.status != 403) {
                 toast({
                   variant: "error",
                   message: err.response.data.message,
-                  timeout: 2000,
                 });
               }
             }
@@ -410,19 +409,16 @@ export default defineComponent({
             toast({
               variant: "success",
               message: `Successfully deleted ${successful.length} cipher key(s)`,
-              timeout: 2000,
             });
           } else if (successful.length > 0 && unsuccessful.length > 0) {
             toast({
               variant: "warning",
               message: `Deleted ${successful.length} cipher key(s), but ${unsuccessful.length} failed`,
-              timeout: 3000,
             });
           } else if (unsuccessful.length > 0) {
             toast({
               variant: "error",
               message: `Failed to delete ${unsuccessful.length} cipher key(s)`,
-              timeout: 2000,
             });
           }
 
@@ -435,7 +431,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: err.response?.data?.message || err?.message || "Error while deleting cipher keys",
-              timeout: 2000,
             });
           }
         });

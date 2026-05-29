@@ -194,6 +194,7 @@ describe("InvoiceTable Component", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while loading invoice history...",
+        timeout: 0,
       });
     });
 

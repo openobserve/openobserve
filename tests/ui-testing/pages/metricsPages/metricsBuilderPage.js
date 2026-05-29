@@ -173,8 +173,8 @@ export class MetricsBuilderPage {
         this.newDashboardNameFieldInput = page.locator('[data-test="add-dashboard-name-field"]').first();
 
         // OToast success / error
-        this.toastSuccess = page.locator('[data-test="o-toast-success"]');
-        this.toastError = page.locator('[data-test="o-toast-error"]');
+        this.toastSuccess = page.locator('[data-test-variant="success"]');
+        this.toastError = page.locator('[data-test-variant="error"]');
     }
 
     // ============== Factory helpers for per-index locators ==============

@@ -409,8 +409,7 @@ const loadFile = async (file: File | null) => {
   } catch (error: any) {
     toast({
       message: `Failed to parse JSON: ${error.message}`,
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "error",
     });
     clearFile();
   } finally {
@@ -442,8 +441,7 @@ const previewDiff = async (groups: SemanticGroup[]) => {
   } catch (error: any) {
     toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "error",
     });
   }
 };
@@ -533,8 +531,7 @@ const applyChanges = async () => {
 
     toast({
       message: `Successfully applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "success",
     });
 
     // Go back
@@ -542,8 +539,7 @@ const applyChanges = async () => {
   } catch (error: any) {
     toast({
       message: `Failed to save changes: ${error.response?.data?.error || error.message}`,
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "error",
     });
   } finally {
     isApplying.value = false;
@@ -575,8 +571,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
   } catch (error: any) {
     toast({
       message: `Invalid JSON: ${error.message}`,
-      position: "bottom-right",
-      timeout: 3000,
+      variant: "error",
     });
   } finally {
     isImporting.value = false;

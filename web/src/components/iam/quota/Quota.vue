@@ -950,7 +950,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: response.data.message,
-            timeout: 3000,
           });
         }
 
@@ -977,7 +976,6 @@ export default defineComponent({
           message:
             error.response.data.message ||
             "Error while updating rate limits rule",
-          timeout: 3000,
         });
         console.error("Error saving changes:", error);
       }
@@ -1024,7 +1022,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: response.data.message,
-            timeout: 3000,
           });
         }
 
@@ -1052,7 +1049,6 @@ export default defineComponent({
           message:
             error.response.data.message ||
             "Error while updating rate limits rule",
-          timeout: 3000,
         });
         console.error("Error saving changes:", error);
       }
@@ -1102,7 +1098,7 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait while uploading rules...",
-          timeout: 1000,
+          timeout: 0,
         });
         uploadingRules.value = true;
         const response = await ratelimitService.upload_template(
@@ -1113,7 +1109,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: response.data.message,
-            timeout: 3000,
           });
         }
         uploadingRules.value = false;
@@ -1147,8 +1142,7 @@ export default defineComponent({
               } catch (error) {
                 toast({
                   message: `Error parsing JSON from file ${file.name}`,
-                  position: "bottom-right",
-                  timeout: 2000,
+                  variant: "error",
                 });
                 resolve([]);
               }
@@ -1246,7 +1240,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: "some values are empty please check",
-              timeout: 3000,
             });
             isEmpty = true;
           }
@@ -1440,7 +1433,6 @@ export default defineComponent({
         toast({
           variant: "warning",
           message: "Please save or cancel your changes before switching time units",
-          timeout: 3000,
         });
         // Revert back to previous time unit
         activeTimeUnit.value = activeTimeUnit.value;

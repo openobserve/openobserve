@@ -732,7 +732,7 @@ describe("useStreams Composable", () => {
       expect(vi.mocked(toast)).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while loading streams...",
-        timeout: 5000,
+        timeout: 0,
       });
       expect(mockToastDismiss).toHaveBeenCalled();
     });

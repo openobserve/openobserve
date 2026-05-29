@@ -455,7 +455,7 @@ test.describe(
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Verify no error toast appeared — check for OToast error elements
-        const errorToast = page.locator('[data-test="o-toast-error"]');
+        const errorToast = page.locator('[data-test-variant="error"]');
         const errorCount = await errorToast.count();
 
         // We expect no errors since the mustache variable should be substituted
@@ -893,7 +893,7 @@ test.describe(
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Verify no error toast appeared — check for OToast error elements
-        const errorToast = page.locator('[data-test="o-toast-error"]');
+        const errorToast = page.locator('[data-test-variant="error"]');
         const errorCount = await errorToast.count();
 
         // We expect no errors since the spaced mustache variable should be normalized and substituted

@@ -1339,7 +1339,6 @@ export default defineComponent({
           toast({
             variant: "info",
             message: `No metric streams found for service "${result.correlationData.service_name}"`,
-            timeout: 3000,
           });
         }
 
@@ -1539,7 +1538,6 @@ export default defineComponent({
         toast({
           variant: "warning",
           message: "No trace ID available for inspection",
-          timeout: 2000,
         });
         return;
       }

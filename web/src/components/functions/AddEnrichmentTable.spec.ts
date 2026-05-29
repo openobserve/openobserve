@@ -362,7 +362,7 @@ describe('AddEnrichmentTable.vue', () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: 'loading',
         message: 'Please wait...',
-        timeout: 2000,
+        timeout: 0,
       });
       expect(mockToast).toHaveBeenCalledWith({
         variant: 'success',
@@ -563,7 +563,7 @@ describe('AddEnrichmentTable.vue', () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: 'loading',
         message: 'Please wait...',
-        timeout: 2000,
+        timeout: 0,
       });
       
       await submitPromise;

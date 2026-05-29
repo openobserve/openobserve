@@ -35,7 +35,7 @@ export class PipelinesEP {
         this.quasarMenuScroll = '[data-test$="-popover"], [role="listbox"]';
         this.quasarMenuItem = '[data-test$="-option"]';
         this.quasarVirtualScrollContent = '[data-test$="-popover"] [role="listitem"]';
-        this.notifyContainer = '[data-test="o-toast"]';
+        this.notifyContainer = '[data-test^="o-toast-"]';
         this.monacoViewLines = '.view-lines';
     }
 

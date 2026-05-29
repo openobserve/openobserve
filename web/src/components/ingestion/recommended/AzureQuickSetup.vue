@@ -350,7 +350,6 @@ export default defineComponent({
           message: shouldReplace
             ? "Microsoft O365 dashboard replaced successfully"
             : "Microsoft O365 dashboard added successfully to Microsoft folder",
-          timeout: 3000,
         });
       } catch (error) {
         console.error("Error adding dashboard:", error);

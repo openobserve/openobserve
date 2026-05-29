@@ -30,42 +30,45 @@ describe("toast()", () => {
 
   it("calling DismissFn with replacement closes current and fires new toast", () => {
     const dismiss = toast({ variant: "loading", message: "Loading..." })
-    expect(toastRecords).toHaveLength(1)
+    // Loading is suppressed — no record is added to the UI
+    expect(toastRecords).toHaveLength(0)
     dismiss({ variant: "success", message: "Done!" })
-    expect(toastRecords[0].open).toBe(false)
-    expect(toastRecords).toHaveLength(2)
-    expect(toastRecords[1].variant).toBe("success")
-    expect(toastRecords[1].message).toBe("Done!")
+    // Only the replacement success toast appears in records
+    expect(toastRecords).toHaveLength(1)
+    expect(toastRecords[0].variant).toBe("success")
+    expect(toastRecords[0].message).toBe("Done!")
   })
 
   it("applies default timeout for success variant", () => {
     toast({ variant: "success", message: "OK" })
-    expect(toastRecords[0].timeout).toBe(3000)
+    expect(toastRecords[0].timeout).toBe(5000)
   })
 
   it("applies default timeout for error variant", () => {
     toast({ variant: "error", message: "Fail" })
-    expect(toastRecords[0].timeout).toBe(5000)
+    expect(toastRecords[0].timeout).toBe(30000)
   })
 
   it("applies default timeout for warning variant", () => {
     toast({ variant: "warning", message: "Warn" })
-    expect(toastRecords[0].timeout).toBe(4000)
+    expect(toastRecords[0].timeout).toBe(30000)
   })
 
   it("applies default timeout for info variant", () => {
     toast({ variant: "info", message: "FYI" })
-    expect(toastRecords[0].timeout).toBe(4000)
+    expect(toastRecords[0].timeout).toBe(5000)
   })
 
   it("applies timeout: 0 for loading variant (persistent)", () => {
+    // Loading is suppressed from UI — no record is added; caller uses the
+    // returned DismissFn to swap in a success/error toast when done.
     toast({ variant: "loading", message: "Working..." })
-    expect(toastRecords[0].timeout).toBe(0)
+    expect(toastRecords).toHaveLength(0)
   })
 
   it("applies default timeout for default variant", () => {
     toast({ message: "Hello" })
-    expect(toastRecords[0].timeout).toBe(3000)
+    expect(toastRecords[0].timeout).toBe(5000)
   })
 
   it("respects explicit timeout: 0 (persistent)", () => {

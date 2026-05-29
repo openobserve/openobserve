@@ -542,7 +542,6 @@ const addDomain = () => {
     toast({
       variant: "error",
       message: t("settings.domainAlreadyExists"),
-      timeout: 3000,
     });
     return;
   }
@@ -577,7 +576,6 @@ const doRemoveDomain = () => {
   toast({
     variant: "success",
     message: t("settings.domainRemoved"),
-    timeout: 3000,
   });
 };
 
@@ -589,7 +587,6 @@ const addEmail = (domain: Domain) => {
     toast({
       variant: "error",
       message: t("settings.emailAlreadyExists"),
-      timeout: 3000,
     });
     return;
   }
@@ -600,7 +597,6 @@ const addEmail = (domain: Domain) => {
   toast({
     variant: "success",
     message: t("settings.emailAdded"),
-    timeout: 3000,
   });
 };
 
@@ -618,7 +614,6 @@ const doRemoveEmail = () => {
   toast({
     variant: "success",
     message: t("settings.emailRemoved"),
-    timeout: 3000,
   });
 };
 
@@ -684,13 +679,11 @@ const saveClaimParserFunction = async () => {
     toast({
       variant: "success",
       message: t("settings.claimParserFunctionSaved"),
-      timeout: 3000,
     });
   } catch (error: any) {
     toast({
       variant: "error",
       message: error?.message || t("settings.errorSavingClaimParserFunction"),
-      timeout: 3000,
     });
   } finally {
     savingClaimParser.value = false;
@@ -805,7 +798,6 @@ const saveChanges = async () => {
         toast({
           variant: "error",
           message: t("settings.domainNeedsEmails", { domain: domain.name }),
-          timeout: 3000,
         });
         saving.value = false;
         return;
@@ -827,7 +819,6 @@ const saveChanges = async () => {
     toast({
       variant: "success",
       message: t("settings.domainSettingsSaved"),
-      timeout: 3000,
     });
 
     emit("saved", domains);
@@ -835,7 +826,6 @@ const saveChanges = async () => {
     toast({
       variant: "error",
       message: error?.message || t("settings.errorSavingDomainSettings"),
-      timeout: 3000,
     });
   } finally {
     saving.value = false;

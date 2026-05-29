@@ -272,7 +272,7 @@ export class AlertManagement {
                 await this.page.getByText('Delete').click();
                 await this.page.waitForTimeout(1000);
                 await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
-                await expect(this.page.locator('[data-test="o-toast-success"] [data-test="o-toast-message"]').filter({ hasText: 'Alert deleted' })).toBeVisible();
+                await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Alert deleted' })).toBeVisible();
 
                 await this.page.waitForTimeout(3000);
                 attempts++;

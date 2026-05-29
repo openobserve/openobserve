@@ -6,30 +6,22 @@
         Write a SQL query for complex actions.
       </div>
 
-      <textarea
-        style="
-          min-width: 100%;
-          max-width: 100%;
-          resize: vertical;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          margin-top: 2px;
-          padding: 2px;
-        "
+      <OTextarea
         v-model="fields.rawQuery"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
-        data-test="dashboard-raw-query-textarea"
         :rows="6"
-      ></textarea>
+        data-test="dashboard-raw-query-textarea"
+        class="tw:mt-0.5"
+      />
     </div>
   </div>
 </template>
 <script lang="ts">
 import { ref, watch } from "vue";
-import { useStore } from "vuex";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 
 export default {
   name: "RawQueryBuilder",
+  components: { OTextarea },
   props: {
     modelValue: {
       type: Object,
@@ -38,8 +30,6 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const store = useStore();
-
     const fields = ref(props.modelValue);
 
     watch(
@@ -51,7 +41,6 @@ export default {
     );
 
     return {
-      store,
       fields,
     };
   },

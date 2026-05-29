@@ -29,8 +29,8 @@ export class AlertDestinationsPage {
         this.submitButton = '[data-test="add-destination-submit-btn"]';
         this.successMessage = 'Destination saved';
         // OToast success message (preferred over getByText to dodge strict-mode collisions)
-        this.successToast = '[data-test="o-toast-success"]';
-        this.successToastMessage = '[data-test="o-toast-success"] [data-test="o-toast-message"]';
+        this.successToast = '[data-test-variant="success"]';
+        this.successToastMessage = '[data-test-variant="success"] [data-test="o-toast-message"]';
         
         // Import locators
         this.destinationImportButton = '[data-test="destination-import"]';
@@ -99,9 +99,8 @@ export class AlertDestinationsPage {
         this.saveButton = '[data-test="add-destination-submit-btn"]';
         this.cancelButton = '[data-test="add-destination-cancel-btn"]';
         this.backButton = '[data-test="add-destination-back-btn"]';
-        // Toast/notification appears via OToast — match either o-toast-success or o-toast-message
-        this.successNotification = '[data-test^="o-toast-"]';
-        this.toastSuccess = '[data-test="o-toast-success"]';
+        this.successNotification = '[data-test-variant="success"]';
+        this.toastSuccess = '[data-test-variant="success"]';
         this.toastMessage = '[data-test="o-toast-message"]';
         // OInput-derived per-field error nodes (e.g. add-destination-name-input-error). Any of these visible = validation error
         this.errorMessage = '[data-test$="-input-error"], [data-test$="-error"]';

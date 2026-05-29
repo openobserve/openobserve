@@ -661,7 +661,6 @@ const saveCondition = async () => {
       toast({
         variant: "error",
         message: "Please add at least one condition",
-        timeout: 3000,
       });
       return;
     }
@@ -764,7 +763,6 @@ const validateSqlQuery = () => {
           toast({
             variant: "error",
             message: "Invalid SQL Query : " + err.response.data.message,
-            timeout: 3000,
           });
           reject("");
         } else isValidSqlQuery.value = true;

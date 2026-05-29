@@ -124,7 +124,7 @@ export class LogsPage {
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
         this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
-        this.notificationErrorMessage = '[data-test="o-toast-error"]';
+        this.notificationErrorMessage = '[data-test-variant="error"]';
         this.vrlFunctionText = (text) => `text=${text}`;
         this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
         this.expandLabel = label => `Expand "${label}"`;
@@ -289,7 +289,7 @@ export class LogsPage {
         // `o-toast-info`, `o-toast-warning`, `o-toast-loading`, `o-toast-default`). Enumerate
         // known variants on the root only — also dodges Monaco's `role="alert"` accessibility
         // hosts and the inner `o-toast-message` description node that share the `o-toast-` prefix.
-        this.successNotification = '[data-test="o-toast-success"], [data-test="o-toast-error"], [data-test="o-toast-info"], [data-test="o-toast-warning"], [data-test="o-toast-loading"], [data-test="o-toast-default"]';
+        this.successNotification = '[data-test-variant="success"], [data-test-variant="error"], [data-test-variant="info"], [data-test-variant="warning"], [data-test-variant="loading"], [data-test-variant="default"]';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
 
@@ -2929,7 +2929,7 @@ export class LogsPage {
     async expectSavedViewCreatedToast(timeout = 3000) {
         try {
             await this.page
-                .locator('[data-test="o-toast-success"], [data-test="o-toast-message"]')
+                .locator('[data-test-variant="success"], [data-test="o-toast-message"]')
                 .first()
                 .waitFor({ state: 'visible', timeout });
             return true;
@@ -3343,12 +3343,12 @@ export class LogsPage {
     async expectNotificationMessage(text) {
         const escaped = String(text).replace(/"/g, '\\"');
         const selector = [
-            `[data-test="o-toast-success"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-error"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-info"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-warning"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-loading"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-default"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="success"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="error"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="info"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="warning"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="loading"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="default"][data-test-message*="${escaped}"]`,
         ].join(', ');
         await expect(this.page.locator(selector).first()).toBeVisible({ timeout: 15000 });
     }
@@ -3371,12 +3371,12 @@ export class LogsPage {
         // Cover both surfaces so the wait succeeds for either feedback channel.
         const escaped = String(text).replace(/"/g, '\\"');
         const selector = [
-            `[data-test="o-toast-success"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-error"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-info"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-warning"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-loading"][data-test-message*="${escaped}"]`,
-            `[data-test="o-toast-default"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="success"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="error"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="info"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="warning"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="loading"][data-test-message*="${escaped}"]`,
+            `[data-test-variant="default"][data-test-message*="${escaped}"]`,
             `[data-test$="-error"][data-test-error-text*="${escaped}"]`,
         ].join(', ');
         await this.page.locator(selector).first().waitFor({ state: 'visible', timeout });
@@ -4210,7 +4210,7 @@ export class LogsPage {
     async expectWarningNoFunctionDefinition() {
         // SearchBar.vue calls toast({ variant: "error", message: "No function definition found." }).
         // OToast renders with data-test="o-toast-error" / "o-toast-message".
-        const toast = this.page.locator('[data-test="o-toast-error"], [data-test="o-toast-message"]').first();
+        const toast = this.page.locator('[data-test-variant="error"], [data-test="o-toast-message"]').first();
         await toast.waitFor({ state: 'visible', timeout: 15000 });
         await expect(toast).toContainText('No function definition');
     }
@@ -6449,7 +6449,7 @@ export class LogsPage {
      * Uses .first() to tolerate multiple stacked toasts from repeated share clicks.
      */
     async expectShareLinkSuccessNotification() {
-        const notification = this.page.locator(`[data-test="o-toast-success"][data-test-message*="${this.linkCopiedSuccessText}"]`).first();
+        const notification = this.page.locator(`[data-test-variant="success"][data-test-message*="${this.linkCopiedSuccessText}"]`).first();
         await expect(notification).toBeVisible({ timeout: 15000 });
         testLogger.info('Share link success notification verified');
     }

@@ -1256,7 +1256,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading alerts...",
-      });
+              timeout: 0,
+});
       if (query) {
         folderId = "";
       }
@@ -1386,7 +1387,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Error while pulling alerts.",
-          timeout: 2000,
         });
       } finally {
         loading.value = false;
@@ -1396,7 +1396,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading alert...",
-      });
+              timeout: 0,
+});
       try {
         const res = await alertsService.get_by_alert_id(
           store.state.selectedOrganization.identifier,
@@ -1597,7 +1598,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: "Failed to load alert for editing",
-              timeout: 2000,
             });
           }
         }
@@ -1627,7 +1627,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "Error while fetching destinations.",
-            timeout: 3000,
           }),
         );
     };
@@ -1644,7 +1643,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "Error while fetching templates.",
-            timeout: 3000,
           }),
         );
     };
@@ -1685,7 +1683,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "Please select stream type ",
-            timeout: 2000,
           });
           return;
         }
@@ -1693,7 +1690,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "Please select stream name",
-            timeout: 2000,
           });
           return;
         }
@@ -1701,8 +1697,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait...",
-          timeout: 2000,
-        });
+                  timeout: 0,
+});
         try {
           await alertsService.clone_by_id(
             store.state.selectedOrganization.identifier,
@@ -1719,7 +1715,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: "Anomaly detection cloned successfully",
-            timeout: 2000,
           });
           showForm.value = false;
           await getAlertsFn(store, folderIdToBeCloned.value);
@@ -1730,7 +1725,6 @@ export default defineComponent({
             variant: "error",
             message:
               e?.response?.data?.message || "Failed to clone anomaly detection",
-            timeout: 2000,
           });
         } finally {
           isSubmitting.value = false;
@@ -1742,7 +1736,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Alert not found",
-          timeout: 2000,
         });
         return;
       }
@@ -1750,7 +1743,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Please select stream type ",
-          timeout: 2000,
         });
         return;
       }
@@ -1758,7 +1750,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Please select stream name",
-          timeout: 2000,
         });
         return;
       }
@@ -1766,8 +1757,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-        timeout: 2000,
-      });
+              timeout: 0,
+});
 
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
@@ -1795,7 +1786,6 @@ export default defineComponent({
               toast({
                 variant: "success",
                 message: "Alert Cloned Successfully",
-                timeout: 2000,
               });
               showForm.value = false;
               await getAlertsFn(store, folderIdToBeCloned.value);
@@ -1804,7 +1794,6 @@ export default defineComponent({
               toast({
                 variant: "error",
                 message: res.data.message,
-                timeout: 2000,
               });
             }
           })
@@ -1818,7 +1807,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: e.response.data.message,
-              timeout: 2000,
             });
           })
           .finally(() => {
@@ -1830,7 +1818,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: e.data.message,
-          timeout: 2000,
         });
       }
     };
@@ -1876,7 +1863,6 @@ export default defineComponent({
             toast({
               variant: "success",
               message: res.data.message,
-              timeout: 2000,
             });
             await getAlertsFn(store, activeFolderId.value);
             if (filterQuery.value) {
@@ -1886,7 +1872,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: res.data.message,
-              timeout: 2000,
             });
           }
         })
@@ -1897,7 +1882,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: err?.data?.message || "Error while deleting alert.",
-            timeout: 2000,
           });
         });
       if (config.enableAnalytics == "true") {
@@ -1987,7 +1971,6 @@ export default defineComponent({
             message: isEnabled
               ? "Alert Resumed Successfully"
               : "Alert Paused Successfully",
-            timeout: 2000,
           });
         })
         .finally(() => {
@@ -2091,7 +2074,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: t("alerts.alertTriggeredSuccess"),
-          timeout: 2000,
         });
         if (row.type === "anomaly") {
           await getAlertsFn(store, activeFolderId.value);
@@ -2100,7 +2082,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: error?.response?.data?.message || "Failed to trigger alert",
-          timeout: 2000,
         });
       }
     };
@@ -2115,14 +2096,12 @@ export default defineComponent({
         toast({
           variant: "success",
           message: "Retraining triggered",
-          timeout: 2000,
         });
       } catch (error: any) {
         toast({
           variant: "error",
           message:
             error?.response?.data?.message || "Failed to trigger retraining",
-          timeout: 2000,
         });
       }
     };
@@ -2281,7 +2260,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while searching for dashboards...",
-      });
+              timeout: 0,
+});
       dismiss();
       await getAlertsFn(store, activeFolderId.value, query);
     }, 600);
@@ -2389,7 +2369,6 @@ export default defineComponent({
         toast({
           variant: "success",
           message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
-          timeout: 2000,
         });
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
@@ -2398,7 +2377,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: "Error exporting alerts. Please try again.",
-          timeout: 2000,
         });
       }
     };
@@ -2503,7 +2481,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: `No alerts to ${action}`,
-            timeout: 2000,
           });
           dismiss();
           return;
@@ -2527,7 +2504,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: `Alerts ${action}d successfully`,
-            timeout: 2000,
           });
         }
         // Refresh alerts
@@ -2542,7 +2518,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: `Error ${action}ing alerts. Please try again.`,
-          timeout: 2000,
         });
       }
     };
@@ -2565,7 +2540,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "No alerts selected for deletion",
-            timeout: 2000,
           });
           dismiss();
           return;
@@ -2602,14 +2576,12 @@ export default defineComponent({
             toast({
               variant: "error",
               message: `Failed to delete ${failCount} alert(s)`,
-              timeout: 3000,
             });
           } else {
             // All successful
             toast({
               variant: "success",
               message: `${successCount} alert(s) deleted successfully`,
-              timeout: 2000,
             });
           }
         } else {
@@ -2617,7 +2589,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
-            timeout: 2000,
           });
         }
 
@@ -2640,7 +2611,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: errorMessage,
-            timeout: 3000,
           });
         }
       }

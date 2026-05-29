@@ -292,7 +292,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading functions...",
-      });
+              timeout: 0,
+});
 
       jsTransformService
         .list(
@@ -342,7 +343,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: "Error while pulling function.",
-              timeout: 2000,
             });
           }
         })
@@ -456,14 +456,12 @@ export default defineComponent({
             toast({
               variant: "success",
               message: res.data.message,
-              timeout: 2000,
             });
             getJSTransforms();
           } else {
             toast({
               variant: "error",
               message: res.data.message,
-              timeout: 2000,
             });
           }
         })
@@ -583,7 +581,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: "No functions selected for deletion",
-            timeout: 2000,
           });
           dismiss();
           return;
@@ -619,14 +616,12 @@ export default defineComponent({
             toast({
               variant: "error",
               message: `Failed to delete ${failCount} function(s)`,
-              timeout: 3000,
             });
           } else {
             // All successful
             toast({
               variant: "success",
               message: `${successCount} function(s) deleted successfully`,
-              timeout: 2000,
             });
           }
         } else {
@@ -634,7 +629,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: `${selectedFunctions.value.length} function(s) deleted successfully`,
-            timeout: 2000,
           });
         }
 
@@ -651,7 +645,6 @@ export default defineComponent({
           toast({
             variant: "error",
             message: errorMessage,
-            timeout: 3000,
           });
         }
       }

@@ -478,7 +478,7 @@ size="xs" class="warning" />{{
                   :alt="lang.label"
                   class="header-language-flag"
                 />
-                <OIcon v-else size="xs" :name="lang.icon" />
+                <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                 <span class="tw:flex-1">{{ lang.label }}</span>
                 <OIcon
                   v-if="selectedLanguage.code === lang.code"

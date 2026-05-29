@@ -173,7 +173,7 @@ export async function deleteDashboard(page, dashboardName) {
   }
 
   // Verify the success toast appears
-  await page.locator('[data-test="o-toast-success"]').waitFor({
+  await page.locator('[data-test-variant="success"]').waitFor({
     state: 'visible',
     timeout: 10000
   }).catch(() => {

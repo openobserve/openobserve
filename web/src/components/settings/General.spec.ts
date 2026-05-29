@@ -362,7 +362,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
         message: "Organization settings updated",
-        timeout: 2000,
       });
     });
 
@@ -379,7 +378,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
         message: "Server error",
-        timeout: 2000,
       });
     });
 
@@ -394,7 +392,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
         message: "Something went wrong",
-        timeout: 2000,
       });
     });
   });
@@ -512,7 +509,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
         message: "Text should be less than 100 characters.",
-        timeout: 2000,
       });
       expect(mockSettingsService.updateCustomText).not.toHaveBeenCalled();
     });
@@ -559,7 +555,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
         message: "Update failed",
-        timeout: 2000,
       });
     });
   });
@@ -605,7 +600,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
         message: "Light Mode logo updated successfully.",
-        timeout: 2000,
       });
     });
 
@@ -623,7 +617,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
         message: "Dark Mode logo updated successfully.",
-        timeout: 2000,
       });
     });
 
@@ -642,7 +635,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
         message: "Upload failed",
-        timeout: 2000,
       });
     });
 
@@ -671,7 +663,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
         message: "Light Mode logo deleted successfully.",
-        timeout: 2000,
       });
     });
 
@@ -684,7 +675,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
         message: "Dark Mode logo deleted successfully.",
-        timeout: 2000,
       });
     });
 
@@ -701,7 +691,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
         message: "Something went wrong",
-        timeout: 2000,
       });
     });
   });
@@ -925,7 +914,6 @@ describe("General", () => {
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
         message: "You are not allowed to perform this action.",
-        timeout: 2000,
       });
 
       // Restore original value

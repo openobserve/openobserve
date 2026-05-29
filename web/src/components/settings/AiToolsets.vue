@@ -206,7 +206,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("common.loading"),
-      });
+              timeout: 0,
+});
 
       aiToolsetsService
         .list(store.state.selectedOrganization.identifier)
@@ -305,12 +306,13 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("common.pleaseWait"),
-      });
+              timeout: 0,
+});
 
       aiToolsetsService
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
-          toast({ variant: "success", message: t("aiToolset.deletedSuccessfully"), timeout: 2000 });
+          toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
           getData();
         })
         .catch((err) => {
@@ -318,7 +320,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: err?.response?.data?.message || t("aiToolset.deleteFailed"),
-              timeout: 3000,
             });
           }
         })

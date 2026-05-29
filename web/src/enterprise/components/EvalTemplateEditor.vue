@@ -261,7 +261,6 @@ const saveTemplate = async () => {
       message:
         err?.response?.data?.message ||
         (isEdit.value ? t("evalTemplate.updateFailed") : t("evalTemplate.createFailed")),
-      timeout: 3000,
     });
   } finally {
     saving.value = false;
@@ -291,7 +290,6 @@ onBeforeMount(async () => {
       toast({
         variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.loadFailed"),
-        timeout: 3000,
       });
     }
     router.push({ name: "evalTemplates" });
