@@ -424,10 +424,11 @@ test.describe("Sankey chart testcases", () => {
       // Both elements may be visible simultaneously on CI, so check each
       // independently rather than using .or() which throws strict mode
       // violation when both match.
-      const noDataVisible = await page.locator('[data-test="no-data"]')
-        .isVisible().catch(() => false);
-      const dashErrorVisible = await page.locator('[data-test="dashboard-error"].col-auto')
-        .isVisible().catch(() => false);
+      const noDataLocator = pm.dashboardPanelActions.getNoDataLocator();
+      const dashErrorLocator = pm.dashboardPanelActions.getDashboardErrorLocator();
+
+      const noDataVisible = await noDataLocator.isVisible().catch(() => false);
+      const dashErrorVisible = await dashErrorLocator.isVisible().catch(() => false);
 
       if (!noDataVisible && !dashErrorVisible) {
         // Neither visible yet — wait for either one to appear
@@ -440,8 +441,8 @@ test.describe("Sankey chart testcases", () => {
       }
 
       expect(noDataVisible || dashErrorVisible ||
-        await page.locator('[data-test="no-data"]').isVisible().catch(() => false) ||
-        await page.locator('[data-test="dashboard-error"].col-auto').isVisible().catch(() => false)
+        await noDataLocator.isVisible().catch(() => false) ||
+        await dashErrorLocator.isVisible().catch(() => false)
       ).toBe(true);
 
       testLogger.info("Sankey no data state verified");

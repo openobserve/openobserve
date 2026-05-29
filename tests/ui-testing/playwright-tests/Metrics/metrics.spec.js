@@ -480,11 +480,15 @@ test.describe("Metrics testcases", () => {
       { timeout: 15000 }
     );
 
-    const hasInlineError = await page.locator('[data-test="dashboard-error"]').isVisible().catch(() => false);
-    const hasChartError = await page.locator('[data-test="panel-schema-renderer-error-message"]').isVisible().catch(() => false);
-    const hasNoData = await page.locator('[data-test="no-data"]').isVisible().catch(() => false);
+    const inlineErrorLocator = pm.metricsPage.getDashboardError();
+    const chartErrorLocator = pm.metricsPage.getChartErrorMessage();
+    const noDataLocator = await pm.metricsPage.getNoDataMessage();
+
+    const hasInlineError = await inlineErrorLocator.isVisible().catch(() => false);
+    const hasChartError = await chartErrorLocator.isVisible().catch(() => false);
+    const hasNoData = await noDataLocator.isVisible().catch(() => false);
     // Also check DOM presence (no-data can render with empty text and 0px height)
-    const noDataInDom = await page.locator('[data-test="no-data"]').count() > 0;
+    const noDataInDom = await noDataLocator.count() > 0;
 
     testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}, noDataInDom=${noDataInDom}`);
 
@@ -493,10 +497,10 @@ test.describe("Metrics testcases", () => {
     expect(handledGracefully).toBe(true);
 
     if (hasInlineError) {
-      const errorText = await page.locator('[data-test="dashboard-error"]').first().textContent().catch(() => '');
+      const errorText = await inlineErrorLocator.first().textContent().catch(() => '');
       testLogger.info(`Dashboard error displayed: ${errorText.substring(0, 100)}`);
     } else if (hasChartError) {
-      const errorText = await page.locator('[data-test="panel-schema-renderer-error-message"]').first().textContent().catch(() => '');
+      const errorText = await chartErrorLocator.first().textContent().catch(() => '');
       testLogger.info(`Chart error displayed: ${errorText.substring(0, 100)}`);
     } else {
       testLogger.info('Invalid query handled gracefully - no-data state (no crash, loading completed)');
