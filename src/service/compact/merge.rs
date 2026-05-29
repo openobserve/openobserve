@@ -42,8 +42,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     runtime::DATAFUSION_RUNTIME,
     schema::{
-        SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
-        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
+        SchemaCache, get_partition_time_level, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_created_at,
     },
     storage,
 };
@@ -446,7 +446,7 @@ pub async fn merge_by_stream(
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
+        let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
@@ -474,7 +474,7 @@ pub async fn merge_by_stream(
             let skip_group_files = false;
 
             if files_with_size.len() <= 1 && !skip_group_files {
-                return Ok(());
+                return Ok(vec![]);
             }
 
             // group files need to merge
@@ -500,9 +500,10 @@ pub async fn merge_by_stream(
                             if job_strategy == MergeStrategy::FileSize {
                                 break;
                             }
-                            new_file_size = 0;
                             new_file_list.clear();
-                            continue; // this batch don't need to merge, skip
+                            new_file_size = file.meta.original_size;
+                            new_file_list.push(file.clone());
+                            continue; // replace previous file with current file
                         }
                         batch_groups.push(MergeBatch {
                             batch_id: batch_groups.len(),
@@ -535,7 +536,7 @@ pub async fn merge_by_stream(
                 }
 
                 if batch_groups.is_empty() {
-                    return Ok(()); // no files need to merge
+                    return Ok(vec![]); // no files need to merge
                 }
             }
 
@@ -556,6 +557,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
+            let mut orphan_blooms = Vec::new();
             for ret in worker_results {
                 let (batch_id, new_files) = match ret {
                     Ok(v) => v,
@@ -599,18 +601,53 @@ pub async fn merge_by_stream(
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
+
+                // collect orphan blooms after writing file list successfully
+                for file in delete_file_list {
+                    if file.meta.bloom_ver > 0 {
+                        orphan_blooms.push(file.meta.bloom_ver);
+                    }
+                }
             }
             drop(permit);
             if let Some(e) = last_error {
                 return Err(e);
             }
-            Ok(())
+            Ok(orphan_blooms)
         });
         tasks.push(task);
     }
 
+    // collect bloom files which need to be clean
+    let mut orphan_blooms = Vec::new();
     for task in tasks {
-        task.await??;
+        orphan_blooms.extend(task.await??);
+    }
+
+    // Build bloom for the current hour
+    let build_start = std::time::Instant::now();
+    match crate::service::compact::bloom_build::build_for_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        is_incremental,
+        orphan_blooms,
+    )
+    .await
+    {
+        Ok(false) => {}
+        Ok(true) => {
+            let build_time = build_start.elapsed().as_millis();
+            log::info!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
+            );
+        }
+        Err(e) => {
+            log::warn!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
+            );
+        }
     }
 
     // update job status
@@ -727,6 +764,7 @@ pub async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        bloom_ver: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -735,7 +773,6 @@ pub async fn merge_files(
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values, storage_type) =
@@ -831,7 +868,6 @@ pub async fn merge_files(
                     &stream_name,
                     schema,
                     tables,
-                    &bloom_filter_fields,
                     new_file_meta,
                     false,
                 )
@@ -904,7 +940,6 @@ pub async fn merge_files(
             }
 
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                // generate inverted index
                 generate_inverted_index(
                     org_id,
                     &new_file_key,
@@ -952,7 +987,6 @@ pub async fn merge_files(
                 }
 
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                    // generate inverted index
                     generate_inverted_index(
                         org_id,
                         &new_file_key,
@@ -1312,6 +1346,7 @@ mod tests {
                 compressed_size: original_size / 2, // assume 50% compression
                 index_size: 0,
                 flattened: false,
+                bloom_ver: 0,
             },
             deleted: false,
             segment_ids: None,

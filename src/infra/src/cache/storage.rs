@@ -163,6 +163,7 @@ impl ObjectStoreExt for CacheFS {
         if let Ok(v) = file_data::get_ranges_opts(account, &path, ranges, false).await {
             return Ok(v);
         }
+
         // default to storage
         storage::get_ranges(account, &path, ranges).await
     }

@@ -169,6 +169,7 @@ mod tests {
             compressed_size: 500,
             index_size: 100,
             flattened: false,
+            bloom_ver: 0,
         }
     }
 
