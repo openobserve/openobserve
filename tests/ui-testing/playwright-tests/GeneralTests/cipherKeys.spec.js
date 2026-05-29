@@ -98,7 +98,7 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyOO(simpleSecretInvalid);
     await cipherKeys.addCipherKeyContinue();
     await cipherKeys.addCipherKeySave();
-    await cipherKeys.verifyAlertMessage('warningfailed to decode the key, check if secret value and mechanism match');
+    await cipherKeys.verifyAlertMessage('failed to decode the key, check if secret value and mechanism match');
     testLogger.info('Test completed successfully');
   });
 
@@ -162,7 +162,7 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyContinue();
     await cipherKeys.addCipherKeyTink();
     await cipherKeys.addCipherKeySave();
-    await cipherKeys.verifyAlertMessage('warningerror deserializing tink keyset, please check if provided json is valid tink keyset');
+    await cipherKeys.verifyAlertMessage('error deserializing tink keyset, please check if provided json is valid tink keyset');
     testLogger.info('Test completed successfully');
   });
 
@@ -223,7 +223,7 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     // Add Cipher Key with blank name
     await cipherKeys.addCipherKey();
     await cipherKeys.addCipherKeyContinue();
-    await cipherKeys.verifyAlertMessage('Name is required');
+    await cipherKeys.verifyNameError();
     testLogger.info('Test completed successfully');
   });
 
@@ -235,7 +235,7 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKey();
     await cipherKeys.addCipherKeyName(cipherName);
     await cipherKeys.addCipherKeyContinue();
-    await cipherKeys.verifyAlertMessage('Secret is required');
+    await cipherKeys.verifySecretError();
     testLogger.info('Test completed successfully');
   });
 
@@ -249,7 +249,7 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyOO('invalidSecret');
     await cipherKeys.addCipherKeyContinue();
     await cipherKeys.addCipherKeySave();
-    await cipherKeys.verifyAlertMessage('warningfailed to decode the key, check if secret value and mechanism match');
+    await cipherKeys.verifyAlertMessage('failed to decode the key, check if secret value and mechanism match');
     testLogger.info('Test completed successfully');
   });
 
@@ -368,7 +368,7 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyEncryDataDFC(simpleEncryDataDFCInvalid);
     await cipherKeys.addCipherKeyContinue();
     await cipherKeys.addCipherKeySave();
-    await cipherKeys.verifyAlertMessage('warningfailed to decode the ciphertext: illegal base64 data at input byte 4');
+    await cipherKeys.verifyAlertMessage('failed to decode the ciphertext: illegal base64 data at input byte 4');
     testLogger.info('Test completed successfully');
   });
 
