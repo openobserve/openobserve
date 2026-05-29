@@ -147,7 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   self="top middle"
                   class="tw:text-sm"
                 >
-                  {{ membership?.payer_org_id }}
+                  <div v-if="membership?.payer_org_name">
+                    {{ membership.payer_org_name }}
+                  </div>
+                  <div class="tw:text-xs tw:opacity-70">
+                    {{ membership?.payer_org_id }}
+                  </div>
                 </q-tooltip>
               </span>
             </div>
