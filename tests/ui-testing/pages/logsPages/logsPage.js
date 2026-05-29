@@ -994,12 +994,13 @@ export class LogsPage {
 
     async addStreamToSelection(streamName) {
         testLogger.info(`Adding stream to selection: ${streamName}`);
-        // Legacy `log-search-index-list-stream-toggle-<name>` is gone post-OSelect
-        // migration. Click the wrapper to open the popover, then pick the option
-        // by data-test-value.
-        const searchInput = this.page.locator(this.indexDropDown);
-        await searchInput.click();
+        // Click the wrapper to open the OSelect popover, then fill the ListboxFilter
+        // search input (data-test="log-search-index-list-select-stream-search").
+        const wrapper = this.page.locator(this.indexDropDown);
+        await wrapper.click();
         await this.page.waitForTimeout(500);
+        const searchInput = this.page.locator(this.indexDropDownSearch);
+        await searchInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         await searchInput.fill(streamName);
         await this.page.waitForTimeout(1000);
         const option = this.page.locator(
@@ -9371,9 +9372,7 @@ export class LogsPage {
      * @param {string|number} pageNum - The page number to click (e.g., '1', '2')
      */
     async clickPageNumber(pageNum) {
-        const pageBtn = this.page
-            .locator('[data-test="logs-search-result-pagination"]')
-            .locator(`button[aria-label="${pageNum}"]`);
+        const pageBtn = this.page.locator(this.resultPaginationPageBtn(pageNum));
         await pageBtn.click({ force: true });
         await this.waitForResultsLoaded();
     }
@@ -9382,9 +9381,7 @@ export class LogsPage {
      * Click the "Next page" button in the pagination component.
      */
     async clickNextPage() {
-        const nextBtn = this.page
-            .locator('[data-test="logs-search-result-pagination"]')
-            .locator('button[aria-label="Next page"]');
+        const nextBtn = this.page.locator('[data-test="logs-search-result-pagination-next"]');
         await nextBtn.click({ force: true });
         await this.waitForResultsLoaded();
     }
@@ -9507,8 +9504,11 @@ export class LogsPage {
         return await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
             if (!pagination) return '';
-            const btn = pagination.querySelector('button[aria-current="true"]');
-            return btn ? btn.getAttribute('aria-label') : '';
+            const btn = pagination.querySelector('button[aria-current="page"]');
+            if (!btn) return '';
+            const label = btn.getAttribute('aria-label') || '';
+            const match = label.match(/\d+/);
+            return match ? match[0] : '';
         });
     }
 
