@@ -17,6 +17,8 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
 
   test.beforeAll(async ({ browser }) => {
+    // 4-min daemon wait + 30s buffer + ingestion time exceeds the default 3-5 min test timeout.
+    test.setTimeout(600000); // 10 minutes for beforeAll
     testLogger.info('=== SERVICE GRAPH SETUP: Ingesting trace data ===');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',

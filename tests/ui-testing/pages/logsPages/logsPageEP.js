@@ -30,11 +30,12 @@ async searchSchedulerCreate() {
 }
 
 async searchSchedulerSubmit() {
-  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
-
-  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]');
-  await inputField.click();
-  await inputField.fill('1000');
+  // OInput: outer wrapper has data-test="search-scheuduler-max-number-of-records-input";
+  // inner native <input> has data-test="search-scheuduler-max-number-of-records-input-field".
+  // fill() requires the native input, not the wrapper div.
+  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input-field"]');
+  await inputField.waitFor({ state: 'attached', timeout: 10000 });
+  await inputField.fill('1000', { force: true });
 
   const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
   await this.page.waitForSelector(submitBtn);
@@ -54,24 +55,29 @@ async searchSchedulerSubmit() {
 
 async validateAddJob(jobId) {
   // Wait for the notification — it fires only after the job creation API call succeeds
-  await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Job Added Succesfully', { timeout: 15000 });
+  await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job added successfully' }).first()).toBeVisible({ timeout: 15000 });
 
   // Navigate to the scheduler list
   await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
-  await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
-  // Resolve trace_id for the specific job we created, then assert that exact row
+  // OTable rows are indexed as [data-test="o2-table-row-{index}"] (positional integer).
+  // trace_id is the row-key but is NOT a visible column, so filter({ hasText }) won't match.
+  // Instead: intercept the GET response from clicking "Get Jobs" to find the job's row index.
   const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
   const orgId = getOrgIdentifier();
-  const listResponse = await this.page.request.get(
-    `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
-    { headers: getAuthHeaders() }
+  const responsePromise = this.page.waitForResponse(
+    resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
+    { timeout: 15000 }
   );
+  await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
+  const listResponse = await responsePromise;
   const jobs = await listResponse.json();
-  const job = jobs.find(j => j.id === jobId);
-  if (!job?.trace_id) throw new Error(`Job with id "${jobId}" not found in scheduler list`);
-  await expect(this.page.locator(`[data-test="search-scheduler-table-${job.trace_id}-row"]`)).toBeVisible({ timeout: 15000 });
+  const rowIndex = jobs.findIndex(j => j.id === jobId);
+  if (rowIndex === -1) throw new Error(`Job with id "${jobId}" not found in scheduler list`);
+  await expect(
+    this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`).first()
+  ).toBeVisible({ timeout: 15000 });
 }
 
 async queryJobSearch() {
@@ -135,10 +141,11 @@ async clickJobID () {
 
 
 async searchSchedulerInvalid() {
-  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').click();
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').fill('100000000');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').press('Enter');
+  // OInput: use the inner native input (-field suffix) for fill/press operations
+  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input-field"]');
+  await inputField.waitFor({ state: 'attached', timeout: 10000 });
+  await inputField.fill('100000000', { force: true });
+  await inputField.press('Enter');
   const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
   await this.page.waitForSelector(submitBtn);
   await this.page.locator(submitBtn).click();
@@ -146,9 +153,9 @@ async searchSchedulerInvalid() {
 
 
 async validateInvalidData() {
-  await expect(this.page.locator('[data-test-variant="error"]')).toContainText('Job Scheduler should be between 1 and 100000');
-  
-  
+  await expect(
+    this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job Scheduler should be between 1 and 100000' }).first()
+  ).toBeVisible({ timeout: 10000 });
 }
 
 
