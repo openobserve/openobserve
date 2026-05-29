@@ -1806,7 +1806,7 @@ WHERE org = $1 AND account = $2;"#;
             .with_label_values(&["stats_by_org_account", "file_list"])
             .inc();
         let start = std::time::Instant::now();
-        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+        let ret: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(sql)
             .bind(org_id)
             .bind(account)
             .fetch_optional(&pool)
@@ -1815,7 +1815,10 @@ WHERE org = $1 AND account = $2;"#;
         DB_QUERY_TIME
             .with_label_values(&["stats_by_org_account", "file_list"])
             .observe(time);
-        Ok(ret.unwrap_or_default())
+        // in case there are no files ingested before settings up storage,
+        // we can get null, so need to handle that with option<>
+        let (storage,index) = ret.unwrap_or_default();
+        Ok((storage.unwrap_or_default(),index.unwrap_or_default()))
     }
 }
 
