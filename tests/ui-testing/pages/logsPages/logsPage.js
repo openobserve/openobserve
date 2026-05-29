@@ -7692,8 +7692,9 @@ export class LogsPage {
      * Assert that the Patterns toggle is in selected state
      */
     async expectPatternsToggleSelected() {
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        await expect(this.page.locator(`${this.patternsToggle} [data-state]`)).toHaveAttribute('data-state', 'on');
+        // OToggleGroupItem uses inheritAttrs:false + v-bind="$attrs" on the inner Reka UI <button>.
+        // data-test AND data-state are both on that same <button> element — no child selector.
+        await expect(this.page.locator(`${this.patternsToggle}[data-state="on"]`)).toBeVisible({ timeout: 10000 });
         testLogger.info('Patterns toggle is in selected state');
     }
 
@@ -8092,7 +8093,7 @@ export class LogsPage {
      * Get pattern details dialog content
      */
     async getPatternDetailsDialogContent() {
-        const content = await this.page.locator('[data-test="logs-search-result-detail-dialog"]').innerText();
+        const content = await this.page.locator('[data-test="pattern-details-dialog"]').innerText();
         testLogger.info(`Dialog content length: ${content.length} chars`);
         return content;
     }
