@@ -91,9 +91,15 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.crossLinkPage.clickCrossLinkingTab();
         await pm.crossLinkPage.deleteAllCrossLinks();
         await pm.crossLinkPage.addCrossLink(crossLink);
+
+        // Wait for the PUT settings API to confirm the save succeeded
+        const settingsResponse = page.waitForResponse(
+            (resp) => resp.url().includes('/streams/') && resp.url().includes('/settings') && resp.request().method() === 'PUT',
+            { timeout: 15000 }
+        );
         await pm.crossLinkPage.clickUpdateSettings();
-        await page.waitForTimeout(2000);
-        testLogger.info(`Cross-link "${crossLink.name}" set up on ${streamName}`);
+        const resp = await settingsResponse;
+        testLogger.info(`Cross-link "${crossLink.name}" saved on ${streamName}`, { status: resp.status() });
         return true;
     }
 
@@ -222,24 +228,26 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Step 2: Navigate to logs, select both streams, enable SQL mode
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectIndexAndStreamJoinUnion(STREAM_A, STREAM_B);
-        await page.waitForTimeout(2000);
+        // selectIndexAndStreamJoinUnion already waits for stream options and selection
 
         await pm.logsPage.enableSqlModeIfNeeded();
-        await page.waitForTimeout(1000);
 
         // Step 3: Enter UNION ALL query
         const unionQuery = `SELECT * FROM "${STREAM_A}" UNION ALL BY NAME SELECT * FROM "${STREAM_B}" LIMIT 100`;
         await pm.logsPage.clearAndFillQueryEditor(unionQuery);
-        await page.waitForTimeout(500);
         testLogger.info('UNION ALL query entered', { query: unionQuery });
 
         // Disable quick mode for full field visibility
         await pm.logsPage.ensureQuickModeState(false);
-        await page.waitForTimeout(1000);
+        // ensureQuickModeState already waits for the toggle data-state to flip
 
-        // Run query
+        // Run query and wait for the search API and result_schema responses
+        const resultSchemaPromise = page.waitForResponse(
+            (resp) => resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200,
+            { timeout: 20000 }
+        ).catch(() => {});
         await pm.logsPage.selectRunQuery();
-        await page.waitForTimeout(3000);
+        await resultSchemaPromise;
 
         // Step 4: Expand a log row
         await pm.crossLinkPage.expandFirstLogRow();
@@ -251,7 +259,6 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
             'kubernetes_container_name',
             crossLinkNameA,
             crossLinkNameB,
-            { timeout: 30000 },
         );
 
         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
@@ -616,15 +623,19 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Step 2: Navigate to logs, select only Stream A
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_A);
-        await page.waitForTimeout(2000);
+        // selectStream already waits for the stream option and selection
 
         // Disable quick mode
         await pm.logsPage.ensureQuickModeState(false);
-        await page.waitForTimeout(1000);
+        // ensureQuickModeState already waits for the toggle data-state to flip
 
-        // Run query
+        // Run query and wait for search API + result_schema cross-linking response
+        const resultSchemaPromise = page.waitForResponse(
+            (resp) => resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200,
+            { timeout: 20000 }
+        ).catch(() => {});
         await pm.logsPage.runQueryAndWaitForResults();
-        await page.waitForTimeout(3000);
+        await resultSchemaPromise;
 
         // Step 3: Expand a log row
         await pm.crossLinkPage.expandFirstLogRow();
@@ -637,7 +648,6 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         const hasCrossLink = await pm.crossLinkPage.expectLogCrossLinkVisible(
             'kubernetes_container_name',
             crossLinkName,
-            { timeout: 30000 },
         );
 
         testLogger.info('Single-stream cross-link visibility', { visible: hasCrossLink });

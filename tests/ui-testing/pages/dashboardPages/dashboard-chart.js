@@ -157,7 +157,7 @@ export default class ChartTypeSelector {
 
     // New data-test format: o-field-list-row-{fieldName}
     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
-    await fieldItem.first().waitFor({ state: "visible", timeout: 15000 });
+    await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
 
     // Add button is hidden until hover — reveal it first
     await fieldItem.first().scrollIntoViewIfNeeded();
@@ -472,10 +472,12 @@ export default class ChartTypeSelector {
   async enterCustomSQL(query) {
     await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
     await this.queryEditor.click();
-    // Clear any placeholder/default content, then type the new query
-    await this.page.keyboard.press("Control+a");
-    await this.page.keyboard.press("Delete");
-    await this.page.keyboard.type(query);
+    // Use .inputarea.fill() for Monaco/CodeMirror editors — this is instant
+    // and avoids the slowness of keyboard.type() for long SQL queries.
+    const inputArea = this.queryEditor.locator('.inputarea');
+    await inputArea.waitFor({ state: "visible", timeout: 5000 });
+    await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await inputArea.fill(query);
     testLogger.debug('Entered custom SQL query', { query });
   }
 
