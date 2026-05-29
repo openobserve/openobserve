@@ -42,7 +42,7 @@ pub(super) async fn read_vortex_with_projection(
 ) -> Result<RecordBatchStream, anyhow::Error> {
     let session = VortexSession::default().with_tokio();
     let vxf = session.open_options().open_buffer(data)?;
-    let full_schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+    let full_schema = vxf.dtype().to_arrow_schema()?;
 
     let projected_names = vortex_projection_names(&full_schema, projection);
 
@@ -51,13 +51,7 @@ pub(super) async fn read_vortex_with_projection(
         let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
         scan = scan.with_projection(select(name_refs, root()));
     }
-    // The stream emits projected arrays, so the schema we hand back must match
-    // — otherwise downstream consumers downcasting by index break.
-    let stream_schema: Arc<Schema> = if projected_names.is_some() {
-        Arc::new(scan.dtype()?.to_arrow_schema()?)
-    } else {
-        full_schema
-    };
+    let stream_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
 
     let arrow_data_type = DataType::Struct(stream_schema.fields().clone());
     let vortex_stream = scan.into_array_stream()?;
@@ -90,12 +84,6 @@ pub(super) async fn read_vortex_with_projection(
 }
 
 /// Build a lazy sync iterator for one vortex row range.
-///
-/// `into_array_iter` returns `impl ArrayIterator + 'static`: the underlying
-/// `SingleThreadIterator` holds an `Rc` clone of the executor — not a borrow
-/// of the runtime — so the two can coexist in the same struct without any
-/// self-referential lifetime trick or `unsafe`. The runtime is kept alive so
-/// the stream's `Weak<Executor>` handle remains valid during iteration.
 pub(super) fn build_vortex_sync_iter(
     data: Bytes,
     projection: Option<&[String]>,
@@ -104,7 +92,7 @@ pub(super) fn build_vortex_sync_iter(
     let runtime = SingleThreadRuntime::default();
     let session = VortexSession::default().with_handle(runtime.handle());
     let vxf = session.open_options().open_buffer(data)?;
-    let full_schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+    let full_schema = vxf.dtype().to_arrow_schema()?;
 
     let projected_names = vortex_projection_names(&full_schema, projection);
 
@@ -130,11 +118,6 @@ pub(super) fn build_vortex_sync_iter(
 }
 
 /// Lazy sync iterator over one vortex row range.
-///
-/// `iter` is `'static` (holds an `Rc` clone of the executor, not a reference
-/// to `_runtime`), so the two fields have no borrow relationship. `_runtime`
-/// is declared last so it is dropped after `iter`, ensuring the stream's
-/// `Weak<Executor>` handle is still upgradeable during the final `next()` call.
 pub(in crate::service::tantivy) struct VortexRowRangeIter {
     iter: Box<dyn Iterator<Item = VortexResult<ArrayRef>> + 'static>,
     arrow_data_type: DataType,

@@ -19,33 +19,29 @@ use arrow_schema::Schema;
 use parquet::arrow::ProjectionMask;
 
 /// Compute the parquet `ProjectionMask` for a given projection column list.
-/// Shared between the sync and async parquet paths.
+/// Returns `None` when all columns should be read.
 pub(super) fn parquet_projection(
     full_schema: &Arc<Schema>,
     metadata: &parquet::file::metadata::ParquetMetaData,
     projection: Option<&[String]>,
-) -> Result<ProjectionMask, anyhow::Error> {
-    // Keep only requested columns that exist; an empty intersection means
-    // "read everything" so we don't emit a 0-column batch.
-    let projected_indices: Vec<usize> = match projection {
-        Some(cols) => {
-            let kept: Vec<usize> = full_schema
-                .fields()
-                .iter()
-                .enumerate()
-                .filter_map(|(i, f)| cols.iter().any(|c| c == f.name()).then_some(i))
-                .collect();
-            if kept.is_empty() {
-                (0..full_schema.fields().len()).collect()
-            } else {
-                kept
-            }
-        }
-        None => (0..full_schema.fields().len()).collect(),
+) -> Result<Option<ProjectionMask>, anyhow::Error> {
+    let Some(cols) = projection else {
+        return Ok(None);
     };
 
-    Ok(ProjectionMask::roots(
+    let kept: Vec<usize> = full_schema
+        .fields()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, f)| cols.iter().any(|c| c == f.name()).then_some(i))
+        .collect();
+
+    if kept.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(ProjectionMask::roots(
         metadata.file_metadata().schema_descr(),
-        projected_indices.iter().copied(),
-    ))
+        kept,
+    )))
 }

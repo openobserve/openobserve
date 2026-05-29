@@ -29,6 +29,7 @@ use arrow::{error::ArrowError, record_batch::RecordBatch};
 use bytes::Bytes;
 use config::{FileFormat, get_batch_size, utils::parquet::RecordBatchStream};
 use futures::TryStreamExt;
+use parquet::parquet_projection;
 
 pub(super) enum ChunkSelector {
     Parquet(usize), // row_group id
@@ -37,8 +38,7 @@ pub(super) enum ChunkSelector {
 }
 
 /// Read a whole file as a record batch stream restricted to `projection`
-/// columns. Columns in `projection` that the file doesn't have are silently
-/// dropped. `None` reads every column.
+/// columns. `None` reads every column.
 pub(super) async fn file_stream(
     file_format: FileFormat,
     data: Bytes,
@@ -47,12 +47,13 @@ pub(super) async fn file_stream(
     match file_format {
         FileFormat::Parquet => {
             let builder = ParquetRecordBatchStreamBuilder::new(Cursor::new(data)).await?;
-            let projection_mask =
-                parquet::parquet_projection(builder.schema(), builder.metadata(), projection)?;
-            let reader = builder
-                .with_batch_size(get_batch_size())
-                .with_projection(projection_mask)
-                .build()?;
+            let mut builder = builder.with_batch_size(get_batch_size());
+            if let Some(mask) =
+                parquet_projection(builder.schema(), builder.metadata(), projection)?
+            {
+                builder = builder.with_projection(mask);
+            }
+            let reader = builder.build()?;
             let stream: RecordBatchStream = Box::pin(reader.map_err(ArrowError::from));
             Ok(stream)
         }
@@ -66,8 +67,6 @@ pub(super) async fn file_stream(
 }
 
 /// Sync chunk reader. Returns a sync `Iterator`.
-/// The vortex variant owns its `SingleThreadRuntime`, so each call is
-/// independent — appropriate for use inside `spawn_blocking` per chunk.
 pub(super) fn chunk_iter(
     selector: ChunkSelector,
     data: Bytes,
@@ -76,13 +75,13 @@ pub(super) fn chunk_iter(
     match selector {
         ChunkSelector::Parquet(row_group_id) => {
             let builder = ParquetRecordBatchReaderBuilder::try_new(data)?;
-            let projection_mask =
-                parquet::parquet_projection(builder.schema(), builder.metadata(), projection)?;
-            let reader = builder
-                .with_batch_size(get_batch_size())
-                .with_projection(projection_mask)
-                .with_row_groups(vec![row_group_id])
-                .build()?;
+            let mut builder = builder.with_batch_size(get_batch_size());
+            if let Some(mask) =
+                parquet_projection(builder.schema(), builder.metadata(), projection)?
+            {
+                builder = builder.with_projection(mask);
+            }
+            let reader = builder.with_row_groups(vec![row_group_id]).build()?;
             Ok(ChunkBatchIter::Parquet(reader))
         }
         #[cfg(all(feature = "vortex", feature = "enterprise"))]
