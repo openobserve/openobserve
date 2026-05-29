@@ -52,11 +52,17 @@ export default class LogsVisualise {
 
   async openVisualiseTab() {
     // Open Visualise Tab
-    await this.page.locator('[data-test="logs-visualize-toggle"]').click();
+    const visualizeToggle = this.page.locator('[data-test="logs-visualize-toggle"]');
+    // Wait for the toggle to be enabled before clicking
+    await visualizeToggle.waitFor({ state: "visible", timeout: 10000 });
+    await visualizeToggle.click();
 
-    // Wait for the visualization panel editor to load by checking for chart selector
-    const chartSelector = this.page.locator('[data-test="dashboard-addpanel-chart-selection-item"]').first();
-    await chartSelector.waitFor({ state: "visible", timeout: 15000 });
+    // Wait for the panel editor container to load (async component)
+    // It may be hidden if there's a query error, so wait for attached (in DOM)
+    await this.page.locator('[data-test="panel-editor-container"]').waitFor({
+      state: "attached",
+      timeout: 30000,
+    });
   }
 
   // Open visualise tab and ensure table chart is selected when VRL is present
@@ -117,12 +123,19 @@ export default class LogsVisualise {
 
   //set relative time selection
   async setRelative(date, time) {
-    await this.timeTab.waitFor({ state: "visible" });
+    // Wait for the date-time button to be enabled before interacting
+    await this.page.waitForSelector(
+      '[data-test="date-time-btn"]:not([disabled])',
+      { timeout: 15000 }
+    );
     await this.timeTab.click();
     await this.relativeTime.click();
-    await this.page
-      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
-      .click();
+    const selector = `[data-test="date-time-relative-${date}-${time}-btn"]`;
+    // Wait for the relative time button to be enabled (not just visible)
+    await this.page.waitForSelector(`${selector}:not([disabled])`, {
+      timeout: 15000,
+    });
+    await this.page.locator(selector).click();
   }
 
   //search and add fields
@@ -437,19 +450,24 @@ export default class LogsVisualise {
 
   // Get quick mode toggle state using the most reliable method
   async getQuickModeToggleState() {
-    const quickModeToggle = this.page.locator(
-      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    // Open utilities dropdown to access the quick mode toggle
+    const utilitiesBtn = this.page.locator(
+      '[data-test="logs-search-bar-utilities-menu-btn"]'
     );
+    await utilitiesBtn.waitFor({ state: "visible", timeout: 10000 });
+    await utilitiesBtn.click();
 
-    // Wait for the toggle to be present
-    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+    const quickModeSwitch = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-switch"]'
+    );
+    await quickModeSwitch.waitFor({ state: "visible", timeout: 10000 });
 
-    // Check aria-checked attribute - this is the most reliable indicator
-    // Falls back to aria-pressed if aria-checked is not available
-    let ariaChecked = await quickModeToggle.getAttribute("aria-checked");
-    if (ariaChecked === null) {
-      ariaChecked = await quickModeToggle.getAttribute("aria-pressed");
-    }
+    // OSwitch inner button carries aria-checked
+    const switchBtn = quickModeSwitch.locator('[data-test$="-btn"]');
+    const ariaChecked = await switchBtn.getAttribute("aria-checked");
+
+    // Close dropdown
+    await this.page.keyboard.press("Escape");
 
     return ariaChecked === "true";
   }
