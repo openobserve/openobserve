@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </template>
   <script lang="ts">
-  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick } from "vue";
+  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick, inject } from "vue";
   import { useStore } from "vuex";
   import { useQuasar, date } from "quasar";
   import { useI18n } from "vue-i18n";
@@ -250,7 +250,7 @@ import router from "@/router";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
-  
+
   let currentDate = new Date(); // Get the current date and time
   
   // Subtract 30 days from the current date
@@ -287,6 +287,13 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         ai_credits: "0.00"
       });
       let chartData: any = ref({});
+      // The member-org selector lives in Billing.vue (rendered beside this
+      // component) and shares the current selection via this injected reactive.
+      const usageMember = inject<{ selected: string }>(
+        "usageMember",
+        undefined as any
+      );
+      const selectedMember = computed(() => usageMember?.selected || "");
       onMounted(async () => {
         selectUsageDate();
       });
@@ -300,6 +307,9 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       watch(usageDataType, (val) => {
         getUsage();
       })
+      watch(selectedMember, () => {
+        getUsage();
+      })
       const getUsage = () => {
         const dismiss = $q.notify({
           spinner: true,
@@ -308,8 +318,9 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         dataLoading.value = true;
         BillingService.get_data_usage(
           store.state.selectedOrganization.identifier,
-          usageDate.value,  
-          usageDataType.value
+          usageDate.value,
+          usageDataType.value,
+          selectedMember.value || undefined
         )
           .then((res) => {
             dataLoading.value = false;
@@ -954,6 +965,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         remotePipelineIcon,
         dataRetentionIcon,
         aiIcon,
+        selectedMember,
       };
     },
   });

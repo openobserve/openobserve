@@ -82,6 +82,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
 
+          <q-checkbox
+            v-if="!beingUpdated && config.isCloud == 'true' && canMakeBilledMember"
+            v-model="makeBilledMember"
+            :label="t('organization.makeBilledMember', { org: currentOrgName })"
+            dense
+            class="tw:mt-4"
+            data-test="org-make-billed-member"
+          />
+
           <div class="flex justify-start tw:mt-6 tw:gap-2">
             <OButton
               variant="outline"
@@ -172,6 +181,23 @@ export default defineComponent({
       return orgNameRegex.test(organizationData.value.name);
     });
 
+    const makeBilledMember = ref(false);
+    const currentOrgName = computed(
+      () =>
+        store.state.selectedOrganization?.name ||
+        store.state.selectedOrganization?.identifier ||
+        ""
+    );
+
+    // Only orgs listed in billing_group_allowed_orgs (comma-separated, from
+    // config) can act as a payer org, so the checkbox is shown only for them.
+    const canMakeBilledMember = computed(() => {
+      const allowed = (store.state.zoConfig?.billing_group_allowed_orgs || "")
+        .split(",")
+        .map((o: string) => o.trim())
+        .filter(Boolean);
+      return allowed.includes(store.state.selectedOrganization?.identifier);
+    });
 
     return {
       t,
@@ -185,6 +211,10 @@ export default defineComponent({
       isValidIdentifier,
       track,
       isValidOrgName,
+      config,
+      makeBilledMember,
+      currentOrgName,
+      canMakeBilledMember,
     };
   },
   created() {
@@ -241,7 +271,12 @@ export default defineComponent({
         //if organizationId is not there we will create a new organization else we will update the existing organization
         if (!organizationId) {
           delete this.organizationData.id;
-          callOrganization = organizationService.create(this.organizationData);
+          const payload: any = { name: this.organizationData.name };
+          if (this.makeBilledMember && config.isCloud == "true") {
+            payload.make_billed_member_of =
+              this.store.state.selectedOrganization.identifier;
+          }
+          callOrganization = organizationService.create(payload);
         }
         else {
           callOrganization = organizationService.rename_organization(

@@ -589,6 +589,15 @@ where
                             .map_or(path_columns[1], |model| model.key),
                         path_columns[0]
                     )
+                } else if path_columns[1].eq("billing_group") {
+                    // as billing groups are org wide, we check the _all perm for that
+                    format!(
+                        "{}:_all_{}",
+                        OFGA_MODELS
+                            .get(path_columns[1])
+                            .map_or(path_columns[1], |model| model.key),
+                        path_columns[0]
+                    )
                 } else {
                     // otherwise for listing/creating we need permissions on that "sub-entity"
                     // in general such as org:templates or org:destinations or org:alerts
@@ -879,6 +888,15 @@ where
                     path_columns[2]
                 )
             }
+        } else if url_len == 5 && path_columns.get(1) == Some(&"billing_group") {
+            // this is for accepting or rejecting the billing group invite
+            format!(
+                "{}:_all_{}",
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
+                path_columns[0]
+            )
         } else if method.eq("POST")
             && path_columns.get(1) == Some(&"alerts")
             && path_columns.get(2) == Some(&"deduplication")

@@ -16,13 +16,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-px-lg q-pt-md" style="min-height: inherit; overflow: auto">
-    <div class="row justify-between items-center">
+    <div v-if="!isChildOrg" class="row justify-between items-center">
       <div>
         <span class="o2-page-title">{{ t("billing.title") }}</span
         ><br />
         <span class="o2-page-subtitle">{{ t("billing.subtitle") }}</span>
       </div>
     </div>
+    <!-- Managed billing empty state for child orgs -->
+    <div
+      v-if="isChildOrg"
+      class="managed-empty"
+      data-test="plans-managed-billing-panel"
+    >
+      <div class="managed-empty__icon-outer">
+        <div class="managed-empty__icon-inner">
+          <q-icon name="account_balance" size="28px" class="managed-empty__icon" />
+        </div>
+      </div>
+
+      <div class="managed-empty__title">
+        {{ t("billing.billingGroup.plansManagedTitle") }}
+      </div>
+      <div class="managed-empty__desc">
+        {{
+          t("billing.billingGroup.plansManagedDescription", {
+            name: membership?.payer_org_name,
+            id: membership?.payer_org_id,
+          })
+        }}
+      </div>
+
+      <div class="managed-empty__chips">
+        <span class="managed-empty__chip">
+          <q-icon name="receipt_long" size="13px" />
+          {{ t("billing.billingGroup.chipConsolidatedBill") }}
+        </span>
+        <span class="managed-empty__chip">
+          <q-icon name="lock" size="13px" />
+          {{ t("billing.billingGroup.chipPlanManaged") }}
+        </span>
+        <span class="managed-empty__chip">
+          <q-icon name="description" size="13px" />
+          {{ t("billing.billingGroup.chipNoInvoices") }}
+        </span>
+      </div>
+
+      <OButton
+        variant="primary"
+        class="managed-empty__btn"
+        data-test="plans-view-org-group-btn"
+        @click="goToOrgGroup"
+      >
+        {{ t("billing.billingGroup.viewOrgGroup") }}
+        <template #icon-right>
+          <q-icon name="arrow_forward" size="16px" class="tw:ml-1" />
+        </template>
+      </OButton>
+    </div>
+    <template v-else>
     <trial-period class="q-mb-md" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
@@ -95,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pricingError="pricingError"
       ></enterprise-plan>
     </div>
+    </template>
   </q-page>
 </template>
 
@@ -103,6 +156,7 @@ import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
@@ -117,14 +171,36 @@ export default defineComponent({
     EnterprisePlan,
     ProPlan,
     TrialPeriod,
+    OButton,
   },
   emits: ["update:proSubscription"],
   async mounted() {
     this.loading = true;
+    this.fetchMembership();
     await Promise.all([this.loadSubscription(), this.fetchPricingData()]);
     this.fetchAiUsage();
   },
   methods: {
+    goToOrgGroup() {
+      this.$router.push({
+        name: "billing_group",
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+        },
+      });
+    },
+    fetchMembership() {
+      if (config.isCloud !== "true") return;
+      BillingService.get_billing_group_membership(
+        this.store.state.selectedOrganization.identifier
+      )
+        .then((res: any) => {
+          this.membership = res.data?.membership ?? null;
+        })
+        .catch(() => {
+          // membership not available
+        });
+    },
     fetchAiUsage() {
       BillingService.get_ai_usage(
         this.store.state.selectedOrganization.identifier
@@ -341,6 +417,8 @@ export default defineComponent({
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);
     const pricingError = ref(false);
+    const membership = ref<any>(null);
+    const isChildOrg = computed(() => membership.value != null);
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
@@ -379,6 +457,8 @@ export default defineComponent({
       proPlanFeatures,
       enterprisePlanFeatures,
       pricingError,
+      membership,
+      isChildOrg,
     };
   },
 });
@@ -386,5 +466,77 @@ export default defineComponent({
 <style lang="scss" scoped>
 .subtitle {
   color: $primary;
+}
+.managed-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: calc(100vh - var(--navbar-height) - 200px);
+  padding: 48px 24px;
+
+  &__icon-outer {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 1px dashed color-mix(in srgb, var(--q-primary) 30%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+  &__icon-inner {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--q-primary) 10%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--q-primary) 24%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  &__icon {
+    color: var(--q-primary);
+    opacity: 0.85;
+  }
+  &__title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    margin-bottom: 10px;
+  }
+  &__desc {
+    font-size: 0.88rem;
+    line-height: 1.65;
+    opacity: 0.65;
+    max-width: 440px;
+    margin-bottom: 24px;
+  }
+  &__chips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.85;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.1));
+    border-radius: 20px;
+    padding: 4px 12px;
+  }
+  &__btn {
+    height: 40px;
+    padding: 0 24px;
+    font-weight: 600;
+  }
 }
 </style>
