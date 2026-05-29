@@ -5933,20 +5933,25 @@ export class LogsPage {
     }
 
     async fillTimeCellWithInvalidValue(value) {
-        // Post-UX-revamp: native <input type="time"> rejects malformed values via fill(),
-        // so use evaluate() to bypass browser validation and inject the value directly.
+        // Use fill() with the value and rely on the component's validation to surface
+        // the error state, rather than bypassing browser validation via evaluate().
         const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
         await timeInput.waitFor({ state: 'visible', timeout: 5000 });
-        await timeInput.evaluate((el, val) => {
-            el.value = val;
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        }, value);
+        const currentValue = await timeInput.inputValue().catch(() => '');
+        await timeInput.fill('');
+        await timeInput.fill(value);
+        // Verify the input reflects the attempted value (or its best-effort parse)
+        const newValue = await timeInput.inputValue().catch(() => '');
+        if (newValue !== value) {
+            // Browser rejected or parsed the value — that's the expected error path
+            return { rejected: true, originalValue: currentValue, newValue };
+        }
+        return { rejected: false, originalValue: currentValue, newValue };
     }
 
     async expectErrorIconVisible() {
-        // Post-UX-revamp: OIcon renders with data-test or use generic error-text selector
-        const errorIcon = this.page.locator('[data-test="o-input-error"], i.material-icons:has-text("error"), [class*="text-negative"]:has-text("error")').first();
+        // O2 OInput error state uses data-test="o-input-error" scoped to the datetime container
+        const errorIcon = this.page.locator('[data-test="datetime-start-time"] [data-test="o-input-error"]').first();
         return await expect(errorIcon).toBeVisible({ timeout: 5000 });
     }
 
