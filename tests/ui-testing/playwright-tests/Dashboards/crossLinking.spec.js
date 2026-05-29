@@ -707,10 +707,15 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.openStreamDetail();
         await pm.crossLinkPage.clickCrossLinkingTab();
 
-        // Verify the cross-link survived the reload
+        // Verify the cross-link survived the reload.
+        // Poll for the item — the cross-link list container renders before
+        // the individual items finish loading from the settings API.
         await pm.crossLinkPage.expectCrossLinkListVisible();
+        await expect.poll(
+            () => pm.crossLinkPage.findCrossLinkItemIndexByName(linkName),
+            { timeout: 10000, message: `Cross-link "${linkName}" should exist after reload` }
+        ).toBeGreaterThanOrEqual(0);
         const idx = await pm.crossLinkPage.findCrossLinkItemIndexByName(linkName);
-        expect(idx, `Cross-link "${linkName}" should exist after reload`).toBeGreaterThanOrEqual(0);
         const itemText = await pm.crossLinkPage.getCrossLinkItemText(idx);
         expect(itemText).toContain(linkName);
         expect(itemText).toContain('persist.example.com');

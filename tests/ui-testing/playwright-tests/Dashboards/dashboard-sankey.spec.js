@@ -420,12 +420,13 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Verify no data or error is shown (incomplete Sankey config)
-      // Check each independently — both may be visible simultaneously
-      await page.waitForSelector(
-        '[data-test="no-data"], [data-test="dashboard-error"].col-auto',
-        { state: "visible", timeout: 10000 }
-      );
+      // Verify no data or error is shown (incomplete Sankey config).
+      // Use locator.or() so whichever element becomes visible first satisfies
+      // the assertion — waitForSelector with a CSS comma selector always picks
+      // the first element in DOM order, which may be the invisible no-data div.
+      const noData = page.locator('[data-test="no-data"]');
+      const dashError = page.locator('[data-test="dashboard-error"].col-auto');
+      await expect(noData.or(dashError)).toBeVisible({ timeout: 10000 });
 
       testLogger.info("Sankey no data state verified");
 
