@@ -99,7 +99,6 @@
   background-color: var(--o2-hover-accent) !important;
 }
 .logs-search-bar-component {
-  padding-bottom: 0.0625rem; // 1px
   height: 100%;
   overflow: visible;
 
@@ -363,7 +362,7 @@
   }
 
   .query-editor-container {
-    height: calc(100% - 3.31rem) !important; // 35px
+    height: calc(100% - 2.9rem) !important; // 35px
   }
 
   .logs-auto-refresh-interval {
