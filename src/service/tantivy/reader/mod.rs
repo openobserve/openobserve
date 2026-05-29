@@ -17,7 +17,9 @@ mod parquet;
 #[cfg(all(feature = "vortex", feature = "enterprise"))]
 mod vortex;
 
-use std::{io::Cursor, ops::Range};
+use std::io::Cursor;
+#[cfg(all(feature = "vortex", feature = "enterprise"))]
+use std::ops::Range;
 
 use ::parquet::arrow::{
     ParquetRecordBatchStreamBuilder,
@@ -88,10 +90,6 @@ pub(super) fn chunk_iter(
             let iter = vortex::build_vortex_sync_iter(data, projection, row_range)?;
             Ok(ChunkBatchIter::Vortex(iter))
         }
-        #[cfg(not(all(feature = "vortex", feature = "enterprise")))]
-        ChunkSelector::Vortex(_) => Err(anyhow::anyhow!(
-            "Vortex file format requires the vortex feature"
-        )),
     }
 }
 
