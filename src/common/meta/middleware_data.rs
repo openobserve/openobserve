@@ -86,11 +86,20 @@ impl RumExtraData {
     /// Returns `None` if the body is empty, not a JSON object, or
     /// doesn't contain an `ootags`/`o2tags` field.
     fn extract_tags_from_body_bytes(body: &[u8]) -> Option<String> {
-        if body.is_empty() || body[0] != b'{' {
+        // Skip leading whitespace that some NDJSON encoders may emit
+        let start = body
+            .iter()
+            .position(|&b| !matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+            .unwrap_or(body.len());
+        if start >= body.len() || body[start] != b'{' {
             return None;
         }
-        let end = body.iter().position(|&b| b == b'\n').unwrap_or(body.len());
-        let json: serde_json::Value = serde_json::from_slice(&body[..end]).ok()?;
+        let end = body[start..]
+            .iter()
+            .position(|&b| b == b'\n')
+            .map(|p| start + p)
+            .unwrap_or(body.len());
+        let json: serde_json::Value = serde_json::from_slice(&body[start..end]).ok()?;
         let obj = json.as_object()?;
         obj.get("ootags")
             .or_else(|| obj.get("o2tags"))
