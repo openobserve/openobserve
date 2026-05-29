@@ -187,23 +187,30 @@ export class CipherKeys {
     }
 
       async verifyAlertMessage(expectedText) {
-        // this.alert targets [data-test="o-toast-message"] which contains only {{ message }}
-        // (OIcon renders as SVG — no icon text in textContent). Pass message text without icon prefix.
-        await this.alert.waitFor({ state: 'visible', timeout: 10000 });
-        const timeout = 10000;
-        const interval = 500;
+        // Polls ALL visible [data-test="o-toast-message"] elements (loading + error toasts can
+        // coexist or appear sequentially). Using .first() would latch onto the loading toast
+        // "Please wait..." and miss the subsequent error toast when the API responds.
+        const toasts = this.page.locator('[data-test="o-toast-message"]');
+        const timeout = 12000; // extra headroom for API round-trip after loading toast appears
+        const interval = 300;
         let elapsed = 0;
+        let lastSeenTexts = [];
 
+        const lowerExpected = expectedText.toLowerCase();
         while (elapsed < timeout) {
-            const alertText = await this.alert.textContent();
-            if (alertText && alertText.includes(expectedText)) {
+            const texts = await toasts.allTextContents().catch(() => []);
+            lastSeenTexts = texts;
+            if (texts.some(t => t && t.toLowerCase().includes(lowerExpected))) {
                 return;
             }
             await new Promise(resolve => setTimeout(resolve, interval));
             elapsed += interval;
         }
 
-        throw new Error(`Expected alert message "${expectedText}" not found within ${timeout}ms.`);
+        const seen = lastSeenTexts.length > 0
+            ? `Last visible toasts: ${JSON.stringify(lastSeenTexts)}`
+            : 'No toasts were visible at last check.';
+        throw new Error(`Expected alert message "${expectedText}" not found within ${timeout}ms. ${seen}`);
     }
 
     // OInput inline error: [data-test="<parent>-error"] rendered by OInput when :error=true

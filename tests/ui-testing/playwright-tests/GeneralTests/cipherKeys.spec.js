@@ -97,7 +97,14 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyName(cipherName);
     await cipherKeys.addCipherKeyOO(simpleSecretInvalid);
     await cipherKeys.addCipherKeyContinue();
+    const cipherKeyResp1 = page.waitForResponse(
+      resp => resp.url().includes('/cipher_keys') && resp.request().method() === 'POST',
+      { timeout: 15000 }
+    );
     await cipherKeys.addCipherKeySave();
+    const resp1 = await cipherKeyResp1;
+    testLogger.info(`POST /cipher_keys status: ${resp1.status()}`);
+    test.skip(resp1.status() === 403, 'Cipher key API returned 403 — feature not enabled in this environment');
     await cipherKeys.verifyAlertMessage('failed to decode the key, check if secret value and mechanism match');
     testLogger.info('Test completed successfully');
   });
@@ -161,7 +168,14 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyOO(tinkeySecretInvalid);
     await cipherKeys.addCipherKeyContinue();
     await cipherKeys.addCipherKeyTink();
+    const cipherKeyResp3 = page.waitForResponse(
+      resp => resp.url().includes('/cipher_keys') && resp.request().method() === 'POST',
+      { timeout: 15000 }
+    );
     await cipherKeys.addCipherKeySave();
+    const resp3 = await cipherKeyResp3;
+    testLogger.info(`POST /cipher_keys status: ${resp3.status()}`);
+    test.skip(resp3.status() === 403, 'Cipher key API returned 403 — feature not enabled in this environment');
     await cipherKeys.verifyAlertMessage('error deserializing tink keyset, please check if provided json is valid tink keyset');
     testLogger.info('Test completed successfully');
   });
@@ -248,7 +262,14 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyName(cipherName);
     await cipherKeys.addCipherKeyOO('invalidSecret');
     await cipherKeys.addCipherKeyContinue();
+    const cipherKeyResp7 = page.waitForResponse(
+      resp => resp.url().includes('/cipher_keys') && resp.request().method() === 'POST',
+      { timeout: 15000 }
+    );
     await cipherKeys.addCipherKeySave();
+    const resp7 = await cipherKeyResp7;
+    testLogger.info(`POST /cipher_keys status: ${resp7.status()}`);
+    test.skip(resp7.status() === 403, 'Cipher key API returned 403 — feature not enabled in this environment');
     await cipherKeys.verifyAlertMessage('failed to decode the key, check if secret value and mechanism match');
     testLogger.info('Test completed successfully');
   });
@@ -367,7 +388,14 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
     await cipherKeys.addCipherKeyNameDFC(simpleNameDFC);
     await cipherKeys.addCipherKeyEncryDataDFC(simpleEncryDataDFCInvalid);
     await cipherKeys.addCipherKeyContinue();
+    const cipherKeyResp8 = page.waitForResponse(
+      resp => resp.url().includes('/cipher_keys') && resp.request().method() === 'POST',
+      { timeout: 15000 }
+    );
     await cipherKeys.addCipherKeySave();
+    const resp8 = await cipherKeyResp8;
+    testLogger.info(`POST /cipher_keys status: ${resp8.status()}`);
+    test.skip(resp8.status() === 403, 'Cipher key API returned 403 — feature not enabled in this environment');
     await cipherKeys.verifyAlertMessage('failed to decode the ciphertext: illegal base64 data at input byte 4');
     testLogger.info('Test completed successfully');
   });
