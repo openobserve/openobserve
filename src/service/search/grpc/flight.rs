@@ -692,6 +692,7 @@ async fn handle_tantivy_optimize(
             | Some(IndexOptimizeMode::SimpleHistogram(..))
             | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
             | Some(IndexOptimizeMode::SimpleTopN(..))
+            | Some(IndexOptimizeMode::SimpleTopNMulti(..))
             | Some(IndexOptimizeMode::SimpleDistinct(..))
     ) {
         return Ok((vec![], file_list));
@@ -727,7 +728,9 @@ async fn update_index_updated_at(
 
     if matches!(
         idx_optimize_rule,
-        Some(IndexOptimizeMode::SimpleTopN(..)) | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
+        Some(IndexOptimizeMode::SimpleTopN(..))
+            | Some(IndexOptimizeMode::SimpleTopNMulti(..))
+            | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
     ) {
         let ttv_secondary_index_updated_at =
             db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
