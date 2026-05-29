@@ -2236,6 +2236,12 @@ export default defineComponent({
       // }
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
+
+      // Turn off SQL mode when query is completely cleared
+      if (value.trim() === "" && searchObj.meta.sqlMode === true) {
+        searchObj.meta.sqlMode = false;
+      }
+
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
