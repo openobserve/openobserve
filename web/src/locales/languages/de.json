@@ -415,7 +415,13 @@
     "formatQuery": "Abfrage formatieren",
     "hideFunctionEditor": "Funktionseditor ausblenden",
     "selectFunction": "Funktion wählen",
-    "sqlModeDisabledReason": "Der SQL-Modus ist für diese Ansicht nicht verfügbar"
+    "sqlModeDisabledReason": "Der SQL-Modus ist für diese Ansicht nicht verfügbar",
+    "hideHistogram": "Histogramm ausblenden",
+    "disableQuickMode": "Schnellmodus deaktivieren",
+    "menuGroupSetOnce": "Einmal einstellen",
+    "menuGroupSavedViews": "Gespeicherte Ansichten",
+    "menuGroupTools": "Werkzeuge",
+    "searchInspect": "Suche Inspect"
   },
   "menu": {
     "home": "Startseite",

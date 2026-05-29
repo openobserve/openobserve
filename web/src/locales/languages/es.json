@@ -415,7 +415,13 @@
     "formatQuery": "Consulta de formato",
     "hideFunctionEditor": "Ocultar editor de funciones",
     "selectFunction": "Seleccione la función",
-    "sqlModeDisabledReason": "El modo SQL no está disponible para esta vista"
+    "sqlModeDisabledReason": "El modo SQL no está disponible para esta vista",
+    "hideHistogram": "Ocultar histograma",
+    "disableQuickMode": "Desactivar el modo rápido",
+    "menuGroupSetOnce": "Establecer una vez",
+    "menuGroupSavedViews": "Vistas guardadas",
+    "menuGroupTools": "Herramientas",
+    "searchInspect": "Buscar e inspeccionar"
   },
   "menu": {
     "home": "Inicio",

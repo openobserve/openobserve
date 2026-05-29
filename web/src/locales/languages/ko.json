@@ -415,7 +415,13 @@
     "formatQuery": "형식 쿼리",
     "hideFunctionEditor": "함수 편집기 숨기기",
     "selectFunction": "기능 선택",
-    "sqlModeDisabledReason": "이 뷰에서는 SQL 모드를 사용할 수 없습니다."
+    "sqlModeDisabledReason": "이 뷰에서는 SQL 모드를 사용할 수 없습니다.",
+    "hideHistogram": "히스토그램 숨기기",
+    "disableQuickMode": "퀵 모드 비활성화",
+    "menuGroupSetOnce": "한 번 설정",
+    "menuGroupSavedViews": "저장된 뷰",
+    "menuGroupTools": "도구",
+    "searchInspect": "검색 검사"
   },
   "menu": {
     "home": "홈",

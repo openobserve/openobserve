@@ -415,7 +415,13 @@
     "formatQuery": "Biçim sorgusu",
     "hideFunctionEditor": "İşlev düzenleyicisini gizle",
     "selectFunction": "İşlev seç",
-    "sqlModeDisabledReason": "SQL modu bu görünüm için kullanılamıyor"
+    "sqlModeDisabledReason": "SQL modu bu görünüm için kullanılamıyor",
+    "hideHistogram": "Histogramı Gizle",
+    "disableQuickMode": "Hızlı Mod Devre Dışı Bırak",
+    "menuGroupSetOnce": "Bir Kez Ayarla",
+    "menuGroupSavedViews": "Kayıtlı Görünümler",
+    "menuGroupTools": "Araçlar",
+    "searchInspect": "Arayın İnceleyin"
   },
   "menu": {
     "home": "Ana Sayfa",

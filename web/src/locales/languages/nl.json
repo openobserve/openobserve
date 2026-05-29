@@ -415,7 +415,13 @@
     "formatQuery": "Zoekopdracht opmaken",
     "hideFunctionEditor": "Functie-editor verbergen",
     "selectFunction": "Functie selecteren",
-    "sqlModeDisabledReason": "SQL-modus is niet beschikbaar voor deze weergave"
+    "sqlModeDisabledReason": "SQL-modus is niet beschikbaar voor deze weergave",
+    "hideHistogram": "Histogram verbergen",
+    "disableQuickMode": "Schakel de snelle modus uit",
+    "menuGroupSetOnce": "Eenmaal instellen",
+    "menuGroupSavedViews": "Opgeslagen weergaven",
+    "menuGroupTools": "Hulpmiddelen",
+    "searchInspect": "Zoek Inspect"
   },
   "menu": {
     "home": "Home",

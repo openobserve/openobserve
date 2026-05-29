@@ -415,7 +415,13 @@
     "formatQuery": "格式查询",
     "hideFunctionEditor": "隐藏函数编辑器",
     "selectFunction": "选择函数",
-    "sqlModeDisabledReason": "此视图不可用 SQL 模式"
+    "sqlModeDisabledReason": "此视图不可用 SQL 模式",
+    "hideHistogram": "隐藏直方图",
+    "disableQuickMode": "禁用快速模式",
+    "menuGroupSetOnce": "设置一次",
+    "menuGroupSavedViews": "保存的视图",
+    "menuGroupTools": "工具",
+    "searchInspect": "搜索检查"
   },
   "menu": {
     "home": "主页",

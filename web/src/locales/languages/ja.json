@@ -415,7 +415,13 @@
     "formatQuery": "フォーマットクエリ",
     "hideFunctionEditor": "関数エディターを非表示",
     "selectFunction": "選択機能",
-    "sqlModeDisabledReason": "このビューでは SQL モードは使用できません"
+    "sqlModeDisabledReason": "このビューでは SQL モードは使用できません",
+    "hideHistogram": "ヒストグラムを非表示",
+    "disableQuickMode": "クイックモードを無効にする",
+    "menuGroupSetOnce": "1 回設定",
+    "menuGroupSavedViews": "保存済みビュー",
+    "menuGroupTools": "ツール",
+    "searchInspect": "検索検査"
   },
   "menu": {
     "home": "ホーム",
