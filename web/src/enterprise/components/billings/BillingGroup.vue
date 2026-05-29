@@ -978,9 +978,9 @@ export default defineComponent({
   flex-wrap: wrap;
 
   &__left {
-    flex: 1;
+    flex: 2;
     min-width: 280px;
-    max-width: 480px;
+    max-width: 640px;
   }
   &__eyebrow {
     display: inline-flex;

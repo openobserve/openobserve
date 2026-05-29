@@ -248,6 +248,10 @@ export default defineComponent({
     background-color: var(--o2-primary-btn-bg);
     color: white;
 
+    &:hover {
+      background-color: var(--o2-primary-btn-bg);
+    }
+
     .member-id {
       opacity: 0.85;
     }
