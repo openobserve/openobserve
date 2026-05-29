@@ -51,7 +51,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
    * a default query is automatically populated in the query editor.
    */
   test('P1: Auto-populated query appears when stream is selected in Tab 1', {
-    tag: ['@metrics', '@promql', '@queryPersistence', '@P1']
+    tag: ['@metrics', '@promql', '@queryPersistence', '@P1', '@all']
   }, async ({ page }, testInfo) => {
     const { pm, queryEditor } = await setupTest(page, testInfo);
     testLogger.info('Test: Verify auto-populated query in Tab 1');
@@ -84,7 +84,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
    * the query in Tab 1 would be lost. This test validates the fix.
    */
   test('P0: Query persists in Tab 1 after switching to Tab 2 and back', {
-    tag: ['@metrics', '@promql', '@queryPersistence', '@P0', '@criticalBugFix']
+    tag: ['@metrics', '@promql', '@queryPersistence', '@P0', '@criticalBugFix', '@all']
   }, async ({ page }, testInfo) => {
     const { pm, queryEditor } = await setupTest(page, testInfo);
     testLogger.info('Test: Query persistence when switching between tabs (CRITICAL BUG FIX)');
@@ -155,7 +155,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
    * the query is properly saved to Vue state before switching tabs.
    */
   test('P1: Multiple tabs maintain separate queries independently', {
-    tag: ['@metrics', '@promql', '@queryPersistence', '@P1']
+    tag: ['@metrics', '@promql', '@queryPersistence', '@P1', '@all']
   }, async ({ page }, testInfo) => {
     const { pm, queryEditor } = await setupTest(page, testInfo);
     testLogger.info('Test: Multiple tabs maintain separate queries');
@@ -234,7 +234,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
    * the query in another tab.
    */
   test('P2: Query persistence when changing streams across tabs', {
-    tag: ['@metrics', '@promql', '@queryPersistence', '@P2']
+    tag: ['@metrics', '@promql', '@queryPersistence', '@P2', '@all']
   }, async ({ page }, testInfo) => {
     const { pm, queryEditor } = await setupTest(page, testInfo);
     testLogger.info('Test: Query persistence with stream changes across tabs');
@@ -282,7 +282,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
    * when switching between tabs.
    */
   test('P2: Manually edited queries persist correctly', {
-    tag: ['@metrics', '@promql', '@queryPersistence', '@P2']
+    tag: ['@metrics', '@promql', '@queryPersistence', '@P2', '@all']
   }, async ({ page }, testInfo) => {
     const { pm, queryEditor } = await setupTest(page, testInfo);
     testLogger.info('Test: Manually edited query persistence');
@@ -330,7 +330,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
    * switching between multiple tabs.
    */
   test('P3: Query persistence under rapid tab switching', {
-    tag: ['@metrics', '@promql', '@queryPersistence', '@P3', '@stressTest']
+    tag: ['@metrics', '@promql', '@queryPersistence', '@P3', '@stressTest', '@all']
   }, async ({ page }, testInfo) => {
     const { pm, queryEditor } = await setupTest(page, testInfo);
     testLogger.info('Test: Query persistence under rapid tab switching');

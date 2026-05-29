@@ -207,6 +207,8 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     await pm.metricsPage.enterMetricsQuery(query);
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
+    const hasError = await pm.metricsPage.hasErrorIndicator();
+    expect(hasError).toBe(false);
     testLogger.info('PromQL subquery executed');
   });
 
@@ -219,6 +221,8 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     await pm.metricsPage.enterMetricsQuery(query);
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
+    const hasError = await pm.metricsPage.hasErrorIndicator();
+    expect(hasError).toBe(false);
     testLogger.info('PromQL offset modifier executed');
   });
 
@@ -231,6 +235,8 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     await pm.metricsPage.enterMetricsQuery(query);
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
+    const hasError = await pm.metricsPage.hasErrorIndicator();
+    expect(hasError).toBe(false);
     testLogger.info('PromQL vector matching executed');
   });
 

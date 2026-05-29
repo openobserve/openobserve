@@ -258,6 +258,8 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     for (const query of subqueries) {
       testLogger.info(`Executing subquery: ${query.substring(0, 50)}...`);
       await pm.metricsPage.executeQuery(query);
+      const hasError = await pm.metricsPage.expectQueryError();
+      expect(hasError).toBe(false);
       testLogger.info('Subquery executed');
     }
 
@@ -275,6 +277,9 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       testLogger.info(`Testing alert condition: ${name}`);
 
       await pm.metricsPage.executeQuery(query);
+
+      const hasError = await pm.metricsPage.expectQueryError();
+      expect(hasError).toBe(false);
 
       const resultsVisible = await pm.metricsPage.areResultsVisible();
       if (resultsVisible) {
