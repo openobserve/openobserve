@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { ToastProps, ToastEmits } from "./OToast.types"
 import { computed, ref } from "vue"
 import OIcon from "@/lib/core/Icon/OIcon.vue"
-import { pauseTimer, resumeTimer } from "./useToast"
+import { pauseTimer, resumeTimer, isPageVisible } from "./useToast"
 import {
   ToastRoot,
   ToastTitle,
@@ -94,16 +94,26 @@ const progressBarColorClasses: Record<NonNullable<ToastProps["variant"]>, string
   default: "tw:bg-toast-default-border",
 }
 
-const isPaused = ref(false)
+const isHovered = ref(false)
+
+// isPaused drives the CSS progress-bar animation. It is a computed so it is
+// always derived from the two independent pause sources: hover AND page
+// visibility. A plain ref could fall out of sync; a computed never can.
+const isPaused = computed(() => isHovered.value || !isPageVisible.value)
 
 function onMouseEnter() {
-  isPaused.value = true
+  isHovered.value = true
   pauseTimer(props.id)
 }
 
 function onMouseLeave() {
-  isPaused.value = false
-  resumeTimer(props.id)
+  isHovered.value = false
+  // Only resume if the page is actually visible right now; if the user somehow
+  // triggered mouseleave while the tab was backgrounded (unlikely but safe),
+  // we must not restart the timer.
+  if (isPageVisible.value) {
+    resumeTimer(props.id)
+  }
 }
 
 // ── Computed ─────────────────────────────────────────────────────────────────
@@ -130,7 +140,7 @@ const isTopPosition = computed(() =>
     :class="[
       'tw:relative tw:pointer-events-auto tw:flex tw:gap-2 tw:rounded-lg tw:p-3 tw:shadow-toast',
       title ? 'tw:items-start' : 'tw:items-center',
-      'tw:w-fit tw:min-w-[16rem] tw:max-w-[28rem]',
+      'tw:w-fit tw:min-w-[18rem] tw:max-w-[calc(100vw-2rem)]',
       'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
       isTopPosition ? 'tw:data-[state=open]:slide-in-from-top-4' : 'tw:data-[state=open]:slide-in-from-bottom-4',
       'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
