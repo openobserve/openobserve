@@ -873,7 +873,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden">
       <div
-        class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0 tw:px-[0.375rem]"
+        class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0 tw:px-[0.0625rem]"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >

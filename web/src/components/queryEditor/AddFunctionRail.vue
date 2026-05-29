@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="emit('open')"
   >
     <span class="add-function-rail__icon" aria-hidden="true">{{ iconText }}</span>
-    <span class="add-function-rail__label">{{ label }}</span>
-    <OTooltip v-if="tooltip" :content="tooltip" />
+    <OTooltip :content="tooltip || label" />
   </button>
 </template>
 
@@ -90,17 +89,6 @@ const emit = defineEmits<{
     font-weight: var(--font-bold);
     line-height: 1;
     color: var(--o2-primary-color);
-  }
-
-  &__label {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    font-size: 0.6875rem; /* 11px — fits the slim rail but stays readable */
-    font-weight: var(--font-semibold);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    color: var(--o2-text-body);
   }
 }
 </style>

@@ -40,8 +40,8 @@
                   :debounce-time="debounceTime"
                   @update:query="handleQueryUpdate"
                   @run-query="emit('run-query')"
-                  @focus="emit('focus')"
-                  @blur="emit('blur')"
+                  @focus="() => { queryEditorFocused.value = true; emit('focus') }"
+                  @blur="() => { queryEditorFocused.value = false; emit('blur') }"
                   @nlpModeDetected="handleNlpModeDetected"
                   @generation-start="handleGenerationStart"
                   @generation-end="handleGenerationEnd"
@@ -124,11 +124,11 @@
                     v-if="showFooterAi && aiEnabledInEnv && !hideNlToggle"
                     :data-test="`${dataTestPrefix}-footer-ai-btn`"
                     variant="ai-gradient"
-                    size="icon-xs-sq"
+                    size="icon-chip"
                     :disabled="props.disableAi"
                     @click="onMainAiClick"
                   >
-                    <img :src="nlpIcon" alt="AI" class="tw:w-[14px] tw:h-[14px] query-editor__ai-icon-invert" />
+                    <img :src="nlpIcon" alt="AI" class="tw:w-[12px] tw:h-[12px] query-editor__ai-icon-invert" />
                     <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
                   </OButton>
 
@@ -136,7 +136,7 @@
                     v-if="showFullscreen"
                     :data-test="`${dataTestPrefix}-footer-fullscreen-btn`"
                     variant="ghost"
-                    size="icon-xs"
+                    size="icon-chip"
                     :icon-left="fullscreenState ? 'fullscreen-exit' : 'fullscreen'"
                     @click="toggleFullscreen"
                   >
@@ -147,8 +147,8 @@
                     v-if="showFooterToggle"
                     :data-test="`${dataTestPrefix}-footer-hide-btn`"
                     variant="ghost"
-                    size="icon-xs"
-                    icon-left="chevron-down"
+                    size="icon-chip"
+                    icon-left="expand-more"
                     @click="hideBottomBar"
                   >
                     <OTooltip :content="t('common.hide')" />
@@ -172,8 +172,8 @@
                   :debounce-time="debounceTime"
                   @update:query="onFunctionQueryUpdate"
                   @run-query="emit('run-query')"
-                  @focus="emit('function-focus')"
-                  @blur="emit('function-blur')"
+                  @focus="() => { fnEditorFocused.value = true; emit('function-focus') }"
+                  @blur="() => { fnEditorFocused.value = false; emit('function-blur') }"
                   @keydown="(e: KeyboardEvent) => emit('function-keydown', e)"
                   class="monaco-editor tw:w-full tw:h-full"
                 />
@@ -202,7 +202,7 @@
                     <template #trigger>
                       <OButton
                         variant="outline"
-                        size="xs"
+                        size="chip"
                         icon-right="expand-more"
                         :disabled="functionReadOnly || functionOptions.length === 0"
                         :data-test="`${functionDataTestPrefix}-picker-btn`"
@@ -235,18 +235,18 @@
                     v-if="showFooterAi && aiEnabledInEnv"
                     :data-test="`${functionDataTestPrefix}-ai-btn`"
                     variant="ai-gradient"
-                    size="icon-xs-sq"
+                    size="icon-chip"
                     :disabled="functionDisableAi"
                     @click="onFunctionAiClick"
                   >
-                    <img :src="nlpIcon" alt="AI" class="tw:w-[14px] tw:h-[14px] query-editor__ai-icon-invert" />
+                    <img :src="nlpIcon" alt="AI" class="tw:w-[12px] tw:h-[12px] query-editor__ai-icon-invert" />
                     <OTooltip :content="functionDisableAi && functionDisableAiReason ? functionDisableAiReason : t('nlMode.toggle')" />
                   </OButton>
 
                   <OButton
                     :data-test="`${functionDataTestPrefix}-save-btn`"
                     variant="outline"
-                    size="xs"
+                    size="chip"
                     icon-left="save"
                     :disabled="functionSaveDisabled"
                     @click="onFunctionSave"
@@ -264,7 +264,7 @@
                   <OButton
                     :data-test="`${functionDataTestPrefix}-close-btn`"
                     variant="ghost"
-                    size="icon-xs"
+                    size="icon-chip"
                     icon-left="close"
                     @click="closeFunctionPane"
                   >
@@ -294,8 +294,8 @@
               :debounce-time="debounceTime"
               @update:query="handleQueryUpdate"
               @run-query="emit('run-query')"
-              @focus="emit('focus')"
-              @blur="emit('blur')"
+              @focus="() => { queryEditorFocused = true; emit('focus') }"
+              @blur="() => { queryEditorFocused = false; emit('blur') }"
               @nlpModeDetected="handleNlpModeDetected"
               @generation-start="handleGenerationStart"
               @generation-end="handleGenerationEnd"
@@ -346,13 +346,13 @@
                   v-for="opt in modeOptions"
                   :key="opt.value"
                   :value="opt.value"
-                  size="sm"
+                  size="xs"
                   :disabled="modeDisabled"
                   :tooltip="modeDisabled && modeDisabledReason ? modeDisabledReason : undefined"
                   :data-test="`${dataTestPrefix}-mode-${opt.value}`"
                 >
                   <template v-if="opt.icon" #icon-left>
-                    <OIcon :name="opt.icon" size="sm" />
+                    <OIcon :name="opt.icon" size="xs" />
                   </template>
                   {{ opt.label }}
                 </OToggleGroupItem>
@@ -402,7 +402,7 @@
                 :data-test="`${dataTestPrefix}-footer-hide-btn`"
                 variant="ghost"
                 size="icon-chip"
-                icon-left="chevron-down"
+                icon-left="expand-more"
                 @click="hideBottomBar"
               >
                 <OTooltip :content="t('common.hide')" />
@@ -411,16 +411,17 @@
           </QueryEditorFooter>
 
           <!-- Reveal pill when footer is hidden -->
-          <button
+          <OButton
             v-if="!showBottomBarState && (validation || enableFunctionPane || showFooterAi)"
-            type="button"
+            variant="ghost"
+            size="icon-chip"
+            icon-left="expand-less"
             class="query-editor__reveal-footer"
             :data-test="`${dataTestPrefix}-footer-reveal-btn`"
             @click="revealBottomBar"
           >
-            <OIcon name="expand-less" size="sm" />
             <OTooltip :content="t('common.show')" />
-          </button>
+          </OButton>
         </div>
 
         <!-- Vertical fx · ADD FUNCTION rail -->
@@ -1100,6 +1101,10 @@ const showBottomBarState = computed({
 const fnNlpMode = ref(false);
 const fnEditorRef = ref<any>(null);
 
+// Focus tracking — hide placeholder while editor is active
+const queryEditorFocused = ref(false);
+const fnEditorFocused = ref(false);
+
 // AI target: which pane the inline AI strip generates for
 const aiTarget = ref<'query' | 'function'>('query');
 
@@ -1164,9 +1169,11 @@ const functionPlaceholderText = ref('');
 const queryPlaceholderPhrases = ['Write SQL query', 'Write filter criteria', 'Write VRL function'];
 const functionPlaceholderPhrases = ['Write VRL function'];
 
-const showQueryPlaceholder = computed(() => !props.query || !props.query.trim());
+const showQueryPlaceholder = computed(
+  () => !queryEditorFocused && (!props.query || !props.query.trim()),
+);
 const showFunctionPlaceholder = computed(
-  () => functionPaneOpenState.value && (!props.functionQuery || !props.functionQuery.trim()),
+  () => !fnEditorFocused && functionPaneOpenState.value && (!props.functionQuery || !props.functionQuery.trim()),
 );
 
 const createTypewriter = (
@@ -1620,7 +1627,7 @@ defineExpose({
 .query-editor__body {
   width: 100%;
   /* Floor based on minLines var so SearchBar can shrink with empty queries. */
-  min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem + 2rem); /* editor rows + footer */
+  min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem + 2rem);
 }
 
 .query-editor__pane {
@@ -1758,22 +1765,7 @@ defineExpose({
   position: absolute;
   right: 0.5rem;
   bottom: 0.25rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 0.0625rem solid var(--o2-border);
-  border-radius: 9999px;
-  background: var(--o2-card-bg-solid);
-  color: var(--o2-text-secondary);
-  cursor: pointer;
   z-index: 5;
-
-  &:hover {
-    background: var(--o2-hover-accent);
-    color: var(--o2-text-body);
-  }
 }
 
 .query-editor--fullscreen {
