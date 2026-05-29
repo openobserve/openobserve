@@ -322,7 +322,7 @@ export class StreamsPage {
         await expect(
             this.page
                 .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: /Field\(s\) '.*' cannot have/ })
+                .filter({ hasText: /field \[.*\] cannot be both/ })
                 .first(),
         ).toBeVisible({ timeout: 30000 });
     }
