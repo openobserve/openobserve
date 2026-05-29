@@ -1076,7 +1076,6 @@ export default defineComponent({
       toast({
         variant: "success",
         message: `Filter added: ${field} ${operator} '${value}'`,
-        timeout: 2000,
       });
     };
 
@@ -2394,7 +2393,6 @@ export default defineComponent({
     const copyTraceId = () => {
       copyToClipboard(spanList.value[0]["trace_id"], {
         successMessage: "Trace ID copied to clipboard",
-        timeout: 2000,
       });
     };
 
@@ -2406,7 +2404,6 @@ export default defineComponent({
       if (!sessionId.value) return;
       copyToClipboard(sessionId.value, {
         successMessage: "Session ID copied to clipboard",
-        timeout: 2000,
       });
     };
 

@@ -475,7 +475,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait while loading streams...",
-        });
+                  timeout: 0,
+});
         logStream.value = [];
 
         const offset = (currentPage.value - 1) * pageSize.value;
@@ -551,7 +552,6 @@ export default defineComponent({
                 message:
                   err.response?.data?.message ||
                   "Error while fetching streams.",
-                timeout: 2000,
               });
             }
             loadingState.value = false;
@@ -609,6 +609,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             toast({
               message: "Stream deleted successfully.",
+              variant: "success",
             });
             removeStream(deleteStreamName, deleteStreamType);
             selectedIds.value = [];
@@ -619,6 +620,7 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               message: "Error while deleting stream.",
+              variant: "error",
             });
           }
         })
@@ -654,12 +656,14 @@ export default defineComponent({
           if (successfulDeletions.length > 0) {
             toast({
               message: `Deleted ${successfulDeletions.length} streams successfully.`,
+              variant: "success",
             });
           }
 
           if (failedDeletions.length > 0) {
             toast({
               message: `Failed to delete ${failedDeletions.length} streams.`,
+              variant: "error",
             });
           }
 
@@ -677,6 +681,7 @@ export default defineComponent({
               message:
                 error.response?.data?.message ||
                 "Error while deleting streams.",
+              variant: "error",
             });
           }
         })
@@ -722,7 +727,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Redirecting to explorer...",
-        });
+                  timeout: 0,
+});
 
         await getStream(stream.name, stream.stream_type, true)
           .then((streamResponse) => {

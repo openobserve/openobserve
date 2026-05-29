@@ -194,6 +194,7 @@ describe('GetStarted.vue', () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: 'Please fill all the fields',
+        variant: 'warning',
       });
     });
 
@@ -265,6 +266,7 @@ describe('GetStarted.vue', () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: 'Thank you for your feedback',
+        variant: 'success',
       });
     });
 
@@ -312,6 +314,7 @@ describe('GetStarted.vue', () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         message: 'Something went wrong',
+        variant: 'error',
       });
     });
 

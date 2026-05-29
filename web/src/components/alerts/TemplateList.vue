@@ -255,7 +255,8 @@ const getTemplates = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while loading templates...",
-  });
+      timeout: 0,
+});
 
   loading.value = true;
   templateService
@@ -276,7 +277,6 @@ const getTemplates = () => {
         toast({
           variant: "error",
           message: "Error while pulling templates.",
-          timeout: 2000,
         });
       }
     })
@@ -349,7 +349,6 @@ const deleteTemplate = () => {
         toast({
           variant: "success",
           message: `Template ${confirmDelete.value.data.name} deleted successfully`,
-          timeout: 2000,
         });
 
         getTemplates();
@@ -359,7 +358,6 @@ const deleteTemplate = () => {
           toast({
             variant: "error",
             message: err.response.data.message,
-            timeout: 2000,
           });
         }
       });
@@ -457,19 +455,16 @@ const bulkDeleteTemplates = () => {
         toast({
           variant: "success",
           message: `Successfully deleted ${successful.length} template(s)`,
-          timeout: 2000,
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
         toast({
           variant: "warning",
           message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
-          timeout: 3000,
         });
       } else if (unsuccessful.length > 0) {
         toast({
           variant: "error",
           message: `Failed to delete ${unsuccessful.length} template(s)`,
-          timeout: 2000,
         });
       }
 
@@ -486,7 +481,6 @@ const bulkDeleteTemplates = () => {
         toast({
           variant: "error",
           message: errorMessage,
-          timeout: 2000,
         });
       }
     });

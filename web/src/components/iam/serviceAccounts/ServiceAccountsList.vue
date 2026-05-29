@@ -388,7 +388,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading service accounts...",
-      });
+              timeout: 0,
+});
 
       loading.value = true;
       return new Promise((resolve, reject) => {
@@ -493,6 +494,7 @@ export default defineComponent({
         if (operationType == "created") {
             toast({
               message: "Service Account created successfully.",
+              variant: "success",
             });
 
           serviceToken.value = res.token;
@@ -518,6 +520,7 @@ export default defineComponent({
           setTimeout(() => {
             toast({
               message: "Service Account updated successfully.",
+              variant: "success",
             });
           }, 2000);
           serviceAccountsState.service_accounts_users = serviceAccountsState.service_accounts_users.map((member: any) => {
@@ -544,6 +547,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             toast({
               message: "Service Account deleted successfully.",
+              variant: "success",
             });
             await getServiceAccountsUsers();
           }
@@ -552,6 +556,7 @@ export default defineComponent({
           if(err.response?.status != 403){
             toast({
             message: err.response?.data?.message || "Error while deleting user.",
+            variant: "error",
             });
           }
 
@@ -577,17 +582,17 @@ export default defineComponent({
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
             message: `Successfully deleted ${successful.length} service account(s)`,
-            timeout: 2000,
+            variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: `Deleted ${successful.length} service account(s), but ${unsuccessful.length} failed`,
-            timeout: 3000,
+            variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
             message: `Failed to delete ${unsuccessful.length} service account(s)`,
-            timeout: 2000,
+            variant: "error",
           });
         }
 
@@ -598,7 +603,7 @@ export default defineComponent({
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
             message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
-            timeout: 2000,
+            variant: "error",
           });
         }
       }
@@ -613,6 +618,7 @@ export default defineComponent({
 
         toast({
           message: "Service token refreshed successfully.",
+          variant: "success",
         });
 
         getServiceAccountsUsers();
@@ -620,6 +626,7 @@ export default defineComponent({
         if(err.response?.status != 403){
           toast({
           message: err.response?.data?.message || "Error while refreshing token.",
+          variant: "error",
           });
         }
 

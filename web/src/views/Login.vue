@@ -365,7 +365,8 @@ export default defineComponent({
             const dismiss = toast({
               variant: "loading",
               message: "Please wait while creating new user...",
-            });
+                          timeout: 0,
+});
 
             usersService.addNewUser(this.user).then((res) => {
               this.store.dispatch("login", {
@@ -391,7 +392,8 @@ export default defineComponent({
           toast({
             variant: "loading",
             message: "Error while verifying user...",
-          });
+                      timeout: 0,
+});
           if (error.status === 403) this.signout();
         });
     },

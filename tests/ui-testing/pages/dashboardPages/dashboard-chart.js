@@ -9,7 +9,7 @@ export default class ChartTypeSelector {
     this.page = page;
 
     // Raw query / DynamicFunctionPopUp selectors
-    this.rawQueryTextarea = page.locator('[data-test="dashboard-raw-query-textarea"]');
+    this.rawQueryTextarea = page.locator('[data-test="dashboard-raw-query-textarea-field"]');
     this.popupTabs = page.locator('[data-test="dynamic-function-popup-tabs"]');
     this.buildTab = page.locator('[data-test="dynamic-function-popup-tab-build"]');
     this.rawTab = page.locator('[data-test="dynamic-function-popup-tab-raw"]');

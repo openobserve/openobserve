@@ -391,6 +391,7 @@ describe("UsageTab", () => {
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "loading",
         message: "Please wait while loading summary...",
+        timeout: 0,
       });
       // The returned dismiss function should have been called
       expect(mockNotifyDismiss).toHaveBeenCalled();
@@ -446,7 +447,6 @@ describe("UsageTab", () => {
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
         message: "Error while pulling summary.",
-        timeout: 2000,
       });
     });
 

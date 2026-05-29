@@ -25,19 +25,18 @@ import OToast from "./OToast.vue"
 
 const { toasts } = useToast()
 
-// Distinct positions among active toasts (plus the default), one viewport each.
-const activePositions = computed<ToastPosition[]>(() => {
-  const seen = new Set<ToastPosition>()
-  for (const t of toasts) {
-    seen.add(t.position)
-  }
-  seen.add("bottom-right")
-  return [...seen]
-})
+// Always render these two positions. Each needs its own ToastProvider so that
+// Reka UI's single-viewport-per-provider constraint is satisfied — if all toasts
+// shared one provider with two viewports the last-mounted viewport would win and
+// all toasts would appear there regardless of their intended position.
+const positions: ToastPosition[] = ["bottom-center"]
+
+function toastsForPosition(pos: ToastPosition) {
+  return toasts.filter((t) => t.position === pos)
+}
 
 function handleOpenChange(id: string, open: boolean): void {
   if (!open) {
-    // Remove the record after Reka's exit animation finishes
     const idx = toastRecords.findIndex((r) => r.id === id)
     if (idx !== -1) {
       toastRecords.splice(idx, 1)
@@ -47,18 +46,18 @@ function handleOpenChange(id: string, open: boolean): void {
 </script>
 
 <template>
-  <ToastProvider swipe-direction="right" :duration="0">
+  <ToastProvider
+    v-for="pos in positions"
+    :key="pos"
+    swipe-direction="right"
+    :duration="0"
+  >
     <OToast
-      v-for="t in toasts"
+      v-for="t in toastsForPosition(pos)"
       :key="t.id"
       v-bind="t"
       @open-change="(open) => handleOpenChange(t.id, open)"
     />
-
-    <ToastViewport
-      v-for="pos in activePositions"
-      :key="pos"
-      :class="viewportPositionClasses[pos]"
-    />
+    <ToastViewport :class="viewportPositionClasses[pos]" />
   </ToastProvider>
 </template>

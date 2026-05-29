@@ -610,7 +610,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: t("aiToolset.updatedSuccessfully"),
-            timeout: 2000,
           });
         } else {
           await aiToolsetsService.create(org, {
@@ -622,7 +621,6 @@ export default defineComponent({
           toast({
             variant: "success",
             message: t("aiToolset.createdSuccessfully"),
-            timeout: 2000,
           });
         }
         emit("cancel:hideform");
@@ -632,7 +630,7 @@ export default defineComponent({
           (isEditing.value
             ? t("aiToolset.updateFailed")
             : t("aiToolset.createFailed"));
-        toast({ variant: "error", message: msg, timeout: 4000 });
+        toast({ variant: "error", message: msg });
       } finally {
         saving.value = false;
       }

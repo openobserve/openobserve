@@ -594,7 +594,6 @@ export default defineComponent({
         toast({
           variant: "error",
           message: error.response?.data?.message || "Failed to test string",
-          timeout: 4000,
         });
       } finally {
         testLoading.value = false;

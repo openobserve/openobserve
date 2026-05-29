@@ -121,16 +121,14 @@ const saveGroup = () => {
 
       toast({
         message: `User Group "${name.value}" Created Successfully!`,
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "success",
       });
     })
     .catch((err) => {
       if(err.response.status != 403){
         toast({
         message: "Error while creating group",
-        position: "bottom-right",
-        timeout: 3000,
+        variant: "error",
       });
       }
       console.log(err);

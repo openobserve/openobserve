@@ -389,7 +389,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait while loading streams...",
-        });
+                  timeout: 0,
+});
 
         getStreams("", false)
           .then((res: any) => {
@@ -434,7 +435,6 @@ export default defineComponent({
             toast({
               variant: "error",
               message: "Error while pulling stream.",
-              timeout: 2000,
             });
           });
       }
@@ -483,7 +483,6 @@ export default defineComponent({
             message:
               JSON.stringify(err.response.data["error"]) ||
               "Function fetching failed",
-            timeout: 2000,
           });
         });
     };
@@ -546,7 +545,6 @@ export default defineComponent({
             message:
               JSON.stringify(err.response.data["error"]) ||
               "Function creation failed",
-            timeout: 2000,
           });
         })
         .finally(() => {
@@ -602,6 +600,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             toast({
               message: "Stream deleted successfully.",
+              variant: "success",
             });
             getLogStream();
           }
@@ -609,6 +608,7 @@ export default defineComponent({
         .catch((err: any) => {
           toast({
             message: "Error while deleting stream.",
+            variant: "error",
           });
         });
     };

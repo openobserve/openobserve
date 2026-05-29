@@ -444,7 +444,6 @@ const areInputValid = () => {
     toast({
       variant: "error",
       message: "Please enter a query",
-      timeout: 3000,
     });
     sqlQueryErrorMsg.value = "Please enter a query";
     return false;
@@ -547,7 +546,6 @@ const getResults = async () => {
       toast({
         variant: "error",
         message: "Invalid SQL Query : " + err.response?.data?.message,
-        timeout: 3000,
       });
     })
     .finally(() => {
@@ -563,7 +561,6 @@ const isInputValid = () => {
     toast({
       variant: "error",
       message: eventsErrorMsg.value,
-      timeout: 3000,
     });
     return false;
   }

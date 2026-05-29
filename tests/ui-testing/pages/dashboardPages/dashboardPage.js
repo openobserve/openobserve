@@ -102,7 +102,7 @@ export class DashboardPage {
     this.absoluteTab = page.locator(absoluteTabLocator);
 
     // Share / view dashboard locators
-    this.shareSuccessToast = page.locator('[data-test="o-toast-success"]');
+    this.shareSuccessToast = page.locator('[data-test-variant="success"]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
 

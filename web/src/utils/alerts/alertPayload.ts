@@ -192,8 +192,8 @@ export const prepareAndSaveAlert = async (
     const dismiss = toast({
       variant: "loading",
       message: "Please wait...",
-      timeout: 2000,
-    });
+          timeout: 0,
+});
 
     if (props.isUpdated) {
       await alertsService.update_by_alert_id(

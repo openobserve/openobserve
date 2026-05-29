@@ -853,8 +853,8 @@ describe("Use Logs Composable", () => {
       await wrapper.vm.$nextTick();
 
       expect(toast).toHaveBeenCalledWith({
+        variant: "info",
         message: `Live mode is enabled. Only top ${wrapper.vm.searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-        timeout: 1000,
       });
     });
 

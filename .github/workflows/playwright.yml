@@ -141,9 +141,10 @@ jobs:
           if-no-files-found: error
 
   ui_integration_tests:
-    timeout-minutes: 180
+    timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
+    if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
       labels: repo-openobserve-standard-8
     permissions:
@@ -453,6 +454,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-
 
       - name: Check if this is a rerun
         id: check_rerun
@@ -517,13 +520,42 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            echo "Browser cache hit — installing system deps only"
-            npx playwright install-deps chromium
-          else
-            echo "Browser cache miss — installing browser + system deps"
-            npx playwright install --with-deps chromium
-          fi
+
+          # Install apt system dependencies (always needed)
+          npx playwright install-deps chromium
+
+          # Get revision from playwright's own metadata
+          CHROMIUM_REV=$(node -pe "
+            require('./node_modules/playwright-core/browsers.json')
+              .browsers.find(b => b.name === 'chromium').revision
+          ")
+
+          install_browser() {
+            local NAME="$1"
+            local BINARY="$2"
+            local ZIP_PATH="$3"
+            local DIR="$HOME/.cache/ms-playwright/${NAME}-${CHROMIUM_REV}"
+            if [ -f "${DIR}/INSTALLATION_COMPLETE" ]; then
+              echo "${NAME} already installed (cache hit)"; return 0
+            fi
+            rm -rf "${DIR}"
+            echo "Cache miss — downloading ${NAME} r${CHROMIUM_REV} via curl + system unzip"
+            curl -fL --progress-bar \
+              "https://cdn.playwright.dev/dbazure/download/playwright/builds/${ZIP_PATH}" \
+              -o "/tmp/${NAME}.zip"
+            mkdir -p "${DIR}"
+            unzip -q "/tmp/${NAME}.zip" -d "${DIR}"
+            rm -f "/tmp/${NAME}.zip"
+            find "${DIR}" -name "${BINARY}" -type f -exec chmod 755 {} \;
+            find "${DIR}" -name 'chrome_sandbox' -type f -exec chmod 4755 {} \; 2>/dev/null || true
+            touch "${DIR}/INSTALLATION_COMPLETE"
+            echo "${NAME} installed: $(ls ${DIR}/)"
+          }
+
+          install_browser "chromium" "chrome" \
+            "chromium/${CHROMIUM_REV}/chromium-linux.zip"
+          install_browser "chromium_headless_shell" "headless_shell" \
+            "chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip"
 
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
@@ -811,7 +843,7 @@ jobs:
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: repo-openobserve-standard-4
     permissions:
       contents: read
       actions: read
@@ -998,7 +1030,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: repo-openobserve-standard-4
     permissions: {}
     needs:
       [

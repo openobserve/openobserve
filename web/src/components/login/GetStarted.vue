@@ -114,6 +114,7 @@ const onSubmit = async () => {
   if(!validateForm()) {
     toast({
       message: 'Please fill all the fields',
+      variant: 'warning',
     })
     isSubmitting.value = false
     return
@@ -128,11 +129,13 @@ const onSubmit = async () => {
     emit("removeFirstTimeLogin",false);
     toast({
       message: 'Thank you for your feedback',
+      variant: 'success',
     })
     isSubmitting.value = false
   } else {
     toast({
       message: 'Something went wrong',
+      variant: 'error',
     })
     isSubmitting.value = false
   }

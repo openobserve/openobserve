@@ -322,7 +322,6 @@ describe("EditGroup Component", () => {
       expect(vi.mocked(toast)).toHaveBeenCalledWith({
         variant: "info",
         message: "No updates detected.",
-        timeout: 3000,
       });
     });
 
@@ -350,7 +349,6 @@ describe("EditGroup Component", () => {
       expect(vi.mocked(toast)).toHaveBeenCalledWith({
         variant: "success",
         message: "Updated group successfully!",
-        timeout: 3000,
       });
     });
 
@@ -411,7 +409,6 @@ describe("EditGroup Component", () => {
       expect(vi.mocked(toast)).toHaveBeenCalledWith({
         variant: "error",
         message: "Error while updating group!",
-        timeout: 3000,
       });
     });
 
@@ -560,7 +557,6 @@ describe("EditGroup Component", () => {
       expect(vi.mocked(toast)).toHaveBeenCalledWith({
         variant: "info",
         message: "No updates detected.",
-        timeout: 3000,
       });
     });
   });

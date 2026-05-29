@@ -158,7 +158,7 @@ size="xs" class="warning" />{{
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
-    <div class="header-menu tw:flex tw:items-center tw:gap-2">
+    <div class="header-menu tw:flex tw:items-center tw:gap-1">
       <!-- EDITION BADGE / UPGRADE BUTTON -->
       <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
       <!-- Open Source: primary CTA to drive upgrades -->
@@ -220,9 +220,9 @@ size="xs" class="warning" />{{
               variant="outline"
               size="sm-toolbar"
               data-test="navbar-organizations-select-trigger"
-              class="tw:max-w-50"
+              class="tw:w-56"
             >
-              <span class="tw:truncate tw:max-w-35">{{ userClickedOrg?.label || "" }}</span>
+              <span class="tw:truncate tw:flex-1 tw:min-w-0 tw:text-left">{{ userClickedOrg?.label || "" }}</span>
               <template #icon-right>
                 <OIcon name="arrow-drop-down" size="sm" class="tw:opacity-70 tw:shrink-0" />
               </template>
@@ -317,9 +317,12 @@ size="xs" class="warning" />{{
         </ODropdown>
       </div>
 
-      <!-- Visual separator: org context from utility icons -->
-      <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0 tw:mx-2" aria-hidden="true" />
+      <!-- Visual separator between org context and utility icons. Parent's
+           gap-1 (4px) provides equal spacing on both sides via flex gap, so
+           no per-element margin needed here. -->
+      <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" />
 
+      <div class="header-utility-icons tw:flex tw:items-center tw:gap-1">
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
@@ -475,7 +478,7 @@ size="xs" class="warning" />{{
                   :alt="lang.label"
                   class="header-language-flag"
                 />
-                <OIcon v-else size="xs" :name="lang.icon" />
+                <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                 <span class="tw:flex-1">{{ lang.label }}</span>
                 <OIcon
                   v-if="selectedLanguage.code === lang.code"
@@ -512,6 +515,7 @@ size="xs" class="warning" />{{
           </ODropdownItem>
         </div>
       </ODropdown>
+      </div>
     </div>
     </div><!-- end right side -->
 
@@ -918,6 +922,23 @@ export default defineComponent({
   .block {
     font-weight: 700;
     color: var(--o2-text-primary);
+  }
+}
+
+/* Hover "jump" on the utility icons RIGHT of the vertical separator
+ * (theme switcher, slack, help, settings, profile). Scoped to the
+ * `.header-utility-icons` wrapper so buttons on the LEFT (edition,
+ * AI assist, org dropdown) are unaffected. `:deep` is needed because
+ * OButton renders the actual <button> as a child of the scoped root. */
+.header-utility-icons :deep(button) {
+  transition: transform 0.15s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
   }
 }
 </style>

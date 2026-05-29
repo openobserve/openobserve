@@ -360,9 +360,9 @@
     --color-toast-warning-border: var(--color-warning-500);
     --color-toast-warning-icon:   var(--color-warning-400);
 
-    --color-toast-info-bg:        color-mix(in srgb, var(--color-primary-800) 40%, var(--color-grey-900));
-    --color-toast-info-border:    var(--color-primary-700);
-    --color-toast-info-icon:      var(--color-primary-400);
+    --color-toast-info-bg:        color-mix(in srgb, var(--color-primary-600) 30%, var(--color-grey-900));
+    --color-toast-info-border:    var(--color-primary-500);
+    --color-toast-info-icon:      var(--color-primary-300);
 
     --color-toast-loading-bg:     var(--color-surface-overlay);
     --color-toast-loading-border: var(--color-border-default);

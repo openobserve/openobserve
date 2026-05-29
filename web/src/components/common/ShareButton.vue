@@ -197,7 +197,6 @@ export default defineComponent({
         toast({
           variant: "warning",
           message: "No URL to share",
-          timeout: 3000,
         });
         return;
       }

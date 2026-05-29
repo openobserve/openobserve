@@ -204,7 +204,6 @@ const saveSemanticMappings = async () => {
         toast({
           variant: "error",
           message: group.group + t("settings.correlation.emptyIdError"),
-          timeout: 3000,
         });
         savingSemanticMappings.value = false;
         return;
@@ -215,7 +214,6 @@ const saveSemanticMappings = async () => {
         toast({
           variant: "error",
           message: t("common.nameRequired"),
-          timeout: 3000,
         });
         savingSemanticMappings.value = false;
         return;
@@ -226,7 +224,6 @@ const saveSemanticMappings = async () => {
         toast({
           variant: "error",
           message: `"${group.display || group.id}": ${t("settings.correlation.emptyFieldsError")}`,
-          timeout: 3000,
         });
         savingSemanticMappings.value = false;
         return;
@@ -292,7 +289,6 @@ const saveSemanticMappings = async () => {
     toast({
       variant: "success",
       message: t("settings.correlation.semanticMappingsSaved"),
-      timeout: 2000,
     });
 
     emit("saved");
@@ -301,7 +297,6 @@ const saveSemanticMappings = async () => {
     toast({
       variant: "error",
       message: error?.message || t("settings.correlation.configSaveFailed"),
-      timeout: 3000,
     });
   } finally {
     savingSemanticMappings.value = false;

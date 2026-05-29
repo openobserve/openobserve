@@ -325,7 +325,6 @@ describe("LogStream Component", () => {
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
-          timeout: 2000,
         })
       );
     });
@@ -605,7 +604,6 @@ describe("LogStream Component", () => {
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
-          timeout: 2000,
         })
       );
     });
@@ -895,7 +893,6 @@ describe("LogStream Component", () => {
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
-          timeout: 2000,
         })
       );
     });

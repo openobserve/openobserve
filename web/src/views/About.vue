@@ -370,7 +370,7 @@ export default defineComponent({
         // Show error notification when user doesn't have access to meta org
           toast({
             message: "You are not authorized to manage the license.",
-            timeout: 5000,
+            variant: "error",
           })
         // router.push({
         //   name: 'license',

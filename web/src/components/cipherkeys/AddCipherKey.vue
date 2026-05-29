@@ -380,7 +380,8 @@ const createCipherKey = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while processing your request...",
-  });
+      timeout: 0,
+});
   CipherKeysService.create(
     store.state.selectedOrganization.identifier,
     formData.value,
@@ -438,7 +439,8 @@ const updateCipherKey = () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while processing your request...",
-  });
+      timeout: 0,
+});
 
   if (JSON.stringify(formData.value) == originalData.value) {
     dismiss();

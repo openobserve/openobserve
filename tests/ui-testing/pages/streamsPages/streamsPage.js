@@ -496,7 +496,7 @@ export class StreamsPage {
     }
 
     async expectStreamSettingsUpdatedMessage() {
-        await expect(this.page.locator('[data-test="o-toast-success"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test-variant="success"]')).toBeVisible({ timeout: 10000 });
     }
 
     async waitForUI(milliseconds) {
@@ -827,7 +827,7 @@ export class StreamsPage {
      */
     async expectSuccessToast(message = 'Stream created successfully') {
         testLogger.info('Verifying success toast', { message });
-        await expect(this.page.locator('[data-test="o-toast-success"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test-variant="success"]')).toBeVisible({ timeout: 5000 });
     }
 
     /**
@@ -836,7 +836,7 @@ export class StreamsPage {
      */
     async expectErrorToast(message) {
         testLogger.info('Verifying error toast', { message });
-        await expect(this.page.locator('[data-test="o-toast-error"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test-variant="error"]')).toBeVisible({ timeout: 10000 });
     }
 
     /**
