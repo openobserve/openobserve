@@ -244,10 +244,6 @@ export default defineComponent({
     background-color: var(--o2-hover-bg, rgba(0, 0, 0, 0.06));
   }
 
-  .member-header-dark &:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-  }
-
   &--active {
     background-color: var(--o2-primary-btn-bg);
     color: white;
@@ -259,6 +255,17 @@ export default defineComponent({
     .member-id {
       opacity: 0.85;
     }
+  }
+
+  // Dark mode overrides — hover is invisible on #1a1a1a without these
+  .member-header-dark &:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .member-header-dark &--active,
+  .member-header-dark &--active:hover {
+    background-color: var(--o2-primary-btn-bg);
+    color: white;
   }
 
   .member-name {
