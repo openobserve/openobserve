@@ -16,10 +16,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import AlertSummary from "./AlertSummary.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 
-installQuasar();
 
 describe("AlertSummary", () => {
   let mockFormData: any;

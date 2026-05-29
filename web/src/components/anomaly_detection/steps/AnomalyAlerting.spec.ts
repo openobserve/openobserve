@@ -15,12 +15,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({
@@ -96,37 +93,15 @@ describe("AnomalyAlerting - rendering", () => {
 });
 
 describe("AnomalyAlerting - destinations", () => {
-  it("initializes filteredDestinations from props", async () => {
+  it("receives destinations as prop", async () => {
     const w = await mountComp();
-    expect((w.vm as any).filteredDestinations).toHaveLength(2);
+    expect(w.props("destinations")).toHaveLength(2);
   });
 
-  it("syncs filteredDestinations when destinations prop changes", async () => {
-    const w = await mountComp({ destinations: [] });
-    await flushPromises();
-    expect((w.vm as any).filteredDestinations).toHaveLength(0);
-    await w.setProps({ destinations: makeDestinations() });
-    await flushPromises();
-    expect((w.vm as any).filteredDestinations).toHaveLength(2);
-  });
-
-  it("filterDestinations filters by keyword", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterDestinations("slack", (cb: () => void) => cb());
-    expect((w.vm as any).filteredDestinations).toHaveLength(1);
-    expect((w.vm as any).filteredDestinations[0].name).toBe("slack-dest");
-  });
-
-  it("filterDestinations returns all when empty query", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterDestinations("", (cb: () => void) => cb());
-    expect((w.vm as any).filteredDestinations).toHaveLength(2);
-  });
-
-  it("filterDestinations is case-insensitive", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterDestinations("SLACK", (cb: () => void) => cb());
-    expect((w.vm as any).filteredDestinations).toHaveLength(1);
+  it("renders destination options from props", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_enabled: true }) });
+    const selectEl = w.find('[data-test="anomaly-destination"]');
+    expect(selectEl.exists()).toBe(true);
   });
 });
 

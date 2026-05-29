@@ -16,12 +16,10 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { ref } from "vue";
 import { shallowMount, flushPromises, mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import DateTime from "@/components/DateTime.vue";
 
 
-installQuasar();
 
 describe("DateTimePickerDashboard", () => {
   let wrapper: any;

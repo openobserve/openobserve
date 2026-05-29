@@ -15,12 +15,9 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 const mockOnDragStart = vi.fn();
 const mockPipelineObj = { value: { nodes: [], edges: [] } };
@@ -33,6 +30,7 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 }));
 
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -206,11 +204,9 @@ describe("NodeSidebar - node label and icon", () => {
   });
 
   it("node icon is rendered with the correct name", () => {
-    // q-icon renders as <i class="q-icon ...">icon_name</i> in tests
-    const icon = wrapper.find(".q-icon");
+    const icon = wrapper.findComponent(OIcon);
     expect(icon.exists()).toBe(true);
-    // The icon name appears as text content inside q-icon stubs
-    expect(icon.text()).toContain("functions");
+    expect(icon.props("name")).toBe("functions");
   });
 });
 

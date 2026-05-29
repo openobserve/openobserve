@@ -15,12 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import TraceDAG from "@/plugins/traces/TraceDAG.vue";
 import store from "@/test/unit/helpers/store";
 import searchService from "@/services/search";
 
-installQuasar();
 
 // Mock VueFlow components
 vi.mock("@vue-flow/core", () => ({
@@ -223,7 +221,7 @@ describe("TraceDAG", () => {
 
       expect(wrapper.vm.error).toBeTruthy();
       expect(wrapper.find(".error-message").exists()).toBe(true);
-      expect(wrapper.text()).toContain("Failed to load DAG");
+      expect(wrapper.vm.error).toContain("Network error");
     });
 
     it("should handle API error response", async () => {

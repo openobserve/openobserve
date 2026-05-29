@@ -250,6 +250,19 @@ pub async fn handle_otlp_request(
     let mut need_mark_llm_stream = false;
     if infra::schema::get_is_llm_stream(org_id, &traces_stream_name, StreamType::Traces).await {
         is_llm_stream = true;
+        if let Err(e) = super::db::schema::ensure_gen_ai_fields_in_schema(
+            org_id,
+            &traces_stream_name,
+            StreamType::Traces,
+        )
+        .await
+        {
+            log::warn!(
+                "[TRACES:OTLP] Failed to ensure gen_ai schema fields for {}/{}: {e}",
+                org_id,
+                &traces_stream_name
+            );
+        }
     }
 
     // Start retrieving associated pipeline and construct pipeline params
@@ -709,6 +722,19 @@ pub async fn ingest_json(
     let mut need_mark_llm_stream = false;
     if infra::schema::get_is_llm_stream(org_id, traces_stream_name, StreamType::Traces).await {
         is_llm_stream = true;
+        if let Err(e) = super::db::schema::ensure_gen_ai_fields_in_schema(
+            org_id,
+            traces_stream_name,
+            StreamType::Traces,
+        )
+        .await
+        {
+            log::warn!(
+                "[TRACES:JSON] Failed to ensure gen_ai schema fields for {}/{}: {e}",
+                org_id,
+                traces_stream_name
+            );
+        }
     }
 
     let cfg = get_config();
@@ -1039,7 +1065,10 @@ async fn write_traces(
     // Start write data
     for (timestamp, record_val) in json_data {
         // get service_name
-        let service_name = json::get_string_value(record_val.get("service_name").unwrap());
+        let service_name = record_val
+            .get("service_name")
+            .map(json::get_string_value)
+            .unwrap_or_default();
         // get distinct_value item
         if stream_settings.enable_distinct_fields {
             let mut map = Map::new();
@@ -1177,8 +1206,6 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
         otel::attributes::GenAiAttributes::USAGE_OUTPUT_TOKENS,
         otel::attributes::GenAiAttributes::INPUT_MESSAGES,
         otel::attributes::GenAiAttributes::OUTPUT_MESSAGES,
-        otel::attributes::O2Attributes::INPUT,
-        otel::attributes::O2Attributes::OUTPUT,
         otel::attributes::LangfuseAttributes::INPUT,
         otel::attributes::LangfuseAttributes::OUTPUT,
     ];
@@ -1956,17 +1983,20 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_llm_stream_hashmap_o2_attrs() {
-        use crate::service::traces::otel::attributes::O2Attributes;
+    fn test_detect_llm_stream_hashmap_gen_ai_attrs() {
+        use crate::service::traces::otel::attributes::GenAiAttributes;
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
-        map.insert(O2Attributes::INPUT.to_string(), json!("prompt"));
+        map.insert(GenAiAttributes::INPUT_MESSAGES.to_string(), json!("prompt"));
         assert!(super::detect_llm_stream(|k| map.contains_key(k)));
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
-        map.insert(O2Attributes::OUTPUT.to_string(), json!("completion"));
+        map.insert(
+            GenAiAttributes::OUTPUT_MESSAGES.to_string(),
+            json!("completion"),
+        );
         assert!(super::detect_llm_stream(|k| map.contains_key(k)));
     }
 

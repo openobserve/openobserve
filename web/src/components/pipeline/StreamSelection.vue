@@ -16,95 +16,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="full-height"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    class="tw:h-full"
+    :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
   >
-    <q-form @submit="savePipeline">
-      <div class="flex justify-between items-center q-px-md q-py-sm">
+    <div>
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-2">
         <div data-test="add-pipeline-section-title" style="font-size: 18px">
           {{ t("pipeline.addPipeline") }}
         </div>
-        <q-icon
+        <OIcon
           data-test="add-pipeline-close-dialog-btn"
           name="cancel"
-          class="cursor-pointer"
-          size="20px"
+          class="tw:cursor-pointer"
+          size="md"
           v-close-popup="true"
         />
       </div>
 
-      <div class="full-width bg-grey-4" style="height: 1px" />
+      <div class="tw:w-full tw:bg-gray-300" style="height: 1px" />
 
-      <div class="q-px-md">
+      <div class="tw:px-3">
         <div
           data-test="add-pipeline-name-input"
           class="alert-name-input o2-input"
           style="padding-top: 12px"
         >
-          <q-input
+          <OInput
             v-model="formData.name"
             :label="t('alerts.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            :rules="[
-              (val: any, rules: any) =>
-                !!val
-                  ? isValidName ||
-                    `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-                  : t('common.nameRequired'),
-            ]"
-            tabindex="0"
+            :readonly="isUpdating"
+            :disabled="isUpdating"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
+            data-test="add-pipeline-name-input"
             style="min-width: 480px"
           />
         </div>
         <div
           data-test="add-pipeline-description-input"
-          class="alert-name-input o2-input q-mb-sm"
+          class="alert-name-input o2-input tw:mb-2"
         >
-          <q-input
+          <OInput
             v-model="formData.description"
             :label="t('alerts.description')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            tabindex="0"
+            data-test="add-pipeline-description-input"
             style="min-width: 480px"
           />
         </div>
         <div
           data-test="add-pipeline-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm q-mb-sm"
+          class="alert-stream-type o2-input tw:mr-2 tw:mb-2"
           style="padding-top: 0"
         >
-          <q-select
+          <OSelect
             v-model="formData.stream_type"
             :options="streamTypes"
+            labelKey="label"
+            valueKey="value"
             :label="t('alerts.streamType') + ' *'"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            emit-value
-            map-options
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @update:model-value="updateStreams()"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :readonly="isUpdating"
+            :disabled="isUpdating"
+            :error="!!streamTypeError"
+            :error-message="streamTypeError"
+            @update:model-value="updateStreams(); streamTypeError = ''"
+            data-test="add-pipeline-stream-type-select"
             style="min-width: 220px"
           />
         </div>
@@ -113,33 +89,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-input"
           style="padding-top: 0"
         >
-          <q-select
+          <OSelect
             v-model="formData.stream_name"
-            :options="filteredStreams"
+            :options="indexOptions"
             :label="t('alerts.stream_name') + ' *'"
             :loading="isFetchingStreams"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            filled
-            stack-label
-            dense
-            use-input
-            hide-selected
-            fill-input
-            :input-debounce="400"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @filter="filterStreams"
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 250px !important"
+            searchable
+            :readonly="isUpdating"
+            :disabled="isUpdating"
+            :error="!!streamNameError"
+            :error-message="streamNameError"
+            @update:model-value="streamNameError = ''"
+            data-test="add-pipeline-stream-select"
+            style="min-width: 250px"
           />
         </div>
       </div>
 
-      <div class="tw:flex tw:gap-2 q-mt-lg q-px-md">
+      <div class="tw:flex tw:gap-2 tw:mt-4 tw:px-3">
         <OButton
           variant="outline"
           size="sm-action"
@@ -148,11 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm-action"
-          type="submit"
+          @click="handleSave"
           data-test="add-pipeline-submit-btn"
         >{{ t('alerts.save') }}</OButton>
       </div>
-    </q-form>
+    </div>
   </div>
 </template>
 
@@ -162,6 +129,9 @@ import { ref, computed, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   isUpdating: {
@@ -194,9 +164,12 @@ const streamTypes = ref([
   { label: "Traces", value: "traces" },
 ]);
 
-const filteredStreams: Ref<string[]> = ref([]);
+const nameError = ref('');
+const streamTypeError = ref('');
+const streamNameError = ref('');
 
 const indexOptions = ref([]);
+const filteredStreams = ref([]);
 
 const isValidName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
@@ -241,6 +214,18 @@ const filterColumns = (options: any[], val: String, update: Function) => {
     );
   });
   return filteredOptions;
+};
+
+const handleSave = () => {
+  nameError.value = '';
+  streamTypeError.value = '';
+  streamNameError.value = '';
+  if (!formData.value.name) { nameError.value = t('common.nameRequired'); }
+  if (!isValidName.value && formData.value.name) { nameError.value = "Use alphanumeric and '+=,.@-_' characters only, without spaces."; }
+  if (!formData.value.stream_type) { streamTypeError.value = 'Field is required!'; }
+  if (!formData.value.stream_name) { streamNameError.value = 'Field is required!'; }
+  if (nameError.value || streamTypeError.value || streamNameError.value) return;
+  savePipeline();
 };
 
 const savePipeline = () => {

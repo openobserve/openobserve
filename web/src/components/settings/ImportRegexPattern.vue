@@ -38,12 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full" style="min-width: 400px;">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
               <div
@@ -72,26 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         {{ errorMessage.message }}
-                        <!-- name is required so we need to show the input field -->
                         <div style="width: 300px">
-                          <q-input
+                          <OInput
                             data-test="regex-pattern-import-name-input"
                             v-model="userSelectedRegexPatternName[index]"
                             :label="'Regex Pattern Name *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateRegexPatternName(
-                                userSelectedRegexPatternName[index],
-                                index,
-                              )
-                            "
+                            @update:model-value="updateRegexPatternName(userSelectedRegexPatternName[index], index)"
                           />
                         </div>
                       </span>
@@ -106,24 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <!-- name is required so we need to show the input field -->
                         <div style="width: 300px">
-                          <q-input
+                          <OInput
                             data-test="regex-pattern-import-name-input"
                             v-model="userSelectedRegexPattern[index]"
                             :label="'Regex Pattern *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateRegexPattern(
-                                userSelectedRegexPattern[index],
-                                index,
-                              )
-                            "
+                            @update:model-value="updateRegexPattern(userSelectedRegexPattern[index], index)"
                           />
                         </div>
                       </span>
@@ -148,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     :class="{
-                      'error-item text-bold': true,
+                      'error-item tw:font-bold': true,
                       'text-green ': val.success,
                       'text-red': !val.success,
                     }"
@@ -170,18 +143,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 50px);"
   >
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
-        <div class="col">
+      <div class="tw:flex tw:justify-between tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
+        <div class="tw:flex tw:flex-col">
             <div class="tw:flex tw:items-center tw:gap-2">
               <OButton
                 variant="ghost"
-                size="icon-xs-sq"
+                size="icon"
                 @click="arrowBackFn"
                 data-test="regex-pattern-import-back-btn"
               >
-                <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
+                <OIcon name="arrow-back-ios-new" size="sm" />
               </OButton>
-              <div class="text-h6">
+              <div class="tw:text-xl tw:font-semibold">
                 {{ t("regex_patterns.import_title") }}
               </div>
             </div>
@@ -239,15 +212,17 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useQuasar } from "quasar";
 
 import AppTabs from "../common/AppTabs.vue";
-import { BookOpen, Upload, Link, ChevronLeft } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 
 import regexPatternsService from "@/services/regex_pattern";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ImportRegexPattern",
@@ -262,7 +237,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
     const baseImportRef = ref<any>(null);
 
     const regexPatternErrorsToDisplay = ref<any[]>([]);
@@ -305,17 +279,17 @@ export default defineComponent({
       {
         label: "Built-in Patterns",
         value: "import_built_in_patterns",
-        icon: BookOpen,
+        icon: "menu-book",
       },
       {
         label: "File Upload / JSON",
         value: "import_json_file",
-        icon: Upload,
+        icon: "upload",
       },
       {
         label: "URL Import",
         value: "import_json_url",
-        icon: Link,
+        icon: "link",
       },
     ]);
 
@@ -368,11 +342,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
+          variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -393,11 +365,9 @@ export default defineComponent({
       }
 
       if (successCount === totalCount) {
-        q.notify({
+        toast({
           message: `Successfully imported ${successCount} pattern(s)`,
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
+          variant: "success",
         });
 
         setTimeout(() => {
@@ -435,11 +405,9 @@ export default defineComponent({
         }
         return false;
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Regex Pattern please check the JSON",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
+          variant: "error",
         });
         return false;
       }
@@ -488,19 +456,15 @@ export default defineComponent({
 
           // Check if it's a duplicate pattern error
           if (errorMessage.includes("already exists")) {
-            q.notify({
+            toast({
               message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
-              color: "negative",
-              position: "bottom",
-              timeout: 4000,
+              variant: "error",
             });
           } else {
             // Show generic error notification for other errors
-            q.notify({
+            toast({
               message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
-              color: "negative",
-              position: "bottom",
-              timeout: 4000,
+              variant: "error",
             });
           }
 
@@ -563,7 +527,6 @@ export default defineComponent({
       t,
       importJson,
       router,
-      q,
       baseImportRef,
       regexPatternErrorsToDisplay,
       activeTab,
@@ -588,9 +551,12 @@ export default defineComponent({
     };
   },
   components: {
+    OSeparator,
     BaseImport,
     AppTabs,
     OButton,
+    OIcon,
+    OInput,
     BuiltInPatternsTab: defineAsyncComponent(
       () => import("@/components/settings/BuiltInPatternsTab.vue"),
     ),

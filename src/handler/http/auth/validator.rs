@@ -143,14 +143,11 @@ pub async fn validator(
     path_prefix: &str,
 ) -> Result<AuthValidationResult, AuthError> {
     let cfg = get_config();
-    let path = match req_data
-        .uri
-        .path()
+    let uri_path = req_data.uri.path();
+    let path = uri_path
         .strip_prefix(format!("{}{}", cfg.common.base_uri, path_prefix).as_str())
-    {
-        Some(path) => path,
-        None => req_data.uri.path(),
-    };
+        .or_else(|| uri_path.strip_prefix("/api/"))
+        .unwrap_or(uri_path);
     let path = path.strip_prefix("/").unwrap_or(path);
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
@@ -364,6 +361,18 @@ pub async fn validate_credentials(
         }
 
         return Ok(build_token_validation_response(&user));
+    }
+
+    if INGESTION_EP.iter().any(|s| path_columns.contains(s)) && user_password.is_empty() {
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_string(),
+            is_internal_user: false,
+            user_role: None,
+            user_name: "".to_string(),
+            family_name: "".to_string(),
+            given_name: "".to_string(),
+        });
     }
 
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
@@ -1038,41 +1047,35 @@ pub(crate) async fn check_permissions(
 
     let object_str = auth_info.o2_type;
     log::debug!("Role of user {user_id} is {role:#?}");
-    let obj_str = if object_str.contains("##user_id##") {
-        object_str.replace("##user_id##", user_id)
-    } else {
-        object_str
-    };
     let role = if role.eq(&UserRole::Root) {
         // root user should have access to everything , bypass check in openfga
         return true;
-    } else if auth_info.org_id.eq("organizations") && auth_info.method.eq("POST") {
-        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
-            Some(user) => format!("{}", user.role),
-            None => "".to_string(),
-        }
     } else {
         format!("{role}")
     };
-    let org_id = if auth_info.org_id.eq("organizations") {
-        if auth_info.method.eq("POST") {
-            // The user is trying to create a new organization
-            // Use the usage org to check for permission
-            config::META_ORG_ID
-        } else {
-            user_id
+
+    let org_id = &auth_info.org_id;
+
+    // When checking against META_ORG, look up the user's role there
+    let effective_role = if org_id == config::META_ORG_ID {
+        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
+            Some(user) => user.role.to_string(),
+            None => role,
         }
     } else {
-        &auth_info.org_id
+        role
     };
 
     o2_openfga::authorizer::authz::is_allowed(
         org_id,
         user_id,
         &auth_info.method,
-        &obj_str,
+        &object_str,
         &auth_info.parent_id,
-        &role.to_string(),
+        &effective_role,
+        auth_info.use_all_org,
+        auth_info.use_self_context,
+        auth_info.use_self_parent,
     )
     .await
 }

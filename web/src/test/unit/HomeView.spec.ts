@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar, Notify } from "quasar";
 import HomeView from "../../views/HomeView.vue";
 import store from "./helpers/store";
 import i18n from "@/locales";
@@ -38,6 +37,7 @@ const mockRoute = {
   name: "home",
   path: "/home",
 };
+
 
 describe("HomeView.vue", () => {
   let wrapper: any;
@@ -71,7 +71,6 @@ describe("HomeView.vue", () => {
     return mount(HomeView, {
       global: {
         plugins: [
-          [Quasar, { plugins: [Notify] }],
           i18n,
           store,
         ],
@@ -84,11 +83,8 @@ describe("HomeView.vue", () => {
             template: '<a><slot /></a>',
             props: ["to"],
           },
-          "q-page": {
-            template: '<div class="q-page"><slot /></div>',
-          },
-          "q-icon": {
-            template: '<span class="q-icon-stub"></span>',
+          "OIcon": {
+            template: '<span class="OIcon-stub"></span>',
             props: ["name", "size"],
           },
           OButton: {

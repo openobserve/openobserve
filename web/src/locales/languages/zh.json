@@ -396,7 +396,10 @@
     "traces": "痕迹",
     "switchToLogs": "点击切换回日志",
     "patternNoValuesAvailable": "没有可用值",
-    "selectLogStream": "选择日志流"
+    "selectLogStream": "选择日志流",
+    "noData": "无可用数据",
+    "functionEditorLabel": "函数编辑器",
+    "loadingStream": "正在加载直播..."
   },
   "menu": {
     "home": "主页",
@@ -790,7 +793,8 @@
     "no_keep_current": "不，保持最新状态",
     "feature_correlation_management": "关联管理",
     "feature_log_patterns": "日志模式",
-    "environment_type": "环境类型"
+    "environment_type": "环境类型",
+    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地摄取数据。"
   },
   "login": {
     "userid": "账号",
@@ -856,7 +860,12 @@
     "groups": "群组",
     "customRole": "自定义角色",
     "description": "描述",
-    "revoke_invite": "撤销邀请"
+    "revoke_invite": "撤销邀请",
+    "authType": "身份验证",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "本地人",
+    "noCustomRolesHint": "未定义自定义角色——在 IAM → 角色中创建一个",
+    "externalUserCustomRoleHint": "只能通过源系统修改外部用户"
   },
   "ticket": {
     "header": "工单",
@@ -1411,7 +1420,7 @@
     "markLineYAxis": "Y 轴",
     "colorPalette": "调色板",
     "colorSeriesBy": "颜色系列来自：",
-    "colorBySeries": "<b>按系列分类</b>",
+    "colorBySeries": "按系列分类",
     "colorDefaultPaletteBySeries": "默认调色板（按系列）",
     "colorDefaultPaletteBySeriesSubLabel": "同名的系列将使用相同的颜色",
     "colorPaletteClassic": "调色板-经典",
@@ -1420,7 +1429,7 @@
     "colorSingleColorSubLabel": "为所有系列设置特定颜色",
     "colorShadesOfSpecificColor": "特定颜色的色调",
     "colorShadesOfSpecificColorSubLabel": "特定颜色的不同色调",
-    "colorByValue": "<b>按值</b>",
+    "colorByValue": "按值",
     "colorGreenYellowRed": "绿色-黄色-红色（按值）",
     "colorRedYellowGreen": "红-黄-绿（按值）",
     "colorTemperature": "温度（按值）",
@@ -1590,7 +1599,9 @@
     "axisLabelRotateTooltipText": "按选定角度（以度为单位）旋转 x 轴标签文本，以提高标签较长或拥挤时的可读性。",
     "axisLabelTruncateTooltipText": "将 x 轴标签截断为指定宽度（以像素为单位）。",
     "axisLabelTooltipNotePrefix": "注意：",
-    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。"
+    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。",
+    "allFolders": "所有文件夹",
+    "selectFile": "选择文件"
   },
   "panel": {
     "header": "面板",
@@ -2623,6 +2634,7 @@
     "serviceAccounts": "服务账号",
     "serviceAccountsName": "服务账户名称",
     "basicUsers": "用户",
+    "organizationMembers": "组织成员",
     "quota": "配额",
     "externalUserWarningTitle": "外部用户警告",
     "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
@@ -2939,7 +2951,75 @@
     "copyStacktrace": "复制堆栈跟踪",
     "noStacktraceAvailable": "没有可用的堆栈跟踪",
     "stacktraceCopied": "Stacktrace 已复制到剪贴板",
-    "stacktraceCopyFailed": "无法复制堆栈跟踪"
+    "stacktraceCopyFailed": "无法复制堆栈跟踪",
+    "sessionsList": {
+      "noStreamsTooltip": "没有 LLM 直播可用。",
+      "session": "会话",
+      "sessions": "会议",
+      "countPill": "{总计} {单位} 的 {数量}",
+      "noStreamsFound": "未找到 LLM 直播",
+      "noStreamsDescription1": "会话组跨度为",
+      "noStreamsDescription2": "跨越标记为 LLM 流的跟踪流。要么不存在这样的直播，要么尚未摄取任何跨度。",
+      "failedToLoad": "加载会话失败",
+      "retry": "重试",
+      "noSessionsFound": "未找到会话",
+      "noSessionsDescription": "在此时间范围内，{stream} 上未录制任何 LLM 会话。尝试扩大时间范围或切换到其他直播。",
+      "loading": "正在加载会话...",
+      "tokenTooltip": "输入：{输入} · 输出：{输出} · 总计：{总计}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "时间戳",
+        "sessionId": "会话 ID",
+        "turns": "回合",
+        "duration": "持续时间",
+        "tokens": "代币",
+        "cost": "成本",
+        "status": "状态"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "返回会话",
+      "pageTitle": "会话详情",
+      "failedToLoad": "加载会话失败",
+      "retry": "重试",
+      "sessionNotFound": "未找到会话",
+      "noSpansFound": "在当前时间范围内未找到 {id} 的跨度。",
+      "searchPlaceholder": "在此会话中搜索痕迹...",
+      "turn": "转",
+      "turns": "转弯",
+      "turnsShown": "显示了 {总} {单位} 中的 {已过滤}",
+      "userBadge": "用户",
+      "sessionPrefix": "会话",
+      "copySessionId": "复制会话 ID",
+      "openInTraceExplorer": "在跟踪资源管理器中打开",
+      "unknownUser": "未知用户",
+      "kpi": {
+        "turns": "回合",
+        "duration": "持续时间",
+        "inputTokens": "输入代币",
+        "outputTokens": "输出代币",
+        "cost": "成本"
+      },
+      "conversation": "对话",
+      "turnLabel": "转",
+      "openTrace": "打开追踪",
+      "noUserMessage": "本回合未捕获任何用户消息。",
+      "noAssistantMessage": "本回合未捕获助手回应。",
+      "roles": {
+        "user": "用户",
+        "assistant": "助理"
+      },
+      "stats": {
+        "status": "状态",
+        "model": "模型",
+        "tokens": "代币",
+        "input": "输入",
+        "output": "输出",
+        "total": "总计",
+        "cost": "成本",
+        "spans": "跨度"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3023,7 +3103,10 @@
     "algorithm": "算法",
     "storeType": "商店类型",
     "mechanismType": "机制类型",
-    "actions": "操作"
+    "actions": "操作",
+    "providerTypeRequired": "提供商类型为必填项",
+    "algorithmRequired": "算法是必需的",
+    "secretRequired": "密钥为必填项"
   },
   "quota": {
     "header": "配额",
@@ -3343,7 +3426,8 @@
     "serviceGroupProtected": "无法删除服务组。您只能修改映射的字段。",
     "noDataFound": "未找到任何数据",
     "isWorkloadType": "服务标识符",
-    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。"
+    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。",
+    "loadingCorrelation": "正在加载关联数据..."
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",
@@ -3680,7 +3764,8 @@
     "errSave": "保存失败",
     "errLoadModel": "加载模型失败",
     "tierDefaultName": "默认",
-    "tierConditionalName": "有条件的等级"
+    "tierConditionalName": "有条件的等级",
+    "shadowedWarningBanner": "以下规则被 “{name}” 遮盖——由更高优先级的规则覆盖，不会用于成本计算。"
   },
   "overview": {
     "title": "系统概述",

@@ -20,16 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="flex justify-between items-center">
-        <div class="text-bold text-h6">Resource Details</div>
+      <div class="tw:flex tw:justify-between tw:items-center">
+        <div class="tw:font-bold tw:text-xl tw:font-semibold">Resource Details</div>
         <OButton
+          icon-left="close"
           variant="ghost"
           size="icon-sm"
           data-test="close-drawer-btn"
           @click="closeDrawer"
-        >
-          <X class="tw:size-4" />
-        </OButton>
+        />
       </div>
     </div>
 
@@ -37,41 +36,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:overflow-y-auto tw:p-[0.625rem]">
       <template v-if="resource">
         <!-- Resource Header -->
-        <div class="q-mb-md">
-          <div class="text-bold text-subtitle1 q-mb-sm">
+        <div class="tw:mb-3">
+          <div class="tw:font-bold tw:text-base tw:font-medium tw:mb-2">
             {{ resource.resource_method || "GET" }}
             {{ resource.resource_url }}
           </div>
-          <div class="row items-center q-gutter-sm text-grey-7">
-            <div class="row items-center">
-              <q-icon name="schedule" size="sm" class="q-mr-xs" />
+          <div class="tw:flex tw:items-center tw:gap-2 tw:text-gray-400">
+            <div class="tw:flex tw:items-center">
+              <OIcon name="schedule" size="sm" class="tw:mr-1" />
               <span>{{
                 formatTimestamp(resource[store.state.zoConfig.timestamp_column])
               }}</span>
             </div>
-            <q-separator vertical />
-            <div class="row items-center">
-              <q-icon name="access_time" size="sm" class="q-mr-xs" />
+            <OSeparator vertical />
+            <div class="tw:flex tw:items-center">
+              <OIcon name="access-time" size="sm" class="tw:mr-1" />
               <span>{{ formatDuration(resource.resource_duration) }}</span>
             </div>
-            <q-separator vertical />
-            <div class="row items-center">
-              <q-icon
+            <OSeparator vertical />
+            <div class="tw:flex tw:items-center">
+              <OIcon
                 :name="getStatusIcon(resource.resource_status_code)"
-                :color="getStatusColor(resource.resource_status_code)"
+                :class="['tw:mr-1', getStatusColorClass(resource.resource_status_code)]"
                 size="sm"
-                class="q-mr-xs"
               />
               <span>{{ resource.resource_status_code || "N/A" }}</span>
             </div>
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
+        <OSeparator class="tw:my-4" />
 
         <!-- Resource Details -->
-        <div class="q-mb-md">
-          <div class="tags-title text-bold q-ml-xs q-mb-sm">
+        <div class="tw:mb-3">
+          <div class="tags-title tw:font-bold tw:ml-1 tw:mb-2">
             Resource Information
           </div>
           <div class="resource-info-grid">
@@ -104,14 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="info-row" v-if="resource.view?.url">
               <div class="info-label">Page URL:</div>
-              <div class="info-value ellipsis" :title="resource.view.url">
+              <div class="info-value tw:truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
             </div>
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
+        <OSeparator class="tw:my-4" />
 
         <!-- Trace Correlation -->
         <TraceCorrelationCard
@@ -125,41 +123,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Trace ID Notice -->
         <div
           v-else
-          class="q-pa-md text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
+          class="tw:p-3 tw:text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
         >
-          <q-icon name="info" color="info" size="md" class="q-mb-sm" />
-          <div class="text-grey-7">
+          <OIcon name="info" size="md" class="tw:mb-2" />
+          <div class="tw:text-gray-400">
             No trace information available for this resource.
           </div>
-          <div class="text-caption text-grey-6 q-mt-xs">
+          <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
             Trace correlation requires browser SDK v0.3.3+ with trace
             propagation enabled.
           </div>
         </div>
 
         <!-- Session Context -->
-        <div v-if="resource.session?.id" class="q-mt-md">
-          <q-separator class="q-my-md" />
-          <div class="tags-title text-bold q-ml-xs q-mb-sm">
+        <div v-if="resource.session?.id" class="tw:mt-3">
+          <OSeparator class="tw:my-4" />
+          <div class="tags-title tw:font-bold tw:ml-1 tw:mb-2">
             Session Context
           </div>
-        <div class="row q-gutter-sm">
+          <div class="tw:flex tw:gap-2">
             <OButton
+              icon-left="play-circle"
               variant="outline"
               size="sm-action"
               data-test="view-session-replay-btn"
               @click="viewSessionReplay"
             >
-              <PlayCircle class="tw:size-4 tw:mr-1" />
               View Session Replay
             </OButton>
             <OButton
+              icon-left="format-list-bulleted"
               variant="ghost"
               size="sm-action"
               data-test="view-session-events-btn"
               @click="viewSessionEvents"
             >
-              <List class="tw:size-4 tw:mr-1" />
               View All Session Events
             </OButton>
           </div>
@@ -171,12 +169,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { date, useQuasar } from "quasar";
+import { formatToHuman } from "@/utils/date";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import { X, PlayCircle, List } from 'lucide-vue-next';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+
 
 const props = defineProps({
   modelValue: {
@@ -191,7 +192,6 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"]);
 
-const q = useQuasar();
 const router = useRouter();
 const store = useStore();
 
@@ -214,10 +214,7 @@ const closeDrawer = () => {
 
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(
-    Math.floor(timestamp / 1000),
-    "MMM DD, YYYY HH:mm:ss.SSS Z",
-  );
+  return formatToHuman(timestamp);
 };
 
 const formatDuration = (duration: number) => {
@@ -248,19 +245,19 @@ const formatSessionId = (id: string) => {
 };
 
 const getStatusIcon = (statusCode: number) => {
-  if (!statusCode) return "help";
-  if (statusCode >= 200 && statusCode < 300) return "check_circle";
+  if (!statusCode) return "help-outline";
+  if (statusCode >= 200 && statusCode < 300) return "check-circle";
   if (statusCode >= 300 && statusCode < 400) return "info";
   if (statusCode >= 400 && statusCode < 500) return "warning";
   return "error";
 };
 
-const getStatusColor = (statusCode: number) => {
-  if (!statusCode) return "grey";
-  if (statusCode >= 200 && statusCode < 300) return "positive";
-  if (statusCode >= 300 && statusCode < 400) return "info";
-  if (statusCode >= 400 && statusCode < 500) return "warning";
-  return "negative";
+const getStatusColorClass = (statusCode: number) => {
+  if (!statusCode) return "tw:text-gray-500";
+  if (statusCode >= 200 && statusCode < 300) return "tw:text-[var(--o2-positive)]";
+  if (statusCode >= 300 && statusCode < 400) return "tw:text-[var(--o2-info)]";
+  if (statusCode >= 400 && statusCode < 500) return "tw:text-[var(--o2-warning)]";
+  return "tw:text-[var(--o2-negative)]";
 };
 
 const viewSessionReplay = () => {
@@ -280,10 +277,9 @@ const viewSessionEvents = () => {
   if (!props.resource?.session?.id) return;
 
   // TODO: Navigate to filtered session events view
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Session events view coming soon",
-    timeout: 2000,
   });
 };
 

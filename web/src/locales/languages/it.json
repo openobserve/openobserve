@@ -396,7 +396,10 @@
     "traces": "Tracce",
     "switchToLogs": "clicca per tornare a Logs",
     "patternNoValuesAvailable": "Nessun valore disponibile",
-    "selectLogStream": "Seleziona lo stream dei log"
+    "selectLogStream": "Seleziona lo stream dei log",
+    "noData": "Nessun dato disponibile",
+    "functionEditorLabel": "Editor di funzioni",
+    "loadingStream": "Caricamento dello stream..."
   },
   "menu": {
     "home": "Home",
@@ -790,7 +793,8 @@
     "no_keep_current": "No, tieniti aggiornato",
     "feature_correlation_management": "Gestione delle correlazioni",
     "feature_log_patterns": "Schemi di registro",
-    "environment_type": "Tipo di ambiente"
+    "environment_type": "Tipo di ambiente",
+    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati."
   },
   "login": {
     "userid": "ID utente",
@@ -856,7 +860,12 @@
     "groups": "Gruppi",
     "customRole": "Ruoli personalizzati",
     "description": "Descrizione",
-    "revoke_invite": "Revoca l'invito"
+    "revoke_invite": "Revoca l'invito",
+    "authType": "Autenticazione",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Nativo",
+    "noCustomRolesHint": "Nessun ruolo personalizzato definito: creane uno in IAM → Ruoli",
+    "externalUserCustomRoleHint": "Gli utenti esterni possono essere modificati solo tramite il sistema sorgente"
   },
   "ticket": {
     "header": "Ticket di assistenza",
@@ -1411,7 +1420,7 @@
     "markLineYAxis": "Asse Y",
     "colorPalette": "Palette di colori",
     "colorSeriesBy": "Serie a colori di:",
-    "colorBySeries": "<b>Per serie</b>",
+    "colorBySeries": "Per serie",
     "colorDefaultPaletteBySeries": "Palette predefinita (per serie)",
     "colorDefaultPaletteBySeriesSubLabel": "Le serie con lo stesso nome useranno lo stesso colore",
     "colorPaletteClassic": "Palette-Classic",
@@ -1420,7 +1429,7 @@
     "colorSingleColorSubLabel": "Imposta un colore specifico per tutte le serie",
     "colorShadesOfSpecificColor": "Sfumature di colore specifico",
     "colorShadesOfSpecificColorSubLabel": "Diverse tonalità di colore specifico",
-    "colorByValue": "<b>Per valore</b>",
+    "colorByValue": "Per valore",
     "colorGreenYellowRed": "Verde-Giallo-Rosso (in base al valore)",
     "colorRedYellowGreen": "Rosso-Giallo-Verde (per valore)",
     "colorTemperature": "Temperatura (per valore)",
@@ -1588,7 +1597,9 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo"
+    "configSectionBackground": "Sfondo",
+    "allFolders": "Tutte le cartelle",
+    "selectFile": "Seleziona file"
   },
   "panel": {
     "header": "Pannello",
@@ -2628,6 +2639,7 @@
     "serviceAccounts": "Account di servizio",
     "serviceAccountsName": "Nome degli account di servizio",
     "basicUsers": "Utenti",
+    "organizationMembers": "Membri dell'Organizzazione",
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
     "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
@@ -2944,7 +2956,75 @@
     "copyStacktrace": "Copia stacktrace",
     "noStacktraceAvailable": "Nessuno stacktrace disponibile",
     "stacktraceCopied": "Stacktrace copiato negli appunti",
-    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita"
+    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita",
+    "sessionsList": {
+      "noStreamsTooltip": "Non sono disponibili stream LLM.",
+      "session": "sessione",
+      "sessions": "sessioni",
+      "countPill": "{count} di {total} {unità}",
+      "noStreamsFound": "Nessun stream LLM trovato",
+      "noStreamsDescription1": "Il gruppo di sessioni si estende per",
+      "noStreamsDescription2": "attraverso tracce di flussi contrassegnati come flussi LLM. O non esiste un flusso di questo tipo o non è stato ancora inserito alcun intervallo.",
+      "failedToLoad": "Caricamento delle sessioni non riuscito",
+      "retry": "Riprova",
+      "noSessionsFound": "Nessuna sessione trovata",
+      "noSessionsDescription": "Nessuna sessione LLM è stata registrata in questo intervallo di tempo su {stream}. Prova ad ampliare l'intervallo di tempo o a passare a un altro stream.",
+      "loading": "Caricamento delle sessioni...",
+      "tokenTooltip": "Ingresso: {input} · Uscita: {output} · Totale: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Timestamp",
+        "sessionId": "ID sessione",
+        "turns": "Turni",
+        "duration": "Durata",
+        "tokens": "Gettoni",
+        "cost": "Costo",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Torna alle sessioni",
+      "pageTitle": "Dettagli della sessione",
+      "failedToLoad": "Caricamento della sessione non riuscito",
+      "retry": "Riprova",
+      "sessionNotFound": "Sessione non trovata",
+      "noSpansFound": "Nessun intervallo trovato per {id} nell'intervallo di tempo corrente.",
+      "searchPlaceholder": "Cerca tracce in questa sessione...",
+      "turn": "girare",
+      "turns": "turni",
+      "turnsShown": "{filtrato} di {total} {unit} mostrato",
+      "userBadge": "Utente",
+      "sessionPrefix": "sessione",
+      "copySessionId": "Copia l'id della sessione",
+      "openInTraceExplorer": "Apri in Trace Explorer",
+      "unknownUser": "Utente sconosciuto",
+      "kpi": {
+        "turns": "Turni",
+        "duration": "Durata",
+        "inputTokens": "Token di input",
+        "outputTokens": "Token di uscita",
+        "cost": "Costo"
+      },
+      "conversation": "Conversazione",
+      "turnLabel": "Turno",
+      "openTrace": "Traccia aperta",
+      "noUserMessage": "Nessun messaggio utente ricevuto per questo turno.",
+      "noAssistantMessage": "Nessuna risposta dell'assistente acquisita per questo turno.",
+      "roles": {
+        "user": "Utente",
+        "assistant": "Assistente"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "Modello",
+        "tokens": "Gettoni",
+        "input": "Ingresso",
+        "output": "Uscita",
+        "total": "Totale",
+        "cost": "Costo",
+        "spans": "Spaziate"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3028,7 +3108,10 @@
     "algorithm": "Algoritmo",
     "storeType": "Tipo di negozio",
     "mechanismType": "Tipo di meccanismo",
-    "actions": "Azioni"
+    "actions": "Azioni",
+    "providerTypeRequired": "Il tipo di provider è obbligatorio",
+    "algorithmRequired": "L'algoritmo è richiesto",
+    "secretRequired": "Il segreto è obbligatorio"
   },
   "quota": {
     "header": "Quote",
@@ -3348,7 +3431,8 @@
     "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
     "noDataFound": "Nessun dato trovato",
     "isWorkloadType": "Identificatore del servizio",
-    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database."
+    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database.",
+    "loadingCorrelation": "Caricamento dei dati di correlazione..."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
@@ -3685,7 +3769,8 @@
     "errSave": "Salvataggio non riuscito",
     "errLoadModel": "Caricamento del modello non riuscito",
     "tierDefaultName": "Predefinito",
-    "tierConditionalName": "Livello condizionale"
+    "tierConditionalName": "Livello condizionale",
+    "shadowedWarningBanner": "Le regole seguenti sono ombreggiate da «{name}», sostituite da una regola con priorità più alta e non verranno utilizzate per il calcolo dei costi."
   },
   "overview": {
     "title": "Panoramica del sistema",

@@ -522,8 +522,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.billings)).toHaveLength(3);
     });
 
-    it("iam has 7 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.iam)).toHaveLength(7);
+    it("iam has 9 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.iam)).toHaveLength(9);
     });
   });
 });

@@ -254,6 +254,21 @@ pub struct Response {
     pub peak_memory_usage: Option<f64>,
 }
 
+/// Paginated response used by list-style APIs (sessions, traces, users).
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
+pub struct PaginatedResponse {
+    pub took: usize,
+    pub total: usize,
+    pub from: i64,
+    pub size: i64,
+    #[schema(value_type = Vec<Object>)]
+    pub hits: Vec<json::Value>,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub trace_id: String,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub function_error: String,
+}
+
 /// Iterator for Streaming response of search `Response`
 ///
 /// This is used to split the search response to smaller chunks based on
@@ -614,6 +629,13 @@ pub struct SearchPartitionResponse {
     pub streaming_id: Option<String>,
     #[serde(default)]
     pub is_histogram_eligible: bool,
+    /// ORDER BY columns when the primary sort is a non-timestamp column.
+    /// Non-empty means this is a non-ts ORDER BY query; empty means timestamp sort (normal path).
+    /// Each entry is (column_name, is_descending). The heap honors all columns in order so
+    /// that ties on the primary column are broken correctly by secondary columns.
+    /// Skipped from serialization — internal leader use only, not exposed to callers.
+    #[serde(skip)]
+    pub non_ts_order_by_cols: Vec<(String, bool)>,
 }
 
 /// Request parameters for querying search history
@@ -2931,6 +2953,7 @@ mod tests {
             streaming_aggs: false,
             streaming_id: Some("stream123".to_string()),
             is_histogram_eligible: false,
+            non_ts_order_by_cols: vec![],
         };
 
         response

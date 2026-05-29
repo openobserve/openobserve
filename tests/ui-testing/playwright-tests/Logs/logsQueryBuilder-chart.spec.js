@@ -14,7 +14,6 @@ const {
     ingestForQueryBuilderTest,
     setupQueryAndSwitchToBuild,
     initQueryBuilderTest,
-    initQueryBuilderTestLite,
 } = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
@@ -224,7 +223,7 @@ test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTestLite(page, pm);
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Chart Type on Tab Switch test setup completed');
     });
 
@@ -485,7 +484,7 @@ test.describe("Logs Query Builder - Chart Auto-Selection", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTestLite(page, pm);
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Chart Auto-Selection test setup completed');
     });
 

@@ -17,16 +17,24 @@ use std::{
     collections::HashMap,
     ops::Range,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use byteorder::ByteOrder;
 use bytes::Bytes;
+use infra::cache::bytes_cache::BytesCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tantivy::{Directory, ReloadPolicy, directory::OwnedBytes};
 
 use super::{EMPTY_FILE_EXT, FOOTER_CACHE, caching_directory::CachingDirectory};
+
+pub(crate) static FOOTER_DATA_CACHE: LazyLock<BytesCache> = LazyLock::new(|| {
+    let max_size = config::get_config()
+        .limit
+        .inverted_index_footer_cache_max_size;
+    BytesCache::new(max_size, "tantivy_footer_cache".to_string())
+});
 
 const FOOTER_CACHE_VERSION: u32 = 1;
 const FOOTER_VERSION_LEN: usize = 4;
@@ -162,10 +170,20 @@ impl FooterCache {
         })
     }
 
-    pub async fn from_directory(source: Arc<dyn Directory>) -> tantivy::Result<Self> {
+    pub async fn from_directory(
+        source: Arc<dyn Directory>,
+        cache_key: &str,
+    ) -> tantivy::Result<Self> {
+        if let Some(cached) = FOOTER_DATA_CACHE.get(cache_key) {
+            return Self::from_bytes(OwnedBytes::new(cached.to_vec()));
+        }
         let path = std::path::Path::new(FOOTER_CACHE);
         let file = source.get_file_handle(path)?;
         let data = file.read_bytes_async(0..file.len()).await?;
+        FOOTER_DATA_CACHE.put(
+            cache_key.to_string(),
+            Bytes::copy_from_slice(data.as_slice()),
+        );
         Self::from_bytes(data)
     }
 }
@@ -625,7 +643,7 @@ mod tests {
     async fn test_footer_cache_from_directory_nonexistent() {
         let ram_directory = Arc::new(RamDirectory::create());
 
-        let result = FooterCache::from_directory(ram_directory).await;
+        let result = FooterCache::from_directory(ram_directory, "test_nonexistent").await;
         assert!(result.is_err());
     }
 
@@ -645,7 +663,7 @@ mod tests {
             .atomic_write(std::path::Path::new(FOOTER_CACHE), &cache_bytes)
             .unwrap();
 
-        let result = FooterCache::from_directory(ram_directory).await;
+        let result = FooterCache::from_directory(ram_directory, "test_success").await;
         assert!(result.is_ok());
 
         let loaded_cache = result.unwrap();

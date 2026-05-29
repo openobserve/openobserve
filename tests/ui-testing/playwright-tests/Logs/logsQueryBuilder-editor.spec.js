@@ -15,7 +15,6 @@ const {
     ingestForQueryBuilderTest,
     setupQueryAndSwitchToBuild,
     initQueryBuilderTest,
-    initQueryBuilderTestLite,
 } = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
@@ -189,6 +188,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         const windowQuery = 'SELECT *, ROW_NUMBER() OVER (ORDER BY _timestamp DESC) as rn FROM "e2e_automate" LIMIT 10';
         await setupQueryAndSwitchToBuild(pm, page, windowQuery);
 
+        await pm.logsPage.expectDashboardPanelTableVisible();
         await pm.logsPage.verifyChartTypeSelected('table');
 
         testLogger.info('Window function → table chart - PASSED');
@@ -202,6 +202,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         const multiGroupByQuery = 'SELECT code, method, level, count(*) as "y_axis_1" FROM "e2e_automate" GROUP BY code, method, level';
         await setupQueryAndSwitchToBuild(pm, page, multiGroupByQuery);
 
+        await pm.logsPage.expectDashboardPanelTableVisible();
         await pm.logsPage.verifyChartTypeSelected('table');
 
         testLogger.info('Case 7: >2 GROUP BY → table chart - PASSED');
@@ -434,7 +435,7 @@ test.describe("Logs Query Builder — Bare Field Select defaults (Case 3a)", () 
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTestLite(page, pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('Bare field select test setup completed');
     });
@@ -518,7 +519,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTestLite(page, pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('FieldList button test setup completed');
     });
@@ -552,7 +553,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await setupQueryAndSwitchToBuild(pm, page, 'SELECT kubernetes_container_name, kubernetes_host FROM "e2e_automate"');
         await pm.logsPage.clickCustomQueryType();
 
-        await pm.logsPage.searchFieldInBuilder('kubernetes');
+        await pm.logsPage.searchFieldInBuilder('axis');
 
         const buttonCount = await pm.logsPage.getAddXButtonCount();
         testLogger.info(`Custom mode + search: ${buttonCount} +X buttons`);

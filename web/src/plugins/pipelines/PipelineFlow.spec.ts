@@ -15,12 +15,10 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PipelineFlow from "./PipelineFlow.vue";
 import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 
-installQuasar({});
 
 // Create i18n instance
 const i18n = createI18n({
@@ -198,10 +196,20 @@ describe("PipelineFlow.vue", () => {
     }
   });
 
+  // Stub OIcon so the warning-text OIcon renders cleanly
+  const OIconStub = {
+    name: "OIcon",
+    props: ["name", "size"],
+    template: '<span data-test-stub="o-icon" />',
+  };
+
   const mountComponent = () => {
     return mount(PipelineFlow, {
       global: {
-        plugins: [i18n]
+        plugins: [i18n],
+        stubs: {
+          OIcon: OIconStub,
+        },
       }
     });
   };
@@ -256,8 +264,9 @@ describe("PipelineFlow.vue", () => {
   // Test 8: Empty canvas text is shown when no nodes
   it("should show empty canvas text when no nodes exist", () => {
     wrapper = mountComponent();
-    expect(wrapper.find('.empty-text').exists()).toBe(true);
-    expect(wrapper.find('.empty-text').text()).toBe('Drag and drop nodes here');
+    const emptyTextEl = wrapper.find('.empty-text');
+    expect(emptyTextEl.exists()).toBe(true);
+    expect(emptyTextEl.text()).toBe('Drag and drop nodes here');
   });
 
   // Test 9: Empty canvas text is hidden when nodes exist
@@ -506,7 +515,7 @@ describe("PipelineFlow.vue", () => {
   // Test 39: Container div has correct CSS class
   it("should have container div with correct class", () => {
     wrapper = mountComponent();
-    expect(wrapper.find('.container').exists()).toBe(true);
+    expect(wrapper.find('[data-test="pipeline-flow-container"]').exists()).toBe(true);
   });
 
   // Test 40: Warning text contains correct icon and message
@@ -517,6 +526,6 @@ describe("PipelineFlow.vue", () => {
     
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
     expect(warningText.text()).toContain('Unsaved changes detected');
-    expect(warningText.find('.q-icon').exists()).toBe(true);
+    expect(warningText.find('[data-test-stub="o-icon"]').exists()).toBe(true);
   });
 });

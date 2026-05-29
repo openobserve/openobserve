@@ -13,7 +13,15 @@ export class LogsQueryPage {
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
     this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
-    this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
+    // OSwitch renders the wrapper data-test on a div and the state on an inner
+    // <button data-state="checked|unchecked"> — drill into that button. Note: a sibling
+    // OTooltip grace-area span also carries `data-state="closed"`, so we filter on the
+    // OSwitch states explicitly to avoid the strict-mode collision.
+    this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
+    this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
+    this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]';
+    this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="unchecked"]';
     this.autoRunDropdownBtn = '[data-test="logs-search-bar-refresh-btn"] ~ button';
     this.autoRunToggleItem = '[data-test="logs-search-bar-live-mode-toggle-btn"]';
     this._autoQueryEnabledCache = undefined;
@@ -45,19 +53,16 @@ export class LogsQueryPage {
   }
 
   async clickNoDataFound() {
-    // Page-level search — the "No data" text may be in:
-    //   SearchResult.vue  histogram-empty span (warning icon + "No data found for histogram.")
-    //   Index.vue         h6[data-test="logs-search-error-message"] (info icon + "No events found…")
-    //   Index.vue         div[data-test="logs-search-result-not-found-text"] ("Result not found.")
-    // Use specific enough substrings to avoid matching unrelated empty-states.
-    const patterns = [
-      'No data found for',
-      'No events found',
-      'Result not found',
-      'No data found',
+    // Try data-test selectors in priority order:
+    //   logs-search-no-data-histogram — SearchResult.vue histogram empty state
+    //   logs-search-error-message     — Index.vue "No events found" heading
+    //   logs-search-result-not-found-text — Index.vue "Result not found" div
+    const locators = [
+      this.page.locator('[data-test="logs-search-no-data-histogram"]'),
+      this.page.locator('[data-test="logs-search-error-message"]'),
+      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
     ];
-    for (const pattern of patterns) {
-      const locator = this.page.getByText(pattern).first();
+    for (const locator of locators) {
       try {
         await locator.waitFor({ state: 'visible', timeout: 10000 });
         await locator.click({ force: true });
@@ -66,7 +71,7 @@ export class LogsQueryPage {
         continue;
       }
     }
-    throw new Error('No "no data" message matched — expected one of: ' + patterns.join(', '));
+    throw new Error('No "no data" message found — checked: logs-search-no-data-histogram, logs-search-error-message, logs-search-result-not-found-text');
   }
 
   async clickResultDetail() {
@@ -78,15 +83,24 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-    await this.page.locator(this.histogramToggle).click();
+    // Histogram toggle is inside the utilities ("More") menu.
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.locator(this.utilitiesMenuButton).click();
+    const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+    await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+    await histogramMenuItem.click();
   }
 
   async isHistogramOn() {
-    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-    const histogramToggle = this.page.locator(this.histogramToggle);
-    const isChecked = await histogramToggle.getAttribute('aria-checked');
-    return isChecked === 'true';
+    // Histogram is inside the utilities ("More") menu — open menu, read OSwitch state, close menu.
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.locator(this.utilitiesMenuButton).click();
+    const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+    await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const switchChecked = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"] [data-state="checked"]');
+    const count = await switchChecked.count();
+    await this.page.keyboard.press('Escape').catch(() => {});
+    return count > 0;
   }
 
   async ensureHistogramState(desiredState) {
@@ -96,22 +110,64 @@ export class LogsQueryPage {
     }
   }
 
+  /** Open the utilities dropdown so the SQL mode menu item becomes visible. Returns true if opened. */
+  async _openUtilitiesMenuForSqlMode() {
+    const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+    const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
+    if (!isVisible) {
+      await this.page.locator(this.utilitiesMenuButton).click();
+      await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+      return true;
+    }
+    return false;
+  }
+
   async isSQLModeOn() {
-    const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
-    return await sw.isChecked();
+    // Open the dropdown to read the OSwitch inner button's data-state, then close it.
+    const menuOpened = await this._openUtilitiesMenuForSqlMode();
+    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    const state = await stateEl.getAttribute('data-state').catch(() => null);
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
+    return state === 'checked';
   }
 
   async ensureSQLMode() {
-    if (!(await this.isSQLModeOn())) {
-      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
-      await this.page.waitForTimeout(500);
+    const menuOpened = await this._openUtilitiesMenuForSqlMode();
+    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
+    if (!isOn) {
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+      await expect.poll(async () => {
+        const s = await stateEl.getAttribute('data-state').catch(() => null);
+        return s === 'checked';
+      }, { timeout: 5000 }).toBe(true);
+    }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
   }
 
   async ensureFTSMode() {
-    if (await this.isSQLModeOn()) {
-      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
-      await this.page.waitForTimeout(500);
+    const menuOpened = await this._openUtilitiesMenuForSqlMode();
+    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
+    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
+    if (isOn) {
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
+      await expect.poll(async () => {
+        const s = await stateEl.getAttribute('data-state').catch(() => null);
+        return s === 'unchecked';
+      }, { timeout: 5000 }).toBe(true);
+    }
+    if (menuOpened) {
+      await this.page.keyboard.press('Escape');
+      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
   }
 
@@ -140,10 +196,12 @@ export class LogsQueryPage {
     await expect(toggle).toBeVisible({ timeout: 5000 });
     if (((await toggle.textContent()) || '').includes(expectedLabel)) {
       await toggle.click();
+      // After clicking, the toggle menu closes — wait for it to be detached/hidden.
+      await toggle.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     } else {
       await this.page.keyboard.press('Escape');
+      await toggle.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
-    await this.page.waitForTimeout(300);
   }
 
   async disableAutoRun() {

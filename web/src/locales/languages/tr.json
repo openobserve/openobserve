@@ -396,7 +396,10 @@
     "traces": "İzleri",
     "switchToLogs": "Günlüklere geri dönmek için tıklayın",
     "patternNoValuesAvailable": "Mevcut değer yok",
-    "selectLogStream": "Günlükler akışını seçin"
+    "selectLogStream": "Günlükler akışını seçin",
+    "noData": "Veri yok",
+    "functionEditorLabel": "İşlev Düzenleyicisi",
+    "loadingStream": "Akış Yükleniyor..."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -790,7 +793,8 @@
     "no_keep_current": "Hayır, güncel tut",
     "feature_correlation_management": "Korelasyon yönetimi",
     "feature_log_patterns": "Günlük kalıpları",
-    "environment_type": "Ortam Türü"
+    "environment_type": "Ortam Türü",
+    "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir."
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
@@ -856,7 +860,12 @@
     "groups": "Gruplar",
     "customRole": "Özel Roller",
     "description": "Açıklama",
-    "revoke_invite": "Daveti İptal Et"
+    "revoke_invite": "Daveti İptal Et",
+    "authType": "Yetkilendirme",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Yerli",
+    "noCustomRolesHint": "Özel rol tanımlanmadı - IAM → Roller'de bir tane oluşturun",
+    "externalUserCustomRoleHint": "Harici kullanıcılar yalnızca kaynak sistem üzerinden değiştirilebilir"
   },
   "ticket": {
     "header": "Destek Talepleri",
@@ -1411,7 +1420,7 @@
     "markLineYAxis": "Y ekseni",
     "colorPalette": "Renk paleti",
     "colorSeriesBy": "Renk serisi:",
-    "colorBySeries": "<b>Serilere Göre</b>",
+    "colorBySeries": "Serilere Göre",
     "colorDefaultPaletteBySeries": "Varsayılan Palet (Seriye Göre)",
     "colorDefaultPaletteBySeriesSubLabel": "Aynı adı taşıyan seriler aynı rengi kullanacak",
     "colorPaletteClassic": "Palet-Klasik",
@@ -1420,7 +1429,7 @@
     "colorSingleColorSubLabel": "Tüm serilere belirli bir renk ayarlayın",
     "colorShadesOfSpecificColor": "Belirli Renk Tonları",
     "colorShadesOfSpecificColorSubLabel": "Belirli rengin farklı tonları",
-    "colorByValue": "<b>Değere Göre</b>",
+    "colorByValue": "Değere Göre",
     "colorGreenYellowRed": "Yeşil-Sarı-Kırmızı (Değere Göre)",
     "colorRedYellowGreen": "Kırmızı-Sarı-Yeşil (Değere Göre)",
     "colorTemperature": "Sıcaklık (Değere Göre)",
@@ -1588,7 +1597,9 @@
     "configSectionDrilldown": "Detaya inme",
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
-    "configSectionBackground": "Arkaplan"
+    "configSectionBackground": "Arkaplan",
+    "allFolders": "Tüm Klasörler",
+    "selectFile": "Dosya Seç"
   },
   "panel": {
     "header": "Panel",
@@ -2630,6 +2641,7 @@
     "serviceAccounts": "Hizmet Hesapları",
     "serviceAccountsName": "Hizmet Hesapları Adı",
     "basicUsers": "Kullanıcılar",
+    "organizationMembers": "Organizasyon Üyeleri",
     "quota": "Kontenjanlar",
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
     "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",
@@ -2946,7 +2958,75 @@
     "copyStacktrace": "Stacktrace'i kopyala",
     "noStacktraceAvailable": "Yığın izleme mevcut değil",
     "stacktraceCopied": "Stacktrace panoya kopyalandı",
-    "stacktraceCopyFailed": "Stacktrace kopyalanamadı"
+    "stacktraceCopyFailed": "Stacktrace kopyalanamadı",
+    "sessionsList": {
+      "noStreamsTooltip": "LLM akışı mevcut değil.",
+      "session": "oturum, toplantı, celse",
+      "sessions": "oturumları",
+      "countPill": "{total} {unit} {count}",
+      "noStreamsFound": "LLM akışı bulunamadı",
+      "noStreamsDescription1": "Oturum grubu şunları kapsar:",
+      "noStreamsDescription2": "LLM akışları olarak işaretlenmiş izleme akışları arasında. Ya böyle bir akış yoktur ya da henüz hiçbir açıklık alınmamıştır.",
+      "failedToLoad": "Oturumlar yüklenemedi",
+      "retry": "Tekrar dene",
+      "noSessionsFound": "Oturum bulunamadı",
+      "noSessionsDescription": "{stream} üzerinde bu zaman aralığında hiçbir LLM oturumu kaydedilmedi. Zaman aralığını genişletmeyi veya farklı bir akışa geçmeyi deneyin.",
+      "loading": "Oturumlar yükleniyor...",
+      "tokenTooltip": "Giriş: {input} · Çıktı: {output} · Toplam: {toplam}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Zaman damgası",
+        "sessionId": "Oturum Kimliği",
+        "turns": "Dönüyor",
+        "duration": "Süre",
+        "tokens": "Jetonlar",
+        "cost": "Maliyet",
+        "status": "Durum"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Oturumlara Dön",
+      "pageTitle": "Oturum Detayı",
+      "failedToLoad": "Oturum yüklenemedi",
+      "retry": "Tekrar dene",
+      "sessionNotFound": "Oturum bulunamadı",
+      "noSpansFound": "Geçerli zaman aralığında {id} için hiçbir açıklık bulunamadı.",
+      "searchPlaceholder": "Bu oturumdaki izleri ara...",
+      "turn": "dönüş",
+      "turns": "sıralar",
+      "turnsShown": "{total} {unit} 'den {filtrelenmiş} gösterildi",
+      "userBadge": "Kullanıcı",
+      "sessionPrefix": "oturum, toplantı, celse",
+      "copySessionId": "Oturum kimliğini kopyala",
+      "openInTraceExplorer": "Trace explorer'da aç",
+      "unknownUser": "Bilinmeyen kullanıcı",
+      "kpi": {
+        "turns": "Dönüyor",
+        "duration": "Süre",
+        "inputTokens": "Giriş Belirteçleri",
+        "outputTokens": "Çıktı Belirteçleri",
+        "cost": "Maliyet"
+      },
+      "conversation": "Konuşma",
+      "turnLabel": "Döndür",
+      "openTrace": "İzini aç",
+      "noUserMessage": "Bu tur için kullanıcı mesajı alınmadı.",
+      "noAssistantMessage": "Bu tur için asistan yanıtı alınmadı.",
+      "roles": {
+        "user": "Kullanıcı",
+        "assistant": "asistan"
+      },
+      "stats": {
+        "status": "Durum",
+        "model": "Modeli",
+        "tokens": "Jetonlar",
+        "input": "Giriş",
+        "output": "Çıktı",
+        "total": "Toplam",
+        "cost": "Maliyet",
+        "spans": "Açıklıklar"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -3030,7 +3110,10 @@
     "algorithm": "Algoritma",
     "storeType": "Mağaza Türü",
     "mechanismType": "Mekanizma Tipi",
-    "actions": "Eylemler"
+    "actions": "Eylemler",
+    "providerTypeRequired": "Sağlayıcı tipi gereklidir",
+    "algorithmRequired": "Algoritma gerekli",
+    "secretRequired": "Sır gerekli"
   },
   "quota": {
     "header": "Kontenjanlar",
@@ -3350,7 +3433,8 @@
     "serviceGroupProtected": "Hizmet grubu kaldırılamaz. Yalnızca eşlenen alanları değiştirebilirsiniz.",
     "noDataFound": "Veri Bulunamadı",
     "isWorkloadType": "Hizmet tanımlayıcısı",
-    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın."
+    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın.",
+    "loadingCorrelation": "Korelasyon verileri yükleniyor..."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
@@ -3687,7 +3771,8 @@
     "errSave": "Kaydedilemedi",
     "errLoadModel": "Model yüklenemedi",
     "tierDefaultName": "Varsayılan",
-    "tierConditionalName": "Koşullu Katman"
+    "tierConditionalName": "Koşullu Katman",
+    "shadowedWarningBanner": "Aşağıdaki kurallar “{name}” ile gölgelenmiştir - daha yüksek öncelikli bir kural tarafından geçersiz kılınır ve maliyet hesaplamalarında kullanılmaz."
   },
   "overview": {
     "title": "Sisteme Genel Bakış",

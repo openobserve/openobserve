@@ -497,6 +497,96 @@ pub static QUERY_PARQUET_METADATA_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::ne
     )
     .expect("Metric created")
 });
+pub static QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_parquet_metadata_cache_hits_total",
+            "Querier parquet metadata cache hits.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_parquet_metadata_cache_miss_total",
+            "Querier parquet metadata cache misses.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_PARQUET_METADATA_CACHE_GC_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_parquet_metadata_cache_gc_count",
+            "Querier parquet metadata cache eviction runs.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_PARQUET_METADATA_CACHE_GC_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "query_parquet_metadata_cache_gc_time",
+            "Time (ms) spent per eviction run of the querier parquet metadata cache.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.2, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0,
+        ])
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+// bloom filter prune metrics
+//
+// Records the ratio of files surviving the search-side bloom prune step
+// (kept_files / candidate_files). A low value indicates strong pruning;
+// 1.0 means everything was kept (e.g. files without bloom_ver, or every
+// bloom returned "maybe"). Only emitted when bloom prune actually runs.
+pub static BLOOM_PRUNE_KEEP_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "bloom_prune_keep_ratio",
+            "Search-side bloom prune kept-file ratio (kept / candidate).".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.0, 0.001, 0.005, 0.01, 0.05, 0.10, 0.20, 0.30, 0.50, 0.75, 1.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static BLOOM_PRUNE_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "bloom_prune_duration_seconds",
+            "Search-side bloom prune duration (seconds).".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
 
 // compactor stats
 pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
@@ -1312,6 +1402,88 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// metrics for generic bytes cache
+pub static BYTES_CACHE_MEMORY_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "bytes_cache_memory_size",
+            "Total memory size (bytes) of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_ENTRY_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "bytes_cache_entry_count",
+            "Number of entries in a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_GC_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "bytes_cache_gc_time",
+            "Time spent per GC run for a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.2, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_GC_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_gc_count",
+            "Total number of GC runs of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_hits_total",
+            "Total number of hits of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_miss_total",
+            "Total number of misses of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
 // Tokio runtime metrics - consolidated into fewer metrics with different labels
 pub static TOKIO_RUNTIME_TASKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -1736,6 +1908,18 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(QUERY_PARQUET_METADATA_CACHE_USED_BYTES.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_PARQUET_METADATA_CACHE_GC_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_PARQUET_METADATA_CACHE_GC_TIME.clone()))
+        .expect("Metric registered");
 
     // query manager
     registry
@@ -1763,6 +1947,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(COMPACT_PENDING_JOBS.clone()))
+        .expect("Metric registered");
+
+    // bloom filter prune metrics
+    registry
+        .register(Box::new(BLOOM_PRUNE_KEEP_RATIO.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BLOOM_PRUNE_DURATION.clone()))
         .expect("Metric registered");
 
     // stream stats aggregation metrics
@@ -1966,6 +2158,26 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+
+    // metrics for generic bytes cache
+    registry
+        .register(Box::new(BYTES_CACHE_MEMORY_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_ENTRY_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_GC_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_GC_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_MISS_TOTAL.clone()))
         .expect("Metric registered");
 
     // tokio runtime metrics
@@ -2215,6 +2427,10 @@ mod tests {
         let _ = QUERY_METRICS_CACHE_RATIO.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_FILES.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_USED_BYTES.clone();
+        let _ = QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL.clone();
+        let _ = QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL.clone();
+        let _ = QUERY_PARQUET_METADATA_CACHE_GC_COUNT.clone();
+        let _ = QUERY_PARQUET_METADATA_CACHE_GC_TIME.clone();
         let _ = QUERY_DISK_CACHE_HIT_COUNT.clone();
         let _ = QUERY_DISK_CACHE_MISS_COUNT.clone();
         let _ = QUERY_AGGREGATION_CACHE_ITEMS.clone();
@@ -2316,6 +2532,12 @@ mod tests {
         let _ = TANTIVY_RESULT_CACHE_GC_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_HITS_TOTAL.clone();
+        let _ = BYTES_CACHE_MEMORY_SIZE.clone();
+        let _ = BYTES_CACHE_ENTRY_COUNT.clone();
+        let _ = BYTES_CACHE_GC_TIME.clone();
+        let _ = BYTES_CACHE_GC_COUNT.clone();
+        let _ = BYTES_CACHE_HITS_TOTAL.clone();
+        let _ = BYTES_CACHE_MISS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_TASKS.clone();
         let _ = TOKIO_RUNTIME_TASKS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_WORKER_METRICS.clone();

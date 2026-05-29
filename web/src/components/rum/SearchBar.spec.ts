@@ -23,13 +23,11 @@ import {
   beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-// Mock Vue's defineAsyncComponent
+// Mock Vue's defineAsyncComponent — must be hoisted before importing component
 vi.mock("vue", async (importOriginal) => {
   const mod = await importOriginal<typeof import("vue")>();
   return {
@@ -50,26 +48,14 @@ vi.mock("vue", async (importOriginal) => {
 
 import SearchBar from "@/components/rum/SearchBar.vue";
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
-});
-
-// Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
-  default: {
-    track: vi.fn(),
-  },
+  default: { track: vi.fn() },
 }));
 
-// Mock AWS config
 vi.mock("@/aws-exports", () => ({
-  default: {
-    isCloud: "false",
-  },
+  default: { isCloud: "false" },
 }));
 
-// Mock SQL suggestions composable
 const mockAutoCompleteKeywords = ["SELECT", "FROM", "WHERE"];
 const mockAutoCompleteData = {
   value: {
@@ -91,7 +77,6 @@ vi.doMock("@/composables/useSuggestions", () => ({
   }),
 }));
 
-// Mock SQL parser
 const mockParser = {
   astify: vi.fn().mockReturnValue({
     type: "select",
@@ -107,7 +92,6 @@ vi.doMock("@/composables/useParser", () => ({
   }),
 }));
 
-// Mock useTraces composable
 const mockSearchObj = {
   data: {
     queryResults: {
@@ -155,34 +139,20 @@ const mockSearchObj = {
 };
 
 vi.doMock("@/composables/useTraces", () => ({
-  default: () => ({
-    searchObj: mockSearchObj,
-  }),
+  default: () => ({ searchObj: mockSearchObj }),
 }));
 
-// Mock Quasar notify
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Use vi.hoisted so mockToast is available in the factory function
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
-// Mock components
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     name: "DateTime",
     template: '<div data-test="date-time-picker">Date Time Picker</div>',
-    props: [
-      "auto-apply",
-      "default-type",
-      "default-absolute-time",
-      "default-relative-time",
-    ],
+    props: ["auto-apply", "default-type", "default-absolute-time", "default-relative-time"],
     emits: ["on:date-change"],
   },
 }));
@@ -195,7 +165,6 @@ vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
   },
 }));
 
-// Mock File constructor and URL for vitest v4
 beforeAll(() => {
   (globalThis as any).File = vi.fn(function (
     bits: any[],
@@ -215,12 +184,12 @@ beforeAll(() => {
   };
 });
 
-describe("SearchBar Component", () => {
+describe("SearchBar", () => {
   let wrapper: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockNotify.mockClear();
+    mockToast.mockClear();
 
     wrapper = mount(SearchBar, {
       props: {
@@ -243,34 +212,39 @@ describe("SearchBar Component", () => {
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    if (wrapper) wrapper.unmount();
     vi.clearAllTimers();
     vi.restoreAllMocks();
   });
 
+  // ==========================================================================
+  // COMPONENT MOUNTING
+  // ==========================================================================
+
   describe("Component Mounting", () => {
-    it("should mount successfully", () => {
+    it("mounts successfully without errors", () => {
+      // Arrange & Assert
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should render search bar component structure", () => {
-      expect(wrapper.find(".search-bar-component").exists()).toBe(true);
-      expect(wrapper.find("#searchBarComponent").exists()).toBe(true);
+    it("renders the search-bar-component container element", () => {
+      // Arrange & Assert
+      expect(wrapper.find('[id="searchBarComponent"]').exists()).toBe(true);
     });
 
-    it("should render refresh button", () => {
-      const refreshBtn = wrapper.find(
-        '[data-test="logs-search-bar-refresh-btn"]',
-      );
-      expect(refreshBtn.exists()).toBe(true);
+    it("renders refresh button with correct data-test attribute", () => {
+      // Arrange & Assert
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
     });
   });
 
+  // ==========================================================================
+  // PROPS HANDLING
+  // ==========================================================================
+
   describe("Props Handling", () => {
-    it("should receive fieldValues prop correctly", () => {
+    it("receives fieldValues prop with the provided object", () => {
+      // Arrange & Assert
       expect(wrapper.props("fieldValues")).toEqual({
         field1: ["value1", "value2"],
         field2: ["value3", "value4"],
@@ -278,51 +252,104 @@ describe("SearchBar Component", () => {
     });
   });
 
+  // ==========================================================================
+  // COMPONENT DATA (public return API)
+  // ==========================================================================
+
   describe("Component Data", () => {
-    it("should have searchObj available", () => {
+    it("exposes searchObj with data sub-object via return API", () => {
+      // Arrange & Assert
       expect(wrapper.vm.searchObj).toBeDefined();
       expect(wrapper.vm.searchObj.data).toBeDefined();
     });
 
-    it("should have queryEditorRef available", () => {
+    it("exposes queryEditorRef via return API", () => {
+      // Arrange & Assert
       expect(wrapper.vm.queryEditorRef).toBeDefined();
     });
   });
 
+  // ==========================================================================
+  // COMPONENT METHODS (public return API)
+  // ==========================================================================
+
   describe("Component Methods", () => {
-    it("should have all required public methods", () => {
+    it("exposes searchData as a function via return API", () => {
+      // Arrange & Assert
       expect(typeof wrapper.vm.searchData).toBe("function");
+    });
+
+    it("exposes updateDateTime as a function via return API", () => {
+      // Arrange & Assert
       expect(typeof wrapper.vm.updateDateTime).toBe("function");
+    });
+
+    it("exposes updateQueryValue as a function via return API", () => {
+      // Arrange & Assert
       expect(typeof wrapper.vm.updateQueryValue).toBe("function");
+    });
+
+    it("exposes updateQuery as a function via return API", () => {
+      // Arrange & Assert
       expect(typeof wrapper.vm.updateQuery).toBe("function");
+    });
+
+    it("exposes downloadLogs as a function via return API", () => {
+      // Arrange & Assert
       expect(typeof wrapper.vm.downloadLogs).toBe("function");
+    });
+
+    it("exposes setEditorValue as a function via return API", () => {
+      // Arrange & Assert
       expect(typeof wrapper.vm.setEditorValue).toBe("function");
     });
 
-    it("should not expose internal methods", () => {
+    it("does not expose jsonToCsv as part of the public API", () => {
+      // Arrange & Assert
       expect(wrapper.vm.jsonToCsv).toBeUndefined();
+    });
+
+    it("does not expose updateAutoComplete as part of the public API", () => {
+      // Arrange & Assert
       expect(wrapper.vm.updateAutoComplete).toBeUndefined();
     });
   });
 
+  // ==========================================================================
+  // SEARCH FUNCTIONALITY
+  // ==========================================================================
+
   describe("Search Functionality", () => {
-    it("should handle search data trigger", async () => {
+    it("emits searchdata event when searchData is called and loading is false", () => {
+      // Arrange
       wrapper.vm.searchObj.loading = false;
+
+      // Act
       wrapper.vm.searchData();
 
+      // Assert
       expect(wrapper.emitted("searchdata")).toBeTruthy();
     });
 
-    it("should not trigger search when loading", () => {
+    it("does not emit searchdata event when searchData is called while loading is true", () => {
+      // Arrange
       wrapper.vm.searchObj.loading = true;
+
+      // Act
       wrapper.vm.searchData();
 
+      // Assert
       expect(wrapper.emitted("searchdata")).toBeFalsy();
     });
   });
 
+  // ==========================================================================
+  // DATE TIME HANDLING
+  // ==========================================================================
+
   describe("Date Time Handling", () => {
-    it("should handle date time updates", async () => {
+    it("updates datetime in searchObj and emits date-change when updateDateTime is called with relative type", async () => {
+      // Arrange
       const dateTimeData = {
         startTime: Date.now() - 3600000,
         endTime: Date.now(),
@@ -330,44 +357,55 @@ describe("SearchBar Component", () => {
         type: "relative",
       };
 
+      // Act
       await wrapper.vm.updateDateTime(dateTimeData);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.datetime).toMatchObject({
         startTime: dateTimeData.startTime,
         endTime: dateTimeData.endTime,
         relativeTimePeriod: dateTimeData.relativeTimePeriod,
         type: "relative",
       });
-
       expect(wrapper.emitted("date-change")).toBeTruthy();
     });
 
-    it("should handle absolute date time updates", async () => {
+    it("sets datetime type to absolute and emits date-change when updateDateTime is called with absolute type", async () => {
+      // Arrange
       const dateTimeData = {
         startTime: Date.now() - 3600000,
         endTime: Date.now(),
         type: "absolute",
       };
 
+      // Act
       await wrapper.vm.updateDateTime(dateTimeData);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.datetime.type).toBe("absolute");
       expect(wrapper.emitted("date-change")).toBeTruthy();
     });
   });
 
+  // ==========================================================================
+  // QUERY EDITOR INTEGRATION
+  // ==========================================================================
+
   describe("Query Editor Integration", () => {
-    it("should update query value correctly", async () => {
+    it("sets parsedQuery in searchObj when updateQueryValue is called with a valid query", async () => {
+      // Arrange
       const queryValue = "SELECT * FROM test_stream";
 
+      // Act
       await wrapper.vm.updateQueryValue(queryValue);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.parsedQuery).toBeDefined();
     });
 
-    it("should handle SQL mode query parsing", async () => {
+    it("calls astify with query value when updateQueryValue is called in SQL mode", async () => {
+      // Arrange
       wrapper.vm.searchObj.meta.sqlMode = true;
-      // Ensure streamResults.list is available
       wrapper.vm.searchObj.data.streamResults = {
         list: [
           {
@@ -376,20 +414,21 @@ describe("SearchBar Component", () => {
           },
         ],
       };
-      const queryValue = "SELECT * FROM test_stream";
 
-      await wrapper.vm.updateQueryValue(queryValue);
+      // Act
+      await wrapper.vm.updateQueryValue("SELECT * FROM test_stream");
 
-      expect(mockParser.astify).toHaveBeenCalledWith(queryValue);
+      // Assert
+      expect(mockParser.astify).toHaveBeenCalledWith("SELECT * FROM test_stream");
     });
 
-    it("should handle stream detection from query", async () => {
+    it("updates selectedStream to new_stream when query references new_stream in SQL mode", async () => {
+      // Arrange
       wrapper.vm.searchObj.meta.sqlMode = true;
       mockParser.astify.mockReturnValue({
         type: "select",
         from: [{ table: "new_stream" }],
       });
-
       wrapper.vm.searchObj.data.streamResults.list = [
         {
           name: "new_stream",
@@ -397,92 +436,117 @@ describe("SearchBar Component", () => {
         },
       ];
 
+      // Act
       await wrapper.vm.updateQueryValue("SELECT * FROM new_stream");
 
-      expect(wrapper.vm.searchObj.data.stream.selectedStream.value).toBe(
-        "new_stream",
-      );
+      // Assert
+      expect(wrapper.vm.searchObj.data.stream.selectedStream.value).toBe("new_stream");
     });
 
-    it("should handle stream not found scenario", async () => {
+    it("shows Stream not found toast when query references a non-existent stream in SQL mode", async () => {
+      // Arrange
       wrapper.vm.searchObj.meta.sqlMode = true;
       mockParser.astify.mockReturnValue({
         type: "select",
         from: [{ table: "nonexistent_stream" }],
       });
 
+      // Act
       await wrapper.vm.updateQueryValue("SELECT * FROM nonexistent_stream");
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        message: "Stream not found",
-        color: "negative",
-        position: "top",
-        timeout: 2000,
-      });
+      // Assert
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Stream not found" }),
+      );
     });
 
-    it("should update query via updateQuery method", async () => {
+    it("calls setValue on queryEditorRef when updateQuery is called", () => {
+      // Arrange
       wrapper.vm.searchObj.data.query = "new query value";
-
       const mockSetValue = vi.fn();
       wrapper.vm.queryEditorRef = { setValue: mockSetValue };
 
+      // Act
       wrapper.vm.updateQuery();
 
+      // Assert
       expect(mockSetValue).toHaveBeenCalledWith("new query value");
     });
 
-    it("should set editor value via setEditorValue method", () => {
+    it("calls setValue on queryEditorRef with provided value when setEditorValue is called", () => {
+      // Arrange
       const mockSetValue = vi.fn();
       wrapper.vm.queryEditorRef = { setValue: mockSetValue };
 
+      // Act
       wrapper.vm.setEditorValue("test value");
 
+      // Assert
       expect(mockSetValue).toHaveBeenCalledWith("test value");
     });
   });
 
-  describe("Error Handling", () => {
-    it("should handle parser errors gracefully", async () => {
-      // mockParser.astify.mockImplementation(() => {
-      //   throw new Error("Parser error");
-      // });
+  // ==========================================================================
+  // ERROR HANDLING
+  // ==========================================================================
 
+  describe("Error Handling", () => {
+    it("does not throw when updateQueryValue is called with invalid SQL in SQL mode", async () => {
+      // Arrange
       wrapper.vm.searchObj.meta.sqlMode = true;
 
-      await wrapper.vm.updateQueryValue("INVALID SQL");
-
+      // Act & Assert
+      expect(() => wrapper.vm.updateQueryValue("INVALID SQL")).not.toThrow();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should handle missing queryEditorRef", () => {
+    it("does not throw when updateQuery is called with null queryEditorRef", () => {
+      // Arrange
       wrapper.vm.queryEditorRef = null;
 
+      // Assert
       expect(() => wrapper.vm.updateQuery()).not.toThrow();
+    });
+
+    it("does not throw when setEditorValue is called with null queryEditorRef", () => {
+      // Arrange
+      wrapper.vm.queryEditorRef = null;
+
+      // Assert
       expect(() => wrapper.vm.setEditorValue("test")).not.toThrow();
     });
   });
 
+  // ==========================================================================
+  // INTEGRATION
+  // ==========================================================================
+
   describe("Integration", () => {
-    it("should work with i18n integration", () => {
+    it("exposes t function for i18n translation via return API", () => {
+      // Arrange & Assert
       expect(wrapper.vm.t).toBeDefined();
       expect(typeof wrapper.vm.t).toBe("function");
     });
 
-    it("should emit events correctly", async () => {
+    it("emits searchdata and date-change when calling searchData and updateDateTime sequentially", async () => {
+      // Arrange
       wrapper.vm.searchObj.loading = false;
-      await wrapper.vm.searchData();
-      expect(wrapper.emitted("searchdata")).toBeTruthy();
 
-      const dateData = {
-        startTime: Date.now(),
-        endTime: Date.now(),
-        type: "relative",
-      };
+      // Act
+      await wrapper.vm.searchData();
+
+      const dateData = { startTime: Date.now(), endTime: Date.now(), type: "relative" };
       await wrapper.vm.updateDateTime(dateData);
+
+      // Assert
+      expect(wrapper.emitted("searchdata")).toBeTruthy();
       expect(wrapper.emitted("date-change")).toBeTruthy();
     });
   });
+
+  // ==========================================================================
+  // DOWNLOAD LOGS FUNCTIONALITY
+  // ==========================================================================
 
   describe("Download Logs Functionality", () => {
     let originalCreateElement: any;
@@ -492,21 +556,18 @@ describe("SearchBar Component", () => {
     let originalFile: any;
 
     beforeEach(() => {
-      // Store originals
       originalCreateElement = document.createElement;
       originalAppendChild = document.body.appendChild;
       originalRemoveChild = document.body.removeChild;
       originalURL = globalThis.URL;
       originalFile = globalThis.File;
 
-      // Mock URL methods
       globalThis.URL = {
         ...originalURL,
         createObjectURL: vi.fn(() => "mock-url"),
         revokeObjectURL: vi.fn(),
       };
 
-      // Mock File constructor
       globalThis.File = class MockFile {
         data: any;
         name: string;
@@ -518,7 +579,6 @@ describe("SearchBar Component", () => {
         }
       } as any;
 
-      // Mock document methods only for download operations
       const mockLink = {
         href: "",
         download: "",
@@ -526,22 +586,17 @@ describe("SearchBar Component", () => {
         setAttribute: vi.fn(),
         removeAttribute: vi.fn(),
       };
-      const mockAppendChild = vi.fn();
-      const mockRemoveChild = vi.fn();
-      const mockCreateElement = vi.fn((tagName) => {
-        if (tagName === "a") {
-          return mockLink;
-        }
+      const mockCreateElement = vi.fn((tagName: string) => {
+        if (tagName === "a") return mockLink;
         return originalCreateElement.call(document, tagName);
       });
 
       document.createElement = mockCreateElement;
-      document.body.appendChild = mockAppendChild;
-      document.body.removeChild = mockRemoveChild;
+      document.body.appendChild = vi.fn();
+      document.body.removeChild = vi.fn();
     });
 
     afterEach(() => {
-      // Restore originals
       document.createElement = originalCreateElement;
       document.body.appendChild = originalAppendChild;
       document.body.removeChild = originalRemoveChild;
@@ -549,29 +604,25 @@ describe("SearchBar Component", () => {
       globalThis.File = originalFile;
     });
 
-    it("should download logs as CSV when downloadLogs is called", () => {
-      // Setup test data
+    it("creates a CSV File with correct headers when downloadLogs is called with data", () => {
+      // Arrange
       wrapper.vm.searchObj.data.queryResults.hits = [
         { field1: "value1", field2: "value2", timestamp: "2023-01-01" },
         { field1: "value3", field2: "value4", timestamp: "2023-01-02" },
       ];
-
-      // Spy on File constructor
       const fileSpy = vi.spyOn(globalThis, "File" as any);
 
+      // Act
       wrapper.vm.downloadLogs();
 
-      // Check that File was called with correct parameters
+      // Assert
       expect(fileSpy).toHaveBeenCalled();
-      const fileCall = fileSpy.mock.calls[0];
-      const csvData = fileCall[0][0]; // First element of the array
-
+      const csvData = fileSpy.mock.calls[0][0][0];
       expect(csvData).toContain("field1,field2,timestamp");
       expect(csvData).toContain('"value1","value2","2023-01-01"');
       expect(csvData).toContain('"value3","value4","2023-01-02"');
-
       expect(fileSpy).toHaveBeenCalledWith(
-        expect.any(Array), // File constructor receives an array of data
+        expect.any(Array),
         "logs-data.csv",
         { type: "text/csv" },
       );
@@ -584,13 +635,16 @@ describe("SearchBar Component", () => {
       fileSpy.mockRestore();
     });
 
-    it("should handle empty query results in downloadLogs", () => {
+    it("throws when downloadLogs is called with empty query results", () => {
+      // Arrange
       wrapper.vm.searchObj.data.queryResults.hits = [];
 
+      // Assert
       expect(() => wrapper.vm.downloadLogs()).toThrow();
     });
 
-    it("should generate correct CSV format with special characters", () => {
+    it("generates correct CSV format when field values contain special characters", () => {
+      // Arrange
       wrapper.vm.searchObj.data.queryResults.hits = [
         {
           field1: 'value with "quotes"',
@@ -598,76 +652,84 @@ describe("SearchBar Component", () => {
           field3: null,
         },
       ];
-
-      // Spy on File constructor
       const fileSpy = vi.spyOn(globalThis, "File" as any);
 
+      // Act
       wrapper.vm.downloadLogs();
 
-      const fileCall = fileSpy.mock.calls[0];
-      const csvCall = fileCall[0][0]; // First element of the array
-      expect(csvCall).toContain("field1,field2,field3");
-      expect(csvCall).toContain('"value with \\"quotes\\""');
-      expect(csvCall).toContain('"value,with,commas"');
-      expect(csvCall).toContain('""'); // null should become empty string
+      // Assert
+      const csvData = fileSpy.mock.calls[0][0][0];
+      expect(csvData).toContain("field1,field2,field3");
+      expect(csvData).toContain('"value with \\"quotes\\""');
+      expect(csvData).toContain('"value,with,commas"');
+      expect(csvData).toContain('""');
 
       fileSpy.mockRestore();
     });
   });
 
+  // ==========================================================================
+  // ADD SEARCH TERM WATCH FUNCTIONALITY
+  // ==========================================================================
+
   describe("AddSearchTerm Watch Functionality", () => {
     beforeEach(() => {
-      // Setup queryEditorRef mock
       const mockSetValue = vi.fn();
       wrapper.vm.queryEditorRef = { setValue: mockSetValue };
     });
 
-    it("should not trigger when addToFilter is empty", () => {
+    it("does not call setValue when addToFilter is empty string", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "";
       wrapper.vm.searchObj.data.editorValue = "existing query";
 
-      // Trigger the watcher by calling it directly
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
+      // Assert
       expect(mockSetValue).not.toHaveBeenCalled();
     });
 
-    it("should add filter to empty query", () => {
+    it("sets query to the filter value and calls setValue when addToFilter is set and editorValue is empty", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field1='value1'";
       wrapper.vm.searchObj.data.editorValue = "";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.query).toBe("field1='value1'");
       expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
       expect(mockSetValue).toHaveBeenCalledWith("field1='value1'");
     });
 
-    it("should append filter to existing simple query", () => {
+    it("appends filter with AND operator to existing simple query when addToFilter is set", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field2='value2'";
       wrapper.vm.searchObj.data.editorValue = "field1='value1'";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
-      expect(wrapper.vm.searchObj.data.query).toBe(
-        "field1='value1' and field2='value2'",
-      );
-      expect(mockSetValue).toHaveBeenCalledWith(
-        "field1='value1' and field2='value2'",
-      );
+      // Assert
+      expect(wrapper.vm.searchObj.data.query).toBe("field1='value1' and field2='value2'");
+      expect(mockSetValue).toHaveBeenCalledWith("field1='value1' and field2='value2'");
     });
 
-    it("should handle piped queries with existing where clause", () => {
+    it("appends filter after pipe separator when editorValue has an existing where clause", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field3='value3'";
-      wrapper.vm.searchObj.data.editorValue =
-        "SELECT * FROM table | field1='value1'";
+      wrapper.vm.searchObj.data.editorValue = "SELECT * FROM table | field1='value1'";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.query).toBe(
         "SELECT * FROM table |  field1='value1' and field3='value3'",
       );
@@ -676,75 +738,85 @@ describe("SearchBar Component", () => {
       );
     });
 
-    it("should handle piped queries with empty where clause", () => {
+    it("appends filter after pipe when editorValue has an empty where clause", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field2='value2'";
       wrapper.vm.searchObj.data.editorValue = "SELECT * FROM table | ";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
-      expect(wrapper.vm.searchObj.data.query).toBe(
-        "SELECT * FROM table | field2='value2'",
-      );
-      expect(mockSetValue).toHaveBeenCalledWith(
-        "SELECT * FROM table | field2='value2'",
-      );
+      // Assert
+      expect(wrapper.vm.searchObj.data.query).toBe("SELECT * FROM table | field2='value2'");
+      expect(mockSetValue).toHaveBeenCalledWith("SELECT * FROM table | field2='value2'");
     });
 
-    it("should handle null value filters correctly", () => {
+    it("converts null value filter to IS NULL syntax when addToFilter contains null value", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field1='null'";
       wrapper.vm.searchObj.data.editorValue = "";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.query).toBe("field1 is null");
       expect(mockSetValue).toHaveBeenCalledWith("field1 is null");
     });
 
-    it("should handle 'not null' value filters correctly", () => {
+    it("converts not-null value filter to IS NOT NULL syntax when addToFilter has !=null", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field1!='null'";
       wrapper.vm.searchObj.data.editorValue = "";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.query).toBe("field1 is not null");
       expect(mockSetValue).toHaveBeenCalledWith("field1 is not null");
     });
 
-    it("should handle missing queryEditorRef gracefully", () => {
+    it("does not throw when queryEditorRef is null and addToFilter is set", () => {
+      // Arrange
       wrapper.vm.queryEditorRef = null;
       wrapper.vm.searchObj.data.stream.addToFilter = "field1='value1'";
       wrapper.vm.searchObj.data.editorValue = "";
 
+      // Act & Assert
       expect(() => {
         wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
       }).not.toThrow();
-
       expect(wrapper.vm.searchObj.data.query).toBe("field1='value1'");
     });
 
-    it("should handle queryEditorRef without setValue method", () => {
+    it("does not throw when queryEditorRef has no setValue method and addToFilter is set", () => {
+      // Arrange
       wrapper.vm.queryEditorRef = {};
       wrapper.vm.searchObj.data.stream.addToFilter = "field1='value1'";
       wrapper.vm.searchObj.data.editorValue = "";
 
+      // Act & Assert
       expect(() => {
         wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
       }).not.toThrow();
-
       expect(wrapper.vm.searchObj.data.query).toBe("field1='value1'");
     });
 
-    it("should handle complex piped queries with multiple conditions", () => {
+    it("appends filter to complex piped query with multiple existing conditions", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "status='error'";
       wrapper.vm.searchObj.data.editorValue =
         "SELECT * FROM logs | level='info' and timestamp > '2023-01-01'";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.query).toBe(
         "SELECT * FROM logs |  level='info' and timestamp > '2023-01-01' and status='error'",
       );
@@ -753,58 +825,147 @@ describe("SearchBar Component", () => {
       );
     });
 
-    it("should replace existing filter when same field is included again", () => {
+    it("replaces existing filter when same field is added again to simple query", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field1='value2'";
       wrapper.vm.searchObj.data.editorValue = "field1='value1'";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
+      // Assert
       expect(wrapper.vm.searchObj.data.query).toBe("field1='value2'");
       expect(mockSetValue).toHaveBeenCalledWith("field1='value2'");
     });
 
-    it("should replace existing filter in piped query when same field is included again", () => {
+    it("replaces existing filter for same field in piped query", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
       wrapper.vm.searchObj.data.stream.addToFilter = "field1='value2'";
-      wrapper.vm.searchObj.data.editorValue =
-        "SELECT * FROM table | field1='value1'";
+      wrapper.vm.searchObj.data.editorValue = "SELECT * FROM table | field1='value1'";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
-      expect(wrapper.vm.searchObj.data.query).toBe(
-        "SELECT * FROM table |  field1='value2'",
-      );
-      expect(mockSetValue).toHaveBeenCalledWith(
-        "SELECT * FROM table |  field1='value2'",
-      );
+      // Assert
+      expect(wrapper.vm.searchObj.data.query).toBe("SELECT * FROM table |  field1='value2'");
+      expect(mockSetValue).toHaveBeenCalledWith("SELECT * FROM table |  field1='value2'");
     });
 
-    it("should replace multi-value group for same field", () => {
+    it("replaces multi-value group for same field when addToFilter has OR group", () => {
+      // Arrange
       const mockSetValue = wrapper.vm.queryEditorRef.setValue;
-      wrapper.vm.searchObj.data.stream.addToFilter =
-        "(field1='valueA' OR field1='valueB')";
+      wrapper.vm.searchObj.data.stream.addToFilter = "(field1='valueA' OR field1='valueB')";
       wrapper.vm.searchObj.data.editorValue = "field1='value1'";
 
+      // Act
       wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
 
-      expect(wrapper.vm.searchObj.data.query).toBe(
-        "(field1='valueA' OR field1='valueB')",
-      );
-      expect(mockSetValue).toHaveBeenCalledWith(
-        "(field1='valueA' OR field1='valueB')",
-      );
+      // Assert
+      expect(wrapper.vm.searchObj.data.query).toBe("(field1='valueA' OR field1='valueB')");
+      expect(mockSetValue).toHaveBeenCalledWith("(field1='valueA' OR field1='valueB')");
     });
   });
 
+  // ==========================================================================
+  // COMPONENT STRUCTURE
+  // ==========================================================================
+
   describe("Component Structure", () => {
-    it("should have correct component name", () => {
+    it("has the component name ComponentSearchSearchBar", () => {
+      // Arrange & Assert
       expect(wrapper.vm.$options.name).toBe("ComponentSearchSearchBar");
     });
+  });
 
-    it("should have correct component structure", () => {
-      expect(wrapper.find(".search-bar-component").exists()).toBe(true);
-      expect(wrapper.find("#searchBarComponent").exists()).toBe(true);
+  // ==========================================================================
+  // REMOVE FIELD TERM WATCH FUNCTIONALITY
+  // ==========================================================================
+
+  describe("RemoveFieldTerm Watch Functionality", () => {
+    beforeEach(() => {
+      const mockSetValue = vi.fn();
+      wrapper.vm.queryEditorRef = { setValue: mockSetValue };
+    });
+
+    it("does nothing when fieldName is empty string", () => {
+      // Arrange
+      const mockSetValue = wrapper.vm.queryEditorRef.setValue;
+      wrapper.vm.searchObj.data.editorValue = "field1='value1' AND field2='value2'";
+
+      // Act — call the watch handler directly with empty fieldName
+      wrapper.vm.$options.watch.removeFieldTerm.call(wrapper.vm, "");
+
+      // Assert — query unchanged
+      expect(mockSetValue).not.toHaveBeenCalled();
+    });
+
+    it("removes field condition from a simple query and updates query and editor", () => {
+      // Arrange
+      const mockSetValue = wrapper.vm.queryEditorRef.setValue;
+      wrapper.vm.searchObj.data.editorValue = "field1='value1'";
+
+      // Act
+      wrapper.vm.$options.watch.removeFieldTerm.call(wrapper.vm, "field1");
+
+      // Assert
+      expect(wrapper.vm.searchObj.data.query).toBe("");
+      expect(wrapper.vm.searchObj.data.stream.removeFilterField).toBe("");
+      expect(mockSetValue).toHaveBeenCalledWith("");
+    });
+
+    it("removes only the specified field from a multi-condition simple query", () => {
+      // Arrange
+      const mockSetValue = wrapper.vm.queryEditorRef.setValue;
+      wrapper.vm.searchObj.data.editorValue = "field1='value1' AND field2='value2'";
+
+      // Act
+      wrapper.vm.$options.watch.removeFieldTerm.call(wrapper.vm, "field1");
+
+      // Assert
+      expect(wrapper.vm.searchObj.data.query).toBe("field2='value2'");
+      expect(mockSetValue).toHaveBeenCalledWith("field2='value2'");
+    });
+
+    it("removes field condition from the WHERE part of a piped query", () => {
+      // Arrange
+      const mockSetValue = wrapper.vm.queryEditorRef.setValue;
+      wrapper.vm.searchObj.data.editorValue = "SELECT * FROM logs | field1='value1' AND field2='value2'";
+
+      // Act
+      wrapper.vm.$options.watch.removeFieldTerm.call(wrapper.vm, "field1");
+
+      // Assert
+      const result = wrapper.vm.searchObj.data.query;
+      expect(result).toContain("SELECT * FROM logs");
+      expect(result).toContain("field2='value2'");
+      expect(result).not.toMatch(/field1/);
+      expect(mockSetValue).toHaveBeenCalledWith(result);
+    });
+
+    it("does not throw when queryEditorRef is null and fieldName is set", () => {
+      // Arrange
+      wrapper.vm.queryEditorRef = null;
+      wrapper.vm.searchObj.data.editorValue = "field1='value1'";
+
+      // Act & Assert
+      expect(() => {
+        wrapper.vm.$options.watch.removeFieldTerm.call(wrapper.vm, "field1");
+      }).not.toThrow();
+      expect(wrapper.vm.searchObj.data.query).toBe("");
+    });
+
+    it("clears removeFilterField after removing the field condition", () => {
+      // Arrange
+      wrapper.vm.searchObj.data.stream.removeFilterField = "field1";
+      wrapper.vm.searchObj.data.editorValue = "field1='value1'";
+
+      // Act
+      wrapper.vm.$options.watch.removeFieldTerm.call(wrapper.vm, "field1");
+
+      // Assert
+      expect(wrapper.vm.searchObj.data.stream.removeFilterField).toBe("");
     });
   });
 });

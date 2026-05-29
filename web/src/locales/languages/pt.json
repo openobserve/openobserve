@@ -396,7 +396,10 @@
     "traces": "Traços",
     "switchToLogs": "clique para voltar para Logs",
     "patternNoValuesAvailable": "Não há valores disponíveis",
-    "selectLogStream": "Selecione o fluxo de registros"
+    "selectLogStream": "Selecione o fluxo de registros",
+    "noData": "Não há dados disponíveis",
+    "functionEditorLabel": "Editor de funções",
+    "loadingStream": "Carregando Stream..."
   },
   "menu": {
     "home": "Início",
@@ -790,7 +793,8 @@
     "no_keep_current": "Não, mantenha-se atualizado",
     "feature_correlation_management": "Gerenciamento de correlações",
     "feature_log_patterns": "Padrões de registro",
-    "environment_type": "Tipo de ambiente"
+    "environment_type": "Tipo de ambiente",
+    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados."
   },
   "login": {
     "userid": "ID do usuário",
@@ -856,7 +860,12 @@
     "groups": "Grupos",
     "customRole": "Funções personalizadas",
     "description": "Descrição",
-    "revoke_invite": "Revogar convite"
+    "revoke_invite": "Revogar convite",
+    "authType": "Autenticação",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Nativo",
+    "noCustomRolesHint": "Nenhuma função personalizada definida — crie uma no IAM → Funções",
+    "externalUserCustomRoleHint": "Usuários externos só podem ser modificados por meio do sistema de origem"
   },
   "ticket": {
     "header": "Tickets de suporte",
@@ -1411,7 +1420,7 @@
     "markLineYAxis": "Eixo Y",
     "colorPalette": "Paleta de cores",
     "colorSeriesBy": "Série de cores de:",
-    "colorBySeries": "<b>Por série</b>",
+    "colorBySeries": "Por série",
     "colorDefaultPaletteBySeries": "Paleta padrão (por série)",
     "colorDefaultPaletteBySeriesSubLabel": "Séries com o mesmo nome usarão a mesma cor",
     "colorPaletteClassic": "Paleta clássica",
@@ -1420,7 +1429,7 @@
     "colorSingleColorSubLabel": "Defina uma cor específica para todas as séries",
     "colorShadesOfSpecificColor": "Tons de cor específica",
     "colorShadesOfSpecificColorSubLabel": "Diferentes tons de cores específicas",
-    "colorByValue": "<b>Por valor</b>",
+    "colorByValue": "Por valor",
     "colorGreenYellowRed": "Verde-amarelo-vermelho (por valor)",
     "colorRedYellowGreen": "Vermelho-amarelo-verde (por valor)",
     "colorTemperature": "Temperatura (por valor)",
@@ -1590,7 +1599,9 @@
     "axisLabelRotateTooltipText": "Gire o texto do rótulo do eixo x em um ângulo escolhido (em graus) para melhorar a legibilidade quando os rótulos estiverem longos ou cheios.",
     "axisLabelTruncateTooltipText": "Trunque os rótulos do eixo x na largura especificada (em pixels).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais."
+    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
+    "allFolders": "Todas as pastas",
+    "selectFile": "Selecionar arquivo"
   },
   "panel": {
     "header": "Painel",
@@ -2619,6 +2630,7 @@
     "serviceAccounts": "Contas de serviço",
     "serviceAccountsName": "Nome das contas de serviço",
     "basicUsers": "Usuários",
+    "organizationMembers": "Membros da Organização",
     "quota": "Cotas",
     "externalUserWarningTitle": "Aviso de usuário externo",
     "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários.",
@@ -2935,7 +2947,75 @@
     "copyStacktrace": "Copiar stacktrace",
     "noStacktraceAvailable": "Nenhum stacktrace disponível",
     "stacktraceCopied": "Stacktrace copiado para a área de transferência",
-    "stacktraceCopyFailed": "Falha ao copiar o stacktrace"
+    "stacktraceCopyFailed": "Falha ao copiar o stacktrace",
+    "sessionsList": {
+      "noStreamsTooltip": "Não há streams LLM disponíveis.",
+      "session": "sessão",
+      "sessions": "sessões",
+      "countPill": "{contagem} de {total} {unidade}",
+      "noStreamsFound": "Nenhum fluxo LLM encontrado",
+      "noStreamsDescription1": "O grupo de sessões se estende por",
+      "noStreamsDescription2": "em fluxos de rastreamentos marcados como fluxos LLM. Ou esse fluxo não existe ou nenhum período foi ingerido ainda.",
+      "failedToLoad": "Falha ao carregar sessões",
+      "retry": "Tente novamente",
+      "noSessionsFound": "Nenhuma sessão encontrada",
+      "noSessionsDescription": "Nenhuma sessão de LLM foi gravada nesse intervalo de tempo em {stream}. Tente ampliar o intervalo de tempo ou mudar para um fluxo diferente.",
+      "loading": "Carregando sessões...",
+      "tokenTooltip": "Entrada: {entrada} · Saída: {saída} · Total: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Carimbo de data/hora",
+        "sessionId": "ID da sessão",
+        "turns": "Vira",
+        "duration": "Duração",
+        "tokens": "Tokens",
+        "cost": "Custo",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Voltar às sessões",
+      "pageTitle": "Detalhe da sessão",
+      "failedToLoad": "Falha ao carregar a sessão",
+      "retry": "Tente novamente",
+      "sessionNotFound": "Sessão não encontrada",
+      "noSpansFound": "Nenhum intervalo de tempo encontrado para {id} no intervalo de tempo atual.",
+      "searchPlaceholder": "Pesquise rastros nesta sessão...",
+      "turn": "vire",
+      "turns": "gira",
+      "turnsShown": "{filtrado} de {total} {unidade} mostrada",
+      "userBadge": "Usuário",
+      "sessionPrefix": "sessão",
+      "copySessionId": "Copiar ID da sessão",
+      "openInTraceExplorer": "Abrir no Trace Explorer",
+      "unknownUser": "Usuário desconhecido",
+      "kpi": {
+        "turns": "Vira",
+        "duration": "Duração",
+        "inputTokens": "Tokens de entrada",
+        "outputTokens": "Tokens de saída",
+        "cost": "Custo"
+      },
+      "conversation": "Conversa",
+      "turnLabel": "Vire",
+      "openTrace": "Rastreamento aberto",
+      "noUserMessage": "Nenhuma mensagem do usuário foi capturada para este turno.",
+      "noAssistantMessage": "Nenhuma resposta do assistente foi capturada para este turno.",
+      "roles": {
+        "user": "Usuário",
+        "assistant": "Assistente"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "modelo",
+        "tokens": "Tokens",
+        "input": "Entrada",
+        "output": "Saída",
+        "total": "Total",
+        "cost": "Custo",
+        "spans": "Vãos"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3019,7 +3099,10 @@
     "algorithm": "algoritmo",
     "storeType": "Tipo de loja",
     "mechanismType": "Tipo de mecanismo",
-    "actions": "Ações"
+    "actions": "Ações",
+    "providerTypeRequired": "O tipo de provedor é obrigatório",
+    "algorithmRequired": "O algoritmo é necessário",
+    "secretRequired": "O segredo é obrigatório"
   },
   "quota": {
     "header": "Cotas",
@@ -3339,7 +3422,8 @@
     "serviceGroupProtected": "O grupo de serviços não pode ser removido. Você só pode modificar os campos mapeados.",
     "noDataFound": "Nenhum dado encontrado",
     "isWorkloadType": "Identificador de serviço",
-    "isWorkloadTypeTooltip": "Quando ativado, esse grupo é usado para identificar exclusivamente um serviço (por exemplo, cluster, namespace, implantação). Desative para grupos que descrevem operações por meio de um serviço, como método HTTP ou nome do banco de dados."
+    "isWorkloadTypeTooltip": "Quando ativado, esse grupo é usado para identificar exclusivamente um serviço (por exemplo, cluster, namespace, implantação). Desative para grupos que descrevem operações por meio de um serviço, como método HTTP ou nome do banco de dados.",
+    "loadingCorrelation": "Carregando dados de correlação..."
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
@@ -3676,7 +3760,8 @@
     "errSave": "Falha ao salvar",
     "errLoadModel": "Falha ao carregar o modelo",
     "tierDefaultName": "Padrão",
-    "tierConditionalName": "Nível condicional"
+    "tierConditionalName": "Nível condicional",
+    "shadowedWarningBanner": "As regras abaixo são sombreadas por “{name}” — substituídas por uma regra de maior prioridade e não serão usadas para cálculos de custos."
   },
   "overview": {
     "title": "Visão geral do sistema",

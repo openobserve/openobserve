@@ -115,7 +115,7 @@ class EnrichmentPage:
             return enrichment_name  # or response.json()['id'] if the API returns an ID
         return None
 
-    def create_enrichment_table_from_url(self, session, base_url, user_email, user_password, org_id, table_name, csv_url, append=False, replace_failed=False):
+    def create_enrichment_table_from_url(self, session, base_url, user_email, user_password, org_id, table_name, csv_url, append=False, replace_failed=False, retry=False, resume=False):
         """Create an enrichment table from a public URL.
 
         Args:
@@ -128,6 +128,8 @@ class EnrichmentPage:
             csv_url: public URL to CSV file (must start with http:// or https://)
             append: whether to append data to existing table (default: False)
             replace_failed: whether to replace failed records (default: False)
+            retry: whether to retry/reload existing URLs (default: False)
+            resume: whether to resume from last byte position (default: False)
 
         Returns:
             response object (status 200 on success - job saved, runs async in background)
@@ -143,7 +145,13 @@ class EnrichmentPage:
             "replace_failed": replace_failed
         }
 
-        url = f"{base_url}api/{org_id}/enrichment_tables/{table_name}/url?append={str(append).lower()}"
+        query_params = f"append={str(append).lower()}"
+        if retry:
+            query_params += "&retry=true"
+        if resume:
+            query_params += "&resume=true"
+
+        url = f"{base_url}api/{org_id}/enrichment_tables/{table_name}/url?{query_params}"
 
         response = session.post(url, headers=headers, json=payload)
         assert response.status_code == 200, f"Failed to create enrichment table from URL: {response.status_code} {response.content.decode()}"

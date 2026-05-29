@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:items-center tw:gap-3 tw:rounded-lg tw:px-4 tw:py-3 tw:mb-2 tw:flex-shrink-0"
       :class="isDarkMode ? 'tw:bg-indigo-900/20 tw:border tw:border-indigo-700/40' : 'tw:bg-indigo-50 tw:border tw:border-indigo-200'"
     >
-      <q-spinner-dots size="20px" :color="isDarkMode ? 'indigo-3' : 'indigo-7'" />
+      <OSpinner variant="dots" size="xs" />
       <div>
         <p
           class="tw:text-sm tw:font-medium tw:mb-0"
@@ -82,10 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, PropType } from "vue";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "IncidentRCAAnalysis",
-  components: { OButton },
+  components: { OButton, OSpinner },
   props: {
     hasExistingRca: {
       type: Boolean,

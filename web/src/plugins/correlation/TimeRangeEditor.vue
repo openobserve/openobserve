@@ -15,193 +15,161 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    :model-value="modelValue"
-    @update:model-value="$emit('update:modelValue', $event)"
-    @hide="handleClose"
+  <ODialog
     data-test="time-range-editor-dialog"
+    :open="modelValue"
+    @update:open="
+      (v) => {
+        $emit('update:modelValue', v);
+        if (!v) handleClose();
+      }
+    "
+    size="sm"
+    :title="t('correlation.logs.timeRange.title')"
+    :secondary-button-label="t('common.cancel')"
+    :neutral-button-label="t('common.reset')"
+    :primary-button-label="t('common.apply')"
+    :primary-button-disabled="!isValid"
+    @click:secondary="handleCancel"
+    @click:neutral="handleReset"
+    @click:primary="handleApply"
   >
-    <q-card style="min-width: 500px; max-width: 600px">
-      <!-- Header -->
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">{{ t('correlation.logs.timeRange.title') }}</div>
-        <q-space />
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          v-close-popup
-          :aria-label="t('common.close')"
-          data-test="close-dialog-btn"
+    <!-- Source Log Time -->
+    <div class="tw:mb-6">
+      <div class="tw:text-sm tw:font-semibold tw:mb-2">
+        {{ t("correlation.logs.timeRange.sourceTime") }}
+      </div>
+      <div
+        class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-gray-50 tw:flex tw:items-center tw:gap-2"
+      >
+        <OIcon name="schedule" size="sm" />
+        <span class="tw:font-mono tw:text-sm">{{
+          formatTimestamp(sourceTimestamp)
+        }}</span>
+      </div>
+    </div>
+
+    <!-- Time Window Presets -->
+    <div class="tw:mb-6">
+      <div class="tw:text-sm tw:font-semibold tw:mb-3">
+        {{ t("correlation.logs.timeRange.window") }}
+      </div>
+
+      <div class="tw:space-y-2">
+        <ORadioGroup
+          :model-value="selectedWindow"
+          orientation="vertical"
+          @update:model-value="onWindowSelect"
         >
-          <X :size="14" />
-        </OButton>
-      </q-card-section>
+          <ORadio
+            val="1min"
+            :label="t('correlation.logs.timeRange.minute1')"
+            data-test="window-1min"
+          />
+          <ORadio
+            val="5min"
+            :label="t('correlation.logs.timeRange.minute5')"
+            data-test="window-5min"
+          />
+          <ORadio
+            val="15min"
+            :label="t('correlation.logs.timeRange.minute15')"
+            data-test="window-15min"
+          />
+          <ORadio
+            val="30min"
+            :label="t('correlation.logs.timeRange.minute30')"
+            data-test="window-30min"
+          />
+          <ORadio
+            val="1hour"
+            :label="t('correlation.logs.timeRange.hour1')"
+            data-test="window-1hour"
+          />
+          <ORadio
+            val="custom"
+            :label="t('correlation.logs.timeRange.custom')"
+            data-test="window-custom"
+          />
+        </ORadioGroup>
+      </div>
+    </div>
 
-      <q-separator class="q-mt-md" />
+    <!-- Custom Time Range Inputs (only shown when custom is selected) -->
+    <div v-if="selectedWindow === 'custom'" class="tw:mb-4 tw:space-y-3">
+      <div>
+        <div class="tw:text-sm tw:font-semibold tw:mb-2">
+          {{ t("correlation.logs.timeRange.customStart") }}
+        </div>
+        <OInput
+          v-model="customStartTime"
+          type="datetime-local"
+          :error="!!startTimeError"
+          :error-message="startTimeError"
+          @update:model-value="onStartTimeChange"
+          data-test="custom-start-input"
+        />
+      </div>
 
-      <!-- Content -->
-      <q-card-section class="q-pt-md">
-        <!-- Source Log Time -->
-        <div class="tw:mb-6">
-          <div class="tw:text-sm tw:font-semibold tw:mb-2">
-            {{ t('correlation.logs.timeRange.sourceTime') }}
-          </div>
-          <div
-            class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-gray-50 tw:flex tw:items-center tw:gap-2"
+      <div>
+        <div class="tw:text-sm tw:font-semibold tw:mb-2">
+          {{ t("correlation.logs.timeRange.customEnd") }}
+        </div>
+        <OInput
+          v-model="customEndTime"
+          type="datetime-local"
+          :error="!!endTimeError"
+          :error-message="endTimeError"
+          @update:model-value="onEndTimeChange"
+          data-test="custom-end-input"
+        />
+      </div>
+    </div>
+
+    <!-- Current Range Display -->
+    <div
+      class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-blue-50"
+    >
+      <div class="tw:text-xs tw:font-semibold tw:mb-2 tw:opacity-70">
+        {{ t("correlation.logs.timeRange.currentRange") }}
+      </div>
+      <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm">
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <span class="tw:font-semibold"
+            >{{ t("correlation.logs.timeRange.start") }}:</span
           >
-            <q-icon name="schedule" size="sm" color="primary" />
-            <span class="tw:font-mono tw:text-sm">{{ formatTimestamp(sourceTimestamp) }}</span>
-          </div>
+          <span class="tw:font-mono">{{
+            formatTimestamp(pendingStartTime)
+          }}</span>
         </div>
-
-        <!-- Time Window Presets -->
-        <div class="tw:mb-6">
-          <div class="tw:text-sm tw:font-semibold tw:mb-3">
-            {{ t('correlation.logs.timeRange.window') }}
-          </div>
-
-          <div class="tw:space-y-2">
-            <q-radio
-              v-model="selectedWindow"
-              val="1min"
-              :label="t('correlation.logs.timeRange.minute1')"
-              @update:model-value="applyPreset"
-              data-test="window-1min"
-            />
-            <q-radio
-              v-model="selectedWindow"
-              val="5min"
-              :label="t('correlation.logs.timeRange.minute5')"
-              @update:model-value="applyPreset"
-              data-test="window-5min"
-            />
-            <q-radio
-              v-model="selectedWindow"
-              val="15min"
-              :label="t('correlation.logs.timeRange.minute15')"
-              @update:model-value="applyPreset"
-              data-test="window-15min"
-            />
-            <q-radio
-              v-model="selectedWindow"
-              val="30min"
-              :label="t('correlation.logs.timeRange.minute30')"
-              @update:model-value="applyPreset"
-              data-test="window-30min"
-            />
-            <q-radio
-              v-model="selectedWindow"
-              val="1hour"
-              :label="t('correlation.logs.timeRange.hour1')"
-              @update:model-value="applyPreset"
-              data-test="window-1hour"
-            />
-            <q-radio
-              v-model="selectedWindow"
-              val="custom"
-              :label="t('correlation.logs.timeRange.custom')"
-              @update:model-value="selectedWindow = 'custom'"
-              data-test="window-custom"
-            />
-          </div>
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <span class="tw:font-semibold"
+            >{{ t("correlation.logs.timeRange.end") }}:</span
+          >
+          <span class="tw:font-mono">{{
+            formatTimestamp(pendingEndTime)
+          }}</span>
         </div>
-
-        <!-- Custom Time Range Inputs (only shown when custom is selected) -->
-        <div v-if="selectedWindow === 'custom'" class="tw:mb-4 tw:space-y-3">
-          <div>
-            <div class="tw:text-sm tw:font-semibold tw:mb-2">
-              {{ t('correlation.logs.timeRange.customStart') }}
-            </div>
-            <q-input
-              v-model="customStartTime"
-              type="datetime-local"
-              outlined
-              dense
-              :rules="[validateStartTime]"
-              data-test="custom-start-input"
-            />
-          </div>
-
-          <div>
-            <div class="tw:text-sm tw:font-semibold tw:mb-2">
-              {{ t('correlation.logs.timeRange.customEnd') }}
-            </div>
-            <q-input
-              v-model="customEndTime"
-              type="datetime-local"
-              outlined
-              dense
-              :rules="[validateEndTime]"
-              data-test="custom-end-input"
-            />
-          </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:mt-1">
+          <span class="tw:font-semibold"
+            >{{ t("correlation.logs.timeRange.duration") }}:</span
+          >
+          <span>{{ formatDuration(pendingEndTime - pendingStartTime) }}</span>
         </div>
-
-        <!-- Current Range Display -->
-        <div
-          class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-blue-50"
-        >
-          <div class="tw:text-xs tw:font-semibold tw:mb-2 tw:opacity-70">
-            {{ t('correlation.logs.timeRange.currentRange') }}
-          </div>
-          <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm">
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <span class="tw:font-semibold">{{ t('correlation.logs.timeRange.start') }}:</span>
-              <span class="tw:font-mono">{{ formatTimestamp(pendingStartTime) }}</span>
-            </div>
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <span class="tw:font-semibold">{{ t('correlation.logs.timeRange.end') }}:</span>
-              <span class="tw:font-mono">{{ formatTimestamp(pendingEndTime) }}</span>
-            </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:mt-1">
-              <span class="tw:font-semibold">{{ t('correlation.logs.timeRange.duration') }}:</span>
-              <span>{{ formatDuration(pendingEndTime - pendingStartTime) }}</span>
-            </div>
-          </div>
-        </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <!-- Actions -->
-      <q-card-actions align="right" class="q-pa-md">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="handleCancel"
-          data-test="cancel-btn"
-        >
-          {{ t('common.cancel') }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          @click="handleReset"
-          data-test="reset-btn"
-        >
-          <RotateCcw :size="14" class="tw:mr-1" />
-          {{ t('common.reset') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="handleApply"
-          :disabled="!isValid"
-          data-test="apply-btn"
-        >
-          {{ t('common.apply') }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { date } from 'quasar';
-import OButton from '@/lib/core/Button/OButton.vue';
-import { X, RotateCcw } from 'lucide-vue-next';
+import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { formatDate } from "@/utils/date";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 
 interface Props {
   modelValue: boolean;
@@ -212,24 +180,31 @@ interface Props {
 // Props & Emits
 const props = defineProps<Props>();
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean];
-  'update:range': [startTime: number, endTime: number];
-  'close': [];
+  "update:modelValue": [value: boolean];
+  "update:range": [startTime: number, endTime: number];
+  close: [];
 }>();
 
 // Composables
 const { t } = useI18n();
 
 // State
-const selectedWindow = ref<string>('5min');
+const selectedWindow = ref<string>("5min");
+
+function onWindowSelect(val: string) {
+  selectedWindow.value = val;
+  if (val !== "custom") applyPreset();
+}
 const pendingStartTime = ref<number>(props.currentRange.startTime);
 const pendingEndTime = ref<number>(props.currentRange.endTime);
-const customStartTime = ref<string>('');
-const customEndTime = ref<string>('');
+const customStartTime = ref<string>("");
+const customEndTime = ref<string>("");
+const startTimeError = ref("");
+const endTimeError = ref("");
 
 // Computed
 const isValid = computed(() => {
-  if (selectedWindow.value === 'custom') {
+  if (selectedWindow.value === "custom") {
     return (
       customStartTime.value &&
       customEndTime.value &&
@@ -244,7 +219,7 @@ const isValid = computed(() => {
  */
 const formatTimestamp = (timestamp: number): string => {
   const ms = Math.floor(timestamp / 1000);
-  return date.formatDate(ms, 'YYYY-MM-DD HH:mm:ss.SSS');
+  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
 };
 
 /**
@@ -274,19 +249,19 @@ const applyPreset = () => {
   let windowMicros: number;
 
   switch (selectedWindow.value) {
-    case '1min':
+    case "1min":
       windowMicros = 1 * 60 * 1000 * 1000; // 1 minute in microseconds
       break;
-    case '5min':
+    case "5min":
       windowMicros = 5 * 60 * 1000 * 1000; // 5 minutes
       break;
-    case '15min':
+    case "15min":
       windowMicros = 15 * 60 * 1000 * 1000; // 15 minutes
       break;
-    case '30min':
+    case "30min":
       windowMicros = 30 * 60 * 1000 * 1000; // 30 minutes
       break;
-    case '1hour':
+    case "1hour":
       windowMicros = 60 * 60 * 1000 * 1000; // 1 hour
       break;
     default:
@@ -310,20 +285,30 @@ const datetimeToMicros = (datetime: string): number => {
  */
 const microsToDatetime = (micros: number): string => {
   const ms = Math.floor(micros / 1000);
-  return date.formatDate(ms, 'YYYY-MM-DDTHH:mm');
+  return formatDate(ms, "YYYY-MM-DDTHH:mm");
+};
+
+const onStartTimeChange = (val: string) => {
+  const result = validateStartTime(val);
+  startTimeError.value = result === true ? "" : (result as string);
+};
+
+const onEndTimeChange = (val: string) => {
+  const result = validateEndTime(val);
+  endTimeError.value = result === true ? "" : (result as string);
 };
 
 /**
  * Validate start time
  */
 const validateStartTime = (val: string): boolean | string => {
-  if (!val) return t('validation.required');
+  if (!val) return t("validation.required");
 
   const startMicros = datetimeToMicros(val);
   pendingStartTime.value = startMicros;
 
   if (startMicros >= pendingEndTime.value) {
-    return t('correlation.logs.timeRange.startBeforeEnd');
+    return t("correlation.logs.timeRange.startBeforeEnd");
   }
 
   return true;
@@ -333,13 +318,13 @@ const validateStartTime = (val: string): boolean | string => {
  * Validate end time
  */
 const validateEndTime = (val: string): boolean | string => {
-  if (!val) return t('validation.required');
+  if (!val) return t("validation.required");
 
   const endMicros = datetimeToMicros(val);
   pendingEndTime.value = endMicros;
 
   if (endMicros <= pendingStartTime.value) {
-    return t('correlation.logs.timeRange.endAfterStart');
+    return t("correlation.logs.timeRange.endAfterStart");
   }
 
   return true;
@@ -356,7 +341,7 @@ const detectCurrentWindow = () => {
   const isSymmetric = Math.abs(center - props.sourceTimestamp) < 1000000; // 1 second in microseconds
 
   if (!isSymmetric) {
-    selectedWindow.value = 'custom';
+    selectedWindow.value = "custom";
     return;
   }
 
@@ -365,21 +350,21 @@ const detectCurrentWindow = () => {
 
   if (Math.abs(durationMinutes - 2) < 0.1) {
     // ±1 min = 2 min total
-    selectedWindow.value = '1min';
+    selectedWindow.value = "1min";
   } else if (Math.abs(durationMinutes - 10) < 0.1) {
     // ±5 min = 10 min total
-    selectedWindow.value = '5min';
+    selectedWindow.value = "5min";
   } else if (Math.abs(durationMinutes - 30) < 0.1) {
     // ±15 min = 30 min total
-    selectedWindow.value = '15min';
+    selectedWindow.value = "15min";
   } else if (Math.abs(durationMinutes - 60) < 0.1) {
     // ±30 min = 60 min total
-    selectedWindow.value = '30min';
+    selectedWindow.value = "30min";
   } else if (Math.abs(durationMinutes - 120) < 0.1) {
     // ±1 hour = 120 min total
-    selectedWindow.value = '1hour';
+    selectedWindow.value = "1hour";
   } else {
-    selectedWindow.value = 'custom';
+    selectedWindow.value = "custom";
   }
 };
 
@@ -387,19 +372,19 @@ const detectCurrentWindow = () => {
  * Handle apply button click
  */
 const handleApply = () => {
-  if (selectedWindow.value === 'custom') {
+  if (selectedWindow.value === "custom") {
     // Use custom times
     const startMicros = datetimeToMicros(customStartTime.value);
     const endMicros = datetimeToMicros(customEndTime.value);
 
     if (startMicros < endMicros) {
-      emit('update:range', startMicros, endMicros);
-      emit('update:modelValue', false);
+      emit("update:range", startMicros, endMicros);
+      emit("update:modelValue", false);
     }
   } else {
     // Use preset times
-    emit('update:range', pendingStartTime.value, pendingEndTime.value);
-    emit('update:modelValue', false);
+    emit("update:range", pendingStartTime.value, pendingEndTime.value);
+    emit("update:modelValue", false);
   }
 };
 
@@ -411,8 +396,8 @@ const handleCancel = () => {
   pendingStartTime.value = props.currentRange.startTime;
   pendingEndTime.value = props.currentRange.endTime;
   detectCurrentWindow();
-  emit('update:modelValue', false);
-  emit('close');
+  emit("update:modelValue", false);
+  emit("close");
 };
 
 /**
@@ -420,7 +405,7 @@ const handleCancel = () => {
  */
 const handleReset = () => {
   // Reset to ±5 minutes
-  selectedWindow.value = '5min';
+  selectedWindow.value = "5min";
   applyPreset();
 };
 
@@ -432,7 +417,7 @@ const handleClose = () => {
   pendingStartTime.value = props.currentRange.startTime;
   pendingEndTime.value = props.currentRange.endTime;
   detectCurrentWindow();
-  emit('close');
+  emit("close");
 };
 
 // Watch for prop changes
@@ -443,7 +428,7 @@ watch(
     pendingEndTime.value = newRange.endTime;
     detectCurrentWindow();
   },
-  { deep: true }
+  { deep: true },
 );
 
 watch(
@@ -459,7 +444,7 @@ watch(
       customStartTime.value = microsToDatetime(pendingStartTime.value);
       customEndTime.value = microsToDatetime(pendingEndTime.value);
     }
-  }
+  },
 );
 
 // Watch custom inputs and update pending times

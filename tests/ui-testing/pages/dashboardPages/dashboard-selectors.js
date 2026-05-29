@@ -14,25 +14,29 @@
  * Static selectors - Quasar Framework UI components
  */
 const QUASAR = {
-  // Dialog components
-  DIALOG: '.q-dialog',
-  DIALOG_CARD: '.q-dialog .q-card',
+  // Dialog components — match both the legacy Quasar dialog and the new ODrawer/ODialog
+  // panels migrated for the dialog v2 UX overhaul. Many specs use this to detect "is the
+  // settings overlay still open" after `addScopedVariable` saves; the settings drawer
+  // overlay intercepts pointer events on the dashboard, so missing the new selector
+  // here causes clicks on variable dropdowns to time out.
+  DIALOG: '[data-test="dashboard-settings-drawer"], [data-o2-dialog], [data-o2-drawer]',
+  DIALOG_CARD: '[data-test="dashboard-settings-drawer"] .q-card',
 
   // Menu/Dropdown components
-  MENU: '.q-menu',
-  MENU_ITEM: '.q-item',
+  MENU: '[data-test$="-popover"]',
+  MENU_ITEM: '[data-test$="-option"]',
 
   // Form components
   CHECKBOX: '.q-checkbox',
   CHECKBOX_CHECKED: '.q-checkbox[aria-checked="true"]',
   CHECKBOX_UNCHECKED: '.q-checkbox[aria-checked="false"]',
 
-  // Loading indicators
-  SPINNER: '.q-spinner',
-  LINEAR_PROGRESS: '.q-linear-progress',
+  // Loading indicators (legacy — kept for backward compat; prefer specific data-test selectors)
+  SPINNER: '[data-test*="loading-indicator"]',
+  LINEAR_PROGRESS: '[data-test*="loading-indicator"]',
 
-  // Chip/Badge components
-  CHIP: '.q-chip',
+  // Chip/Badge components — OBadge replaces q-chip; use data-test or aria where available
+  CHIP: '[data-test*="chip"], [data-test*="badge"]',
 
   // Tooltip
   TOOLTIP: '.q-tooltip',
@@ -99,13 +103,18 @@ const DASHBOARD = {
 };
 
 /**
- * Role-based selectors (ARIA)
+ * Selectors that previously relied on raw ARIA roles. Each OSelect now forwards
+ * its parent data-test to the popover (`*-popover`) and ListboxItems
+ * (`*-option`), so consumers should prefer the field-specific data-test where
+ * possible. These generic aliases match any OSelect's dropdown surface.
+ * TODO(data-test): tooltips (OTooltip / reka TooltipContent) still need a
+ * data-test on the root content; tracked in web/src/lib/overlay/Tooltip/OTooltip.vue.
  */
 const ROLES = {
-  OPTION: '[role="option"]',
-  ROLE_OPTION: '[role="option"]', // Alias for clarity
-  LISTBOX: '[role="listbox"]',
-  ROLE_LISTBOX: '[role="listbox"]', // Alias for clarity
+  OPTION: '[data-test$="-option"]',
+  ROLE_OPTION: '[data-test$="-option"]', // Alias for clarity
+  LISTBOX: '[data-test$="-popover"]',
+  ROLE_LISTBOX: '[data-test$="-popover"]', // Alias for clarity
   TOOLTIP: '[role="tooltip"]',
 };
 
@@ -176,7 +185,7 @@ function getDeleteVariableBtn(variableName) {
  * @returns {string} Selector string
  */
 function getVariableLoadingIndicator(variableName) {
-  return `[data-test="variable-selector-${variableName}"] .q-spinner, [data-test="variable-selector-${variableName}"] .q-linear-progress`;
+  return `[data-test="variable-selector-${variableName}"] [data-test*="loading-indicator"]`;
 }
 
 /**

@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
-    <div data-test="add-report-section" class="full-width create-report-page">
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1 tw:pb-[0.625rem]">
+    <div data-test="add-report-section" class="tw:w-full create-report-page">
       <div
-        class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
+        class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
       >
-        <div class="flex items-center">
+        <div class="tw:flex tw:items-center">
           <div
             data-test="add-report-back-btn"
-            class="flex justify-center items-center q-mr-md cursor-pointer"
+            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -33,75 +33,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             title="Go Back"
             @click="router.back()"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
           <div
             v-if="isEditingReport"
-            class="text-h6"
+            class="tw:text-xl tw:font-semibold"
             data-test="add-report-title"
           >
             {{ t("reports.update") }}
           </div>
-          <div v-else class="text-h6" data-test="add-report-title">
+          <div v-else class="tw:text-xl tw:font-semibold" data-test="add-report-title">
             {{ t("reports.add") }}
           </div>
         </div>
       </div>
       <div
-        class="flex card-container tw:mb-[0.675rem]"
-        style="height: calc(100vh - 192px); overflow: auto"
+        class="tw:flex card-container tw:mb-[0.675rem] tw:h-[calc(100vh-12.5rem)] tw:overflow-auto"
       >
         <div
           ref="addAlertFormRef"
-          class="q-px-lg q-my-md"
+          class="tw:px-4 tw:my-3"
           style="width: 1024px"
         >
-          <q-form
+          <form
             class="create-report-form"
-            ref="addReportFormRef"
-            @submit="onSubmit"
+            @submit.prevent="onSubmit"
           >
             <div
-              class="tw:flex tw:items-start tw:gap-4 q-px-sm"
-              style="padding-top: 12px"
+              class="tw:flex tw:items-start tw:gap-4 tw:px-2"
+              style="padding-top: 0.75rem"
             >
               <div data-test="add-report-name-input" class="o2-input">
-                <q-input
+                <OInput
+                  data-test="add-report-name-input"
                   v-model.trim="formData.name"
                   :label="t('alerts.name') + ' *'"
                   color="input-border"
-                  bg-color="input-bg"
                   class="showLabelOnTop"
-                  stack-label
-                  borderless
-                  dense
                   v-bind:readonly="isEditingReport"
-                  v-bind:disable="isEditingReport"
-                  :rules="[
-                    (val: any) =>
-                      !!val
-                        ? isValidResourceName(val) ||
-                          `Characters like :, ?, /, #, and spaces are not allowed.`
-                        : t('common.nameRequired'),
-                  ]"
+                  :disabled="isEditingReport"
+                  :error="!!nameError"
+                  :error-message="nameError"
+                  help-text="Characters like :, ?, /, #, and spaces are not allowed."
+                  @update:model-value="nameError = ''"
                   tabindex="0"
-                  style="width: 330px"
+                  style="width: 20.625rem"
                 >
-                  <template v-slot:hint>
-                    Characters like :, ?, /, #, and spaces are not allowed.
-                  </template>
-                </q-input>
+                </OInput>
               </div>
 
               <div
                 data-test="add-report-folder-select"
                 class="o2-input"
-                style="width: 250px; padding-top: 2px"
+                style="width: 15.625rem"
               >
                 <SelectFolderDropdown
                   :activeFolderId="selectedReportFolderId"
                   type="reports"
-                  :style="'height: 34px;top:28px'"
                   :disableDropdown="isEditingReport"
                   @folder-selected="
                     (f: any) => (selectedReportFolderId = f.value)
@@ -112,60 +100,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               data-test="add-report-description-input"
-              class="report-name-input o2-input q-px-sm"
+              class="report-name-input o2-input tw:px-2 tw:pt-3"
             >
-              <q-input
+              <OInput
+                data-test="add-report-description-input"
                 v-model="formData.description"
                 :label="t('reports.description')"
                 color="input-border"
-                bg-color="input-bg"
                 class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
                 tabindex="0"
                 style="width: 600px"
               />
             </div>
 
             <div class="tw:flex tw:items-center tw:pt-4">
-              <q-toggle
+              <OSwitch
                 data-test="report-cached-toggle-btn"
                 v-model="isCachedReport"
                 size="lg"
-                class="q-pl-0 o2-toggle-button-lg tw:h-[36px] tw:ml-1"
                 :label="t('reports.cachedReport')"
               />
-              <q-icon
-                name="info_outline"
-                class="cursor-pointer q-ml-sm"
-                size="16px"
+              <OIcon
+                name="info-outline"
+                class="tw:cursor-pointer tw:ml-2"
+                size="sm"
               >
-                <q-tooltip
-                  v-model="showInfoTooltip"
-                  anchor="center end"
-                  self="center left"
-                  class="tw:text-[12px]"
+                <OTooltip
+                  side="right"
+                  align="center"
                 >
-                  Note: Cached reports are stored for quick access to
-                  dashboards; sharing is disabled for these reports.</q-tooltip
-                >
-              </q-icon>
+                  <template #content>Note: Cached reports are stored for quick access to
+                  dashboards; sharing is disabled for these reports.</template>
+                </OTooltip>
+              </OIcon>
             </div>
 
-            <q-stepper
+            <OStepper
               v-model="step"
-              vertical
-              color="primary"
+              orientation="vertical"
               animated
-              class="q-mt-md"
-              header-nav
+              navigable
+              class="tw:mt-3"
             >
-              <q-step
+              <OStep
                 data-test="add-report-select-dashboard-step"
                 :name="1"
                 title="Select Dashboard"
-                :icon="outlinedDashboard"
+                icon="edit"
                 :done="step > 1"
               >
                 <template
@@ -174,84 +155,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     :data-test="`add-report-dashboard-${index}`"
-                    class="q-my-sm q-px-sm flex items-center justify-start"
+                    class="tw:my-2 tw:px-2 tw:flex tw:flex-col"
                   >
+                    <div class="tw:flex tw:items-center tw:justify-start">
                     <div
                       data-test="add-report-folder-select"
-                      class="o2-input q-mr-sm"
+                      class="o2-input tw:mr-2"
                       style="padding-top: 0; width: 30%"
                     >
-                      <q-select
+                      <OSelect
+                        data-test="add-report-dashboard-folder-select"
                         v-model="dashboard.folder"
                         :options="folderOptions"
                         :label="t('reports.dashboardFolder') + ' *'"
                         :loading="isFetchingFolders"
-                        :popup-content-style="{ textTransform: 'none' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-py-sm showLabelOnTop no-case"
-                        borderless
-                        stack-label
-                        map-options
-                        dense
-                        emit-value
-                        use-input
-                        hide-selected
-                        fill-input
-                        :input-debounce="400"
-                        input-style="text-transform: none;"
-                        @update:model-value="
-                          onFolderSelection(dashboard.folder)
-                        "
-                        @filter="
-                          (...args: any) =>
-                            onFilterOptions('folders', args[0], args[1])
-                        "
-                        behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="
-                          min-width: 250px !important;
-                          width: 100% !important;
-                        "
+                        :error="index === 0 && !!folderError"
+                        :error-message="index === 0 ? folderError : ''"
+                        @update:model-value="folderError = ''; onFolderSelection(dashboard.folder)"
+                        style="min-width: 250px !important; width: 100% !important;"
                       />
                     </div>
                     <div
                       data-test="add-report-dashboard-select"
-                      class="o2-input q-mr-sm"
+                      class="o2-input tw:mr-2"
                       style="padding-top: 0; width: 30%"
                     >
-                      <q-select
+                      <OSelect
+                        data-test="add-report-dashboard-name-select"
                         v-model="dashboard.dashboard"
                         :options="dashboardOptions"
                         :label="t('reports.dashboard') + ' *'"
                         :loading="isFetchingDashboard || isFetchingFolders"
-                        :popup-content-style="{ textTransform: 'none' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-py-sm showLabelOnTop no-case"
-                        borderless
-                        emit-value
-                        map-options
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        input-style="text-transform: none;"
-                        :input-debounce="400"
-                        @update:model-value="
-                          onDashboardSelection(dashboard.dashboard)
-                        "
-                        @filter="
-                          (...args: any) =>
-                            onFilterOptions('dashboards', args[0], args[1])
-                        "
-                        behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="
-                          min-width: 250px !important;
-                          width: 100% !important;
-                        "
+                        :error="index === 0 && !!dashboardError"
+                        :error-message="index === 0 ? dashboardError : ''"
+                        @update:model-value="dashboardError = ''; onDashboardSelection(dashboard.dashboard)"
+                        style="min-width: 250px !important; width: 100% !important;"
                       />
                     </div>
                     <div
@@ -259,47 +197,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="o2-input"
                       style="padding-top: 0; width: 30%"
                     >
-                      <q-select
+                      <OSelect
+                        data-test="add-report-dashboard-tab-select"
                         v-model="dashboard.tabs"
                         :options="dashboardTabOptions"
                         :label="t('reports.dashboardTab') + ' *'"
                         :loading="isFetchingDashboard || isFetchingFolders"
-                        :popup-content-style="{ textTransform: 'none' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-py-sm showLabelOnTop"
-                        borderless
-                        emit-value
-                        map-options
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        input-style="text-transform: none;"
-                        :input-debounce="400"
-                        :rules="[
-                          (val: any) => !!val.length || 'Field is required!',
-                        ]"
-                        @filter="
-                          (...args: any) =>
-                            onFilterOptions('tabs', args[0], args[1])
-                        "
-                        style="
-                          min-width: 250px !important;
-                          width: 100% !important;
-                        "
+                        :error="index === 0 && !!tabError"
+                        :error-message="index === 0 ? tabError : ''"
+                        @update:model-value="tabError = ''"
+                        style="min-width: 250px !important; width: 100% !important;"
                       />
+                    </div>
                     </div>
 
                     <div
                       data-test="add-report-timerange-select"
-                      class="full-width q-mt-sm"
+                      class="tw:w-full tw:mt-2"
                     >
-                      <div class="q-mb-sm">
+                      <div class="tw:mb-2">
                         <div
                           style="font-size: 14px"
-                          class="text-bold text-grey-8"
+                          class="tw:font-bold tw:text-gray-500"
                         >
                           Time Range*
                         </div>
@@ -317,13 +236,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :default-relative-time="dashboard.timerange.period"
                         data-test="add-report-timerange-dropdown"
+                        menu-align="start"
                         @on:date-change="updateDateTime"
                       />
                     </div>
 
                     <div
                       data-test="add-report-variable-select"
-                      class="full-width q-mt-md o2-input"
+                      class="tw:w-full tw:mt-3 o2-input"
                     >
                       <VariablesInput
                         :variables="dashboard.variables"
@@ -334,37 +254,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Report Format -->
                     <div
-                      class="full-width q-mt-md"
+                      class="tw:w-full tw:mt-3"
                       data-test="add-report-format-section"
                     >
                       <div
                         style="font-size: 14px"
-                        class="text-bold text-grey-8 q-mb-sm"
+                        class="tw:font-bold tw:text-gray-500 tw:mb-2"
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
-                      <div class="row q-col-gutter-md">
+                      <div class="tw:flex tw:gap-3">
                         <!-- Report Type -->
                         <div
                           class="col-auto o2-input"
                           data-test="add-report-type-select"
                         >
-                          <q-select
+                          <OSelect
                             v-model="dashboard.report_type"
                             :options="[
                               { label: 'PDF (default)', value: 'pdf' },
                               { label: 'PNG (Image)', value: 'png' },
                               { label: 'CSV (Data)', value: 'csv' },
                             ]"
-                            emit-value
-                            map-options
-                            borderless
-                            dense
                             :label="t('reports.reportType')"
                             color="input-border"
-                            bg-color="input-bg"
                             class="showLabelOnTop"
-                            stack-label
                             style="min-width: 180px"
                           />
                         </div>
@@ -375,140 +289,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="col-auto o2-input"
                           data-test="add-report-attachment-type-select"
                         >
-                          <q-select
+                          <OSelect
                             v-model="dashboard.email_attachment_type"
                             :options="
                               attachmentTypeOptions(dashboard.report_type)
                             "
-                            emit-value
-                            map-options
-                            borderless
-                            dense
                             :label="t('reports.attachmentType')"
-                            color="input-border"
-                            bg-color="input-bg"
                             class="showLabelOnTop"
-                            stack-label
                             style="min-width: 200px"
-                          >
-                            <template v-slot:option="scope">
-                              <q-item
-                                v-bind="scope.itemProps"
-                                :disable="scope.opt.disable"
-                              >
-                                <q-item-section>
-                                  <q-item-label>{{
-                                    scope.opt.label
-                                  }}</q-item-label>
-                                  <q-item-label
-                                    v-if="scope.opt.disable"
-                                    caption
-                                    class="text-negative"
-                                  >
-                                    Not supported for PDF
-                                  </q-item-label>
-                                </q-item-section>
-                              </q-item>
-                            </template>
-                          </q-select>
+                          />
                         </div>
                       </div>
 
                       <!-- PNG note -->
                       <div
                         v-if="dashboard.report_type === 'png'"
-                        class="q-mt-sm"
+                        class="tw:mt-2"
                         data-test="add-report-png-note"
                       >
-                        <q-banner
-                          dense
-                          rounded
-                          class="bg-orange-1 text-orange-9"
-                          style="font-size: 13px"
-                        >
-                          <template v-slot:avatar>
-                            <q-icon name="info" color="orange-7" />
-                          </template>
-                          PNG captures only the first visible page of the
-                          dashboard. Use PDF if the dashboard spans multiple
-                          pages.
-                        </q-banner>
+                        <OBanner
+                          variant="warning"
+                          icon="info"
+                          content="PNG captures only the first visible page of the dashboard. Use PDF if the dashboard spans multiple pages."
+                        />
                       </div>
 
                       <!-- Custom Dimensions (Advanced) -->
                       <div
                         v-if="dashboard.report_type !== 'csv'"
-                        class="q-mt-md"
+                        class="tw:mt-3"
                         data-test="add-report-custom-dimensions-section"
                       >
                         <div
-                          class="flex items-center cursor-pointer"
+                          class="tw:flex tw:items-center tw:cursor-pointer"
                           style="font-size: 14px; color: inherit"
                           @click="showCustomDimensions = !showCustomDimensions"
                         >
-                          <q-icon
+                          <OIcon
                             :name="
                               showCustomDimensions
-                                ? 'expand_less'
-                                : 'expand_more'
+                                ? 'expand-less'
+                                : 'expand-more'
                             "
-                            size="18px"
-                            class="q-mr-xs"
+                            size="sm"
+                            class="tw:mr-1"
                           />
-                          <span class="text-bold text-grey-8">{{
+                          <span class="tw:font-bold tw:text-gray-500">{{
                             t("reports.customDimensions")
                           }}</span>
                         </div>
                         <div
                           v-if="showCustomDimensions"
-                          class="row q-col-gutter-md q-pt-sm"
+                          class="tw:flex tw:gap-3 tw:pt-2"
                         >
                           <div class="col-auto o2-input">
-                            <q-input
+                            <OInput
                               :model-value="
                                 dashboard.attachment_dimensions?.width ?? ''
                               "
                               @update:model-value="
                                 (v) => setDimension(dashboard, 'width', v)
                               "
-                              borderless
-                              dense
                               type="number"
                               min="1"
                               :label="t('reports.dimensionWidth')"
                               color="input-border"
-                              bg-color="input-bg"
                               class="showLabelOnTop"
-                              stack-label
                               style="min-width: 120px"
                               placeholder="e.g. 1440"
                               data-test="add-report-dimension-width"
                             />
                           </div>
                           <div class="col-auto o2-input">
-                            <q-input
+                            <OInput
                               :model-value="
                                 dashboard.attachment_dimensions?.height ?? ''
                               "
                               @update:model-value="
                                 (v) => setDimension(dashboard, 'height', v)
                               "
-                              borderless
-                              dense
                               type="number"
                               min="1"
                               :label="t('reports.dimensionHeight')"
                               color="input-border"
-                              bg-color="input-bg"
                               class="showLabelOnTop"
-                              stack-label
                               style="min-width: 120px"
                               placeholder="e.g. 900"
                               data-test="add-report-dimension-height"
                             />
                           </div>
-                          <div class="col-auto flex items-end">
-                            <div class="text-caption text-grey-6 q-pb-xs">
+                          <div class="col-auto tw:flex tw:items-end">
+                            <div class="tw:text-xs tw:text-gray-400 tw:pb-1">
                               Leave blank to use server defaults
                             </div>
                           </div>
@@ -517,29 +388,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </template>
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-report-step1-continue-btn"
                     variant="primary"
                     size="sm-action"
-                    @click="step = 2"
+                    @click="step++"
                   >
                     Continue
                   </OButton>
-                </q-stepper-navigation>
-              </q-step>
+                </div>
+              </OStep>
 
-              <q-step
+              <OStep
                 data-test="add-report-select-schedule-step"
                 :name="2"
                 title="Schedule"
                 icon="schedule"
                 :done="step > 2"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="q-my-sm q-px-sm">
-                  <!-- <div class="flex justify-start items-center q-py-sm">
-                <q-icon name="event" class="q-mr-sm" />
+                <div class="tw:my-2 tw:px-2">
+                  <!-- <div class="tw:flex tw:justify-start tw:items-center tw:py-2">
+                <OIcon name="event" size="sm" class="tw:mr-2" />
                 <div style="font-size: 14px">
                   The report will be sent immediately after it is saved and will
                   be sent every hour.
@@ -547,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div> -->
                   <div
                     style="font-size: 14px"
-                    class="text-bold text-grey-8 q-mb-sm"
+                    class="tw:font-bold tw:text-gray-500 tw:mb-2"
                   >
                     Frequency
                   </div>
@@ -568,26 +439,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OToggleGroup>
 
                   <template v-if="frequency.type === 'cron'">
-                    <div class="flex items-center justify-start q-mt-md">
+                    <div class="tw:flex tw:items-center tw:justify-start tw:mt-3">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                         style="padding-top: 0; width: 320px"
                       >
-                        <div class="q-mb-xs text-bold text-grey-8">
+                        <div class="tw:mb-1 tw:font-bold tw:text-gray-500">
                           {{ t("reports.cronExpression") + " *" }}
-                          <q-icon
-                            :name="outlinedInfo"
-                            size="17px"
-                            class="q-ml-xs cursor-pointer"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'text-grey-5'
-                                : 'text-grey-7'
-                            "
+                          <OIcon
+                            name="info"
+                            size="sm"
+                            class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
                           >
-                            <q-tooltip anchor="center right" self="center left">
-                              <span style="font-size: 14px">
+                            <OTooltip side="right" align="center">
+                              <template #content><span style="font-size: 14px">
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
@@ -601,56 +467,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 daily. It specifies second, minute, hour, day of
                                 month, month, and day of week,
                                 respectively.</span
-                              >
-                            </q-tooltip>
-                          </q-icon>
+                              ></template>
+                            </OTooltip>
+                          </OIcon>
                         </div>
-                        <q-input
-                          filled
+                        <OInput
                           v-model="frequency.cron"
                           color="input-border"
-                          bg-color="input-bg"
                           type="text"
                           outlined
-                          :rules="[
-                            (val: any) =>
-                              !!val.length
-                                ? cronError.length
-                                  ? cronError
-                                  : true
-                                : 'Field is required!',
-                          ]"
-                          dense
+                          :error="!!cronError"
+                          :error-message="cronError"
                           style="width: 100%"
-                          debounce="400"
+                          :debounce="400"
                           @update:model-value="validateFrequency"
                         />
                       </div>
                       <div class="o2-input">
-                        <q-select
+                        <OSelect
                           data-test="add-report-schedule-start-timezone-select"
                           v-model="scheduling.timezone"
-                          :options="filteredTimezone"
-                          @blur="
-                            timezone =
-                              timezone == ''
-                                ? Intl.DateTimeFormat().resolvedOptions()
-                                    .timeZone
-                                : timezone
-                          "
-                          use-input
-                          @filter="timezoneFilterFn"
-                          input-debounce="0"
-                          dense
-                          emit-value
-                          fill-input
-                          hide-selected
+                          :options="timezoneOptions"
                           :label="t('logStream.timezone') + ' *'"
-                          :display-value="`Timezone: ${timezone}`"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!timezoneError"
+                          :error-message="timezoneError"
+                          @update:model-value="timezoneError = ''"
                           class="timezone-select showLabelOnTop"
-                          stack-label
-                          borderless
                           style="width: 300px"
                         />
                       </div>
@@ -658,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-else>
                     <div
-                      class="q-mt-md tw:flex tw:justify-start tw:items-center"
+                      class="tw:mt-3 tw:flex tw:justify-start tw:items-center"
                     >
                       <OToggleGroup
                         :model-value="selectedTimeTab"
@@ -674,45 +516,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ visual.label }}
                         </OToggleGroupItem>
                       </OToggleGroup>
-                      <q-icon
-                        name="info_outline"
-                        class="cursor-pointer q-ml-sm"
-                        size="16px"
+                      <OIcon
+                        name="info-outline"
+                        class="tw:cursor-pointer tw:ml-2"
+                        size="sm"
                       >
-                        <q-tooltip
-                          anchor="center end"
-                          self="center left"
-                          class="tw:text-[12px]"
-                        >
-                          "Schedule Now" will schedule the report using the
+                        <OTooltip side="right" align="center">
+                          <template #content>"Schedule Now" will schedule the report using the
                           current date, time, and timezone.<br />
                           In "Schedule Later" you can customize the date, time,
-                          and timezone.
-                        </q-tooltip>
-                      </q-icon>
+                          and timezone.</template>
+                        </OTooltip>
+                      </OIcon>
                     </div>
 
                     <div
                       v-if="frequency.type === 'custom'"
-                      class="flex items-start justify-start q-mt-md"
+                      class="tw:flex tw:items-start tw:justify-start tw:mt-3"
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                         style="padding-top: 0; width: 160px"
                       >
-                        <q-input
-                          filled
+                        <OInput
                           v-model="frequency.custom.interval"
                           label="Repeat every *"
                           color="input-border"
-                          bg-color="input-bg"
                           class="showLabelOnTop"
-                          stack-label
                           type="number"
-                          borderless
-                          dense
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!intervalError"
+                          :error-message="intervalError"
+                          @update:model-value="intervalError = ''"
                           style="width: 100%"
                         />
                       </div>
@@ -722,20 +557,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input"
                         style="padding-top: 0; width: 160px"
                       >
-                        <q-select
+                        <OSelect
                           v-model="frequency.custom.period"
                           :options="customFrequencyOptions"
                           :label="'Frequency *'"
-                          :popup-content-style="{ textTransform: 'capitalize' }"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="q-pt-sm q-pb-none showLabelOnTop no-case"
-                          borderless
-                          emit-value
-                          stack-label
-                          dense
-                          behavior="menu"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          class="showLabelOnTop no-case"
+                          :error="!!periodError"
+                          :error-message="periodError"
+                          @update:model-value="periodError = ''"
                           style="width: 100% !important"
                         />
                       </div>
@@ -744,176 +573,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       data-test="add-report-schedule-send-later-section"
                       v-if="selectedTimeTab === 'scheduleLater'"
-                      class="flex items-center justify-start q-mt-md"
+                      class="tw:flex tw:items-center tw:justify-start tw:mt-3"
                     >
                       <div
                         data-test="add-report-schedule-start-date-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                       >
-                        <q-input
-                          borderless
+                        <ODate
                           v-model="scheduling.date"
-                          label="Start Date *"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop"
-                          :rules="[
-                            (val: any) =>
-                              /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
-                                val,
-                              ) || 'Date format is incorrect!',
-                          ]"
-                          stack-label
-                          dense
-                          style="width: 160px"
-                        >
-                          <template v-slot:append>
-                            <q-icon name="event" class="cursor-pointer">
-                              <q-popup-proxy
-                                cover
-                                transition-show="scale"
-                                transition-hide="scale"
-                              >
-                                <q-date
-                                  v-model="scheduling.date"
-                                  mask="DD-MM-YYYY"
-                                >
-                                  <div class="row items-center justify-end">
-                                    <OButton
-                                      v-close-popup="true"
-                                      variant="outline"
-                                      size="sm-action"
-                                    >
-                                      Close
-                                    </OButton>
-                                  </div>
-                                </q-date>
-                              </q-popup-proxy>
-                            </q-icon>
-                          </template>
-                        </q-input>
+                          :label="'Start Date *'"
+                          data-test="add-report-schedule-start-date-field"
+                        />
                       </div>
                       <div
                         data-test="add-report-schedule-start-time-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                       >
-                        <q-input
+                        <OTime
                           v-model="scheduling.time"
-                          label="Start Time *"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop"
-                          mask="time"
-                          :rules="['time']"
-                          stack-label
-                          borderless
-                          dense
-                          style="width: 160px"
-                        >
-                          <template v-slot:append>
-                            <q-icon name="access_time" class="cursor-pointer">
-                              <q-popup-proxy
-                                cover
-                                transition-show="scale"
-                                transition-hide="scale"
-                              >
-                                <q-time v-model="scheduling.time">
-                                  <div class="row items-center justify-end">
-                                    <OButton
-                                      v-close-popup="true"
-                                      variant="outline"
-                                      size="sm-action"
-                                    >
-                                      Close
-                                    </OButton>
-                                  </div>
-                                </q-time>
-                              </q-popup-proxy>
-                            </q-icon>
-                          </template>
-                        </q-input>
+                          :label="'Start Time *'"
+                          data-test="add-report-schedule-start-time-field"
+                        />
                       </div>
                       <div class="o2-input">
-                        <q-select
+                        <OSelect
                           data-test="add-report-schedule-start-timezone-select"
                           v-model="scheduling.timezone"
-                          :options="filteredTimezone"
-                          @blur="
-                            timezone =
-                              timezone == ''
-                                ? Intl.DateTimeFormat().resolvedOptions()
-                                    .timeZone
-                                : timezone
-                          "
-                          use-input
-                          @filter="timezoneFilterFn"
-                          input-debounce="0"
-                          dense
-                          emit-value
-                          fill-input
-                          hide-selected
+                          :options="timezoneOptions"
                           :label="t('logStream.timezone') + ' *'"
-                          :display-value="`Timezone: ${timezone}`"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :error="!!timezoneError"
+                          :error-message="timezoneError"
+                          @update:model-value="timezoneError = ''"
                           class="timezone-select showLabelOnTop"
-                          stack-label
-                          borderless
                           style="width: 300px"
                         />
                       </div>
                     </div>
                   </template>
                 </div>
-
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-report-step2-back-btn"
                     variant="outline"
                     size="sm-action"
-                    class="q-ml-sm"
-                    @click="step = 1"
+                    @click="step--"
                   >
                     Back
                   </OButton>
                   <OButton
-                    v-if="!isCachedReport"
                     data-test="add-report-step2-continue-btn"
                     variant="primary"
                     size="sm-action"
-                    class="q-ml-sm"
-                    @click="step = 3"
+                    @click="step++"
                   >
                     Continue
                   </OButton>
-                </q-stepper-navigation>
-              </q-step>
+                </div>
+              </OStep>
 
-              <q-step
+              <OStep
                 v-if="!isCachedReport"
                 data-test="add-report-share-step"
                 :name="3"
                 title="Share"
                 icon="mail"
                 :done="step > 3"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="q-my-sm q-px-sm">
+                <div class="tw:my-2 tw:px-2">
                   <div
                     data-test="add-report-share-title-input"
                     class="report-name-input o2-input"
                   >
-                    <q-input
+                    <OInput
+                      data-test="add-report-share-title-input"
                       v-model="formData.title"
                       :label="t('reports.title') + ' *'"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="showLabelOnTop"
-                      stack-label
-                      borderless
-                      dense
-                      :rules="[
-                        (val: any) => !!val.trim() || 'Field is required!',
-                      ]"
+                      :error="!!titleError"
+                      :error-message="titleError"
+                      @update:model-value="titleError = ''"
                       tabindex="0"
                       style="width: 400px"
                     />
@@ -921,37 +659,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     data-test="add-report-share-recipients-input"
-                    class="report-name-input o2-input"
+                    class="report-name-input o2-input tw:pt-3"
                   >
-                    <q-input
+                    <OInput
+                      data-test="add-report-share-recipients-input"
                       v-model="emails"
                       :label="t('reports.recipients') + ' *'"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="showLabelOnTop"
-                      stack-label
-                      borderless
-                      dense
-                      :rules="[
-                        (val: any) =>
-                          /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-                            val,
-                          ) || 'Add valid emails!',
-                      ]"
+                      :error="!!recipientsError"
+                      :error-message="recipientsError"
+                      @update:model-value="recipientsError = ''"
                       tabindex="0"
                       style="width: 100%"
                       :placeholder="t('user.inviteByEmail')"
                     />
                   </div>
-                  <div data-test="add-report-share-message-section">
-                    <div style="font-size: 14px" class="text-bold text-grey-8">
+                  <div data-test="add-report-share-message-section" class="tw:pt-3">
+                    <div style="font-size: 14px" class="tw:font-bold tw:text-gray-500">
                       Message
                     </div>
 
                     <div data-test="add-report-share-message-input">
-                      <q-input
+                      <OInput
                         v-model="formData.message"
-                        filled
                         type="textarea"
                       />
                     </div>
@@ -963,47 +692,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:items-center tw:pt-4"
                     data-test="add-report-image-preview-section"
                   >
-                    <q-toggle
+                    <OSwitch
                       v-model="formData.imagePreview"
                       size="lg"
-                      class="q-pl-0 o2-toggle-button-lg tw:h-[36px] tw:ml-1"
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
-                    <q-icon
-                      name="info_outline"
-                      class="cursor-pointer q-ml-sm"
-                      size="16px"
+                    <OIcon
+                      name="info-outline"
+                      class="tw:cursor-pointer tw:ml-2"
+                      size="sm"
                     >
-                      <q-tooltip max-width="320px">
-                        Captures a PNG screenshot of the dashboard and embeds it
-                        inline in the email body alongside the PDF attachment
-                        for a quick visual preview.
-                      </q-tooltip>
-                    </q-icon>
+                      <OTooltip max-width="320px">
+                        <template #content>Captures a PNG screenshot of the dashboard and embeds it
+                        tw:inline in the email body alongside the PDF attachment
+                        for a quick visual preview.</template>
+                      </OTooltip>
+                    </OIcon>
                   </div>
                 </div>
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-report-step3-back-btn"
                     variant="outline"
                     size="sm-action"
-                    class="q-ml-sm"
-                    @click="step = 2"
+                    @click="step--"
                   >
                     Back
                   </OButton>
-                </q-stepper-navigation>
-              </q-step>
-            </q-stepper>
-          </q-form>
+                </div>
+              </OStep>
+            </OStepper>
+          </form>
         </div>
       </div>
     </div>
     <div
-      class="flex justify-end q-px-md full-width tw:py-3 card-container"
-      style="position: sticky; bottom: 0.375rem; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container tw:sticky! tw:bottom-2.5"
+      style="z-index: 2"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
       :style="{
         'box-shadow':
           store.state.theme === 'dark'
@@ -1015,7 +742,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-report-cancel-btn"
         variant="outline"
         size="sm-action"
-        class="q-mr-sm"
+        class="tw:mr-2"
         @click="openCancelDialog"
       >
         {{ t("alerts.cancel") }}
@@ -1041,7 +768,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1055,23 +782,31 @@ import {
 } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
-import { outlinedDashboard } from "@quasar/extras/material-icons-outlined";
 import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getFoldersListByType } from "@/utils/commons";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   report: {
@@ -1137,13 +872,10 @@ const showInfoTooltip = ref(false);
 
 const originalReportData: Ref<string> = ref("");
 
-const addReportFormRef: Ref<any> = ref(null);
-
 const step = ref(1);
 
 const formData = ref(defaultReport);
 
-const q = useQuasar();
 
 const { track } = useReo();
 
@@ -1223,6 +955,15 @@ const selectedReportFolderId = ref<string>(
 const isFetchingReport = ref(false);
 
 const cronError = ref("");
+const folderError = ref("");
+const dashboardError = ref("");
+const tabError = ref("");
+const timezoneError = ref("");
+const titleError = ref("");
+const recipientsError = ref("");
+const nameError = ref("");
+const intervalError = ref("");
+const periodError = ref("");
 
 const frequency = ref({
   type: "once",
@@ -1260,11 +1001,10 @@ onBeforeMount(async () => {
       })
       .catch((err) => {
         if (err.response.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               err.response?.data?.message || "Error while fetching report!",
-            timeout: 4000,
           });
         }
       })
@@ -1555,8 +1295,8 @@ const saveReport = async () => {
     const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
     const year = now.getFullYear();
 
-    // Combine them in the DD-MM-YYYY format
-    scheduling.value.date = `${day}-${month}-${year}`;
+    // Combine them in the YYYY-MM-DD format (ISO 8601, for ODate compatibility)
+    scheduling.value.date = `${year}-${month}-${day}`;
 
     // Get the hours and minutes, ensuring they are formatted with two digits
     const hours = String(now.getHours()).padStart(2, "0");
@@ -1571,8 +1311,13 @@ const saveReport = async () => {
     scheduling.value.timezone = timezone.value;
   }
 
+  // scheduling.value.date is always YYYY-MM-DD (ISO 8601),
+  // but convertDateToTimestamp expects DD-MM-YYYY
+  const [y, m, d] = scheduling.value.date.split("-");
+  const dateForConversion = `${d}-${m}-${y}`;
+
   const convertedDateTime = convertDateToTimestamp(
-    scheduling.value.date,
+    dateForConversion,
     scheduling.value.time,
     scheduling.value.timezone,
   );
@@ -1597,6 +1342,7 @@ const saveReport = async () => {
   } else {
     reportPayload.frequency.type = frequency.value.type;
     reportPayload.frequency.interval = 1;
+    formData.value.frequency.interval = 1;
   }
 
   reportPayload.timezone = scheduling.value.timezone;
@@ -1615,15 +1361,8 @@ const saveReport = async () => {
   if (isCachedReport.value) reportPayload.destinations = [];
 
   // Check if all report input fields are valid
-  try {
-    validateReportData();
-    await nextTick();
-    await nextTick();
-    const isValidForm = await addReportFormRef.value.validate();
-    if (!isValidForm) return;
-  } catch (err) {
-    console.log(err);
-  }
+  const isValidForm = await validateReportData();
+  if (!isValidForm) return;
 
   // This is unitil we support multiple dashboards and tabs
   if (reportPayload.dashboards[0]?.tabs)
@@ -1653,33 +1392,39 @@ const saveReport = async () => {
     savePromise = reports.createReportV2(org, reportPayload, folderId);
   }
 
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
 
   savePromise
     .then(() => {
-      q.notify({
-        type: "positive",
+      // Invalidate the folder cache so ReportList fetches fresh data on mount
+      const folderId = selectedReportFolderId.value || "default";
+      const updated = {
+        ...store.state.organizationData.allReportsListByFolderId,
+      };
+      delete updated[folderId];
+      store.dispatch("setAllReportsListByFolderId", updated);
+
+      toast({
+        variant: "success",
         message: `Report ${
           isEditingReport.value ? "updated" : "saved"
         } successfully.`,
-        timeout: 3000,
       });
       goToReports();
     })
     .catch((error) => {
       if (error.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error?.response?.data?.message ||
             `Error while ${
               isEditingReport.value ? "updating" : "saving"
             } report.`,
-          timeout: 4000,
         });
       }
     })
@@ -1692,21 +1437,39 @@ const saveReport = async () => {
   });
 };
 
-const validateReportData = async () => {
-  if (!formData.value.dashboards[0].folder) {
+const validateReportData = async (): Promise<boolean> => {
+  if (!formData.value.name) {
+    nameError.value = t('common.nameRequired');
     step.value = 1;
-    return;
+    return false;
   }
+  if (!isValidResourceName(formData.value.name)) {
+    nameError.value = 'Characters like :, ?, /, #, and spaces are not allowed.';
+    step.value = 1;
+    return false;
+  }
+  nameError.value = '';
+
+  if (!formData.value.dashboards[0].folder) {
+    folderError.value = t('validation.required');
+    step.value = 1;
+    return false;
+  }
+  folderError.value = '';
 
   if (!formData.value.dashboards[0].dashboard) {
+    dashboardError.value = t('validation.required');
     step.value = 1;
-    return;
+    return false;
   }
+  dashboardError.value = '';
 
   if (!formData.value.dashboards[0].tabs) {
+    tabError.value = t('validation.required');
     step.value = 1;
-    return;
+    return false;
   }
+  tabError.value = '';
 
   if (formData.value.dashboards[0].timerange) {
     if (
@@ -1714,7 +1477,7 @@ const validateReportData = async () => {
       !formData.value.dashboards[0].timerange.period
     ) {
       step.value = 1;
-      return;
+      return false;
     }
 
     if (
@@ -1725,7 +1488,7 @@ const validateReportData = async () => {
       )
     ) {
       step.value = 1;
-      return;
+      return false;
     }
   }
 
@@ -1739,34 +1502,62 @@ const validateReportData = async () => {
       validateFrequency();
     } catch (err) {
       cronError.value = "Invalid cron expression!";
-      return;
+      return false;
     }
   }
 
   if (formData.value.frequency.type === "cron" && cronError.value) {
     step.value = 2;
-    return;
+    return false;
   }
+
+  console.log(JSON.parse(JSON.stringify(formData.value)));
 
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
+    if (formData.value.frequency.type === "custom") {
+      if (!frequency.value.custom.interval) {
+        intervalError.value = t('validation.required');
+        step.value = 2;
+        return false;
+      }
+      intervalError.value = '';
+      if (!frequency.value.custom.period) {
+        periodError.value = t('validation.required');
+        step.value = 2;
+        return false;
+      }
+      periodError.value = '';
+    }
     step.value = 2;
-    return;
+    return false;
   }
 
-  if (!formData.value.start || !formData.value.timezone) {
+  if (!scheduling.value.timezone) {
+    timezoneError.value = t('validation.required');
     step.value = 2;
-    return;
+    return false;
+  }
+  timezoneError.value = '';
+
+  // Share step validation only applies to non-cached reports
+  if (!isCachedReport.value) {
+    if (!formData.value.title) {
+      titleError.value = t('validation.required');
+      step.value = 3;
+      return false;
+    }
+    titleError.value = '';
+
+    const emailRegex = /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
+    if (!emailRegex.test(emails.value)) {
+      recipientsError.value = 'Add valid emails!';
+      step.value = 3;
+      return false;
+    }
+    recipientsError.value = '';
   }
 
-  if (
-    !formData.value.title ||
-    !/^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-      emails.value,
-    )
-  ) {
-    step.value = 3;
-    return;
-  }
+  return true;
 };
 
 const validateFrequency = () => {
@@ -1881,8 +1672,8 @@ const setupEditingReport = async (report: any) => {
     zone: reportTimezone,
   });
 
-  // Combine them in the DD-MM-YYYY format
-  scheduling.value.date = dateInReportTz.toFormat("dd-MM-yyyy");
+  // Combine them in the YYYY-MM-DD format (ISO 8601, for ODate compatibility)
+  scheduling.value.date = dateInReportTz.toFormat("yyyy-MM-dd");
 
   // Combine them in the HH:MM format
   scheduling.value.time = dateInReportTz.toFormat("HH:mm");
@@ -1928,10 +1719,9 @@ const setupEditingReport = async (report: any) => {
     formData.value.dashboards[0].folder = report.dashboards[0].folder;
   } else {
     formData.value.dashboards[0].folder = "";
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Selected folder has been deleted!",
-      timeout: 4000,
     });
   }
 
@@ -1944,10 +1734,9 @@ const setupEditingReport = async (report: any) => {
     formData.value.dashboards[0].dashboard = report.dashboards[0].dashboard;
   } else {
     formData.value.dashboards[0].dashboard = "";
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Selected dashboard has been deleted!",
-      timeout: 4000,
     });
   }
 
@@ -1961,10 +1750,9 @@ const setupEditingReport = async (report: any) => {
   if (tab) {
     formData.value.dashboards[0].tabs = tab.value;
   } else {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Selected dashboard tab has been deleted!",
-      timeout: 4000,
     });
     formData.value.dashboards[0].tabs = "";
   }
@@ -1986,10 +1774,3 @@ const openCancelDialog = () => {
 };
 </script>
 
-<style lang="scss">
-.create-report-page {
-  .q-expansion-item .q-item {
-    padding: 0 8px;
-  }
-}
-</style>

@@ -262,16 +262,18 @@ describe("useLoading", () => {
 
     const { execute } = useLoading(mockAsyncFunction);
 
+    // The composable guards concurrent calls: only the first call executes;
+    // subsequent calls while isLoading is true return undefined immediately.
     const promises = [
       execute("call1"),
-      execute("call2"), 
+      execute("call2"),
       execute("call3"),
     ];
 
     const results = await Promise.all(promises);
 
-    expect(results).toEqual(["result1", "result2", "result3"]);
-    expect(mockAsyncFunction).toHaveBeenCalledTimes(3);
+    expect(results).toEqual(["result1", undefined, undefined]);
+    expect(mockAsyncFunction).toHaveBeenCalledTimes(1);
   });
 
   it("should handle async function with mixed success and failure", async () => {

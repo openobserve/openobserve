@@ -15,37 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="show"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="show"
+    :width="30"
+    title="Edit Backfill Job"
+    secondary-button-label="Cancel"
+    primary-button-label="Update Job"
+    :primary-button-loading="loading"
+    @click:secondary="onCancel"
+    @click:primary="onSubmit"
     data-test="edit-backfill-job-dialog"
   >
-    <q-card class="tw-w-full" style="width: 600px">
-      <q-card-section class="q-pa-md">
-        <div class="flex items-center justify-between">
-          <div class="text-h6" data-test="dialog-title">
-            Edit Backfill Job
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            v-close-popup
-            data-test="close-dialog-btn"
-          >
-            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-          </OButton>
-        </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section class="q-pa-md">
-        <q-form @submit="onSubmit" class="tw-space-y-4">
+    <div id="edit-backfill-form" class="tw:mx-5 tw:my-3">
           <!-- Time Range Section -->
           <div>
-            <div class="text-subtitle2 q-mb-sm">
+            <div class="tw:text-sm tw:font-medium tw:mb-2">
               Time Range <span class="text-red-600">*</span>
             </div>
             <date-time
@@ -59,65 +43,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
-              class="text-caption text-red-600 q-mt-xs"
+              class="tw:text-xs text-red-600 tw:mt-1"
             >
               Please select a valid time range
             </div>
           </div>
 
           <!-- Advanced Options -->
-          <q-expansion-item
+          <OCollapsible
+            class="tw:mt-2"
             v-model="showAdvanced"
             icon="settings"
             label="Advanced Options"
             data-test="advanced-options-expansion"
           >
-            <q-card flat bordered class="q-pa-md tw-space-y-4">
+            <div class="tw:p-3 tw:space-y-2 tw:mt-2">
               <!-- Chunk Period -->
               <div>
-                <div class="text-caption q-mb-xs">
+                <div class="tw:text-xs tw:mb-1">
                   Chunk Period (minutes)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Size of each processing chunk in minutes. Default: 60
-                    </q-tooltip>
-                  </q-icon>
+                  <OIcon name="info-outline" size="sm" />
+                    <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
                 </div>
-                <q-input
-                  v-model.number="formData.chunkPeriodMinutes"
+                <OInput
+                  v-model="formData.chunkPeriodMinutes"
                   type="number"
-                  outlined
-                  dense
                   placeholder="60"
-                  :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
+                  :error="!!chunkPeriodError"
+                  :error-message="chunkPeriodError"
+                  @update:model-value="chunkPeriodError = ''"
                   data-test="chunk-period-input"
                 />
               </div>
 
               <!-- Delay Between Chunks -->
               <div>
-                <div class="text-caption q-mb-xs">
+                <div class="tw:text-xs tw:mb-1">
                   Delay Between Chunks (seconds)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Delay between processing chunks in seconds. Default: 5
-                    </q-tooltip>
-                  </q-icon>
+                  <OIcon name="info-outline" size="sm" />
+                    <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
                 </div>
-                <q-input
-                  v-model.number="formData.delayBetweenChunks"
+                <OInput
+                  v-model="formData.delayBetweenChunks"
                   type="number"
-                  outlined
-                  dense
                   placeholder="5"
-                  :rules="[(val) => !val || (val >= 1 && val <= 3600) || 'Must be between 1 and 3600']"
+                  :error="!!delayBetweenError"
+                  :error-message="delayBetweenError"
+                  @update:model-value="delayBetweenError = ''"
                   data-test="delay-between-chunks-input"
                 />
               </div>
 
               <!-- Delete Before Backfill -->
               <div>
-                <q-checkbox
+                <OCheckbox
                   v-model="formData.deleteBeforeBackfill"
                   label="Delete existing data before backfill"
                   data-test="delete-before-backfill-checkbox"
@@ -126,9 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="formData.deleteBeforeBackfill"
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
-                  <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
-                    <div class="text-caption text-orange-800">
+                  <div class="tw:flex tw:items-start">
+                    <OIcon name="warning" size="sm" class="tw:mr-2 tw-mt-0.5" />
+                    <div class="tw:text-xs text-orange-800">
                       <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
                       <div class="tw-mb-2">
                         This will permanently delete all data in the destination stream for the specified time
@@ -143,46 +122,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-            </q-card>
-          </q-expansion-item>
+            </div>
+          </OCollapsible>
 
-          <!-- Error Message -->
-          <div v-if="errorMessage" class="text-negative">
-            <q-icon name="error" class="q-mr-sm" />
-            {{ errorMessage }}
-          </div>
-
-          <!-- Form Actions -->
-          <div class="tw:flex tw:justify-end tw:gap-2 q-mt-md">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="onCancel"
-              data-test="cancel-btn"
-            >Cancel</OButton>
-            <OButton
-              type="submit"
-              variant="primary"
-              size="sm-action"
-              :loading="loading"
-              :disabled="loading"
-              data-test="update-btn"
-            >Update Job</OButton>
-          </div>
-        </q-form>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+      <!-- Error Message -->
+      <div v-if="errorMessage" class="tw:text-red-500">
+        <OIcon name="error" size="sm" class="tw:mr-2" />
+        {{ errorMessage }}
+      </div>
+    </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
-import { X } from "lucide-vue-next";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 interface Props {
   modelValue: boolean;
@@ -197,8 +161,9 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const $q = useQuasar();
 const store = useStore();
+
+const { confirm } = useConfirmDialog();
 
 const show = computed({
   get: () => props.modelValue,
@@ -208,6 +173,8 @@ const show = computed({
 const showAdvanced = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
+const chunkPeriodError = ref("");
+const delayBetweenError = ref("");
 const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
 
 const formData = ref({
@@ -271,6 +238,22 @@ const onCancel = () => {
 
 const onSubmit = async () => {
   errorMessage.value = "";
+  chunkPeriodError.value = "";
+  delayBetweenError.value = "";
+
+  // Validate optional numeric range fields
+  let hasError = false;
+  if (formData.value.chunkPeriodMinutes !== null && formData.value.chunkPeriodMinutes !== undefined &&
+    (formData.value.chunkPeriodMinutes < 1 || formData.value.chunkPeriodMinutes > 1440)) {
+    chunkPeriodError.value = "Must be between 1 and 1440";
+    hasError = true;
+  }
+  if (formData.value.delayBetweenChunks !== null && formData.value.delayBetweenChunks !== undefined &&
+    (formData.value.delayBetweenChunks < 1 || formData.value.delayBetweenChunks > 3600)) {
+    delayBetweenError.value = "Must be between 1 and 3600";
+    hasError = true;
+  }
+  if (hasError) return;
 
   if (!props.job) {
     errorMessage.value = "No job selected";
@@ -292,24 +275,16 @@ const onSubmit = async () => {
 
   // Show confirmation dialog if delete_before_backfill is enabled
   if (formData.value.deleteBeforeBackfill) {
-    $q.dialog({
+    const ok = await confirm({
       title: "Confirm Data Deletion",
       message:
         "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
-      cancel: {
-        label: "Cancel",
-        color: "grey-8",
-        flat: true,
-      },
-      ok: {
-        label: "Yes, Delete and Backfill",
-        color: "negative",
-      },
-      persistent: true,
-      focus: "cancel", // Focus on cancel button by default for safety
-    }).onOk(() => {
-      updateBackfillJobRequest();
+      confirmLabel: "Yes, Delete and Backfill",
+      cancelLabel: "Cancel",
     });
+    if (ok) {
+      updateBackfillJobRequest();
+    }
   } else {
     updateBackfillJobRequest();
   }
@@ -332,10 +307,9 @@ const updateBackfillJobRequest = async () => {
       },
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job updated successfully",
-      timeout: 3000,
     });
 
     emit("job-updated");

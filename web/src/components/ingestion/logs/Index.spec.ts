@@ -1,11 +1,7 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar();
 
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
@@ -26,6 +22,11 @@ vi.mock("../../../aws-exports", () => ({
   },
 }));
 
+// Mock clipboard utility (replaces the removed quasar mock)
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+}));
+
 // Mock router
 const mockRouter = {
   currentRoute: {
@@ -42,19 +43,7 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn(),
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn(),
-  };
-});
+import IngestLogs from "@/components/ingestion/logs/Index.vue";
 
 // Helper to build mount options
 function buildMountOptions() {
@@ -68,12 +57,12 @@ function buildMountOptions() {
         store,
       },
       stubs: {
-        "q-splitter": {
+        OSplitter: {
           template:
             '<div><slot name="before"></slot><slot name="after"></slot></div>',
         },
-        "q-tabs": true,
-        "q-route-tab": true,
+        OTabs: { template: '<div><slot /></div>' },
+        ORouteTab: true,
         "router-view": true,
       },
     },
@@ -167,12 +156,12 @@ describe("IngestLogs Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            "q-splitter": {
+            OSplitter: {
               template:
                 '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            "q-tabs": true,
-            "q-route-tab": true,
+            OTabs: { template: '<div><slot /></div>' },
+            ORouteTab: true,
             "router-view": true,
           },
         },
@@ -329,53 +318,29 @@ describe("IngestLogs Component", () => {
   // copyToClipboardFn
   // ─────────────────────────────────────────────────────────────────────────
   describe("copyToClipboardFn", () => {
-    it("should call copyToClipboard with content.innerText", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
+    it("should call copyToClipboard with content.innerText and options", async () => {
+      const { copyToClipboard } = await import("@/utils/clipboard");
 
       const mockContent = { innerText: "log ingestion snippet" };
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("log ingestion snippet");
-    });
-
-    it("should show positive notify on successful copy", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
-
-      await wrapper.vm.copyToClipboardFn({ innerText: "some text" });
-      await new Promise((r) => setTimeout(r, 0));
-
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
-        message: "Content Copied Successfully!",
+      expect(copyToClipboard).toHaveBeenCalledWith("log ingestion snippet", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
         timeout: 5000,
       });
     });
 
-    it("should show negative notify on copy failure", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockRejectedValueOnce(
-        new Error("clipboard denied"),
-      );
-
-      wrapper.vm.copyToClipboardFn({ innerText: "fail text" });
-      await new Promise((r) => setTimeout(r, 0));
-
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "negative",
-        message: "Error while copy content.",
-        timeout: 5000,
-      });
-    });
-
-    it("should track segment analytics with correct payload on copy", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
+    it("should track segment analytics on successful copy", async () => {
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(true);
       const segment = await import("@/services/segment_analytics");
 
       mockRouter.currentRoute.value.name = "curl";
       await wrapper.vm.copyToClipboardFn({ innerText: "track this" });
+
+      // Wait for the .then() callback to fire
+      await flushPromises();
 
       expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
@@ -386,38 +351,42 @@ describe("IngestLogs Component", () => {
       });
     });
 
-    it("should track segment analytics even when copy fails", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error("fail"));
+    it("should not track segment analytics when copy fails (resolves false)", async () => {
+      const { copyToClipboard } = await import("@/utils/clipboard");
+      vi.mocked(copyToClipboard).mockResolvedValue(false);
       const segment = await import("@/services/segment_analytics");
 
       mockRouter.currentRoute.value.name = "fluentbit";
-      wrapper.vm.copyToClipboardFn({ innerText: "fail track" });
-      await new Promise((r) => setTimeout(r, 0));
+      await wrapper.vm.copyToClipboardFn({ innerText: "fail track" });
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: "fluentbit",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
-      });
+      // Wait for the .then() callback to fire
+      await flushPromises();
+
+      expect(segment.default.track).not.toHaveBeenCalled();
     });
 
     it("should handle empty innerText gracefully", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
+      const { copyToClipboard } = await import("@/utils/clipboard");
 
       await wrapper.vm.copyToClipboardFn({ innerText: "" });
-      expect(copyToClipboard).toHaveBeenCalledWith("");
+
+      expect(copyToClipboard).toHaveBeenCalledWith("", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     });
 
     it("should handle undefined innerText gracefully", async () => {
-      const { copyToClipboard } = await import("quasar");
-      vi.mocked(copyToClipboard).mockResolvedValue();
+      const { copyToClipboard } = await import("@/utils/clipboard");
 
       await wrapper.vm.copyToClipboardFn({});
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined);
+
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     });
   });
 

@@ -1,10 +1,10 @@
 <template>
-  <div class="q-pa-md">
+  <div class="tw:p-3">
     <ContentCopy :content="getCommand"></ContentCopy>
     <br />
     <hr />
     <div>
-      <div class="text-subtitle1 q-pl-xs q-mt-md">
+      <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
         Once you have installed the OpenObserve collector, it will:
         <ol class="tw:list-decimal tw:ml-5">
           <li>Collect system logs</li>

@@ -15,102 +15,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
+  <OCard
     data-test="custom-chart-type-selector-popup"
     style="
       padding: 0;
-      width: 95vw;
+      width: 100%;
       height: calc(100vh - 57px);
-      max-width: 1800px;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     "
   >
     <!-- Header -->
-    <q-card-section>
-      <div class="flex justify-between items-center q-pa-none">
-        <div class="flex items-center q-table__title">
-          <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
-          <span class="text-h6">Example of custom charts</span>
-        </div>
-        <q-space />
-        <q-input
+    <OCardSection role="header">
+      <div class="tw:flex tw:items-center tw:gap-3 tw:w-full">
+        <OIcon name="bar-chart" size="sm" />
+        <span class="tw:text-xl tw:font-semibold tw:whitespace-nowrap">Example of custom charts</span>
+        <OInput
           v-model="searchQuery"
-          dense
-          borderless
           placeholder="Search charts..."
-          style="min-width: 250px; border-radius: 4px; padding: 2px 8px"
           clearable
+          style="width: 280px; flex: 0 0 280px; margin-left: 16px;"
           @clear="searchQuery = ''"
         >
-          <template v-slot:prepend>
-            <q-icon name="search" />
+          <template #icon-left>
+            <OIcon name="search" size="sm" />
           </template>
-        </q-input>
+        </OInput>
+        <div class="tw:flex-1" />
         <OButton
           variant="ghost"
           size="icon"
           :title="t('dashboard.cancel')"
           @click.stop="closeDialog"
           data-test="custom-chart-type-selector-close"
-        >
-          <template #icon-left><q-icon name="close" /></template>
-        </OButton>
+          icon-left="close"
+        />
       </div>
-    </q-card-section>
+    </OCardSection>
 
-    <q-separator />
+    <OSeparator />
 
     <!-- Main Content -->
-    <q-card-section
-      class="flex"
+    <OCardSection
+      class="tw:flex"
       style="height: calc(100% - 60px); overflow: hidden; padding: 0"
     >
-      <div class="row no-wrap" style="height: 100%; width: 100%">
+      <div class="tw:flex tw:flex-nowrap" style="height: 100%; width: 100%">
         <!-- Left Sidebar -->
-        <q-card
-          flat
-          class="sidebar q-pa-md"
+        <OCard
+          class="sidebar tw:p-4"
           style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
         >
-          <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
-          <q-list dense>
-            <q-item
+          <div class="tw:text-sm tw:font-medium tw:mb-3 text-weight-bold">Chart Types</div>
+          <ul class="chart-category-list tw:flex tw:flex-col">
+            <li
               v-for="(category, index) in chartCategories"
               :key="index"
-              clickable
-              v-ripple
-              :active="selectedCategory === category.chartLabel"
               @click="scrollToCategory(category.chartLabel)"
-              class="sidebar-item"
+              class="sidebar-item tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer"
               :class="{
                 'active-category': selectedCategory === category.chartLabel,
               }"
               data-test="chart-category-item"
             >
-              <q-item-section>
-                <q-item-label>{{ category.chartLabel }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
+              <span class="tw:text-sm">{{ category.chartLabel }}</span>
+            </li>
+          </ul>
+        </OCard>
 
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="content-area q-pa-md"
+          class="content-area tw:p-3"
           style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
           @scroll="handleScroll"
         >
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="flex justify-center items-center"
+            class="tw:flex tw:justify-center tw:items-center"
             style="height: 100%"
           >
-            <div class="text-center">
-              <q-icon name="search_off" size="4rem" color="grey-5" />
-              <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
-              <div class="text-body2 text-grey-6 q-mt-sm">
+            <div class="tw:text-center">
+              <OIcon name="search-off" style="width: 4rem; height: 4rem;" />
+              <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3">No results found</div>
+              <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
                 Try searching with different keywords
               </div>
             </div>
@@ -120,29 +110,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(category, categoryIndex) in filteredCategories"
             :key="categoryIndex"
-            class="chart-category-section q-mb-xl"
+            class="chart-category-section tw:mb-6"
             :data-category="category.chartLabel"
+            data-test="chart-category-section"
           >
-            <div class="text-h6 q-mb-md text-weight-medium">
+            <div class="tw:text-xl tw:font-semibold tw:mb-3 text-weight-medium">
               {{ category.chartLabel }}
             </div>
-            <div class="row q-col-gutter-md">
+            <div class="tw:flex tw:gap-3">
               <div
                 v-for="(chart, chartIndex) in category.type"
                 :key="chartIndex"
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
-                <q-card
-                  flat
-                  bordered
-                  class="chart-card cursor-pointer"
+                <OCard
+                  class="chart-card tw:cursor-pointer"
                   :class="{
                     'selected-chart': selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
-                  <q-card-section class="q-pa-sm">
+                  <OCardSection class="tw:p-2">
                     <div class="chart-image-container">
                       <img
                         :src="chart.asset"
@@ -151,19 +140,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         loading="lazy"
                       />
                     </div>
-                  </q-card-section>
-                  <q-card-section class="q-pt-none q-px-sm q-pb-sm">
-                    <div class="text-caption text-center text-weight-medium">
+                  </OCardSection>
+                  <OCardSection class="tw:pt-0 tw:px-2 tw:pb-2">
+                    <div class="tw:text-xs tw:text-center text-weight-medium">
                       {{ chart.label }}
                     </div>
-                  </q-card-section>
-                </q-card>
+                  </OCardSection>
+                </OCard>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </q-card-section>
+    </OCardSection>
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
@@ -174,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="cancelChartSelection"
       v-model="confirmChartSelectionDialog"
     />
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
@@ -192,13 +181,23 @@ import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
+    OSeparator,
     CustomChartConfirmDialog,
     OButton,
-  },
+    OInput,
+    OCard,
+    OCardSection,
+    OIcon,
+},
   emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -352,6 +351,12 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .sidebar {
+  .chart-category-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
   .sidebar-item {
     border-radius: 4px;
     margin-bottom: 4px;

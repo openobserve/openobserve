@@ -15,22 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton
-    data-cy="syntax-guide-button"
-    variant="ghost"
-    size="sm-action"
-    class="syntax-guide-button"
-    :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-  >
-    <HelpCircle class="tw:size-4 tw:mr-1" />
-    {{ t('search.syntaxGuideLabel') }}
-    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
-      <q-card flat v-if="!sqlmode">
-        <q-card-section class="syntax-guide-title">
+  <ODropdown side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        data-cy="syntax-guide-button"
+        data-test="metrics-syntax-guide-button"
+        variant="ghost"
+        size="sm-action"
+        class="syntax-guide-button"
+        :class="sqlmode ? 'sql-mode' : 'normal-mode'"
+      >
+        <OIcon name="help" size="sm" />
+        {{ t('search.syntaxGuideLabel') }}
+      </OButton>
+    </template>
+    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+      <div v-if="!sqlmode">
+        <div class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
+        </div>
+        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
@@ -57,22 +62,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-      <q-card flat v-else>
-        <q-card-section class="syntax-guide-title">
+        </div>
+      </div>
+      <div v-else>
+        <div class="syntax-guide-title">
           <div class="label">Syntax Guide: SQL Mode</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
+        </div>
+        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all('error')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
@@ -114,10 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-menu>
-  </OButton>
+        </div>
+      </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
@@ -125,11 +129,15 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { HelpCircle } from 'lucide-vue-next';
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 export default defineComponent({
   name: "SyntaxGuideMetrics",
-  components: { OButton, HelpCircle },
+  components: { OButton, OIcon, ODropdown },
   props: {
     sqlmode: {
       type: Boolean,
@@ -165,7 +173,7 @@ export default defineComponent({
   text-transform: capitalize;
   padding: 5px 5px;
   height: 30px;
-  font-weight: bold;
+  font-weight: 600;
   border: 1px solid rgba(89, 96, 178, 0.3);
 }
 

@@ -49,8 +49,9 @@ export class CommonActions {
      * @returns {Promise<boolean>} - Whether the option was found
      */
     async scrollAndFindOption(optionName, optionType) {
-        // Use more specific locator to target the visible dropdown to avoid strict mode violation
-        const dropdown = this.page.locator('.q-menu:visible').first();
+        // Target the visible dropdown — OSelect (Reka Listbox) post-migration,
+        // q-select (.q-menu) pre-migration.
+        const dropdown = this.page.locator('[data-test$="-popover"]').first();
         let optionFound = false;
         let maxScrolls = 50;
         let scrollAmount = 1000;
@@ -237,12 +238,12 @@ export class CommonActions {
     // Dismiss any blocking overlays/modals that might intercept clicks
     async dismissBlockingOverlays() {
         for (let i = 0; i < 3; i += 1) {
-            const backdrop = this.page.locator('.q-dialog__backdrop');
-            const count = await backdrop.count();
-            const visible = count > 0 ? await backdrop.first().isVisible().catch(() => false) : false;
+            const dialog = this.page.locator('[data-test$="-dialog"]');
+            const count = await dialog.count();
+            const visible = count > 0 ? await dialog.first().isVisible().catch(() => false) : false;
             if (!visible) break;
-            await this.page.keyboard.press('Escape').catch(() => {});
-            await backdrop.first().waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {});
+            await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+            await dialog.first().waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {});
             await this.page.waitForTimeout(150);
         }
     }

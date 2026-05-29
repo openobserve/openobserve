@@ -28,6 +28,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     // Ingest data using page object method
     const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3"];
     await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
+    await pageManager.apiCleanup.cleanupPipelines(streamNames).catch(() => {});
+
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );

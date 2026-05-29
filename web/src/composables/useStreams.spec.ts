@@ -17,6 +17,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Mock Stream Service
 vi.mock("@/services/stream", () => ({
@@ -26,12 +27,11 @@ vi.mock("@/services/stream", () => ({
   }
 }));
 
-// Mock Quasar
-const mockNotify = vi.fn().mockReturnValue(() => {});
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: mockNotify
-  })
+// Mock Toast
+const mockToastDismiss = vi.fn();
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
 }));
 
 // Mock utilities
@@ -81,12 +81,13 @@ describe("useStreams Composable", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(toast).mockReturnValue(mockToastDismiss);
     mockStore = createMockStore();
-    
+
     // Set up default mocks
     const mockStreamService = vi.mocked(StreamService);
     mockStreamService.nameList.mockResolvedValue({
-      data: { 
+      data: {
         list: [
           { name: "test-stream", stream_type: "logs" }
         ]
@@ -724,36 +725,30 @@ describe("useStreams Composable", () => {
     });
 
     it("should handle notification dismissal in getStreams", async () => {
-      const dismissMock = vi.fn();
-      mockNotify.mockReturnValueOnce(dismissMock);
-      
       mockStore.state.streams.logs = null;
-      
+
       await streamsInstance.getStreams("logs", false, true);
-      
-      expect(mockNotify).toHaveBeenCalledWith({
-        spinner: true,
+
+      expect(vi.mocked(toast)).toHaveBeenCalledWith({
+        variant: "loading",
         message: "Please wait while loading streams...",
-        timeout: 5000
+        timeout: 0,
       });
-      expect(dismissMock).toHaveBeenCalled();
+      expect(mockToastDismiss).toHaveBeenCalled();
     });
 
     it("should handle notification dismissal in getPaginatedStreams", async () => {
-      const dismissMock = vi.fn();
-      mockNotify.mockReturnValueOnce(dismissMock);
-      
       await streamsInstance.getPaginatedStreams("logs", false, true);
-      
-      expect(dismissMock).toHaveBeenCalled();
+
+      expect(mockToastDismiss).toHaveBeenCalled();
     });
 
     it("should handle getStreams with notify=false", async () => {
       mockStore.state.streams.logs = null;
-      
+
       await streamsInstance.getStreams("logs", false, false);
-      
-      expect(mockNotify).not.toHaveBeenCalled();
+
+      expect(vi.mocked(toast)).not.toHaveBeenCalled();
     });
 
     it("should handle Promise.allSettled with mixed results in getStreams", async () => {

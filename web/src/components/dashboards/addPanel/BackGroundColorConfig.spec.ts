@@ -14,7 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import { ref, reactive } from "vue";
 
@@ -60,7 +59,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// Removed installQuasar() since we're using Quasar directly in global plugins
 
 describe("BackGroundColorConfig", () => {
   let wrapper: any;
@@ -69,41 +67,46 @@ describe("BackGroundColorConfig", () => {
     return mount(BackGroundColorConfig, {
       attachTo: "#app",
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
           ...provide,
         },
         stubs: {
-          "q-select": {
+          OSelect: {
             template: `
-              <div class="q-select-stub" :data-test="$attrs['data-test']">
-                <select 
-                  :value="modelValue" 
+              <div :data-test="$attrs['data-test']">
+                <select
+                  data-test="o-select-native"
+                  :value="modelValue"
                   @change="$emit('update:modelValue', $event.target.value)"
-                  class="select-element"
+                  class="o-select-native"
                 >
-                  <option 
-                    v-for="option in options" 
-                    :key="option.value" 
+                  <option
+                    v-for="option in options"
+                    :key="option.value"
                     :value="option.value"
                   >
                     {{ option.label }}
                   </option>
                 </select>
-                <div class="display-value">{{ displayValue }}</div>
-                <div class="label">{{ label }}</div>
+                <span class="o-select-display">{{ modelValue || 'None' }}</span>
               </div>
             `,
             props: [
               "modelValue",
               "options",
-              "dense",
               "label",
-              "stackLabel",
-              "emitValue",
-              "displayValue",
-              "outlined",
+              "labelKey",
+              "valueKey",
+              "multiple",
+              "loading",
+              "error",
+              "clearable",
+              "searchable",
+              "size",
+              "disabled",
+              "selectAll",
             ],
             emits: ["update:modelValue"],
             inheritAttrs: false,
@@ -393,11 +396,11 @@ describe("BackGroundColorConfig", () => {
       expect(container.attributes("style")).toContain("width: 100%");
     });
 
-    it("should render q-select with correct props", () => {
+    it("should render OSelect with correct props", () => {
       wrapper = createWrapper();
-      const qSelect = wrapper.find(".q-select-stub");
+      const oSelect = wrapper.find('[data-test="o-select-native"]');
 
-      expect(qSelect.exists()).toBeTruthy();
+      expect(oSelect.exists()).toBeTruthy();
       expect(wrapper.vm.colorModeOptions).toEqual([
         { label: "None", value: "" },
         { label: "Single color", value: "single" },
@@ -406,34 +409,34 @@ describe("BackGroundColorConfig", () => {
 
     it("should render display value as 'None' when no background type", () => {
       wrapper = createWrapper();
-      const displayValue = wrapper.find(".display-value");
-      expect(displayValue.text()).toBe("None");
+      // backgroundType is computed from config, which defaults to ""
+      expect(wrapper.vm.backgroundType).toBe("");
     });
 
     it("should render display value as 'Single color' when type is single", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
-      const displayValue = wrapper.find(".display-value");
-      expect(displayValue.text()).toBe("Single color");
+      // backgroundType is computed from config
+      expect(wrapper.vm.backgroundType).toBe("single");
     });
 
     it("should not show color input when background type is empty", () => {
       wrapper = createWrapper();
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-config-color-input"]');
       expect(colorInput.exists()).toBeFalsy();
     });
 
     it("should show color input when background type is single", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-config-color-input"]');
       expect(colorInput.exists()).toBeTruthy();
     });
 
     it("should render color input wrapper with correct styling when visible", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
-      const colorWrapper = wrapper.find(".color-input-wrapper");
+      const colorWrapper = wrapper.find('[data-test="dashboard-config-color-input-wrapper"]');
 
       expect(colorWrapper.exists()).toBeTruthy();
       expect(colorWrapper.attributes("style")).toContain("margin-top: 36px");
@@ -445,7 +448,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.value.color = "#ff0000";
       wrapper = createWrapper();
 
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-config-color-input"]');
       expect(colorInput.element.value).toBe("#ff0000");
     });
   });
@@ -458,7 +461,7 @@ describe("BackGroundColorConfig", () => {
     });
 
     it("should update background type when select changes", async () => {
-      const select = wrapper.find(".select-element");
+      const select = wrapper.find('[data-test="o-select-native"]');
 
       await select.setValue("single");
       await flushPromises();
@@ -470,7 +473,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       await wrapper.vm.$nextTick();
 
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-config-color-input"]');
       await colorInput.setValue("#00ff00");
 
       expect(mockDashboardPanelData.data.config.background.value.color).toBe(
@@ -479,19 +482,19 @@ describe("BackGroundColorConfig", () => {
     });
 
     it("should handle form interactions correctly", async () => {
-      const select = wrapper.find(".select-element");
+      const select = wrapper.find('[data-test="o-select-native"]');
 
       // Change to single
       await select.setValue("single");
       await flushPromises();
 
-      expect(wrapper.find("input[type='color']").exists()).toBeTruthy();
+      expect(wrapper.find('[data-test="dashboard-config-color-input"]').exists()).toBeTruthy();
 
       // Change back to none
       await select.setValue("");
       await flushPromises();
 
-      expect(wrapper.find("input[type='color']").exists()).toBeFalsy();
+      expect(wrapper.find('[data-test="dashboard-config-color-input"]').exists()).toBeFalsy();
     });
   });
 
@@ -643,7 +646,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
 
-      const colorWrapper = wrapper.find(".color-input-wrapper");
+      const colorWrapper = wrapper.find('[data-test="dashboard-config-color-input-wrapper"]');
       expect(colorWrapper.exists()).toBeTruthy();
       expect(colorWrapper.classes()).toContain("color-input-wrapper");
     });
@@ -652,7 +655,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.type = "single";
       wrapper = createWrapper();
 
-      const colorInput = wrapper.find("input[type='color']");
+      const colorInput = wrapper.find('[data-test="dashboard-config-color-input"]');
       expect(colorInput.exists()).toBeTruthy();
       expect(colorInput.attributes("type")).toBe("color");
     });

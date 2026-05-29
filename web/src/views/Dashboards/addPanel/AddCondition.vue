@@ -1,29 +1,28 @@
 <template>
   <div class="condition">
-    <q-select
+    <OSelect
       v-if="conditionIndex !== 0"
       v-model="condition.logicalOperator"
-      dense
-      options-dense
-      borderless
-      hide-bottom-space
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup class="axis-field" radius="sm">
-      <OButton
-        variant="primary"
-        size="chip-12"
-        :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
+      <ODropdown
+        @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
       >
-        {{ computedLabel(condition) }}
-        <template #icon-right><q-icon name="arrow_drop_down" /></template>
-        <q-menu
-          class="q-pa-md"
-          @show="(e: any) => loadFilterItem(condition.column)"
-        >
+        <template #trigger>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
+            icon-right="arrow-drop-down"
+          >
+            {{ computedLabel(condition) }}
+          </OButton>
+        </template>
+        <div class="add-condition-dropdown tw:p-4 tw:w-72">
           <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
               class="tw:w-full"
@@ -36,15 +35,13 @@
               size="icon"
               @click="removeColumnName"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
+              icon-left="close"
             >
-              <template #icon-left
-                ><q-icon name="close" size="18px"
-              /></template>
             </OButton>
           </div>
-          <div style="height: 100%">
-            <div class="q-pa-xs" style="height: 100%">
-              <div class="q-gutter-xs" style="height: 100%">
+          <div>
+            <div class="tw:p-1">
+              <div class="tw:gap-1">
                 <OTabs v-model="condition.type" dense>
                   <OTab
                     name="list"
@@ -57,15 +54,12 @@
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
                   ></OTab>
                 </OTabs>
-                <q-separator></q-separator>
-                <div class="tw:h-full">
+                <OSeparator />
+                <div>
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
-                      <div class="flex column" style="height: 220px">
-                        <q-select
-                          dense
-                          borderless
-                          hide-bottom-space
+                      <div class="tw:flex column tw:gap-2">
+                        <OSelect
                           v-model="condition.operator"
                           :options="operators"
                           :label="t('common.operator')"
@@ -73,7 +67,7 @@
                           data-test="dashboard-add-condition-operator"
                           class="o2-custom-select-dashboard"
                         />
-                        <CommonAutoComplete
+                        <OCombobox
                           v-if="
                             !['Is Null', 'Is Not Null'].includes(
                               condition.operator,
@@ -82,79 +76,38 @@
                           :label="t('common.value')"
                           v-model="condition.value"
                           :items="dashboardVariablesFilterItems"
-                          searchRegex="(?:^|[^$])\$?(\w+)"
-                        ></CommonAutoComplete>
+                          search-regex="(?:^|[^$])\$?(\w+)"
+                          data-test="dashboard-add-condition-value"
+                        />
                       </div>
                     </OTabPanel>
                     <OTabPanel name="list">
-                      <q-select
-                        dense
-                        borderless
+                      <OSelect
                         v-model="condition.values"
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
                         multiple
-                        emit-value
-                        map-options
-                        :rules="[
-                          (val: any) =>
-                            val.length > 0 || 'At least 1 item required',
-                        ]"
-                        use-input
-                        @filter="filterListFn"
+                        searchable
+                        :error="condition.values?.length === 0"
+                        :error-message="condition.values?.length === 0 ? 'At least 1 item required' : ''"
                         data-test="dashboard-add-condition-list-tab"
                         class="o2-custom-select-dashboard"
-                      >
-                        <template v-slot:selected>
-                          {{
-                            condition.values[0]?.length > 15
-                              ? condition.values[0]?.substring(0, 15) + "..."
-                              : condition.values[0]
-                          }}
-                          {{
-                            condition.values?.length > 1
-                              ? " +" + (condition.values?.length - 1)
-                              : ""
-                          }}
-                        </template>
-                        <template
-                          v-slot:option="{
-                            itemProps,
-                            opt,
-                            selected,
-                            toggleOption,
-                          }"
-                        >
-                          <q-item v-bind="itemProps">
-                            <q-item-section side>
-                              <q-checkbox
-                                dense
-                                :model-value="selected"
-                                @update:model-value="toggleOption(opt)"
-                                data-test="dashboard-add-condition-list-item"
-                              ></q-checkbox>
-                            </q-item-section>
-                            <q-item-section>
-                              <SanitizedHtmlRenderer :html-content="opt" />
-                            </q-item-section>
-                          </q-item>
-                        </template>
-                      </q-select>
+                      />
                     </OTabPanel>
                   </OTabPanels>
                 </div>
               </div>
             </div>
           </div>
-        </q-menu>
-      </OButton>
+        </div>
+      </ODropdown>
       <OButton
         variant="outline"
         size="icon-chip"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
+        icon-left="close"
       >
-        <template #icon-left><q-icon name="close" /></template>
       </OButton>
     </OButtonGroup>
   </div>
@@ -163,13 +116,15 @@
 <script lang="ts">
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -180,15 +135,17 @@ import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 export default defineComponent({
   name: "AddCondition",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
+    ODropdown,
     OTabs,
     OTab,
     OTabPanels,
     OTabPanel,
-    CommonAutoComplete,
-    SanitizedHtmlRenderer,
+    OCombobox,
     StreamFieldSelect,
+    OSelect,
   },
   props: [
     "condition",
@@ -261,7 +218,10 @@ export default defineComponent({
       "Is Not Null",
     ];
 
-    const filterOptions = ["AND", "OR"];
+    const filterOptions = [
+      { label: "AND", value: "AND" },
+      { label: "OR", value: "OR" },
+    ];
 
     const computedLabel = (condition: any) => {
       const builtCondition = buildCondition(condition, dashboardPanelData);
@@ -306,8 +266,8 @@ export default defineComponent({
       computedLabel,
       t,
       filterStreamFn,
-      filterListFn,
       filterOptions,
+      filterListFn,
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
@@ -326,18 +286,19 @@ export default defineComponent({
   gap: 8px;
 }
 
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
-  .q-virtual-scroll__content {
+.add-condition-dropdown {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
+  }
+
+  :deep(.o-tab) {
+    flex: 1;
   }
 }
 
 .condition-logical-operator {
-  width: 60px;
+  width: fit-content;
+  max-width: 8rem;
 }
 
 :deep(.condition-logical-operator .q-field__control) {

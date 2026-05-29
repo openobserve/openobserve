@@ -1,17 +1,17 @@
 <template>
     <div data-test="alerts-container">
-      <div data-test="alerts-container-header" class="tw:flex tw:justify-between cursor-pointer" @click="expanded = !expanded">
-        <div class="tw:flex tw:items-start tw:justify-between full-width ">
+      <div data-test="alerts-container-header" class="tw:flex tw:justify-between tw:cursor-pointer" @click="expanded = !expanded">
+        <div class="tw:flex tw:items-start tw:justify-between tw:w-full ">
 
           <div
             class="tw:text-[16px] tw:flex tw:items-start"
 
           >
-          <q-icon
+          <OIcon
             v-if="!image"
             data-test="container-icon"
             :name="icon"
-            size="16px"
+            size="sm"
             class="tw:mr-2   tw:rounded-full tw:px-1 tw:py-1  "
             :class="[
               store.state.theme === 'dark'
@@ -46,9 +46,9 @@
           </div>
 
           </div>
-          <q-icon
+          <OIcon
             data-test="expand-toggle-icon"
-            :name="expanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
+            :name="expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
             class="tw:rounded-full tw:p-1 tw:mt-2"
 
             :class="[
@@ -56,7 +56,7 @@
                 ? 'tw:text-gray-100  tw:bg-gray-600'
                 : 'tw:text-gray-900 tw:bg-gray-300',
             ]"
-            size="18px"
+            size="sm"
           />
         </div>
       </div>

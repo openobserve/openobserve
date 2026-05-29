@@ -1007,6 +1007,7 @@ mod tests {
             compressed_size: 1024 * 1024,   // 1MB
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
 
         let stats = RequestStats::from(file_meta);

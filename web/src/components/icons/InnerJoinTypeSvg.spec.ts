@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import InnerJoinTypeSvg from '@/components/icons/InnerJoinTypeSvg.vue';
-import { Quasar } from 'quasar';
+
 
 describe('InnerJoinTypeSvg.vue', () => {
   let wrapper: VueWrapper;
@@ -11,7 +11,7 @@ describe('InnerJoinTypeSvg.vue', () => {
   });
 
   const createWrapper = (props = {}) =>
-    mount(InnerJoinTypeSvg, { global: { plugins: [Quasar] }, props });
+    mount(InnerJoinTypeSvg, { global: { plugins: [] }, props });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

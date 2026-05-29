@@ -39,6 +39,7 @@ use crate::{
 pub struct PuffinDirReader {
     source: Arc<PuffinBytesReader>,
     blobs_metadata: Arc<HashMap<PathBuf, Arc<BlobMetadata>>>,
+    properties: Arc<HashMap<String, String>>,
 }
 
 impl PuffinDirReader {
@@ -60,10 +61,17 @@ impl PuffinDirReader {
             }
         }
 
+        let properties = metadata.properties.into_iter().collect::<HashMap<_, _>>();
+
         Ok(Self {
             source: Arc::new(source),
             blobs_metadata: Arc::new(blobs_metadata),
+            properties: Arc::new(properties),
         })
+    }
+
+    pub fn get_property(&self, key: &str) -> Option<&str> {
+        self.properties.get(key).map(|s| s.as_str())
     }
 }
 
@@ -72,6 +80,7 @@ impl Clone for PuffinDirReader {
         PuffinDirReader {
             source: self.source.clone(),
             blobs_metadata: self.blobs_metadata.clone(),
+            properties: self.properties.clone(),
         }
     }
 }
@@ -243,18 +252,25 @@ pub async fn warm_up_terms(
         }
     }
 
-    if !warm_up_fields_futures.is_empty() {
-        try_join_all(warm_up_fields_futures).await?;
-    }
-    if !warm_up_fields_term_futures.is_empty() {
-        try_join_all(warm_up_fields_term_futures).await?;
-    }
-    if !warm_up_terms_futures.is_empty() {
-        try_join_all(warm_up_terms_futures).await?;
-    }
-    if !warm_up_fast_fields_futures.is_empty() {
-        try_join_all(warm_up_fast_fields_futures).await?;
-    }
+    // Run all warm-up categories in parallel
+    tokio::try_join!(
+        async {
+            try_join_all(warm_up_terms_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            try_join_all(warm_up_fields_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            try_join_all(warm_up_fields_term_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async { try_join_all(warm_up_fast_fields_futures).await },
+    )?;
     Ok(())
 }
 
@@ -441,6 +457,7 @@ mod tests {
         let reader = PuffinDirReader {
             source: Arc::new(mock_reader),
             blobs_metadata: Arc::new(blobs_metadata),
+            properties: Arc::new(HashbrownHashMap::new()),
         };
 
         let result = reader.get_file_handle(&path);
@@ -458,6 +475,7 @@ mod tests {
         let reader = PuffinDirReader {
             source: Arc::new(mock_reader),
             blobs_metadata: Arc::new(blobs_metadata),
+            properties: Arc::new(HashbrownHashMap::new()),
         };
 
         let path = PathBuf::from("nonexistent_file.terms");
@@ -487,6 +505,7 @@ mod tests {
         let reader = PuffinDirReader {
             source: Arc::new(mock_reader),
             blobs_metadata: Arc::new(blobs_metadata),
+            properties: Arc::new(HashbrownHashMap::new()),
         };
 
         let path = PathBuf::from("file_without_extension");
@@ -512,6 +531,7 @@ mod tests {
         let reader = PuffinDirReader {
             source: Arc::new(mock_reader),
             blobs_metadata: Arc::new(blobs_metadata),
+            properties: Arc::new(HashbrownHashMap::new()),
         };
 
         let result = reader.exists(&path);
@@ -529,6 +549,7 @@ mod tests {
         let reader = PuffinDirReader {
             source: Arc::new(mock_reader),
             blobs_metadata: Arc::new(blobs_metadata),
+            properties: Arc::new(HashbrownHashMap::new()),
         };
 
         let path = PathBuf::from("nonexistent_file.unknown");
@@ -549,6 +570,7 @@ mod tests {
         let reader = PuffinDirReader {
             source: Arc::new(mock_reader),
             blobs_metadata: Arc::new(blobs_metadata),
+            properties: Arc::new(HashbrownHashMap::new()),
         };
 
         let path = PathBuf::from("test_file.txt");

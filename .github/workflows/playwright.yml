@@ -6,7 +6,7 @@ on:
       - "main"
   pull_request:
     branches:
-      - "*"
+      - "**"
   merge_group:
 
 concurrency:
@@ -47,6 +47,7 @@ env:
 
 jobs:
   check_changes:
+    timeout-minutes: 5
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -70,11 +71,14 @@ jobs:
           fi
 
   build_binary:
+    timeout-minutes: 45
     name: build_binary
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
       labels: ubicloud-standard-16
+    permissions:
+      contents: read
 
     steps:
       - name: Remove unused tools
@@ -137,14 +141,20 @@ jobs:
           if-no-files-found: error
 
   ui_integration_tests:
+    timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
+    if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-8
+    permissions:
+      contents: read
+      actions: read
     # container:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
-    #   options: --user root 
+    #   options: --user root
     strategy:
+      fail-fast: false
       matrix:
         include:
           - testfolder: "GeneralTests"
@@ -197,8 +207,7 @@ jobs:
               ]
           - testfolder: "Logs-Features"
             browser: "chrome"
-            run_files:
-              [
+            run_files: [
                 "logs-autocomplete-suggestions.spec.js",
                 # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
                 "logs-sql-autocomplete.spec.js",
@@ -211,8 +220,7 @@ jobs:
               ]
           - testfolder: "Alerts"
             browser: "chrome"
-            run_files:
-              [
+            run_files: [
                 # "alerts-e2e-flow.spec.js",
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
@@ -253,7 +261,8 @@ jobs:
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
-            run_files: [
+            run_files:
+              [
                 "custom-charts.spec.js",
                 "dashboard-geoMap.spec.js",
                 "dashboard-maps.spec.js",
@@ -271,7 +280,7 @@ jobs:
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js",]
+            run_files: ["dashboard-streaming.spec.js"]
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
@@ -289,16 +298,19 @@ jobs:
               ]
           - testfolder: "Functions"
             browser: "chrome"
-            run_files: [
+            run_files:
+              [
                 "js-transform-type.spec.js",
                 "row-expansion.spec.js",
                 "enrichment-table-url.spec.js",
               ]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files: [
-              "reportsScheduleNow.spec.js", 
-              "reportsScheduleLater.spec.js"
+            run_files:
+              [
+                "reportsScheduleNow.spec.js",
+                "reportsScheduleLater.spec.js",
+                "reportFolders.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"
@@ -322,7 +334,6 @@ jobs:
                 "tracesAnalyzeDimensions.spec.js",
                 "traces-autocomplete-suggestions.spec.js",
               ]
-
           - testfolder: "Metrics"
             browser: "chrome"
             run_files:
@@ -358,16 +369,10 @@ jobs:
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-table-pagination.spec.js",
-              ]
+            run_files: ["dashboard-table-pagination.spec.js"]
           - testfolder: "Dashboard-Pivot-Table"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-pivot-table.spec.js",
-              ]
+            run_files: ["dashboard-pivot-table.spec.js"]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"
             run_files:
@@ -397,6 +402,13 @@ jobs:
                 "dashboard-config-markline.spec.js",
               ]
     steps:
+      - name: Kill background apt processes
+        run: |
+          sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+          sudo systemctl disable apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+          sudo flock --wait 30 /var/lib/dpkg/lock-frontend true 2>/dev/null || true
+
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
@@ -435,6 +447,15 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-
 
       - name: Check if this is a rerun
         id: check_rerun
@@ -499,7 +520,42 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          npx playwright install --with-deps chromium
+
+          # Install apt system dependencies (always needed)
+          npx playwright install-deps chromium
+
+          # Get revision from playwright's own metadata
+          CHROMIUM_REV=$(node -pe "
+            require('./node_modules/playwright-core/browsers.json')
+              .browsers.find(b => b.name === 'chromium').revision
+          ")
+
+          install_browser() {
+            local NAME="$1"
+            local BINARY="$2"
+            local ZIP_PATH="$3"
+            local DIR="$HOME/.cache/ms-playwright/${NAME}-${CHROMIUM_REV}"
+            if [ -f "${DIR}/INSTALLATION_COMPLETE" ]; then
+              echo "${NAME} already installed (cache hit)"; return 0
+            fi
+            rm -rf "${DIR}"
+            echo "Cache miss — downloading ${NAME} r${CHROMIUM_REV} via curl + system unzip"
+            curl -fL --progress-bar \
+              "https://cdn.playwright.dev/dbazure/download/playwright/builds/${ZIP_PATH}" \
+              -o "/tmp/${NAME}.zip"
+            mkdir -p "${DIR}"
+            unzip -q "/tmp/${NAME}.zip" -d "${DIR}"
+            rm -f "/tmp/${NAME}.zip"
+            find "${DIR}" -name "${BINARY}" -type f -exec chmod 755 {} \;
+            find "${DIR}" -name 'chrome_sandbox' -type f -exec chmod 4755 {} \; 2>/dev/null || true
+            touch "${DIR}/INSTALLATION_COMPLETE"
+            echo "${NAME} installed: $(ls ${DIR}/)"
+          }
+
+          install_browser "chromium" "chrome" \
+            "chromium/${CHROMIUM_REV}/chromium-linux.zip"
+          install_browser "chromium_headless_shell" "headless_shell" \
+            "chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip"
 
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
@@ -767,7 +823,7 @@ jobs:
             fi
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
-          fi 
+          fi
 
       - name: Upload blob report to GitHub Actions Artifacts
         if: ${{ !cancelled() }}
@@ -782,11 +838,15 @@ jobs:
         run: cat o2.log
 
   merge_and_upload_reports:
+    timeout-minutes: 15
     name: Merge Reports and Upload to TestDino
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-4
+    permissions:
+      contents: read
+      actions: read
 
     steps:
       - name: Clone the current repo
@@ -795,7 +855,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: "22"
 
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci
@@ -901,7 +961,7 @@ jobs:
             echo "::notice::Using cache ID: $CACHE_ID"
 
             # Suppress verbose debug output from TestDino, only show result
-            if CACHE_OUTPUT=$(npx tdpw cache --cache-id "$CACHE_ID" 2>&1); then
+            if CACHE_OUTPUT=$(npx --yes tdpw cache --cache-id "$CACHE_ID" 2>&1); then
               # Extract only the success message, filter out debug spam
               SUCCESS_MSG=$(echo "$CACHE_OUTPUT" | grep "Cache data submitted successfully" || echo "")
               if [ -n "$SUCCESS_MSG" ]; then
@@ -940,18 +1000,45 @@ jobs:
             mv playwright-results/report.json.tmp playwright-results/report.json
           fi
 
+          # Filter report to only include failed tests for TestDino upload
+          node -e "
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('playwright-results/report.json', 'utf8'));
+          function filterSuite(s) {
+            const specs = (s.specs||[]).filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'));
+            const suites = (s.suites||[]).map(filterSuite).filter(sub=>(sub.specs&&sub.specs.length)||(sub.suites&&sub.suites.length));
+            return {...s,specs,suites};
+          }
+          const filtered = {
+            ...report,
+            suites: report.suites.map(filterSuite).filter(s=>(s.specs&&s.specs.length)||(s.suites&&s.suites.length)),
+            stats: {...report.stats,expected:0,flaky:0,skipped:0}
+          };
+          fs.writeFileSync('playwright-results/report-failures-only.json',JSON.stringify(filtered));
+          const total=(report.stats.expected||0)+(report.stats.unexpected||0)+(report.stats.skipped||0)+(report.stats.flaky||0);
+          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino');
+          "
+          echo "::notice::Report filtered to failures only"
+
           npx --yes tdpw@latest upload playwright-results \
-            --json-report playwright-results/report.json \
+            --json-report playwright-results/report-failures-only.json \
             --html-report playwright-results/html-report \
             --upload-html \
             --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
   playwright_summary:
+    timeout-minutes: 5
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-4
     permissions: {}
-    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports]
+    needs:
+      [
+        check_changes,
+        build_binary,
+        ui_integration_tests,
+        merge_and_upload_reports,
+      ]
     if: always()
     steps:
       - name: Check test results

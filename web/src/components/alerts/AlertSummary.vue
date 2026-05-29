@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="summary-content" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
       <p v-if="summaryText" class="summary-text" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
       <div v-else class="summary-empty-state">
-        <q-icon name="article" size="36px" class="summary-empty-icon" />
+        <OIcon name="article" size="lg" class="summary-empty-icon" />
         <span class="summary-empty-text">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
       </div>
     </div>
@@ -36,10 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="scroll-to-bottom-btn"
         @click="scrollToBottomSmooth"
       >
-        <q-icon name="arrow_downward" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          Scroll to bottom
-        </q-tooltip>
+        <OIcon name="arrow-downward" size="sm" />
+        <OTooltip content="Scroll to bottom" side="top" />
       </OButton>
     </div>
   </div>
@@ -49,8 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, nextTick, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import DOMPurify from 'dompurify';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 
@@ -103,10 +103,9 @@ const checkIfShouldShowScrollButton = () => {
 
   const { scrollTop, scrollHeight, clientHeight } = summaryContainer.value;
 
-  // Show scroll to bottom button when user scrolls up significantly
-  // Only show if there's enough content to scroll and user is not at bottom
-  const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
-  const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
+  // Show scroll to bottom button when there's scrollable content and user is not at bottom
+  const hasScrollableContent = scrollHeight > clientHeight + 10;
+  const isScrolledUp = scrollTop + clientHeight < scrollHeight - 10;
 
   showScrollToBottom.value = hasScrollableContent && isScrolledUp;
 };
@@ -123,7 +122,6 @@ const scrollToBottomSmooth = async () => {
   }
 };
 
-// Check scroll state when summary text changes
 watch(summaryText, async () => {
   await nextTick();
   checkIfShouldShowScrollButton();
@@ -148,6 +146,7 @@ onMounted(async () => {
   font-size: 0.8125rem;
   line-height: 2.2;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem;
   display: flex;
@@ -297,11 +296,6 @@ onMounted(async () => {
 
   &:active {
     transform: scale(1);
-  }
-
-  .q-icon {
-    font-size: 18px;
-    font-weight: bold;
   }
 }
 

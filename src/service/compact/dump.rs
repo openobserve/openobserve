@@ -89,6 +89,10 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // we don't dump for file_list stream
             continue;
         }
+        if !super::is_past_hour(*offset) {
+            need_done_ids.push(*job_id); // the data is not past hour, need to wait
+            continue;
+        }
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
@@ -341,6 +345,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         }
 
         infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
+
         log::info!(
             "[COMPACTOR::DUMP] successfully dumped {records} records to file {file_name}, took: {} ms",
             start.elapsed().as_millis(),
@@ -367,28 +372,21 @@ pub async fn delete_all(
         stream_type,
         stream_name,
         (BASE_TIME.timestamp_micros(), Utc::now().timestamp_micros()),
-        true,
     )
     .await
 }
 
-// check this delete is daily or hourly
-// -> daily
-//   1. we need to get all the files in the range
-//   2. simple mark these files as deleted
-//   3. insert the deleted items into file_list_deleted table
-// -> hourly
+// check this delete is all or other cases
 //   1. we need to get all the files in the range
 //   2. pickup the items that need to be deleted
-//   3. insert the deleted items into file_list_deleted table
-//   4. generate a new dump file excluding the items that need to be deleted
-//   5. make the old files deleted and add the new file to file_list table
+//   3. if not all the files need to be deleted, we need to generate new dump files
+//   4. insert the deleted items into file_list_deleted table
+//   5. make the old files deleted and add the new files to file_list table
 pub async fn delete_by_time_range(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
-    is_hourly: bool,
 ) -> Result<(), errors::Error> {
     let cfg = get_config();
     if !cfg.compact.file_list_dump_enabled {
@@ -401,104 +399,7 @@ pub async fn delete_by_time_range(
     if list.is_empty() {
         return Ok(());
     }
-    if is_hourly {
-        if let Err(e) = delete_hourly_inner(org_id, stream_type, stream_name, list, range).await {
-            log::error!("[FILE_LIST_DUMP] delete_hourly_inner failed: {e}");
-            return Err(e);
-        }
-    } else if let Err(e) = delete_daily_inner(org_id, list, range).await {
-        log::error!("[FILE_LIST_DUMP] delete_daily_inner failed: {e}");
-        return Err(e);
-    }
-    Ok(())
-}
 
-async fn delete_daily_inner(
-    org_id: &str,
-    list: Vec<FileRecord>,
-    _range: (i64, i64),
-) -> Result<(), errors::Error> {
-    let cfg = get_config();
-    let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
-    let query = "SELECT * FROM file_list";
-    let trace_id = config::ider::generate_trace_id();
-    let ret = exec(&trace_id, cfg.limit.cpu_num, dump_files.clone(), query).await?;
-    let files = ret
-        .into_iter()
-        .flat_map(record_batch_to_file_record)
-        .collect::<Vec<_>>();
-
-    // create deleted items for file_list_deleted table
-    let mut del_items: Vec<_> = files
-        .iter()
-        .map(|f| FileListDeleted {
-            id: 0,
-            account: f.account.to_string(),
-            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
-            index_file: false,
-            flattened: false,
-        })
-        .collect();
-
-    // we also need to delete the dump files
-    del_items.extend(dump_files.iter().map(|f| FileListDeleted {
-        id: 0,
-        account: f.account.to_string(),
-        file: f.key.clone(),
-        index_file: false,
-        flattened: false,
-    }));
-
-    let items: Vec<_> = dump_files
-        .into_iter()
-        .map(|mut f| {
-            f.deleted = true;
-            f.segment_ids = None;
-            f
-        })
-        .collect();
-
-    let mut mark_deleted_done = false;
-    for _ in 0..5 {
-        if !mark_deleted_done && let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        mark_deleted_done = true;
-
-        if let Err(e) =
-            infra::file_list::batch_add_deleted(org_id, Utc::now().timestamp_micros(), &del_items)
-                .await
-        {
-            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        break;
-    }
-
-    // Delete dump_stats for deleted dump files
-    for item in &items {
-        if let Err(e) = infra_file_list::delete_dump_stats(&item.key).await {
-            log::error!(
-                "[FILE_LIST_DUMP] delete_dump_stats for {} failed: {e}",
-                item.key
-            );
-        }
-    }
-
-    Ok(())
-}
-
-async fn delete_hourly_inner(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    list: Vec<FileRecord>,
-    range: (i64, i64),
-) -> Result<(), errors::Error> {
-    let cfg = get_config();
     let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
     let query = "SELECT * FROM file_list;";
     let trace_id = config::ider::generate_trace_id();
@@ -519,19 +420,26 @@ async fn delete_hourly_inner(
         return Ok(()); // nothing need to do
     }
 
-    let new_dump_file = if !files_to_keep.is_empty() {
-        match generate_dump(org_id, stream_type, stream_name, range, files_to_keep).await {
-            Ok(v) => v,
+    // Check if there are some files need to be kept, then we need to generate new dump files
+    let mut new_dump_files = Vec::new();
+    let groupd_files_to_keep = files_to_keep
+        .into_iter()
+        .chunk_by(|f| f.date.clone())
+        .into_iter()
+        .map(|(date, files)| (date, files.collect::<Vec<_>>()))
+        .collect::<Vec<_>>();
+    for (date, files) in groupd_files_to_keep {
+        match generate_dump(org_id, stream_type, stream_name, range, files).await {
+            Ok(Some(v)) => new_dump_files.push(v),
+            Ok(None) => continue,
             Err(e) => {
                 log::error!(
-                    "[FILE_LIST_DUMP] failed to generate dump file for delete hourly data, time range: {range:?}, error: {e}"
+                    "[FILE_LIST_DUMP] failed to generate dump file for delete data, date: {date}, error: {e}"
                 );
                 return Err(e);
             }
         }
-    } else {
-        None
-    };
+    }
 
     // Create deleted items for file_list_deleted table
     let mut del_items: Vec<_> = files_to_delete
@@ -560,13 +468,14 @@ async fn delete_hourly_inner(
         .map(|mut f| {
             f.deleted = true;
             f.segment_ids = None;
+            f.row_group_size = None;
             f
         })
         .collect();
 
     // insert the new dump file into file_list table
-    if let Some(ref new_dump_file) = new_dump_file {
-        items.push(new_dump_file.clone());
+    if !new_dump_files.is_empty() {
+        items.extend(new_dump_files.clone());
     }
 
     // Insert deleted items into file_list_deleted table with retry logic
@@ -604,7 +513,7 @@ async fn delete_hourly_inner(
     }
 
     // If a new dump file was created, calculate and insert its stats
-    if let Some(ref new_dump_file) = new_dump_file {
+    for new_dump_file in new_dump_files {
         match calculate_dump_file_stats(&new_dump_file.account, &new_dump_file.key).await {
             Ok(stats) => {
                 // Insert dump_stats for the new dump file
@@ -686,6 +595,7 @@ async fn generate_dump(
         compressed_size: buf.len() as i64,
         index_size: 0,
         flattened: false,
+        bloom_ver: 0,
     };
 
     // store the file in storage
@@ -699,6 +609,7 @@ async fn generate_dump(
         meta,
         deleted: false,
         segment_ids: None,
+        row_group_size: None,
     };
 
     Ok(Some(dump_file))
@@ -830,6 +741,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_original_size = Int64Builder::with_capacity(batch_size);
     let mut field_compressed_size = Int64Builder::with_capacity(batch_size);
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
+    let mut field_bloom_ver = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
 
@@ -847,6 +759,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         field_original_size.append_value(file.original_size);
         field_compressed_size.append_value(file.compressed_size);
         field_index_size.append_value(file.index_size);
+        field_bloom_ver.append_value(file.bloom_ver);
         field_flattened.append_value(file.flattened);
         field_updated_at.append_value(file.updated_at);
     }
@@ -868,6 +781,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_original_size.finish()),
             Arc::new(field_compressed_size.finish()),
             Arc::new(field_index_size.finish()),
+            Arc::new(field_bloom_ver.finish()),
             Arc::new(field_updated_at.finish()),
         ],
     )?;
@@ -995,7 +909,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 15);
+        assert_eq!(batch.num_columns(), 16);
     }
 
     #[test]
@@ -1015,6 +929,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            bloom_ver: 0,
             updated_at: 1100,
         };
 
@@ -1024,7 +939,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 15);
+        assert_eq!(batch.num_columns(), 16);
 
         // Verify column values
         let id_col = batch
@@ -1074,6 +989,7 @@ mod tests {
                 original_size: 10000,
                 compressed_size: 5000,
                 index_size: 500,
+                bloom_ver: 0,
                 updated_at: 1100,
             },
             FileRecord {
@@ -1091,6 +1007,7 @@ mod tests {
                 original_size: 20000,
                 compressed_size: 10000,
                 index_size: 1000,
+                bloom_ver: 0,
                 updated_at: 2100,
             },
             FileRecord {
@@ -1108,6 +1025,7 @@ mod tests {
                 original_size: 30000,
                 compressed_size: 15000,
                 index_size: 1500,
+                bloom_ver: 0,
                 updated_at: 3100,
             },
         ];
@@ -1164,6 +1082,7 @@ mod tests {
             original_size: 500000,
             compressed_size: 250000,
             index_size: 25000,
+            bloom_ver: 0,
             updated_at: 1234568000,
         };
 
@@ -1205,6 +1124,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            bloom_ver: 0,
             updated_at: 1100,
         };
 
@@ -1230,6 +1150,7 @@ mod tests {
             "original_size",
             "compressed_size",
             "index_size",
+            "bloom_ver",
             "updated_at",
         ];
 
@@ -1258,6 +1179,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            bloom_ver: 0,
             updated_at: 0,
         };
 
@@ -1298,6 +1220,7 @@ mod tests {
             original_size: i64::MAX,
             compressed_size: i64::MAX,
             index_size: i64::MAX,
+            bloom_ver: 0,
             updated_at: i64::MAX,
         };
 
@@ -1338,6 +1261,7 @@ mod tests {
                 original_size: 1024,
                 compressed_size: 512,
                 index_size: 64,
+                bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
             .collect();
@@ -1375,6 +1299,7 @@ mod tests {
                 original_size: 2048,
                 compressed_size: 1024,
                 index_size: 128,
+                bloom_ver: 0,
                 updated_at: 3000,
             })
             .collect();
@@ -1411,6 +1336,7 @@ mod tests {
             original_size: 100,
             compressed_size: 50,
             index_size: 5,
+            bloom_ver: 0,
             updated_at: 200,
         };
 
@@ -1443,6 +1369,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            bloom_ver: 0,
             updated_at: 0,
         };
 
@@ -1482,6 +1409,7 @@ mod tests {
             original_size: 100_000,
             compressed_size: 40_000,
             index_size: 5_000,
+            bloom_ver: 0,
             updated_at: 9999,
         };
 
@@ -1510,8 +1438,9 @@ mod tests {
             .unwrap();
         assert_eq!(idx_col.value(0), 5_000);
 
+        // bloom_ver was inserted at index 14 between index_size (13) and updated_at (15).
         let upd_col = batch
-            .column(14)
+            .column(15)
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap();
@@ -1537,6 +1466,7 @@ mod tests {
                 original_size: i * 1000,
                 compressed_size: i * 500,
                 index_size: i * 50,
+                bloom_ver: 0,
                 updated_at: i * 100 + 100,
             })
             .collect();
@@ -1566,6 +1496,7 @@ mod tests {
             original_size: 25_000,
             compressed_size: 12_500,
             index_size: 1_250,
+            bloom_ver: 0,
             updated_at: 20_001,
         };
 
@@ -1609,6 +1540,7 @@ mod tests {
                 original_size: i * 100,
                 compressed_size: i * 50,
                 index_size: i * 5,
+                bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
             .collect();

@@ -52,8 +52,8 @@ export class ServiceGraphPage {
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
-    this.correlationDashboardCard = '.correlation-dashboard-card';
-    this.correlationDialogTabs = '.q-dialog [role="tab"]';
+    this.correlationDashboardCard = '[data-test*="correlation-dashboard"]';
+    this.correlationDialogTabs = '[data-test*="dialog"] [role="tab"]';
   }
 
   // ===== NAVIGATION =====
@@ -100,23 +100,23 @@ export class ServiceGraphPage {
 
   async switchToGraphView() {
     await this.page.locator(this.graphViewTab).click();
-    // Wait for the graph button to become selected (OToggleGroup uses data-state="on")
-    await expect(this.page.locator(this.graphViewTab)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+    await expect(this.page.locator(`${this.graphViewTab} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
   }
 
   async switchToTreeView() {
     await this.page.locator(this.treeViewTab).click();
-    // Wait for the tree button to become selected (OToggleGroup uses data-state="on")
-    await expect(this.page.locator(this.treeViewTab)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+    await expect(this.page.locator(`${this.treeViewTab} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
   }
 
   async getActiveViewTab() {
-    // Check which view toggle button has data-state="on" (OToggleGroup)
-    const treeSelected = await this.page.locator(this.treeViewTab)
+    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
+    const treeSelected = await this.page.locator(`${this.treeViewTab} [data-state]`)
       .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
     if (treeSelected) return 'Tree View';
 
-    const graphSelected = await this.page.locator(this.graphViewTab)
+    const graphSelected = await this.page.locator(`${this.graphViewTab} [data-state]`)
       .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
     if (graphSelected) return 'Graph View';
 
@@ -330,7 +330,7 @@ export class ServiceGraphPage {
 
   async getOperationsTableRowCount() {
     const table = this.page.locator(this.operationsTable);
-    await table.locator('.q-spinner, .loading').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+    await table.locator('[data-test="service-graph-operations-loading-indicator"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     return await table.locator('tbody tr').count();
   }
 
@@ -352,8 +352,8 @@ export class ServiceGraphPage {
 
     // Wait for loading spinner to appear and disappear
     const metricsPanel = this.page.locator('[data-test="service-graph-side-panel-metrics"]');
-    await metricsPanel.locator('.q-spinner').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await metricsPanel.locator('.q-spinner').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
 
     // Check if the metrics dashboard rendered
     const dashboardVisible = await this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')

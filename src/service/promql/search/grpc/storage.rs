@@ -45,7 +45,7 @@ use crate::service::{
         datafusion::exec::register_metrics_table,
         grpc::{
             QueryParams,
-            storage::{cache_files, tantivy_search},
+            storage::{cache_files, calc_target_partitions, tantivy_search},
         },
         index::{Condition, IndexCondition},
         match_source,
@@ -198,13 +198,13 @@ pub(crate) async fn create_context(
             .observe(cached_ratio);
     }
 
-    // set target partitions based on cache type
     let cfg = get_config();
-    let target_partitions = if cache_type == file_data::CacheType::None {
-        cfg.limit.query_thread_num
-    } else {
-        cfg.limit.cpu_num
-    };
+    let target_partitions =
+        calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
+
+    log::info!(
+        "[trace_id {trace_id}] promql->search->storage: session target_partitions: {target_partitions}"
+    );
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 

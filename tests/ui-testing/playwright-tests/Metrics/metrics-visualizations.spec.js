@@ -39,15 +39,13 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
     // Set time range to Last 15 minutes for all chart tests
     testLogger.info('Setting time range to Last 15 minutes');
-    await pm.metricsPage.openDatePicker();
     const timeRangeSelected = await pm.metricsPage.selectLast15Minutes();
     if (timeRangeSelected) {
       testLogger.info('Selected Last 15 minutes time range');
     } else {
-      await page.keyboard.press('Escape');
+      await pm.metricsPage.dismissOpenPopover();
       testLogger.warn('Could not select 15 minutes time range, using default');
     }
-    await page.waitForTimeout(500);
 
     // Select cpu_usage metric from the metrics list/stream selector
     testLogger.info('Selecting cpu_usage metric from the UI');
@@ -65,9 +63,8 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     testLogger.info('Executing initial query with cpu_usage metric');
     await page.evaluate(() => window.scrollTo(0, 0));
     await pm.metricsPage.executeQuery('cpu_usage');
-    await page.waitForTimeout(2000);
+    await pm.metricsPage.waitForChartRender().catch(() => {});
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(300);
 
     const chartTests = [
       {
@@ -167,7 +164,6 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
       // Scroll to top before attempting to select chart type
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForTimeout(300);
 
       // Try to select chart type
       const selected = await pm.metricsPage.selectChartType(chart.type);
@@ -189,8 +185,8 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         testLogger.info(`Successfully selected ${chart.name}`);
       }
 
-      // Wait for rendering
-      await page.waitForTimeout(2000);
+      // Wait for rendering (deterministic — bounded poll)
+      await pm.metricsPage.waitForChartRender(5000).catch(() => {});
 
       // Verify chart renders
       if (chart.type === 'line' && chart.checkAxes) {
@@ -322,10 +318,10 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       testLogger.info(`Testing ${variation.name}`);
 
       await pm.metricsPage.executeQuery(variation.query);
-      await page.waitForTimeout(1000);
+      await pm.metricsPage.waitForChartRender(5000).catch(() => {});
 
       await pm.metricsPage.selectChartType(variation.type);
-      await page.waitForTimeout(1000);
+      await pm.metricsPage.waitForChartRender(5000).catch(() => {});
 
       if (variation.enableStacking) {
         const stackOption = await pm.metricsPage.getStackOption();
@@ -341,7 +337,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         testLogger.info(`Stacking option found for ${variation.type} chart`);
         await stackOption.click();
         testLogger.info(`Enabled ${variation.type} chart stacking`);
-        await page.waitForTimeout(2000);
+        await pm.metricsPage.waitForChartRender(5000).catch(() => {});
 
         if (variation.type === 'bar') {
           const stackedBars = await pm.metricsPage.getStackedBars();
@@ -369,9 +365,13 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         if (await chartArea.isVisible()) {
           try {
             await chartArea.hover({ position: { x: 100, y: 100 }, timeout: 5000 }).catch(() => chartArea.hover());
-            await page.waitForTimeout(500);
+            // Poll deterministically for tooltip visibility (bounded)
+            const tooltipVisible = await expect.poll(
+              async () => await pm.metricsPage.isChartTooltipVisible(),
+              { timeout: 2000, intervals: [200, 400] }
+            ).toBe(true).then(() => true).catch(() => false);
 
-            if (await pm.metricsPage.isChartTooltipVisible()) {
+            if (tooltipVisible) {
               testLogger.info('Chart tooltip appears on hover');
             }
           } catch (error) {
@@ -406,7 +406,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     const correlationQuery = 'cpu_usage_percent and memory_usage_bytes/1000000';
     await pm.metricsPage.executeQuery(correlationQuery);
     const scatterSelected = await pm.metricsPage.selectChartType('scatter');
-    await page.waitForTimeout(2000);
+    await pm.metricsPage.waitForChartRender(5000).catch(() => {});
 
     // Assert: Scatter chart should be selectable
     if (scatterSelected) {
@@ -435,7 +435,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     testLogger.info('Testing table sorting functionality');
     await pm.metricsPage.executeQuery('topk(10, http_requests_total)');
     const tableSelected = await pm.metricsPage.selectChartType('table');
-    await page.waitForTimeout(1000);
+    await pm.metricsPage.waitForChartRender(5000).catch(() => {});
 
     // Table chart SHOULD be selectable - fail explicitly if not
     expect(tableSelected).toBe(true);
@@ -447,7 +447,6 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         // Assert: Table should have sortable headers
         expect(sortableHeader).toBeVisible();
         await sortableHeader.click();
-        await page.waitForTimeout(500);
         testLogger.info('Table sorting functionality available and working');
       } else {
         testLogger.info('Table rendered but no sortable headers found');
@@ -465,7 +464,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
     await pm.metricsPage.executeQuery('rate(http_requests_total[1h])');
     await pm.metricsPage.selectChartType('line');
-    await page.waitForTimeout(1000);
+    await pm.metricsPage.waitForChartRender(5000).catch(() => {});
 
     // Test zoom and pan
     const chartArea = await pm.metricsPage.getChartArea();
@@ -477,13 +476,11 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
       await chartArea.hover();
       await page.mouse.wheel(0, -100); // Zoom in
-      await page.waitForTimeout(500);
       testLogger.info('Chart zoom tested');
 
       await page.mouse.down();
       await page.mouse.move(100, 0);
       await page.mouse.up();
-      await page.waitForTimeout(500);
       testLogger.info('Chart pan tested');
 
       const resetButton = await pm.metricsPage.getResetButton();
@@ -502,7 +499,9 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
     if (hasExportButton) {
       await exportButton.click();
-      await page.waitForTimeout(500);
+      // Wait for at least one export option to surface before reading them
+      const pngProbe = await pm.metricsPage.getPngOption();
+      await pngProbe.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
 
       const pngOption = await pm.metricsPage.getPngOption();
       const svgOption = await pm.metricsPage.getSvgOption();
@@ -519,7 +518,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       if (hasSvg) testLogger.info('SVG export option available');
       if (hasCsv) testLogger.info('CSV export option available');
 
-      await page.keyboard.press('Escape');
+      await pm.metricsPage.dismissOpenPopover();
     }
 
     // Test chart customization options
@@ -528,7 +527,9 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
     if (hasSettingsButton) {
       await settingsButton.click();
-      await page.waitForTimeout(500);
+      // Wait for at least one settings toggle to surface
+      const legendProbe = await pm.metricsPage.getLegendToggleOption();
+      await legendProbe.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
 
       const legendToggle = await pm.metricsPage.getLegendToggleOption();
       const gridToggle = await pm.metricsPage.getGridToggleOption();
@@ -545,7 +546,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       if (hasGrid) testLogger.info('Grid toggle option available');
       if (hasTooltip) testLogger.info('Tooltip toggle option available');
 
-      await page.keyboard.press('Escape');
+      await pm.metricsPage.dismissOpenPopover();
     }
 
     testLogger.info('Chart interaction features tested successfully');

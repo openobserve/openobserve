@@ -74,15 +74,10 @@
 .floating-buttons {
   position: sticky;
   bottom: 0;
-  z-index: 1; /* Ensure it stays on top of table content */
+  z-index: 1;
   width: 100%;
-  margin-top: auto; /* Push to bottom when there's less content */
-}
-.dark-theme-floating-buttons {
-  background-color: #181a1b;
-}
-.light-theme-floating-buttons {
-  background-color: #ffffff
+  margin-top: auto;
+  background-color: var(--o2-card-bg-solid);
 }
 
 .warning-text {

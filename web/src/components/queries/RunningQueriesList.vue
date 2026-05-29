@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,66 +14,53 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="running-queries-page" v-if="isMetaOrg">
-    <q-table
+  <template v-if="isMetaOrg">
+    <OTable
       data-test="running-queries-table"
-      ref="qTable"
-      :rows="rows"
+      :data="rows"
       :columns="columns"
-      :pagination="pagination as QTableProps['pagination']"
       row-key="trace_id"
-      style="width: 100%"
+      :loading="loadingState"
+      :selected-ids="selectedRowIds"
       selection="multiple"
-      v-model:selected="selectedRowsModel"
+      pagination="client"
+      :page-size="20"
+      :page-size-options="[5, 10, 20, 50, 100]"
+      sorting="client"
+      filter-mode="client"
+      :default-columns="false"
+      :show-global-filter="false"
+      @update:selected-ids="handleSelectedIdsUpdate"
     >
-      <template #no-data>
-        <div v-if="!loadingState" class="text-center full-width full-height">
-          <NoData />
-        </div>
-        <div v-else class="text-center full-width full-height q-mt-lg">
-          <q-spinner-hourglass color="primary" size="lg" />
-        </div>
+      <template #empty>
+        <NoData />
       </template>
-      <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+      <template #cell-actions="{ row }">
+        <OButton
+          icon-left="format-list-bulleted"
+          variant="ghost"
+          size="icon-sm"
+          :title="t('queries.queryList')"
+          data-test="queryList-btn"
+          @click="listSchema(row)"
+        />
+        <OButton
+          icon-left="close"
+          variant="ghost-destructive"
+          size="icon-sm"
+          :title="t('queries.cancelQuery')"
+          data-test="cancelQuery-btn"
+          @click="confirmDeleteAction(row)"
+        />
       </template>
-      <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+      <template #cell-duration="{ row }">
+        {{ durationFormatter(row.duration) }}
       </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props">
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            :title="t('queries.queryList')"
-            data-test="queryList-btn"
-            @click="listSchema(props)"
-          >
-            <List class="tw:size-4" />
-          </OButton>
-          <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            :title="t('queries.cancelQuery')"
-            data-test="cancelQuery-btn"
-            @click="confirmDeleteAction(props)"
-          >
-            <X class="tw:size-4" />
-          </OButton>
-        </q-td>
-      </template>
-      <template #body-cell-duration="props">
-        <q-td :props="props">
-          {{ durationFormatter(props.row.duration) }}
-        </q-td>
-      </template>
-      <template #body-cell-queryRange="props">
-        <q-td :props="props">
-          {{ durationFormatter(props.row.queryRange) }}
-        </q-td>
+      <template #cell-queryRange="{ row }">
+        {{ durationFormatter(row.queryRange) }}
       </template>
 
-      <template #bottom="scope">
+      <template #bottom>
         <OButton
           data-test="qm-multiple-cancel-query-btn"
           variant="outline-destructive"
@@ -83,52 +70,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t('queries.cancelQuery') }}
         </OButton>
-        <q-space />
-        <div style="width: auto">
-          <q-table-pagination
-            data-test="query-stream-table-pagination"
-            :scope="scope"
-            :resultTotal="rows.length"
-            :perPageOptions="perPageOptions"
-            position="bottom"
-            @update:changeRecordPerPage="changePagination"
-            class="fit"
-          />
-        </div>
       </template>
-    </q-table>
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    </OTable>
+    <ODrawer
+      v-model:open="showListSchemaDialog"
+      size="lg"
       data-test="list-schema-dialog"
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
-    </q-dialog>
-  </div>
+    </ODrawer>
+  </template>
 </template>
 
 <script lang="ts">
-
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, type Ref, defineComponent, computed } from "vue";
-import { type QTableProps, QTable } from "quasar";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import { List, X } from 'lucide-vue-next';
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getDuration, durationFormatter } from "@/utils/zincutils";
-
-// TODO OK : Define types and interfaces for data properties.
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, List, X },
+  components: { QueryList, NoData, OButton, ODrawer, OSpinner, OTable },
   props: {
     rows: {
       type: Array,
@@ -148,132 +118,106 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const schemaData = ref({});
-    const lastRefreshed = ref("");
     const { isMetaOrg } = useIsMetaOrg();
-    const resultTotal = ref<number>(0);
-
     const loadingState = ref(false);
 
-    const deleteDialog = ref({
-      show: false,
-      title: "Delete Running Query",
-      message: "Are you sure you want to delete this running query?",
-      data: null as any,
-    });
-
-    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
-    const listSchema = (props: any) => {
-      //pass whole props.row to schemaData
-      emit("show:schema", props.row);
+    const listSchema = (row: any) => {
+      emit("show:schema", row);
     };
 
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
+    const columns: OTableColumnDef[] = [
+      { id: "#", header: "#", accessorKey: "#", size:67, meta: { align: "left" } },
+      {
+        id: "user_id",
+        header: t("user.email"),
+        accessorKey: "user_id",
+        sortable: true,
+        meta: { align: "left" , autoWidth: true },
+      },
+      {
+        id: "org_id",
+        header: t("organization.id"),
+        accessorKey: "org_id",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "search_type",
+        header: t("queries.searchType"),
+        accessorKey: "search_type",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "query_source",
+        header: t("queries.querySource"),
+        accessorKey: "query_source",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "duration",
+        header: t("queries.duration"),
+        accessorKey: "duration",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "queryRange",
+        header: t("queries.queryRange"),
+        accessorKey: "queryRange",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "work_group",
+        header: t("queries.queryType"),
+        accessorKey: "work_group",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "status",
+        header: t("queries.status"),
+        accessorKey: "status",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "stream_type",
+        header: t("alerts.streamType"),
+        accessorKey: "stream_type",
+        sortable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "actions",
+        header: t("common.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 100,
+        meta: { align: "center", actionCount: 2 },
+      },
     ];
-    const selectedPerPage = ref(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
+
+    const selectedRowIds = computed(() =>
+      ((props.selectedRows as any[]) || []).map((r: any) => r.trace_id),
+    );
+
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const rows = (props.rows as any[]) || [];
+      const map = new Map(rows.map((r: any) => [r.trace_id, r]));
+      const selected = ids.map((id: any) => map.get(id)).filter(Boolean);
+      emit("update:selectedRows", selected);
     };
 
-    const columns = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
-      {
-        name: "user_id",
-        field: "user_id",
-        label: t("user.email"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "org_id",
-        field: "org_id",
-        label: t("organization.id"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "search_type",
-        field: "search_type",
-        label: t("queries.searchType"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "query_source",
-        field: "query_source",
-        label: t("queries.querySource"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "duration",
-        label: t("queries.duration"),
-        align: "left",
-        sortable: true,
-        field: "duration",
-      },
-      {
-        name: "queryRange",
-        label: t("queries.queryRange"),
-        align: "left",
-        sortable: true,
-        field: "queryRange",
-      },
-      {
-        name: "work_group",
-        label: t("queries.queryType"),
-        align: "left",
-        sortable: true,
-        field: "work_group",
-      },
-      {
-        name: "status",
-        field: "status",
-        label: t("queries.status"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "stream_type",
-        field: "stream_type",
-        label: t("alerts.streamType"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("common.actions"),
-        align: "center",
-      },
-    ]);
+    const selectedRowsModel = computed(() => props.selectedRows);
 
-    const selectedRowsModel = computed({
-      get: () => props.selectedRows,
-      set: (value) => {
-        emit("update:selectedRows", value);
-      },
-    });
-
-    const confirmDeleteAction = (props: any) => {
-      emit("delete:query", props.row);
+    const confirmDeleteAction = (row: any) => {
+      emit("delete:query", row);
     };
 
     const handleMultiQueryCancel = () => {
@@ -285,22 +229,15 @@ export default defineComponent({
       store,
       columns,
       confirmDeleteAction,
-      deleteDialog,
-      perPageOptions,
       listSchema,
       showListSchemaDialog,
-      changePagination,
-      outlinedCancel,
       schemaData,
       loadingState,
-      lastRefreshed,
       isMetaOrg,
-      resultTotal,
-      selectedPerPage,
-      qTable,
       selectedRowsModel,
+      selectedRowIds,
+      handleSelectedIdsUpdate,
       handleMultiQueryCancel,
-      pagination,
       getDuration,
       durationFormatter,
     };
@@ -313,6 +250,10 @@ export default defineComponent({
   :deep(.q-btn:before) {
     border: none !important;
   }
+}
+
+:deep(.no-data-image) {
+  margin-bottom: 0.5rem;
 }
 
 .label-container {

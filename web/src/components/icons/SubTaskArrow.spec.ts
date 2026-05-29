@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import SubTaskArrow from '@/components/icons/SubTaskArrow.vue';
-import { Quasar } from 'quasar';
+
 
 describe('SubTaskArrow.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +10,7 @@ describe('SubTaskArrow.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(SubTaskArrow, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(SubTaskArrow, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

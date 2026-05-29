@@ -1,11 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
 
 // Mock utils
 vi.mock("@/utils/zincutils", () => ({
@@ -86,8 +84,7 @@ describe("Billing Component", () => {
           store,
         },
         stubs: {
-          'q-page': true,
-          'q-separator': true,
+                    'q-separator': true,
           'q-splitter': {
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
           },
@@ -95,7 +92,7 @@ describe("Billing Component", () => {
           'q-route-tab': true,
           'router-view': true,
           'q-select': true,
-          'q-icon': true,
+          'OIcon': true,
           'ConfirmDialog': true,
           'Usage': true,
           'AppTabs': {
@@ -192,8 +189,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
-            'q-separator': true,
+                        'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
@@ -201,7 +197,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -235,8 +231,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
-            'q-separator': true,
+                        'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
@@ -244,7 +239,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -297,9 +292,36 @@ describe("Billing Component", () => {
   });
 
   describe("isUsageRoute Computed Property", () => {
-    it("should return true when route is usage", () => {
+    it("should return true when route is usage", async () => {
+      // Must mount with route=usage before mount because mock router is not reactive
       mockRouter.currentRoute.value.name = "usage";
-      expect(wrapper.vm.isUsageRoute).toBe(true);
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            'q-separator': true,
+            'q-splitter': {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            },
+            'q-tabs': true,
+            'q-route-tab': true,
+            'router-view': true,
+            'q-select': true,
+            'OIcon': true,
+            'ConfirmDialog': true,
+            'Usage': true,
+            'AppTabs': {
+              template: '<div></div>',
+              props: ['tabs', 'activeTab'],
+              emits: ['update:activeTab']
+            }
+          }
+        },
+      });
+      await testWrapper.vm.$nextTick();
+      expect(testWrapper.vm.isUsageRoute).toBe(true);
+      testWrapper.unmount();
     });
 
     it("should return false when route is plans", () => {
@@ -492,8 +514,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
-            'q-separator': true,
+                        'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
@@ -501,7 +522,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -527,8 +548,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
-            'q-separator': true,
+                        'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
@@ -536,7 +556,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -562,8 +582,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
-            'q-separator': true,
+                        'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
@@ -571,7 +590,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {

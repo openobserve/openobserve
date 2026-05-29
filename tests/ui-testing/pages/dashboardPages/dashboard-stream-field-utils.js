@@ -22,11 +22,12 @@ export async function selectStreamType(page, streamType) {
   await page
     .locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT)
     .click();
-  // Use .first() — the q-focus-helper div that Quasar may insert makes
-  // .locator("div").nth(2) index-unstable; clicking the option element directly is safe.
-  const streamTypeOption = page.getByRole("option", { name: streamType, exact: true }).first();
+  // Use data-test-value selector — OSelect emits `${parentDataTest}-option` with `data-test-value` per item.
+  await page.locator('[data-test="dashboard-variable-stream-type-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+  const streamTypeOption = page.locator(`[data-test="dashboard-variable-stream-type-select-option"][data-test-value="${streamType}"]`);
   await streamTypeOption.waitFor({ state: "visible", timeout: 10000 });
   await streamTypeOption.click();
+  await page.locator('[data-test="dashboard-variable-stream-type-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 });
 }
 
 /**
@@ -39,21 +40,18 @@ export async function selectStreamType(page, streamType) {
 export async function selectStreamFromDropdown(page, streamNameOrVar) {
   const isVariable = streamNameOrVar.startsWith("$");
   const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
+  // Search input lives inside the popover (OSelect searchable pattern)
+  const streamInput = page.locator('[data-test="dashboard-variable-stream-select-popover"] input');
   await streamSelect.click();
 
-  // Clear existing value and fill with new value
-  await streamSelect.fill("");
-  await page.waitForTimeout(300);
-  await streamSelect.fill(streamNameOrVar);
-
-  // For variables, wait longer for the dropdown to filter and show variable options
-  // Increased wait time especially for edit mode where variables need to load
-  await page.waitForTimeout(isVariable ? 1500 : 500);
+  // Wait for popover search input to be visible, then fill
+  await streamInput.waitFor({ state: "visible", timeout: 5000 });
+  await streamInput.fill(streamNameOrVar);
 
   // Wait for dropdown options to appear
   const hasOptions = await page
     .waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
+      () => document.querySelectorAll('[data-test$="-option"]').length > 0,
       { timeout: isVariable ? 8000 : 10000, polling: 100 }
     )
     .then(() => true)
@@ -71,58 +69,28 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
   // Multi-strategy selection
   let selected = false;
 
-  // Strategy 1: Exact match by role
+  // Strategy 1: data-test-value exact match — OSelect sets data-test-value per option item.
   try {
-    const option = page.getByRole("option", { name: streamNameOrVar, exact: true });
+    const option = page
+      .locator(`[data-test$="-option"][data-test-value="${streamNameOrVar}"]`)
+      .first();
     await option.waitFor({ state: "visible", timeout: 5000 });
     await option.click();
     selected = true;
   } catch {
-    // Strategy 2: For variables, look for option containing both the variable name and "(variable)"
-    if (isVariable && !selected) {
-      try {
-        // Variables are displayed as "$varName (variable)" in the dropdown
-        const option = page.locator('[role="option"]').filter({ hasText: streamNameOrVar }).filter({ hasText: "(variable)" }).first();
-        await option.waitFor({ state: "visible", timeout: 3000 });
-        await option.click();
-        selected = true;
-      } catch {
-        // Fall through to next strategy
-      }
-    }
-
-    // Strategy 3: Partial match
-    if (!selected) {
-      try {
-        const option = page.getByRole("option", { name: streamNameOrVar, exact: false }).first();
-        await option.waitFor({ state: "visible", timeout: 5000 });
-        await option.click();
-        selected = true;
-      } catch {
-        // Strategy 4: Keyboard navigation
-        try {
-          await page.keyboard.press("ArrowDown");
-          await page.waitForTimeout(200);
-          await page.keyboard.press("Enter");
-          selected = true;
-        } catch {
-          // Strategy 5: JS direct click
-          const clicked = await page.evaluate((name) => {
-            const options = document.querySelectorAll('[role="option"]');
-            for (const opt of options) {
-              if (opt.textContent.trim().includes(name)) {
-                opt.click();
-                return true;
-              }
-            }
-            return false;
-          }, streamNameOrVar);
-          if (clicked) {
-            await page.waitForTimeout(300);
-            selected = true;
-          }
+    // Strategy 2: JS direct click by text content (fallback for variable references)
+    const clicked = await page.evaluate((name) => {
+      const options = document.querySelectorAll('[data-test$="-option"]');
+      for (const opt of options) {
+        if (opt.textContent.trim().includes(name)) {
+          opt.click();
+          return true;
         }
       }
+      return false;
+    }, streamNameOrVar);
+    if (clicked) {
+      selected = true;
     }
   }
 
@@ -141,13 +109,15 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
 export async function selectFieldFromDropdown(page, fieldNameOrVar) {
   const isVariable = fieldNameOrVar.startsWith("$");
   const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
+  const fieldInput = page.locator('[data-test="dashboard-variable-field-select-popover"] input');
   await fieldSelect.click();
-  await fieldSelect.fill(fieldNameOrVar);
+  await fieldInput.waitFor({ state: "visible", timeout: 5000 });
+  await fieldInput.fill(fieldNameOrVar);
 
   // Wait for dropdown options to appear
   const hasOptions = await page
     .waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
+      () => document.querySelectorAll('[data-test$="-option"]').length > 0,
       { timeout: isVariable ? 5000 : 10000, polling: 100 }
     )
     .then(() => true)
@@ -157,56 +127,36 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
     // No options appeared. For variables this may happen if it's the only one;
     // for real fields this shouldn't happen (stream is real so schema loads).
     // Accept typed value by pressing Escape to close empty dropdown.
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
+    await page.keyboard.press('Escape');
+    await page.locator('[data-test="dashboard-variable-field-select-popover"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     return;
   }
 
   // Multi-strategy selection
   let selected = false;
 
-  // Strategy 1: Exact match
+  // Strategy 1: data-test-value exact match — OSelect sets data-test-value per option item.
   try {
-    const option = page.getByRole("option", {
-      name: fieldNameOrVar,
-      exact: true,
-    });
+    const option = page
+      .locator(`[data-test$="-option"][data-test-value="${fieldNameOrVar}"]`)
+      .first();
     await option.waitFor({ state: "visible", timeout: 3000 });
     await option.click();
     selected = true;
   } catch {
-    // Strategy 2: Partial match (useful for variable options that may have "(variable)" label)
-    try {
-      const option = page
-        .getByRole("option", { name: fieldNameOrVar, exact: false })
-        .first();
-      await option.waitFor({ state: "visible", timeout: 3000 });
-      await option.click();
-      selected = true;
-    } catch {
-      // Strategy 3: Click first available option
-      try {
-        const firstOption = page.locator('[role="option"]').first();
-        await firstOption.waitFor({ state: "visible", timeout: 3000 });
-        await firstOption.click();
-        selected = true;
-      } catch {
-        // Strategy 4: JS direct click
-        const clicked = await page.evaluate((name) => {
-          const options = document.querySelectorAll('[role="option"]');
-          for (const opt of options) {
-            if (opt.textContent.trim().includes(name)) {
-              opt.click();
-              return true;
-            }
-          }
-          return false;
-        }, fieldNameOrVar);
-        if (clicked) {
-          await page.waitForTimeout(300);
-          selected = true;
+    // Strategy 2: JS direct click by text content (fallback for variable references)
+    const clicked = await page.evaluate((name) => {
+      const options = document.querySelectorAll('[data-test$="-option"]');
+      for (const opt of options) {
+        if (opt.textContent.trim().includes(name)) {
+          opt.click();
+          return true;
         }
       }
+      return false;
+    }, fieldNameOrVar);
+    if (clicked) {
+      selected = true;
     }
   }
 
@@ -226,17 +176,28 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
  */
 export async function verifyDropdownContainsVariable(page, dropdownSelector, variableName) {
   const dropdown = page.locator(dropdownSelector);
-  await dropdown.click();
-  await page.waitForTimeout(300);
 
-  // Type $ to filter for variables
-  await dropdown.fill(`$${variableName}`);
-  await page.waitForTimeout(500);
+  // Derive the popover search input selector — dropdownSelector is e.g.
+  // '[data-test="dashboard-variable-stream-select"]' → popover input is
+  // '[data-test="dashboard-variable-stream-select-popover"] input'
+  const dataTestMatch = dropdownSelector.match(/data-test="([^"]+)"/);
+  const searchInputSelector = dataTestMatch
+    ? `[data-test="${dataTestMatch[1]}-popover"] input`
+    : null;
+
+  await dropdown.click();
+
+  // Type $ to filter for variables using the popover search input
+  if (searchInputSelector) {
+    const searchInput = page.locator(searchInputSelector);
+    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+    await searchInput.fill(`$${variableName}`);
+  }
 
   // Wait for options to appear
   const hasOptions = await page
     .waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
+      () => document.querySelectorAll('[data-test$="-option"]').length > 0,
       { timeout: 10000, polling: 100 }
     )
     .then(() => true)
@@ -248,7 +209,7 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
   if (hasOptions) {
     // Use page.evaluate for reliable DOM inspection (avoids Playwright visibility heuristics)
     const result = await page.evaluate((varName) => {
-      const options = document.querySelectorAll('[role="option"]');
+      const options = document.querySelectorAll('[data-test$="-option"]');
       for (const opt of options) {
         const rect = opt.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
@@ -263,12 +224,12 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
     hasVariableLabel = result.hasVariableLabel;
   }
 
-  // If not found via filter, try without filter text (open full list)
-  if (!found) {
-    await dropdown.fill("");
-    await page.waitForTimeout(500);
+  // If not found via filter, clear and retry with full list
+  if (!found && searchInputSelector) {
+    const searchInput = page.locator(searchInputSelector);
+    await searchInput.fill("");
     const retryResult = await page.evaluate((varName) => {
-      const options = document.querySelectorAll('[role="option"]');
+      const options = document.querySelectorAll('[data-test$="-option"]');
       for (const opt of options) {
         const rect = opt.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
@@ -283,9 +244,21 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
     hasVariableLabel = retryResult.hasVariableLabel;
   }
 
-  // Close dropdown
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(300);
+  // Close dropdown — only press Escape if the popover is still open.
+  // page.evaluate() above can cause focus loss that closes the popover early;
+  // pressing Escape on a closed popover would propagate to the parent dialog.
+  const popoverStillOpen = dataTestMatch
+    ? await page.locator(`[data-test="${dataTestMatch[1]}-popover"]`).isVisible()
+    : true;
+  if (popoverStillOpen) {
+    await page.keyboard.press('Escape');
+    if (dataTestMatch) {
+      await page
+        .locator(`[data-test="${dataTestMatch[1]}-popover"]`)
+        .waitFor({ state: 'hidden', timeout: 3000 })
+        .catch(() => {});
+    }
+  }
 
   return { found, hasVariableLabel };
 }
@@ -299,27 +272,27 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
 export async function verifyFieldDropdownEmptyOrVariablesOnly(page) {
   const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
   await fieldSelect.click();
-  await page.waitForTimeout(1000);
+  await page.locator('[data-test="dashboard-variable-field-select-popover"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
   // Check option count - should be 0 or only variable options (containing "$")
-  const optionCount = await page.locator('[role="option"]').count();
+  const optionCount = await page.locator('[data-test$="-option"]').count();
 
   if (optionCount === 0) {
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
+    await page.keyboard.press('Escape');
+    await page.locator('[data-test="dashboard-variable-field-select-popover"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     return true;
   }
 
   // Check if all options are variable references
   const allVariables = await page.evaluate(() => {
-    const options = document.querySelectorAll('[role="option"]');
+    const options = document.querySelectorAll('[data-test$="-option"]');
     return Array.from(options).every((opt) =>
       opt.textContent.trim().startsWith("$")
     );
   });
 
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(300);
+  await page.keyboard.press('Escape');
+  await page.locator('[data-test="dashboard-variable-field-select-popover"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
   return optionCount === 0 || allVariables;
 }
@@ -336,17 +309,16 @@ export async function getDropdownOptions(page, dropdownSelector) {
   await dropdown.click();
 
   await page.waitForFunction(
-    () => document.querySelectorAll('[role="option"]').length > 0,
+    () => document.querySelectorAll('[data-test$="-option"]').length > 0,
     { timeout: 10000, polling: 100 }
   ).catch(() => {});
 
   const options = await page.evaluate(() => {
-    const opts = document.querySelectorAll('[role="option"]');
+    const opts = document.querySelectorAll('[data-test$="-option"]');
     return Array.from(opts).map((o) => o.textContent.trim());
   });
 
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(300);
+  await page.keyboard.press('Escape');
 
   return options;
 }
@@ -360,9 +332,9 @@ export async function getDropdownOptions(page, dropdownSelector) {
  */
 export async function hasErrorNotification(page, waitMs = 3000) {
   try {
-    // Quasar notifications use .q-notification with type danger/negative
+    // ONotification (Reka UI) uses role="alert" with bg-negative/bg-red classes
     const errorNotif = page.locator(
-      '.q-notification--standard.bg-negative, .q-notification--standard.bg-red, .q-notification.text-negative'
+      '[role="alert"][class*="bg-negative"], [role="alert"][class*="bg-red"], [data-test*="notification"][class*="negative"]'
     );
     await errorNotif.waitFor({ state: "visible", timeout: waitMs });
     return true;

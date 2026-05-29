@@ -3,7 +3,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import Office365 from "@/components/ingestion/security/Office365.vue";
 
 vi.mock("@/composables/useIngestion", () => ({
@@ -14,6 +13,7 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
+
 describe("Office365.vue", () => {
   let store: any;
   beforeEach(() => {
@@ -23,7 +23,7 @@ describe("Office365.vue", () => {
   const mountComponent = () => {
     return mount(Office365, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
       },
     });
