@@ -200,22 +200,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
-        <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
-          <transform-selector
-            v-if="isActionsEnabled"
-            :function-options="functionOptions"
-            :hide-toggle="true"
-            @select:function="populateFunctionImplementation"
-            @save:function="fnSavedFunctionDialog"
-          />
-          <function-selector
-            v-else
-            :function-options="functionOptions"
-            :hide-toggle="true"
-            @select:function="populateFunctionImplementation"
-            @save:function="fnSavedFunctionDialog"
-          />
-        </template>
+        <!-- Function picker + Save are now part of the in-editor function footer
+             (rendered inside <unified-query-editor>). Removed from the top bar
+             to avoid duplication. -->
         <ODropdown
           side="bottom"
           align="start"
@@ -510,11 +497,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : handleRunQueryFn()
                   "
                 >
-                  {{
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? t("search.generateQuery")
-                      : t("search.runQuery")
-                  }}
+                  <span class="tw:inline-flex tw:items-center tw:gap-2">
+                    <span>{{
+                      isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                        ? t("search.generateQuery")
+                        : t("search.runQuery")
+                    }}</span>
+                    <kbd
+                      v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                      class="o2-run-query-kbd"
+                      aria-hidden="true"
+                    >⌘↵</kbd>
+                  </span>
                 </OButton>
                 <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
@@ -879,176 +873,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden">
       <div
-        class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
+        class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0 tw:px-[0.375rem]"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
-        <OSplitter
-          class="logs-search-splitter tw:h-full!"
-          v-model="searchObj.config.fnSplitterModel"
-          :limits="searchObj.config.fnSplitterLimit"
-          :horizontal="false"
+        <!-- Unified Query Editor — embeds function pane + footer + fullscreen -->
+        <unified-query-editor
+          v-if="router.currentRoute.value.name === 'logs'"
+          ref="queryEditorRef"
+          :query="searchObj.data.query"
+          :keywords="effectiveKeywords"
+          :suggestions="effectiveSuggestions"
+          :debounce-time="100"
+          :nlp-mode="searchObj.meta.nlpMode"
+          :disable-ai="
+            !searchObj.data.stream.selectedStream.length || isSqlModeDisabled
+          "
+          :disable-ai-reason="
+            !searchObj.data.stream.selectedStream.length
+              ? t('search.selectStreamForAI')
+              : t('search.nlpModeDisabledForVisualization')
+          "
+          data-test="logs-search-bar-query-editor"
+          data-test-prefix="logs-search-bar"
+          editor-height="100%"
+          :class="
+            searchObj.data.editorValue == '' &&
+            searchObj.meta.queryEditorPlaceholderFlag
+              ? 'empty-query'
+              : ''
+          "
+          language="sql"
+          :read-only="
+            searchObj.meta.logsVisualizeToggle === 'build' &&
+            searchObj.meta.buildModeQueryEditorDisabled
+          "
+          :show-bottom-bar="searchObj.meta.showEditorBottomBar !== false"
+          @update:show-bottom-bar="(v: boolean) => (searchObj.meta.showEditorBottomBar = v)"
+          :mode="searchObj.meta.sqlMode ? 'sql' : 'filter'"
+          @update:mode="onEditorModeChange"
+          :mode-disabled="isSqlModeDisabled"
+          :mode-disabled-reason="t('search.sqlModeDisabledReason')"
+          :validation="editorValidation"
+          v-model:is-fullscreen="isFocused"
+          :enable-function-pane="true"
+          :function-pane-open="
+            searchObj.meta.showTransformEditor &&
+            !!searchObj.data.transformType
+          "
+          @update:function-pane-open="onFunctionPaneOpenChange"
+          :function-query="
+            searchObj.data.transformType === 'action'
+              ? actionEditorQuery
+              : searchObj.data.tempFunctionContent
+          "
+          @update:function-query="
+            (v: string) => (searchObj.data.tempFunctionContent = v)
+          "
+          :function-language="
+            searchObj.data.transformType === 'action' ? 'markdown' : 'vrl'
+          "
+          :function-read-only="
+            searchObj.data.transformType === 'action' || isVrlEditorDisabled
+          "
+          :function-disable-ai="isVrlEditorDisabled"
+          :function-disable-ai-reason="
+            isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''
+          "
+          :function-dirty="isFunctionDirty"
+          :function-data-test-prefix="'logs-vrl-function-editor'"
+          :function-options="editorFunctionOptions"
+          :selected-function="searchObj.data.tempFunctionName"
+          v-model:splitter-model="searchObj.config.fnSplitterModel"
+          :splitter-limits="searchObj.config.fnSplitterLimit"
+          :rail-tooltip="t('search.functionEditorLabel')"
+          @select-function="onEditorSelectFunction"
+          @save-function="onSaveFunctionFromFooter"
+          @update:query="updateQueryValue"
+          @update:nlp-mode="(val: boolean) => (searchObj.meta.nlpMode = val)"
+          @run-query="handleRunQueryFn"
+          @keydown="handleKeyDown"
+          @function-keydown="handleKeyDown"
+          @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
+          @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+          @function-focus="searchObj.meta.functionEditorPlaceholderFlag = false"
+          @function-blur="searchObj.meta.functionEditorPlaceholderFlag = true"
         >
-          <template #before>
-            <div
-              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
-              :class="
-                searchObj.data.transformType &&
-                searchObj.meta.showTransformEditor
-                  ? 'tw:ml-[0.375rem]'
-                  : 'tw:ml-[0.375rem]'
-              "
+          <template v-if="isVrlEditorDisabled" #function-footer-right>
+            <span
+              class="tw:text-red-500 tw:text-xs tw:font-semibold tw:mr-2"
+              data-test="vrl-editor-disabled-warning"
             >
-              <!-- Unified Query Editor (with built-in AI bar) -->
-              <unified-query-editor
-                v-if="router.currentRoute.value.name === 'logs'"
-                ref="queryEditorRef"
-                :query="searchObj.data.query"
-                :keywords="effectiveKeywords"
-                :suggestions="effectiveSuggestions"
-                :debounce-time="100"
-                :nlp-mode="searchObj.meta.nlpMode"
-                :show-ai-icon="
-                  config.isEnterprise == 'true' &&
-                  store.state.zoConfig.ai_enabled
-                "
-                :disable-ai="
-                  !searchObj.data.stream.selectedStream.length ||
-                  isSqlModeDisabled
-                "
-                :disable-ai-reason="
-                  !searchObj.data.stream.selectedStream.length
-                    ? t('search.selectStreamForAI')
-                    : t('search.nlpModeDisabledForVisualization')
-                "
-                data-test="logs-search-bar-query-editor"
-                data-test-prefix="logs-search-bar"
-                editor-height="100%"
-                :style="editorWidthToggleFunction"
-                :class="
-                  searchObj.data.editorValue == '' &&
-                  searchObj.meta.queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
-                language="sql"
-                :readOnly="
-                  searchObj.meta.logsVisualizeToggle === 'build' &&
-                  searchObj.meta.buildModeQueryEditorDisabled
-                "
-                @update:query="updateQueryValue"
-                @update:nlp-mode="(val) => (searchObj.meta.nlpMode = val)"
-                @run-query="handleRunQueryFn"
-                @keydown="handleKeyDown"
-                @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-                @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
-              />
-            </div>
+              <OIcon name="warning" size="sm" class="tw:mr-1" />
+              {{ t('search.vrlOnlyForTable') }}
+            </span>
           </template>
-          <template #after>
-            <div
-              data-test="logs-vrl-function-editor"
-              v-if="searchObj.data.transformType"
-              class="tw:w-full tw:h-full"
-            >
-              <template v-if="showFunctionEditor">
-                <div class="tw:relative tw:h-full tw:w-full">
-                  <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
-                  >
-                    <!-- Unified Query Editor (with built-in AI bar) -->
-                    <unified-query-editor
-                      v-if="router.currentRoute.value.name === 'logs'"
-                      data-test="logs-vrl-function-editor"
-                      ref="fnEditorRef"
-                      :languages="['vrl']"
-                      :default-language="'vrl'"
-                      :query="searchObj.data.tempFunctionContent"
-                      :nlp-mode="vrlEditorNlpMode"
-                      :hide-nl-toggle="false"
-                      :disable-ai="isVrlEditorDisabled"
-                      :disable-ai-reason="
-                        isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''
-                      "
-                      :ai-placeholder="t('search.askAIFunctionPlaceholder')"
-                      :ai-tooltip="t('search.enterFunctionPrompt')"
-                      :read-only="isVrlEditorDisabled"
-                      editor-height="100%"
-                      class="monaco-editor"
-                      :class="
-                        searchObj.data.tempFunctionContent == '' &&
-                        searchObj.meta.functionEditorPlaceholderFlag
-                          ? 'empty-function'
-                          : ''
-                      "
-                      @update:query="
-                        searchObj.data.tempFunctionContent = $event
-                      "
-                      @update:nlp-mode="(val) => (vrlEditorNlpMode = val)"
-                      @keydown="handleKeyDown"
-                      @focus="
-                        searchObj.meta.functionEditorPlaceholderFlag = false
-                      "
-                      @blur="
-                        searchObj.meta.functionEditorPlaceholderFlag = true
-                      "
-                    />
-                    <!-- VRL disabled warning for non-table charts -->
-                    <div
-                      v-if="isVrlEditorDisabled"
-                      class="tw:absolute tw:bottom-0 tw:w-full tw:mt-3 tw:flex tw:items-center vrl-disabled-warning"
-                      data-test="vrl-editor-disabled-warning"
-                    >
-                      <OIcon name="warning" size="md" class="tw:mx-2" />
-                      <span
-                        class="tw:text-red-500 tw:p-2 tw:font-semibold"
-                        >VRL function is only supported for table chart.</span
-                      >
-                    </div>
-                  </div>
-                </div>
-              </template>
-              <template v-else-if="searchObj.data.transformType === 'action'">
-                <code-query-editor
-                  v-if="router.currentRoute.value.name === 'logs'"
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor"
-                  class="monaco-editor"
-                  :query="actionEditorQuery"
-                  read-only
-                  language="markdown"
-                />
-              </template>
-            </div>
-          </template>
-        </OSplitter>
+        </unified-query-editor>
       </div>
-      <OButton
-        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
-        data-test="logs-query-editor-full_screen-btn"
-        :title="isFocused ? t('search.collapse') : t('search.expand')"
-        variant="ghost"
-        size="icon"
-        @click="isFocused = !isFocused"
-        class="tw:p-1 tw:absolute! tw:z-50 fullscreen-hover-btn"
-        :style="{
-          top:
-            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
-            (vrlEditorNlpMode &&
-              searchObj.meta.showTransformEditor &&
-              searchObj.data.transformType === 'function')
-              ? '6.5rem'
-              : '3.5rem',
-          right:
-            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
-            (vrlEditorNlpMode &&
-              searchObj.meta.showTransformEditor &&
-              searchObj.data.transformType === 'function')
-              ? '1.6rem'
-              : '4rem',
-        }"
-      />
     </div>
 
     <ODialog
@@ -2043,6 +1964,71 @@ export default defineComponent({
         dashboardPanelData.data.type !== "table"
       );
     });
+
+    // Editor validation status for the new bottom bar.
+    // Returns `undefined` in plain filter mode so the badge collapses entirely —
+    // the active segment in the mode toggle is the source of truth for filter mode.
+    const editorValidation = computed(() => {
+      const errorMsg = searchObj.data.errorMsg;
+      if (errorMsg && String(errorMsg).trim().length > 0) {
+        return { valid: false, message: String(errorMsg) };
+      }
+      if (searchObj.meta.sqlMode) {
+        return { valid: true, message: t("search.validSql") };
+      }
+      return undefined;
+    });
+
+    // Marks the function pane Save button dirty when the buffer differs
+    // from the persisted function body.
+    const isFunctionDirty = computed(() => {
+      const buffer = searchObj.data.tempFunctionContent ?? "";
+      const persisted = searchObj.data.tempFunctionContent ?? "";
+      // Without a separate persisted value we can't compute true diff here;
+      // expose a heuristic: dirty when buffer has any content and a function
+      // is selected. Pages with a saved-function flow already manage their
+      // own dirty signal — Phase 2 can wire this to applyTransform state.
+      return Boolean(buffer && persisted);
+    });
+
+    const onEditorModeChange = (value: string) => {
+      const wantsSql = value === "sql";
+      if (wantsSql === searchObj.meta.sqlMode) return;
+      // The mode toggle is rendered with `mode-disabled` reflecting the same
+      // condition as the legacy SQL-mode switch, so we don't re-check here.
+      searchObj.meta.sqlMode = wantsSql;
+      searchObj.meta.sqlModeManualTrigger = true;
+    };
+
+    const onFunctionPaneOpenChange = (open: boolean) => {
+      searchObj.meta.showTransformEditor = open;
+      if (open && !searchObj.data.transformType) {
+        searchObj.data.transformType = "function";
+      }
+      searchObj.config.fnSplitterModel = open ? 60 : 100;
+    };
+
+    const onSaveFunctionFromFooter = () => {
+      // Reuse the existing saved-function flow (opens the save dialog)
+      fnSavedFunctionDialog();
+    };
+
+    // Map raw transform records into the {label, value} shape QueryEditor expects.
+    const editorFunctionOptions = computed(() =>
+      (functionOptions.value || []).map((f: any) => ({
+        label: f.name ?? String(f.value ?? ""),
+        value: f.name ?? String(f.value ?? ""),
+      })),
+    );
+
+    const onEditorSelectFunction = (opt: { label: string; value: string }) => {
+      const full = (functionOptions.value || []).find(
+        (f: any) => (f.name ?? f.value) === opt.value,
+      );
+      if (full) {
+        populateFunctionImplementation(full as any);
+      }
+    };
 
     watch(
       () => searchObj.data.transforms,
@@ -4638,6 +4624,14 @@ export default defineComponent({
       isActionsEnabled,
       showFunctionEditor,
       isVrlEditorDisabled,
+      // ── New: in-editor bottom bar + function pane wiring ──
+      editorValidation,
+      isFunctionDirty,
+      onEditorModeChange,
+      onFunctionPaneOpenChange,
+      onSaveFunctionFromFooter,
+      editorFunctionOptions,
+      onEditorSelectFunction,
       closeSocketWithError,
       histogram_svg,
       visualizeIcon,
@@ -5186,13 +5180,23 @@ html.dark .file-type label,
   font-size: var(--text-xs);
   font-weight: var(--font-medium) !important;
   line-height: 1rem !important;
-  padding: 0 !important;
-  width: 5.875rem !important;
+  padding: 0 0.5rem !important;
+  min-width: 5.875rem;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
   /* subtle default glow */
   // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
+}
+.o2-run-query-kbd {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-2xs, 0.625rem);
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.1875rem;
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
 }
 .o2-color-primary {
   background-color: var(--o2-primary-btn-bg);

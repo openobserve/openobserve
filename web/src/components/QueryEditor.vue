@@ -4,30 +4,476 @@
 -->
 
 <template>
-  <div class="query-editor tw:w-full tw:relative" :style="rootStyle">
-    <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
+  <div
+    class="query-editor tw:w-full tw:relative"
+    :class="{
+      'query-editor--fullscreen': fullscreenState,
+      'query-editor--bordered': bordered !== false,
+    }"
+    :style="rootStyle"
+    :data-test="`${dataTestPrefix}-root`"
+  >
+    <!-- Editor body: either split (query + function) or single editor -->
+    <div class="query-editor__body tw:relative tw:flex-1 tw:min-h-0 tw:flex">
+      <!-- ───────── Split: query + function pane ───────── -->
+      <template v-if="enableFunctionPane && functionPaneOpenState">
+        <OSplitter
+          v-model="splitterState"
+          :limits="splitterLimits"
+          :horizontal="false"
+          :separator-style="{ width: '0.0625rem', background: 'var(--o2-border)', cursor: 'col-resize' }"
+          class="query-editor__splitter tw:flex-1 tw:h-full"
+        >
+          <template #before>
+            <div class="query-editor__pane">
+              <div class="editor-container tw:relative tw:flex-1 tw:min-h-0">
+                <CodeQueryEditor
+                  :ref="(el) => (editorRef = el)"
+                  :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
+                  :language="currentLanguage"
+                  :query="query"
+                  :nlp-mode="nlpMode"
+                  :read-only="readOnly"
+                  :show-auto-complete="showAutoComplete"
+                  :keywords="keywords"
+                  :suggestions="suggestions"
+                  :debounce-time="debounceTime"
+                  @update:query="handleQueryUpdate"
+                  @run-query="emit('run-query')"
+                  @focus="emit('focus')"
+                  @blur="emit('blur')"
+                  @nlpModeDetected="handleNlpModeDetected"
+                  @generation-start="handleGenerationStart"
+                  @generation-end="handleGenerationEnd"
+                  @generation-success="handleGenerationSuccess"
+                  class="monaco-editor tw:w-full tw:h-full"
+                />
+                <span
+                  v-if="showQueryPlaceholder"
+                  class="query-editor__placeholder"
+                  :data-test="`${dataTestPrefix}-placeholder`"
+                  aria-hidden="true"
+                >
+                  {{ queryPlaceholderText }}<span class="query-editor__caret" />
+                </span>
+                <!-- Legacy floating AI icon (only when footer is hidden) -->
+                <OButton
+                  v-if="
+                    !showBottomBarState &&
+                    aiEnabledInEnv &&
+                    !hideNlToggle &&
+                    !isAIMode
+                  "
+                  :data-test="`${dataTestPrefix}-ai-toggle-btn`"
+                  variant="ghost"
+                  size="icon-toolbar"
+                  :disabled="props.disableAi"
+                  @click="nlpMode = true"
+                  class="ai-floating-button"
+                >
+                  <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
+                  <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
+                </OButton>
+              </div>
+              <QueryEditorFooter
+                compact
+                v-if="showBottomBarState"
+                :data-test="`${dataTestPrefix}-footer`"
+              >
+                <template #left>
+                  <OToggleGroup
+                    type="single"
+                    :model-value="currentMode"
+                    :disabled="modeDisabled"
+                    :data-test="`${dataTestPrefix}-mode-toggle`"
+                    @update:model-value="(v: any) => v && (currentMode = String(v))"
+                  >
+                    <OToggleGroupItem
+                      v-for="opt in modeOptions"
+                      :key="opt.value"
+                      :value="opt.value"
+                      size="xs"
+                      :disabled="modeDisabled"
+                      :tooltip="modeDisabled && modeDisabledReason ? modeDisabledReason : undefined"
+                      :data-test="`${dataTestPrefix}-mode-${opt.value}`"
+                    >
+                      <template v-if="opt.icon" #icon-left>
+                        <OIcon :name="opt.icon" size="xs" />
+                      </template>
+                      {{ opt.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+
+                  <span
+                    v-if="validation"
+                    class="query-editor__validation"
+                    :class="{ 'query-editor__validation--error': !validation.valid }"
+                    :data-test="`${dataTestPrefix}-validation`"
+                  >
+                    <span class="query-editor__validation-dot" />
+                    {{ validation.message || (validation.valid ? t('search.validSql') : t('search.invalidSql')) }}
+                  </span>
+
+                  <slot name="footer-left" />
+                </template>
+
+                <template #right>
+                  <slot name="footer-right" />
+
+                  <OButton
+                    v-if="showFooterAi && aiEnabledInEnv && !hideNlToggle"
+                    :data-test="`${dataTestPrefix}-footer-ai-btn`"
+                    variant="ai-gradient"
+                    size="icon-xs-sq"
+                    :disabled="props.disableAi"
+                    @click="onMainAiClick"
+                  >
+                    <img :src="nlpIcon" alt="AI" class="tw:w-[14px] tw:h-[14px] query-editor__ai-icon-invert" />
+                    <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
+                  </OButton>
+
+                  <OButton
+                    v-if="showFullscreen"
+                    :data-test="`${dataTestPrefix}-footer-fullscreen-btn`"
+                    variant="ghost"
+                    size="icon-xs"
+                    :icon-left="fullscreenState ? 'fullscreen-exit' : 'fullscreen'"
+                    @click="toggleFullscreen"
+                  >
+                    <OTooltip :content="fullscreenState ? t('search.collapse') : t('search.expand')" />
+                  </OButton>
+
+                  <OButton
+                    v-if="showFooterToggle"
+                    :data-test="`${dataTestPrefix}-footer-hide-btn`"
+                    variant="ghost"
+                    size="icon-xs"
+                    icon-left="chevron-down"
+                    @click="hideBottomBar"
+                  >
+                    <OTooltip :content="t('common.hide')" />
+                  </OButton>
+                </template>
+              </QueryEditorFooter>
+            </div>
+          </template>
+
+          <template #after>
+            <div class="query-editor__pane">
+              <div class="editor-container tw:relative tw:flex-1 tw:min-h-0">
+                <CodeQueryEditor
+                  :ref="(el) => (fnEditorRef = el)"
+                  :editor-id="`${functionDataTestPrefix}-editor`"
+                  :language="functionLanguage"
+                  :query="functionQuery"
+                  :nlp-mode="fnNlpMode"
+                  :read-only="functionReadOnly"
+                  :show-auto-complete="showAutoComplete"
+                  :debounce-time="debounceTime"
+                  @update:query="onFunctionQueryUpdate"
+                  @run-query="emit('run-query')"
+                  @focus="emit('function-focus')"
+                  @blur="emit('function-blur')"
+                  @keydown="(e: KeyboardEvent) => emit('function-keydown', e)"
+                  class="monaco-editor tw:w-full tw:h-full"
+                />
+                <span
+                  v-if="showFunctionPlaceholder"
+                  class="query-editor__placeholder"
+                  :data-test="`${functionDataTestPrefix}-placeholder`"
+                  aria-hidden="true"
+                >
+                  {{ functionPlaceholderText }}<span class="query-editor__caret" />
+                </span>
+              </div>
+              <QueryEditorFooter
+                compact
+                v-if="showBottomBarState"
+                class="query-editor__fn-zone"
+                :data-test="`${functionDataTestPrefix}-footer`"
+              >
+                <template #left>
+                  <!-- Built-in O2 dropdown picker -->
+                  <ODropdown
+                    v-if="!$slots['function-footer-left']"
+                    side="top"
+                    align="start"
+                  >
+                    <template #trigger>
+                      <OButton
+                        variant="outline"
+                        size="xs"
+                        icon-right="expand-more"
+                        :disabled="functionReadOnly || functionOptions.length === 0"
+                        :data-test="`${functionDataTestPrefix}-picker-btn`"
+                        class="query-editor__fx-trigger"
+                      >
+                        <span class="query-editor__fx-pill">
+                          <span class="query-editor__fx-mark" aria-hidden="true">fx</span>
+                          <span class="query-editor__fx-name">
+                            {{ selectedFunction || functionPlaceholder || t('search.selectFunction') }}
+                          </span>
+                        </span>
+                      </OButton>
+                    </template>
+                    <ODropdownItem
+                      v-for="opt in functionOptions"
+                      :key="opt.value"
+                      :data-test="`${functionDataTestPrefix}-picker-item-${opt.value}`"
+                      @select="onSelectFunction(opt)"
+                    >
+                      {{ opt.label }}
+                    </ODropdownItem>
+                  </ODropdown>
+                  <slot name="function-footer-left" />
+                </template>
+
+                <template #right>
+                  <slot name="function-footer-right" />
+
+                  <OButton
+                    v-if="showFooterAi && aiEnabledInEnv"
+                    :data-test="`${functionDataTestPrefix}-ai-btn`"
+                    variant="ai-gradient"
+                    size="icon-xs-sq"
+                    :disabled="functionDisableAi"
+                    @click="onFunctionAiClick"
+                  >
+                    <img :src="nlpIcon" alt="AI" class="tw:w-[14px] tw:h-[14px] query-editor__ai-icon-invert" />
+                    <OTooltip :content="functionDisableAi && functionDisableAiReason ? functionDisableAiReason : t('nlMode.toggle')" />
+                  </OButton>
+
+                  <OButton
+                    :data-test="`${functionDataTestPrefix}-save-btn`"
+                    variant="outline"
+                    size="xs"
+                    icon-left="save"
+                    :disabled="functionSaveDisabled"
+                    @click="onFunctionSave"
+                  >
+                    <span class="tw:inline-flex tw:items-center tw:gap-1">
+                      <span
+                        v-if="functionDirty"
+                        class="query-editor__dirty-dot"
+                        aria-hidden="true"
+                      />
+                      {{ t('common.save') }}
+                    </span>
+                  </OButton>
+
+                  <OButton
+                    :data-test="`${functionDataTestPrefix}-close-btn`"
+                    variant="ghost"
+                    size="icon-xs"
+                    icon-left="close"
+                    @click="closeFunctionPane"
+                  >
+                    <OTooltip :content="t('search.hideFunctionEditor')" />
+                  </OButton>
+                </template>
+              </QueryEditorFooter>
+            </div>
+          </template>
+        </OSplitter>
+      </template>
+
+      <!-- ───────── Single editor (no function pane open) ───────── -->
+      <template v-else>
+        <div class="query-editor__pane tw:flex-1 tw:min-w-0">
+          <div class="editor-container tw:relative tw:flex-1 tw:min-h-0">
+            <CodeQueryEditor
+              :ref="(el) => (editorRef = el)"
+              :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
+              :language="currentLanguage"
+              :query="query"
+              :nlp-mode="nlpMode"
+              :read-only="readOnly"
+              :show-auto-complete="showAutoComplete"
+              :keywords="keywords"
+              :suggestions="suggestions"
+              :debounce-time="debounceTime"
+              @update:query="handleQueryUpdate"
+              @run-query="emit('run-query')"
+              @focus="emit('focus')"
+              @blur="emit('blur')"
+              @nlpModeDetected="handleNlpModeDetected"
+              @generation-start="handleGenerationStart"
+              @generation-end="handleGenerationEnd"
+              @generation-success="handleGenerationSuccess"
+              class="monaco-editor tw:w-full tw:h-full"
+            />
+            <span
+              v-if="showQueryPlaceholder"
+              class="query-editor__placeholder"
+              :data-test="`${dataTestPrefix}-placeholder`"
+              aria-hidden="true"
+            >
+              {{ queryPlaceholderText }}<span class="query-editor__caret" />
+            </span>
+            <!-- Legacy floating AI icon (only when no footer to host it) -->
+            <OButton
+              v-if="
+                !showBottomBarState &&
+                aiEnabledInEnv &&
+                !hideNlToggle &&
+                !isAIMode
+              "
+              :data-test="`${dataTestPrefix}-ai-toggle-btn`"
+              variant="ghost"
+              size="icon-toolbar"
+              :disabled="props.disableAi"
+              @click="nlpMode = true"
+              class="ai-floating-button"
+            >
+              <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
+              <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
+            </OButton>
+          </div>
+          <QueryEditorFooter
+            compact
+            v-if="showBottomBarState"
+            :data-test="`${dataTestPrefix}-footer`"
+          >
+            <template #left>
+              <OToggleGroup
+                type="single"
+                :model-value="currentMode"
+                :disabled="modeDisabled"
+                :data-test="`${dataTestPrefix}-mode-toggle`"
+                @update:model-value="(v: any) => v && (currentMode = String(v))"
+              >
+                <OToggleGroupItem
+                  v-for="opt in modeOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                  size="sm"
+                  :disabled="modeDisabled"
+                  :tooltip="modeDisabled && modeDisabledReason ? modeDisabledReason : undefined"
+                  :data-test="`${dataTestPrefix}-mode-${opt.value}`"
+                >
+                  <template v-if="opt.icon" #icon-left>
+                    <OIcon :name="opt.icon" size="sm" />
+                  </template>
+                  {{ opt.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+
+              <span
+                v-if="validation"
+                class="query-editor__validation"
+                :class="{ 'query-editor__validation--error': !validation.valid }"
+                :data-test="`${dataTestPrefix}-validation`"
+              >
+                <span class="query-editor__validation-dot" />
+                {{ validation.message || (validation.valid ? t('search.validSql') : t('search.invalidSql')) }}
+              </span>
+
+              <slot name="footer-left" />
+            </template>
+
+            <template #right>
+              <slot name="footer-right" />
+
+              <OButton
+                v-if="showFooterAi && aiEnabledInEnv && !hideNlToggle"
+                :data-test="`${dataTestPrefix}-footer-ai-btn`"
+                variant="ai-gradient"
+                size="icon-chip"
+                :disabled="props.disableAi"
+                @click="onMainAiClick"
+              >
+                <img :src="nlpIcon" alt="AI" class="tw:w-[12px] tw:h-[12px] query-editor__ai-icon-invert" />
+                <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
+              </OButton>
+
+              <OButton
+                v-if="showFullscreen"
+                :data-test="`${dataTestPrefix}-footer-fullscreen-btn`"
+                variant="ghost"
+                size="icon-chip"
+                :icon-left="fullscreenState ? 'fullscreen-exit' : 'fullscreen'"
+                @click="toggleFullscreen"
+              >
+                <OTooltip :content="fullscreenState ? t('search.collapse') : t('search.expand')" />
+              </OButton>
+
+              <OButton
+                v-if="showFooterToggle"
+                :data-test="`${dataTestPrefix}-footer-hide-btn`"
+                variant="ghost"
+                size="icon-chip"
+                icon-left="chevron-down"
+                @click="hideBottomBar"
+              >
+                <OTooltip :content="t('common.hide')" />
+              </OButton>
+            </template>
+          </QueryEditorFooter>
+
+          <!-- Reveal pill when footer is hidden -->
+          <button
+            v-if="!showBottomBarState && (validation || enableFunctionPane || showFooterAi)"
+            type="button"
+            class="query-editor__reveal-footer"
+            :data-test="`${dataTestPrefix}-footer-reveal-btn`"
+            @click="revealBottomBar"
+          >
+            <OIcon name="expand-less" size="sm" />
+            <OTooltip :content="t('common.show')" />
+          </button>
+        </div>
+
+        <!-- Vertical fx · ADD FUNCTION rail -->
+        <AddFunctionRail
+          v-if="enableFunctionPane && !functionPaneOpenState"
+          :label="railLabel"
+          :tooltip="railTooltip"
+          :data-test="`${dataTestPrefix}-add-function-rail`"
+          @open="openFunctionPane"
+        />
+      </template>
+    </div>
+
+    <!-- Inline AI strip (docked inside editor card, below the body) -->
     <div
       v-if="isAIMode"
-      class="ai-input-bar tw:p-2 tw:flex-shrink-0 tw:z-10"
+      class="query-editor__ai-strip"
+      :data-test="`${dataTestPrefix}-ai-strip`"
     >
-      <!-- Show streaming status with spinner + stop button -->
-      <div v-if="isGenerating" :class="aiBarStreamingClass">
-        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+      <div v-if="isGenerating" class="query-editor__ai-streaming">
+        <img :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px]" />
         <OSpinner variant="dots" size="xs" />
-        <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+        <span class="tw:flex-1 tw:text-xs">
+          {{ streamingText || aiStatusText || t('search.analyzingQuery') }}
+        </span>
         <OButton
           variant="ghost-destructive"
-          size="icon-circle-sm"
+          size="icon-xs"
           icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
-          class="ai-stop-button"
         >
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
       </div>
-      <!-- Normal input when not generating -->
-      <div v-else class="tw:flex tw:items-center tw:gap-2">
+      <div v-else class="query-editor__ai-row">
+        <!-- Target toggle: Query | Function -->
+        <OToggleGroup
+          v-if="enableFunctionPane"
+          type="single"
+          :model-value="aiTarget"
+          class="query-editor__ai-target"
+          :data-test="`${dataTestPrefix}-ai-target`"
+          @update:model-value="(v: any) => v && (aiTarget = v as ('query' | 'function'))"
+        >
+          <OToggleGroupItem value="query" size="xs">
+            {{ t('common.query') }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="function" size="xs" :disabled="!functionPaneOpenState">
+            {{ functionLabel || 'fx' }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+
         <OInput
           v-model="aiInputText"
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
@@ -36,85 +482,56 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+            <img :src="nlpIcon" alt="AI" class="tw:w-[16px] tw:h-[16px]" />
           </template>
         </OInput>
-        <!-- Send Button -->
+
+        <!-- Output language badge -->
+        <span class="query-editor__ai-badge" aria-hidden="true">
+          {{ aiTarget === 'function' ? functionLanguage.toUpperCase() : currentLanguage.toUpperCase() }}
+        </span>
+
         <OButton
           variant="ai-gradient"
-          size="icon-xs-sq"
+          size="xs"
           icon-left="send"
-          :disabled="!aiInputText.trim() || props.disableAi"
+          :disabled="!aiInputText.trim() || (aiTarget === 'function' ? functionDisableAi : props.disableAi)"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="ai-send-button"
         >
-          <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
-          <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
+          {{ t('search.generate') }}
         </OButton>
-        <!-- Close Button -->
+
         <OButton
           variant="ghost-muted"
-          size="icon-circle-sm"
+          size="icon-xs"
           icon-left="close"
           :data-test="`${dataTestPrefix}-ai-close-btn`"
           @click="dismissAIMode"
-          class="ai-close-button"
         >
           <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
     </div>
-
-    <!-- Code Editor with relative positioning for floating button -->
-    <div class="editor-container tw:relative tw:flex-1 tw:min-h-0">
-      <CodeQueryEditor
-        :ref="(el) => (editorRef = el)"
-        :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
-        :language="currentLanguage"
-        :query="query"
-        :nlp-mode="nlpMode"
-        :read-only="readOnly"
-        :show-auto-complete="showAutoComplete"
-        :keywords="keywords"
-        :suggestions="suggestions"
-        :debounce-time="debounceTime"
-        @update:query="handleQueryUpdate"
-        @run-query="emit('run-query')"
-        @focus="emit('focus')"
-        @blur="emit('blur')"
-        @nlpModeDetected="handleNlpModeDetected"
-        @generation-start="handleGenerationStart"
-        @generation-end="handleGenerationEnd"
-        @generation-success="handleGenerationSuccess"
-        class="monaco-editor tw:w-full tw:h-full"
-      />
-
-      <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
-      <OButton
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && !hideNlToggle && !isAIMode"
-        :data-test="`${dataTestPrefix}-ai-toggle-btn`"
-        variant="ghost"
-        size="icon-toolbar"
-        :disabled="props.disableAi"
-        @click="nlpMode = true"
-        class="ai-floating-button"
-      >
-        <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
-        <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
-      </OButton>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
+import OIcon from '@/lib/core/Icon/OIcon.vue';
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
+import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
+import QueryEditorFooter from '@/components/queryEditor/QueryEditorFooter.vue';
+import AddFunctionRail from '@/components/queryEditor/AddFunctionRail.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';
@@ -122,6 +539,9 @@ import config from '@/aws-exports';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';
+type QueryMode = 'filter' | 'sql';
+interface ModeOption { value: string; label: string; icon?: string }
+interface Validation { valid: boolean; message?: string }
 
 interface Props {
   // Language configuration
@@ -151,6 +571,42 @@ interface Props {
 
   // Testing
   dataTestPrefix?: string;
+
+  // ───── New: in-editor bottom bar ─────
+  showBottomBar?: boolean;                    // render the new editor footer
+  mode?: QueryMode | string;                  // current segmented mode (filter/sql/…)
+  modeOptions?: ModeOption[];                 // override default Filter/SQL options
+  modeDisabled?: boolean;                     // disable the mode toggle
+  modeDisabledReason?: string;                // tooltip when mode toggle is disabled
+  validation?: Validation;                    // Valid SQL / error
+  showFullscreen?: boolean;                   // fullscreen button in footer
+  isFullscreen?: boolean;                     // controlled fullscreen state
+  showFooterAi?: boolean;                     // AI sparkle in footer (replaces floating btn)
+  showFooterToggle?: boolean;                 // chevron to collapse footer
+
+  // ───── New: function pane ─────
+  enableFunctionPane?: boolean;               // shows the splitter + rail
+  functionPaneOpen?: boolean;                 // controlled open state
+  functionQuery?: string;                     // function/VRL code (two-way)
+  functionLanguage?: Language;                // default 'vrl'
+  functionLabel?: string;                     // label in fn footer (default "FX FUNCTION")
+  functionDirty?: boolean;                    // dot on Save
+  functionSaveDisabled?: boolean;
+  functionDisableAi?: boolean;
+  functionDisableAiReason?: string;
+  functionReadOnly?: boolean;
+  functionDataTestPrefix?: string;
+  // built-in function picker (ODropdown) — used when slot override isn't provided
+  functionOptions?: Array<{ label: string; value: string }>;
+  selectedFunction?: string;
+  functionPlaceholder?: string;
+  minLines?: number;                          // editor min height in line count (default 2)
+  maxLines?: number;                          // editor max height in line count (default 12)
+  bordered?: boolean;                         // outer rounded border around the editor (default true)
+  splitterModel?: number;                     // persistable splitter position
+  splitterLimits?: [number, number];
+  railLabel?: string;                         // text in the vertical rail
+  railTooltip?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -167,6 +623,33 @@ const props = withDefaults(defineProps<Props>(), {
   disableAi: false,
   disableAiReason: '',
   dataTestPrefix: 'query-editor',
+  showBottomBar: false,
+  modeOptions: () => [
+    { value: 'filter', label: 'Filter', icon: 'filter-list' },
+    { value: 'sql', label: 'SQL', icon: 'database' },
+  ],
+  modeDisabled: false,
+  showFullscreen: true,
+  showFooterAi: true,
+  showFooterToggle: true,
+  enableFunctionPane: false,
+  functionPaneOpen: false,
+  functionQuery: '',
+  functionLanguage: 'vrl',
+  functionLabel: 'FX FUNCTION',
+  functionDirty: false,
+  functionSaveDisabled: false,
+  functionDisableAi: false,
+  functionDisableAiReason: '',
+  functionReadOnly: false,
+  functionDataTestPrefix: 'query-editor-fn',
+  splitterModel: 60,
+  splitterLimits: () => [20, 80] as [number, number],
+  railLabel: 'ADD FUNCTION',
+  functionOptions: () => [],
+  selectedFunction: '',
+  minLines: 2,
+  maxLines: 12,
 });
 
 const emit = defineEmits<{
@@ -181,6 +664,20 @@ const emit = defineEmits<{
   'generation-start': [];
   'generation-end': [];
   'generation-success': [payload: { type: string; message: string }];
+  // new
+  'update:mode': [value: string];
+  'update:showBottomBar': [value: boolean];
+  'update:functionPaneOpen': [value: boolean];
+  'update:functionQuery': [value: string];
+  'update:isFullscreen': [value: boolean];
+  'update:splitterModel': [value: number];
+  'save-function': [];
+  'toggle-fullscreen': [value: boolean];
+  'function-focus': [];
+  'function-blur': [];
+  'function-keydown': [event: KeyboardEvent];
+  'update:selectedFunction': [value: string];
+  'select-function': [option: { label: string; value: string }];
 }>();
 
 const store = useStore();
@@ -255,13 +752,17 @@ const isAIMode = computed(() => {
   return nlpMode.value || isNaturalLanguageDetected.value;
 });
 
-// Computed: Root container style - sets overall height
+// Computed: Root container style - sets overall height + line-count CSS vars
 const rootStyle = computed(() => {
+  const base: Record<string, string> = {
+    ['--query-editor-min-lines' as any]: String(props.minLines ?? 2),
+    ['--query-editor-max-lines' as any]: String(props.maxLines ?? 12),
+  };
+  // editorHeight: '100%' → let parent decide; otherwise use the supplied size.
   if (props.editorHeight === '100%') {
-    return { height: '100%' };
+    return { ...base, height: '100%' };
   }
-  // For fixed/calc heights, apply to the root so it sizes correctly in any parent
-  return { height: props.editorHeight };
+  return { ...base, height: props.editorHeight };
 });
 
 // Handle query update from editor
@@ -297,20 +798,29 @@ const handleAIGenerate = async () => {
 
   if (!userInput || isGenerating.value) return;
 
-  const currentQuery = editorRef.value?.getValue ? editorRef.value.getValue() : props.query;
+  // Route to either the main editor or the function editor based on aiTarget.
+  const target =
+    aiTarget.value === 'function' ? fnEditorRef.value : editorRef.value;
+  const targetLanguage =
+    aiTarget.value === 'function' ? props.functionLanguage : currentLanguage.value;
+
+  const currentQuery = target?.getValue
+    ? target.getValue()
+    : aiTarget.value === 'function'
+      ? props.functionQuery
+      : props.query;
 
   // Check if user wants to execute the query instead of generating a new one
   if (currentQuery && currentQuery.trim() && isExecutionIntent(userInput)) {
-    console.log('[QueryEditor] Execution intent detected, running query instead of generating');
     aiInputText.value = ''; // Clear input
-    emit('run-query'); // Trigger query execution
+    emit('run-query');
     return;
   }
 
   // Build the prompt based on whether there's an existing query
   let naturalLanguage = '';
   if (currentQuery && currentQuery.trim()) {
-    naturalLanguage = `Modify this ${currentLanguage.value.toUpperCase()} query to ${userInput}:\n\n${currentQuery}`;
+    naturalLanguage = `Modify this ${String(targetLanguage).toUpperCase()} query to ${userInput}:\n\n${currentQuery}`;
   } else {
     naturalLanguage = userInput;
   }
@@ -327,17 +837,17 @@ const handleAIGenerate = async () => {
   chatMessages.value.push({ role: 'user', content: userInput });
 
   // Call the CodeQueryEditor's handleGenerateSQL method with abort + session
-  if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
+  if (target && typeof target.handleGenerateSQL === 'function') {
     try {
       aiStatusText.value = t('search.generatingQuery');
-      await editorRef.value.handleGenerateSQL(
+      await target.handleGenerateSQL(
         naturalLanguage,
         currentAbortController.value.signal,
         currentSessionId.value,
       );
 
       // Track assistant response in chat history
-      const generatedQuery = editorRef.value.getValue?.() || '';
+      const generatedQuery = target.getValue?.() || '';
       chatMessages.value.push({ role: 'assistant', content: generatedQuery });
 
       // Save to IndexedDB (shared with O2AIChat history)
@@ -377,7 +887,11 @@ const handleAIGenerate = async () => {
   currentAbortController.value = null;
 
   // Emit event for parent components
-  emit('ask-ai', naturalLanguage, currentLanguage.value);
+  emit(
+    'ask-ai',
+    naturalLanguage,
+    (aiTarget.value === 'function' ? props.functionLanguage : currentLanguage.value) as Language,
+  );
 };
 
 // Cancel in-flight AI request
@@ -438,11 +952,232 @@ const handleGenerationSuccess = ({ type, message }: any) => {
   emit('generation-success', { type, message });
 };
 
+// ───── Footer / function-pane state ─────
+
+// Mode toggle (Filter / SQL): internal fallback when `mode` prop is omitted
+const internalMode = ref<string>(props.mode ?? 'filter');
+const currentMode = computed({
+  get: () => (props.mode !== undefined ? props.mode : internalMode.value),
+  set: (val: string) => {
+    if (props.mode !== undefined) {
+      emit('update:mode', val);
+    } else {
+      internalMode.value = val;
+    }
+  },
+});
+
+// Function pane open/close (controlled or self-managed)
+const internalFunctionPaneOpen = ref<boolean>(!!props.functionPaneOpen);
+const functionPaneOpenState = computed({
+  get: () => (props.functionPaneOpen !== undefined ? props.functionPaneOpen : internalFunctionPaneOpen.value),
+  set: (val: boolean) => {
+    if (props.functionPaneOpen !== undefined) {
+      emit('update:functionPaneOpen', val);
+    } else {
+      internalFunctionPaneOpen.value = val;
+    }
+  },
+});
+
+// Fullscreen (controlled or self-managed)
+const internalFullscreen = ref<boolean>(!!props.isFullscreen);
+const fullscreenState = computed({
+  get: () => (props.isFullscreen !== undefined ? props.isFullscreen : internalFullscreen.value),
+  set: (val: boolean) => {
+    if (props.isFullscreen !== undefined) {
+      emit('update:isFullscreen', val);
+    } else {
+      internalFullscreen.value = val;
+    }
+    emit('toggle-fullscreen', val);
+  },
+});
+
+// Splitter (controlled or self-managed)
+const internalSplitter = ref<number>(props.splitterModel);
+const splitterState = computed({
+  get: () => (props.splitterModel !== undefined ? props.splitterModel : internalSplitter.value),
+  set: (val: number) => {
+    internalSplitter.value = val;
+    emit('update:splitterModel', val);
+  },
+});
+
+// Show/hide footer — supports both controlled (v-model:show-bottom-bar)
+// and uncontrolled usage. Internal override wins until the parent supplies a new prop value.
+const showBottomBarOverride = ref<boolean | undefined>(undefined);
+watch(() => props.showBottomBar, () => {
+  showBottomBarOverride.value = undefined;
+});
+const showBottomBarState = computed({
+  get: () =>
+    showBottomBarOverride.value !== undefined
+      ? showBottomBarOverride.value
+      : props.showBottomBar,
+  set: (val: boolean) => {
+    showBottomBarOverride.value = val;
+    emit('update:showBottomBar', val);
+  },
+});
+
+// VRL function-pane NLP mode (self-managed; no external control surface yet)
+const fnNlpMode = ref(false);
+const fnEditorRef = ref<any>(null);
+
+// AI target: which pane the inline AI strip generates for
+const aiTarget = ref<'query' | 'function'>('query');
+
+const openFunctionPane = () => {
+  functionPaneOpenState.value = true;
+};
+const closeFunctionPane = () => {
+  functionPaneOpenState.value = false;
+};
+const toggleFullscreen = () => {
+  fullscreenState.value = !fullscreenState.value;
+};
+const hideBottomBar = () => {
+  showBottomBarState.value = false;
+};
+const revealBottomBar = () => {
+  showBottomBarState.value = true;
+};
+
+const onMainAiClick = () => {
+  if (props.disableAi) return;
+  aiTarget.value = 'query';
+  nlpMode.value = true;
+};
+const onFunctionAiClick = () => {
+  if (props.functionDisableAi) return;
+  aiTarget.value = 'function';
+  fnNlpMode.value = true;
+  // Keep the shared AI strip visible regardless of which pane triggered it.
+  nlpMode.value = true;
+};
+
+const onFunctionQueryUpdate = (val: string) => {
+  emit('update:functionQuery', val);
+};
+const onFunctionSave = () => {
+  if (props.functionSaveDisabled) return;
+  emit('save-function');
+};
+
+const onSelectFunction = (opt: { label: string; value: string }) => {
+  emit('update:selectedFunction', opt.value);
+  emit('select-function', opt);
+};
+
+const aiEnabledInEnv = computed(
+  () => config.isEnterprise === 'true' && store.state.zoConfig.ai_enabled,
+);
+
 // Watch for language prop changes
 watch(() => props.defaultLanguage, (newLang) => {
   if (newLang && newLang !== currentLanguage.value) {
     currentLanguage.value = newLang;
   }
+});
+
+// ───── Typewriter placeholder ─────
+// Floating placeholder rendered over Monaco when the editor is empty.
+// Cycles through the three modes a user can author in.
+const queryPlaceholderText = ref('');
+const functionPlaceholderText = ref('');
+const queryPlaceholderPhrases = ['Write SQL query', 'Write filter criteria', 'Write VRL function'];
+const functionPlaceholderPhrases = ['Write VRL function'];
+
+const showQueryPlaceholder = computed(() => !props.query || !props.query.trim());
+const showFunctionPlaceholder = computed(
+  () => functionPaneOpenState.value && (!props.functionQuery || !props.functionQuery.trim()),
+);
+
+const createTypewriter = (
+  phrases: string[],
+  target: { value: string },
+  isActive: () => boolean,
+) => {
+  let phraseIdx = 0;
+  let charIdx = 0;
+  let mode: 'typing' | 'pausing' | 'deleting' = 'typing';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const tick = () => {
+    if (!isActive()) {
+      target.value = '';
+      timer = setTimeout(tick, 400);
+      return;
+    }
+    const current = phrases[phraseIdx];
+    if (mode === 'typing') {
+      charIdx++;
+      target.value = current.slice(0, charIdx);
+      if (charIdx >= current.length) {
+        mode = 'pausing';
+        timer = setTimeout(() => {
+          mode = phrases.length > 1 ? 'deleting' : 'typing';
+          tick();
+        }, 1800);
+        return;
+      }
+      timer = setTimeout(tick, 70);
+    } else if (mode === 'deleting') {
+      charIdx--;
+      target.value = current.slice(0, charIdx);
+      if (charIdx <= 0) {
+        phraseIdx = (phraseIdx + 1) % phrases.length;
+        mode = 'typing';
+      }
+      timer = setTimeout(tick, 35);
+    }
+  };
+
+  return {
+    start: () => {
+      if (timer) return;
+      tick();
+    },
+    stop: () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    },
+  };
+};
+
+const queryTypewriter = createTypewriter(
+  queryPlaceholderPhrases,
+  queryPlaceholderText,
+  () => showQueryPlaceholder.value,
+);
+const functionTypewriter = createTypewriter(
+  functionPlaceholderPhrases,
+  functionPlaceholderText,
+  () => showFunctionPlaceholder.value,
+);
+
+onMounted(() => {
+  queryTypewriter.start();
+  functionTypewriter.start();
+});
+onBeforeUnmount(() => {
+  queryTypewriter.stop();
+  functionTypewriter.stop();
+});
+
+// Keep internal mirrors in sync with controlled props
+watch(() => props.functionPaneOpen, (v) => {
+  if (v !== undefined) internalFunctionPaneOpen.value = v;
+});
+watch(() => props.isFullscreen, (v) => {
+  if (v !== undefined) internalFullscreen.value = v;
+});
+watch(() => props.splitterModel, (v) => {
+  if (v !== undefined) internalSplitter.value = v;
+});
+watch(() => props.mode, (v) => {
+  if (v !== undefined) internalMode.value = v;
 });
 
 // Watch for query changes and update editor if needed
@@ -535,6 +1270,20 @@ defineExpose({
 
   // Streaming response (for AI status display)
   streamingResponse: computed(() => editorRef.value?.streamingResponse),
+
+  // ── new exposes ──
+  openFunctionPane,
+  closeFunctionPane,
+  toggleFullscreen,
+  hideBottomBar,
+  revealBottomBar,
+  getFunctionEditor: () => fnEditorRef.value,
+  getFunctionValue: () => fnEditorRef.value?.getValue?.() ?? '',
+  setFunctionValue: (value: string) => {
+    if (fnEditorRef.value?.setValue) {
+      fnEditorRef.value.setValue(value);
+    }
+  },
 });
 </script>
 
@@ -543,12 +1292,46 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
-  outline-color: transparent; /* Remove focus outline from root container */  
+  outline-color: transparent; /* Remove focus outline from root container */
+  border: 0.0625rem solid var(--o2-border);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: var(--o2-card-bg-solid);
 }
 
 /* Editor container - clips Monaco but keeps floating button visible */
 .editor-container {
   overflow: hidden;
+}
+
+/* Floating typewriter placeholder shown when the editor is empty. */
+.query-editor__placeholder {
+  position: absolute;
+  top: 0.5rem;
+  left: 4rem; /* clear Monaco's gutter (line numbers + glyph margin) */
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8125rem;
+  line-height: 1.375rem;
+  color: var(--o2-text-placeholder, var(--o2-text-muted));
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.query-editor__caret {
+  display: inline-block;
+  width: 0.0625rem;
+  height: 0.875rem;
+  margin-left: 0.125rem;
+  vertical-align: middle;
+  background: currentColor;
+  animation: query-editor-caret-blink 1s steps(1) infinite;
+}
+
+@keyframes query-editor-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
 }
 
 /* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
@@ -684,5 +1467,182 @@ defineExpose({
 
 .ai-bar-streaming--dark span {
   color: #ccc;
+}
+
+/* ───── Layout: body, panes, splitter ───── */
+.query-editor--bordered {
+  border: 0.0625rem solid var(--o2-border);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: var(--o2-card-bg-solid);
+}
+
+.query-editor__body {
+  width: 100%;
+  /* Floor based on minLines var so SearchBar can shrink with empty queries. */
+  min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem + 2rem); /* editor rows + footer */
+}
+
+.query-editor__pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.query-editor__pane .editor-container {
+  min-height: calc(var(--query-editor-min-lines, 2) * 1.375rem);
+  max-height: calc(var(--query-editor-max-lines, 12) * 1.375rem);
+}
+
+.query-editor__splitter {
+  width: 100%;
+}
+
+/* Validation badge */
+.query-editor__validation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--text-xs);
+  color: var(--o2-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18rem;
+}
+.query-editor__validation-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--o2-status-success, #16a34a);
+  flex-shrink: 0;
+}
+.query-editor__validation--error {
+  color: var(--o2-status-error, #ef4444);
+}
+.query-editor__validation--error .query-editor__validation-dot {
+  background: var(--o2-status-error, #ef4444);
+}
+
+/* Function-side zone (faint iris tint) */
+.query-editor__fn-zone {
+  background: color-mix(in srgb, var(--o2-primary-color) 5%, var(--o2-section-header-bg));
+}
+
+/* fx <name> ▾ pill content inside the picker trigger */
+.query-editor__fx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.query-editor__fx-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.25rem;
+  font-style: italic;
+  font-weight: var(--font-semibold);
+  font-size: var(--text-2xs, 0.625rem);
+  letter-spacing: 0.02em;
+  color: var(--o2-primary-color);
+  background: color-mix(in srgb, var(--o2-primary-color) 14%, transparent);
+  border-radius: 0.25rem;
+}
+.query-editor__fx-name {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--o2-text-body);
+}
+
+/* Bordered trigger that matches OSelect dropdown chrome */
+.query-editor__fx-trigger {
+  background: var(--o2-card-bg-solid) !important;
+  border-color: var(--o2-border) !important;
+}
+
+.query-editor__dirty-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 9999px;
+  background: var(--o2-status-warning, #f59e0b);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* AI icons rendered as <img> turn white on the gradient AI button. */
+.query-editor__ai-icon-invert {
+  filter: brightness(0) invert(1);
+}
+
+/* ───── Inline AI strip (docked at bottom of editor card) ───── */
+.query-editor__ai-strip {
+  border-top: 0.0625rem solid var(--o2-border);
+  background: color-mix(in srgb, var(--o2-primary-color) 6%, transparent);
+  padding: 0.375rem 0.5rem;
+}
+.query-editor__ai-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2rem;
+}
+.query-editor__ai-streaming {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  font-size: var(--text-xs);
+  color: var(--o2-text-body);
+}
+.query-editor__ai-target {
+  flex-shrink: 0;
+}
+.query-editor__ai-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-2xs, 0.625rem);
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.05em;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.1875rem;
+  border: 0.0625rem solid var(--o2-border);
+  color: var(--o2-text-code);
+  background: var(--o2-card-bg-solid);
+}
+
+.query-editor__reveal-footer {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 0.0625rem solid var(--o2-border);
+  border-radius: 9999px;
+  background: var(--o2-card-bg-solid);
+  color: var(--o2-text-secondary);
+  cursor: pointer;
+  z-index: 5;
+
+  &:hover {
+    background: var(--o2-hover-accent);
+    color: var(--o2-text-body);
+  }
+}
+
+.query-editor--fullscreen {
+  position: fixed !important;
+  inset: 4rem 1rem 1rem 1rem;
+  z-index: 50;
+  background: var(--o2-card-bg-solid);
+  border: 0.0625rem solid var(--o2-border);
+  border-radius: 0.375rem;
+  box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.25);
 }
 </style>
