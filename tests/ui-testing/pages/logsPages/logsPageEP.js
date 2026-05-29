@@ -55,27 +55,28 @@ async searchSchedulerSubmit() {
 
 async validateAddJob(jobId) {
   // Wait for the notification — it fires only after the job creation API call succeeds
-  await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job Added Succesfully' }).first()).toBeVisible({ timeout: 15000 });
+  await expect(this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job added successfully' }).first()).toBeVisible({ timeout: 15000 });
 
   // Navigate to the scheduler list
   await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
-  await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
-  // Resolve trace_id for the specific job we created, then assert that exact row.
-  // OTable rows render as [data-test="o2-table-row-{index}"], not by row-key.
-  // We find the row by filtering on the visible trace_id text instead.
+  // OTable rows are indexed as [data-test="o2-table-row-{index}"] (positional integer).
+  // trace_id is the row-key but is NOT a visible column, so filter({ hasText }) won't match.
+  // Instead: intercept the GET response from clicking "Get Jobs" to find the job's row index.
   const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
   const orgId = getOrgIdentifier();
-  const listResponse = await this.page.request.get(
-    `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
-    { headers: getAuthHeaders() }
+  const responsePromise = this.page.waitForResponse(
+    resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
+    { timeout: 15000 }
   );
+  await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
+  const listResponse = await responsePromise;
   const jobs = await listResponse.json();
-  const job = jobs.find(j => j.id === jobId);
-  if (!job?.trace_id) throw new Error(`Job with id "${jobId}" not found in scheduler list`);
+  const rowIndex = jobs.findIndex(j => j.id === jobId);
+  if (rowIndex === -1) throw new Error(`Job with id "${jobId}" not found in scheduler list`);
   await expect(
-    this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: job.trace_id }).first()
+    this.page.locator(`[data-test="o2-table-row-${rowIndex}"]`).first()
   ).toBeVisible({ timeout: 15000 });
 }
 

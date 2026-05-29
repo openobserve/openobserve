@@ -4366,13 +4366,21 @@ export class LogsPage {
     }
 
     async selectStreamAndStreamTypeForLogs(stream) {
+        // Click the OSelect wrapper to open the popover
         await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
+        await this.page.locator('[data-test="log-search-index-list-select-stream-popover"]').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+        // Fill the search input INSIDE the popover — the wrapper div is not an input
+        const popoverSearch = this.page.locator('[data-test="log-search-index-list-select-stream-popover"] input').first();
+        await popoverSearch.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await popoverSearch.fill(stream);
         await this.page.waitForTimeout(2000);
-        await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(stream);
-        await this.page.waitForTimeout(2000);
-        await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
-        await this.page.waitForTimeout(2000);
-        await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
+        // Click the matching option — OSelect renders each option with data-test-value="{streamName}"
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`
+        ).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click();
     }
 
     // Download-related functions
