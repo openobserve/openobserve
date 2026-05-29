@@ -342,6 +342,7 @@ class TestStreamSettingsDedupEdgeCases:
         candidates = filtered if filtered else available
         field_b = candidates[0] if candidates else pytest.skip("Only one index-safe field available")
         original_idx = list(settings.get("index_fields", []))
+        logger.info(f"Original index fields: {original_idx}")
 
         try:
             # Add first field
@@ -349,12 +350,14 @@ class TestStreamSettingsDedupEdgeCases:
             resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
             assert resp.status_code == 200
             time.sleep(1)
+            logger.info(f"Added index fields: {field_a}")
 
             # Add second field
             payload = {"index_fields": {"add": [field_b], "remove": []}}
             resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
             assert resp.status_code == 200
             time.sleep(1)
+            logger.info(f"Added index fields: {field_b}")
 
             # Verify both present
             settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
