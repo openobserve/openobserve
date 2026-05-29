@@ -162,6 +162,7 @@ async fn gc_stream(
     let prefixes = [
         format!("files/{org_id}/{stream_type}/{stream_name}/"),
         format!("files/{org_id}/index/{stream_name}_{stream_type}/"),
+        format!("files/{org_id}/bloom/{stream_name}_{stream_type}/"),
     ];
     let mut total_dirs = 0usize;
     let mut total_files = 0usize;

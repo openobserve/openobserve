@@ -345,6 +345,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         }
 
         infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
+
         log::info!(
             "[COMPACTOR::DUMP] successfully dumped {records} records to file {file_name}, took: {} ms",
             start.elapsed().as_millis(),
@@ -594,6 +595,7 @@ async fn generate_dump(
         compressed_size: buf.len() as i64,
         index_size: 0,
         flattened: false,
+        bloom_ver: 0,
     };
 
     // store the file in storage
@@ -739,6 +741,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_original_size = Int64Builder::with_capacity(batch_size);
     let mut field_compressed_size = Int64Builder::with_capacity(batch_size);
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
+    let mut field_bloom_ver = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
 
@@ -756,6 +759,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         field_original_size.append_value(file.original_size);
         field_compressed_size.append_value(file.compressed_size);
         field_index_size.append_value(file.index_size);
+        field_bloom_ver.append_value(file.bloom_ver);
         field_flattened.append_value(file.flattened);
         field_updated_at.append_value(file.updated_at);
     }
@@ -777,6 +781,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_original_size.finish()),
             Arc::new(field_compressed_size.finish()),
             Arc::new(field_index_size.finish()),
+            Arc::new(field_bloom_ver.finish()),
             Arc::new(field_updated_at.finish()),
         ],
     )?;
@@ -904,7 +909,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 15);
+        assert_eq!(batch.num_columns(), 16);
     }
 
     #[test]
@@ -924,6 +929,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            bloom_ver: 0,
             updated_at: 1100,
         };
 
@@ -933,7 +939,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 15);
+        assert_eq!(batch.num_columns(), 16);
 
         // Verify column values
         let id_col = batch
@@ -983,6 +989,7 @@ mod tests {
                 original_size: 10000,
                 compressed_size: 5000,
                 index_size: 500,
+                bloom_ver: 0,
                 updated_at: 1100,
             },
             FileRecord {
@@ -1000,6 +1007,7 @@ mod tests {
                 original_size: 20000,
                 compressed_size: 10000,
                 index_size: 1000,
+                bloom_ver: 0,
                 updated_at: 2100,
             },
             FileRecord {
@@ -1017,6 +1025,7 @@ mod tests {
                 original_size: 30000,
                 compressed_size: 15000,
                 index_size: 1500,
+                bloom_ver: 0,
                 updated_at: 3100,
             },
         ];
@@ -1073,6 +1082,7 @@ mod tests {
             original_size: 500000,
             compressed_size: 250000,
             index_size: 25000,
+            bloom_ver: 0,
             updated_at: 1234568000,
         };
 
@@ -1114,6 +1124,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            bloom_ver: 0,
             updated_at: 1100,
         };
 
@@ -1139,6 +1150,7 @@ mod tests {
             "original_size",
             "compressed_size",
             "index_size",
+            "bloom_ver",
             "updated_at",
         ];
 
@@ -1167,6 +1179,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            bloom_ver: 0,
             updated_at: 0,
         };
 
@@ -1207,6 +1220,7 @@ mod tests {
             original_size: i64::MAX,
             compressed_size: i64::MAX,
             index_size: i64::MAX,
+            bloom_ver: 0,
             updated_at: i64::MAX,
         };
 
@@ -1247,6 +1261,7 @@ mod tests {
                 original_size: 1024,
                 compressed_size: 512,
                 index_size: 64,
+                bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
             .collect();
@@ -1284,6 +1299,7 @@ mod tests {
                 original_size: 2048,
                 compressed_size: 1024,
                 index_size: 128,
+                bloom_ver: 0,
                 updated_at: 3000,
             })
             .collect();
@@ -1320,6 +1336,7 @@ mod tests {
             original_size: 100,
             compressed_size: 50,
             index_size: 5,
+            bloom_ver: 0,
             updated_at: 200,
         };
 
@@ -1352,6 +1369,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            bloom_ver: 0,
             updated_at: 0,
         };
 
@@ -1391,6 +1409,7 @@ mod tests {
             original_size: 100_000,
             compressed_size: 40_000,
             index_size: 5_000,
+            bloom_ver: 0,
             updated_at: 9999,
         };
 
@@ -1419,8 +1438,9 @@ mod tests {
             .unwrap();
         assert_eq!(idx_col.value(0), 5_000);
 
+        // bloom_ver was inserted at index 14 between index_size (13) and updated_at (15).
         let upd_col = batch
-            .column(14)
+            .column(15)
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap();
@@ -1446,6 +1466,7 @@ mod tests {
                 original_size: i * 1000,
                 compressed_size: i * 500,
                 index_size: i * 50,
+                bloom_ver: 0,
                 updated_at: i * 100 + 100,
             })
             .collect();
@@ -1475,6 +1496,7 @@ mod tests {
             original_size: 25_000,
             compressed_size: 12_500,
             index_size: 1_250,
+            bloom_ver: 0,
             updated_at: 20_001,
         };
 
@@ -1518,6 +1540,7 @@ mod tests {
                 original_size: i * 100,
                 compressed_size: i * 50,
                 index_size: i * 5,
+                bloom_ver: 0,
                 updated_at: i * 1000 + 1000,
             })
             .collect();
