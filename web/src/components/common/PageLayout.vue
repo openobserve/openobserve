@@ -27,10 +27,6 @@
     splitterLimits  — [min, max] px limits for OSplitter (default [0, 400])
     mainPanel       — when false, main content fills space without an inner border panel
                       (use for full-bleed content like the dashboard view; default true)
-    constrained     — when true (and no sidebar), the main content is centered in a
-                      max-width reading column (ConstrainedPage) instead of full width.
-                      Use for settings sections, single forms, org params, hubs, etc.
-    contentSize     — reading-column width when constrained ('sm'|'md'|'lg'|'xl'; default 'lg')
     headerClass     — override the default header wrapper class
                       (default: 'tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default')
 
@@ -59,9 +55,13 @@
       <template #before>
         <div
           v-if="sidebarVisible"
-          class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-subtle"
+          class="tw:w-full tw:h-full tw:pt-1 tw:pl-2 tw:pb-2"
         >
-          <slot name="sidebar" />
+          <div
+            class="tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border tw:border-border-default tw:rounded-lg"
+          >
+            <slot name="sidebar" />
+          </div>
         </div>
       </template>
       <template #separator>
@@ -82,8 +82,12 @@
         </slot>
       </template>
       <template #after>
-        <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
-          <slot />
+        <div class="tw:w-full tw:h-full tw:pt-1 tw:pl-1 tw:pb-2 tw:pr-2">
+          <div
+            class="tw:h-full tw:flex tw:flex-col tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden"
+          >
+            <slot />
+          </div>
         </div>
       </template>
     </OSplitter>
@@ -91,36 +95,36 @@
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
     <div
       v-else-if="$slots.sidebar"
-      class="tw:flex-1 tw:flex tw:min-h-0"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2 tw:pb-2 tw:pt-1 tw:gap-2"
     >
       <aside
-        class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-subtle"
+        class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border tw:border-border-default tw:rounded-lg"
         :style="{ width: (sidebarWidth ?? 200) + 'px' }"
       >
         <slot name="sidebar" />
       </aside>
       <section
-        class="tw:flex-1 tw:min-w-0 tw:h-full tw:overflow-hidden"
+        class="tw:flex-1 tw:min-w-0 tw:h-full tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden"
       >
         <slot />
       </section>
     </div>
 
-    <!-- ── Body: constrained reading column (no sidebar) ────────── -->
-    <ConstrainedPage
-      v-else-if="constrained"
-      :size="contentSize"
-      class="tw:flex-1 tw:min-h-0"
-    >
-      <slot />
-    </ConstrainedPage>
-
     <!-- ── Body: main only (no sidebar) ─────────────────────────── -->
-    <!-- Main content is flush: the app chrome (MainLayout) already provides the
-         single bordered "content card", so inner panels would just nest borders.
-         Sections inside separate with border-soft dividers, not boxed cards. -->
     <template v-else>
-      <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden">
+      <!-- With bordered panel (default) -->
+      <div
+        v-if="mainPanel"
+        class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:px-2 tw:pb-2 tw:pt-1"
+      >
+        <div
+          class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden"
+        >
+          <slot />
+        </div>
+      </div>
+      <!-- Without bordered panel (full-bleed content) -->
+      <div v-else class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
         <slot />
       </div>
     </template>
@@ -132,7 +136,6 @@ import { ref, computed, watch } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -140,8 +143,6 @@ const props = withDefaults(
     resizable?: boolean;
     splitterLimits?: [number, number];
     mainPanel?: boolean;
-    constrained?: boolean;
-    contentSize?: "sm" | "md" | "lg" | "xl";
     headerClass?: string;
   }>(),
   {
@@ -149,8 +150,6 @@ const props = withDefaults(
     resizable: false,
     splitterLimits: () => [0, 400] as [number, number],
     mainPanel: true,
-    constrained: false,
-    contentSize: "lg",
     headerClass: undefined,
   },
 );

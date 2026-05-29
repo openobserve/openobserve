@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,69 +17,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-history-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
   >
-    <!-- Controls live in the shell header (Functions.vue #o2-page-actions),
-         next to the "Pipelines › History" breadcrumb — no bespoke 2nd header. -->
-    <Teleport to="#o2-page-actions">
-      <DateTime
-        ref="dateTimeRef"
-        auto-apply
-        :default-type="dateTimeType"
-        :default-absolute-time="{
-          startTime: absoluteTime.startTime,
-          endTime: absoluteTime.endTime,
-        }"
-        :default-relative-time="relativeTime"
-        data-test="pipeline-history-date-picker"
-        @on:date-change="updateDateTime"
-      />
-      <OSelect
-        v-model="selectedPipeline"
-        :options="allPipelines"
-        labelKey="label"
-        valueKey="value"
-        searchable
-        @update:model-value="onPipelineSelected"
-        :placeholder="
-          t(`pipeline.searchHistory`) || 'Select or search pipeline...'
-        "
-        data-test="pipeline-history-search-select"
-        class="tw:min-w-[250px]"
-        clearable
-      >
-        <template #empty>
-          <span>No pipelines found</span>
-        </template>
-      </OSelect>
-      <OButton
-        variant="ghost"
-        size="icon-xs-sq"
-        @click="manualSearch"
-        data-test="pipeline-history-manual-search-btn"
-        :disabled="loading"
-        icon-left="search"
-      >
-        <OTooltip :content="t('common.search') || 'Search'" side="top" />
-      </OButton>
-      <OButton
-        variant="ghost"
-        size="icon-xs-sq"
-        @click="refreshData"
-        data-test="pipeline-history-refresh-btn"
-        :loading="loading"
-        icon-left="refresh"
-      >
-        <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
-      </OButton>
-    </Teleport>
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="tw:shrink-0">
+      <div class="card-container tw:mb-[0.625rem]">
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-2 tw:h-[68px]"
+        >
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+            <div class="tw:mr-2">
+              <DateTime
+                ref="dateTimeRef"
+                auto-apply
+                :default-type="dateTimeType"
+                :default-absolute-time="{
+                  startTime: absoluteTime.startTime,
+                  endTime: absoluteTime.endTime,
+                }"
+                :default-relative-time="relativeTime"
+                data-test="pipeline-history-date-picker"
+                @on:date-change="updateDateTime"
+              />
+            </div>
+            <OSelect
+              v-model="selectedPipeline"
+              :options="allPipelines"
+              labelKey="label"
+              valueKey="value"
+              searchable
+              @update:model-value="onPipelineSelected"
+              :placeholder="
+                t(`pipeline.searchHistory`) || 'Select or search pipeline...'
+              "
+              data-test="pipeline-history-search-select"
+              class="tw:mr-2 tw:min-w-[250px]"
+              clearable
+            >
+              <template #empty>
+                <span>No pipelines found</span>
+              </template>
+            </OSelect>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              class="tw:mr-2"
+              @click="manualSearch"
+              data-test="pipeline-history-manual-search-btn"
+              :disabled="loading"
+              icon-left="search"
+            >
+              <OTooltip :content="t('common.search') || 'Search'" side="top" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              @click="refreshData"
+              data-test="pipeline-history-refresh-btn"
+              :loading="loading"
+              icon-left="refresh"
+            >
+              <OTooltip
+                :content="t('common.refresh') || 'Refresh'"
+                side="top"
+              />
+            </OButton>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tw:flex-1 tw:min-h-0">
       <div
         data-test="pipeline-history-table"
         class="pipeline-history-table card-container tw:h-full"
       >
         <OTable
-          :frame="false"
           :data="rows"
           :columns="columns"
           row-key="id"
@@ -474,7 +485,6 @@ import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -527,7 +537,7 @@ const columns = ref([
     id: "row_number",
     header: "#",
     accessorKey: "#",
-    size: TABLE_INDEX_COL_SIZE,
+    size: 37,
     meta: { align: "left" as const },
   },
   {

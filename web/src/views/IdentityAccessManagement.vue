@@ -1,245 +1,258 @@
-<!-- Copyright 2026 OpenObserve Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
-
 <template>
-  <!-- Grouped left rail (prototype admin model): the rail is always present;
-       the chosen section renders its own page (header + table) to the right.
-       Breadcrumb lives in the top chrome bar (published from this shell). -->
-  <PageLayout :sidebar-width="218" data-test="iam-page">
+  <PageLayout
+    data-test="iam-page"
+    resizable
+    :sidebar-width="220"
+    :splitter-limits="[0, 300]"
+  >
+    <template #header>
+      <AppPageHeader icon="shield" title="Identity &amp; Access" />
+    </template>
+
     <template #sidebar>
-      <SectionRail
-        :groups="sectionGroups"
-        :active-key="activeSection"
-        :title="t('menu.iam')"
+      <route-tabs
+        ref="iamRouteTabsRef"
+        dataTest="iam-tabs"
+        :tabs="tabs"
+        :activeTab="activeTab"
+        @update:activeTab="updateActiveTab"
       />
     </template>
-    <section class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
-      <RouterView />
-    </section>
+
+    <RouterView />
   </PageLayout>
 </template>
 
 <script setup lang="ts">
 import PageLayout from "@/components/common/PageLayout.vue";
-import SectionRail from "@/components/common/SectionRail.vue";
-import {
-  type SectionHubGroup,
-  type SectionHubItem,
-} from "@/components/common/SectionHub.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
-import { computed, watch, onActivated, onDeactivated, onUnmounted } from "vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import RouteTabs from "@/components/RouteTabs.vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
-import { useRouter, useRoute, RouterView } from "vue-router";
+import { useRouter } from "vue-router";
+import { nextTick } from "vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-
+import { resolveTab } from "@/utils/routeTabMaps";
 const store = useStore();
 const { t } = useI18n();
+
 const router = useRouter();
-const route = useRoute();
+
+const activeTab = ref(resolveTab("iam", router.currentRoute.value.name as string, "users"));
+
+const iamRouteTabsRef: any = ref(null);
+
 const { isMetaOrg } = useIsMetaOrg();
 
-const orgQuery = computed(() => ({
-  org_identifier: store.state.selectedOrganization?.identifier,
-}));
-
-const isHub = computed(() => route.name === "iam");
-const hubRoute = computed(() => ({ name: "iam", query: orgQuery.value }));
-
-// Route name → section key (drill-down editors map back to their section).
-const routeToIamTab: Record<string, string> = {
-  users: "users",
-  serviceAccounts: "serviceAccounts",
-  ingestionTokens: "ingestionTokens",
-  groups: "groups",
-  editGroup: "groups",
-  roles: "roles",
-  editRole: "roles",
-  quota: "quota",
-  organizations: "organizations",
-  invitations: "invitations",
-};
-const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
-
-// Dynamic L3 detail crumb (role/group editors).
-const trailing = computed(() => {
-  if (route.name === "editRole")
-    return (route.params.role_name as string) || "Edit role";
-  if (route.name === "editGroup")
-    return (route.params.group_name as string) || "Edit group";
-  return undefined;
-});
-
-// Breadcrumb (row 1). Hub: just the module name. Section: IAM(link → hub) ›
-// <Section ▾>  (› role/group name on editors).
-const crumbs = computed<Crumb[]>(() => {
-  if (isHub.value)
-    return [
-      {
-        label: t("menu.iam"),
-        icon: "manage-accounts",
-        current: true,
-        dataTest: "breadcrumb-iam-root",
+const allTabs = [
+  {
+    dataTest: "iam-users-tab",
+    name: "users",
+    to: {
+      name: "users",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
       },
-    ];
-  const list: Crumb[] = [
-    {
-      label: t("menu.iam"),
-      icon: "manage-accounts",
-      to: hubRoute.value,
-      dataTest: "breadcrumb-iam-root",
     },
-    {
-      dropdown: sectionGroups.value,
-      activeKey: activeSection.value,
-      dataTest: "breadcrumb-iam-section",
+    label: t("iam.basicUsers"),
+    class: "tab_content",
+    icon: "person",
+  },
+  {
+    dataTest: "iam-service-accounts-tab",
+    name: "serviceAccounts",
+    to: {
+      name: "serviceAccounts",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     },
-  ];
-  if (trailing.value) list.push({ label: trailing.value, current: true });
-  return list;
-});
+    label: t("iam.serviceAccounts"),
+    class: "tab_content",
+    icon: "manage-accounts",
+  },
+  {
+    dataTest: "iam-ingestion-tokens-tab",
+    name: "ingestionTokens",
+    to: {
+      name: "ingestionTokens",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.ingestionTokens"),
+    class: "tab_content",
+  },
+  {
+    dataTest: "iam-groups-tab",
+    name: "groups",
+    to: {
+      name: "groups",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.groups"),
+    class: "tab_content",
+    icon: "group",
+  },
+  {
+    dataTest: "iam-roles-tab",
+    name: "roles",
+    to: {
+      name: "roles",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.roles"),
+    class: "tab_content",
+    icon: "shield",
+  },
+  {
+    dataTest: "iam-quota-tab",
+    name: "quota",
+    to: {
+      name: "quota",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.quota"),
+    class: "tab_content",
+    icon: "speed",
+  },
+  {
+    dataTest: "iam-organizations-tab",
+    name: "organizations",
+    to: {
+      name: "organizations",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.organizations"),
+    class: "tab_content",
+    icon: "corporate-fare",
+  },
+  {
+    dataTest: "iam-invitations-tab",
+    name: "invitations",
+    to: {
+      name: "invitations",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.invitations"),
+    class: "tab_content",
+    icon: "mail",
+  },
+];
 
-const sectionGroups = computed<SectionHubGroup[]>(() => {
-  const isEnt = config.isEnterprise == "true" || config.isCloud == "true";
-  const isCloud = config.isCloud == "true";
-  const meta = isMetaOrg.value;
-  const rbac = !!store.state.zoConfig.rbac_enabled;
-  const svc = store.state.zoConfig.service_account_enabled ?? true;
+const tabs = ref(allTabs);
 
-  const groups: { label: string; items: SectionHubItem[] }[] = [
-    {
-      label: "ACCESS",
-      items: [
-        {
-          key: "users",
-          label: t("iam.basicUsers"),
-          description: "People with access to this organization",
-          icon: "person",
-          to: { name: "users", query: orgQuery.value },
-          dataTest: "iam-users-tab",
-        },
-        {
-          key: "serviceAccounts",
-          label: t("iam.serviceAccounts"),
-          description: "Programmatic access tokens for APIs",
-          icon: "manage-accounts",
-          to: { name: "serviceAccounts", query: orgQuery.value },
-          visible: svc,
-          dataTest: "iam-service-accounts-tab",
-        },
-        {
-          key: "ingestionTokens",
-          label: t("iam.ingestionTokens"),
-          description: "Tokens for ingesting data into this organization",
-          icon: "key",
-          to: { name: "ingestionTokens", query: orgQuery.value },
-          dataTest: "iam-ingestion-tokens-tab",
-        },
-        {
-          key: "invitations",
-          label: t("iam.invitations"),
-          description: "Pending and sent member invitations",
-          icon: "mail",
-          to: { name: "invitations", query: orgQuery.value },
-          visible: isCloud,
-          dataTest: "iam-invitations-tab",
-        },
-      ],
-    },
-    {
-      label: "PERMISSIONS",
-      items: [
-        {
-          key: "groups",
-          label: t("iam.groups"),
-          description: "Group users together to assign roles",
-          icon: "group",
-          to: { name: "groups", query: orgQuery.value },
-          visible: isEnt && rbac,
-          dataTest: "iam-groups-tab",
-        },
-        {
-          key: "roles",
-          label: t("iam.roles"),
-          description: "Define permissions and access policies",
-          icon: "shield",
-          to: { name: "roles", query: orgQuery.value },
-          visible: isEnt && rbac,
-          dataTest: "iam-roles-tab",
-        },
-        {
-          key: "quota",
-          label: t("iam.quota"),
-          description: "Usage limits applied per role",
-          icon: "speed",
-          to: { name: "quota", query: orgQuery.value },
-          visible: isEnt && rbac && meta,
-          dataTest: "iam-quota-tab",
-        },
-      ],
-    },
-    {
-      label: "ORGANIZATION",
-      items: [
-        {
-          key: "organizations",
-          label: t("iam.organizations"),
-          description: "Organizations you can access",
-          icon: "corporate-fare",
-          to: { name: "organizations", query: orgQuery.value },
-          dataTest: "iam-organizations-tab",
-        },
-      ],
-    },
-  ];
-  return groups;
-});
-
-// Publish the breadcrumb to the top chrome bar (republish on change + keep-alive
-// re-entry; clear on leave — the chrome's route-key gate guards against staleness).
-// Declared after `sectionGroups` because `crumbs` reads it on section routes — an
-// immediate watch any earlier would hit a TDZ on `sectionGroups`.
-const { publish, clear } = useAppBreadcrumb();
-watch(crumbs, (c) => publish(c), { immediate: true });
-onActivated(() => publish(crumbs.value));
-onDeactivated(clear);
-onUnmounted(clear);
-
-// The rail is always shown, so the IAM root has no standalone landing — send it
-// to the first section (Users, always available). Also: non-meta users can't use
-// the quota section — bounce them to Users too.
 watch(
-  () => route.name,
-  (name) => {
-    if (name === "iam") {
-      // .catch: in unit tests the mounted router may not register child routes;
-      // a rejected navigation must not surface as an unhandled error.
-      Promise.resolve(
-        router.replace({ name: "users", query: orgQuery.value }),
-      ).catch(() => {});
-    } else if (name === "quota" && !isMetaOrg.value) {
-      Promise.resolve(
-        router.push({ name: "users", query: orgQuery.value }),
-      ).catch(() => {});
+  () => router.currentRoute.value.name,
+  async (value) => {
+    if (!value) return;
+    await nextTick();
+    if (value === "iam") {
+      router.push({
+        name: activeTab.value,
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
+    //this condition is added to avoid the unnecessarily showing the quota tab when the user is not in the meta org and trying to access the quota tab
+    //this is fallback to users tab when the user is not in the meta org and trying to access the quota tab
+    if (value == "quota" && !isMetaOrg.value) {
+      router.push({
+        name: "users",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     }
   },
-  { immediate: true },
+  {
+    immediate: true,
+  },
 );
+watch(
+  () => store.state.zoConfig,
+  () => {
+    setTabs();
+  },
+  {
+    immediate: true,
+  },
+);
+
+function setTabs() {
+  const cloud = ["users", "ingestionTokens", "organizations"];
+
+  const rbac = ["groups", "roles"];
+
+  const os = ["users", "serviceAccounts", "ingestionTokens", "organizations"];
+
+  const isEnterprise =
+    config.isEnterprise == "true" || config.isCloud == "true";
+
+  // Filter service accounts based on config
+  const serviceAccountEnabled = store.state.zoConfig.service_account_enabled ?? true;
+
+  if (isEnterprise) {
+    if (serviceAccountEnabled) {
+      cloud.push("serviceAccounts");
+    }
+
+    if (config.isCloud == "true") {
+      cloud.push("invitations");
+    }
+
+    let filteredTabs = allTabs.filter((tab) => cloud.includes(tab.name));
+
+    if (store.state.zoConfig.rbac_enabled) {
+      if (isMetaOrg.value) {
+        rbac.push("quota");
+      }
+      filteredTabs = [
+        ...filteredTabs,
+        ...allTabs.filter((tab) => rbac.includes(tab.name)),
+      ];
+    }
+
+    tabs.value = filteredTabs;
+  } else {
+    // Filter based on os array and service account config
+    tabs.value = allTabs.filter((tab) => {
+      if (tab.name === "serviceAccounts" && !serviceAccountEnabled) {
+        return false;
+      }
+      return os.includes(tab.name);
+    });
+  }
+}
+
+const updateActiveTab = (tab: string) => {
+  if (tab) activeTab.value = tab;
+  else {
+    const value = router.currentRoute.value.name;
+
+    if (!iamRouteTabsRef.value) return;
+
+    if (value === "editGroup" || value === "groups") {
+      iamRouteTabsRef.value.setActiveTab("groups");
+    }
+
+    if (value === "editRole" || value === "roles") {
+      iamRouteTabsRef.value.setActiveTab("roles");
+    }
+  }
+};
 </script>
+

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
     v-if="currentRouteName === 'pipelines'"
   >
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="tw:flex-1 tw:min-h-0">
       <OTable
-        :frame="false"
         :key="activeTab"
         data-test="pipeline-list-table"
         :data="filteredPipelines"
@@ -35,9 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         selection="multiple"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="pipelines-pipeline-list"
         v-model:selected-ids="selectedPipelineIds"
         :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
         :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
@@ -47,38 +42,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:w-full tw:h-full"
       >
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
-              data-test="pipeline-list-tabs"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("pipeline_list.tab_all") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                {{ t("pipeline_list.tab_scheduled") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
-                <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                {{ t("pipeline_list.tab_realtime") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div class="tw:flex-1 tw:min-w-0">
-              <OInput
-                data-test="pipeline-list-search-input"
-                v-model="filterQuery"
-                class="tw:w-full"
-                :placeholder="t('pipeline.search')"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
-            </div>
-          </div>
+          <OToggleGroup
+            :model-value="activeTab"
+            @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
+            data-test="pipeline-list-tabs"
+          >
+            <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+              {{ t("pipeline_list.tab_all") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+              <template #icon-left><OIcon name="schedule" size="sm" /></template>
+              {{ t("pipeline_list.tab_scheduled") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
+              <template #icon-left><OIcon name="bolt" size="sm" /></template>
+              {{ t("pipeline_list.tab_realtime") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OInput
+            data-test="pipeline-list-search-input"
+            v-model="filterQuery"
+            class="tw:ml-2 tw:w-50"
+            :placeholder="t('pipeline.search')"
+          >
+            <template #icon-left>
+              <OIcon name="search" size="sm" />
+            </template>
+          </OInput>
         </template>
 
         <template #cell-actions="{ row }">
@@ -207,19 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-pipelines"
-            :filtered="!!filterQuery"
-            @action="
-              (id) =>
-                id === 'clear-filters'
-                  ? (filterQuery = '')
-                  : id === 'import'
-                    ? goToImportPipeline()
-                    : goToCreatePipeline()
-            "
-          />
+          <no-data />
         </template>
 
         <template #bottom="bottomProps">
@@ -227,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
           >
             <div
-              class="tw:flex tw:items-center tw:text-sm tw:mr-4"
+              class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
             >
               {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -275,7 +254,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
-      </div>
     </div>
   </div>
 
@@ -396,7 +374,6 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -416,7 +393,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -561,7 +537,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: "#",
     accessorKey: "#",
     sortable: false,
-    size: TABLE_INDEX_COL_SIZE,
+    size: 67,
     meta: { align: "left" },
   };
   const nameColumn = {
@@ -577,7 +553,6 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("alerts.stream_name"),
     accessorKey: "stream_name",
     sortable: true,
-    size: COL.streamName,
     meta: { align: "left" },
   };
   const streamTypeColumn = {
@@ -585,7 +560,6 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("alerts.streamType"),
     accessorKey: "stream_type",
     sortable: true,
-    size: COL.streamType,
     meta: { align: "left" },
   };
   const frequencyColumn = {
@@ -593,7 +567,6 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.frequency"),
     accessorKey: "frequency",
     sortable: true,
-    size: COL.frequency,
     meta: { align: "left" },
   };
   const periodColumn = {
@@ -601,7 +574,6 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.period"),
     accessorKey: "period",
     sortable: true,
-    size: COL.frequency,
     meta: { align: "left" },
   };
   const cronColumn = {
@@ -609,7 +581,6 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.cron"),
     accessorKey: "cron",
     sortable: false,
-    size: COL.cron,
     meta: { align: "left" },
   };
   const typeColumn = {
@@ -617,7 +588,6 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.type"),
     accessorKey: "type",
     sortable: true,
-    size: COL.type,
     meta: { align: "left" },
   };
   const scheduledStreamTypeColumn = {
@@ -675,21 +645,8 @@ onMounted(async () => {
   updateActiveTab();
 });
 
-// Empty-state "New pipeline" → the dedicated pipeline-builder page (not the
-// stream-selection side panel).
-const goToCreatePipeline = () => {
-  router.push({
-    name: "createPipeline",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
-  });
-};
-
-// Empty-state "Import pipeline" → the dedicated import page.
-const goToImportPipeline = () => {
-  router.push({
-    name: "importPipeline",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
-  });
+const createPipeline = () => {
+  showCreatePipeline.value = true;
 };
 
 const loading = ref(true);
