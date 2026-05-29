@@ -42,7 +42,6 @@ use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
-    _bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
     write_metadata: bool,
     compression: Option<&str>,
@@ -76,25 +75,6 @@ pub fn new_parquet_writer<'a>(
             ),
         ]));
     }
-    // Bloom filter stored by row_group, set NDV to reduce the memory usage.
-    // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
-    // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
-    // let mut bf_ndv = min(metadata.records as u64, PARQUET_MAX_ROW_GROUP_SIZE as u64);
-    // if bf_ndv > 1000 {
-    //     bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
-    // }
-    // if cfg.common.bloom_filter_enabled {
-    //     let mut fields = bloom_filter_fields.to_vec();
-    //     fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
-    //     fields.sort();
-    //     fields.dedup();
-    //     for field in fields {
-    //         writer_props = writer_props
-    //             .set_column_bloom_filter_enabled(field.as_str().into(), true)
-    //             .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
-    //             .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
-    //     }
-    // }
     let writer_props = writer_props.build();
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
@@ -102,12 +82,10 @@ pub fn new_parquet_writer<'a>(
 pub async fn write_recordbatch_to_parquet(
     schema: Arc<Schema>,
     record_batches: &[RecordBatch],
-    bloom_filter_fields: &[String],
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer =
-        new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true, None);
+    let mut writer = new_parquet_writer(&mut buf, &schema, metadata, true, None);
     for batch in record_batches {
         writer.write(batch).await?;
     }
@@ -457,14 +435,10 @@ mod tests {
         };
 
         // Write to parquet
-        let data = write_recordbatch_to_parquet(
-            schema.clone(),
-            std::slice::from_ref(&batch),
-            &["name".to_string()],
-            &metadata,
-        )
-        .await
-        .unwrap();
+        let data =
+            write_recordbatch_to_parquet(schema.clone(), std::slice::from_ref(&batch), &metadata)
+                .await
+                .unwrap();
 
         // Read back
         let (read_schema, read_batches) =
@@ -493,7 +467,7 @@ mod tests {
         };
 
         // Write to parquet
-        let data = write_recordbatch_to_parquet(schema, &[batch], &["name".to_string()], &metadata)
+        let data = write_recordbatch_to_parquet(schema, &[batch], &metadata)
             .await
             .unwrap();
 
