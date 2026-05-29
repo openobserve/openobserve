@@ -13,23 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Cursor;
-
 use anyhow::Context;
-use arrow::{array::RecordBatch, error::ArrowError};
+use arrow::array::RecordBatch;
 use bytes::Bytes;
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME, get_batch_size,
+    FileFormat, TIMESTAMP_COL_NAME,
     utils::{
-        parquet::{RecordBatchStream, get_recordbatch_reader_from_bytes},
+        parquet::RecordBatchStream,
         tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
 };
 use futures::TryStreamExt;
-use parquet::arrow::{ParquetRecordBatchStreamBuilder, ProjectionMask};
 use tokio::task::JoinHandle;
 
-use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
+use super::{TantivyIndexSchema, convert_batch_to_docs_sync, reader::file_stream};
 
 /// Create a tantivy index in the given directory for the input file bytes.
 pub(super) async fn build_index<D: tantivy::Directory>(
@@ -113,30 +110,10 @@ async fn open_reader(
     buf: Bytes,
     index_schema: &TantivyIndexSchema,
 ) -> Result<RecordBatchStream, anyhow::Error> {
-    if !matches!(file_format, FileFormat::Parquet) {
-        let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
-        return Ok(reader);
-    }
-
-    let builder = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf)).await?;
-    let projection_indices: Vec<usize> = builder
-        .schema()
-        .fields()
-        .iter()
-        .enumerate()
-        .filter_map(|(i, f)| {
-            (f.name() == TIMESTAMP_COL_NAME || index_schema.fields.contains(f.name())).then_some(i)
-        })
-        .collect();
-    let projection_mask = ProjectionMask::roots(
-        builder.metadata().file_metadata().schema_descr(),
-        projection_indices,
-    );
-    let stream = builder
-        .with_batch_size(get_batch_size())
-        .with_projection(projection_mask)
-        .build()?;
-    Ok(Box::pin(stream.map_err(ArrowError::from)))
+    let mut projection: Vec<String> = index_schema.fields.iter().cloned().collect();
+    projection.push(TIMESTAMP_COL_NAME.to_string());
+    let reader = file_stream(file_format, buf, Some(&projection)).await?;
+    Ok(reader)
 }
 
 #[cfg(test)]

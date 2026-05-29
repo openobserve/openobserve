@@ -16,6 +16,7 @@
 mod parallel;
 pub mod puffin;
 pub mod puffin_directory;
+mod reader;
 mod sequential;
 use std::{collections::HashMap, sync::Arc};
 
@@ -57,8 +58,8 @@ pub(crate) async fn create_tantivy_index(
     };
 
     let dir = PuffinDirWriter::new();
-    let index = if thread_num > 1 && matches!(file_format, FileFormat::Parquet) {
-        parallel::build_index(dir.clone(), buf, index_schema, thread_num).await?
+    let index = if thread_num > 1 {
+        parallel::build_index(dir.clone(), file_format, buf, index_schema, thread_num).await?
     } else {
         sequential::build_index(dir.clone(), file_format, buf, index_schema).await?
     };
