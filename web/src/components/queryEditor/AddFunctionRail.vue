@@ -24,7 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="emit('open')"
   >
     <span class="add-function-rail__icon" aria-hidden="true">{{ iconText }}</span>
-    <OTooltip :content="tooltip || label" />
+    <span class="add-function-rail__label">{{ label }}</span>
+    <OTooltip v-if="tooltip" :content="tooltip" />
   </button>
 </template>
 
@@ -52,17 +53,6 @@ const emit = defineEmits<{
 </script>
 
 <style scoped lang="scss">
-@keyframes fx-rail-pulse {
-  0%, 100% {
-    background: color-mix(in srgb, var(--o2-primary-color) 8%, var(--o2-card-bg-solid));
-    border-left-color: color-mix(in srgb, var(--o2-primary-color) 35%, var(--o2-card-bg-solid));
-  }
-  50% {
-    background: color-mix(in srgb, var(--o2-primary-color) 18%, var(--o2-card-bg-solid));
-    border-left-color: var(--o2-primary-color);
-  }
-}
-
 .add-function-rail {
   display: flex;
   flex-direction: column;
@@ -72,18 +62,15 @@ const emit = defineEmits<{
   width: 1.625rem;
   height: 100%;
   padding: 0.5rem 0;
-  background: color-mix(in srgb, var(--o2-primary-color) 8%, var(--o2-card-bg-solid));
+  background: color-mix(in srgb, var(--o2-primary-color) 6%, transparent);
   border: 0;
-  border-left: 0.125rem solid color-mix(in srgb, var(--o2-primary-color) 35%, var(--o2-card-bg-solid));
+  border-left: 0.0625rem solid var(--o2-border);
   cursor: pointer;
   color: var(--o2-text-secondary);
-  animation: fx-rail-pulse 2.4s ease-in-out infinite;
-  transition: background-color 0.15s ease, color 0.15s ease, border-left-color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--o2-primary-color) 22%, var(--o2-card-bg-solid));
-    border-left-color: var(--o2-primary-color);
-    animation: none;
+    background: color-mix(in srgb, var(--o2-primary-color) 14%, transparent);
     color: var(--o2-primary-color);
   }
 
@@ -94,7 +81,6 @@ const emit = defineEmits<{
   &:disabled {
     cursor: not-allowed;
     opacity: 0.5;
-    animation: none;
   }
 
   &__icon {
@@ -104,6 +90,17 @@ const emit = defineEmits<{
     font-weight: var(--font-bold);
     line-height: 1;
     color: var(--o2-primary-color);
+  }
+
+  &__label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 0.6875rem; /* 11px — fits the slim rail but stays readable */
+    font-weight: var(--font-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--o2-text-body);
   }
 }
 </style>

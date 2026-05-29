@@ -19,7 +19,7 @@ const slots = defineSlots<ToggleGroupItemSlots>();
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
   md: "tw:h-9 tw:px-3 tw:text-sm",
   sm: "tw:h-7 tw:px-2.5 tw:text-sm",
-  xs: "tw:h-6 tw:px-2 tw:text-xs", // 24px + 4px track padding = 28px total
+  xs: "tw:h-7 tw:px-2 tw:text-xs", // 28px — matches OButton xs
 };
 
 // Icon size mirrors the toggle size — md = sm icon (16px), sm/xs = xs icon (12px)

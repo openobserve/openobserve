@@ -42,15 +42,14 @@ defineProps<{
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0 0.5rem;
+  padding: 0.1875rem 0.625rem;
   background: var(--o2-section-header-bg);
   border-top: 0.0625rem solid var(--o2-border);
-  height: 2rem; /* fixed 32px — identical on both query and function panes */
-  flex-shrink: 0;
+  min-height: 2rem; /* 32px — 28px control + 2×2px padding */
 
   &--compact {
-    height: 2rem;
-    padding: 0 0.5rem;
+    min-height: 2rem;
+    padding: 0.1875rem 0.625rem;
   }
 
   &__left,
