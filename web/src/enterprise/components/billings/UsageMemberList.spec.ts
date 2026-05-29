@@ -40,8 +40,23 @@ describe("UsageMemberList.vue", () => {
     wrapper?.unmount();
   });
 
-  describe("options", () => {
-    it("always lists the current-org option first with an empty value", () => {
+  describe("current org display", () => {
+    it("shows current org separately when it's a super org (not in members list)", () => {
+      wrapper = mountList([{ id: "child-1", name: "Child One" }]);
+      // Current org from store is "default", which is not in members
+      expect(wrapper.vm.currentOrgToShow).toBeTruthy();
+      expect(wrapper.vm.currentOrgToShow.primary).toBe("default");
+    });
+
+    it("hides current org section when it's a member org (in members list)", () => {
+      wrapper = mountList([{ id: "default", name: "Default Org" }]);
+      // Current org is in members, so it shouldn't show separately
+      expect(wrapper.vm.currentOrgToShow).toBeNull();
+    });
+  });
+
+  describe("member options", () => {
+    it("always lists the all-members option first with an empty value", () => {
       wrapper = mountList([]);
       expect(wrapper.vm.filteredOptions[0].value).toBe("");
     });

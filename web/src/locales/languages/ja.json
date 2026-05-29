@@ -1836,7 +1836,8 @@
       "chipNoInvoices": "個別の請求書は不要",
       "viewOrgGroup": "組織グループを表示",
       "usageMemberLabel": "メンバー組織",
-      "usageAllMembers": "現在の組織"
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
     },
     "billingGroup": {
       "tabLabel": "請求グループ",
@@ -1884,7 +1885,8 @@
       "chipNoInvoices": "個別の請求書は不要",
       "viewOrgGroup": "組織グループを表示",
       "usageMemberLabel": "メンバー組織",
-      "usageAllMembers": "現在の組織"
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
     }
   },
   "message": {

@@ -41,7 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="managed-empty__desc">
         {{
           t("billing.billingGroup.plansManagedDescription", {
-            payer: membership?.payer_org_id,
+            name: membership?.payer_org_name,
+            id: membership?.payer_org_id,
           })
         }}
       </div>

@@ -1819,7 +1819,8 @@
       "chipNoInvoices": "Sem faturas separadas",
       "viewOrgGroup": "Exibir grupo organizacional",
       "usageMemberLabel": "Organização membro",
-      "usageAllMembers": "Organização atual"
+      "usageAllMembers": "Organização atual",
+      "currentOrgTitle": "Organização Atual"
     },
     "billingGroup": {
       "tabLabel": "Grupo de cobrança",
@@ -1867,7 +1868,8 @@
       "chipNoInvoices": "Sem faturas separadas",
       "viewOrgGroup": "Exibir grupo organizacional",
       "usageMemberLabel": "Organização membro",
-      "usageAllMembers": "Organização atual"
+      "usageAllMembers": "Organização atual",
+      "currentOrgTitle": "Organização Atual"
     }
   },
   "message": {

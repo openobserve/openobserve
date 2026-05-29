@@ -1817,7 +1817,8 @@
       "chipNoInvoices": "별도 청구서 없음",
       "viewOrgGroup": "조직 그룹 보기",
       "usageMemberLabel": "회원 조직",
-      "usageAllMembers": "현재 조직"
+      "usageAllMembers": "현재 조직",
+      "currentOrgTitle": "현재 조직"
     },
     "billingGroup": {
       "tabLabel": "결제 그룹",
@@ -1865,7 +1866,8 @@
       "chipNoInvoices": "별도 청구서 없음",
       "viewOrgGroup": "조직 그룹 보기",
       "usageMemberLabel": "회원 조직",
-      "usageAllMembers": "현재 조직"
+      "usageAllMembers": "현재 조직",
+      "currentOrgTitle": "현재 조직"
     }
   },
   "message": {

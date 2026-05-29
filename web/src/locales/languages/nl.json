@@ -1817,7 +1817,8 @@
       "chipNoInvoices": "Geen afzonderlijke facturen",
       "viewOrgGroup": "Organisatiegroep bekijken",
       "usageMemberLabel": "Organisatie die lid is",
-      "usageAllMembers": "Huidige organisatie"
+      "usageAllMembers": "Huidige organisatie",
+      "currentOrgTitle": "Huidige Organisatie"
     },
     "billingGroup": {
       "tabLabel": "Factureringsgroep",
@@ -1865,7 +1866,8 @@
       "chipNoInvoices": "Geen afzonderlijke facturen",
       "viewOrgGroup": "Organisatiegroep bekijken",
       "usageMemberLabel": "Organisatie die lid is",
-      "usageAllMembers": "Huidige organisatie"
+      "usageAllMembers": "Huidige organisatie",
+      "currentOrgTitle": "Huidige Organisatie"
     }
   },
   "message": {

@@ -1817,7 +1817,8 @@
       "chipNoInvoices": "Ayrı Fatura Yok",
       "viewOrgGroup": "Organizasyon Grubunu Görüntüle",
       "usageMemberLabel": "Üye Organizasyon",
-      "usageAllMembers": "Mevcut Kuruluş"
+      "usageAllMembers": "Mevcut Kuruluş",
+      "currentOrgTitle": "Mevcut Kuruluş"
     },
     "billingGroup": {
       "tabLabel": "Faturalandırma Grubu",
@@ -1865,7 +1866,8 @@
       "chipNoInvoices": "Ayrı Fatura Yok",
       "viewOrgGroup": "Organizasyon Grubunu Görüntüle",
       "usageMemberLabel": "Üye Organizasyon",
-      "usageAllMembers": "Mevcut Kuruluş"
+      "usageAllMembers": "Mevcut Kuruluş",
+      "currentOrgTitle": "Mevcut Kuruluş"
     }
   },
   "message": {

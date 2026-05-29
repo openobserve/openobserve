@@ -1819,7 +1819,8 @@
       "chipNoInvoices": "没有单独的发票",
       "viewOrgGroup": "查看组织群组",
       "usageMemberLabel": "成员组织",
-      "usageAllMembers": "当前组织"
+      "usageAllMembers": "当前组织",
+      "currentOrgTitle": "当前组织"
     },
     "billingGroup": {
       "tabLabel": "账单组",
@@ -1867,7 +1868,8 @@
       "chipNoInvoices": "没有单独的发票",
       "viewOrgGroup": "查看组织群组",
       "usageMemberLabel": "成员组织",
-      "usageAllMembers": "当前组织"
+      "usageAllMembers": "当前组织",
+      "currentOrgTitle": "当前组织"
     }
   },
   "message": {

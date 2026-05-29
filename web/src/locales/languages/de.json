@@ -1819,7 +1819,8 @@
       "chipNoInvoices": "Keine separaten Rechnungen",
       "viewOrgGroup": "Organisationsgruppe anzeigen",
       "usageMemberLabel": "Mitgliedsorganisation",
-      "usageAllMembers": "Aktuelle Org"
+      "usageAllMembers": "Aktuelle Org",
+      "currentOrgTitle": "Aktuelle Organisation"
     },
     "billingGroup": {
       "tabLabel": "Abrechnungsgruppe",
@@ -1867,7 +1868,8 @@
       "chipNoInvoices": "Keine separaten Rechnungen",
       "viewOrgGroup": "Organisationsgruppe anzeigen",
       "usageMemberLabel": "Mitgliedsorganisation",
-      "usageAllMembers": "Aktuelle Org"
+      "usageAllMembers": "Aktuelle Org",
+      "currentOrgTitle": "Aktuelle Organisation"
     }
   },
   "message": {
