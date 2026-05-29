@@ -21,11 +21,6 @@
 }
 
 .pagination-block {
-  .q-field--dense .q-field__control,
-  .q-field--dense .q-field__marginal {
-    height: 30px !important;
-  }
-
   .select-pagination {
     position: relative;
   }
@@ -55,14 +50,14 @@
   }
 
   .wrap-content-btn {
-    height: 1.4rem !important; // 23px - match select-pagination
-    min-height: 1.3rem !important;
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
     width: 1.45rem !important; // Square button
     padding: 0 !important;
     border: 0.0626rem solid var(--o2-border-color) !important;
     border-radius: 0.25rem !important; // 4px - match select-pagination
     transition: all 0.2s ease;
-    margin: 7px 0px; // Match select-pagination vertical alignment
+    margin: 0; // flex parent handles alignment
     background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
     backdrop-filter: blur(10px) !important;
     display: flex !important;

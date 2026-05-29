@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import RouteTabs from '@/components/RouteTabs.vue';
-import { Quasar } from 'quasar';
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -10,6 +9,7 @@ vi.mock('vue-router', () => ({
   }),
   useRoute: () => ({ name: '', query: {} }),
 }));
+
 
 describe('RouteTabs.vue', () => {
   let wrapper: VueWrapper;
@@ -55,7 +55,7 @@ describe('RouteTabs.vue', () => {
     return mount(RouteTabs, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           OTabs: {
             template: '<div class="o-tabs-stub" :data-test="dataTest" :class="{ vertical: orientation === \'vertical\' }"><slot></slot></div>',

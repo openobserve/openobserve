@@ -147,7 +147,7 @@ describe("OButton", () => {
 
   it("applies sm size classes", () => {
     const wrapper = mount(OButton, { props: { size: "sm" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:h-9");
+    expect(wrapper.classes().join(" ")).toContain("tw:h-8");
   });
 
   it("applies lg size classes", () => {
@@ -167,11 +167,11 @@ describe("OButton", () => {
     expect(classes).toContain("tw:rounded-full");
   });
 
-  it("applies icon-sm size classes (h-9 w-9)", () => {
+  it("applies icon-sm size classes (h-8 w-8)", () => {
     const wrapper = mount(OButton, { props: { size: "icon-sm" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:h-9");
-    expect(classes).toContain("tw:w-9");
+    expect(classes).toContain("tw:h-8");
+    expect(classes).toContain("tw:w-8");
   });
 
   it("applies icon-md size classes (h-10 w-10)", () => {
@@ -238,6 +238,78 @@ describe("OButton", () => {
       props: { asChild: true },
       slots: { default: '<a href="/home">Home</a>' },
     });
-    expect(wrapper.element.tagName.toLowerCase()).toBe("a");
+    // asChild merges the button's attributes onto the slot's first child.
+    // The <a> element should be present with the expected href.
+    const link = wrapper.find('a[href="/home"]');
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toBe("Home");
+  });
+
+  // --- Base layout / transition / focus-ring offset ---
+
+  it("applies the multi-property transition class (color, bg, border, shadow, etc.)", () => {
+    const wrapper = mount(OButton);
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain(
+      "tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow]",
+    );
+    expect(classes).toContain("tw:duration-150");
+  });
+
+  it("does not apply the old transition-colors-only utility", () => {
+    const wrapper = mount(OButton);
+    // The migration replaced `tw:transition-colors` with an explicit property list.
+    // Ensure we don't regress back to the colors-only utility.
+    expect(wrapper.classes()).not.toContain("tw:transition-colors");
+  });
+
+  it("applies ring-offset utilities so the focus ring renders with a surface-base gap", () => {
+    const wrapper = mount(OButton);
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("tw:ring-offset-1");
+    expect(classes).toContain("tw:ring-offset-surface-base");
+  });
+
+  it("retains outline-none alongside the ring-offset utilities", () => {
+    const wrapper = mount(OButton);
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("tw:outline-none");
+    expect(classes).toContain("tw:ring-offset-1");
+  });
+
+  it("applies a focus-visible ring on the default primary variant", () => {
+    const wrapper = mount(OButton);
+    expect(wrapper.classes().join(" ")).toContain(
+      "tw:focus-visible:ring-button-primary-hover",
+    );
+  });
+
+  it("applies a focus-visible ring on the secondary variant", () => {
+    const wrapper = mount(OButton, { props: { variant: "secondary" } });
+    expect(wrapper.classes().join(" ")).toContain(
+      "tw:focus-visible:ring-button-secondary-focus-ring",
+    );
+  });
+
+  it("applies tw:focus-visible:ring-2 on every styled variant", () => {
+    const wrapper = mount(OButton, { props: { variant: "destructive" } });
+    expect(wrapper.classes().join(" ")).toContain("tw:focus-visible:ring-2");
+  });
+
+  // --- data attributes ---
+
+  it("sets data-o2-btn on the rendered element", () => {
+    const wrapper = mount(OButton);
+    expect(wrapper.attributes("data-o2-btn")).toBeDefined();
+  });
+
+  it("sets data-o2-variant to the active variant name", () => {
+    const wrapper = mount(OButton, { props: { variant: "ghost-primary" } });
+    expect(wrapper.attributes("data-o2-variant")).toBe("ghost-primary");
+  });
+
+  it("defaults data-o2-variant to primary", () => {
+    const wrapper = mount(OButton);
+    expect(wrapper.attributes("data-o2-variant")).toBe("primary");
   });
 });

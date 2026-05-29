@@ -15,7 +15,6 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Quasar } from 'quasar';
 import TelegrafConfig from './TelegrafConfig.vue';
 import { createStore } from 'vuex';
 
@@ -65,6 +64,7 @@ const defaultProps = {
   currUserEmail: 'test@example.com'
 };
 
+
 describe('TelegrafConfig', () => {
   let wrapper: any;
 
@@ -72,7 +72,7 @@ describe('TelegrafConfig', () => {
     wrapper = mount(TelegrafConfig, {
       props: defaultProps,
       global: {
-        plugins: [Quasar, store],
+        plugins: [store],
         components: {
           CopyContent: MockCopyContent
         },
@@ -93,7 +93,7 @@ describe('TelegrafConfig', () => {
     });
 
     it('should render main container div', () => {
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
 
     it('should render CopyContent component', () => {
@@ -245,7 +245,7 @@ describe('TelegrafConfig', () => {
       const newWrapper = mount(TelegrafConfig, {
         props: { currOrgIdentifier: 'new_org' },
         global: {
-          plugins: [Quasar, store],
+          plugins: [store],
           components: { CopyContent: MockCopyContent },
           stubs: { CopyContent: MockCopyContent }
         }
@@ -287,7 +287,7 @@ describe('TelegrafConfig', () => {
       const wrapperWithEmptyOrg = mount(TelegrafConfig, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, storeWithEmptyOrg],
+          plugins: [storeWithEmptyOrg],
           components: { CopyContent: MockCopyContent },
           stubs: { CopyContent: MockCopyContent }
         }
@@ -303,7 +303,7 @@ describe('TelegrafConfig', () => {
           currUserEmail: 'another@example.com'
         },
         global: {
-          plugins: [Quasar, store],
+          plugins: [store],
           components: { CopyContent: MockCopyContent },
           stubs: { CopyContent: MockCopyContent }
         }
@@ -333,7 +333,7 @@ describe('TelegrafConfig', () => {
       const newWrapper = mount(TelegrafConfig, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, store],
+          plugins: [store],
           components: { CopyContent: MockCopyContent },
           stubs: { CopyContent: MockCopyContent }
         }

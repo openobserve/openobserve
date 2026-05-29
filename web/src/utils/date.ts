@@ -13,8 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { date } from "quasar";
+import { format as dfFormat, sub } from "date-fns";
 import { DateTime as _DateTime } from "luxon";
+
+// ---------------------------------------------------------------------------
+// Duration helpers
+// ---------------------------------------------------------------------------
 
 // Parses the duration string and returns the number is seconds
 export const parseDuration = (durationString: string) => {
@@ -199,29 +203,21 @@ export const getConsumableRelativeTime = (period: string) => {
     let periodValue: number = parseInt(periodString[1]);
     let periodUnit: string = periodString[2];
 
-    // quasar does not support arithmetic on weeks. convert to days.
+    // date-fns sub() supports weeks, but we convert for consistency with period string format
     if (periodUnit == "w") {
       periodUnit = "d";
       periodValue = periodValue * 7;
     }
 
-    const subtractObject =
-      '{"' +
-      getRelativePeriod(periodUnit).toLowerCase() +
-      '":' +
-      periodValue +
-      "}";
+    const subtractObject: Record<string, number> = {};
+    subtractObject[getRelativePeriod(periodUnit).toLowerCase()] = periodValue;
 
     const endTimeStamp = new Date();
-
-    const startTimeStamp = date.subtractFromDate(
-      endTimeStamp,
-      JSON.parse(subtractObject),
-    );
+    const startTimeStamp = subtractRelativeTime(endTimeStamp, subtractObject);
 
     return {
-      startTime: new Date(startTimeStamp).getTime() * 1000,
-      endTime: new Date(endTimeStamp).getTime() * 1000,
+      startTime: startTimeStamp.getTime() * 1000,
+      endTime: endTimeStamp.getTime() * 1000,
     };
   }
 };
@@ -242,13 +238,112 @@ export const isInvalidDate = (date: any) => {
   return !(date && date instanceof Date && !isNaN(date.getTime()));
 };
 
+// ---------------------------------------------------------------------------
+// Core formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize Quasar-style format tokens to date-fns (Unicode CLDR) tokens.
+ * Quasar uses YYYY/DD whereas date-fns uses yyyy/dd.
+ */
+function normalizeFormat(format: string): string {
+  return format
+    .replace(/YYYY/g, "yyyy")
+    .replace(/DD/g, "dd")
+    .replace(/(?<!d)D(?!D)/g, "d")
+    .replace(/(?<!')T(?!')/g, "'T'")
+    .replace(/(?<!')Z(?!')/g, "X");
+}
+
+/**
+ * Format a value using date-fns format.
+ * Accepts a Date object, ISO string, or number (milliseconds since epoch).
+ */
+export function formatDate(
+  value: number | string | Date,
+  formatStr: string,
+): string {
+  const input = typeof value === "string" ? new Date(value) : value;
+  return dfFormat(input, normalizeFormat(formatStr));
+}
+
+/**
+ * Format a microsecond timestamp (standard backend format) to a string.
+ * Converts microseconds to milliseconds internally.
+ */
+export function formatTimestamp(us: number, format: string): string {
+  return formatDate(us / 1000, format);
+}
+
+/**
+ * Format a nanosecond timestamp to a string.
+ * Converts nanoseconds to milliseconds internally.
+ */
+export function formatTimestampNs(ns: number, format: string): string {
+  return formatDate(ns / 1000000, format);
+}
+
+// ---------------------------------------------------------------------------
+// Preset formatters — all accept microsecond timestamps
+// ---------------------------------------------------------------------------
+
+/** "YYYY-MM-DD HH:mm:ss" — standard readable datetime */
+export const formatToReadable = (us: number): string =>
+  formatTimestamp(us, "YYYY-MM-DD HH:mm:ss");
+
+/** "YYYY-MM-DD HH:mm:ss.SSS" — readable with milliseconds */
+export const formatToDetailed = (us: number): string =>
+  formatTimestamp(us, "YYYY-MM-DD HH:mm:ss.SSS");
+
+/** "YYYY-MM-DDTHH:mm:ssZ" — ISO 8601 compact */
+export const formatToISO = (us: number): string =>
+  formatTimestamp(us, "YYYY-MM-DDTHH:mm:ssZ");
+
+/** "MMM DD, YYYY HH:mm:ss.SSS Z" — human-readable with ms + tz */
+export const formatToHuman = (us: number): string =>
+  formatTimestamp(us, "MMM DD, YYYY HH:mm:ss.SSS Z");
+
+/** "MMM DD, YYYY HH:mm:ss Z" — human-readable with tz */
+export const formatToHumanShort = (us: number): string =>
+  formatTimestamp(us, "MMM DD, YYYY HH:mm:ss Z");
+
+/** "MMM D, YYYY" — date only (e.g. "May 19, 2026") */
+export const formatToDateOnly = (us: number): string =>
+  formatTimestamp(us, "MMM D, YYYY");
+
+/** "MMM DD, HH:mm" — month day + time, no year */
+export const formatToTimeCompact = (us: number): string =>
+  formatTimestamp(us, "MMM DD, HH:mm");
+
+// ---------------------------------------------------------------------------
+// Relative time
+// ---------------------------------------------------------------------------
+
+/**
+ * Subtract a relative time period from a date.
+ *
+ * @example
+ * subtractRelativeTime(new Date(), { minutes: 15 }) // 15 min ago
+ * subtractRelativeTime(new Date(), { days: 7 })     // 7 days ago
+ */
+export function subtractRelativeTime(
+  endDate: Date,
+  period: Record<string, number>,
+): Date {
+  return sub(endDate, period);
+}
+
+// ---------------------------------------------------------------------------
+// Legacy / specific helpers
+// ---------------------------------------------------------------------------
+
 export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
   try {
     if (!unixMicroseconds) return "";
     const unixSeconds = unixMicroseconds / 1e6;
     const dateToFormat = new Date(unixSeconds * 1000);
     const formattedDate = dateToFormat.toISOString();
-    return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+    return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
   } catch (error) {
     console.log("Error converting unix to quasar format");
     return "";

@@ -17,8 +17,8 @@ import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
-import { Notify } from "quasar";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Shared refresh state — ensures only one dex_refresh request is in-flight
 // at a time across all axios instances and streaming fetch requests. All
@@ -217,18 +217,10 @@ const http = ({ headers } = {} as any) => {
               const notifyMessage = backendError
                 ? `Unauthorized Access: ${backendError}`
                 : `Unauthorized Access: You are not authorized to perform this operation${resourceHint}. Please contact your administrator.`;
-              Notify.create({
+              toast({
                 message: notifyMessage,
                 timeout: 0, // This ensures the notification does not close automatically
-                color: "negative", // Customize color as needed
-                position: "top",
-                actions: [
-                  {
-                    color: "white",
-                    icon: "close",
-                    size: "sm",
-                  },
-                ],
+                variant: "error",
               });
             }
             console.log(

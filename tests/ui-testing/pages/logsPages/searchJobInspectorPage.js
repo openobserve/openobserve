@@ -136,7 +136,7 @@ export class SearchJobInspectorPage {
   async isSearchInspectVisible() {
     await this.openMoreOptionsMenu();
     const visible = await this.page.locator(this.searchInspectBtn).isVisible({ timeout: 3000 }).catch(() => false);
-    await this.page.keyboard.press('Escape'); // Close menu
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } }); // Close menu
     return visible;
   }
 
@@ -363,8 +363,8 @@ export class SearchJobInspectorPage {
    * Close SQL query dialog
    */
   async closeSqlDialog() {
-    // Try pressing Escape to close any dialog
-    await this.page.keyboard.press('Escape');
+    // Close dialog by clicking outside
+    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     await this.page.waitForLoadState('domcontentloaded');
   }
 
@@ -608,14 +608,14 @@ export class SearchJobInspectorPage {
    * @returns {Promise<boolean>}
    */
   async hasExpandableRows() {
-    return await this.page.locator(`${this.inspectorEventsTable} .q-expansion-item`).count() > 0;
+    return await this.page.locator(`${this.inspectorEventsTable} [data-reka-accordion-item], ${this.inspectorEventsTable} [aria-expanded]`).count() > 0;
   }
 
   /**
    * Expand first event row in inspector table
    */
   async expandFirstEventRow() {
-    const expandBtn = this.page.locator(`${this.inspectorEventsTable} .q-expansion-item`).first();
+    const expandBtn = this.page.locator(`${this.inspectorEventsTable} [data-reka-accordion-item], ${this.inspectorEventsTable} [aria-expanded]`).first();
     if (await expandBtn.isVisible()) {
       await expandBtn.click();
       await this.page.waitForTimeout(500);
@@ -700,7 +700,7 @@ export class SearchJobInspectorPage {
    * @returns {Promise<boolean>}
    */
   async isSqlDialogVisible() {
-    return await this.page.locator('pre, code, .q-dialog').isVisible({ timeout: 3000 }).catch(() => false);
+    return await this.page.locator('pre, code, [data-test*="dialog"]').isVisible({ timeout: 3000 }).catch(() => false);
   }
 
   /**

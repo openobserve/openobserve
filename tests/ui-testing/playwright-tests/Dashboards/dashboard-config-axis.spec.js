@@ -41,10 +41,8 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
     // Clear both to restore auto-scaling
-    await yAxisMinInput.click();
-    await yAxisMinInput.fill("");
-    await yAxisMaxInput.click();
-    await yAxisMaxInput.fill("");
+    await yAxisMinInput.locator('[data-test$="-field"]').fill("");
+    await yAxisMaxInput.locator('[data-test$="-field"]').fill("");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Y-axis min/max cleared");
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -53,8 +51,8 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying Y-axis cleared state persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-y_axis_min"]')).toHaveValue("");
-    await expect(page.locator('[data-test="dashboard-config-y_axis_max"]')).toHaveValue("");
+    await expect(page.locator('[data-test="dashboard-config-y_axis_min"]').locator('[data-test$="-field"]')).toHaveValue("");
+    await expect(page.locator('[data-test="dashboard-config-y_axis_max"]').locator('[data-test$="-field"]')).toHaveValue("");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -75,7 +73,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying axis width persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-axis-width"]')).toHaveValue("80");
+    await expect(page.locator('[data-test="dashboard-config-axis-width"]').locator('[data-test$="-field"]')).toHaveValue("80");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -97,7 +95,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying axis border enabled persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-axis-border"]')).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator('[data-test="dashboard-config-axis-border"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -119,7 +117,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying gridlines disabled persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show-gridlines"]')).toHaveAttribute("aria-checked", "false");
+    await expect(page.locator('[data-test="dashboard-config-show-gridlines"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -146,8 +144,8 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying label position and rotate persist after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-label-position"]')).toContainText("Top");
-    await expect(page.locator('[data-test="dashboard-config-label-rotate"]')).toHaveValue("45");
+    await expect(page.locator('[data-test="dashboard-config-label-position-trigger"]')).toHaveAttribute('data-test-selected-value', 'top');
+    await expect(page.locator('[data-test="dashboard-config-label-rotate"]').locator('[data-test$="-field"]')).toHaveValue("45");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -160,8 +158,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
 
     const axisLabelRotateInput = page.locator('[data-test="dashboard-config-axis-label-rotate"]');
     await expect(axisLabelRotateInput).toBeVisible();
-    await axisLabelRotateInput.click();
-    await axisLabelRotateInput.fill("30");
+    await axisLabelRotateInput.locator('[data-test$="-field"]').fill("30");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("X-axis label rotate set to 30");
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -170,7 +167,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying x-axis label rotate persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-axis-label-rotate"]')).toHaveValue("30");
+    await expect(page.locator('[data-test="dashboard-config-axis-label-rotate"]').locator('[data-test$="-field"]')).toHaveValue("30");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -181,10 +178,9 @@ test.describe("ConfigPanel — Axis Settings", () => {
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
-    const truncateInput = page.locator('[data-test="dashboard-config-axis-label-truncate-width"]');
+    const truncateInput = page.locator('[data-test="dashboard-config-axis-label-truncate"]');
     await expect(truncateInput).toBeVisible();
-    await truncateInput.click();
-    await truncateInput.fill("50");
+    await truncateInput.locator('[data-test$="-field"]').fill("50");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Label truncate width set to 50");
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -193,7 +189,7 @@ test.describe("ConfigPanel — Axis Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying label truncate width persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-axis-label-truncate-width"]')).toHaveValue("50");
+    await expect(page.locator('[data-test="dashboard-config-axis-label-truncate"]').locator('[data-test$="-field"]')).toHaveValue("50");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

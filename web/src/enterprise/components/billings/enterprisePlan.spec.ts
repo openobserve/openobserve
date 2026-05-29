@@ -15,13 +15,11 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import enterprisePlan from '@/enterprise/components/billings/enterprisePlan.vue';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 
 // Install Quasar
-installQuasar();
 
 const mockEnterpriseFeatures = [
   { name: "Everything in Pay as you go plan, plus:", price: "", is_parent: true },
@@ -60,9 +58,8 @@ describe('enterprisePlan.vue', () => {
         },
         stubs: {
           'q-card': true,
-          'q-chip': true,
           'q-separator': true,
-          'q-icon': true,
+          'OIcon': true,
           'q-btn': {
             template: '<button @click="$emit(\'click\')" v-bind="$attrs"><slot/></button>',
             emits: ['click']

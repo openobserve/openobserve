@@ -2,135 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-async function closeStreamDetailSidebar(page) {
-  // Close stream detail sidebar if open
-  const cancelButton = page.getByRole('button', { name: 'Cancel' });
-  const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
-  if (cancelVisible) {
-    await cancelButton.click();
-    testLogger.info('Closed stream detail sidebar');
-    await page.waitForTimeout(500);
-  }
-}
-
-async function navigateToLogsQuick(page) {
-  // Quick navigation to logs without VRL editor wait
-  await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-  testLogger.info('Navigated to Logs (fast - no VRL wait)');
-}
-
-// Verify multiple fields for hash status
-// Expected hash format: [REDACTED:32_hex_characters]
-// Examples:
-//   user_email:john.doe@example.com → [REDACTED:hash]
-//   phone:5551234567 → [REDACTED:hash]
-async function verifyMultipleFieldsRedaction(page, pm, streamName, fieldsToVerify) {
-  testLogger.info(`Verifying ${fieldsToVerify.length} fields for hash status`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(2000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(4000); // Increased wait time for logs to load
-
-  // Get data from all 4 columns (one field per column)
-  const columnLocators = [
-    page.locator('[data-test="log-table-column-0-source"]'),
-    page.locator('[data-test="log-table-column-1-source"]'),
-    page.locator('[data-test="log-table-column-2-source"]'),
-    page.locator('[data-test="log-table-column-3-source"]')
-  ];
-
-  // Wait for first column to appear
-  await columnLocators[0].first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
-    testLogger.warn('Timeout waiting for logs to appear');
-  });
-
-  // Collect text from all 4 columns
-  const allLogTexts = [];
-  for (let colIndex = 0; colIndex < 4; colIndex++) {
-    const locator = columnLocators[colIndex];
-    const count = await locator.count();
-
-    if (count > 0) {
-      const text = await locator.first().textContent();
-      allLogTexts.push(text);
-      testLogger.info(`Column ${colIndex}: ${text.substring(0, 200)}...`);
-    } else {
-      testLogger.warn(`Column ${colIndex}: No data found`);
-    }
-  }
-
-  testLogger.info(`Total columns with data: ${allLogTexts.length}. Expected ${fieldsToVerify.length} fields.`);
-
-  if (allLogTexts.length === 0) {
-    throw new Error('No logs found in any column');
-  }
-
-  // For each field we want to verify, search through all logs to find the one containing that field
-  for (const { fieldName, shouldBeHashed } of fieldsToVerify) {
-    testLogger.info(`Searching for log containing field: ${fieldName}`);
-
-    let foundLog = null;
-    let foundIndex = -1;
-
-    // Search through all logs to find one containing this field
-    for (let i = 0; i < allLogTexts.length; i++) {
-      const logText = allLogTexts[i];
-      const fieldAsJsonKey = `"${fieldName}":`;
-      const fieldAsKey = `${fieldName}:`;
-
-      if (logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey)) {
-        foundLog = logText;
-        foundIndex = i;
-        break;
-      }
-    }
-
-    if (!foundLog) {
-      testLogger.error(`Could not find log containing field: ${fieldName}`);
-      testLogger.error(`Available logs: ${allLogTexts.map((t, i) => `\n  Log ${i}: ${t.substring(0, 150)}...`).join('')}`);
-      throw new Error(`Could not find log entry containing field: ${fieldName}`);
-    }
-
-    testLogger.info(`Found ${fieldName} in log ${foundIndex}`);
-
-    // For HASH, the field should be present with [REDACTED:hash] format
-    if (shouldBeHashed) {
-      testLogger.info(`Checking if field ${fieldName} is HASHED at query time`);
-
-      // Check if it contains [REDACTED:hash] format
-      const redactedHashPattern = /\[REDACTED:[0-9a-f]{32}\]/i;
-      if (!redactedHashPattern.test(foundLog)) {
-        testLogger.error(`Field ${fieldName} found but value is NOT in [REDACTED:hash] format!`);
-        testLogger.error(`Expected format: [REDACTED:hash] where hash is 32 hex characters`);
-        testLogger.error(`Actual log text: ${foundLog.substring(0, 300)}`);
-        throw new Error(`Field ${fieldName} is not properly hashed - missing [REDACTED:hash] format`);
-      }
-
-      // Extract and log the hash value
-      const hashMatch = foundLog.match(/\[REDACTED:([0-9a-f]{32})\]/i);
-      if (hashMatch) {
-        testLogger.info(`✓ Field ${fieldName} is correctly HASHED at query time: [REDACTED:${hashMatch[1]}]`);
-      }
-    } else {
-      testLogger.info(`Checking if field ${fieldName} is visible with actual value`);
-
-      // Verify it's NOT hashed
-      const redactedHashPattern = /\[REDACTED:[0-9a-f]{32}\]/i;
-      if (redactedHashPattern.test(foundLog)) {
-        testLogger.error(`Field ${fieldName} should be visible but appears to be hashed!`);
-        throw new Error(`Field ${fieldName} is unexpectedly hashed`);
-      }
-
-      testLogger.info(`✓ Field ${fieldName} is visible with actual value`);
-    }
-  }
-}
-
-
 test.describe("Query Time Hash - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -236,12 +107,11 @@ test.describe("Query Time Hash - Combined Test", { tag: '@enterprise' }, () => {
     await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     // Verify all fields are visible without hashing
-    testLogger.info('Verifying 4 fields for hash status');
     const fieldsBeforeHashing = patternsToTest.map(p => ({
       fieldName: p.field,
       shouldBeHashed: false
     }));
-    await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsBeforeHashing);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsBeforeHashing);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -284,7 +154,7 @@ test.describe("Query Time Hash - Combined Test", { tag: '@enterprise' }, () => {
       fieldName: p.field,
       shouldBeHashed: true
     }));
-    await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsAfterHashing);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsAfterHashing);
     testLogger.info('✓ STEP 4 PASSED: All fields are HASHED at query time');
 
     testLogger.info('=== ✓ COMBINED QUERY TIME HASH TEST COMPLETED SUCCESSFULLY ===');

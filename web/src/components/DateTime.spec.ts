@@ -1,12 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 const mockRouter = createRouter({
   history: createWebHistory(),
@@ -28,7 +26,12 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("@/utils/date", () => ({
   generateDurationLabel: vi.fn(() => "15m"),
-  formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00")
+  formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00"),
+  subtractRelativeTime: vi.fn((endDate: Date, _period: Record<string, number>) => {
+    const result = new Date(endDate);
+    result.setMinutes(result.getMinutes() - 15);
+    return result;
+  }),
 }));
 
 vi.mock("date-fns-tz", () => ({

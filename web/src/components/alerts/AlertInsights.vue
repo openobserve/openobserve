@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:mb-[0.625rem]">
         <!-- Header -->
         <div
-          class="insights-header flex justify-between items-center"
+          class="insights-header tw:flex tw:justify-between tw:items-center"
         >
-          <div class="flex items-center">
+          <div class="tw:flex tw:items-center">
             <OButton
               variant="outline"
               size="icon-sm"
@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBack"
               data-test="alert-insights-back-btn"
             >
-              <q-icon name="arrow_back_ios_new" />
+              <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
-            <div class="q-table__title tw:font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2">{{ t("alerts.insights.title") }}</div>
           </div>
 
-          <div class="flex items-center">
+          <div class="tw:flex tw:items-center">
             <date-time
               ref="dateTimeRef"
               auto-apply
@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isLoading"
               variant="ghost"
               size="icon-sm"
-              class="q-mr-xs el-border"
+              class="tw:mr-1 el-border"
               data-test="alert-insights-refresh-btn"
             >
-              <q-icon name="refresh" />
-              <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+              <OIcon name="refresh" size="sm" />
+              <OTooltip :content="t('common.refresh')" />
             </OButton>
           </div>
         </div>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabs
           v-model="currentTab"
           dense
-          class="alert-insights-tabs q-ml-sm"
+          class="alert-insights-tabs tw:ml-2"
           align="left"
           data-test="alert-insights-tabs"
         >
@@ -97,28 +97,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="filter-label">{{ t("common.filters") }}:</span>
 
           <!-- Failed Only Toggle -->
-          <q-toggle
-            v-model="showFailedOnly"
-            :label="t('alerts.insights.filters.failedOnly')"
-            class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-            @update:model-value="onFilterChange"
-            data-test="failed-only-toggle"
+          <OSwitch
+          v-model="showFailedOnly"
+          :label="t('alerts.insights.filters.failedOnly')"
+          class="o2-toggle-button-sm"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+          @update:model-value="onFilterChange"
+          data-test="failed-only-toggle"
           >
-            <q-tooltip>{{ t("alerts.insights.filters.failedOnlyTooltip") }}</q-tooltip>
-          </q-toggle>
+          <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')">
+          </OTooltip>
+        </OSwitch>
 
           <!-- Silenced Only Toggle -->
-          <q-toggle
-            v-model="showSilencedOnly"
-            :label="t('alerts.insights.filters.silenced')"
-            class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-            @update:model-value="onFilterChange"
-            data-test="silenced-only-toggle"
+          <OSwitch
+          v-model="showSilencedOnly"
+          :label="t('alerts.insights.filters.silenced')"
+          class="o2-toggle-button-sm"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+          @update:model-value="onFilterChange"
+          data-test="silenced-only-toggle"
           >
-            <q-tooltip>{{ t("alerts.insights.filters.silencedTooltip") }}</q-tooltip>
-          </q-toggle>
+          <OTooltip :content="t('alerts.insights.filters.silencedTooltip')">
+          </OTooltip>
+            </OSwitch>
 
           <!-- Range Filter Chips -->
           <div
@@ -145,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <= {{ formatFilterValue(filter.end) }}
               </span>
             </span>
-            <q-icon
-              name="close"
+            <OIcon
+              name="close" size="sm"
               class="chip-close-icon tw:cursor-pointer"
               @click="removeRangeFilter(panelId)"
             />
@@ -160,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="clear-filters-btn"
             @click="clearAllFilters"
             data-test="clear-all-filters-btn"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="clear" /></template>
             {{ t('alerts.insights.filters.clearAll') }}
           </OButton>
         </div>
@@ -174,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="action-buttons-row tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center"
       data-test="action-buttons-row"
     >
-      <q-icon name="campaign" color="primary" size="sm" />
+      <OIcon name="campaign" size="sm" />
       <span class="tw:text-sm tw:font-medium"
         >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
       >
@@ -184,10 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="openDedupConfig"
         data-test="configure-dedup-btn"
+        icon-left="settings"
       >
-        <template #icon-left><q-icon name="settings" /></template>
         {{ t("alerts.insights.actions.configureDedup") }}
-        <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
+        <OTooltip :content="t('alerts.insights.actions.configureDedupTooltip')" />
       </OButton>
 
       <OButton
@@ -195,10 +197,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="editAlert"
         data-test="edit-alert-btn"
+        icon-left="edit"
       >
-        <template #icon-left><q-icon name="edit" /></template>
         {{ t("alerts.insights.actions.editAlert") }}
-        <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
+        <OTooltip :content="t('alerts.insights.actions.editAlertTooltip')" />
       </OButton>
 
       <OButton
@@ -206,13 +208,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="viewHistory"
         data-test="view-history-btn"
+        icon-left="history"
       >
-        <template #icon-left><q-icon name="history" /></template>
         {{ t("alerts.insights.actions.viewHistory") }}
-        <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
+        <OTooltip :content="t('alerts.insights.actions.viewHistoryTooltip')" />
       </OButton>
 
-      <q-space />
+      <div class="tw:flex-1" />
 
       <OButton
         variant="ghost"
@@ -220,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="selectedAlertForAction = null"
         data-test="close-actions-btn"
       >
-        <q-icon name="close" />
-        <q-tooltip>Close actions</q-tooltip>
+        <OIcon name="close" size="sm" />
+        <OTooltip content="Close actions" />
       </OButton>
     </div>
 
@@ -231,9 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           @contextmenu="handleNativeContextMenu"
         >
-          <div v-show="isLoading" class="loading-container flex items-center justify-center">
-            <q-spinner-hourglass color="primary" size="40px" />
-            <div class="q-ml-md">Loading insights...</div>
+          <div v-show="isLoading" class="loading-container tw:flex tw:items-center tw:justify-center">
+            <OSpinner size="md" />
+            <div class="tw:ml-3">Loading insights...</div>
           </div>
 
           <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
@@ -284,7 +286,6 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
@@ -294,11 +295,15 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
 import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 // Check if enterprise features are enabled
@@ -441,10 +446,9 @@ const fetchAlerts = async () => {
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to load alerts",
-      timeout: 2000,
     });
   }
 };
@@ -598,10 +602,9 @@ const handleConfigureDedup = async (alertName: string) => {
     const alert = alertsList.value.find((a: any) => a.name === alertName);
 
     if (!alert) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
-        timeout: 3000,
       });
       return;
     }
@@ -619,10 +622,9 @@ const handleConfigureDedup = async (alertName: string) => {
       },
     });
   } catch (error) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to navigate to alert",
-      timeout: 2000,
     });
   }
 };
@@ -633,10 +635,9 @@ const handleEditAlert = async (alertName: string) => {
     const alert = alertsList.value.find((a: any) => a.name === alertName);
 
     if (!alert) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Alert not found",
-        timeout: 2000,
       });
       return;
     }
@@ -652,10 +653,9 @@ const handleEditAlert = async (alertName: string) => {
       },
     });
   } catch (error) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to navigate to alert",
-      timeout: 2000,
     });
   }
 };
@@ -679,8 +679,8 @@ const formatFilterValue = (value: number): string => {
 
 // Action button methods
 const openDedupConfig = () => {
-  $q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page with dedup section focused",
   });
@@ -694,8 +694,8 @@ const openDedupConfig = () => {
 };
 
 const editAlert = () => {
-  $q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: `Editing alert: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page",
   });

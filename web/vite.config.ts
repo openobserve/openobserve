@@ -18,7 +18,6 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import vueJsx from "@vitejs/plugin-vue-jsx";
-import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 import path from "path";
@@ -29,6 +28,7 @@ import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
+import Icons from "unplugin-icons/vite";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -108,14 +108,7 @@ export default defineConfig({
   },
   base: "./",
   plugins: [
-    vue({
-      template: { transformAssetUrls },
-    }),
-    quasar({
-      sassVariables: fileURLToPath(
-        new URL("src/styles/quasar-variables.sass", import.meta.url),
-      ),
-    }),
+    vue(),
     process.env.VITE_COVERAGE === "true" &&
       istanbul({
         include: "src/**/*",
@@ -125,12 +118,23 @@ export default defineConfig({
         forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
+    Icons({
+      compiler: "vue3",
+      autoInstall: false,
+    }),
     vueJsx(),
     (monacoEditorPlugin as any).default({
       customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
     }),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@use '@/styles/legacy-variables' as *;\n`,
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -148,7 +152,7 @@ export default defineConfig({
   build: {
     sourcemap: false,
     target: "es2020",
-    chunkSizeWarningLimit: 3000,
+    chunkSizeWarningLimit: 4000,
     rollupOptions: {
       plugins: [
         nodePolyfills() as any,

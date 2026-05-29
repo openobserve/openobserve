@@ -21,12 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     :data-test="`trace-tree-span-kind-badge-${kindClass}`"
   >
     {{ abbrev }}
-    <q-tooltip anchor="bottom middle" self="top middle">{{ kind }}</q-tooltip>
+    <OTooltip :content="kind" side="bottom" align="center" />
   </span>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{
   /** Human-readable span kind label, e.g. "Client", "Server", "Internal" */

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-metrics-dashboard tw:w-full">
+  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard tw:w-full">
     <!-- Charts Section -->
     <transition name="slide-fade">
       <div

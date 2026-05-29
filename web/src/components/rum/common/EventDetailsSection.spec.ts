@@ -1,32 +1,43 @@
-// Copyright 2026 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import EventDetailsSection from "./EventDetailsSection.vue";
 
-installQuasar();
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
 
 vi.mock("./KeyValueRow.vue", () => ({
   default: {
     name: "KeyValueRow",
-    template: '<div class="key-value-row" :data-test="dataTest"><span class="label">{{ label }}</span><span class="value">{{ value }}</span><slot /></div>',
+    template:
+      '<div data-test="key-value-row" :data-key="label"><span>{{ label }}</span><span>{{ value }}</span><slot /></div>',
     props: ["label", "value", "showBorder", "valueClass", "dataTest"],
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const sampleFields = [
+  { key: "browser", label: "Browser", value: "Chrome" },
+  { key: "os", label: "OS", value: "macOS" },
+  { key: "ip", label: "IP", value: "127.0.0.1" },
+];
+
+function mountComponent(props: Record<string, any> = {}) {
+  return mount(EventDetailsSection, {
+    props: {
+      title: "Session Details",
+      fields: sampleFields,
+      ...props,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe("EventDetailsSection", () => {
   let wrapper: VueWrapper;
@@ -36,89 +47,97 @@ describe("EventDetailsSection", () => {
     vi.clearAllMocks();
   });
 
-  const sampleFields = [
-    { key: "browser", label: "Browser", value: "Chrome" },
-    { key: "os", label: "OS", value: "macOS" },
-    { key: "ip", label: "IP", value: "127.0.0.1" },
-  ];
-
-  function mountComponent(props = {}) {
-    return mount(EventDetailsSection, {
-      props: {
-        title: "Session Details",
-        fields: sampleFields,
-        ...props,
-      },
-    });
-  }
-
   describe("initial render", () => {
-    it("should render without errors", () => {
+    it("renders without errors", () => {
+      // Arrange + Act
       wrapper = mountComponent();
+
+      // Assert
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should display the title", () => {
+    it("displays the title text", () => {
+      // Arrange + Act
       wrapper = mountComponent({ title: "My Section" });
+
+      // Assert
       expect(wrapper.text()).toContain("My Section");
     });
 
-    it("should render KeyValueRow for each visible field", () => {
+    it("renders a KeyValueRow for each visible field", () => {
+      // Arrange + Act
       wrapper = mountComponent();
-      const rows = wrapper.findAll(".key-value-row");
-      expect(rows).toHaveLength(3);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(3);
     });
   });
 
-  describe("visibleFields computed — filtering", () => {
-    it("should exclude fields with null value", () => {
+  describe("visibleFields — filtering", () => {
+    it("excludes fields with null value", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [
           { key: "browser", label: "Browser", value: "Chrome" },
           { key: "os", label: "OS", value: null },
         ],
       });
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(1);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(1);
     });
 
-    it("should exclude fields with empty string value", () => {
+    it("excludes fields with empty string value", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [
           { key: "browser", label: "Browser", value: "Chrome" },
           { key: "os", label: "OS", value: "" },
         ],
       });
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(1);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(1);
     });
 
-    it("should exclude fields with condition=false", () => {
+    it("excludes fields with condition=false", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [
           { key: "browser", label: "Browser", value: "Chrome", condition: false },
           { key: "os", label: "OS", value: "macOS", condition: true },
         ],
       });
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(1);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(1);
     });
 
-    it("should include fields with condition=true", () => {
+    it("includes fields with condition=true", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [
           { key: "browser", label: "Browser", value: "Chrome", condition: true },
           { key: "os", label: "OS", value: "macOS", condition: true },
         ],
       });
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(2);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(2);
     });
 
-    it("should include fields when condition is undefined (not specified)", () => {
+    it("includes fields when condition is not specified", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [{ key: "browser", label: "Browser", value: "Chrome" }],
       });
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(1);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(1);
     });
 
-    it("should show no rows when all fields are filtered out", () => {
+    it("shows no rows when all fields are filtered out", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [
           { key: "a", label: "A", value: null },
@@ -126,26 +145,33 @@ describe("EventDetailsSection", () => {
           { key: "c", label: "C", value: "valid", condition: false },
         ],
       });
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(0);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(0);
     });
 
-    it("should handle empty fields array", () => {
+    it("renders no rows for empty fields array", () => {
+      // Arrange + Act
       wrapper = mountComponent({ fields: [] });
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(0);
+
+      // Assert
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(0);
     });
 
-    it("should include field with numeric value 0", () => {
+    it("includes field with numeric value 0 (not null and not empty string)", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [{ key: "count", label: "Count", value: 0 }],
       });
-      // 0 is not null and not "", so it should pass the filter
-      // but 0 is falsy — the filter checks != null and !== ""
-      expect(wrapper.findAll(".key-value-row")).toHaveLength(1);
+
+      // Assert — 0 is not null and not "", it passes the filter
+      expect(wrapper.findAll('[data-test="key-value-row"]')).toHaveLength(1);
     });
   });
 
   describe("showBorder logic", () => {
-    it("should pass showBorder=true to all rows except the last", () => {
+    it("renders the correct number of rows for a 3-field list", () => {
+      // Arrange + Act
       wrapper = mountComponent({
         fields: [
           { key: "a", label: "A", value: "1" },
@@ -153,26 +179,35 @@ describe("EventDetailsSection", () => {
           { key: "c", label: "C", value: "3" },
         ],
       });
-      const rows = wrapper.findAll(".key-value-row");
+
+      // Assert
+      const rows = wrapper.findAll('[data-test="key-value-row"]');
       expect(rows).toHaveLength(3);
     });
   });
 
   describe("dataTest prop", () => {
-    it("should apply dataTest to the root element", () => {
+    it("applies dataTest value to the root element", () => {
+      // Arrange + Act
       wrapper = mountComponent({ dataTest: "rum-session-details" });
+
+      // Assert
       expect(wrapper.attributes("data-test")).toBe("rum-session-details");
     });
 
-    it("should use empty string as default when dataTest not provided", () => {
+    it("uses empty string as default when dataTest is not provided", () => {
+      // Arrange + Act
       wrapper = mountComponent();
+
+      // Assert
       const dataTest = wrapper.attributes("data-test");
       expect(dataTest === undefined || dataTest === "").toBe(true);
     });
   });
 
   describe("slot support", () => {
-    it("should render slot content for fields with slot=true", () => {
+    it("renders slot content for fields with slot=true", () => {
+      // Arrange + Act
       wrapper = mount(EventDetailsSection, {
         props: {
           title: "Custom",
@@ -182,6 +217,8 @@ describe("EventDetailsSection", () => {
           "custom-key": '<span data-test="slot-content">custom slot</span>',
         },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="slot-content"]').exists()).toBe(true);
     });
   });

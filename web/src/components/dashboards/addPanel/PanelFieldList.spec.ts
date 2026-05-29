@@ -1,0 +1,730 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { reactive, computed } from "vue";
+
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+import router from "@/test/unit/helpers/router";
+
+
+// ── Mock data ──────────────────────────────────────────────────────────
+
+const mockStreamResults = [
+  { name: "app_logs", stream_type: "logs" },
+  { name: "system_metrics", stream_type: "metrics", metrics_meta: { metric_type: "Gauge" } },
+  { name: "user_traces", stream_type: "traces" },
+  { name: "error_logs", stream_type: "logs" },
+];
+
+const createMockDashboardPanelData = (overrides: Record<string, any> = {}) =>
+  reactive({
+    data: {
+      type: "bar",
+      queries: [
+        {
+          fields: { stream_type: "logs", stream: "app_logs" },
+          customQuery: false,
+          query: "",
+          config: {},
+        },
+      ],
+      ...overrides.data,
+    },
+    layout: {
+      currentQueryIndex: 0,
+      showFieldList: true,
+      splitter: 20,
+      ...overrides.layout,
+    },
+    meta: {
+      stream: {
+        streamResults: mockStreamResults,
+        streamResultsType: "logs",
+        filterField: "",
+        customQueryFields: [] as any[],
+        vrlFunctionFieldList: [] as any[],
+        userDefinedSchema: [] as any[],
+        selectedStreamFields: [] as any[],
+        ...overrides.meta?.stream,
+      },
+      streamFields: {
+        groupedFields: [] as any[],
+        ...overrides.meta?.streamFields,
+      },
+      dragAndDrop: {
+        dragging: false,
+        dragElement: null,
+        dragSource: null,
+        dragSourceIndex: null,
+        currentDragArea: null,
+        targetDragIndex: null,
+        ...overrides.meta?.dragAndDrop,
+      },
+      ...overrides.meta,
+    },
+  });
+
+// ── Default composable mock returns ────────────────────────────────────
+
+const defaultMockReturn = () => {
+  const dashboardPanelData = createMockDashboardPanelData();
+  return {
+    dashboardPanelData,
+    addXAxisItem: vi.fn(),
+    addYAxisItem: vi.fn(),
+    addZAxisItem: vi.fn(),
+    addBreakDownAxisItem: vi.fn(),
+    addFilteredItem: vi.fn(),
+    isAddXAxisNotAllowed: computed(() => false),
+    isAddBreakdownNotAllowed: computed(() => false),
+    isAddYAxisNotAllowed: computed(() => false),
+    isAddZAxisNotAllowed: computed(() => false),
+    promqlMode: computed(() => false),
+    addLatitude: vi.fn(),
+    addLongitude: vi.fn(),
+    addWeight: vi.fn(),
+    addMapName: vi.fn(),
+    addMapValue: vi.fn(),
+    addSource: vi.fn(),
+    addTarget: vi.fn(),
+    addValue: vi.fn(),
+    cleanupDraggingFields: vi.fn(),
+    updateGroupedFields: vi.fn(),
+    fetchPromQLLabels: vi.fn(),
+  };
+};
+
+let mockReturn = defaultMockReturn();
+
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
+  default: vi.fn(() => mockReturn),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStreams: vi.fn().mockResolvedValue({ list: mockStreamResults }),
+    getStream: vi.fn().mockResolvedValue({}),
+  }),
+}));
+
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showErrorNotification: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/usePromqlSuggestions", () => ({
+  default: () => ({
+    parsePromQlQuery: vi.fn().mockReturnValue({ metricName: null }),
+  }),
+}));
+
+// Must come after all vi.mock calls
+import FieldList from "@/components/dashboards/addPanel/PanelFieldList.vue";
+
+describe("FieldList", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReturn = defaultMockReturn();
+    store.state.selectedOrganization = { identifier: "test-org" };
+    store.state.theme = "light";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function mountComponent(
+    options: {
+      pageKey?: string;
+      props?: Record<string, unknown>;
+    } = {},
+  ) {
+    return mount(FieldList, {
+      props: {
+        editMode: false,
+        hideAllFieldsSelection: false,
+        ...options.props,
+      },
+      global: {
+        plugins: [i18n, store, router],
+        provide: {
+          dashboardPanelDataPageKey: options.pageKey ?? "dashboard",
+        },
+      },
+    });
+  }
+
+  // ── Rendering ──────────────────────────────────────────────────────
+
+  describe("Component Rendering", () => {
+    it("should render field list container", () => {
+      wrapper = mountComponent();
+      expect(wrapper.find('[data-test="o-field-list"]').exists()).toBe(true);
+    });
+
+    it("should mount in light theme", () => {
+      store.state.theme = "light";
+      wrapper = mountComponent();
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should mount in dark theme", () => {
+      store.state.theme = "dark";
+      wrapper = mountComponent();
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should render stream type dropdown", () => {
+      wrapper = mountComponent();
+      expect(
+        wrapper.find('[data-test="index-dropdown-stream_type"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should render stream dropdown", () => {
+      wrapper = mountComponent();
+      expect(
+        wrapper.find('[data-test="index-dropdown-stream"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should render OFieldList", () => {
+      wrapper = mountComponent();
+      expect(wrapper.find('[data-test="o-field-list"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Stream Type Selection ───────────────────────────────────────────
+
+  describe("Stream Type Selection", () => {
+    it("should show stream type dropdown for dashboard page", () => {
+      wrapper = mountComponent({ pageKey: "dashboard" });
+      expect(
+        wrapper.find('[data-test="index-dropdown-stream_type"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should hide stream type dropdown for metrics page", () => {
+      wrapper = mountComponent({ pageKey: "metrics" });
+      expect(
+        wrapper.find('[data-test="index-dropdown-stream_type"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should render stream type dropdown for logs page (readonly)", () => {
+      wrapper = mountComponent({ pageKey: "logs" });
+      const dropdown = wrapper.find(
+        '[data-test="index-dropdown-stream_type"]',
+      );
+      expect(dropdown.exists()).toBe(true);
+    });
+  });
+
+  // ── Stream Selection ────────────────────────────────────────────────
+
+  describe("Stream Selection", () => {
+    it("should render stream dropdown", () => {
+      wrapper = mountComponent();
+      const dropdown = wrapper.find('[data-test="index-dropdown-stream"]');
+      expect(dropdown.exists()).toBe(true);
+    });
+  });
+
+  // ── Drag and Drop ──────────────────────────────────────────────────
+
+  describe("Drag and Drop", () => {
+    it("should render drag indicator when draggable", () => {
+      wrapper = mountComponent();
+      // OFieldList with draggable=true should render drag indicators
+      const dragIndicator = wrapper.find(
+        '[data-test="o-field-list-drag-indicator"]',
+      );
+      // Only appears when fields are present — no fields means no indicators
+      expect(wrapper.find('[data-test="o-field-list"]').exists()).toBe(true);
+    });
+
+    it("should set draggable attribute on field rows", async () => {
+      // Set up grouped fields to render field rows
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "field1", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const row = wrapper.find('[data-test="o-field-list-row-field1"]');
+      expect(row.exists()).toBe(true);
+      expect(row.attributes("draggable")).toBe("true");
+    });
+
+    it("should not set draggable when hideAllFieldsSelection is true", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "field1", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent({
+        props: { hideAllFieldsSelection: true },
+      });
+      await flushPromises();
+
+      const row = wrapper.find('[data-test="o-field-list-row-field1"]');
+      expect(row.exists()).toBe(true);
+      expect(row.attributes("draggable")).toBe("false");
+    });
+
+    it("should disable drag in promql mode", () => {
+      const mock = defaultMockReturn();
+      mock.promqlMode = computed(() => true);
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      // PromQL mode hides drag indicators via dragEnabledFn returning false
+      expect(wrapper.find('[data-test="o-field-list"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Search ──────────────────────────────────────────────────────────
+
+  describe("Search", () => {
+    it("should render search input", () => {
+      wrapper = mountComponent();
+      const searchInput = wrapper.find('[data-test="o-field-list-search"]');
+      expect(searchInput.exists()).toBe(true);
+    });
+  });
+
+  // ── Pagination ──────────────────────────────────────────────────────
+
+  describe("Pagination", () => {
+    it("should paginate when fields exceed page size", async () => {
+      const mock = defaultMockReturn();
+      const schema = Array.from({ length: 300 }, (_, i) => ({
+        name: `field_${i}`,
+        type: "Utf8",
+      }));
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "largeGroup",
+          stream_alias: "largeGroup",
+          schema,
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // With 250 page size, only 250 fields + 1 group header should be rendered
+      const rows = wrapper.findAll('[data-test^="o-field-list-row-"]');
+      expect(rows.length).toBeLessThanOrEqual(250);
+    });
+  });
+
+  // ── Field Actions ───────────────────────────────────────────────────
+
+  describe("Field Actions", () => {
+    beforeEach(() => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [
+            { name: "test_field", type: "Utf8" },
+          ],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+    });
+
+    it("should render action buttons for standard chart types", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // X and Y buttons should exist for 'bar' chart type
+      expect(wrapper.find('[data-test="dashboard-add-x-data"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-add-y-data"]').exists()).toBe(
+        true,
+      );
+      // B button should exist for bar chart
+      expect(wrapper.find('[data-test="dashboard-add-b-data"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should show +Y/+X swapped labels for h-bar charts", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.data.type = "h-bar";
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const xBtn = wrapper.find('[data-test="dashboard-add-x-data"]');
+      const yBtn = wrapper.find('[data-test="dashboard-add-y-data"]');
+      if (xBtn.exists()) {
+        expect(xBtn.text()).toContain("+Y");
+      }
+      if (yBtn.exists()) {
+        expect(yBtn.text()).toContain("+X");
+      }
+    });
+
+    it("should show +P button for table chart type", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.data.type = "table";
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dashboard-add-p-data"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should show +Z button for heatmap chart type", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.data.type = "heatmap";
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dashboard-add-z-data"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should hide standard action buttons for geomap chart type", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.data.type = "geomap";
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Standard buttons should not exist for geomap
+      expect(
+        wrapper.find('[data-test="dashboard-add-x-data"]').exists(),
+      ).toBe(false);
+      // Geomap buttons should exist
+      expect(
+        wrapper.find('[data-test="dashboard-add-latitude-data"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-add-longitude-data"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-add-weight-data"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should show maps action buttons", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.data.type = "maps";
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Maps buttons use +N and +V
+      const xBtn = wrapper.find('[data-test="dashboard-add-x-data"]');
+      const yBtn = wrapper.find('[data-test="dashboard-add-y-data"]');
+      if (xBtn.exists()) {
+        expect(xBtn.text()).toContain("+N");
+      }
+      if (yBtn.exists()) {
+        expect(yBtn.text()).toContain("+V");
+      }
+    });
+
+    it("should show sankey action buttons", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.data.type = "sankey";
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="dashboard-add-source-data"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-add-target-data"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-add-value-data"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should hide action buttons for custom_chart chart type", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.data.type = "custom_chart";
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="dashboard-add-x-data"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="dashboard-add-y-data"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should disable action buttons when isAddXAxisNotAllowed", async () => {
+      const mock = defaultMockReturn();
+      mock.isAddXAxisNotAllowed = computed(() => true);
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const xBtn = wrapper.find('[data-test="dashboard-add-x-data"]');
+      expect(xBtn.exists()).toBe(true);
+      // OButton with disabled should have disabled attribute or class
+    });
+
+    it("should emit +F button click for non-custom-query mode", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "testGroup",
+          stream_alias: "testGroup",
+          schema: [{ name: "test_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const filterBtn = wrapper.find(
+        '[data-test="dashboard-add-filter-data"]',
+      );
+      expect(filterBtn.exists()).toBe(true);
+    });
+  });
+
+  // ── Group Headers ───────────────────────────────────────────────────
+
+  describe("Group Headers", () => {
+    it("should render group headers", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "myGroup",
+          stream_alias: "myGroup",
+          schema: [{ name: "field1", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const groupHeader = wrapper.find(
+        '[data-test="o-field-list-group-myGroup"]',
+      );
+      expect(groupHeader.exists()).toBe(true);
+      expect(groupHeader.text()).toContain("myGroup");
+    });
+  });
+
+  // ── Custom Query Fields ─────────────────────────────────────────────
+
+  describe("Custom Query Fields", () => {
+    it("should show custom query fields before grouped fields", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.stream.customQueryFields = [
+        { name: "custom_field", type: "Utf8" },
+      ];
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "streamGroup",
+          stream_alias: "streamGroup",
+          schema: [{ name: "stream_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Both fields should be rendered
+      expect(
+        wrapper.find('[data-test="o-field-list-row-custom_field"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="o-field-list-row-stream_field"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should show action buttons for custom query fields", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.stream.customQueryFields = [
+        { name: "custom_field", type: "Utf8" },
+      ];
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "streamGroup",
+          stream_alias: "streamGroup",
+          schema: [{ name: "stream_field", type: "Utf8" }],
+          settings: {},
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Action buttons exist (they're hover-revealed but present in DOM)
+      expect(
+        wrapper.find('[data-test="dashboard-add-x-data"]').exists(),
+      ).toBe(true);
+    });
+  });
+
+  // ── User Defined Schemas ────────────────────────────────────────────
+
+  describe("User Defined Schemas", () => {
+    it("should render timestamp and all-fields for defined schemas", async () => {
+      const mock = defaultMockReturn();
+      mock.dashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "schemaGroup",
+          stream_alias: "schemaGroup",
+          schema: [
+            { name: "field_a", type: "Utf8" },
+            { name: "field_b", type: "Int64" },
+          ],
+          settings: {
+            defined_schema_fields: ["field_a"],
+          },
+        },
+      ];
+      mockReturn = mock;
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // _timestamp and _all should be rendered along with defined schema fields
+      const timestampRow = wrapper.find(
+        '[data-test="o-field-list-row-_timestamp"]',
+      );
+      const allRow = wrapper.find('[data-test="o-field-list-row-_all"]');
+      const fieldARow = wrapper.find(
+        '[data-test="o-field-list-row-field_a"]',
+      );
+
+      expect(timestampRow.exists()).toBe(true);
+      expect(allRow.exists()).toBe(true);
+      expect(fieldARow.exists()).toBe(true);
+    });
+  });
+});

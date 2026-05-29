@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import SlackIcon from '@/components/icons/SlackIcon.vue';
-import { Quasar } from 'quasar';
+
 
 describe('SlackIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +10,7 @@ describe('SlackIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(SlackIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(SlackIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

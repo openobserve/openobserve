@@ -1,38 +1,33 @@
 ﻿<template>
-  <div>
-    <OButton
-      :style="{
-        width: changeStyle ? '170px' : '180px',
-        height: changeStyle ? '40px' : '',
-      }"
-      data-test="date-time-btn"
-      variant="outline"
-      class="date-time-button"
-      :class="changeStyle ? computedClass : ''"
-      :disabled="isFirstEntry"
-      @click="picker.showMenu = !picker.showMenu"
-    >
-      <template v-if="!changeStyle" #icon-left>
-        <q-icon name="schedule" />
-      </template>
-      {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
-      <template #icon-right>
-        <q-icon name="arrow_drop_down" />
-      </template>
-    </OButton>
-    <q-menu
-      v-if="picker.showMenu"
-      class="date-time-dialog"
-      anchor="bottom left"
-      self="top left"
-      no-route-dismiss
-    >
+  <ODropdown v-model:open="picker.showMenu" side="bottom" :align="props.align">
+    <template #trigger>
+      <OButton
+        :style="{
+          width: changeStyle ? '170px' : '180px',
+          height: changeStyle ? '40px' : '',
+        }"
+        data-test="date-time-btn"
+        variant="outline"
+        class="date-time-button"
+        :class="changeStyle ? computedClass : ''"
+        :disabled="isFirstEntry"
+      >
+        <template v-if="!changeStyle" #icon-left>
+          <OIcon name="schedule" size="sm" />
+        </template>
+        {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
+        <template #icon-right>
+          <OIcon name="arrow-drop-down" size="sm" />
+        </template>
+      </OButton>
+    </template>
+    <div class="date-time-dialog">
       <div class="tw:flex tw:justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">
-            <div class="date-time-table relative column">
+            <div class="date-time-table tw:relative tw:flex tw:flex-col">
               <div
-                class="relative-row q-px-md q-py-sm"
+                class="relative-row tw:px-3 tw:py-2"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
@@ -54,32 +49,26 @@
                   >
                 </div>
               </div>
-              <div class="relative-row q-px-md q-py-sm">
+              <div class="relative-row tw:px-3 tw:py-2">
                 <div class="relative-period-name">Custom</div>
-                <div class="row q-gutter-sm">
-                  <div class="col">
-                    <q-input
+                <div class="tw:flex tw:gap-2">
+                  <div class="tw:flex tw:flex-col tw:w-20">
+                    <OInput
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"
-                      dense
-                      filled
-                      min="1"
+                      :min="1"
                     />
                   </div>
-                  <div class="col">
-                    <q-select
+                  <div class="tw:flex tw:flex-col">
+                    <OSelect
                       v-model="picker.data.selectedDate.relative.period"
                       :options="relativePeriodsSelect"
-                      dense
-                      filled
-                      emit-value
-                      style="width: 100px"
                       @update:model-value="updateCustomPeriod"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel() }}</div>
                       </template>
-                    </q-select>
+                    </OSelect>
                   </div>
                 </div>
               </div>
@@ -87,14 +76,19 @@
           </OTabPanel>
         </OTabPanels>
       </div>
-    </q-menu>
-  </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script setup>
+// Copyright 2026 OpenObserve Inc.
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { ref, reactive, watch, computed } from "vue";
 import { useStore } from "vuex";
 
@@ -106,6 +100,12 @@ const props = defineProps({
     default: false,
     required: false,
     type: Boolean,
+  },
+  align: {
+    default: "end",
+    required: false,
+    type: String,
+    validator: (v) => ["start", "center", "end"].includes(v),
   },
 });
 
@@ -262,10 +262,10 @@ const computedClass = computed(() => {
   min-width: auto;
   background: rgba(89, 96, 178, 0.2) !important;
 
-  .q-icon.on-right {
+  .OIcon.on-right {
     transition: transform 0.25s ease;
   }
-  &.isOpen .q-icon.on-right {
+  &.isOpen .OIcon.on-right {
     transform: rotate(180deg);
   }
 
@@ -450,11 +450,6 @@ const computedClass = computed(() => {
       margin-right: 1rem;
       color: $dark-page;
     }
-  }
-}
-.timezone-select {
-  .q-item:nth-child(2) {
-    border-bottom: 1px solid #dcdcdc;
   }
 }
 .dashboard-add-btn {

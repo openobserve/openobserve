@@ -90,7 +90,7 @@ export async function deleteDashboard(page, dashboardName) {
 
   // Wait for the confirm button to be visible (q-dialog teleports content to body; text element
   // may be in DOM but hidden during animation — confirm button visibility is more reliable)
-  await page.locator('[data-test="confirm-button"]').waitFor({
+  await page.locator('[data-test="o-dialog-primary-btn"]').waitFor({
     state: 'visible',
     timeout: 10000
   });
@@ -98,11 +98,11 @@ export async function deleteDashboard(page, dashboardName) {
   // Wait for button to be truly stable using waitForFunction
   await page.waitForFunction(
     () => {
-      const dialog = document.querySelector('[data-test="dialog-box"]');
+      const dialog = document.querySelector('[data-test="dashboard-confirm-dialog"]');
       if (!dialog) return false;
 
       // Find the confirm button with data-test attribute inside dialog
-      const button = dialog.querySelector('[data-test="confirm-button"]');
+      const button = dialog.querySelector('[data-test="o-dialog-primary-btn"]');
       if (!button) return false;
 
       // Check if button is stable (has computed style and is not animating)
@@ -158,8 +158,8 @@ export async function deleteDashboard(page, dashboardName) {
 
   // Click the button using evaluate to avoid detachment issues
   await page.evaluate(() => {
-    const dialog = document.querySelector('[data-test="dialog-box"]');
-    const button = dialog?.querySelector('[data-test="confirm-button"]');
+    const dialog = document.querySelector('[data-test="dashboard-confirm-dialog"]');
+    const button = dialog?.querySelector('[data-test="o-dialog-primary-btn"]');
     if (button) {
       button.click();
     }

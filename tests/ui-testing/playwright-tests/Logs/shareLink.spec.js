@@ -134,12 +134,8 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     // Step 2: Enable SQL mode
-    const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
-    const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-    if (isChecked !== 'true') {
-      await sqlModeToggle.click();
-      await page.waitForTimeout(1000);
-    }
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(1000);
 
     // Step 3: Click refresh
     await pm.logsPage.clickRefresh();
@@ -351,12 +347,8 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     // Step 2: Enable SQL mode
-    const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
-    const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-    if (isChecked !== 'true') {
-      await sqlModeToggle.click();
-      await page.waitForTimeout(1000);
-    }
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(1000);
 
     // Step 3: Enter a SQL query
     const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');

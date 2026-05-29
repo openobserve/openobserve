@@ -39,10 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             data-test="alert-status-indicator"
           >
-            <q-icon
-              :name="evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
+            <OIcon
+              :name="evaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" size="sm"
               class="tw:text-xs tw:flex-shrink-0"
-              :class="evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'"
+              :class="evaluationStatus.wouldTrigger ? 'tw:text-green-500' : 'tw:text-gray-400'"
             />
             <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="togglePreview"
           class="expand-toggle-btn"
         >
-          <q-icon :name="expandState.preview ? 'expand_less' : 'expand_more'" />
+          <OIcon :name="expandState.preview ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
       <div v-show="expandState.preview" class="section-content">
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="toggleSummary"
           class="expand-toggle-btn"
         >
-          <q-icon :name="expandState.summary ? 'expand_less' : 'expand_more'" />
+          <OIcon :name="expandState.summary ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
       <div v-show="expandState.summary" class="summary-section-content">
@@ -120,13 +120,15 @@ import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "AlertWizardRightColumn",
   components: {
     PreviewAlert,
     AlertSummary,
     OButton,
-  },
+    OIcon,
+},
   props: {
     formData: {
       type: Object as PropType<any>,

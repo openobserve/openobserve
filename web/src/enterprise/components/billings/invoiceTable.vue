@@ -15,228 +15,149 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-table
-    ref="qTable"
-    :rows="invoiceHistory"
+  <OTable
+    :data="invoiceHistory"
     :columns="columns"
     row-key="id"
-    :pagination="pagination"
-    :style="invoiceHistory.length > 0
-        ? 'width: 100%; height: calc(100vh - 150px); overflow-y: auto;'
-        : 'width: 100%'"
-     class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+    pagination="client"
+    :page-size="20"
+    :page-size-options="[5, 10, 20, 50, 100]"
+    sorting="client"
+    filter-mode="client"
+    :default-columns="false"
+    :show-global-filter="false"
+    class="tw:h-full tw:w-full"
   >
-    <template #no-data><NoData /></template>
-    <template #body-cell-actions="props">
-      <q-td :props="props">
-        <OButton
-          as="a"
-          :href="props.row.pdf"
-          target="_blank"
-          :title="t('billing.downloadInvoice')"
-          variant="ghost"
-          size="icon-sm"
-          class="q-ml-xs"
-        >
-          <Download class="tw:size-4" />
-        </OButton>
-      </q-td>
+    <template #empty>
+      <NoData />
     </template>
-            <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-    <template #bottom="scope">
-      <QTablePagination
-        :scope="scope"
-        :resultTotal="resultTotal"
-        :perPageOptions="perPageOptions"
-        position="bottom"
-        @update:changeRecordPerPage="changePagination"
-        @update:maxRecordToReturn="changeMaxRecordToReturn"
-      />
+    <template #cell-actions="{ row }">
+      <OButton
+        as="a"
+        :href="row.pdf"
+        target="_blank"
+        :title="t('billing.downloadInvoice')"
+        variant="ghost"
+        size="icon-sm"
+        class="tw:ml-1"
+      >
+        <OIcon name="download" size="sm" />
+      </OButton>
     </template>
-  </q-table>
+  </OTable>
 </template>
 
-<script lang="ts">
-// @ts-nocheck
-import { computed, defineComponent, onMounted, ref } from "vue";
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar, date } from "quasar";
 import NoData from "@/components/shared/grid/NoData.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import BillingService from "@/services/billings";
-import { getImageURL } from "@/utils/zincutils";
-import OButton from '@/lib/core/Button/OButton.vue';
-import { Download } from 'lucide-vue-next';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
-export default defineComponent({
-  name: "InvoiceHistory",
-  components: {
-    NoData,
-    QTablePagination,
-    OButton,
-    Download,
+const { t } = useI18n();
+const store = useStore();
+
+const columns: OTableColumnDef[] = [
+  {
+    id: "id",
+    header: "#",
+    accessorKey: "id",
+    sortable: true,
+    meta: { align: "left" },
   },
-  props: [],
-  setup(props) {
-    const { t } = useI18n();
-    const $q = useQuasar();
-    const store = useStore();
-    const qTable: any = ref(null);
-    const columns = ref<QTableProps["columns"]>([
-      {
-        name: "id",
-        field: "id",
-        label: "#",
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "amount",
-        field: "amount",
-        label: t("billing.amount"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "paid",
-        field: "paid",
-        label: t("billing.amountPaid"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "start_date",
-        field: "start_date",
-        label: t("billing.invoiceStartDate"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "end_date",
-        field: "end_date",
-        label: t("billing.invoiceEndDate"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "status",
-        field: "status",
-        label: t("billing.status"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("billing.action"),
-        align: "center",
-        classes:"actions-column"
-      },
-    ]);
-    const resultTotal = ref<number>(0);
-    const invoiceHistory = ref([]);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-    // const selectedPerPage = ref<number>(20);
-   const perPageOptions = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 }
+  {
+    id: "amount",
+    header: t("billing.amount"),
+    accessorKey: "amount",
+    sortable: true,
+    meta: { align: "left" },
+  },
+  {
+    id: "paid",
+    header: t("billing.amountPaid"),
+    accessorKey: "paid",
+    sortable: true,
+    meta: { align: "left" },
+  },
+  {
+    id: "start_date",
+    header: t("billing.invoiceStartDate"),
+    accessorKey: "start_date",
+    sortable: true,
+    meta: { align: "left" },
+  },
+  {
+    id: "end_date",
+    header: t("billing.invoiceEndDate"),
+    accessorKey: "end_date",
+    sortable: true,
+    meta: { align: "left" },
+  },
+  {
+    id: "status",
+    header: t("billing.status"),
+    accessorKey: "status",
+    sortable: true,
+    meta: { align: "left" },
+  },
+  {
+    id: "actions",
+    header: t("billing.action"),
+    isAction: true,
+    pinned: "right",
+    meta: { align: "center" },
+  },
 ];
 
-    onMounted(() => {
-      getInvoiceHistory();
-    });
+const invoiceHistory = ref([]);
 
-    const getInvoiceHistory = () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait while loading invoice history...",
-      });
+const getInvoiceHistory = () => {
+  const dismiss = toast({
+    variant: "loading",
+    message: "Please wait while loading invoice history...",
+      timeout: 0,
+});
 
-      BillingService.list_invoice_history(
-        store.state.selectedOrganization.identifier
-      )
-        .then((res) => {
-          dismiss();
-          const invoiceList = res.data.invoices;
-          if (invoiceList.length > 0) {
-            resultTotal.value = invoiceList.length;
-            invoiceHistory.value = invoiceList.map((invoice, index) => {
-              return {
-                id: ++index,
-                start_date: invoice.period_start,
-                end_date: invoice.period_end,
-                paid: invoice.paid ? "Yes" : "No",
-                amount: invoice.total + " " + invoice.currency.toUpperCase(),
-                amount_paid: invoice.amount_paid,
-                amount_due: invoice.amount_due,
-                attempt_count: invoice.attempt_count,
-                status: invoice.statue,
-                pdf: invoice.invoice_pdf,
-                action: "Download",
-              };
-            });
-          }
-        })
-        .catch((e) => {
-          dismiss();
-          $q.notify({
-            type: "negative",
-            message: e.message,
-            timeout: 5000,
-          });
+  BillingService.list_invoice_history(
+    store.state.selectedOrganization.identifier
+  )
+    .then((res) => {
+      dismiss();
+      const invoiceList = res.data.invoices;
+      if (invoiceList.length > 0) {
+        invoiceHistory.value = invoiceList.map((invoice, index) => {
+          return {
+            id: ++index,
+            start_date: invoice.period_start,
+            end_date: invoice.period_end,
+            paid: invoice.paid ? "Yes" : "No",
+            amount: invoice.total + " " + invoice.currency.toUpperCase(),
+            amount_paid: invoice.amount_paid,
+            amount_due: invoice.amount_due,
+            attempt_count: invoice.attempt_count,
+            status: invoice.statue,
+            pdf: invoice.invoice_pdf,
+            action: "Download",
+          };
         });
-    };
+      }
+    })
+    .catch((e) => {
+      dismiss();
+      toast({
+        variant: "error",
+        message: e.message,
+        timeout: 5000,
+      });
+    });
+};
 
-    const changePagination = (val: { label: string; value: any }) => {
-      // selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-    const changeMaxRecordToReturn = (val: any) => {
-      // maxRecordToReturn.value = val;
-      // getOrganizations();
-    };
-
-    return {
-      t,
-      // $q,
-      store,
-      qTable,
-      columns,
-      resultTotal,
-      invoiceHistory,
-      pagination,
-      changePagination,
-      // selectedPerPage,
-      changeMaxRecordToReturn,
-      perPageOptions,
-      getInvoiceHistory,
-      getImageURL,
-    };
-  },
+onMounted(() => {
+  getInvoiceHistory();
 });
 </script>
-<style lang="scss" scoped>
-.download-icon {
-  cursor: pointer;
-}
-</style>

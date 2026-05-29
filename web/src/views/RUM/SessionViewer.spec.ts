@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createI18n } from 'vue-i18n';
-import { Quasar } from 'quasar';
 import SessionViewer from './SessionViewer.vue';
 
 describe('SessionViewer.vue', () => {
@@ -32,7 +31,7 @@ describe('SessionViewer.vue', () => {
   it('should render component', () => {
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, [Quasar, {}]],
+        plugins: [router, i18n, ],
         stubs: {
           QIcon: true,
           VideoPlayer: true,
@@ -47,7 +46,7 @@ describe('SessionViewer.vue', () => {
   it('should display session details', () => {
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, [Quasar, {}]],
+        plugins: [router, i18n, ],
         stubs: {
           QIcon: true,
           VideoPlayer: true,
@@ -65,7 +64,7 @@ describe('SessionViewer.vue', () => {
   it('should display Unknown User when user_email is not available', () => {
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, [Quasar, {}]],
+        plugins: [router, i18n, ],
         stubs: {
           QIcon: true,
           VideoPlayer: true,
@@ -84,7 +83,7 @@ describe('SessionViewer.vue', () => {
 
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, [Quasar, {}]],
+        plugins: [router, i18n, ],
         stubs: {
           QIcon: true,
           VideoPlayer: true,
@@ -103,9 +102,10 @@ describe('SessionViewer.vue', () => {
   it('should display browser and os information', () => {
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, [Quasar, {}]],
+        plugins: [router, i18n],
         stubs: {
           QIcon: true,
+          OIcon: true,
           VideoPlayer: true,
           PlayerEventsSidebar: true,
           QSeparator: true,
@@ -113,16 +113,17 @@ describe('SessionViewer.vue', () => {
       },
     });
 
-    // Component renders the structure for browser/os display
+    // Component renders OIcon with name="settings" for browser/os display
     expect(wrapper.find('[name="settings"]').exists()).toBe(true);
   });
 
   it('should display location information', () => {
     const wrapper = mount(SessionViewer, {
       global: {
-        plugins: [router, i18n, [Quasar, {}]],
+        plugins: [router, i18n],
         stubs: {
           QIcon: true,
+          OIcon: true,
           VideoPlayer: true,
           PlayerEventsSidebar: true,
           QSeparator: true,
@@ -130,15 +131,15 @@ describe('SessionViewer.vue', () => {
       },
     });
 
-    // Component renders the structure for location display
-    expect(wrapper.find('[name="location_on"]').exists()).toBe(true);
+    // Component renders OIcon with name="location-on" for location display
+    expect(wrapper.find('[name="location-on"]').exists()).toBe(true);
   });
 
   describe('Frustration Signals', () => {
     it('should display frustration summary when events have frustrations', async () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,
@@ -173,7 +174,7 @@ describe('SessionViewer.vue', () => {
     it('should not display frustration summary when no frustrations', async () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,
@@ -201,7 +202,7 @@ describe('SessionViewer.vue', () => {
     it('should calculate correct frustration count', async () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,
@@ -225,7 +226,7 @@ describe('SessionViewer.vue', () => {
     it('should display singular "Frustration" for count of 1', async () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,
@@ -248,7 +249,7 @@ describe('SessionViewer.vue', () => {
     it('should display plural "Frustrations" for count > 1', async () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,
@@ -272,7 +273,7 @@ describe('SessionViewer.vue', () => {
     it('should handle action events with JSON string frustration types', () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,
@@ -298,7 +299,7 @@ describe('SessionViewer.vue', () => {
     it('should handle single frustration type string', () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,
@@ -324,7 +325,7 @@ describe('SessionViewer.vue', () => {
     it('should handle malformed JSON gracefully', () => {
       const wrapper = mount(SessionViewer, {
         global: {
-          plugins: [router, i18n, [Quasar, {}]],
+          plugins: [router, i18n, ],
           stubs: {
             QIcon: true,
             VideoPlayer: true,

@@ -17,26 +17,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="aws-integration-grid">
     <div class="tw:mb-4">
-      <q-input
+      <OInput
         v-model="searchQuery"
         placeholder="Search AWS services..."
-        dense
-        outlined
         clearable
         class="tw:max-w-md"
         data-test="aws-integration-search"
       >
-        <template #prepend>
-          <q-icon name="search" />
+        <template #icon-left>
+          <OIcon name="search" size="sm" />
         </template>
-      </q-input>
+      </OInput>
     </div>
 
     <div class="tw:mb-6">
       <OTabs
         v-model="activeCategory"
         dense
-        class="text-grey-7"
+        class="tw:text-gray-400"
         data-test="aws-integration-category-tabs"
       >
         <OTab name="all" label="All Services" />
@@ -51,15 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="filteredIntegrations.length === 0"
       class="tw:text-center tw:py-12 empty-state"
     >
-      <q-icon name="search_off" size="3rem" class="tw:mb-2" />
+      <OIcon name="search-off" class="tw:mb-2" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
-    <div class="row q-col-gutter-md" v-else>
+    <div class="tw:grid tw:grid-cols-1 tw:gap-4 sm:tw:grid-cols-2 lg:tw:grid-cols-4" v-else>
       <div
         v-for="integration in filteredIntegrations"
         :key="integration.id"
-        class="col-12 col-sm-6 col-md-4 col-lg-3"
       >
         <AWSIntegrationTile :integration="integration" />
       </div>
@@ -70,17 +67,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
 import { defineComponent, ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import AWSIntegrationTile from "./AWSIntegrationTile.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "AWSIntegrationGrid",
   components: {
     OTabs, OTab,
     AWSIntegrationTile,
-  },
+    OInput,
+    OIcon,
+},
   props: {
     initialSearch: {
       type: String,

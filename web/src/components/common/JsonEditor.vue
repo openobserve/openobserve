@@ -1,97 +1,63 @@
 <template>
-  <q-card
-    class=" "
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  <div
+    class="tw:h-[calc(100vh-3.75rem)] tw:flex tw:min-h-0"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ title }}
-        </div>
-      </div>
-      <div class="tw:flex tw:items-center">
-        <div>
-          <OButton
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          variant="ghost"
-          size="icon-toolbar"
-          @click="toggleAIChat"
-          data-test="menu-link-ai-item"
-          class="ai-hover-btn"
-          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false"
-        >
-          <div class="row items-center no-wrap tw:gap-2">
-            <img  :src="getBtnLogo" class="header-icon ai-icon" />
-          </div>
-        </OButton>
-        </div>
-        <q-icon
-          v-close-popup
-          name="cancel"
-          class="cursor-pointer tw:mr-3 tw:ml-2"
-          size="20px"
-          data-test="json-editor-close"
+    <div class="common-json-editor tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:min-w-0">
+      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+        <query-editor
+          data-test="common-json-editor"
+          ref="queryEditorRef"
+          editor-id="common-json-editor"
+          class="monaco-editor tw:flex-1 tw:min-h-0"
+          :debounceTime="300"
+          v-model:query="jsonContent"
+          language="json"
+          @update:query="handleEditorChange"
         />
       </div>
-    </div>
-    <q-separator></q-separator>
-    <div class="tw:h-[calc(100vh-65px)] tw:flex">
-      <div class="row common-json-editor column tw:h-[calc(100vh-65px)]"
-      :class="store.state.isAiChatEnabled ? 'tw:w-[64.5vw]' : 'tw:w-[90vw]'"
+
+      <!-- Display validation errors -->
+      <div
+        v-if="validationErrors.length > 0"
+        class="tw:p-3 tw:text-red-500 validation-errors tw:shrink-0"
       >
-      <q-card-section class="col q-pa-none">
-      <query-editor
-        data-test="common-json-editor"
-        ref="queryEditorRef"
-        editor-id="common-json-editor"
-        class="monaco-editor"
-        :debounceTime="300"
-        v-model:query="jsonContent"
-        language="json"
-        @update:query="handleEditorChange"
-      />
-    </q-card-section>
+        <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
+        <ul class="tw:ml-3">
+          <li v-for="(error, index) in validationErrors" :key="index">
+            {{ error }}
+          </li>
+        </ul>
+      </div>
 
-    <!-- Display validation errors -->
-    <q-card-section
-      v-if="validationErrors.length > 0"
-      class="q-pa-md text-negative validation-errors"
+      <div class="tw:flex tw:justify-end tw:gap-2 tw:p-3 tw:shrink-0">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="$emit('close')"
+          data-test="json-editor-cancel"
+        >{{ t('common.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="saveChanges"
+          data-test="json-editor-save"
+        >{{ t('common.save') }}</OButton>
+      </div>
+    </div>
+    <!-- o2aichat enabled -->
+    <div
+      v-if="store.state.isAiChatEnabled"
+      class="tw:ml-2 tw:w-[25vw] tw:h-full"
+      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
-      <div class="text-bold q-mb-sm">Please fix the following issues:</div>
-      <ul class="q-ml-md">
-        <li v-for="(error, index) in validationErrors" :key="index">
-          {{ error }}
-        </li>
-      </ul>
-    </q-card-section>
-
-    <q-space></q-space>
-
-    <q-card-actions align="right" class="q-pa-md tw:gap-2">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        v-close-popup
-        data-test="json-editor-cancel"
-      >{{ t('common.cancel') }}</OButton>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        @click="saveChanges"
-        data-test="json-editor-save"
-      >{{ t('common.save') }}</OButton>
-    </q-card-actions>
+      <O2AIChat
+        class="tw:h-full"
+        :is-open="store.state.isAiChatEnabled"
+        @close="store.state.isAiChatEnabled = false"
+      />
     </div>
-    <!-- o2aichat enableddd -->
-
-    <div  class="q-ml-sm tw:w-[25vw] tw:h-[calc(100vh - 65px)]" v-if="store.state.isAiChatEnabled " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-            <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
-          </div>
-    </div>
-
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts">

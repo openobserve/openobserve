@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component" id="searchBarComponent">
-    <div class="row q-my-xs">
-      <div class="float-right col">
+    <div class="tw:flex tw:my-1">
+      <div class="float-right tw:flex tw:flex-col">
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
@@ -27,18 +27,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col-auto">
         <OButton
           v-if="searchObj.data.queryResults.hits"
-          class="q-mr-sm float-left download-logs-btn"
+          class="tw:mr-2 float-left download-logs-btn"
           variant="ghost"
           size="icon-sm"
+          icon-left="download"
           :disabled="!searchObj.data.queryResults.hits.length"
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-        >
-          <Download class="tw:size-4" />
-        </OButton>
+        />
         <div class="float-left">
           <date-time
             auto-apply
+            menu-align="end"
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="search-time q-pl-sm float-left">
+        <div class="search-time tw:pl-2 float-left">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -66,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="row" v-if="searchObj.meta.showQuery">
-      <div class="col">
+    <div class="tw:flex" v-if="searchObj.meta.showQuery">
+      <div class="tw:flex tw:flex-col">
         <query-editor
           ref="queryEditorRef"
           editor-id="rum-searchbar-query-editor"
@@ -94,7 +94,6 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
@@ -104,11 +103,12 @@ import {
 } from "@/utils/traces/filterUtils";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Download } from 'lucide-vue-next';
+
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -119,7 +119,6 @@ export default defineComponent({
     ),
     SyntaxGuide,
     OButton,
-    Download,
   },
   emits: ["searchdata", "date-change"],
   props: {
@@ -137,7 +136,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const { searchObj } = useTraces();
     const queryEditorRef = ref(null);
@@ -226,11 +224,9 @@ export default defineComponent({
             if (streamFound == false) {
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
+              toast({
                 message: "Stream not found",
-                color: "negative",
-                position: "top",
-                timeout: 2000,
+                variant: "warning",
               });
             }
           }
@@ -433,8 +429,7 @@ export default defineComponent({
         height: 0;
       }
 
-      &,
-      .q-list {
+      & {
         border-radius: 0.1875rem;
       }
     }
@@ -458,12 +453,7 @@ export default defineComponent({
     .q-btn__content {
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-
-      .q-icon {
-        font-size: 0.9375rem;
-        color: #ffffff;
-      }
-    }
+}
   }
 
   .download-logs-btn {

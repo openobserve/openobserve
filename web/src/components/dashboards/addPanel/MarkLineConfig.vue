@@ -24,41 +24,25 @@
         style="
           display: flex;
           justify-content: space-between;
-          margin-bottom: 5px;
+          padding-bottom: 12px;
+          margin-bottom: 12px;
           border-bottom: 1px solid gray;
         "
       >
-        <div style="width: 90%">
-          <q-select
+        <div style="width: 90%" class="tw:flex tw:flex-col tw:gap-2">
+          <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"
             :options="markLineTypeOptions"
-            input-debounce="0"
-            behavior="menu"
-            borderless
-            dense
-            style="width: 100%"
-            class="q-py-sm showLabelOnTop"
-            stack-label
-            emit-value
+            class="tw:w-full"
             :data-test="`dashboard-config-markline-type-${index}`"
-            hide-bottom-space
-          ></q-select>
-          <q-input
+          />
+          <OInput
             v-model="dashboardPanelData.data.config.mark_line[index].name"
             :label="t('dashboard.markLineLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
-            stack-label
-            dense
-            borderless
-            label-slot
-            style="width: 100%"
             :data-test="`dashboard-config-markline-name-${index}`"
-            hide-bottom-space
           />
-          <q-input
+          <OInput
             v-if="
               ['xAxis', 'yAxis'].includes(
                 dashboardPanelData.data.config.mark_line[index].type,
@@ -66,22 +50,13 @@
             "
             v-model="dashboardPanelData.data.config.mark_line[index].value"
             :label="t('dashboard.markLineValue')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
-            borderless
-            stack-label
-            dense
-            label-slot
-            style="width: 100%"
             :data-test="`dashboard-config-markline-value-${index}`"
-            hide-bottom-space
           />
         </div>
 
-        <q-icon
-          class="q-mr-xs"
-          size="15px"
+        <OIcon
+          class="tw:mr-1"
+          size="sm"
           name="close"
           style="cursor: pointer"
           @click="removeMarkLineByIndex(index)"
@@ -106,10 +81,15 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MarkLineConfig",
-  components: { OButton },
+  components: { OButton, OSelect, OInput,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const { t } = useI18n();

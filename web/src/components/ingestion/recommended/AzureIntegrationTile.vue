@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="azure-integration-tile" flat bordered>
-    <q-card-section class="tw:pb-2">
+  <OCard class="azure-integration-tile">
+    <OCardSection class="tw:pb-2">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
@@ -29,16 +29,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="docs-btn"
           :data-test="`azure-${integration.id}-docs-btn`"
         >
-          <q-icon name="description" />
-          <q-tooltip>View Documentation</q-tooltip>
+          <OIcon name="description" size="sm" />
+          <OTooltip content="View Documentation" />
         </OButton>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
         {{ integration.description }}
       </div>
-    </q-card-section>
+    </OCardSection>
 
-    <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
+    <OCardActions class="tw:pb-4">
       <!-- Deploy Button (ARM template) -->
       <OButton
         v-if="integration.armTemplate"
@@ -67,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleDocumentation()"
         :data-test="`azure-${integration.id}-docs-icon-btn`"
       >
-        <q-icon name="description" />
-        <q-tooltip>View Documentation</q-tooltip>
+        <OIcon name="description" size="sm" />
+        <OTooltip content="View Documentation" />
       </OButton>
       <!-- Dashboard Button -->
       <OButton
@@ -78,19 +78,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="!integration.hasDashboard"
         class="tw:flex-1"
         :data-test="`azure-${integration.id}-dashboard-btn`"
+        icon-left="dashboard"
       >
-        <template #icon-left><q-icon name="dashboard" /></template>
         Dashboard
       </OButton>
-    </q-card-actions>
-  </q-card>
+    </OCardActions>
+  </OCard>
 </template>
 
 <script lang="ts">
 import { defineComponent, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OCardActions from "@/lib/core/Card/OCardActions.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import type { AzureIntegration } from "@/utils/azureIntegrations";
 import {
@@ -99,10 +103,11 @@ import {
 } from "@/utils/azureIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AzureIntegrationTile",
-  components: { OButton },
+  components: { OButton, OIcon, OTooltip, OCard, OCardSection, OCardActions },
   props: {
     integration: {
       type: Object as PropType<AzureIntegration>,
@@ -111,7 +116,6 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
-    const q = useQuasar();
     const router = useRouter();
 
     let endpoint: any = null;
@@ -125,10 +129,9 @@ export default defineComponent({
       if (!props.integration.armTemplate) return;
 
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
-          timeout: 3000,
         });
         return;
       }
@@ -138,10 +141,9 @@ export default defineComponent({
       const passcode = store.state?.organizationData?.organizationPasscode;
 
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
-          timeout: 3000,
         });
         return;
       }
@@ -162,10 +164,9 @@ export default defineComponent({
         integration_id: props.integration.id,
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: `Opening Azure portal to deploy ${props.integration.displayName}`,
-        timeout: 3000,
       });
     };
 
@@ -197,10 +198,9 @@ export default defineComponent({
         router.push(`/dashboards?org_identifier=${organizationId}`);
       } catch (error) {
         console.error("Error navigating to dashboard:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error opening dashboard. Please try again.",
-          timeout: 3000,
         });
       }
     };
@@ -281,15 +281,6 @@ export default defineComponent({
   .tile-description {
     line-height: 1.5;
     min-height: 3em;
-  }
-
-  .q-card__section,
-  .q-card__actions {
-    flex-grow: 0;
-  }
-
-  .q-card__actions {
-    margin-top: auto;
   }
 
   .docs-btn {

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     "
   >
     <span
-      class="q-mr-xs tw:inline-block tw:w-[0.375rem] tw:h-[0.375rem] tw:rounded-full tw:shrink-0 o2-status-pill__dot"
+      class="tw:mr-1 tw:inline-block tw:w-[0.375rem] tw:h-[0.375rem] tw:rounded-full tw:shrink-0 o2-status-pill__dot"
     />
     <span
       class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:leading-[1.0625rem] tw:uppercase tw:font-bold"

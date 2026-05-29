@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import GeoMapRenderer from "./GeoMapRenderer.vue";
 
 // Mock Leaflet
@@ -155,6 +154,7 @@ Object.defineProperty(window, 'removeEventListener', {
   value: removeEventListenerSpy,
 });
 
+
 describe("GeoMapRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -185,7 +185,7 @@ describe("GeoMapRenderer", () => {
         ...props
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
       ...options
     });
@@ -251,7 +251,7 @@ describe("GeoMapRenderer", () => {
           data: { options: {} }
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
         },
       });
       await wrapper.vm.$nextTick();
@@ -518,14 +518,12 @@ describe("GeoMapRenderer", () => {
 
     it("should have correct wrapper div styling", () => {
       wrapper = createWrapper();
-      
-      const wrapperDivs = wrapper.findAll('div');
-      expect(wrapperDivs.length).toBeGreaterThan(0);
-      
-      const firstDiv = wrapperDivs[0];
-      expect(firstDiv.attributes('style')).toContain('padding: 5px');
-      expect(firstDiv.attributes('style')).toContain('height: 100%');
-      expect(firstDiv.attributes('style')).toContain('width: 100%');
+
+      const rootDiv = wrapper.find('[data-test="dashboard-geomap-renderer"]');
+      expect(rootDiv.exists()).toBe(true);
+      expect(rootDiv.attributes('style')).toContain('padding: 5px');
+      expect(rootDiv.attributes('style')).toContain('height: 100%');
+      expect(rootDiv.attributes('style')).toContain('width: 100%');
     });
   });
 

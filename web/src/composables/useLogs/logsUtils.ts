@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useQuasar } from "quasar";
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -35,6 +34,7 @@ import {
   TimePeriodUnit,
 } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface SQLColumn {
   expr?: {
@@ -89,7 +89,6 @@ export const removeFieldFromWhereAST = (
 export const logsUtils = () => {
   const { searchObj } = searchState();
   let parser: Parser | null = new Parser();
-  const q = useQuasar();
   const router = useRouter();
   const store = useStore();
   const timestampColumnName = store.state.zoConfig.timestamp_column;
@@ -562,11 +561,9 @@ export const logsUtils = () => {
   };
 
   const showCancelSearchNotification = () => {
-    q.notify({
+    toast({
+      variant: "info",
       message: "Running query cancelled successfully",
-      color: "positive",
-      position: "bottom",
-      timeout: 4000,
     });
   };
 
@@ -757,12 +754,14 @@ export const logsUtils = () => {
 
   // validate if timestamp column alias is used for any field
   const checkTimestampAlias = (query: string): boolean => {
+    const tsCol =
+      timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
     const parsedSQL = fnParsedSQL(query);
 
     const columns = parsedSQL?.columns;
     if (Array.isArray(columns)) {
       const invalid = columns.some(
-        (field: any) => field.as === timestampColumnName,
+        (field: any) => field.as === tsCol,
       );
       if (invalid) {
         return false;
@@ -770,7 +769,7 @@ export const logsUtils = () => {
     }
 
     // Escape special regex characters in timestamp column name
-    const escapedTimestamp = timestampColumnName.replace(
+    const escapedTimestamp = tsCol.replace(
       /[.*+?^${}()|[\]\\]/g,
       "\\$&",
     );

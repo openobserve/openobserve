@@ -1,10 +1,10 @@
 <template>
   <div class="cross-link-manager">
     <!-- Header -->
-    <div class="tw:flex tw:justify-between tw:items-center q-mb-md">
+    <div class="tw:flex tw:justify-between tw:items-center tw:mb-3">
       <div>
-        <div class="text-body1 text-bold">{{ title }}</div>
-        <div v-if="subtitle" class="text-caption" style="color: var(--o2-text-muted)">
+        <div class="tw:text-base tw:font-bold">{{ title }}</div>
+        <div v-if="subtitle" class="tw:text-xs" style="color: var(--o2-text-muted)">
           {{ subtitle }}
         </div>
       </div>
@@ -12,10 +12,10 @@
         v-if="!readonly"
         variant="outline"
         size="sm-action"
+        icon-left="add"
         @click="onAddClick"
         data-test="add-cross-link-btn"
       >
-        <Plus class="tw:size-4 tw:mr-1" />
         {{ t('crossLinks.addCrossLink') }}
       </OButton>
     </div>
@@ -25,35 +25,46 @@
       <div
         v-for="(link, idx) in links"
         :key="link.name"
-        class="cross-link-item el-border tw:rounded-md q-mb-xs q-pa-sm"
+        class="cross-link-item el-border tw:rounded-md tw:mb-1 tw:p-2"
         :data-test="`cross-link-item-${idx}`"
       >
         <div class="tw:flex tw:justify-between tw:items-start">
           <div class="tw:flex-1 tw:min-w-0">
             <!-- Name -->
-            <div class="text-subtitle2 text-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
+            <div
+              class="tw:text-sm tw:font-medium tw:font-bold tw:truncate"
+              :title="link.name"
+              style="color: var(--o2-text-primary)"
+              :data-test="`cross-link-item-name-${idx}`"
+            >
               {{ link.name }}
-              <q-badge
+              <OBadge
                 v-if="link._source"
-                :color="link._source === 'stream' ? 'primary' : 'grey'"
-                :label="link._source === 'stream' ? 'Stream' : 'Global'"
-                class="q-ml-xs"
-              />
+                :variant="link._source === 'stream' ? 'primary' : 'default'"
+                class="tw:ml-1"
+              >
+                {{ link._source === 'stream' ? 'Stream' : 'Global' }}
+              </OBadge>
             </div>
             <!-- URL -->
-            <div class="text-caption tw:truncate q-mt-xs" :title="link.url" style="color: var(--o2-text-muted)">
+            <div
+              class="tw:text-xs tw:truncate tw:mt-1"
+              :title="link.url"
+              style="color: var(--o2-text-muted)"
+              :data-test="`cross-link-item-url-${idx}`"
+            >
               {{ link.url }}
             </div>
             <!-- Fields -->
-            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 q-mt-xs">
-              <q-chip
+            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
+              <OBadge
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
-                dense
                 class="tw:max-w-[200px]"
+                :data-test="`cross-link-field-chip-${fIdx}`"
               >
-                <span class="tw:truncate text-caption" :title="field.name">{{ field.name }}</span>
-              </q-chip>
+                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
+              </OBadge>
             </div>
           </div>
           <!-- Actions -->
@@ -61,19 +72,17 @@
             <OButton
               variant="ghost"
               size="icon-sm"
+              icon-left="edit"
               @click="editLink(link)"
               :data-test="`cross-link-edit-${idx}`"
-            >
-              <Pencil class="tw:size-4" />
-            </OButton>
+            />
             <OButton
               variant="ghost-destructive"
               size="icon-sm"
-              @click="removeLink(link)"
+              icon-left="delete"
+              @click="removeLink(idx)"
               :data-test="`cross-link-delete-${idx}`"
-            >
-              <Trash2 class="tw:size-4" />
-            </OButton>
+            />
           </div>
         </div>
       </div>
@@ -82,7 +91,7 @@
     <!-- Empty State -->
     <div
       v-else
-      class="tw:text-center q-py-lg text-body2"
+      class="tw:text-center tw:py-4 tw:text-sm"
       style="color: var(--o2-text-muted)"
       data-test="cross-link-empty"
     >
@@ -106,7 +115,8 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Plus, Pencil, Trash2 } from 'lucide-vue-next';
+import OBadge from '@/lib/core/Badge/OBadge.vue';
+
 
 export interface CrossLink {
   name: string;
@@ -117,7 +127,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton, Plus, Pencil, Trash2 },
+  components: { CrossLinkDialog, OButton, OBadge },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,
@@ -166,8 +176,8 @@ export default defineComponent({
       showAddDialog.value = true;
     }
 
-    function removeLink(link: CrossLink) {
-      const updated = props.modelValue.filter((l) => l.name !== link.name);
+    function removeLink(idx: number) {
+      const updated = props.modelValue.filter((_, i) => i !== idx);
       emit("update:modelValue", updated);
       emit("change");
     }

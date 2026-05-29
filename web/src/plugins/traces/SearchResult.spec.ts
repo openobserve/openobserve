@@ -22,16 +22,10 @@ import {
   vi,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
-
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
-});
 
 const mockStore = createStore({
   state: {
@@ -190,7 +184,7 @@ describe("SearchResult", () => {
   it("should render the main container with correct data-test attribute", () => {
     const container = wrapper.find('[data-test="traces-search-result"]');
     expect(container.exists()).toBe(true);
-    expect(container.classes()).toContain("overflow-hidden");
+    expect(container.classes()).toContain("tw:overflow-hidden");
   });
 
   it("should render the search list container", () => {

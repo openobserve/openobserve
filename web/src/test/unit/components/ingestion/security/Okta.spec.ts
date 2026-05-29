@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import Okta from "@/components/ingestion/security/Okta.vue";
 
 // Mock useIngestion composable
@@ -36,6 +35,7 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
+
 describe("Okta.vue", () => {
   let store: any;
 
@@ -52,7 +52,7 @@ describe("Okta.vue", () => {
   const mountComponent = () => {
     return mount(Okta, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: {
           CopyContent: {
             template: '<div data-test="copy-content-stub">{{ content }}</div>',
@@ -108,7 +108,7 @@ describe("Okta.vue", () => {
     it("should apply padding class", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find(".q-pa-sm").exists()).toBe(true);
+      expect(wrapper.find(".tw\\:p-2").exists()).toBe(true);
     });
 
     it("should have link styling", () => {

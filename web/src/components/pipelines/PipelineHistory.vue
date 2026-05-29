@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,38 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="pipeline-history-page" class="q-pa-none flex">
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
+  <div
+    data-test="pipeline-history-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+  >
+    <div class="tw:shrink-0">
       <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw:h-[68px] tw:px-2 tw:py-3"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-2 tw:h-[68px]"
         >
-          <div class="flex items-center">
+          <div class="tw:flex tw:items-center">
             <OButton
               variant="ghost"
               size="icon-xs-sq"
               class="hideOnPrintMode"
               @click="goBack"
               data-test="alert-history-back-btn"
-            >
-              <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
-            </OButton>
+              icon-left="chevron-left"
+            />
             <div
-              class="q-table__title tw:font-[600] q-ml-sm tw:flex tw:items-center tw:gap-2"
+              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
-              <q-icon name="info" size="18px" color="grey-6">
-                <q-tooltip>
-                  History is only available for scheduled and manually triggered
-                  pipelines. Real-time pipelines do not generate history
-                  records.
-                </q-tooltip>
-              </q-icon>
+              <OIcon name="info" size="sm">
+                <OTooltip
+                  content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
+                  side="top"
+                />
+              </OIcon>
             </div>
           </div>
-          <div class="flex q-ml-auto items-center">
-            <div class="q-mr-sm">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+            <div class="tw:mr-2">
               <DateTime
                 ref="dateTimeRef"
                 auto-apply
@@ -60,57 +61,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @on:date-change="updateDateTime"
               />
             </div>
-            <q-select
+            <OSelect
               v-model="selectedPipeline"
-              dense
-              borderless
-              use-input
-              hide-selected
-              fill-input
-              input-debounce="0"
-              :options="filteredPipelineOptions"
-              option-label="label"
-              option-value="value"
-              @filter="filterPipelineOptions"
+              :options="allPipelines"
+              labelKey="label"
+              valueKey="value"
+              searchable
               @update:model-value="onPipelineSelected"
               :placeholder="
                 t(`pipeline.searchHistory`) || 'Select or search pipeline...'
               "
               data-test="pipeline-history-search-select"
-              class="o2-search-input q-mr-sm"
-              style="min-width: 250px"
+              class="tw:mr-2 tw:min-w-[250px]"
               clearable
-              @clear="clearSearch"
             >
-              <template v-slot:prepend>
-                <q-icon
-                  class="o2-search-input-icon"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-icon-dark'
-                      : 'o2-search-input-icon-light'
-                  "
-                  name="search"
-                />
+              <template #empty>
+                <span>No pipelines found</span>
               </template>
-              <template v-slot:no-option>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    No pipelines found
-                  </q-item-section>
-                </q-item>
-              </template>
-            </q-select>
+            </OSelect>
             <OButton
               variant="ghost"
               size="icon-xs-sq"
-              class="q-mr-sm"
+              class="tw:mr-2"
               @click="manualSearch"
               data-test="pipeline-history-manual-search-btn"
               :disabled="loading"
+              icon-left="search"
             >
-              <template #icon-left><Search class="tw:size-3.5 tw:shrink-0" /></template>
-              <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
+              <OTooltip :content="t('common.search') || 'Search'" side="top" />
             </OButton>
             <OButton
               variant="ghost"
@@ -118,520 +96,428 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshData"
               data-test="pipeline-history-refresh-btn"
               :loading="loading"
+              icon-left="refresh"
             >
-              <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-              <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
+              <OTooltip
+                :content="t('common.refresh') || 'Refresh'"
+                side="top"
+              />
             </OButton>
           </div>
         </div>
       </div>
     </div>
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
+    <div class="tw:flex-1 tw:min-h-0">
       <div
-        class="pipeline-history-table card-container tw:h-[calc(100vh-127px)]"
+        data-test="pipeline-history-table"
+        class="pipeline-history-table card-container tw:h-full"
       >
-        <q-table
-          data-test="pipeline-history-table"
-          ref="qTable"
-          :rows="rows"
+        <OTable
+          :data="rows"
           :columns="columns"
           row-key="id"
-          v-model:pagination="pagination"
-          :rows-per-page-options="rowsPerPageOptions"
-          @request="onRequest"
+          width="100%"
+          class="tw:w-full tw:h-full"
+          pagination="server"
+          :current-page="pagination.page"
+          :page-size="pagination.rowsPerPage"
+          :total-count="pagination.rowsNumber"
+          :page-size-options="pageSizeOptions"
+          sorting="server"
+          :sort-by="pagination.sortBy"
+          :sort-order="pagination.descending ? 'desc' : 'asc'"
           :loading="loading"
-          binary-state-sort
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 127px)"
+          :show-global-filter="false"
+          dense
+          bordered
+          sticky-header
+          @pagination-change="onPaginationChange"
+          @sort-change="onSortChange"
         >
-          <template #no-data>
-            <div class="tw:h-[calc(100vh-136px)] full-width">
-              <no-data />
-            </div>
+          <template #cell-timestamp="{ row }">
+            {{ formatDate(row.timestamp) }}
           </template>
 
-          <template #body-cell-timestamp="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.timestamp) }}
-            </q-td>
+          <template #cell-start_time="{ row }">
+            {{ formatDate(row.start_time) }}
           </template>
 
-          <template #body-cell-start_time="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.start_time) }}
-            </q-td>
+          <template #cell-end_time="{ row }">
+            {{ formatDate(row.end_time) }}
           </template>
 
-          <template #body-cell-end_time="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.end_time) }}
-            </q-td>
-          </template>
-
-          <template #body-cell-status="props">
-            <q-td :props="props">
-              <q-chip
-                :color="getStatusColor(props.row.status)"
-                text-color="white"
-                size="0.8rem"
-                dense
-                outline
-              >
-                {{ props.row.status }}
-              </q-chip>
-            </q-td>
-          </template>
-
-          <template #body-cell-is_realtime="props">
-            <q-td :props="props">
-              <q-icon
-                :name="props.row.is_realtime ? 'check_circle' : 'schedule'"
-                :color="props.row.is_realtime ? 'positive' : 'grey'"
-                size="xs"
-              >
-                <q-tooltip>
-                  {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
-                </q-tooltip>
-              </q-icon>
-            </q-td>
-          </template>
-
-          <template #body-cell-is_silenced="props">
-            <q-td :props="props">
-              <q-icon
-                :name="props.row.is_silenced ? 'volume_off' : 'volume_up'"
-                :color="props.row.is_silenced ? 'grey' : 'positive'"
-                size="20px"
-              >
-                <q-tooltip>
-                  {{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}
-                </q-tooltip>
-              </q-icon>
-            </q-td>
-          </template>
-
-          <template #body-cell-duration="props">
-            <q-td :props="props">
-              {{ formatDuration(props.row.end_time - props.row.start_time) }}
-            </q-td>
-          </template>
-
-          <template #body-cell-is_partial="props">
-            <q-td :props="props">
-              <q-icon
-                v-if="
-                  props.row.is_partial !== null &&
-                  props.row.is_partial !== undefined
-                "
-                :name="props.row.is_partial ? 'warning' : 'check_circle'"
-                :color="props.row.is_partial ? 'warning' : 'positive'"
-                size="xs"
-              >
-                <q-tooltip>
-                  {{
-                    props.row.is_partial
-                      ? "Partial Results"
-                      : "Complete Results"
-                  }}
-                </q-tooltip>
-              </q-icon>
-              <span v-else>-</span>
-            </q-td>
-          </template>
-
-          <template #body-cell-delay_in_secs="props">
-            <q-td :props="props">
-              {{
-                props.row.delay_in_secs !== null &&
-                props.row.delay_in_secs !== undefined
-                  ? props.row.delay_in_secs + "s"
-                  : "-"
-              }}
-            </q-td>
-          </template>
-
-          <template #body-cell-evaluation_took_in_secs="props">
-            <q-td :props="props">
-              {{
-                props.row.evaluation_took_in_secs !== null &&
-                props.row.evaluation_took_in_secs !== undefined
-                  ? props.row.evaluation_took_in_secs.toFixed(2) + "s"
-                  : "-"
-              }}
-            </q-td>
-          </template>
-
-          <template #body-cell-query_took="props">
-            <q-td :props="props">
-              {{
-                props.row.query_took !== null &&
-                props.row.query_took !== undefined
-                  ? (props.row.query_took / 1000).toFixed(2) + "ms"
-                  : "-"
-              }}
-            </q-td>
-          </template>
-
-          <template #bottom="scope">
-            <div
-              class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center"
+          <template #cell-status="{ row }">
+            <OBadge
+              :variant="getStatusVariant(row.status)"
+              size="sm"
+              data-test="pipeline-history-status-badge"
+              :data-test-status="(row.status || '').toLowerCase()"
             >
-              <div
-                class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md"
-              >
-                {{ pagination.rowsNumber }} {{ t("pipeline.header") }}
-              </div>
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="pagination.rowsNumber"
-                :perPageOptions="rowsPerPageOptions"
-                @update:changeRecordPerPage="changePagination"
+              {{ row.status }}
+            </OBadge>
+          </template>
+
+          <template #cell-is_realtime="{ row }">
+            <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
+              <OIcon
+                :name="row.is_realtime ? 'check-circle' : 'schedule'"
+                :class="row.is_realtime ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
+                size="md"
               />
+            </OTooltip>
+          </template>
+
+          <template #cell-is_silenced="{ row }">
+            <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
+              <OIcon
+                :name="row.is_silenced ? 'volume-off' : 'volume-up'"
+                :class="row.is_silenced ? 'tw:text-gray-500' : 'tw:text-[var(--o2-positive)]'"
+                size="md"
+              />
+            </OTooltip>
+          </template>
+
+          <template #cell-duration="{ row }">
+            {{ formatDuration(row.end_time - row.start_time) }}
+          </template>
+
+          <template #cell-is_partial="{ row }">
+            <OIcon
+              v-if="
+                row.is_partial !== null &&
+                row.is_partial !== undefined
+              "
+              :name="row.is_partial ? 'warning' : 'check-circle'"
+              :class="row.is_partial ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-positive)]'"
+              size="xs"
+            >
+              <OTooltip
+                :content="
+                  row.is_partial
+                    ? 'Partial Results'
+                    : 'Complete Results'
+                "
+              />
+            </OIcon>
+            <span v-else>-</span>
+          </template>
+
+          <template #cell-delay_in_secs="{ row }">
+            {{
+              row.delay_in_secs !== null &&
+              row.delay_in_secs !== undefined
+                ? row.delay_in_secs + "s"
+                : "-"
+            }}
+          </template>
+
+          <template #cell-evaluation_took_in_secs="{ row }">
+            {{
+              row.evaluation_took_in_secs !== null &&
+              row.evaluation_took_in_secs !== undefined
+                ? row.evaluation_took_in_secs.toFixed(2) + "s"
+                : "-"
+            }}
+          </template>
+
+          <template #cell-query_took="{ row }">
+            {{
+              row.query_took !== null &&
+              row.query_took !== undefined
+                ? (row.query_took / 1000).toFixed(2) + "ms"
+                : "-"
+            }}
+          </template>
+
+          <template #empty>
+            <no-data />
+          </template>
+
+          <template #bottom="{ totalRows }">
+            <div
+              class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
+            >
+              {{ totalRows }} {{ t("pipeline.header") }}
             </div>
           </template>
-        </q-table>
+        </OTable>
       </div>
     </div>
 
     <!-- Details Dialog -->
-    <q-dialog v-model="detailsDialog" position="standard">
-      <q-card
-        style="width: 700px; max-width: 80vw; max-height: 90vh"
-        class="pipeline-details-dialog"
-      >
-        <q-card-section class="row items-center q-pb-xs bg-primary text-white">
-          <div class="text-h6">Pipeline Execution Details</div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section
-          class="scroll"
-          style="max-height: 70vh"
-          v-if="selectedRow"
-        >
-          <div class="q-gutter-sm">
-            <!-- Basic Information -->
-            <div class="detail-section">
-              <div class="row q-col-gutter-md">
-                <div class="col-6">
-                  <div class="text-caption text-grey-7 q-mb-xs">
-                    Pipeline Name
-                  </div>
-                  <div class="text-body2 text-weight-medium">
-                    {{ selectedRow.pipeline_name }}
-                  </div>
+    <ODialog
+      data-test="pipeline-history-details-dialog"
+      v-model:open="detailsDialog"
+      size="lg"
+      title="Pipeline Execution Details"
+      primary-button-label="Close"
+      @click:primary="detailsDialog = false"
+    >
+      <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
+        <div class="tw:gap-2">
+          <!-- Basic Information -->
+          <div class="detail-section">
+            <div class="tw:flex tw:gap-3">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                  Pipeline Name
                 </div>
-                <div class="col-6">
-                  <div class="text-caption text-grey-7 q-mb-xs">Status</div>
-                  <q-chip
-                    :color="getStatusColor(selectedRow.status)"
-                    text-color="white"
-                    size="0.8rem"
-                    dense
-                    outline
-                  >
-                    {{ selectedRow.status }}
-                  </q-chip>
+                <div class="tw:text-sm text-weight-medium">
+                  {{ selectedRow.pipeline_name }}
                 </div>
+              </div>
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
+                <OBadge
+                  :variant="getStatusVariant(selectedRow.status)"
+                  size="sm"
+                >
+                  {{ selectedRow.status }}
+                </OBadge>
               </div>
             </div>
-
-            <q-separator class="q-my-sm" />
-
-            <!-- Time Information -->
-            <div class="detail-section">
-              <div class="row q-col-gutter-md">
-                <div class="col-6">
-                  <div class="text-caption text-grey-7 q-mb-xs">Timestamp</div>
-                  <div class="text-body2">
-                    {{ formatDate(selectedRow.timestamp) }}
-                  </div>
-                </div>
-                <div class="col-6">
-                  <div class="text-caption text-grey-7 q-mb-xs">Duration</div>
-                  <div class="text-body2">
-                    {{
-                      formatDuration(
-                        selectedRow.end_time - selectedRow.start_time,
-                      )
-                    }}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <q-separator class="q-my-sm" />
-
-            <!-- Pipeline Configuration -->
-            <div class="detail-section">
-              <div class="row q-col-gutter-md">
-                <div class="col-6">
-                  <div class="text-caption text-grey-7 q-mb-xs">Type</div>
-                  <div class="text-body2">
-                    <q-icon
-                      :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                      class="q-mr-xs"
-                      size="xs"
-                    />
-                    {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
-                  </div>
-                </div>
-                <div class="col-6">
-                  <div class="text-caption text-grey-7 q-mb-xs">Silenced</div>
-                  <div class="text-body2">
-                    <q-icon
-                      v-if="selectedRow.is_silenced"
-                      name="volume_off"
-                      color="warning"
-                      size="xs"
-                      class="q-mr-xs"
-                    />
-                    <q-icon
-                      v-else
-                      name="volume_up"
-                      color="positive"
-                      size="xs"
-                      class="q-mr-xs"
-                    />
-                    {{ selectedRow.is_silenced ? "Yes" : "No" }}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Performance Metrics (if available) -->
-            <template
-              v-if="
-                selectedRow.evaluation_took_in_secs ||
-                selectedRow.query_took ||
-                selectedRow.retries > 0 ||
-                selectedRow.delay_in_secs ||
-                (selectedRow.is_partial !== null &&
-                  selectedRow.is_partial !== undefined)
-              "
-            >
-              <q-separator class="q-my-sm" />
-              <div class="detail-section">
-                <div class="row q-col-gutter-md">
-                  <div v-if="selectedRow.evaluation_took_in_secs" class="col-4">
-                    <div class="text-caption text-grey-7 q-mb-xs">
-                      Evaluation Time
-                    </div>
-                    <div class="text-body2">
-                      {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
-                    </div>
-                  </div>
-                  <div v-if="selectedRow.query_took" class="col-4">
-                    <div class="text-caption text-grey-7 q-mb-xs">
-                      Query Time
-                    </div>
-                    <div class="text-body2">
-                      {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
-                    </div>
-                  </div>
-                  <div v-if="selectedRow.retries > 0" class="col-4">
-                    <div class="text-caption text-grey-7 q-mb-xs">Retries</div>
-                    <div class="text-body2">{{ selectedRow.retries }}</div>
-                  </div>
-                  <div v-if="selectedRow.delay_in_secs" class="col-4">
-                    <div class="text-caption text-grey-7 q-mb-xs">Delay</div>
-                    <div class="text-body2">
-                      {{ selectedRow.delay_in_secs }}s
-                    </div>
-                  </div>
-                  <div
-                    v-if="
-                      selectedRow.is_partial !== null &&
-                      selectedRow.is_partial !== undefined
-                    "
-                    class="col-4"
-                  >
-                    <div class="text-caption text-grey-7 q-mb-xs">
-                      Result Status
-                    </div>
-                    <div class="text-body2">
-                      <q-icon
-                        :name="
-                          selectedRow.is_partial ? 'warning' : 'check_circle'
-                        "
-                        :color="selectedRow.is_partial ? 'warning' : 'positive'"
-                        size="xs"
-                        class="q-mr-xs"
-                      />
-                      {{ selectedRow.is_partial ? "Partial" : "Complete" }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- Source Node (if available) -->
-            <template v-if="selectedRow.source_node">
-              <q-separator class="q-my-sm" />
-              <div class="detail-section">
-                <div class="text-caption text-grey-7 q-mb-xs">Source Node</div>
-                <div class="text-body2 text-mono">
-                  {{ selectedRow.source_node }}
-                </div>
-              </div>
-            </template>
-
-            <!-- Error Details (if available) -->
-            <template v-if="selectedRow.error">
-              <q-separator class="q-my-sm" />
-              <div class="detail-section">
-                <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
-                    name="error"
-                    color="negative"
-                    size="xs"
-                    class="q-mr-xs"
-                  />
-                  Error Details
-                </div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
-                  <pre
-                    class="text-body2"
-                    style="
-                      white-space: pre-wrap;
-                      word-break: break-word;
-                      margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
-                      font-size: 12px;
-                    "
-                    >{{ selectedRow.error }}</pre
-                  >
-                </q-card>
-              </div>
-            </template>
-
-            <!-- Success Response (if available) -->
-            <template v-if="selectedRow.success_response">
-              <q-separator class="q-my-sm" />
-              <div class="detail-section">
-                <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
-                    name="check_circle"
-                    color="positive"
-                    size="xs"
-                    class="q-mr-xs"
-                  />
-                  Response
-                </div>
-                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
-                  <pre
-                    class="text-body2"
-                    style="
-                      white-space: pre-wrap;
-                      word-break: break-word;
-                      margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
-                      font-size: 12px;
-                    "
-                    >{{ selectedRow.success_response }}</pre
-                  >
-                </q-card>
-              </div>
-            </template>
           </div>
-        </q-card-section>
 
-        <q-separator />
+          <OSeparator class="tw:my-2" />
 
-        <q-card-actions align="right" class="q-pa-md">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+          <!-- Time Information -->
+          <div class="detail-section">
+            <div class="tw:flex tw:gap-3">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Timestamp</div>
+                <div class="tw:text-sm">
+                  {{ formatDate(selectedRow.timestamp) }}
+                </div>
+              </div>
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Duration</div>
+                <div class="tw:text-sm">
+                  {{
+                    formatDuration(
+                      selectedRow.end_time - selectedRow.start_time,
+                    )
+                  }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <OSeparator class="tw:my-2" />
+
+          <!-- Pipeline Configuration -->
+          <div class="detail-section">
+            <div class="tw:flex tw:gap-3">
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Type</div>
+                <div class="tw:text-sm">
+                  <OIcon
+                    :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
+                    class="tw:mr-1"
+                    size="xs"
+                  />
+                  {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+                </div>
+              </div>
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Silenced</div>
+                <div class="tw:text-sm">
+                  <OIcon
+                    v-if="selectedRow.is_silenced"
+                    name="volume-off"
+                    size="xs"
+                    class="tw:mr-1"
+                  />
+                  <OIcon v-else name="volume-up" size="xs" class="tw:mr-1" />
+                  {{ selectedRow.is_silenced ? "Yes" : "No" }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Performance Metrics (if available) -->
+          <template
+            v-if="
+              selectedRow.evaluation_took_in_secs ||
+              selectedRow.query_took ||
+              selectedRow.retries > 0 ||
+              selectedRow.delay_in_secs ||
+              (selectedRow.is_partial !== null &&
+                selectedRow.is_partial !== undefined)
+            "
+          >
+            <OSeparator class="tw:my-2" />
+            <div class="detail-section">
+              <div class="tw:flex tw:gap-3">
+                <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                    Evaluation Time
+                  </div>
+                  <div class="tw:text-sm">
+                    {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
+                  </div>
+                </div>
+                <div v-if="selectedRow.query_took" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Query Time</div>
+                  <div class="tw:text-sm">
+                    {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
+                  </div>
+                </div>
+                <div v-if="selectedRow.retries > 0" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Retries</div>
+                  <div class="tw:text-sm">{{ selectedRow.retries }}</div>
+                </div>
+                <div v-if="selectedRow.delay_in_secs" class="tw:w-1/3">
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Delay</div>
+                  <div class="tw:text-sm">{{ selectedRow.delay_in_secs }}s</div>
+                </div>
+                <div
+                  v-if="
+                    selectedRow.is_partial !== null &&
+                    selectedRow.is_partial !== undefined
+                  "
+                  class="tw:w-1/3"
+                >
+                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                    Result Status
+                  </div>
+                  <div class="tw:text-sm">
+                    <OIcon
+                      :name="
+                        selectedRow.is_partial ? 'warning' : 'check-circle'
+                      "
+                      :class="['tw:mr-1', selectedRow.is_partial ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-positive)]']"
+                      size="xs"
+                    />
+                    {{ selectedRow.is_partial ? "Partial" : "Complete" }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Source Node (if available) -->
+          <template v-if="selectedRow.source_node">
+            <OSeparator class="tw:my-2" />
+            <div class="detail-section">
+              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Source Node</div>
+              <div class="tw:text-sm text-mono">
+                {{ selectedRow.source_node }}
+              </div>
+            </div>
+          </template>
+
+          <!-- Error Details (if available) -->
+          <template v-if="selectedRow.error">
+            <OSeparator class="tw:my-2" />
+            <div class="detail-section">
+              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                <OIcon name="error" size="xs" class="tw:mr-1" />
+                Error Details
+              </div>
+              <div
+                class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-red-500/5"
+              >
+                <pre
+                  class="tw:text-sm"
+                  style="
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    margin: 0;
+                    font-family: &quot;Courier New&quot;, monospace;
+                    font-size: 12px;
+                  "
+                  >{{ selectedRow.error }}</pre
+                >
+              </div>
+            </div>
+          </template>
+
+          <!-- Success Response (if available) -->
+          <template v-if="selectedRow.success_response">
+            <OSeparator class="tw:my-2" />
+            <div class="detail-section">
+              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                <OIcon name="check-circle" size="xs" class="tw:mr-1" />
+                Response
+              </div>
+              <div
+                class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-green-500/5"
+              >
+                <pre
+                  class="tw:text-sm"
+                  style="
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    margin: 0;
+                    font-family: &quot;Courier New&quot;, monospace;
+                    font-size: 12px;
+                  "
+                  >{{ selectedRow.success_response }}</pre
+                >
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </ODialog>
 
     <!-- Error Dialog -->
-    <q-dialog v-model="errorDialog">
-      <q-card style="min-width: 500px">
-        <q-card-section
-          class="pipeline-error-header row items-center q-pb-none"
-        >
-          <div class="tw:flex-1">
-            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
-              <span class="pipeline-name">{{
-                errorMessage.pipeline_name
-              }}</span>
-            </div>
-            <div class="error-timestamp">
-              <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
-              {{
-                errorMessage.last_error_timestamp &&
-                new Date(
-                  errorMessage.last_error_timestamp / 1000,
-                ).toLocaleString()
-              }}
-            </div>
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            @click="closeErrorDialog"
-            class="close-btn"
-          >
-            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section>
-          <div class="tw:mb-4">
-            <div class="section-label tw:mb-2">Error Summary</div>
-            <div class="error-summary-box">
-              {{ errorMessage.error }}
-            </div>
-          </div>
-        </q-card-section>
-        <q-card-actions class="pipeline-error-actions">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="closeErrorDialog"
-          >Close</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog
+      data-test="pipeline-history-error-dialog"
+      v-model:open="errorDialog"
+      size="sm"
+      :title="errorMessage?.pipeline_name"
+      :sub-title="
+        errorMessage?.last_error_timestamp
+          ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}`
+          : undefined
+      "
+      primary-button-label="Close"
+      @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="closeErrorDialog"
+    >
+      <template #header-left>
+        <OIcon name="error" size="md" class="error-icon" />
+      </template>
+      <div class="tw:mb-4">
+        <div class="section-label tw:mb-2">Error Summary</div>
+        <div class="error-summary-box">
+          {{ errorMessage?.error }}
+        </div>
+      </div>
+    </ODialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar, date } from "quasar";
+import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import { ChevronLeft, Search, RefreshCw, X } from "lucide-vue-next";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 
 // Data
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
-const selectedPipeline = ref<any>(null);
+const selectedPipeline = ref<any>();
 const allPipelines = ref<any[]>([]);
 const filteredPipelineOptions = ref<any[]>([]);
 const pagination = ref({
@@ -642,12 +528,7 @@ const pagination = ref({
   descending: true,
 });
 
-const rowsPerPageOptions = [
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
+const pageSizeOptions = [10, 20, 50, 100];
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -672,121 +553,121 @@ const dateTimeValues = ref({
 const detailsDialog = ref(false);
 const errorDialog = ref(false);
 const selectedRow = ref<any>(null);
-const errorMessage = ref("");
+const errorMessage = ref<any>(null);
 
 // Table columns
 const columns = ref([
-  { name: "#", label: "#", field: "#", align: "left", style: "width: 37px;" },
   {
-    name: "pipeline_name",
-    label: "Pipeline Name",
-    field: "pipeline_name",
-    align: "left",
-    sortable: true,
+    id: "row_number",
+    header: "#",
+    accessorKey: "#",
+    size: 37,
+    meta: { align: "left" as const },
   },
   {
-    name: "is_realtime",
-    label: "Type",
-    field: "is_realtime",
-    align: "center",
+    id: "pipeline_name",
+    header: "Pipeline Name",
+    accessorKey: "pipeline_name",
     sortable: true,
-    style: "width: 37px;",
+    meta: { align: "left" as const },
   },
   {
-    name: "is_silenced",
-    label: "Is Silenced",
-    field: "is_silenced",
-    align: "center",
+    id: "is_realtime",
+    header: "Type",
+    accessorKey: "is_realtime",
     sortable: true,
-    style: "width: 37px;",
+    size: 90,
+    meta: { align: "center" as const },
   },
   {
-    name: "timestamp",
-    label: "Timestamp",
-    field: "timestamp",
-    align: "left",
+    id: "is_silenced",
+    header: "Is Silenced",
+    accessorKey: "is_silenced",
     sortable: true,
-    style: "width: 160px;",
+    size: 130,
+    meta: { align: "center" as const },
   },
   {
-    name: "start_time",
-    label: "Start Time",
-    field: "start_time",
-    align: "left",
+    id: "timestamp",
+    header: "Timestamp",
+    accessorKey: "timestamp",
     sortable: true,
-    style: "width: 160px;",
+    size: 160,
+    meta: { align: "left" as const },
   },
   {
-    name: "end_time",
-    label: "End Time",
-    field: "end_time",
-    align: "left",
+    id: "start_time",
+    header: "Start Time",
+    accessorKey: "start_time",
     sortable: true,
-    style: "width: 160px;",
+    size: 160,
+    meta: { align: "left" as const },
   },
   {
-    name: "duration",
-    label: "Duration",
-    field: (row: any) => row.end_time - row.start_time,
-    align: "right",
+    id: "end_time",
+    header: "End Time",
+    accessorKey: "end_time",
     sortable: true,
-    style: "width: 50px;",
+    size: 160,
+    meta: { align: "left" as const },
   },
   {
-    name: "status",
-    label: "Status",
-    field: "status",
-    align: "center",
+    id: "duration",
+    header: "Duration",
+    accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
-    style: "width: 150px;",
+    size: 110,
+    meta: { align: "right" as const },
   },
   {
-    name: "retries",
-    label: "Retries",
-    field: "retries",
-    align: "center",
+    id: "status",
+    header: "Status",
+    accessorKey: "status",
     sortable: true,
-    style: "width: 50px;",
+    size: 150,
+    meta: { align: "center" as const },
   },
   {
-    name: "is_partial",
-    label: "Partial",
-    field: "is_partial",
-    align: "center",
+    id: "retries",
+    header: "Retries",
+    accessorKey: "retries",
+    sortable: true,
+    size: 50,
+    meta: { align: "center" as const },
+  },
+  {
+    id: "is_partial",
+    header: "Partial",
+    accessorKey: "is_partial",
     sortable: false,
-    style: "width: 60px;",
+    size: 60,
+    meta: { align: "center" as const },
   },
   {
-    name: "delay_in_secs",
-    label: "Delay (s)",
-    field: "delay_in_secs",
-    align: "right",
+    id: "delay_in_secs",
+    header: "Delay (s)",
+    accessorKey: "delay_in_secs",
     sortable: true,
-    style: "width: 80px;",
+    size: 80,
+    meta: { align: "right" as const },
   },
   {
-    name: "evaluation_took_in_secs",
-    label: "Eval Time (s)",
-    field: "evaluation_took_in_secs",
-    align: "right",
+    id: "evaluation_took_in_secs",
+    header: "Eval Time (s)",
+    accessorKey: "evaluation_took_in_secs",
     sortable: true,
-    style: "width: 100px;",
+    size: 100,
+    meta: { align: "right" as const },
   },
   {
-    name: "query_took",
-    label: "Query Time (ms)",
-    field: "query_took",
-    align: "right",
+    id: "query_took",
+    header: "Query Time (ms)",
+    accessorKey: "query_took",
     sortable: true,
-    style: "width: 110px;",
+    size: 110,
+    meta: { align: "right" as const },
   },
 ]);
-
-// Computed
-const filteredRows = computed(() => {
-  // Removed client-side filtering as we're using server-side pagination
-  return rows.value;
-});
 
 // Methods
 const fetchPipelinesList = async () => {
@@ -822,31 +703,21 @@ const filterPipelineOptions = (val: string, update: any) => {
 };
 
 const onPipelineSelected = (val: any) => {
-  if (val && val.value) {
-    // Store the pipeline ID for the API call
-    searchQuery.value = val.value;
-    // Automatically trigger search when an item is selected
-    pagination.value.page = 1;
-    fetchPipelineHistory();
-  }
+  // OSelect with valueKey="value" emits the primitive value (pipeline id) or null on clear
+  searchQuery.value = val ?? "";
+  pagination.value.page = 1;
+  fetchPipelineHistory();
 };
 
 const clearSearch = () => {
   searchQuery.value = "";
-  selectedPipeline.value = null;
+  selectedPipeline.value = undefined;
+  pagination.value.page = 1;
+  fetchPipelineHistory();
 };
 
 const manualSearch = () => {
-  // Update searchQuery from selectedPipeline when manually searching
-  if (selectedPipeline.value && selectedPipeline.value.value) {
-    searchQuery.value = selectedPipeline.value.value;
-  } else if (
-    selectedPipeline.value &&
-    typeof selectedPipeline.value === "string"
-  ) {
-    // Handle case where user typed a value without selecting from dropdown
-    searchQuery.value = selectedPipeline.value;
-  }
+  searchQuery.value = (selectedPipeline.value as any) ?? "";
   pagination.value.page = 1;
   fetchPipelineHistory();
 };
@@ -908,8 +779,8 @@ const fetchPipelineHistory = async () => {
   } catch (error: any) {
     console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         error.response?.data?.message ||
         error.message ||
@@ -946,13 +817,16 @@ const updateDateTime = (value: any) => {
   fetchPipelineHistory();
 };
 
-const onRequest = (props: any) => {
-  // The pagination component passes the updated pagination object
-  pagination.value = {
-    ...pagination.value,
-    ...props.pagination,
-  };
+const onPaginationChange = (params: { page: number; size: number }) => {
+  pagination.value.page = params.page;
+  pagination.value.rowsPerPage = params.size;
+  fetchPipelineHistory();
+};
 
+const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
+  pagination.value.sortBy = params.column;
+  pagination.value.descending = params.order === "desc";
+  pagination.value.page = 1;
   fetchPipelineHistory();
 };
 
@@ -964,7 +838,7 @@ const formatDate = (timestamp: number) => {
   if (!timestamp) return "-";
   // Convert microseconds to milliseconds
   const dateObj = new Date(timestamp / 1000);
-  return date.formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
+  return dateUtils.formatDate(dateObj, "YYYY-MM-DD HH:mm:ss");
 };
 
 const formatDuration = (microseconds: number) => {
@@ -983,22 +857,22 @@ const formatDuration = (microseconds: number) => {
   return `${seconds}s`;
 };
 
-const getStatusColor = (status: string) => {
+const getStatusVariant = (status: string) => {
   switch (status?.toLowerCase()) {
     case "success":
     case "ok":
     case "completed":
-      return "positive";
+      return "success-outline";
     case "error":
     case "failed":
-      return "negative";
+      return "error-outline";
     case "warning":
-      return "warning";
+      return "warning-outline";
     case "pending":
     case "running":
-      return "info";
+      return "primary-outline";
     default:
-      return store.state.theme === "dark" ? "white" : "black";
+      return "default-outline";
   }
 };
 
@@ -1007,7 +881,7 @@ const showDetailsDialog = (row: any) => {
   detailsDialog.value = true;
 };
 
-const showErrorDialog = (error: string) => {
+const showErrorDialog = (error: any) => {
   errorMessage.value = error;
   errorDialog.value = true;
 };
@@ -1028,55 +902,25 @@ const goBack = () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Fetch pipelines list for dropdown
+  // Fetch pipelines list for the dropdown.
+  // The history fetch is triggered by <DateTime>'s on-mount @on:date-change event,
+  // so we don't call fetchPipelineHistory() here to avoid a duplicate request.
   await fetchPipelinesList();
-  // Fetch initial pipeline history
-  fetchPipelineHistory();
 });
 
-// Watch for organization change
+// Watch for organization change (skip the initial firing — onMounted already fetched)
 watch(
   () => store.state.selectedOrganization.identifier,
-  async () => {
-    // Re-fetch pipelines list when organization changes
+  async (newId, oldId) => {
+    if (!oldId || newId === oldId) return;
     await fetchPipelinesList();
-    // Reset search
     clearSearch();
-    // Fetch history for new organization
     fetchPipelineHistory();
   },
 );
-const changePagination = (val: { label: string; value: any }) => {
-  pagination.value.rowsPerPage = val.value;
-  pagination.value.page = 1; // Reset to first page when changing page size
-  fetchPipelineHistory();
-};
 </script>
 
 <style scoped lang="scss">
-.pipeline-history-table {
-  :deep(.q-table) {
-    width: 100%;
-
-    td {
-      vertical-align: middle;
-    }
-
-    // Align all sorting chevrons to the right
-    th.sortable {
-      .q-table__sort-icon {
-        margin-left: auto;
-        margin-right: 0;
-      }
-    }
-
-    // Ensure header content and icon are in a flex container
-    .q-table th .q-table__sort-icon {
-      order: 2;
-    }
-  }
-}
-
 .pipeline-details-dialog {
   :deep(.q-dialog__inner) {
     padding: 24px;

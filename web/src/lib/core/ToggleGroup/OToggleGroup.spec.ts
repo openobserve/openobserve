@@ -32,19 +32,22 @@ describe("OToggleGroup", () => {
 
   it("applies horizontal flex class by default", () => {
     const wrapper = mountGroup();
-    expect(wrapper.classes().join(" ")).toContain("tw:flex-row");
+    const element = wrapper.find("div").element as HTMLElement;
+    expect(element.getAttribute("class") || "").toContain("tw:flex-row");
   });
 
   it("applies outer border class", () => {
     const wrapper = mountGroup();
-    expect(wrapper.classes().join(" ")).toContain("tw:border");
+    const element = wrapper.find("div").element as HTMLElement;
+    expect(element.getAttribute("class") || "").toContain("tw:border");
   });
 
   // --- Orientation ---
 
   it('applies vertical flex class when orientation="vertical"', () => {
     const wrapper = mountGroup({ orientation: "vertical" });
-    expect(wrapper.classes().join(" ")).toContain("tw:flex-col");
+    const element = wrapper.find("div").element as HTMLElement;
+    expect(element.getAttribute("class") || "").toContain("tw:flex-col");
   });
 
   // --- Children ---

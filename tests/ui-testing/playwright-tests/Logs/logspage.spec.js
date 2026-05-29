@@ -73,20 +73,21 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing SQL query validation without query content');
     
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); 
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.clickSQLModeToggle();
-    // Strategic 500ms wait for SQL mode toggle DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    // Wait for SQL mode toggle to apply — Monaco editor becomes ready
+    await page.waitForFunction(
+      () => !!window.monaco?.editor?.getEditors?.().length,
+      { timeout: 10000 }
+    ).catch(() => {});
     await pm.logsPage.clickQueryEditor();
-    // Strategic 500ms wait for query editor DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
     await pm.logsPage.selectAllText();
     await pm.logsPage.pressBackspace();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.clickRefreshButton();
-    // Strategic 2000ms wait for query processing and potential error indication - this is functionally necessary
-    await page.waitForTimeout(2000);
+    // Allow the empty-query refresh response cycle to settle deterministically
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     // The behavior might have changed - let's just ensure the query was attempted and completed
     // The key validation is that the empty SQL query was processed without crashing
     testLogger.info('SQL query execution attempt with empty query completed');
@@ -101,15 +102,12 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing VRL query execution with valid text');
     await pm.logsPage.clickDateTimeButton();
-    // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    await pm.logsPage.waitForRelative6WeeksButtonVisible();
     await pm.logsPage.clickRelative6WeeksButton();
     await applyQueryButton(pm);
 
     await pm.logsPage.toggleVrlEditor();
     await pm.logsPage.clickVrlEditor();
-    // Strategic 500ms wait for VRL editor DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
     // VRL queries may not return HTTP 200 on all envs; use button-state-based wait
     await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectWarningElementHidden();
@@ -145,12 +143,14 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickRelative6WeeksButton();
     await pm.logsPage.clickShowQueryToggle();
     await pm.logsPage.clickSavedViewsButton();
+    // Allowed: alphanumeric, spaces, underscores, hyphens (/^[A-Za-z0-9 _-]+$/)
+    // '@', '#', '/', and other special characters are rejected.
     await pm.logsPage.fillSavedViewName("e2e@@@@@");
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    // Wait for the specific validation notification — using text-filtered wait
-    // avoids false matches when another toast (e.g. streaming) stacks first.
     await pm.logsPage.clickSavedViewDialogSave();
-    await pm.logsPage.waitForNotificationWithText("Please provide valid view name", 15000);
+    // After O2 migration, special-char validation sets savedViewNameError (inline OInput error)
+    // instead of firing a toast. Check the inline error at data-test="add-alert-name-input-error".
+    await pm.logsPage.expectSavedViewNameValidationError('Input must be alphanumeric');
 
     testLogger.info('Saved views special characters validation test completed');
   });
@@ -172,17 +172,14 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing logs results display on graph');
     await pm.logsPage.clickDateTimeButton();
-    // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    await pm.logsPage.waitForRelative6WeeksButtonVisible();
     await pm.logsPage.clickRelative6WeeksButton();
     await applyQueryButton(pm);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace long hard wait
     await pm.logsPage.expectSearchListVisible();
-    // Strategic 500ms wait for UI stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
     await pm.logsPage.clickLogTableColumnSource();
-    // Strategic 500ms wait for dialog DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    // Wait for the log-detail dialog to be visible before attempting to close it
+    await pm.logsPage.waitForLogDetailDialogVisible();
     await pm.logsPage.clickCloseDialogForce();
     await pm.logsPage.expectSearchListVisible();
     
@@ -197,18 +194,17 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative6WeeksButton();
     await pm.logsPage.clickLiveModeButton();
-    // Strategic 500ms wait for live mode dropdown DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    // Wait for the 5-sec live-mode option to be enabled in the dropdown
+    await pm.logsPage.waitForLiveMode5SecReady();
     // Start watching for notification before clicking - Quasar notify has 1s timeout
     const liveNotifPromise = page.waitForFunction(
-      () => document.querySelector('.q-notification__message,.q-notification,.q-banner,[role="alert"]')?.textContent?.includes('Live mode is enabled'),
+      () => document.querySelector('[role="alert"]')?.textContent?.includes('Live mode is enabled'),
       { timeout: 15000 }
     );
     await pm.logsPage.clickLiveMode5Sec();
     await liveNotifPromise;
     await pm.logsPage.clickLiveModeButton();
-    // Strategic 500ms wait for live mode dropdown DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    await pm.logsPage.waitForLiveMode5SecReady();
     await pm.logsPage.clickLiveMode5Sec();
     await applyQueryButton(pm);
     
@@ -265,14 +261,12 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing date-time UI switching from 6 weeks to 6 days');
     await pm.logsPage.clickDateTimeButton();
-    // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    await pm.logsPage.waitForRelative6WeeksButtonVisible();
     await pm.logsPage.clickRelative6WeeksButton();
     await pm.logsPage.expectTextVisible("Past 6 Weeks");
     await applyQueryButton(pm);
     await pm.logsPage.clickDateTimeButton();
-    // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    await pm.logsPage.waitForPast6DaysButtonVisible();
     await pm.logsPage.clickPast6DaysButton();
     await pm.logsPage.expectTextVisible("Past 6 Days");
     await applyQueryButton(pm);
@@ -303,16 +297,15 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing ingested logs persistence across tab navigation');
     await pm.logsPage.clickDateTimeButton();
-    // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    await pm.logsPage.waitForRelative15MinButtonVisible();
     await pm.logsPage.clickRelative15MinButton();
     await applyQueryButton(pm);
     await pm.logsPage.clickMenuLinkTracesItem();
-    // Strategic 1000ms wait for navigation to traces - this is functionally necessary
-    await page.waitForTimeout(1000);
+    // Wait for the URL to actually change to traces before navigating back
+    await page.waitForURL(/\/traces/, { timeout: 10000 }).catch(() => {});
     await pm.logsPage.clickMenuLinkLogsItem();
-    // Strategic 1000ms wait for navigation back to logs - this is functionally necessary
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/\/logs/, { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.expectBarChartVisible();
     
     testLogger.info('Ingested logs persistence test completed');
@@ -370,8 +363,6 @@ test.describe("Logs Page testcases", () => {
     testLogger.info('Testing function save validation when clicking save directly');
     await pm.logsPage.toggleVrlEditor();
     await pm.logsPage.clickVrlEditor();
-    // Strategic 500ms wait for VRL editor DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
     await pm.logsPage.clickFunctionDropdownSave();
     await pm.logsPage.clickSavedViewDialogSave();
     await pm.logsPage.expectFunctionNameNotValid();
@@ -383,11 +374,8 @@ test.describe("Logs Page testcases", () => {
     tag: ['@functionNameValidation', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing function name validation with blank spaces');
-    // VRL editor interaction with minimal strategic wait
     await pm.logsPage.toggleVrlEditor();
     await pm.logsPage.clickVrlEditor();
-    // Strategic 500ms wait for VRL editor DOM stabilization - this is functionally necessary  
-    await page.waitForTimeout(500);
     await pm.logsPage.clickFunctionDropdownSave();
     await pm.logsPage.fillSavedFunctionNameInput(' ');
     await pm.logsPage.clickSavedViewDialogSave();
@@ -402,8 +390,6 @@ test.describe("Logs Page testcases", () => {
     testLogger.info('Testing function name validation with invalid characters');
     await pm.logsPage.toggleVrlEditor();
     await pm.logsPage.clickVrlEditor();
-    // Strategic 500ms wait for VRL editor DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
     await pm.logsPage.clickFunctionDropdownSave();
     await pm.logsPage.fillSavedFunctionNameInput('e2e@@@');
     await pm.logsPage.clickSavedViewDialogSave();
@@ -424,7 +410,9 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickRefreshButton();
     // Wait for VRL function to be applied and data to load
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(3000);
+    // Wait for the logs table to render with the VRL-transformed result so the
+    // subsequent navigation/return path actually has data to persist.
+    await pm.logsPage.expectLogsTableVisible().catch(() => {});
     await pm.logsPage.clickMenuLinkMetricsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
@@ -443,22 +431,17 @@ test.describe("Logs Page testcases", () => {
     // Ensure histogram is ON — alpha1 may default to OFF. Without this the canvas
     // never renders and clickBarChartCanvas times out.
     await pm.logsPage.ensureHistogramState(true);
-    await page.waitForTimeout(300);
 
     await pm.logsPage.clickLogSearchIndexListFieldSearchInput();
     await pm.logsPage.fillLogSearchIndexListFieldSearchInput('code');
-    // Strategic 500ms wait for field search results DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    // Wait for the filtered field row to render before expanding it
+    await pm.logsPage.waitForExpandCodeButtonVisible();
     await pm.logsPage.clickExpandCode();
-    // Strategic 500ms wait for field expansion DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.clickSQLModeToggle();
-    // Strategic 500ms wait for SQL mode toggle DOM stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+    // Wait for Monaco editor to populate SELECT * FROM after SQL toggle
+    await pm.logsPage.expectQueryEditorContainsSelectFrom();
     await pm.logsPage.clickRefreshButton();
-    // Strategic 1000ms wait for chart rendering - this is functionally necessary
-    await page.waitForTimeout(1000);
     await pm.logsPage.clickBarChartCanvas();
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();

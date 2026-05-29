@@ -47,14 +47,15 @@ const quasarStubs = {
   QIcon: {
     name: "QIcon",
     template:
-      '<span class="q-icon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click="$emit(\'click\', $event)"></span>',
+      '<span class="OIcon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click="$emit(\'click\', $event)"></span>',
     props: ["name"],
     emits: ["click"],
   },
-  QTooltip: {
-    name: "QTooltip",
-    template: '<div class="q-tooltip-stub"><slot /></div>',
-    props: ["anchor", "self", "maxWidth"],
+  OTooltip: {
+    name: "OTooltip",
+    template:
+      '<div class="o-tooltip-stub" :data-test="$attrs[\'data-test\']">{{ content }}<slot /></div>',
+    props: ["anchor", "self", "maxWidth", "content", "side", "align"],
   },
   QSeparator: {
     name: "QSeparator",
@@ -183,8 +184,9 @@ describe("FieldListPagination", () => {
       const wrapper = createWrapper({
         showUserDefinedSchemaToggle: true,
       });
+      // Component generates data-test="logs-user-defined-fields-btn-${opt.slot}"
       const userDefinedBtn = wrapper.find(
-        '[data-test="logs-user-defined-fields-btn"]'
+        '[data-test="logs-user-defined-fields-btn-user_defined_slot"]'
       );
       expect(userDefinedBtn.exists()).toBe(true);
     });
@@ -193,8 +195,8 @@ describe("FieldListPagination", () => {
       const wrapper = createWrapper({
         showUserDefinedSchemaToggle: true,
       });
-      // All OToggleGroupItems share data-test="logs-user-defined-fields-btn" — verify at least one is rendered
-      const btns = wrapper.findAll('[data-test="logs-user-defined-fields-btn"]');
+      // Component generates data-test="logs-user-defined-fields-btn-${opt.slot}" for each option
+      const btns = wrapper.findAll('[data-test^="logs-user-defined-fields-btn-"]');
       expect(btns.length).toBeGreaterThanOrEqual(1);
     });
 

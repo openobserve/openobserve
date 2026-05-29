@@ -15,7 +15,6 @@
 
  
 import http from "./http";
-import { useStore } from "vuex";
 
 interface DomainRestriction {
   name: string;
@@ -28,14 +27,10 @@ interface DomainSettings {
 }
 
 const domainManagement = {
-  // Get SSO domain restrictions for an organization
   getDomainRestrictions: (metaOrg: string) => {
-    const store = useStore();
     return http().get(`/api/${metaOrg}/domain_management`);
   },
-  // Update specific domain settings
   updateDomainRestrictions: (metaOrg: string, domain: DomainRestriction) => {
-    const store = useStore();
     return http().put(`/api/${metaOrg}/domain_management`, domain);
   },
 };

@@ -15,7 +15,9 @@ export class AlertTemplatesPage {
         
         // Template creation locators
         this.addTemplateButton = '[data-test="template-list-add-btn"]';
+        // OInput wrapper (use for visibility/state assertions); inner native input gets `-field` suffix
         this.templateNameInput = '[data-test="add-template-name-input"]';
+        this.templateNameInputField = '[data-test="add-template-name-input-field"]';
         this.templateEditor = '[data-test="add-template-editor"]';
         this.templateSubmitButton = '[data-test="add-template-submit-btn"]';
         this.templateSuccessMessage = 'Template Saved Successfully.';
@@ -25,7 +27,8 @@ export class AlertTemplatesPage {
         this.templateDeleteButton = '[data-test="alert-template-list-{templateName}-delete-template"]';
         this.templateUpdateButton = '[data-test="alert-template-list-{templateName}-update-template"]';
         this.deleteConfirmText = 'Delete Template';
-        this.confirmButton = '[data-test="confirm-button"]';
+        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmDialog = '[data-test="confirm-dialog"]';
         this.templateDeletedMessage = 'Template %s deleted successfully';
         this.templateInUseMessage = 'Template is in use for destination';
         this.templateCountText = 'Templates';
@@ -33,10 +36,10 @@ export class AlertTemplatesPage {
         // Template import locators
         this.templateImportButton = '[data-test="template-import"]';
         this.importUrlTab = '[data-test="tab-import_json_url"]';
-        this.importUrlInput = '[data-test="template-import-url-input"]';
+        this.importUrlInput = '[data-test="template-import-url-input-field"]';
         this.importJsonButton = '[data-test="template-import-json-btn"]';
-        this.importNameInput = '[data-test="template-import-name-input"]';
-        this.importFileInput = '[data-test="template-import-json-file-input"]';
+        this.importNameInput = '[data-test="template-import-name-input-field"]';
+        this.importFileInput = '[data-test="template-import-json-file-input-field"]';
         this.templateImportSuccessMessage = 'Successfully imported';
         this.templateImportErrorText = 'Template - 1: "email template" creation failed --> Reason: Template name cannot contain \':\', \'#\', \'?\', \'&\', \'%\', \'/\', quotes and space characters';
 
@@ -156,7 +159,7 @@ export class AlertTemplatesPage {
             'button:has-text("Add Template")',
             '.q-table__control button',
             'button[data-test*="add"]',
-            'button:has(.q-icon):has-text("add")',
+            'button:has(.OIcon):has-text("add")',
             '.q-toolbar button:has-text("Add")',
             'button[data-o2-btn]:has-text("Add Template")'
         ];
@@ -180,10 +183,11 @@ export class AlertTemplatesPage {
             throw new Error('Could not find Add Template button in the UI');
         }
 
-        await this.page.waitForTimeout(2000);
-        await this.page.locator(this.templateNameInput).click({ force: true });
-        await this.page.locator(this.templateNameInput).fill(templateName);
-        await this.page.waitForTimeout(1000);
+        // Wait for the template name input to be ready, then fill via the OInput inner field
+        await this.page.locator(this.templateNameInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.templateNameInputField).click({ force: true });
+        await this.page.locator(this.templateNameInputField).fill(templateName);
+        await expect(this.page.locator(this.templateNameInputField)).toHaveValue(templateName, { timeout: 5000 });
 
         const templateText = `{
   "text": "{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script"`;
@@ -224,7 +228,7 @@ export class AlertTemplatesPage {
             // Strategy 2: data-test selector for template search
             () => this.page.locator('[data-test="alert-template-search-input"]'),
             // Strategy 3: input inside the templates section (look for search/filter input)
-            () => this.page.locator('.q-page-container .q-table__control input[type="text"], .q-page-container input.q-field__input[placeholder*="Search"], .q-page-container input[placeholder*="search"]').first()
+            () => this.page.locator('[data-o2-page-container] .q-table__control input[type="text"], [data-o2-page-container] input.q-field__input[placeholder*="Search"], [data-o2-page-container] input[placeholder*="search"]').first()
         ];
 
         for (const strategy of strategies) {
@@ -319,7 +323,7 @@ export class AlertTemplatesPage {
 
         // Click delete button using the correct locator
         await this.page.locator(this.templateDeleteButton.replace('{templateName}', templateName)).click();
-        await expect(this.page.getByText(this.deleteConfirmText, { exact: true })).toBeVisible();
+        await expect(this.page.locator(this.confirmDialog)).toBeVisible();
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(4000);
 
@@ -503,9 +507,10 @@ export class AlertTemplatesPage {
             testLogger.warn('Editor view-lines not visible, continuing with force-click');
         });
 
-        await this.page.locator(this.templateNameInput).click({ force: true });
-        await this.page.locator(this.templateNameInput).fill(templateName);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.templateNameInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.templateNameInputField).click({ force: true });
+        await this.page.locator(this.templateNameInputField).fill(templateName);
+        await expect(this.page.locator(this.templateNameInputField)).toHaveValue(templateName, { timeout: 5000 });
 
         // JSON array format required for OpenObserve ingestion API
         const templateText = `[{"alert_name": "{alert_name}", "alert_type": "validation", "org_name": "{org_name}", "stream_name": "{stream_name}"}]`;
@@ -791,17 +796,27 @@ export class AlertTemplatesPage {
         await this.page.locator(this.importUrlTab).click();
         await this.page.locator(this.importUrlInput).click();
         await this.page.locator(this.importUrlInput).fill(url);
-        await this.page.waitForTimeout(1000); // Small delay after filling URL
+        // Dispatch a manual input event so OInput's @input handler fires and v-model
+        // propagates the URL to BaseImport's watcher that triggers the axios fetch.
+        await this.page.locator(this.importUrlInput).dispatchEvent('input');
+        // Wait until the URL fetch populated jsonStr (Monaco editor has content)
+        await this.page.waitForFunction(() => {
+          const eds = window.monaco?.editor?.getEditors?.() || [];
+          return eds.length > 0 && eds.some(e => (e.getValue?.() || '').trim().length > 10);
+        }, null, { timeout: 15000 }).catch(() => {});
         await this.page.locator(this.importJsonButton).click();
-        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        // Wait for validation/preview to render — text contains Template index and field validation
+        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
+        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).click();
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
-        
+
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
-            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
+            const successToast = this.page.locator(`[data-test^="o-toast-"][data-test-message*="${this.templateImportSuccessMessage}"]`).first();
+            await expect(successToast).toBeVisible();
         }
     }
 
@@ -826,14 +841,17 @@ export class AlertTemplatesPage {
         await this.page.locator(this.templateImportButton).click();
         await this.page.locator(this.importFileInput).setInputFiles(filePath);
         await this.page.locator(this.importJsonButton).click();
-        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        // Wait for validation/preview to render — text contains Template index and field validation
+        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
+        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
 
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
-            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
+            const successToast = this.page.locator(`[data-test^="o-toast-"][data-test-message*="${this.templateImportSuccessMessage}"]`).first();
+            await expect(successToast).toBeVisible();
         }
     }
 
@@ -908,7 +926,12 @@ export class AlertTemplatesPage {
                 testLogger.warn('Template in use by destination, deleting destination first', { templateName, destinationName });
 
                 // Close the error dialog
-                await this.page.keyboard.press('Escape');
+                const errDialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
+                if (await errDialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await errDialogCloseBtn.click();
+                } else {
+                    await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+                }
                 await this.page.waitForTimeout(500);
 
                 // Navigate to destinations and delete the destination

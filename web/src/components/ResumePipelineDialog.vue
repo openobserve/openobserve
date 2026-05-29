@@ -15,98 +15,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog :class="store.state.theme === 'dark' ? 'dark-theme-dialog' : 'light-theme-dialog'">
-    <q-card class="resume-pipeline-dialog" data-test="dialog-box">
-      <q-card-section class="resume-pipeline-dialog-header q-pa-none" style="padding: 0px;">
-        <div class="dialog-title">Resume Pipeline Ingestion</div>
-        <div v-if="lastPausedAt" class="last-paused-at-text">Last paused: {{ convertUnixToQuasarFormat(lastPausedAt) }}</div>
-      </q-card-section>
-      <q-card-section class="resume-pipeline-dialog-body q-pa-none" style="padding: 0px;">
-              <q-radio
-              v-model="resumeFromStart"
-              class="resume-radio-align"
-              :val="false">
-                <div class="resume-radio-label">
-                <div class="resume-radio-main-text resume-pipeline-dialog-body-text" >Continue from where it paused</div>
-                <div v-if="lastPausedAt" class="resume-radio-sub-text resume-pipeline-dialog-body-text-time">
-                  {{ convertUnixToQuasarFormat(lastPausedAt) }}.
-                </div>
-              </div>
-            </q-radio>
-            <q-radio
-              v-model="resumeFromStart"
-              :val="true"
-              style="height: 18px;"
-            >
-              <span class="resume-pipeline-dialog-body-text">Start from now.</span>
-            </q-radio>
-      </q-card-section>
+  <ODialog
+    v-model:open="open"
+    data-test="resume-pipeline-dialog"
+    size="sm"
+    title="Resume Pipeline Ingestion"
+    :sub-title="lastPausedAt ? `Last paused: ${convertUnixToQuasarFormat(lastPausedAt)}` : undefined"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('pipeline_list.run_pipeline')"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
 
-      <q-card-actions class="resume-pipeline-dialog-actions q-pa-none tw:flex tw:justify-center tw:gap-2" style="padding: 0px;">
-        <OButton
-          v-close-popup
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cancel-button"
+    <div class="resume-pipeline-dialog-body">
+      <ORadioGroup v-model="resumeFromStart">
+        <ORadio
+          class="resume-radio-align"
+          :value="false">
+          <template #label>
+            <div class="resume-radio-label">
+              <div class="resume-radio-main-text resume-pipeline-dialog-body-text">Continue from where it paused</div>
+              <div v-if="lastPausedAt" class="resume-radio-sub-text resume-pipeline-dialog-body-text-time">
+                {{ convertUnixToQuasarFormat(lastPausedAt) }}.
+              </div>
+            </div>
+          </template>
+        </ORadio>
+        <ORadio
+          :value="true"
+          style="height: 18px;"
         >
-          {{ t("confirmDialog.cancel") }}
-        </OButton>
-        <OButton
-          v-close-popup
-          variant="primary"
-          size="sm-action"
-          @click="onConfirm"
-          data-test="confirm-button"
-        >
-          {{ t('pipeline_list.run_pipeline') }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+          <template #label>
+            <span class="resume-pipeline-dialog-body-text">Start from now.</span>
+          </template>
+        </ORadio>
+      </ORadioGroup>
+    </div>
+
+  </ODialog>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import { convertUnixToQuasarFormat } from "@/utils/zincutils";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  emits: ["update:ok", "update:cancel", "update:shouldStartfromNow"],
-  props: ["title", "message", "lastPausedAt", "shouldStartfromNow","lastPausedAt"],
-  components: { OButton },
+  components: { ODialog, ORadio, ORadioGroup },
+  emits: ["update:ok", "update:cancel", "update:shouldStartfromNow", "update:modelValue"],
+  props: {
+    title: { type: String },
+    message: { type: String },
+    lastPausedAt: { type: [Number, String] },
+    shouldStartfromNow: { type: Boolean },
+    modelValue: { type: Boolean, default: false },
+  },
   setup(props, { emit }) {
     const { t } = useI18n();
-    const store = useStore();
+
+    const open = computed({
+      get: () => props.modelValue ?? false,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
 
     const onCancel = () => {
+      open.value = false;
       emit("update:cancel");
     };
 
     const onConfirm = () => {
+      open.value = false;
       emit("update:ok");
     };
+
     const resumeFromStart = ref(props.shouldStartfromNow);
     watch(
-        () => props.shouldStartfromNow,
-        (val) => {
-          resumeFromStart.value = val
-        }
-      )
-      watch(resumeFromStart, (val) => {
-        emit('update:shouldStartfromNow', val)
-      })
+      () => props.shouldStartfromNow,
+      (val) => { resumeFromStart.value = val; }
+    );
+    watch(resumeFromStart, (val) => {
+      emit('update:shouldStartfromNow', val);
+    });
+
     return {
       t,
+      open,
       onCancel,
       onConfirm,
       resumeFromStart,
-      store,
-      convertUnixToQuasarFormat
+      convertUnixToQuasarFormat,
     };
   },
 });
@@ -133,16 +135,6 @@ export default defineComponent({
   flex-direction: column;
   gap: 7px;
   width: 312px;
-  .q-radio{
-    margin-left: -8px;
-    ::v-deep(.q-radio__inner){
-      min-height: 16px !important;
-      height: 24px !important;
-      width: 24px !important;
-      min-width: 16px !important;
-      
-    }
-  }
 }
 
 .dialog-title{

@@ -16,14 +16,15 @@ export class RegexPatternsPage {
     this.searchPatternInput = page.getByPlaceholder('Search Pattern');
     this.importButton = page.locator('[data-test="regex-pattern-list-import"]');
 
-    // Add/Edit Pattern Form
-    this.addPatternTitle = page.locator('[data-test="add-regex-pattern-title"]');
+    // Add/Edit Pattern Form (ODrawer — AddRegexPattern.vue)
+    // The form is now rendered inside an ODrawer; wait for the name input to confirm drawer is open
+    this.addPatternTitle = page.locator('[data-test="add-regex-pattern-name-input"]');
     this.patternNameInput = page.locator('[data-test="add-regex-pattern-name-input"]');
     this.patternDescriptionInput = page.locator('[data-test="add-regex-pattern-description-input"]');
     this.patternInput = page.locator('[data-test="add-regex-pattern-input"]');
     this.testInputButton = page.getByRole('button', { name: 'Test Input' });
-    this.saveButton = page.locator('[data-test="add-regex-pattern-save-btn"]');
-    this.cancelButton = page.getByRole('button', { name: /^cancel$/i });
+    this.saveButton = page.locator('[data-test="add-regex-pattern-drawer"] [data-test="o-drawer-primary-btn"]');
+    this.cancelButton = page.locator('[data-test="add-regex-pattern-drawer"] [data-test="o-drawer-secondary-btn"]');
 
     // Messages
     this.successMessage = (text) => page.getByText(text);
@@ -139,7 +140,7 @@ export class RegexPatternsPage {
 
   async confirmDelete() {
     testLogger.info('Confirming pattern deletion');
-    const confirmButton = this.page.locator('[data-test="confirm-button"]');
+    const confirmButton = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
     await expect(this.page.getByText('Delete Regex Pattern')).toBeVisible();
     await confirmButton.click();
   }

@@ -17,8 +17,8 @@ import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef, reactive } from "vue";
 import { ref } from "vue";
-import { useQuasar } from "quasar";
 import { deepCopy } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const getStreamsPromise: any = ref(null);
 
@@ -46,7 +46,6 @@ const useStreams = () => {
     metadata: computed(() => store.state.streams.metadata),
   };
 
-  const q = useQuasar();
 
   const getStreams = async (
     _streamName: string = "",
@@ -67,10 +66,10 @@ const useStreams = () => {
         if (!isStreamFetched(streamName || "all") || force) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
-            ? q.notify({
-                spinner: true,
+            ? toast({
+                variant: "loading",
                 message: "Please wait while loading streams...",
-                timeout: 5000,
+                timeout: 0,
               })
             : () => {};
           if (streamName === "all") {
@@ -188,8 +187,8 @@ const useStreams = () => {
       try {
         // Added adddtional check to fetch all streamstype separately if streamName is all
         const dismiss = notify
-          ? q.notify({
-              spinner: true,
+          ? toast({
+              variant: "loading",
               message: "Please wait while loading streams...",
               timeout: 5000,
             })

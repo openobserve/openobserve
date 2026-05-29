@@ -22,6 +22,8 @@ use std::{
 use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
+#[cfg(feature = "enterprise")]
+use config::utils::parquet::get_recordbatch_reader_from_bytes;
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
@@ -32,18 +34,13 @@ use config::{
     utils::{
         async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
-        parquet::{
-            get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
-        },
+        parquet::{read_metadata_from_file, read_schema_from_file},
         schema_ext::SchemaExt,
     },
 };
 use hashbrown::HashSet;
 use infra::{
-    schema::{
-        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields,
-    },
+    schema::{SchemaCache, get_stream_setting_fts_fields, get_stream_setting_index_fields},
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
@@ -717,7 +714,6 @@ async fn merge_files(
 
     // get latest version of schema
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values) =
@@ -778,7 +774,6 @@ async fn merge_files(
         &stream_name,
         schema,
         tables,
-        &bloom_filter_fields,
         new_file_meta,
         true,
     )
@@ -928,9 +923,6 @@ async fn merge_files(
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
-    // generate tantivy inverted index and write to storage
-    let file_format = config::get_config().common.file_format;
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &org_id,
@@ -938,7 +930,7 @@ async fn merge_files(
         &full_text_search_fields,
         &index_fields,
         latest_schema.clone(), // Use stream schema to include all configured fields
-        reader,
+        buf,
     )
     .await
     .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {e}"))?;

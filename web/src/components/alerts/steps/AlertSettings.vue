@@ -15,416 +15,364 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-alert-conditions" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="step-alert-conditions"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <!-- Section header -->
     <div class="section-header">
       <div class="section-header-accent" />
-      <span class="section-header-title">{{ t('alerts.alertSettings.sectionTitle') }}</span>
+      <span class="section-header-title">{{
+        t("alerts.alertSettings.sectionTitle")
+      }}</span>
     </div>
     <div class="tw:px-3 tw:py-2">
-      <q-form ref="alertSettingsForm" @submit.prevent>
-      <!-- For Real-Time Alerts -->
-      <template v-if="isRealTime === 'true'">
-        <!-- Silence Notification (Cooldown) -->
-        <div class="flex justify-start items-start tw:pb-3 tw:mb-4">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
-            {{ t("alerts.silenceNotification") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+      <div>
+        <!-- For Real-Time Alerts -->
+        <template v-if="isRealTime === 'true'">
+          <!-- Silence Notification (Cooldown) -->
+          <div class="tw:flex tw:justify-start tw:items-start tw:pb-3 tw:mb-4">
+            <div
+              class="tw:font-semibold tw:flex tw:items-center"
+              style="width: 190px; height: 28px"
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.cooldownTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center q-mr-sm" style="width: fit-content">
-              <div
-                style="width: 87px; margin-left: 0 !important"
-                class="silence-notification-input"
-              >
-                <q-input
-                  v-model.number="formData.trigger_condition.silence"
-                  type="number"
-                  dense
-                  borderless
-                  min="0"
-                  class="alert-v3-input"
-                  style="background: none"
-                  @update:model-value="$emit('update:trigger', formData.trigger_condition)"
+              {{ t("alerts.silenceNotification") + " *" }}
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+                <OTooltip
+                  :content="t('alerts.alertSettings.cooldownTooltip')"
+                  side="right"
                 />
+            </div>
+            <div>
+              <div class="tw:flex tw:items-center tw:mr-2" style="width: fit-content">
+                <div
+                  style="width: 87px; margin-left: 0 !important"
+                  class="silence-notification-input"
+                >
+                  <OInput
+                    v-model="formData.trigger_condition.silence"
+                    type="number"
+                    min="0"
+                    @update:model-value="
+                      $emit('update:trigger', formData.trigger_condition)
+                    "
+                  />
+                </div>
+                <div
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    height: 28px;
+                    font-size: 13px;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                  "
+                  class="tw:flex tw:justify-center tw:items-center"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
               </div>
               <div
-                style="
-                  min-width: 90px;
-                  margin-left: 0 !important;
-                  height: 28px;
-                  font-size: 13px;
+                v-if="
+                  formData.trigger_condition.silence < 0 ||
+                  formData.trigger_condition.silence === undefined ||
+                  formData.trigger_condition.silence === null ||
+                  formData.trigger_condition.silence === ''
                 "
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-grey-9'
-                    : 'bg-grey-2'
-                "
-                class="flex justify-center items-center"
+                class="text-red-8 tw:pt-1"
+                style="font-size: 11px; line-height: 12px"
               >
-                {{ t("alerts.minutes") }}
+                {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
             </div>
+          </div>
+
+          <!-- Destinations -->
+          <div class="tw:flex tw:items-start tw:pb-4 tw:mb-4">
             <div
-              v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
+              style="width: 190px; height: 28px"
+              class="tw:flex tw:items-center tw:font-semibold"
             >
-              {{ t('alerts.alertSettings.fieldRequired') }}
+              <span>{{ t("alerts.destination") }} *</span>
+            </div>
+            <div class="tw:flex tw:flex-col">
+              <div class="tw:flex tw:items-center">
+                <OSelect
+                  v-model="localDestinations"
+                  :options="formattedDestinations"
+                  data-test="alert-destinations-select"
+                  multiple
+                  class="tw:min-w-[180px] tw:max-w-[300px]"
+                  @update:model-value="emitDestinationsUpdate"
+                >
+                  <template #empty>{{
+                    t("alerts.alertSettings.noDestinationsAvailable")
+                  }}</template>
+                </OSelect>
+                <OButton
+                  class="tw:ml-1"
+                  variant="ghost"
+                  size="icon-circle-sm"
+                  :title="t('alerts.alertSettings.refreshDestinations')"
+                  @click="$emit('refresh:destinations')"
+                >
+                  <OIcon name="refresh" size="sm" />
+                </OButton>
+                <OButton
+                  data-test="create-destination-btn"
+                  variant="outline"
+                  size="sm"
+                  class="tw:ml-2"
+                  @click="routeToCreateDestination"
+                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
+                >
+              </div>
+              <div
+                v-if="
+                  destinationsTouched &&
+                  (!localDestinations || localDestinations.length === 0)
+                "
+                class="text-red-8 tw:pt-1"
+                style="font-size: 11px; line-height: 12px"
+              >
+                {{ t("alerts.alertSettings.fieldRequired") }}
+              </div>
             </div>
           </div>
-        </div>
+        </template>
 
-        <!-- Destinations -->
-        <div class="flex items-start tw:pb-4 tw:mb-4">
-          <div style="width: 190px; height: 28px" class="flex items-center tw:font-semibold">
-            <span>{{ t("alerts.destination") }} *</span>
-          </div>
-          <div class="tw:flex tw:flex-col">
-            <div class="tw:flex tw:items-center">
-              <q-select
-                v-model="localDestinations"
-                :options="filteredDestinations"
-                data-test="alert-destinations-select"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop no-case destinations-select-field"
-                filled
-                dense
-                multiple
-                use-input
-                input-debounce="0"
-                @filter="filterDestinations"
-                style="width: 300px; max-width: 300px"
-                @update:model-value="emitDestinationsUpdate"
-              >
-                <template v-slot:selected>
-                  <div v-if="localDestinations.length > 0" class="ellipsis">
-                    {{ localDestinations.join(", ") }}
-                  </div>
-                </template>
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="localDestinations"
-                          :val="option.opt"
-                          @update:model-value="destinationError = false; emitDestinationsUpdate()"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">{{ t('alerts.alertSettings.noDestinationsAvailable') }}</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <OButton
-                class="q-ml-xs"
-                variant="ghost"
-                size="icon-circle-sm"
-                :title="t('alerts.alertSettings.refreshDestinations')"
-                @click="$emit('refresh:destinations')"
-              >
-                <q-icon name="refresh" />
-              </OButton>
-              <OButton
-                data-test="create-destination-btn"
-                variant="outline"
-                size="sm"
-                class="q-ml-sm"
-                @click="routeToCreateDestination"
-              >{{ t('alerts.alertSettings.addNewDestination') }}</OButton>
-            </div>
+        <!-- For Scheduled Alerts -->
+        <template v-else>
+          <!-- Period -->
+          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
             <div
-              v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
+              class="tw:font-semibold tw:flex tw:items-center"
+              style="width: 190px; height: 28px"
             >
-              {{ t('alerts.alertSettings.fieldRequired') }}
-            </div>
-          </div>
-        </div>
-
-      </template>
-
-      <!-- For Scheduled Alerts -->
-      <template v-else>
-        <!-- Period -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
-            {{ t("alerts.period") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.periodTooltip') }}
-                </span>
-              </q-tooltip>
-          </q-icon>
-          </div>
-          <div>
-            <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important" class="period-input-container">
-                <q-input
-                  v-model.number="formData.trigger_condition.period"
-                  type="number"
-                  dense
-                  borderless
-                  min="1"
-                  class="alert-v3-input"
-                  style="background: none"
-                  debounce="300"
-                  @update:model-value="handlePeriodChange"
+              {{ t("alerts.period") + " *" }}
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+                <OTooltip
+                  :content="t('alerts.alertSettings.periodTooltip')"
+                  side="right"
                 />
+            </div>
+            <div>
+              <div
+                ref="periodFieldRef"
+                class="tw:flex tw:items-center tw:mr-2"
+                style="width: fit-content"
+              >
+                <div
+                  style="width: 87px; margin-left: 0 !important"
+                  class="period-input-container"
+                >
+                  <OInput
+                    v-model="formData.trigger_condition.period"
+                    type="number"
+                    min="1"
+                    :debounce="300"
+                    @update:model-value="handlePeriodChange"
+                  />
+                </div>
+                <div
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    height: 28px;
+                    font-weight: normal;
+                    font-size: 13px;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                  "
+                  class="tw:flex tw:justify-center tw:items-center"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
               </div>
               <div
-                style="min-width: 90px; margin-left: 0 !important; height: 28px; font-weight: normal; font-size: 13px;"
-
-                :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
-                class="flex justify-center items-center"
+                v-if="!Number(formData.trigger_condition.period)"
+                class="text-red-8 tw:pt-1"
+                style="font-size: 11px; line-height: 12px"
               >
-                {{ t("alerts.minutes") }}
+                {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
             </div>
+          </div>
+
+          <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
+          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
             <div
-              v-if="!Number(formData.trigger_condition.period)"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
+              class="tw:font-semibold tw:flex tw:items-center"
+              style="width: 190px; height: 28px"
             >
-              {{ t('alerts.alertSettings.fieldRequired') }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
-            {{ t("alerts.silenceNotification") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.cooldownTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div ref="silenceFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
-              <div
-                style="width: 87px; margin-left: 0 !important"
-              >
-                <q-input
-                  v-model.number="formData.trigger_condition.silence"
-                  type="number"
-                  dense
-                  borderless
-                  min="0"
-                  class="alert-v3-input"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
+              {{ t("alerts.silenceNotification") + " *" }}
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+                <OTooltip
+                  :content="t('alerts.alertSettings.cooldownTooltip')"
+                  side="right"
                 />
+            </div>
+            <div>
+              <div
+                ref="silenceFieldRef"
+                class="tw:flex tw:items-center tw:mr-2"
+                style="width: fit-content"
+              >
+                <div style="width: 87px; margin-left: 0 !important">
+                  <OInput
+                    v-model="formData.trigger_condition.silence"
+                    type="number"
+                    min="0"
+                    :debounce="300"
+                    @update:model-value="emitTriggerUpdate"
+                  />
+                </div>
+                <div
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    height: 28px;
+                    font-size: 13px;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                  "
+                  class="tw:flex tw:justify-center tw:items-center"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
               </div>
               <div
-                style="
-                  min-width: 90px;
-                  margin-left: 0 !important;
-                  height: 28px;
-                  font-size: 13px;
+                v-if="
+                  formData.trigger_condition.silence < 0 ||
+                  formData.trigger_condition.silence === undefined ||
+                  formData.trigger_condition.silence === null ||
+                  formData.trigger_condition.silence === ''
                 "
-
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-grey-9'
-                    : 'bg-grey-2'
-                "
-                class="flex justify-center items-center"
+                class="text-red-8 tw:pt-1"
+                style="font-size: 11px; line-height: 12px"
               >
-                {{ t("alerts.minutes") }}
+                {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
             </div>
+          </div>
+
+          <!-- Destinations -->
+          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
             <div
-              v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
+              class="tw:font-semibold tw:flex tw:items-center"
+              style="width: 190px; height: 28px"
             >
-              {{ t('alerts.alertSettings.fieldRequired') }}
+              {{ t("alerts.destination") + " *" }}
+              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+                <OTooltip
+                  :content="t('alerts.alertSettings.destinationsTooltip')"
+                  side="right"
+                />
             </div>
-          </div>
-        </div>
-
-        <!-- Destinations -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
-            {{ t("alerts.destination") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">{{ t('alerts.alertSettings.destinationsTooltip') }}</span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center">
-              <q-select
-                ref="destinationsFieldRef"
-                v-model="localDestinations"
-                :options="filteredDestinations"
-                data-test="alert-destinations-select"
-                class="no-case q-py-none destinations-select-field alert-v3-select destination-select-field"
-                :class="destinationError ? 'destination-select-error' : ''"
-                borderless
-                dense
-                multiple
-                use-input
-                fill-input
-                :input-debounce="400"
-                hide-bottom-space
-                @filter="filterDestinations"
-                @update:model-value="destinationError = false; emitDestinationsUpdate()"
-                style="width: 180px; max-width: 300px"
+            <div>
+              <div class="tw:flex tw:items-center">
+                <OSelect
+                  ref="destinationsFieldRef"
+                  v-model="localDestinations"
+                  :options="formattedDestinations"
+                  data-test="alert-destinations-select"
+                  multiple
+                  :error="destinationError"
+                  class="tw:min-w-[180px] tw:max-w-[300px]"
+                  @update:model-value="
+                    destinationError = false;
+                    emitDestinationsUpdate();
+                  "
+                >
+                  <template #empty>{{
+                    t("alerts.alertSettings.noDestinationsAvailable")
+                  }}</template>
+                </OSelect>
+                <OButton
+                  class="tw:ml-1"
+                  variant="ghost"
+                  size="icon-circle-sm"
+                  :title="t('alerts.alertSettings.refreshDestinations')"
+                  @click="$emit('refresh:destinations')"
+                >
+                  <OIcon name="refresh" size="sm" />
+                </OButton>
+                <OButton
+                  data-test="create-destination-btn"
+                  variant="outline"
+                  size="sm"
+                  class="tw:ml-2"
+                  @click="routeToCreateDestination"
+                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
+                >
+              </div>
+              <div
+                v-if="
+                  destinationsTouched &&
+                  (!localDestinations || localDestinations.length === 0)
+                "
+                class="text-red-8 tw:pt-1"
+                style="font-size: 11px; line-height: 12px"
               >
-                <template v-slot:selected>
-                  <div
-                    v-if="localDestinations.length > 0"
-                    class="ellipsis"
-                  >
-                    {{ localDestinations.join(", ") }}
-                    <q-tooltip>{{ localDestinations.join(", ") }}</q-tooltip>
-                  </div>
-                </template>
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="localDestinations"
-                          :val="option.opt"
-                          @update:model-value="destinationError = false; emitDestinationsUpdate()"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">{{ t('alerts.alertSettings.noDestinationsAvailable') }}</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <OButton
-                class="q-ml-xs"
-                variant="ghost"
-                size="icon-circle-sm"
-                :title="t('alerts.alertSettings.refreshDestinations')"
-                @click="$emit('refresh:destinations')"
-              >
-                <q-icon name="refresh" />
-              </OButton>
-              <OButton
-                data-test="create-destination-btn"
-                variant="outline"
-                size="sm"
-                class="q-ml-sm"
-                @click="routeToCreateDestination"
-              >{{ t('alerts.alertSettings.addNewDestination') }}</OButton>
-            </div>
-            <div
-              v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-            >
-              {{ t('alerts.alertSettings.fieldRequired') }}
+                {{ t("alerts.alertSettings.fieldRequired") }}
+              </div>
             </div>
           </div>
-        </div>
+        </template>
 
-      </template>
-
-      <!-- Creates Incident toggle — shown for all alert types -->
-      <div class="flex items-start alert-settings-row">
-        <div
-          class="tw:font-semibold flex items-center"
-          style="width: 190px; height: 28px"
-        >
-          {{ t("alerts.alertSettings.createsIncident") }}
-          <q-icon
-            name="info"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        <!-- Creates Incident toggle — shown for all alert types -->
+        <div class="tw:flex tw:items-start alert-settings-row">
+          <div
+            class="tw:font-semibold tw:flex tw:items-center"
+            style="width: 190px; height: 28px"
           >
-            <q-tooltip anchor="center right" self="center left" max-width="350px">
-              <span style="font-size: 14px">
-                {{ t("alerts.alertSettings.createsIncidentTooltip") }}
-              </span>
-            </q-tooltip>
-          </q-icon>
+            {{ t("alerts.alertSettings.createsIncident") }}
+            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OTooltip
+                :content="t('alerts.alertSettings.createsIncidentTooltip')"
+                side="right"
+              />
+          </div>
+          <OSwitch
+            v-model="formData.creates_incident"
+            data-test="alert-creates-incident-toggle"
+          />
         </div>
-        <q-toggle
-          v-model="formData.creates_incident"
-          data-test="alert-creates-incident-toggle"
-          size="30px"
-          class="o2-toggle-button-xs"
-        />
       </div>
-      </q-form>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, nextTick, type PropType } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  nextTick,
+  type PropType,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
   convertMinutesToCron,
 } from "@/utils/zincutils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "Step3AlertConditions",
-  components: { OButton },
+  components: { OButton, OInput, OSelect, OSwitch, OTooltip, OIcon },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -464,9 +412,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    // Form ref
-    const alertSettingsForm = ref(null);
-
     // Field refs for focus manager
     const periodFieldRef = ref(null);
     const thresholdFieldRef = ref(null);
@@ -475,9 +420,11 @@ export default defineComponent({
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
-    const queryType = computed(() => props.formData.query_condition?.type || "custom");
+    const queryType = computed(
+      () => props.formData.query_condition?.type || "custom",
+    );
     const localIsAggregationEnabled = ref(
-      queryType.value === "custom" && props.isAggregationEnabled
+      queryType.value === "custom" && props.isAggregationEnabled,
     );
     const localDestinations = ref(props.destinations);
     const destinationsTouched = ref(false);
@@ -494,11 +441,15 @@ export default defineComponent({
     // Initialize timezone
     const initializeTimezone = () => {
       try {
-        const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const detectedTimezone =
+          Intl.DateTimeFormat().resolvedOptions().timeZone;
         browserTimezone.value = detectedTimezone;
 
         // Auto-detect and set timezone if not already set and in cron mode
-        if (props.formData.trigger_condition.frequency_type === 'cron' && !props.formData.trigger_condition.timezone) {
+        if (
+          props.formData.trigger_condition.frequency_type === "cron" &&
+          !props.formData.trigger_condition.timezone
+        ) {
           props.formData.trigger_condition.timezone = detectedTimezone;
           showTimezoneWarning.value = true;
         }
@@ -506,7 +457,10 @@ export default defineComponent({
         // Get all available timezones
         try {
           // @ts-ignore - supportedValuesOf is not in all TypeScript versions
-          if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+          if (
+            typeof Intl !== "undefined" &&
+            typeof Intl.supportedValuesOf === "function"
+          ) {
             // @ts-ignore
             filteredTimezone.value = Intl.supportedValuesOf("timeZone");
           } else {
@@ -517,7 +471,7 @@ export default defineComponent({
           filteredTimezone.value = [detectedTimezone];
         }
       } catch (e) {
-        console.error('Error initializing timezone:', e);
+        console.error("Error initializing timezone:", e);
         browserTimezone.value = "UTC";
         filteredTimezone.value = ["UTC"];
       }
@@ -526,54 +480,72 @@ export default defineComponent({
     // Initialize on mount
     initializeTimezone();
 
-
     // Watch for prop changes
     watch(
       () => props.isAggregationEnabled,
       (newVal) => {
         // Only enable aggregation if query type is "custom"
-        localIsAggregationEnabled.value = queryType.value === "custom" && newVal;
-      }
+        localIsAggregationEnabled.value =
+          queryType.value === "custom" && newVal;
+      },
     );
 
     // Watch for query type changes
-    watch(
-      queryType,
-      (newType) => {
-        // Disable aggregation when switching to sql or promql
-        // Only update local state — do not emit to parent so the composable
-        // preserves the builder-mode isAggregationEnabled value across tab switches.
-        if (newType !== "custom") {
-          localIsAggregationEnabled.value = false;
-        } else {
-          // Re-enable aggregation if it was previously enabled
-          localIsAggregationEnabled.value = props.isAggregationEnabled;
-        }
+    watch(queryType, (newType) => {
+      // Disable aggregation when switching to sql or promql
+      // Only update local state — do not emit to parent so the composable
+      // preserves the builder-mode isAggregationEnabled value across tab switches.
+      if (newType !== "custom") {
+        localIsAggregationEnabled.value = false;
+      } else {
+        // Re-enable aggregation if it was previously enabled
+        localIsAggregationEnabled.value = props.isAggregationEnabled;
       }
-    );
+    });
 
     watch(
       () => props.destinations,
       (newVal) => {
         localDestinations.value = newVal;
-      }
+      },
     );
 
     // Watch for frequency type changes to manage timezone
     watch(
       () => props.formData.trigger_condition.frequency_type,
       (newVal) => {
-        if (newVal === 'cron') {
+        if (newVal === "cron") {
           initializeTimezone();
         }
-      }
+      },
     );
 
     // Aggregation functions
-    const aggFunctions = ["count", "min", "max", "avg", "sum", "median", "p50", "p75", "p90", "p95", "p99"];
+    const aggFunctions = [
+      "count",
+      "min",
+      "max",
+      "avg",
+      "sum",
+      "median",
+      "p50",
+      "p75",
+      "p90",
+      "p95",
+      "p99",
+    ];
 
     // Trigger operators
-    const triggerOperators = ["=", "!=", ">=", ">", "<=", "<", "Contains", "NotContains"];
+    const triggerOperators = [
+      "=",
+      "!=",
+      ">=",
+      ">",
+      "<=",
+      "<",
+      "Contains",
+      "NotContains",
+    ];
 
     // Filtered numeric columns for aggregation
     const filteredNumericColumns = ref([...props.columns]);
@@ -583,25 +555,14 @@ export default defineComponent({
           filteredNumericColumns.value = [...props.columns];
         } else {
           const needle = val.toLowerCase();
-          filteredNumericColumns.value = props.columns.filter((v: any) => v.toLowerCase().indexOf(needle) > -1);
+          filteredNumericColumns.value = props.columns.filter(
+            (v: any) => v.toLowerCase().indexOf(needle) > -1,
+          );
         }
       });
     };
 
     // Filtered destinations
-    const filteredDestinations = ref([...props.formattedDestinations]);
-    const filterDestinations = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredDestinations.value = [...props.formattedDestinations];
-        } else {
-          const needle = val.toLowerCase();
-          filteredDestinations.value = props.formattedDestinations.filter(
-            (v: any) => v.toLowerCase().indexOf(needle) > -1
-          );
-        }
-      });
-    };
 
     // Timezone filter function
     const timezoneFilterFn = (val: string, update: any) => {
@@ -609,7 +570,10 @@ export default defineComponent({
         if (val === "") {
           try {
             // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+            if (
+              typeof Intl !== "undefined" &&
+              typeof Intl.supportedValuesOf === "function"
+            ) {
               // @ts-ignore
               filteredTimezone.value = Intl.supportedValuesOf("timeZone");
             }
@@ -621,37 +585,51 @@ export default defineComponent({
           const allTimezones: string[] = [];
           try {
             // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+            if (
+              typeof Intl !== "undefined" &&
+              typeof Intl.supportedValuesOf === "function"
+            ) {
               // @ts-ignore
               allTimezones.push(...Intl.supportedValuesOf("timeZone"));
             }
           } catch (e) {
             allTimezones.push(browserTimezone.value);
           }
-          filteredTimezone.value = allTimezones.filter((v: string) =>
-            v.toLowerCase().indexOf(needle) > -1
+          filteredTimezone.value = allTimezones.filter(
+            (v: string) => v.toLowerCase().indexOf(needle) > -1,
           );
         }
       });
     };
 
     // Handle frequency type change with conversion
-    const handleFrequencyTypeChange = (type: 'minutes' | 'cron') => {
+    const handleFrequencyTypeChange = (type: "minutes" | "cron") => {
       // If switching to cron and we have a frequency value, convert it
       // Only convert if there's no existing cron expression
-      if (type === 'cron' && props.formData.trigger_condition.frequency_type === 'minutes') {
-        const frequencyMinutes = Number(props.formData.trigger_condition.frequency);
+      if (
+        type === "cron" &&
+        props.formData.trigger_condition.frequency_type === "minutes"
+      ) {
+        const frequencyMinutes = Number(
+          props.formData.trigger_condition.frequency,
+        );
         const existingCron = props.formData.trigger_condition.cron;
 
         // Only convert if we have a frequency value and no existing cron expression
-        if (frequencyMinutes && frequencyMinutes > 0 && (!existingCron || existingCron.trim() === '')) {
+        if (
+          frequencyMinutes &&
+          frequencyMinutes > 0 &&
+          (!existingCron || existingCron.trim() === "")
+        ) {
           // Convert minutes to cron expression (6-field format: second minute hour day month dayOfWeek)
           const cronExpression = convertMinutesToCron(frequencyMinutes);
           props.formData.trigger_condition.cron = cronExpression;
 
           // Set timezone if not already set
           if (!props.formData.trigger_condition.timezone) {
-            props.formData.trigger_condition.timezone = browserTimezone.value || Intl.DateTimeFormat().resolvedOptions().timeZone;
+            props.formData.trigger_condition.timezone =
+              browserTimezone.value ||
+              Intl.DateTimeFormat().resolvedOptions().timeZone;
           }
         }
       }
@@ -661,20 +639,22 @@ export default defineComponent({
       emitTriggerUpdate();
     };
 
-
     // Validate cron expression
     const validateFrequency = () => {
       cronJobError.value = "";
 
       if (props.formData.trigger_condition.frequency_type === "cron") {
         try {
-          const intervalInSecs = getCronIntervalDifferenceInSeconds(props.formData.trigger_condition.cron);
+          const intervalInSecs = getCronIntervalDifferenceInSeconds(
+            props.formData.trigger_condition.cron,
+          );
 
           if (
             typeof intervalInSecs === "number" &&
             !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
           ) {
-            const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
+            const minInterval =
+              Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
             cronJobError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
             return;
           }
@@ -684,10 +664,13 @@ export default defineComponent({
       }
 
       if (props.formData.trigger_condition.frequency_type === "minutes") {
-        const intervalInMins = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60);
+        const intervalInMins = Math.ceil(
+          store.state?.zoConfig?.min_auto_refresh_interval / 60,
+        );
 
         if (props.formData.trigger_condition.frequency < intervalInMins) {
-          cronJobError.value = "Minimum frequency should be " + intervalInMins + " minutes";
+          cronJobError.value =
+            "Minimum frequency should be " + intervalInMins + " minutes";
           return;
         }
       }
@@ -706,7 +689,9 @@ export default defineComponent({
       if (periodValue && periodValue > 0) {
         // Only sync frequency if period is above minimum refresh interval
         // This prevents frequency from going below the minimum allowed value
-        const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+        const minFrequency =
+          Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) ||
+          10;
         if (periodValue >= minFrequency) {
           props.formData.trigger_condition.frequency = periodValue;
         }
@@ -718,7 +703,9 @@ export default defineComponent({
 
         // Ensure timezone is set
         if (!props.formData.trigger_condition.timezone) {
-          props.formData.trigger_condition.timezone = browserTimezone.value || Intl.DateTimeFormat().resolvedOptions().timeZone;
+          props.formData.trigger_condition.timezone =
+            browserTimezone.value ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone;
         }
 
         // Always sync silence notification
@@ -738,7 +725,10 @@ export default defineComponent({
     };
 
     const emitPromqlConditionUpdate = () => {
-      emit("update:promqlCondition", props.formData.query_condition.promql_condition);
+      emit(
+        "update:promqlCondition",
+        props.formData.query_condition.promql_condition,
+      );
     };
 
     const routeToCreateDestination = () => {
@@ -763,22 +753,29 @@ export default defineComponent({
       }
 
       // For Real-Time Alerts
-      if (props.isRealTime === 'true') {
+      if (props.isRealTime === "true") {
         // Check silence notification
         if (
           props.formData.trigger_condition.silence < 0 ||
           props.formData.trigger_condition.silence === undefined ||
           props.formData.trigger_condition.silence === null ||
-          props.formData.trigger_condition.silence === ''
+          props.formData.trigger_condition.silence === ""
         ) {
-          return { valid: false, message: `${t('alerts.silenceNotification')} should be greater than or equal to 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.silenceNotification")} should be greater than or equal to 0`,
+          };
         }
 
         // Check destinations (required for both real-time and scheduled)
         if (!localDestinations.value || localDestinations.value.length === 0) {
           destinationsTouched.value = true;
           destinationError.value = true;
-          return { valid: false, message: "At least one destination is required.", focusDestination: true };
+          return {
+            valid: false,
+            message: "At least one destination is required.",
+            focusDestination: true,
+          };
         }
 
         return { valid: true };
@@ -787,10 +784,10 @@ export default defineComponent({
       // For Scheduled Alerts
       // Check if aggregation is enabled
       // Check if query type is PromQL - validate both promql_condition AND threshold
-      if (queryType.value === 'promql') {
+      if (queryType.value === "promql") {
         // Validate PromQL condition
         if (!props.formData.query_condition.promql_condition) {
-          return { valid: false, message: 'PromQL condition is required' };
+          return { valid: false, message: "PromQL condition is required" };
         }
         if (!props.formData.query_condition.promql_condition.operator) {
           return { valid: false, message: null };
@@ -798,7 +795,7 @@ export default defineComponent({
         if (
           props.formData.query_condition.promql_condition.value === undefined ||
           props.formData.query_condition.promql_condition.value === null ||
-          props.formData.query_condition.promql_condition.value === ''
+          props.formData.query_condition.promql_condition.value === ""
         ) {
           return { valid: false, message: null };
         }
@@ -809,24 +806,37 @@ export default defineComponent({
         }
         const threshold = Number(props.formData.trigger_condition.threshold);
         if (isNaN(threshold) || threshold < 1) {
-          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.threshold")} should be greater than 0`,
+          };
         }
-      } else if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation) {
+      } else if (
+        localIsAggregationEnabled.value &&
+        props.formData.query_condition.aggregation
+      ) {
         // Validate group by fields (if any are added, they must not be empty)
-        const groupByFields = props.formData.query_condition.aggregation.group_by;
+        const groupByFields =
+          props.formData.query_condition.aggregation.group_by;
         if (groupByFields && groupByFields.length > 0) {
           for (const field of groupByFields) {
-            if (!field || field === '') {
+            if (!field || field === "") {
               return { valid: false, message: null }; // Show inline error only
             }
           }
         }
 
         // Validate aggregation having clause
-        if (!props.formData.query_condition.aggregation.having.column || props.formData.query_condition.aggregation.having.column === '') {
+        if (
+          !props.formData.query_condition.aggregation.having.column ||
+          props.formData.query_condition.aggregation.having.column === ""
+        ) {
           return { valid: false, message: null };
         }
-        if (!props.formData.query_condition.aggregation.having.value || props.formData.query_condition.aggregation.having.value === '') {
+        if (
+          !props.formData.query_condition.aggregation.having.value ||
+          props.formData.query_condition.aggregation.having.value === ""
+        ) {
           return { valid: false, message: null };
         }
         if (!props.formData.query_condition.aggregation.having.operator) {
@@ -839,7 +849,10 @@ export default defineComponent({
         }
         const threshold = Number(props.formData.trigger_condition.threshold);
         if (isNaN(threshold) || threshold < 1) {
-          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.threshold")} should be greater than 0`,
+          };
         }
       } else {
         // Validate threshold without aggregation
@@ -848,24 +861,36 @@ export default defineComponent({
         }
         const threshold = Number(props.formData.trigger_condition.threshold);
         if (isNaN(threshold) || threshold < 1) {
-          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.threshold")} should be greater than 0`,
+          };
         }
       }
 
       // Validate period
       const period = Number(props.formData.trigger_condition.period);
       if (isNaN(period) || period < 1) {
-        return { valid: false, message: `${t('alerts.period')} should be greater than 0` };
+        return {
+          valid: false,
+          message: `${t("alerts.period")} should be greater than 0`,
+        };
       }
 
       // Validate frequency
-      if (props.formData.trigger_condition.frequency_type === 'minutes') {
+      if (props.formData.trigger_condition.frequency_type === "minutes") {
         const frequency = Number(props.formData.trigger_condition.frequency);
         if (isNaN(frequency) || frequency < 1) {
-          return { valid: false, message: `${t('alerts.frequency')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.frequency")} should be greater than 0`,
+          };
         }
-      } else if (props.formData.trigger_condition.frequency_type === 'cron') {
-        if (!props.formData.trigger_condition.cron || !props.formData.trigger_condition.timezone) {
+      } else if (props.formData.trigger_condition.frequency_type === "cron") {
+        if (
+          !props.formData.trigger_condition.cron ||
+          !props.formData.trigger_condition.timezone
+        ) {
           return { valid: false, message: null };
         }
       }
@@ -875,16 +900,23 @@ export default defineComponent({
         props.formData.trigger_condition.silence < 0 ||
         props.formData.trigger_condition.silence === undefined ||
         props.formData.trigger_condition.silence === null ||
-        props.formData.trigger_condition.silence === ''
+        props.formData.trigger_condition.silence === ""
       ) {
-        return { valid: false, message: `${t('alerts.silenceNotification')} should be greater than or equal to 0` };
+        return {
+          valid: false,
+          message: `${t("alerts.silenceNotification")} should be greater than or equal to 0`,
+        };
       }
 
       // Check destinations (required for both real-time and scheduled)
       if (!localDestinations.value || localDestinations.value.length === 0) {
         destinationsTouched.value = true;
         destinationError.value = true;
-        return { valid: false, message: "At least one destination is required.", focusDestination: true };
+        return {
+          valid: false,
+          message: "At least one destination is required.",
+          focusDestination: true,
+        };
       }
 
       return { valid: true };
@@ -894,9 +926,9 @@ export default defineComponent({
       nextTick(() => {
         const el = (destinationsFieldRef.value as any)?.$el as HTMLElement;
         if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
           setTimeout(() => {
-            const input = el.querySelector('input') as HTMLElement;
+            const input = el.querySelector("input") as HTMLElement;
             input?.focus();
           }, 400);
         }
@@ -915,8 +947,6 @@ export default defineComponent({
       triggerOperators,
       filteredNumericColumns,
       filterNumericColumns,
-      filteredDestinations,
-      filterDestinations,
       emitTriggerUpdate,
       emitAggregationUpdate,
       emitDestinationsUpdate,
@@ -934,7 +964,6 @@ export default defineComponent({
       validateFrequency,
       // Validation
       validate,
-      alertSettingsForm,
       // Field refs for focus manager
       periodFieldRef,
       thresholdFieldRef,
