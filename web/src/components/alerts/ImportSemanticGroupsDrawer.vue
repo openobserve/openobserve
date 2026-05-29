@@ -15,367 +15,321 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="import-drawer-container tw:w-[45rem]">
-    <!-- Header -->
-    <div class="drawer-header q-pa-md">
-      <div class="row items-center">
-        <div class="col">
-          <div class="text-h6">Import Semantic Groups</div>
-          <div class="text-caption text-grey-7">
-            Upload JSON file to import semantic field groups
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            round
-            dense
-            variant="ghost"
-            size="icon-circle-sm"
-            @click="handleClose"
-            data-test="import-drawer-close-btn"
-          >
-            <q-icon name="close" />
-          </OButton>
-        </div>
-      </div>
-    </div>
-
-    <q-separator />
-
-    <!-- Content -->
-    <div class="drawer-content q-pa-md">
+  <ODrawer
+    data-test="semantic-field-groups-config-import-drawer"
+    v-model:open="internalOpen"
+    :width="40"
+    title="Import Semantic Groups"
+    sub-title="Upload JSON file to import semantic field groups"
+    secondary-button-label="Cancel"
+    primary-button-label="Apply Changes"
+    :primary-button-disabled="!hasSelectedChanges"
+    :primary-button-loading="isApplying"
+    @click:secondary="handleClose"
+    @click:primary="handleApply"
+    @update:open="handleOpenChange"
+  >
+  <div class="tw:p-3">
       <!-- File Upload -->
-      <div class="q-mb-md">
-        <q-file
+      <div class="tw:mb-3">
+        <OFile
           v-model="jsonFile"
-          dense
-          filled
           label="Select JSON file"
           accept=".json"
           @update:model-value="loadFile"
           data-test="semantic-groups-import-file-drawer"
         >
           <template v-slot:prepend>
-            <q-icon name="cloud_upload" />
+            <OIcon name="cloud-upload" size="sm" />
           </template>
           <template v-slot:append>
-            <q-icon
+            <OIcon
               v-if="jsonFile"
               name="close"
+              size="sm"
               @click.stop="clearFile"
-              class="cursor-pointer"
+              class="tw:cursor-pointer"
             />
           </template>
-        </q-file>
+        </OFile>
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="text-center q-pa-lg">
-        <q-spinner-dots size="50px" color="primary" />
-        <div class="text-body2 text-grey-7 q-mt-md">Analyzing file...</div>
+      <div v-if="isLoading" class="tw:text-center tw:p-4">
+        <OSpinner variant="dots" size="lg" />
+        <div class="tw:text-sm tw:text-gray-400 tw:mt-3">Analyzing file...</div>
       </div>
 
       <!-- Diff Preview -->
       <div v-else-if="diffData" class="diff-preview">
         <!-- Summary -->
-        <div class="summary-bar q-mb-md">
-          <div class="row q-col-gutter-sm items-center">
+        <div class="summary-bar tw:mb-3">
+          <div class="tw:flex tw:gap-2 tw:items-center">
             <div class="col-auto">
-              <q-chip dense color="positive" text-color="white">
+              <OBadge variant="success">
                 <strong>{{ diffData.additions.length }}</strong
                 >&nbsp;New
-              </q-chip>
+              </OBadge>
             </div>
             <div class="col-auto">
-              <q-chip dense color="warning" text-color="white">
+              <OBadge variant="warning">
                 <strong>{{ diffData.modifications.length }}</strong
                 >&nbsp;Modified
-              </q-chip>
+              </OBadge>
             </div>
             <div class="col-auto">
-              <q-chip dense color="grey-6" text-color="white">
+              <OBadge variant="default">
                 {{ diffData.unchanged.length }} Unchanged
-              </q-chip>
+              </OBadge>
             </div>
           </div>
         </div>
 
         <!-- Selection Actions -->
-        <div class="selection-actions q-mb-md">
+        <div class="selection-actions tw:mb-3">
           <OButtonGroup>
             <OButton
               variant="ghost-primary"
               size="xs"
               @click="selectAllAdditions"
-            >Select All New</OButton>
+              >Select All New</OButton
+            >
             <OButton
               variant="ghost-warning"
               size="xs"
               @click="selectAllModifications"
-            >Select All Modified</OButton>
-            <OButton
-              variant="ghost-muted"
-              size="xs"
-              @click="deselectAll"
-            >Clear All</OButton>
+              >Select All Modified</OButton
+            >
+            <OButton variant="ghost-muted" size="xs" @click="deselectAll"
+              >Clear All</OButton
+            >
           </OButtonGroup>
         </div>
 
         <!-- Groups List -->
         <div class="groups-list">
           <!-- Additions -->
-          <div v-if="diffData.additions.length > 0" class="q-mb-md">
-            <div class="section-header text-positive q-pa-sm">
-              <q-icon name="add_circle" size="sm" />
+          <div v-if="diffData.additions.length > 0" class="tw:mb-3">
+            <div class="section-header tw:text-green-500 tw:p-2">
+              <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
               }})
             </div>
-            <q-list bordered separator>
-              <q-item
+            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <li
                 v-for="group in diffData.additions"
                 :key="group.id"
-                clickable
+                data-test="semantic-groups-drawer-addition-item"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
                 @click="toggleAddition(group.id)"
               >
-                <q-item-section side>
-                  <q-checkbox
+                <div class="tw:flex tw:items-center tw:shrink-0">
+                  <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
-                    color="positive"
                   />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">{{
+                </div>
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-medium">{{
                     group.display
-                  }}</q-item-label>
-                  <q-item-label caption>
+                  }}</span>
+                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
                     {{ group.id }} • {{ group.fields.length }} fields
-                  </q-item-label>
-                </q-item-section>
-                <q-item-section side>
+                  </span>
+                </div>
+                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
                     @click.stop="viewGroup(group)"
                   >
-                    <q-icon name="visibility" />
+                    <OIcon name="visibility" size="sm" />
                   </OButton>
-                </q-item-section>
-              </q-item>
-            </q-list>
+                </div>
+              </li>
+            </ul>
           </div>
 
           <!-- Modifications -->
-          <div v-if="diffData.modifications.length > 0" class="q-mb-md">
-            <div class="section-header text-warning q-pa-sm">
-              <q-icon name="edit" size="sm" />
+          <div v-if="diffData.modifications.length > 0" class="tw:mb-3">
+            <div class="section-header tw:text-amber-500 tw:p-2">
+              <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
               }})
             </div>
-            <q-list bordered separator>
-              <q-item
+            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <li
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
-                clickable
+                data-test="semantic-groups-drawer-modification-item"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
                 @click="toggleModification(mod.proposed.id)"
               >
-                <q-item-section side>
-                  <q-checkbox
+                <div class="tw:flex tw:items-center tw:shrink-0">
+                  <OCheckbox
                     :model-value="
                       selectedModifications.includes(mod.proposed.id)
                     "
                     @update:model-value="toggleModification(mod.proposed.id)"
-                    color="warning"
                   />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">{{
+                </div>
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-medium">{{
                     mod.proposed.display
-                  }}</q-item-label>
-                  <q-item-label caption>
+                  }}</span>
+                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
                     {{ mod.proposed.fields.length }} fields
-                  </q-item-label>
-                </q-item-section>
-                <q-item-section side>
+                  </span>
+                </div>
+                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
                     @click.stop="viewModification(mod)"
                   >
-                    <q-icon name="compare" />
+                    <OIcon name="compare" size="sm" />
                   </OButton>
-                </q-item-section>
-              </q-item>
-            </q-list>
+                </div>
+              </li>
+            </ul>
           </div>
 
           <!-- Unchanged (Collapsed) -->
           <div v-if="diffData.unchanged.length > 0">
-            <q-expansion-item
+            <OCollapsible
+              v-model="unchangedOpen"
               :label="`Unchanged (${diffData.unchanged.length})`"
-              icon="check_circle"
-              header-class="text-grey-7"
+              icon="check-circle"
             >
-              <q-list bordered separator>
-                <q-item v-for="group in diffData.unchanged" :key="group.id">
-                  <q-item-section>
-                    <q-item-label>{{ group.display }}</q-item-label>
-                    <q-item-label caption
+              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                <li
+                  v-for="group in diffData.unchanged"
+                  :key="group.id"
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                >
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                    <span class="tw:text-sm">{{ group.display }}</span>
+                    <span class="tw:block tw:text-xs tw:text-muted-foreground"
                       >{{ group.id }} •
-                      {{ group.fields.length }} fields</q-item-label
+                      {{ group.fields.length }} fields</span
                     >
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-expansion-item>
+                  </div>
+                </li>
+              </ul>
+            </OCollapsible>
           </div>
         </div>
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state text-center q-pa-lg">
-        <q-icon
-          name="cloud_upload"
-          size="64px"
-          color="grey-5"
-          class="q-mb-md"
-        />
-        <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file</div>
-        <div class="text-body2 text-grey-6">
+      <div v-else class="empty-state tw:text-center tw:p-4">
+        <OIcon name="cloud-upload" class="tw:mb-3" style="width: 64px; height: 64px;" />
+        <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mb-2">Upload a JSON file</div>
+        <div class="tw:text-sm tw:text-gray-400">
           The system will analyze the file and show you what will change
         </div>
       </div>
     </div>
+  </ODrawer>
 
-    <!-- Footer Actions -->
-    <div class="drawer-footer q-pa-md">
-      <q-separator class="q-mb-md" />
-      <div class="row q-col-gutter-sm justify-end">
-        <div class="col-auto">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="handleClose"
-            data-test="import-drawer-cancel-btn"
-          >Cancel</OButton>
+  <!-- Group Details Dialog -->
+  <ODialog
+    data-test="import-semantic-groups-drawer-group-dialog"
+    v-model:open="showGroupDialog"
+    size="md"
+    :title="selectedGroup?.display"
+    :sub-title="`ID: ${selectedGroup?.id}`"
+    primary-button-label="Close"
+    @click:primary="showGroupDialog = false"
+  >
+    <div>
+      <div class="tw:text-sm tw:font-medium tw:mb-2">
+        Fields ({{ selectedGroup?.fields.length }})
+      </div>
+      <OBadge
+        v-for="field in selectedGroup?.fields"
+        :key="field"
+        variant="primary"
+        class="tw:m-1"
+      >
+        {{ field }}
+      </OBadge>
+    </div>
+  </ODialog>
+
+  <!-- Modification Comparison Dialog -->
+  <ODialog
+    data-test="import-semantic-groups-drawer-modification-dialog"
+    v-model:open="showModificationDialog"
+    size="lg"
+    :title="selectedModification?.proposed.display"
+    sub-title="Compare Changes"
+    primary-button-label="Close"
+    @click:primary="showModificationDialog = false"
+  >
+    <div class="tw:flex tw:gap-3">
+      <div class="tw:w-1/2">
+        <div class="tw:text-sm tw:font-medium tw:text-red-500 tw:mb-2">Current</div>
+        <div class="tw:text-xs tw:mb-1">
+          {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="col-auto">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="handleApply"
-            :disabled="!hasSelectedChanges"
-            :loading="isApplying"
-            data-test="import-drawer-apply-btn"
-          >Apply Changes</OButton>
+        <div class="field-chips-container">
+          <OBadge
+            v-for="field in selectedModification?.current.fields"
+            :key="`current-${field}`"
+            variant="default"
+            size="sm"
+            class="tw:m-1"
+          >
+            {{ field }}
+          </OBadge>
+        </div>
+      </div>
+      <div class="tw:w-1/2">
+        <div class="tw:text-sm tw:font-medium tw:text-green-500 tw:mb-2">Proposed</div>
+        <div class="tw:text-xs tw:mb-1">
+          {{ selectedModification?.proposed.fields.length }} fields
+        </div>
+        <div class="field-chips-container">
+          <OBadge
+            v-for="field in selectedModification?.proposed.fields"
+            :key="`proposed-${field}`"
+            :variant="isNewField(field) ? 'success' : 'default'"
+            size="sm"
+            class="tw:m-1"
+          >
+            {{ field }}
+            <OIcon
+              v-if="isNewField(field)"
+              name="add"
+              size="xs"
+              class="tw:ml-1"
+            />
+          </OBadge>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Group Details Dialog -->
-  <q-dialog v-model="showGroupDialog">
-    <q-card style="min-width: 500px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedGroup?.display }}</div>
-        <div class="text-caption text-grey-7">ID: {{ selectedGroup?.id }}</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="text-subtitle2 q-mb-sm">
-          Fields ({{ selectedGroup?.fields.length }})
-        </div>
-        <q-chip
-          v-for="field in selectedGroup?.fields"
-          :key="field"
-          color="primary"
-          text-color="white"
-          class="q-ma-xs"
-        >
-          {{ field }}
-        </q-chip>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
-
-  <!-- Modification Comparison Dialog -->
-  <q-dialog v-model="showModificationDialog">
-    <q-card style="min-width: 700px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedModification?.proposed.display }}</div>
-        <div class="text-caption text-grey-7">Compare Changes</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-col-gutter-md">
-          <div class="col-6">
-            <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-            <div class="text-caption q-mb-xs">
-              {{ selectedModification?.current.fields.length }} fields
-            </div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.current.fields"
-                :key="`current-${field}`"
-                color="grey-4"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-              </q-chip>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-            <div class="text-caption q-mb-xs">
-              {{ selectedModification?.proposed.fields.length }} fields
-            </div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.proposed.fields"
-                :key="`proposed-${field}`"
-                :color="isNewField(field) ? 'positive' : 'grey-4'"
-                :text-color="isNewField(field) ? 'white' : 'black'"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-                <q-icon
-                  v-if="isNewField(field)"
-                  name="add"
-                  size="xs"
-                  class="q-ml-xs"
-                />
-              </q-chip>
-            </div>
-          </div>
-        </div>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 import alertsService from "@/services/alerts";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
 
 interface SemanticGroup {
   id: string;
@@ -398,21 +352,36 @@ interface SemanticGroupDiff {
 interface Props {
   currentGroups: SemanticGroup[];
   orgId: string;
+  open?: boolean;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  (e: "close"): void;
+  (e: "update:open", value: boolean): void;
   (e: "apply", groups: SemanticGroup[]): void;
 }>();
 
-const q = useQuasar();
+const internalOpen = ref(props.open ?? false);
+
+watch(
+  () => props.open,
+  (v) => {
+    if (v !== undefined) internalOpen.value = v;
+  },
+);
+
+function handleOpenChange(v: boolean) {
+  internalOpen.value = v;
+  emit("update:open", v);
+}
+
 
 const jsonFile = ref<File | null>(null);
 const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
 const selectedModifications = ref<string[]>([]);
+const unchangedOpen = ref(false);
 const isLoading = ref(false);
 const isApplying = ref(false);
 const showGroupDialog = ref(false);
@@ -444,11 +413,9 @@ const loadFile = async (file: File | null) => {
 
     await previewDiff(groups);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to parse JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+      variant: "error",
     });
     clearFile();
   } finally {
@@ -479,11 +446,9 @@ const previewDiff = async (groups: SemanticGroup[]) => {
       (m: SemanticGroupModification) => m.proposed.id,
     );
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+      variant: "error",
     });
   }
 };
@@ -559,7 +524,8 @@ const handleApply = () => {
   mergedGroups.push(...selectedModificationGroups);
 
   // Capture count before clearing state
-  const changeCount = selectedAdditions.value.length + selectedModifications.value.length;
+  const changeCount =
+    selectedAdditions.value.length + selectedModifications.value.length;
 
   // Emit the merged groups to parent
   emit("apply", mergedGroups);
@@ -567,46 +533,25 @@ const handleApply = () => {
   // Reset and close
   clearFile();
   isApplying.value = false;
-  emit("close");
+  handleOpenChange(false);
 
-  q.notify({
+  toast({
     message: `Applied ${changeCount} changes`,
-    color: "positive",
-    position: "bottom",
-    timeout: 2000,
+    variant: "success",
   });
 };
 
 const handleClose = () => {
   clearFile();
-  emit("close");
+  handleOpenChange(false);
 };
 </script>
 
 <style lang="scss" scoped>
-.import-drawer-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.drawer-header {
-  flex-shrink: 0;
-}
-
-.drawer-content {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.drawer-footer {
-  flex-shrink: 0;
-}
-
 .section-header {
   font-size: 14px;
   font-weight: 600;
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .groups-list {

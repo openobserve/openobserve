@@ -15,9 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="backfill-jobs-list-page">
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-      <!-- Header -->
+  <div
+    data-test="backfill-jobs-list-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+  >
+    <!-- Header -->
+    <div class="tw:shrink-0">
       <div class="card-container tw:mb-[0.625rem]">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]"
@@ -25,63 +28,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center">
             <OButton
               variant="ghost"
-              size="icon-xs-sq"
+              size="icon-sm"
               @click="goBack"
               data-test="backfill-jobs-back-btn"
-            >
-              <template #icon-left>
-                <ChevronLeft class="tw:size-3.5 tw:shrink-0" />
-              </template>
-            </OButton>
-            <div class="q-table__title tw:font-[600] q-ml-sm">
+              icon-left="chevron-left"
+            />
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2">
               Backfill Jobs
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center tw:gap-2">
             <!-- Filters -->
-            <div class="tw:flex tw:gap-2">
-              <q-select
-                v-model="filters.status"
-                :options="statusOptions"
-                color="input-border"
-                bg-color="input-bg"
-                placeholder="Status"
-                use-input
-                fill-input
-                hide-selected
-                borderless
-                dense
-                clearable
-                input-debounce="300"
-                @filter="filterStatuses"
-                style="width: 150px"
-                data-test="status-filter"
-              />
-              <q-select
-                v-model="filters.pipelineId"
-                :options="pipelineOptions"
-                option-label="label"
-                option-value="value"
-                color="input-border"
-                bg-color="input-bg"
-                placeholder="Pipeline"
-                map-options
-                use-input
-                emit-value
-                fill-input
-                hide-selected
-                borderless
-                dense
-                clearable
-                input-debounce="300"
-                @filter="filterPipelines"
-                style="width: 250px"
-                data-test="pipeline-filter"
-              />
-            </div>
+            <OSelect
+              v-model="filters.status"
+              :options="allStatusOptions"
+              placeholder="Status"
+              clearable
+              searchable
+              class="tw:w-[150px]"
+              data-test="status-filter"
+            />
+            <OSelect
+              v-model="filters.pipelineId"
+              :options="allPipelineOptions"
+              labelKey="label"
+              valueKey="value"
+              placeholder="Pipeline"
+              clearable
+              searchable
+              class="tw:w-[250px]"
+              data-test="pipeline-filter"
+            />
             <OButton
               variant="outline"
-              size="sm-action"
+              size="sm"
               @click="clearFilters"
               data-test="clear-filters-btn"
             >
@@ -89,225 +69,173 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="ghost-muted"
-              size="icon-xs-sq"
+              size="icon-sm"
               @click="refreshJobs"
               :disabled="loading"
               data-test="refresh-btn"
+              icon-left="refresh"
             >
-              <template #icon-left>
-                <RefreshCw class="tw:size-3.5 tw:shrink-0" />
-              </template>
-              <q-tooltip>Refresh</q-tooltip>
+              <OTooltip content="Refresh" side="top" />
             </OButton>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Jobs Table -->
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-127px)]">
-          <q-table
+    <!-- Jobs Table -->
+    <div class="tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:h-full">
+          <OTable
             ref="qTableRef"
-            :rows="filteredJobs"
+            :data="filteredJobs"
             :columns="columns"
             row-key="job_id"
             :loading="loading"
-            :pagination="pagination"
-            binary-state-sort
-            :style="
-              filteredJobs.length > 0
-                ? 'width: 100%; height: calc(100vh - 130px)'
-                : 'width: 100%'
-            "
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            pagination="client"
+            :page-size="selectedPerPage"
+            :page-size-options="perPageOptionsList"
+            sorting="client"
+            filter-mode="client"
+            :show-global-filter="false"
+            width="100%"
+            class="tw:w-full tw:h-full"
             data-test="backfill-jobs-table"
           >
             <!-- Empty State -->
-            <template v-slot:no-data>
+            <template #empty>
               <NoData />
             </template>
 
+            <!-- Bottom footer -->
+            <template #bottom="{ totalRows }">
+              <div
+                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
+              >
+                {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
+              </div>
+            </template>
+
             <!-- Pipeline Name Column -->
-            <template v-slot:body-cell-pipeline_name="props">
-              <q-td :props="props">
-                <div class="tw:font-medium">
-                  {{ props.row.pipeline_name || props.row.pipeline_id }}
-                </div>
-              </q-td>
+            <template #cell-pipeline_name="{ row }">
+              <div class="tw:font-medium">
+                {{ row.pipeline_name || row.pipeline_id }}
+              </div>
             </template>
 
             <!-- Time Range Column -->
-            <template v-slot:body-cell-time_range="props">
-              <q-td :props="props">
-                <div class="text-caption">
-                  {{
-                    formatTimeRange(props.row.start_time, props.row.end_time)
-                  }}
-                </div>
-              </q-td>
+            <template #cell-time_range="{ row }">
+              <div class="tw:text-xs">
+                {{
+                  formatTimeRange(row.start_time, row.end_time)
+                }}
+              </div>
             </template>
 
             <!-- Progress Column -->
-            <template v-slot:body-cell-progress_percent="props">
-              <q-td :props="props">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                  <div class="tw:flex-1 tw:relative">
-                    <q-linear-progress
-                      :value="props.row.progress_percent / 100"
-                      :color="getProgressColor(props.row.deletion_status)"
-                      size="20px"
-                      rounded
-                      data-test="progress-bar"
-                    >
-                      <div
-                        class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center"
-                      >
-                        <div
-                          class="text-caption tw:font-semibold tw:text-white tw:drop-shadow-sm"
-                        >
-                          {{ props.row.progress_percent }}%
-                        </div>
-                      </div>
-                    </q-linear-progress>
-                  </div>
-                  <div
-                    v-if="props.row.chunks_total"
-                    class="text-caption text-grey-6 tw:whitespace-nowrap tw:pr-8"
+            <template #cell-progress_percent="{ row }">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                <div class="tw:flex-1 tw:relative">
+                  <OProgressBar
+                    :value="row.progress_percent / 100"
+                    variant="default"
+                    size="lg"
+                    data-test="progress-bar"
                   >
-                    {{ props.row.chunks_completed || 0 }}/{{
-                      props.row.chunks_total
-                    }}
-                    chunks
-                  </div>
+                    {{ row.progress_percent }}%
+                  </OProgressBar>
                 </div>
-              </q-td>
+                <div
+                  v-if="row.chunks_total"
+                  class="tw:text-xs tw:text-gray-400 tw:whitespace-nowrap tw:pr-8"
+                >
+                  {{ row.chunks_completed || 0 }}/{{
+                    row.chunks_total
+                  }}
+                  chunks
+                </div>
+              </div>
             </template>
 
             <!-- Created At Column -->
-            <template v-slot:body-cell-created_at="props">
-              <q-td :props="props">
-                <div class="text-caption">
-                  {{ formatTimestamp(props.row.created_at) }}
-                </div>
-              </q-td>
+            <template #cell-created_at="{ row }">
+              <div class="tw:text-xs">
+                {{ formatTimestamp(row.created_at) }}
+              </div>
             </template>
 
             <!-- Last Triggered At Column -->
-            <template v-slot:body-cell-last_triggered_at="props">
-              <q-td :props="props">
-                <div class="text-caption">
-                  {{ formatTimestamp(props.row.last_triggered_at) }}
-                </div>
-              </q-td>
+            <template #cell-last_triggered_at="{ row }">
+              <div class="tw:text-xs">
+                {{ formatTimestamp(row.last_triggered_at) }}
+              </div>
             </template>
 
             <!-- Actions Column -->
-            <template v-slot:body-cell-actions="props">
-              <q-td :props="props">
-                <div class="tw:flex tw:items-center tw:justify-center">
-                  <OButton
-                    v-if="canPauseJob(props.row)"
-                    variant="ghost-destructive"
-                    size="icon-xs-sq"
-                    @click="confirmPauseJob(props.row)"
-                    data-test="pause-job-btn"
-                  >
-                    <template #icon-left>
-                      <Pause class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                    <q-tooltip>Pause Job</q-tooltip>
-                  </OButton>
-                  <OButton
-                    v-if="canResumeJob(props.row)"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    @click="confirmResumeJob(props.row)"
-                    data-test="resume-job-btn"
-                  >
-                    <template #icon-left>
-                      <Play class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                    <q-tooltip>Resume Job</q-tooltip>
-                  </OButton>
-                  <OButton
-                    v-if="canEditJob(props.row.status)"
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    @click="editJob(props.row)"
-                    data-test="edit-job-btn"
-                  >
-                    <template #icon-left>
-                      <Pencil class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                    <q-tooltip>Edit Job</q-tooltip>
-                  </OButton>
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    @click="viewJob(props.row)"
-                    data-test="view-job-btn"
-                  >
-                    <template #icon-left>
-                      <Eye class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                    <q-tooltip>View Details</q-tooltip>
-                  </OButton>
-                  <OButton
-                    v-if="canDeleteJob(props.row.status)"
-                    variant="ghost-destructive"
-                    size="icon-xs-sq"
-                    @click="confirmDeleteJob(props.row)"
-                    data-test="delete-job-btn"
-                  >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                    <q-tooltip>Delete Job</q-tooltip>
-                  </OButton>
-                  <OButton
-                    v-if="props.row.error"
-                    variant="ghost-destructive"
-                    size="icon-xs-sq"
-                    @click="showErrorDialog(props.row)"
-                    data-test="error-indicator-btn"
-                  >
-                    <template #icon-left>
-                      <AlertCircle class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                    <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
-                  </OButton>
-                </div>
-              </q-td>
-            </template>
-
-            <template v-slot:header="props">
-              <q-tr :props="props">
-                <!-- Rendering the rest of the columns -->
-                <q-th
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                  :class="col.classes"
-                  :style="col.style"
+            <template #cell-actions="{ row }">
+              <div class="tw:flex tw:items-center tw:justify-center">
+                <OButton
+                  v-if="canPauseJob(row)"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  @click="confirmPauseJob(row)"
+                  data-test="pause-job-btn"
+                  icon-left="pause"
                 >
-                  {{ col.label }}
-                </q-th>
-              </q-tr>
+                  <OTooltip content="Job" />
+                </OButton>
+                <OButton
+                  v-if="canResumeJob(row)"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="confirmResumeJob(row)"
+                  data-test="resume-job-btn"
+                  icon-left="play-arrow"
+                >
+                  <OTooltip content="Resume Job" />
+                </OButton>
+                <OButton
+                  v-if="canEditJob(row.status)"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="editJob(row)"
+                  data-test="edit-job-btn"
+                  icon-left="edit"
+                >
+                  <OTooltip content="Edit Job" />
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="viewJob(row)"
+                  data-test="view-job-btn"
+                  icon-left="visibility"
+                >
+                  <OTooltip content="View Details" />
+                </OButton>
+                <OButton
+                  v-if="canDeleteJob(row.status)"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  @click="confirmDeleteJob(row)"
+                  data-test="delete-job-btn"
+                  icon-left="delete"
+                >
+                  <OTooltip content="Delete Job" />
+                </OButton>
+                <OButton
+                  v-if="row.error"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  @click="showErrorDialog(row)"
+                  data-test="error-indicator-btn"
+                  icon-left="error"
+                >
+                  <OTooltip :content="`Error: ${row.error}`" />
+                </OButton>
+              </div>
             </template>
-
-            <!-- Bottom Pagination -->
-            <template #bottom="scope">
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="filteredJobs.length"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
-            </template>
-          </q-table>
+          </OTable>
         </div>
-      </div>
     </div>
 
     <!-- Job Details Dialog -->
@@ -326,51 +254,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Error Dialog -->
-    <q-dialog v-model="errorDialogVisible" @hide="closeErrorDialog">
-      <q-card class="backfill-error-dialog" style="min-width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">
-            <q-icon name="error" color="negative" size="24px" class="q-mr-sm" />
-            Backfill Job Error
+    <ODialog data-test="backfill-jobs-list-error-dialog"
+      v-model:open="errorDialogVisible"
+      size="md"
+      title="Backfill Job Error"
+      primary-button-label="Close"
+      @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="errorDialogVisible = false; closeErrorDialog()"
+    >
+      <template #header-left>
+        <OIcon name="error" size="sm" />
+      </template>
+
+      <div v-if="errorDialogData">
+        <div class="tw:mb-3">
+          <div class="tw:text-xs tw:text-gray-400">Job ID</div>
+          <div class="tw:text-sm text-weight-medium">
+            {{ errorDialogData.job_id }}
           </div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
+        </div>
 
-        <q-separator />
-
-        <q-card-section v-if="errorDialogData">
-          <div class="q-mb-md">
-            <div class="text-caption text-grey-6">Job ID</div>
-            <div class="text-body2 text-weight-medium">
-              {{ errorDialogData.job_id }}
-            </div>
+        <div class="tw:mb-3">
+          <div class="tw:text-xs tw:text-gray-400">Pipeline</div>
+          <div class="tw:text-sm">
+            {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
+        </div>
 
-          <div class="q-mb-md">
-            <div class="text-caption text-grey-6">Pipeline</div>
-            <div class="text-body2">
-              {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
-            </div>
+        <div>
+          <div class="tw:text-xs tw:text-gray-400 tw:mb-2">Error Message</div>
+          <div class="error-message-box">
+            {{ errorDialogData.error }}
           </div>
+        </div>
+      </div>
 
-          <div>
-            <div class="text-caption text-grey-6 q-mb-sm">Error Message</div>
-            <div class="error-message-box">
-              {{ errorDialogData.error }}
-            </div>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    </ODialog>
 
     <!-- Confirm Dialog -->
     <ConfirmDialog
@@ -380,32 +299,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmDialog.onConfirm"
       @update:cancel="resetConfirmDialog"
     />
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useQuasar, date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronLeft, RefreshCw, Pause, Play, Pencil, Eye, Trash2, AlertCircle } from "lucide-vue-next";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import NoData from "../shared/grid/NoData.vue";
-import QTablePagination from "../shared/grid/Pagination.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedVisibility,
-} from "@quasar/extras/material-icons-outlined";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const router = useRouter();
-const $q = useQuasar();
 const store = useStore();
 
 // Refs
@@ -430,73 +348,21 @@ const confirmDialog = ref({
 });
 
 const filters = ref({
-  status: null as string | null,
-  pipelineId: null as any,
-});
-
-const pagination = ref({
-  rowsPerPage: 20,
+  status: undefined as string | undefined,
+  pipelineId: undefined as any,
 });
 
 const selectedPerPage = ref(10);
 
-const perPageOptions = [
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
+const perPageOptionsList = [10, 20, 50, 100];
 
-const changePagination = (key: any) => {
-  selectedPerPage.value = key.value;
-  pagination.value.rowsPerPage = key.value;
-  qTableRef.value?.setPagination(pagination.value);
-};
-
-const columns = [
-  {
-    name: "pipeline_name",
-    label: "Pipeline",
-    align: "left" as const,
-    field: "pipeline_name",
-    sortable: true,
-  },
-  {
-    name: "time_range",
-    label: "Time Range",
-    align: "left" as const,
-    field: "start_time",
-    sortable: true,
-  },
-  {
-    name: "progress_percent",
-    label: "Progress",
-    align: "left" as const,
-    field: "progress_percent",
-    sortable: true,
-  },
-  {
-    name: "created_at",
-    label: "Created",
-    align: "left" as const,
-    field: "created_at",
-    sortable: true,
-  },
-  {
-    name: "last_triggered_at",
-    label: "Last Triggered",
-    align: "left" as const,
-    field: "last_triggered_at",
-    sortable: true,
-  },
-  {
-    name: "actions",
-    label: "Actions",
-    align: "center" as const,
-    field: "actions",
-    classes: "actions-column",
-    style: "width: 150px;",
-  },
+const columns: OTableColumnDef[] = [
+  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, meta: { align: "left" } },
+  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, meta: { align: "left" } },
+  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, meta: { align: "left" } },
+  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, meta: { align: "left" } },
+  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, meta: { align: "left" } },
+  { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 
 const allStatusOptions = ["running", "completed", "paused", "failed"];
@@ -519,10 +385,9 @@ const loadJobs = async () => {
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to load backfill jobs",
-      timeout: 3000,
     });
   } finally {
     loading.value = false;
@@ -590,8 +455,8 @@ const filteredJobs = computed(() => {
 
 const clearFilters = () => {
   filters.value = {
-    status: null,
-    pipelineId: null,
+    status: undefined,
+    pipelineId: undefined,
   };
 };
 
@@ -653,7 +518,7 @@ const resetConfirmDialog = () => {
 const confirmPauseJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Pause Backfill Job",
+    title: "Backfill Job",
     message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
     onConfirm: () => pauseJob(job.pipeline_id, job.job_id),
   };
@@ -686,17 +551,16 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
       enable: false,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job paused successfully",
-      timeout: 3000,
     });
 
     loadJobs();
   } catch (error: any) {
     console.error("Error pausing backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to pause backfill job",
       timeout: 5000,
     });
@@ -712,17 +576,16 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
       enable: true,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job resumed successfully",
-      timeout: 3000,
     });
 
     loadJobs();
   } catch (error: any) {
     console.error("Error resuming backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to resume backfill job",
       timeout: 5000,
     });
@@ -737,17 +600,16 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
       job_id: jobId,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job deleted successfully",
-      timeout: 3000,
     });
 
     loadJobs();
   } catch (error: any) {
     console.error("Error deleting backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to delete backfill job",
       timeout: 5000,
     });
@@ -798,7 +660,7 @@ const formatTimestamp = (timestamp?: number) => {
   const unixSeconds = timestamp / 1e6; // Convert from microseconds to seconds
   const dateToFormat = new Date(unixSeconds * 1000);
   const formattedDate = dateToFormat.toISOString();
-  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+  return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 };
 </script>
 

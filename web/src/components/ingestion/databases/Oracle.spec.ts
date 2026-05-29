@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar } from 'quasar';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -88,6 +87,7 @@ const mockRouter = createRouter({
   ],
 });
 
+
 describe('Oracle.vue Comprehensive Coverage', () => {
   let wrapper: VueWrapper;
 
@@ -111,7 +111,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     return mount(Oracle, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar, mockI18n, mockRouter],
+        plugins: [mockI18n, mockRouter],
         provide: {
           store: mockStore,
         },
@@ -126,12 +126,12 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should render the component correctly', () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
 
     it('should render with correct CSS classes', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
       expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
       expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
     });
@@ -167,7 +167,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
 
     it('should render with proper component structure', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
       expect(wrapper.find('.tw\\:font-bold.tw\\:pt-6.tw\\:pb-2').exists()).toBe(true);
     });
   });
@@ -209,7 +209,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should render correctly with various prop states', () => {
       wrapper = createWrapper({ currUserEmail: 'test@example.com' });
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
 
     it('should maintain component structure regardless of props', () => {
@@ -266,7 +266,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
       const vm = wrapper.vm as any;
       
       // Test that component structure is correct
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
       expect(typeof vm).toBe('object');
     });
 
@@ -282,7 +282,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
       wrapper = createWrapper();
 
       // Test that all required template elements are present
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
       expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
       expect(wrapper.findComponent(CopyContent).exists()).toBe(true);
       expect(wrapper.find('a').exists()).toBe(true);
@@ -399,7 +399,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
       
       // Test that component remains stable during updates
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
     });
 
     it('should maintain functionality after props update', async () => {
@@ -460,7 +460,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should render all template elements correctly', () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
       expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
       expect(wrapper.find('.copy-content-container-cls').exists()).toBe(true);
       expect(wrapper.find('.tw\\:font-bold.tw\\:pt-6.tw\\:pb-2').exists()).toBe(true);

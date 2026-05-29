@@ -15,67 +15,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="dialogOpen"
-    position="right"
-    maximized
+  <ODrawer data-test="predefined-themes-drawer"
+    v-model:open="dialogOpen"
+    size="sm"
     seamless
-    transition-show="slide-left"
-    transition-hide="slide-right"
+    title="Predefined Themes"
   >
-    <q-card class="predefined-theme-card" style="width: 400px; max-width: 90vw">
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">Predefined Themes</div>
-        <q-space />
-        <OButton
-          variant="ghost-destructive"
-          size="xs"
-          class="q-mr-sm"
-          @click="resetToDefaultTheme"
-        >
-          <template #icon-left><q-icon name="refresh" size="14px" /></template>
-          Reset
-        </OButton>
-        <OButton variant="ghost" size="icon" v-close-popup data-test="predefined-themes-close-btn">
-          <q-icon name="close" size="14px" />
-        </OButton>
-      </q-card-section>
+    <template #header-right>
+      <OButton
+        data-test="predefined-themes-reset-btn"
+        variant="ghost-destructive"
+        size="xs"
+        @click="resetToDefaultTheme"
+      >
+        <template #icon-left><OIcon name="refresh" size="xs" /></template>
+        Reset
+      </OButton>
+    </template>
 
-      <q-card-section class="q-pt-none">
-        <OTabs v-model="activeTab" dense class="text-grey" align="justify">
-          <OTab name="light" label="Light Mode" />
-          <OTab name="dark" label="Dark Mode" />
+      <OCardSection class="tw:pt-0">
+        <OTabs v-model="activeTab" dense class="tw:text-gray-500" align="justify">
+          <OTab data-test="predefined-themes-tab-light" name="light" label="Light Mode" />
+          <OTab data-test="predefined-themes-tab-dark" name="dark" label="Dark Mode" />
         </OTabs>
-      </q-card-section>
+      </OCardSection>
 
-      <q-card-section class="q-pt-none scroll-content-predefined-themes">
+      <OCardSection class="tw:pt-0 scroll-content-predefined-themes">
         <OTabPanels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <OTabPanel name="light">
             <div
               v-for="theme in predefinedThemes"
               :key="theme.id"
-              class="theme-card-compact q-mb-sm"
+              :data-test="`predefined-themes-card-light-${themeNameSlug(theme.name)}`"
+              class="theme-card-compact tw:mb-2"
             >
-              <div class="row items-center no-wrap">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small"
                   :style="{ backgroundColor: theme.light.themeColor }"
                 ></div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">{{ theme.name }}</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ theme.light.themeColor }}
                   </div>
                 </div>
-                <q-space />
-                <q-badge
+                <div class="tw:flex-1" />
+                <OBadge
                   v-if="isThemeApplied(theme, 'light')"
-                  color="positive"
-                  label="Applied"
-                  class="text-caption q-mr-xs"
-                />
+                  :data-test="`predefined-themes-applied-badge-light-${themeNameSlug(theme.name)}`"
+                  variant="success"
+                  size="sm"
+                  class="tw:mr-1"
+                >Applied</OBadge>
                 <OButton
+                  :data-test="`predefined-themes-apply-btn-light-${themeNameSlug(theme.name)}`"
                   variant="primary"
                   size="sm"
                   @click="applyTheme(theme, 'light')"
@@ -84,17 +79,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div class="theme-card-compact q-mb-sm">
-              <div class="row items-center no-wrap">
+            <div data-test="predefined-themes-card-light-custom-color" class="theme-card-compact tw:mb-2">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
+                  data-test="predefined-themes-custom-color-preview-light"
                   class="color-preview-small clickable"
                   :style="{ backgroundColor: customLightColor }"
                   @click="openColorPicker('light')"
                 >
-                  <q-icon
+                  <OIcon
                     name="colorize"
-                    size="16px"
-                    color="white"
+                    size="sm"
                     style="
                       position: absolute;
                       top: 50%;
@@ -103,20 +98,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   />
                 </div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">Custom Color</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">Custom Color</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ customLightColor }}
                   </div>
                 </div>
-                <q-space />
-                <q-badge
+                <div class="tw:flex-1" />
+                <OBadge
                   v-if="isCustomThemeApplied('light')"
-                  color="positive"
-                  label="Applied"
-                  class="text-caption q-mr-xs"
-                />
+                  data-test="predefined-themes-applied-badge-light-custom-color"
+                  variant="success"
+                  size="sm"
+                  class="tw:mr-1"
+                >Applied</OBadge>
                 <OButton
+                  data-test="predefined-themes-apply-btn-light-custom-color"
                   variant="primary"
                   size="sm"
                   @click="applyCustomTheme('light')"
@@ -130,27 +127,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="theme in predefinedThemes"
               :key="theme.id"
-              class="theme-card-compact q-mb-sm"
+              :data-test="`predefined-themes-card-dark-${themeNameSlug(theme.name)}`"
+              class="theme-card-compact tw:mb-2"
             >
-              <div class="row items-center no-wrap">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small"
                   :style="{ backgroundColor: theme.dark.themeColor }"
                 ></div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">{{ theme.name }}</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ theme.dark.themeColor }}
                   </div>
                 </div>
-                <q-space />
-                <q-badge
+                <div class="tw:flex-1" />
+                <OBadge
                   v-if="isThemeApplied(theme, 'dark')"
-                  color="positive"
-                  label="Applied"
-                  class="text-caption q-mr-xs"
-                />
+                  :data-test="`predefined-themes-applied-badge-dark-${themeNameSlug(theme.name)}`"
+                  variant="success"
+                  size="sm"
+                  class="tw:mr-1"
+                >Applied</OBadge>
                 <OButton
+                  :data-test="`predefined-themes-apply-btn-dark-${themeNameSlug(theme.name)}`"
                   variant="primary"
                   size="sm"
                   @click="applyTheme(theme, 'dark')"
@@ -159,17 +159,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div class="theme-card-compact q-mb-sm">
-              <div class="row items-center no-wrap">
+            <div data-test="predefined-themes-card-dark-custom-color" class="theme-card-compact tw:mb-2">
+              <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
+                  data-test="predefined-themes-custom-color-preview-dark"
                   class="color-preview-small clickable"
                   :style="{ backgroundColor: customDarkColor }"
                   @click="openColorPicker('dark')"
                 >
-                  <q-icon
+                  <OIcon
                     name="colorize"
-                    size="16px"
-                    color="white"
+                    size="sm"
                     style="
                       position: absolute;
                       top: 50%;
@@ -178,20 +178,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   />
                 </div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0">
-                  <div class="text-subtitle2">Custom Color</div>
-                  <div class="text-caption text-grey-7">
+                <div class="tw:ml-2" style="flex: 1; min-width: 0">
+                  <div class="tw:text-sm tw:font-medium">Custom Color</div>
+                  <div class="tw:text-xs tw:text-gray-400">
                     {{ customDarkColor }}
                   </div>
                 </div>
-                <q-space />
-                <q-badge
+                <div class="tw:flex-1" />
+                <OBadge
                   v-if="isCustomThemeApplied('dark')"
-                  color="positive"
-                  label="Applied"
-                  class="text-caption q-mr-xs"
-                />
+                  data-test="predefined-themes-applied-badge-dark-custom-color"
+                  variant="success"
+                  size="sm"
+                  class="tw:mr-1"
+                >Applied</OBadge>
                 <OButton
+                  data-test="predefined-themes-apply-btn-dark-custom-color"
                   variant="primary"
                   size="sm"
                   @click="applyCustomTheme('dark')"
@@ -200,58 +202,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OTabPanel>
         </OTabPanels>
-      </q-card-section>
+      </OCardSection>
 
       <!-- Note at the bottom -->
-      <q-card-section class="q-pt-none q-pb-sm">
-        <q-separator class="q-mb-sm" />
+      <OCardSection class="tw:pt-0 tw:pb-2">
+        <OSeparator class="tw:mb-2" />
         <div
-          class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
+          class="tw:text-xs tw:text-gray-400 tw:flex tw:items-start tw:gap-1"
         >
-          <q-icon name="info_outline" size="14px" class="q-mt-xs" />
+          <OIcon name="info-outline" size="xs" class="tw:mt-1" />
           <span
             >Theme preferences are stored locally on this device and will not
             sync across different browsers or devices.</span
           >
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
 
     <!-- Color Picker Dialog -->
-    <q-dialog v-model="showColorPicker">
-      <q-card style="min-width: 300px">
-        <q-card-section>
-          <div class="text-h6">Pick Custom Color</div>
-        </q-card-section>
-        <q-card-section>
-          <q-color
-            v-model="tempColor"
-            @update:model-value="updateCustomColor"
-          />
-        </q-card-section>
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup data-test="color-picker-close-btn">
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-dialog>
+    <ODialog data-test="predefined-themes-color-picker-dialog"
+      v-model:open="showColorPicker"
+      size="sm"
+      title="Pick Custom Color"
+      primary-button-label="Close"
+      @click:primary="showColorPicker = false"
+    >
+      <OColor
+        v-model="tempColor"
+        @update:model-value="updateCustomColor"
+      />
+    </ODialog>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useQuasar } from "quasar";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
 import { hexToRgba, applyThemeColors } from "@/utils/theme";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
-const $q = useQuasar();
 const store = useStore();
 const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
@@ -324,7 +325,6 @@ watch(activeTab, (newTab) => {
     localStorage.setItem("theme", newTheme);
     // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
     document.documentElement.classList.toggle("dark", newTheme === "dark");
-    $q.dark.set(newTheme === "dark");
   }
 });
 
@@ -628,6 +628,11 @@ const predefinedThemes = [
   },
 ];
 
+// Slugify a theme name into a kebab-case identifier for data-test attributes
+// e.g. "Ocean Breeze" -> "ocean-breeze"
+const themeNameSlug = (name: string): string =>
+  name.toLowerCase().replace(/\s+/g, "-");
+
 const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;
 
@@ -646,11 +651,9 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
   }
 
   // Show success notification
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: `${theme.name} applied to ${mode} mode successfully!`,
-    position: "top",
-    timeout: 2000,
   });
 };
 
@@ -721,11 +724,9 @@ const applyCustomTheme = (mode: "light" | "dark") => {
   }
 
   // Show success notification
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: `Custom color applied to ${mode} mode successfully!`,
-    position: "top",
-    timeout: 2000,
   });
 };
 
@@ -760,14 +761,12 @@ const resetToDefaultTheme = () => {
   const isDefault = currentMode === "light" ? !orgLightColor : !orgDarkColor;
   applyThemeColors(currentColor, currentMode, isDefault);
 
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message:
       orgLightColor || orgDarkColor
         ? "Theme reset to organization settings!"
         : "Theme reset to default colors!",
-    position: "top",
-    timeout: 2000,
   });
 };
 </script>

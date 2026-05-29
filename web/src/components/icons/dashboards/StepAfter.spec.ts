@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import StepAfter from '@/components/icons/dashboards/StepAfter.vue';
-import { Quasar } from 'quasar';
+
 
 describe('StepAfter.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +10,7 @@ describe('StepAfter.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(StepAfter, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(StepAfter, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {
@@ -25,44 +25,44 @@ describe('StepAfter.vue', () => {
 
     it('renders an SVG element', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-step-after-svg"]').exists()).toBe(true);
     });
 
     it('has correct SVG dimensions', () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
+      const svg = wrapper.find('[data-test="dashboard-icon-step-after-svg"]');
       expect(svg.attributes('width')).toBe('91');
       expect(svg.attributes('height')).toBe('83');
     });
 
     it('has correct viewBox', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('viewBox')).toBe('0 0 91 83');
+      expect(wrapper.find('[data-test="dashboard-icon-step-after-svg"]').attributes('viewBox')).toBe('0 0 91 83');
     });
 
     it('contains a path element for the step line', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-step-after-path"]').exists()).toBe(true);
     });
 
     it('path uses currentColor stroke', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('stroke')).toBe('currentColor');
+      expect(wrapper.find('[data-test="dashboard-icon-step-after-path"]').attributes('stroke')).toBe('currentColor');
     });
 
     it('path has vertical (V) steps', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('d')).toContain('V');
+      expect(wrapper.find('[data-test="dashboard-icon-step-after-path"]').attributes('d')).toContain('V');
     });
 
     it('has 3 circle elements for data points', () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll('circle').length).toBe(3);
+      expect(wrapper.findAll('[data-test="dashboard-icon-step-after-circle"]').length).toBe(3);
     });
 
     it('circles use currentColor fill', () => {
       wrapper = createWrapper();
-      wrapper.findAll('circle').forEach((c) => {
+      wrapper.findAll('[data-test="dashboard-icon-step-after-circle"]').forEach((c) => {
         expect(c.attributes('fill')).toBe('currentColor');
       });
     });

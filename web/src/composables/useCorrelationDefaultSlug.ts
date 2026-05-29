@@ -208,6 +208,13 @@ export interface CorrelationFiltersOptions {
 }
 
 export function useCorrelationFilters(opts: CorrelationFiltersOptions) {
+  // Tracks which (org, streamType, streamName) keys we've already attempted to
+  // restore for in this session. Without this, every extractFields() call
+  // (which happens after every query) would re-apply saved filters whenever
+  // the query is empty — racing with user actions like deselecting all values
+  // in the field sidebar and silently restoring filters the user just cleared.
+  const restoredKeys = new Set<string>();
+
   const sync = async (queryStr: string): Promise<void> => {
     try {
       const orgId = opts.orgId();
@@ -246,6 +253,10 @@ export function useCorrelationFilters(opts: CorrelationFiltersOptions) {
       const streamType = opts.streamType();
       const streamName = opts.streamName();
       if (!orgId || !streamType || !streamName) return;
+
+      const key = `${orgId}|${streamType}|${streamName}`;
+      if (restoredKeys.has(key)) return;
+      restoredKeys.add(key);
 
       if (opts.getQuery()) return;
 

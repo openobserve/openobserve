@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="deduplication-config q-pa-none q-ma-none">
+  <div class="deduplication-config tw:p-0 tw:m-0">
     <div class="tw:w-full">
       <div class="tw:w-full">
         <AlertsContainer
@@ -23,56 +23,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:is-expanded="isExpanded"
           :label="t('alerts.deduplication.title')"
           :subLabel="t('alerts.deduplication.subtitle')"
-          icon="filter_alt"
-          class="tw:w-full col-12 tw:pl-4 tw:pr-2 tw:py-2"
+          icon="filter-alt"
+          class="tw:w-full tw:w-full tw:pl-4 tw:pr-2 tw:py-2"
           :iconClass="'tw:mt-[2px]'"
         />
       </div>
 
-      <div v-if="isExpanded" class="tw:w-full row alert-setup-container">
-        <q-separator class="tw:my-2"/>
-        <div class="q-mt-sm tw:w-full tw:pl-3">
+      <div v-if="isExpanded" class="tw:w-full tw:flex alert-setup-container">
+        <OSeparator class="tw:my-2"/>
+        <div class="tw:mt-2 tw:w-full tw:pl-3">
             <!-- Fingerprint Fields -->
             <div class="tw:mb-4">
               <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.fingerprintFields") }}
-                <q-icon
-                  :name="outlinedInfo"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    style="font-size: 12px;"
-                  >
-                    {{ t("alerts.deduplication.fingerprintFieldsTooltip") }}
-                  </q-tooltip>
-                </q-icon>
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="tw:ml-1 tw:cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+                 />
+                  <OTooltip
+                    side="right"
+                    align="center"
+                    :max-width="'300px'"
+                    :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
+                  />
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
               </div>
-              <q-select
+              <OSelect
                 v-model="localConfig.fingerprint_fields"
                 :options="availableFields"
-                color="input-border"
-                bg-color="input-bg"
                 class="showLabelOnTop no-case"
                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'"
-                filled
-                dense
                 multiple
-                use-chips
-                use-input
-                input-debounce="0"
-                new-value-mode="add-unique"
-                emit-value
-                map-options
-                option-value="value"
-                option-label="label"
+                valueKey="value"
+                labelKey="label"
                 @update:model-value="emitUpdate"
               >
                 <template v-slot:hint>
@@ -80,37 +67,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)
                   </div>
                 </template>
-              </q-select>
+              </OSelect>
             </div>
 
             <!-- Time Window -->
             <div class="tw:mb-4">
               <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.timeWindow") }}
-                <q-icon
-                  :name="outlinedInfo"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    style="font-size: 12px;"
-                  >
-                    {{ t("alerts.deduplication.timeWindowTooltip") }}
-                  </q-tooltip>
-                </q-icon>
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="tw:ml-1 tw:cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+                 />
+                  <OTooltip
+                    side="right"
+                    align="center"
+                    :max-width="'300px'"
+                    :content="t('alerts.deduplication.timeWindowTooltip')"
+                  />
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
               </div>
-              <q-input
+              <OInput
                 v-model.number="localConfig.time_window_minutes"
                 type="number"
-                dense
-                filled
                 min="1"
                 suffix="minutes"
                 :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
@@ -129,8 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import AlertsContainer from "./AlertsContainer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { t } = useI18n();
 

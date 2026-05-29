@@ -396,7 +396,10 @@
     "traces": "Des traces",
     "switchToLogs": "cliquez pour revenir à Logs",
     "patternNoValuesAvailable": "Aucune valeur disponible",
-    "selectLogStream": "Sélectionnez le flux de journaux"
+    "selectLogStream": "Sélectionnez le flux de journaux",
+    "noData": "Aucune donnée disponible",
+    "functionEditorLabel": "Éditeur de fonctions",
+    "loadingStream": "Chargement du flux..."
   },
   "menu": {
     "home": "Accueil",
@@ -1417,7 +1420,7 @@
     "markLineYAxis": "Axe Y",
     "colorPalette": "Palette de couleurs",
     "colorSeriesBy": "Série de couleurs de :",
-    "colorBySeries": "<b>Par série</b>",
+    "colorBySeries": "Par série",
     "colorDefaultPaletteBySeries": "Palette par défaut (par série)",
     "colorDefaultPaletteBySeriesSubLabel": "Les séries portant le même nom utiliseront la même couleur",
     "colorPaletteClassic": "Palette-Classic",
@@ -1426,7 +1429,7 @@
     "colorSingleColorSubLabel": "Définissez une couleur spécifique pour toutes les séries",
     "colorShadesOfSpecificColor": "Nuances de couleurs spécifiques",
     "colorShadesOfSpecificColorSubLabel": "Différentes nuances de couleurs spécifiques",
-    "colorByValue": "<b>Par valeur</b>",
+    "colorByValue": "Par valeur",
     "colorGreenYellowRed": "Vert-jaune-rouge (par valeur)",
     "colorRedYellowGreen": "Rouge-jaune-vert (par valeur)",
     "colorTemperature": "Température (par valeur)",
@@ -1596,7 +1599,9 @@
     "axisLabelRotateTooltipText": "Faites pivoter le texte de l'étiquette sur l'axe X selon un angle choisi (en degrés) pour améliorer la lisibilité lorsque les étiquettes sont longues ou encombrées.",
     "axisLabelTruncateTooltipText": "Tronquez les étiquettes de l'axe X à la largeur spécifiée (en pixels).",
     "axisLabelTooltipNotePrefix": "Remarque :",
-    "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques."
+    "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
+    "allFolders": "Tous les dossiers",
+    "selectFile": "Sélectionnez un fichier"
   },
   "panel": {
     "header": "Panneau",
@@ -2625,6 +2630,7 @@
     "serviceAccounts": "Comptes de service",
     "serviceAccountsName": "Nom des comptes de service",
     "basicUsers": "Les utilisateurs",
+    "organizationMembers": "Membres de l'Organisation",
     "quota": "Quotas",
     "externalUserWarningTitle": "Avertissement destiné aux utilisateurs externes",
     "externalUserWarningMessage": "L'ajout d'utilisateurs externes directement aux rôles n'accordera pas d'autorisations. Ajoutez-les plutôt aux groupes d'utilisateurs.",
@@ -3093,7 +3099,10 @@
     "algorithm": "Algorithme",
     "storeType": "Type de magasin",
     "mechanismType": "Type de mécanisme",
-    "actions": "Actions"
+    "actions": "Actions",
+    "providerTypeRequired": "Le type de fournisseur est obligatoire",
+    "algorithmRequired": "L'algorithme est requis",
+    "secretRequired": "Le secret est requis"
   },
   "quota": {
     "header": "Quotas",
@@ -3413,7 +3422,8 @@
     "serviceGroupProtected": "Le groupe de services ne peut pas être supprimé. Vous ne pouvez modifier que les champs mappés.",
     "noDataFound": "Aucune donnée trouvée",
     "isWorkloadType": "Identifiant du service",
-    "isWorkloadTypeTooltip": "Lorsqu'il est activé, ce groupe est utilisé pour identifier de manière unique un service (par exemple, cluster, espace de noms, déploiement). Désactivez cette option pour les groupes qui décrivent des opérations via un service, comme la méthode HTTP ou le nom de la base de données."
+    "isWorkloadTypeTooltip": "Lorsqu'il est activé, ce groupe est utilisé pour identifier de manière unique un service (par exemple, cluster, espace de noms, déploiement). Désactivez cette option pour les groupes qui décrivent des opérations via un service, comme la méthode HTTP ou le nom de la base de données.",
+    "loadingCorrelation": "Chargement des données de corrélation..."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
@@ -3750,7 +3760,8 @@
     "errSave": "Impossible d'enregistrer",
     "errLoadModel": "Impossible de charger le modèle",
     "tierDefaultName": "Par défaut",
-    "tierConditionalName": "Niveau conditionnel"
+    "tierConditionalName": "Niveau conditionnel",
+    "shadowedWarningBanner": "Les règles ci-dessous sont masquées par « {name} », qui est remplacé par une règle de priorité plus élevée et ne sera pas utilisée pour les calculs de coûts."
   },
   "overview": {
     "title": "Vue d'ensemble du système",

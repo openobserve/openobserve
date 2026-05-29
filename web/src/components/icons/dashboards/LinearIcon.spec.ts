@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import LinearIcon from '@/components/icons/dashboards/LinearIcon.vue';
-import { Quasar } from 'quasar';
+
 
 describe('LinearIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +10,7 @@ describe('LinearIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(LinearIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(LinearIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {
@@ -25,30 +25,30 @@ describe('LinearIcon.vue', () => {
 
     it('renders an SVG element', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-linear-svg"]').exists()).toBe(true);
     });
 
     it('has correct SVG dimensions', () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
+      const svg = wrapper.find('[data-test="dashboard-icon-linear-svg"]');
       expect(svg.attributes('width')).toBe('116');
       expect(svg.attributes('height')).toBe('87');
     });
 
     it('has correct viewBox', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('viewBox')).toBe('0 0 116 87');
+      expect(wrapper.find('[data-test="dashboard-icon-linear-svg"]').attributes('viewBox')).toBe('0 0 116 87');
     });
 
     it('contains path elements', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-icon-linear-path"]').exists()).toBe(true);
     });
 
     it('uses currentColor for theming', () => {
       wrapper = createWrapper();
-      const paths = wrapper.findAll('path');
-      const circleEls = wrapper.findAll('circle');
+      const paths = wrapper.findAll('[data-test="dashboard-icon-linear-path"]');
+      const circleEls = wrapper.findAll('[data-test="dashboard-icon-linear-circle"]');
       const elems = [...paths, ...circleEls];
       const usesCurrentColor = elems.some(
         (e) =>
@@ -95,7 +95,7 @@ describe('LinearIcon.vue', () => {
 
     it('has circle elements representing data points', () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll('circle').length).toBeGreaterThanOrEqual(2);
+      expect(wrapper.findAll('[data-test="dashboard-icon-linear-circle"]').length).toBeGreaterThanOrEqual(2);
     });
   });
 });

@@ -15,11 +15,9 @@
 
 import { describe, expect, it, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import QueryPlanNode from "./QueryPlanNode.vue";
 import type { OperatorNode } from "@/utils/queryPlanParser";
 
-installQuasar();
 
 function makeNode(overrides: Partial<OperatorNode> = {}): OperatorNode {
   return {

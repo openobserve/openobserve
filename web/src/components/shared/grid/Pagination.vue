@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <div
-    :class="position === 'bottom' ? 'q-py-sm' : 'q-pt-sm'"
-    class="q-table__control full-width row justify-between"
+    :class="position === 'bottom' ? 'tw:py-2' : 'tw:pt-2'"
+    class="q-table__control tw:w-full tw:flex tw:justify-between"
   >
     <div
       v-if="position === 'bottom' && maxRecords"
@@ -26,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="justify-content: start"
     >
       <span class="q-table__bottom-item">{{ t("search.maxRecords") }}</span>
-      <q-input
+      <OInput
         v-model="maxRecords"
-        filled
-        dense
         class="max-records-input"
         @blur="changeMaxRecordToReturn"
       />
     </div>
     <div
       v-if="position === 'top' && pageTitle"
-      class="text-bold row items-center"
+      class="tw:font-bold tw:flex tw:items-center"
     >
       <OButton
         v-if="
@@ -45,10 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="q-mr-sm"
+        class="tw:mr-2"
         @click="toggleSidePanel"
       >
-        <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
+        <img
+          :src="getImageURL('images/common/collapse_sidebar_icon.svg')"
+          width="16"
+          height="16"
+        />
       </OButton>
       <OButton
         v-if="
@@ -57,17 +59,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="q-mr-sm"
+        class="tw:mr-2"
         @click="toggleSidePanel"
       >
-        <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
+        <img
+          :src="getImageURL('images/common/expand_sidebar_icon.svg')"
+          width="16"
+          height="16"
+        />
       </OButton>
-      <div class="q-ml-xs">
+      <div class="tw:ml-1">
         {{ resultTotal }}
         {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
       </div>
     </div>
-    <div class="q-table__control q-ml-auto">
+    <div class="q-table__control tw:ml-auto">
       <span class="q-table__bottom-item">
         {{ t("search.showing") }}
         {{
@@ -89,18 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         of {{ resultTotal }} -->
       </span>
 
-      <div v-if="position === 'bottom'" class="flex items-center">
-        <q-separator vertical inset class="q-mr-md" />
+      <div v-if="position === 'bottom'" class="tw:flex tw:items-center">
+        <OSeparator vertical class="tw:my-2 tw:mr-4" />
 
         <span class="q-table__bottom-item">
           {{ t("search.recordsPerPage") }}
         </span>
-        <q-select
+        <OSelect
           v-model="scope.pagination.rowsPerPage"
-          class="q-mr-md"
-          borderless
-          size="sm"
-          dense
+          class="tw:mr-3"
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />
@@ -112,16 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           :disabled="scope.isFirstPage"
           @click="scope.prevPage"
+          icon-left="chevron-left"
         >
-          <template #icon-left><q-icon name="chevron_left" /></template>
         </OButton>
         <OButton
           variant="outline"
           size="icon-sm"
           :disabled="scope.isLastPage"
           @click="scope.nextPage"
+          icon-left="chevron-right"
         >
-          <template #icon-left><q-icon name="chevron_right" /></template>
         </OButton>
       </OButtonGroup>
     </div>
@@ -133,6 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -140,8 +146,8 @@ import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "QTablePagination",
-  components: { OButtonGroup, OButton },
-   
+  components: { OSeparator, OButtonGroup, OButton },
+
   props: [
     "scope",
     "pageTitle",

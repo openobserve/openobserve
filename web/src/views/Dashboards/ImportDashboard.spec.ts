@@ -5,11 +5,7 @@ import ImportDashboard from "./ImportDashboard.vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
-
 // Install Quasar
-installQuasar();
 
 // Mock external dependencies
 vi.mock("@/utils/commons", () => ({

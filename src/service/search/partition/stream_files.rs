@@ -22,11 +22,16 @@ use config::{
 };
 use infra::{cache::stats, errors::Error, file_list::FileId, schema::unwrap_stream_settings};
 
-use crate::{common::utils::stream::get_settings_max_query_range, service::search::sql::Sql};
+use crate::{
+    common::utils::stream::get_settings_max_query_range,
+    service::search::partition::sql_context::PartitionSqlContext,
+};
 
 /// Result of collecting stream file information across all streams in a query.
 pub struct StreamFiles {
     pub files: Vec<FileId>,
+    pub records: i64,
+    pub original_size: i64,
     pub max_query_range: i64,
     pub max_query_range_in_hour: i64,
 }
@@ -37,10 +42,12 @@ pub struct StreamFiles {
 pub async fn collect_stream_files(
     trace_id: &str,
     user_id: Option<&str>,
-    sql: &Sql,
-    use_single_partition: bool,
+    ctx: &PartitionSqlContext,
 ) -> Result<StreamFiles, Error> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+    let sql = &ctx.sql;
+    let use_single_partition = ctx.use_single_partition;
     let org_id = &sql.org_id;
     let stream_type = sql.stream_type;
     let schemas = &sql.schemas;
@@ -116,8 +123,21 @@ pub async fn collect_stream_files(
         }
     }
 
+    let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
+        (records + f.records, original_size + f.original_size)
+    });
+
+    log::info!(
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, max_query_range: {}, took: {} ms",
+        time_range,
+        files.len(),
+        max_query_range,
+        start.elapsed().as_millis() as usize,
+    );
     Ok(StreamFiles {
         files,
+        records,
+        original_size,
         max_query_range,
         max_query_range_in_hour,
     })

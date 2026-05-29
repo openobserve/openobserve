@@ -17,23 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- Loading state -->
-    <div v-if="isLoadingTranslation" class="loading-container q-pa-xl text-center">
-      <q-spinner-dots color="primary" size="3em" />
-      <div class="q-mt-md text-grey-7" style="font-size: 14px; font-weight: 500;">
+    <div v-if="isLoadingTranslation" class="loading-container tw:p-6 tw:text-center">
+      <OSpinner variant="dots" size="lg" />
+      <div class="tw:mt-3 tw:text-gray-400" style="font-size: 14px; font-weight: 500;">
         Translating stack trace with source maps...
       </div>
-      <div class="q-mt-xs text-grey-6" style="font-size: 12px;">
+      <div class="tw:mt-1 tw:text-gray-400" style="font-size: 12px;">
         This may take a few moments
       </div>
     </div>
 
     <!-- No source maps available message -->
-    <div v-else-if="allSourceInfoNull" class="no-source-maps-container q-pa-md text-center">
-      <q-icon name="code_off" size="2em" color="grey-6" class="q-mb-sm" />
-      <div class="text-subtitle1 text-grey-8 q-mb-xs" style="font-weight: 500;">
+    <div v-else-if="allSourceInfoNull" class="no-source-maps-container tw:p-3 tw:text-center">
+      <OIcon name="code-off" size="lg" class="tw:mb-2" />
+      <div class="tw:text-base tw:font-medium tw:text-gray-500 tw:mb-1" style="font-weight: 500;">
         Source Maps Not Available
       </div>
-      <div class="text-body2 text-grey-6" style="max-width: 500px; margin: 0 auto; font-size: 13px;">
+      <div class="tw:text-sm tw:text-gray-400" style="max-width: 500px; margin: 0 auto; font-size: 13px;">
         To view detailed stack traces with original source code and line numbers, please upload source maps for this application.
       </div>
       <div v-if="props.error.service || props.error.version" class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:mt-2 tw:mb-2">
@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm-action"
+        icon-left="upload"
         class="tw:my-2"
         @click="navigateToUpload"
       >
-        <Upload class="tw:size-4 tw:mr-1" />
         Upload Source Maps
       </OButton>
     </div>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header q-px-md q-py-sm text-weight-bold"
+          class="error-header tw:px-3 tw:py-2 text-weight-bold"
           :style="{
             'background-color': errorHeaderBackground,
             'color': errorHeaderColor,
@@ -88,14 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Frame header - clickable -->
           <div
-            class="frame-header q-px-md q-py-sm cursor-pointer"
+            class="frame-header tw:px-3 tw:py-2 tw:cursor-pointer"
             @click="toggleFrame(traceIndex, 0)"
           >
             <div class="frame-header-content">
-              <q-icon
-                :name="isFrameExpanded(traceIndex, 0) ? 'expand_more' : 'chevron_right'"
+              <OIcon
+                :name="isFrameExpanded(traceIndex, 0) ? 'expand-more' : 'chevron-right'"
                 size="xs"
-                class="q-mr-xs text-grey-7"
+                class="tw:mr-1 tw:text-gray-400"
               />
               <div
                 v-if="stackTrace.stack[0].line"
@@ -110,13 +110,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Expandable source code context -->
           <div
             v-if="isFrameExpanded(traceIndex, 0) && stackTrace.stack[0].source_info"
-            class="source-context q-px-md q-pb-sm"
+            class="source-context tw:px-3 tw:pb-2"
             :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
           >
             <!-- File location -->
-            <div class="source-location-header text-grey-7 text-caption q-mb-xs">
+            <div class="source-location-header tw:text-gray-400 tw:text-xs tw:mb-1">
               Line {{ stackTrace.stack[0].source_info.stack_line }}:{{ stackTrace.stack[0].source_info.stack_col }}
-              <span class="q-ml-xs">
+              <span class="tw:ml-1">
                 (Lines {{ stackTrace.stack[0].source_info.source_line_start }}-{{ stackTrace.stack[0].source_info.source_line_end }})
               </span>
             </div>
@@ -147,19 +147,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'background-color': backgroundColor,
           }"
         >
-          <!-- Show more button - only visible when frames are hidden -->
+          <!-- Show more button - only visible when frames are tw:hidden -->
           <div
             v-if="!expandedTraces[traceIndex]"
-            class="show-more-button q-px-md q-py-sm cursor-pointer"
+            class="show-more-button tw:px-3 tw:py-2 tw:cursor-pointer"
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
-            <q-icon
-              name="expand_more"
+            <OIcon
+              name="expand-more"
               size="xs"
-              class="q-mr-xs"
+              class="tw:mr-1"
             />
-            <span class="text-caption text-grey-7">
+            <span class="tw:text-xs tw:text-gray-400">
               Show {{ stackTrace.stack.length - 1 }} more frame{{ stackTrace.stack.length - 1 > 1 ? 's' : '' }}
             </span>
           </div>
@@ -174,15 +174,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Frame header - clickable -->
               <div
-                class="collapsed-frame-header q-px-md q-py-xs cursor-pointer"
+                class="collapsed-frame-header tw:px-3 tw:py-1 tw:cursor-pointer"
                 :style="{ 'background-color': backgroundColor }"
                 @click="toggleFrame(traceIndex, frameIndex + 1)"
               >
                 <div class="collapsed-frame-content">
-                  <q-icon
-                    :name="isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand_more' : 'chevron_right'"
+                  <OIcon
+                    :name="isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'"
                     size="xs"
-                    class="q-mr-xs text-grey-5"
+                    class="tw:mr-1 tw:text-gray-400"
                   />
                   <div
                     v-if="frame.line"
@@ -197,17 +197,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Expandable source code context -->
               <div
                 v-if="isFrameExpanded(traceIndex, frameIndex + 1) && frame.source_info"
-                class="source-context q-px-md q-pb-sm q-pt-xs"
+                class="source-context tw:px-3 tw:pb-2 tw:pt-1"
                 :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
               >
-                <div class="source-location-header text-grey-7 text-caption q-mb-xs q-ml-lg">
+                <div class="source-location-header tw:text-gray-400 tw:text-xs tw:mb-1 tw:ml-4">
                   Line {{ frame.source_info.stack_line }}:{{ frame.source_info.stack_col }}
-                  <span class="q-ml-xs">
+                  <span class="tw:ml-1">
                     (Lines {{ frame.source_info.source_line_start }}-{{ frame.source_info.source_line_end }})
                   </span>
                 </div>
 
-                <div class="source-code-box q-ml-lg" :style="{ 'border-color': borderColor }">
+                <div class="source-code-box tw:ml-4" :style="{ 'border-color': borderColor }">
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"
@@ -225,8 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Error state -->
-    <div v-else class="q-pa-md text-center text-grey-7">
-      <div v-if="translationError" class="text-negative">
+    <div v-else class="tw:p-3 tw:text-center tw:text-gray-400">
+      <div v-if="translationError" class="tw:text-red-500">
         {{ translationError }}
       </div>
       <div v-else>
@@ -243,12 +243,14 @@ import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Upload } from 'lucide-vue-next';
+
 import {
   generateCacheKey,
   getCachedTranslation,
   setCachedTranslation,
 } from "@/utils/stackTraceCache";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const router = useRouter();

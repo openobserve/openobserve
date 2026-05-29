@@ -16,17 +16,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-
-// vi.mock is hoisted — the real module is never loaded
-vi.mock("../../../utils/zincutils", () => ({
-  getImageURL: vi.fn((path: string) => `/mock/${path}`),
-}));
 
 import NoPanel from "./NoPanel.vue";
-import { getImageURL } from "../../../utils/zincutils";
 
-installQuasar();
 
 const i18n = createI18n({
   legacy: false,
@@ -41,11 +33,6 @@ const i18n = createI18n({
 });
 
 // Stubs for Quasar components not under test
-const qImgStub = {
-  template: '<img :src="src" />',
-  props: ["src", "style"],
-};
-
 const qBtnStub = {
   template:
     "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\">{{ label }}</button>",
@@ -65,7 +52,6 @@ function mountNoPanel(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n],
       stubs: {
-        "q-img": qImgStub,
         "q-btn": qBtnStub,
         OButton: oBtnStub,
       },
@@ -97,21 +83,15 @@ describe("NoPanel", () => {
       );
     });
 
-    it("should render a q-img element", () => {
-      expect(wrapper.find("img").exists()).toBe(true);
+    it("should render the inline svg image", () => {
+      const svg = wrapper.find('[data-test="no-panel-image"]');
+      expect(svg.exists()).toBe(true);
+      expect(svg.element.tagName.toLowerCase()).toBe("svg");
     });
 
-    it("should call getImageURL with the clipboard icon path", () => {
-      expect(getImageURL).toHaveBeenCalledWith(
-        "images/common/clipboard_icon.svg",
-      );
-    });
-
-    it("should set img src to the value returned by getImageURL", () => {
-      const img = wrapper.find("img");
-      expect(img.attributes("src")).toBe(
-        "/mock/images/common/clipboard_icon.svg",
-      );
+    it("should use currentColor for the accent paths so it follows the theme", () => {
+      const svg = wrapper.find('[data-test="no-panel-image"]');
+      expect(svg.html()).toContain('fill="currentColor"');
     });
   });
 
@@ -182,14 +162,11 @@ describe("NoPanel", () => {
     });
   });
 
-  describe("getImageURL utility", () => {
-    it("should not call getImageURL when viewOnly changes to true after initial mount", async () => {
+  describe("image visibility", () => {
+    it("should keep the image in the DOM regardless of viewOnly", async () => {
       wrapper = mountNoPanel({ viewOnly: false });
-      vi.clearAllMocks();
       await wrapper.setProps({ viewOnly: true });
-      // getImageURL is not expected to be called again — image is already rendered
-      // The image still exists in the DOM regardless of viewOnly
-      expect(wrapper.find("img").exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-panel-image"]').exists()).toBe(true);
     });
   });
 });

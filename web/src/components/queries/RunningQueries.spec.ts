@@ -15,8 +15,6 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify, QTable } from "quasar";
 import RunningQueries from "@/components/queries/RunningQueries.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -35,9 +33,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({ isMetaOrg: true }),
 }));
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -155,7 +150,7 @@ describe("RunningQueries", () => {
           },
         },
         stubs: {
-          "q-table": QTable,
+          "q-table": true,
           "q-btn": true,
           "q-input": true,
           "q-select": true,
@@ -163,19 +158,28 @@ describe("RunningQueries", () => {
           "q-tab-panel": true,
           "q-tab-panels": true,
           "q-tabs": true,
-          "q-dialog": true,
           "q-card": true,
           "q-card-section": true,
           "q-card-actions": true,
           "q-separator": true,
-          "q-icon": true,
+          "OIcon": true,
           "q-tooltip": true,
-          "q-badge": true,
-          "q-chip": true,
           "confirm-dialog": true,
           "query-list": true,
           "running-queries-list": true,
           "summary-list": true,
+          ODrawer: {
+            name: "ODrawer",
+            props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel"],
+            emits: ["update:open", "close", "click:primary", "click:secondary", "click:neutral"],
+            template: '<div data-test="o-drawer-stub" v-if="open"><slot /></div>',
+          },
+          ODialog: {
+            name: "ODialog",
+            props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel"],
+            emits: ["update:open", "close", "click:primary", "click:secondary", "click:neutral"],
+            template: '<div data-test="o-dialog-stub" v-if="open"><slot /></div>',
+          },
         },
       },
     });
@@ -671,6 +675,49 @@ describe("RunningQueries", () => {
     
     await wrapper.vm.$nextTick();
     expect(Array.isArray(wrapper.vm.filteredRows)).toBe(true);
+  });
+
+  // ODrawer: schema drawer should be hidden initially
+  it("should not render schema ODrawer initially", () => {
+    expect(wrapper.find('[data-test="o-drawer-stub"]').exists()).toBe(false);
+  });
+
+  // ODrawer: schema drawer should appear after listSchema()
+  it("should render schema ODrawer when listSchema is called", async () => {
+    wrapper.vm.listSchema({ stream_name: "logs" });
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    expect(wrapper.vm.showListSchemaDialog).toBe(true);
+    const drawer = wrapper.findComponent({ name: "ODrawer" });
+    expect(drawer.exists()).toBe(true);
+    expect(drawer.props("open")).toBe(true);
+  });
+
+  // ODrawer: should close drawer when ODrawer emits 'close'
+  it("should close schema drawer when ODrawer emits close", async () => {
+    wrapper.vm.listSchema({ stream_name: "logs" });
+    await flushPromises();
+
+    const drawer = wrapper.findComponent({ name: "ODrawer" });
+    expect(drawer.exists()).toBe(true);
+
+    await drawer.vm.$emit("close");
+    await flushPromises();
+
+    expect(wrapper.vm.showListSchemaDialog).toBe(false);
+  });
+
+  // ODrawer: should sync v-model:open when drawer emits update:open
+  it("should sync showListSchemaDialog when ODrawer emits update:open(false)", async () => {
+    wrapper.vm.listSchema({ stream_name: "logs" });
+    await flushPromises();
+
+    const drawer = wrapper.findComponent({ name: "ODrawer" });
+    await drawer.vm.$emit("update:open", false);
+    await flushPromises();
+
+    expect(wrapper.vm.showListSchemaDialog).toBe(false);
   });
 
   // Test 50: Complex query summary aggregation

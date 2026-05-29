@@ -19,7 +19,7 @@ use axum::{
     http::HeaderMap,
     response::Response,
 };
-use config::SIZE_IN_MB;
+use config::{SIZE_IN_MB, utils::schema::format_stream_name};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -71,6 +71,30 @@ pub async fn save_enrichment_table(
 
     if let Some(msg) = bad_req_msg {
         return MetaHttpResponse::bad_request(msg);
+    }
+
+    // Format the table name to normalize it (lowercase, replace special chars)
+    let table_name = format_stream_name(table_name.trim().to_string());
+
+    // Reject if a URL enrichment already exists with this name
+    // to prevent cross-type silent overwrite
+    {
+        use config::meta::stream::StreamType;
+
+        use crate::{
+            common::infra::config::ENRICHMENT_TABLES,
+            service::db::enrichment_table::get_url_jobs_for_table,
+        };
+
+        let key = format!("{org_id}/{}/{}", StreamType::EnrichmentTables, table_name);
+        if ENRICHMENT_TABLES.contains_key(&key)
+            && let Ok(jobs) = get_url_jobs_for_table(&org_id, &table_name).await
+            && !jobs.is_empty()
+        {
+            return MetaHttpResponse::bad_request(format!(
+                "Enrichment table [{table_name}] already exists as a URL enrichment. Use the URL enrichment API to update it."
+            ));
+        }
     }
 
     let content_type = headers.get("content-type");
@@ -258,16 +282,22 @@ pub async fn save_enrichment_table_from_url(
     if table_name.trim().is_empty() {
         return MetaHttpResponse::bad_request("Table name cannot be empty");
     }
-    if request_body.url.trim().is_empty() {
-        return MetaHttpResponse::bad_request("URL cannot be empty");
+    // URL validation: Skip if retry mode (reprocessing existing URLs from DB).
+    // In retry mode the frontend sends an empty URL since the backend already has
+    // the URLs stored — we just need to re-trigger processing. For all other modes
+    // a non-empty, valid URL is required.
+    if !retry {
+        if request_body.url.trim().is_empty() {
+            return MetaHttpResponse::bad_request("URL cannot be empty");
+        }
+
+        if let Err(err_msg) = validate_enrichment_url(&request_body.url) {
+            return MetaHttpResponse::bad_request(err_msg);
+        }
     }
 
-    // Always validate the URL for SSRF protection, regardless of retry mode.
-    // The retry flag controls job scheduling, not URL sourcing — the body URL
-    // can differ from the original on a retry call, so we cannot skip validation.
-    if let Err(err_msg) = validate_enrichment_url(&request_body.url) {
-        return MetaHttpResponse::bad_request(err_msg);
-    }
+    // Format the table name to normalize it (lowercase, replace special chars)
+    let table_name = format_stream_name(table_name.trim().to_string());
 
     // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
     // Fetch all existing jobs for this table
@@ -283,6 +313,23 @@ pub async fn save_enrichment_table_from_url(
             return MetaHttpResponse::internal_error("Failed to check job status");
         }
     };
+
+    // Reject if a file upload enrichment already exists with this name
+    // to prevent cross-type silent overwrite. A file upload enrichment has
+    // data in ENRICHMENT_TABLES but no URL jobs. If the table exists in the
+    // cache but there are no URL jobs, it must be a file upload enrichment.
+    {
+        use config::meta::stream::StreamType;
+
+        use crate::common::infra::config::ENRICHMENT_TABLES;
+
+        let key = format!("{org_id}/{}/{}", StreamType::EnrichmentTables, table_name);
+        if ENRICHMENT_TABLES.contains_key(&key) && existing_jobs.is_empty() {
+            return MetaHttpResponse::bad_request(format!(
+                "Enrichment table [{table_name}] already exists as a file upload enrichment. Use the file upload API to update it."
+            ));
+        }
+    }
 
     // Check job statuses
     let has_processing = existing_jobs
@@ -308,6 +355,27 @@ pub async fn save_enrichment_table_from_url(
         return MetaHttpResponse::bad_request(format!(
             "Cannot add new URL: table {}/{} has failed jobs. Please reload, replace the failed URL, or use replace mode to start fresh.",
             org_id, table_name
+        ));
+    }
+
+    // RULE 3: Block duplicate URL in append mode
+    // Reason: Adding the same URL twice would create duplicate data in the table
+    if append_data && existing_jobs.iter().any(|j| j.url == request_body.url) {
+        return MetaHttpResponse::bad_request(format!(
+            "URL already exists in table {}/{}. Cannot add the same URL again.",
+            org_id, table_name
+        ));
+    }
+
+    // RULE 4: Block creating a table that already exists
+    // When append=false (default), the user is trying to create a new table.
+    // Silently replacing an existing table is confusing and potentially destructive.
+    // Allow only when the user explicitly intends to modify existing data:
+    // append (add to existing), retry (re-run), resume (continue), replace_failed (fix URL).
+    if !existing_jobs.is_empty() && !append_data && !retry && !resume && !replace_failed {
+        return MetaHttpResponse::bad_request(format!(
+            "Enrichment table {} already exists in organization {}",
+            table_name, org_id
         ));
     }
 

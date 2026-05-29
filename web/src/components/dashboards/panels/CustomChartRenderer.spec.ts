@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
 
 // Create mock chart instance
@@ -73,6 +72,7 @@ Object.defineProperty(window, 'removeEventListener', {
   value: vi.fn(),
 });
 
+
 describe("CustomChartRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -106,7 +106,7 @@ describe("CustomChartRenderer", () => {
         ...props
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         provide: {
           hoveredSeriesState: null
         }
@@ -373,7 +373,7 @@ describe("CustomChartRenderer", () => {
           data: mockChartData
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           provide: {
             hoveredSeriesState: hoveredState
           }
@@ -402,7 +402,7 @@ describe("CustomChartRenderer", () => {
           data: mockChartData
         },
         global: {
-          plugins: [Quasar],
+          plugins: [],
           provide: {
             hoveredSeriesState: null
           }

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import ScriptEditor from '@/components/actionScripts/ScriptEditor.vue';
-import { Quasar } from 'quasar';
 
 // Mock dependencies
 vi.mock('axios');
@@ -10,6 +9,7 @@ vi.mock('vue-i18n', () => ({
     t: (key: string) => key
   })
 }));
+
 
 describe('ScriptEditor.vue', () => {
   let wrapper: VueWrapper;
@@ -35,7 +35,7 @@ describe('ScriptEditor.vue', () => {
     return mount(ScriptEditor, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
           'FullViewContainer': {
             template: '<div><slot name="left"></slot><slot></slot></div>',
@@ -45,17 +45,18 @@ describe('ScriptEditor.vue', () => {
             template: '<div data-test="vrl-function-test-events-editor"></div>',
             props: ['editorId', 'language', 'query']
           },
-          'q-spinner-hourglass': {
-            template: '<div class="spinner"></div>',
-            props: ['size']
-          },
-          'q-icon': {
-            template: '<div class="icon"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
+          'OIcon': {
+            template: '<div class="icon" :data-name="name"><slot></slot></div>',
             props: ['name', 'size']
           },
-          'q-tooltip': {
-            template: '<div class="tooltip"><slot></slot></div>',
-            props: ['anchor', 'self', 'offset']
+          // The source uses OTooltip (O2 lib), not q-tooltip.
+          'OTooltip': {
+            template: '<div class="o-tooltip" :data-content="content"><slot></slot></div>',
+            props: ['side', 'align', 'sideOffset', 'content']
+          },
+          'OSpinner': {
+            template: '<div data-test="script-editor-loading-indicator"></div>',
+            props: ['size']
           }
         }
       }
@@ -149,7 +150,7 @@ describe('ScriptEditor.vue', () => {
     it('shows loading spinner when loading is true', () => {
       wrapper = createWrapper({ loading: true });
       
-      const spinner = wrapper.find('.spinner');
+      const spinner = wrapper.find('[data-test="script-editor-loading-indicator"]');
       expect(spinner.exists()).toBe(true);
     });
 
@@ -162,7 +163,7 @@ describe('ScriptEditor.vue', () => {
     it('does not show loading elements when loading is false', () => {
       wrapper = createWrapper({ loading: false });
       
-      const spinner = wrapper.find('.spinner');
+      const spinner = wrapper.find('[data-test="script-editor-loading-indicator"]');
       expect(spinner.exists()).toBe(false);
     });
 
@@ -191,8 +192,9 @@ describe('ScriptEditor.vue', () => {
     it('shows error tooltip with correct message', () => {
       const errorMessage = 'Test error message';
       wrapper = createWrapper({ error: errorMessage });
-      
-      const tooltip = wrapper.find('.tooltip');
+
+      // OTooltip stub renders with class "o-tooltip" and data-content attribute
+      const tooltip = wrapper.find('.o-tooltip');
       expect(tooltip.exists()).toBe(true);
     });
 
@@ -205,8 +207,9 @@ describe('ScriptEditor.vue', () => {
 
     it('configures tooltip positioning correctly', () => {
       wrapper = createWrapper({ error: 'Error' });
-      
-      const tooltip = wrapper.find('.tooltip');
+
+      // OTooltip stub renders with class "o-tooltip"
+      const tooltip = wrapper.find('.o-tooltip');
       expect(tooltip.exists()).toBe(true);
     });
   });
@@ -367,7 +370,7 @@ describe('ScriptEditor.vue', () => {
     it('handles both loading and error states simultaneously', () => {
       wrapper = createWrapper({ loading: true, error: 'Test error' });
       
-      const spinner = wrapper.find('.spinner');
+      const spinner = wrapper.find('[data-test="script-editor-loading-indicator"]');
       const errorIcon = wrapper.find('.icon');
       
       expect(spinner.exists()).toBe(true);
@@ -377,8 +380,9 @@ describe('ScriptEditor.vue', () => {
     it('handles very long error messages', () => {
       const longError = 'A very long error message that might cause layout issues. '.repeat(10);
       wrapper = createWrapper({ error: longError });
-      
-      const tooltip = wrapper.find('.tooltip');
+
+      // OTooltip stub renders with class "o-tooltip"
+      const tooltip = wrapper.find('.o-tooltip');
       expect(tooltip.exists()).toBe(true);
     });
   });

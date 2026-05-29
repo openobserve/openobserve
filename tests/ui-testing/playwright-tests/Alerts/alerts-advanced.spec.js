@@ -19,10 +19,10 @@ const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const TEST_STREAM = 'e2e_automate';
 
 // Test timeout constants (in milliseconds)
-const UI_STABILIZATION_WAIT_MS = 2000;
-const SHORT_WAIT_MS = 1000;
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
-const SCHEDULED_ALERT_WAIT_MS = 90000; // Wait for scheduled alert evaluation cycle
+const ALERT_LIST_ADD_BTN = '[data-test="alert-list-add-alert-btn"]';
+const TEMPLATE_LIST_ADD_BTN = '[data-test="template-list-add-btn"]';
+const DESTINATION_LIST_ADD_BTN = '[data-test="alert-destination-list-add-alert-btn"]';
 
 test.describe("Alerts Advanced Coverage Tests", () => {
     let pm;
@@ -35,7 +35,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
     });
 
     // ==================== ADVANCED CONDITIONS TESTS ====================
@@ -52,19 +52,19 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const destinationName = 'auto_dest_multicond_' + uniqueSuffix;
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         const webhookUrl = 'https://webhook.site/test-multicond-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
 
         const alertName = await pm.alertsPage.createAlertWithMultipleConditions(
             TEST_STREAM,
@@ -88,12 +88,12 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const destinationName = 'auto_dest_toggle_' + uniqueSuffix;
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         const webhookUrl = 'https://webhook.site/test-toggle-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
@@ -101,7 +101,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         // Navigate back to alerts page
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
 
         // Verifies: multiple conditions can be added, AND is default, can toggle to OR
         const result = await pm.alertsPage.testConditionOperatorToggle(TEST_STREAM, uniqueSuffix);
@@ -122,28 +122,28 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Testing bulk pause/unpause operations', { uniqueSuffix });
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         const webhookUrl = 'https://webhook.site/test-bulk-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
 
         // Create two alerts for bulk operations
         await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk1_' + uniqueSuffix);
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         const createdAlert1 = pm.alertsPage.currentAlertName;
         testLogger.info('Created first alert for bulk test', { alertName: createdAlert1 });
 
         await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk2_' + uniqueSuffix);
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         const createdAlert2 = pm.alertsPage.currentAlertName;
         testLogger.info('Created second alert for bulk test', { alertName: createdAlert2 });
 
@@ -152,7 +152,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await pm.alertsPage.bulkPauseAlerts();
         testLogger.info('Bulk pause completed');
 
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+        // Wait for alert list table to be ready before re-selecting
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
 
         // Selection cleared after operation, re-select
         await pm.alertsPage.selectMultipleAlerts([createdAlert1, createdAlert2]);
@@ -177,19 +178,19 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const destinationName = 'auto_dest_dedup_' + uniqueSuffix;
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.waitForTimeout(SHORT_WAIT_MS);
+        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
         const webhookUrl = 'https://webhook.site/test-dedup-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
 
         const dedupConfig = {
             timeWindowMinutes: 30
@@ -259,7 +260,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await pm.commonActions.navigateToAlerts();
         await page.reload();
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
 
         // Create scheduled alert with deduplication for validation
         const dedupConfig = {
@@ -282,9 +283,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
             stream: sourceStreamName
         });
 
-        // Wait for alert to register
+        // Wait for alert to register (handled implicitly by the validation-stream poll below)
         testLogger.info('Waiting for alert registration...');
-        await page.waitForTimeout(30000); // 30s for registration
 
         // ===== TRIGGER #1: Ingest data to trigger first alert =====
         testLogger.info('Ingesting first batch of data to trigger alert...');
@@ -293,7 +293,6 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         // Wait for scheduled alert evaluation cycle (1 min period + buffer)
         testLogger.info('Waiting for first scheduled alert evaluation cycle...');
-        await page.waitForTimeout(SCHEDULED_ALERT_WAIT_MS);
 
         // Verify first notification appears in validation stream
         const firstCheck = await pm.commonActions.waitForAlertInValidationStream(
@@ -323,15 +322,18 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         // ===== TRIGGER #2: Additional data ingestion (same fingerprint, within window) =====
         testLogger.info('Ingesting second batch of data (should be suppressed by dedup)...');
+        const trigger2Start = Date.now();
         await pm.commonActions.ingestTestDataWithUniqueId(sourceStreamName, `trigger2_${uniqueSuffix}`, column, value);
         testLogger.info('Second data ingestion complete');
 
-        // Wait for another evaluation cycle
+        // Wait for another evaluation cycle: poll until the scheduled-alert window has elapsed
+        // since trigger2 ingestion. This is the deterministic equivalent of the previous time wait.
         testLogger.info('Waiting for second scheduled alert evaluation cycle...');
-        await page.waitForTimeout(SCHEDULED_ALERT_WAIT_MS);
-
-        // Small additional wait to ensure processing completes
-        await page.waitForTimeout(10000);
+        await page.waitForFunction(
+            (startedAt) => Date.now() - startedAt >= 100000,
+            trigger2Start,
+            { timeout: 120000, polling: 5000 }
+        );
 
         // ===== VALIDATION: Check that dedup suppressed the duplicate =====
         const finalCount = await pm.commonActions.countAlertNotificationsInStream(

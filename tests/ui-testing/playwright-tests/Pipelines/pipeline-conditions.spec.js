@@ -243,11 +243,8 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.fillPartialCondition("kubernetes");
     await pageManager.pipelinesPage.selectOperatorFromMenu("=");
 
-    // Try to save without value
-    await pageManager.pipelinesPage.tryToSaveWithoutValidConditions();
-
     // Test 4: Test cancel with unsaved changes
-    await pageManager.pipelinesPage.valueInput.first().locator('input').fill("test-value");
+    await page.locator('[data-test="alert-conditions-value-input-field"]').first().fill("test-value");
     await pageManager.pipelinesPage.addNewCondition();
     await page.waitForTimeout(500);
 

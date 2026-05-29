@@ -23,10 +23,8 @@ import {
   vi,
   type MockedFunction,
 } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PipelinesList from "@/components/pipeline/PipelinesList.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import pipelineService from "@/services/pipelines";
 import { createStore } from "vuex";
@@ -86,7 +84,77 @@ document.createElement = (tag: string) => {
   return originalCreateElement(tag);
 };
 
-installQuasar({ plugins: [Dialog, Notify] });
+// Stubs for migrated ODialog (Pipeline Error Dialog) and ODrawer (Create Pipeline Drawer)
+// These replace the old q-dialog usages and allow us to assert prop forwarding
+// and drive button clicks via emits instead of relying on Quasar internals.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-sub-title="subTitle"
+      :data-primary-label="primaryButtonLabel"
+    >
+      <slot name="header-left" />
+      <slot />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+    </div>
+  `,
+};
+
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-drawer-stub"
+      :data-open="String(open)"
+      :data-size="size"
+    >
+      <slot />
+    </div>
+  `,
+};
 
 describe("PipelinesList", () => {
   let wrapper: any = null;
@@ -143,6 +211,10 @@ describe("PipelinesList", () => {
         mocks: {
           $router: mockRouter,
           $route: mockRouter.currentRoute.value,
+        },
+        stubs: {
+          ODialog: ODialogStub,
+          ODrawer: ODrawerStub,
         },
       },
     });
@@ -215,18 +287,6 @@ describe("PipelinesList", () => {
       expect(wrapper.vm.shouldStartfromNow).toBe(true);
     });
 
-    it("initializes pagination with rowsPerPage 20", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
-    });
-
-    it("initializes selectedPerPage as 20", () => {
-      expect(wrapper.vm.selectedPerPage).toBe(20);
-    });
-
-    it("initializes maxRecordToReturn as 100", () => {
-      expect(wrapper.vm.maxRecordToReturn).toBe(100);
-    });
-
     it("initializes errorDialog as hidden with no data", () => {
       expect(wrapper.vm.errorDialog.show).toBe(false);
       expect(wrapper.vm.errorDialog.data).toBeNull();
@@ -238,50 +298,6 @@ describe("PipelinesList", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Tabs Configuration", () => {
-    it("has exactly 3 tabs", () => {
-      expect(wrapper.vm.tabs).toHaveLength(3);
-    });
-
-    it("first tab is 'all'", () => {
-      expect(wrapper.vm.tabs[0].value).toBe("all");
-    });
-
-    it("second tab is 'scheduled'", () => {
-      expect(wrapper.vm.tabs[1].value).toBe("scheduled");
-    });
-
-    it("third tab is 'realtime'", () => {
-      expect(wrapper.vm.tabs[2].value).toBe("realtime");
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  describe("Pagination Configuration", () => {
-    it("has 5 perPageOptions entries", () => {
-      expect(wrapper.vm.perPageOptions).toHaveLength(5);
-    });
-
-    it("perPageOptions start at 20", () => {
-      expect(wrapper.vm.perPageOptions[0].value).toBe(20);
-    });
-
-    it("perPageOptions end at 500", () => {
-      expect(wrapper.vm.perPageOptions[4].value).toBe(500);
-    });
-
-    it("changePagination updates selectedPerPage and pagination", async () => {
-      const mockQTable = { setPagination: vi.fn() };
-      wrapper.vm.qTableRef = mockQTable;
-
-      await wrapper.vm.changePagination({ label: "50", value: 50 });
-
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────────
   describe("Computed Properties", () => {
     it("currentRouteName returns 'pipelines'", () => {
       expect(wrapper.vm.currentRouteName).toBe("pipelines");
@@ -289,109 +305,36 @@ describe("PipelinesList", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("filterData method", () => {
-    it("filters rows by name (case-insensitive)", () => {
-      const rows = [
-        { name: "Test Pipeline" },
-        { name: "Another Pipeline" },
-        { name: "Different Name" },
-      ];
-      const result = wrapper.vm.filterData(rows, "test");
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("Test Pipeline");
-    });
-
-    it("is case-insensitive", () => {
-      const rows = [{ name: "TEST Pipeline" }, { name: "test pipeline" }];
-      const result = wrapper.vm.filterData(rows, "TeSt");
-      expect(result).toHaveLength(2);
-    });
-
-    it("returns empty array when no matches", () => {
-      const rows = [{ name: "Pipeline One" }, { name: "Pipeline Two" }];
-      expect(wrapper.vm.filterData(rows, "xyz")).toHaveLength(0);
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────────
   describe("getColumnsForActiveTab method", () => {
     it("returns columns with 'actions' for 'all' tab", () => {
       const cols = wrapper.vm.getColumnsForActiveTab("all");
+
       expect(Array.isArray(cols)).toBe(true);
-      expect(cols.some((c: any) => c.name === "actions")).toBe(true);
+      expect(cols.some((c: any) => c.id === "actions")).toBe(true);
     });
 
     it("returns 'stream_name' column for 'realtime' tab", () => {
       const cols = wrapper.vm.getColumnsForActiveTab("realtime");
-      expect(cols.some((c: any) => c.name === "stream_name")).toBe(true);
+
+      expect(cols.some((c: any) => c.id === "stream_name")).toBe(true);
     });
 
     it("returns 'frequency' column for 'scheduled' tab", () => {
       const cols = wrapper.vm.getColumnsForActiveTab("scheduled");
-      expect(cols.some((c: any) => c.name === "frequency")).toBe(true);
+
+      expect(cols.some((c: any) => c.id === "frequency")).toBe(true);
     });
 
     it("returns 'period' column for 'scheduled' tab", () => {
       const cols = wrapper.vm.getColumnsForActiveTab("scheduled");
-      expect(cols.some((c: any) => c.name === "period")).toBe(true);
+
+      expect(cols.some((c: any) => c.id === "period")).toBe(true);
     });
 
     it("'all' tab includes 'type' column", () => {
       const cols = wrapper.vm.getColumnsForActiveTab("all");
-      expect(cols.some((c: any) => c.name === "type")).toBe(true);
-    });
-  });
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  describe("filterColumns method", () => {
-    it("returns all columns for 'all' tab", () => {
-      wrapper.vm.activeTab = "all";
-      wrapper.vm.columns = [{ name: "#" }, { name: "name" }];
-      const result = wrapper.vm.filterColumns();
-      expect(result).toEqual(wrapper.vm.columns);
-    });
-
-    it("returns all columns for 'realtime' tab", () => {
-      wrapper.vm.activeTab = "realtime";
-      wrapper.vm.columns = [{ name: "#" }, { name: "name" }];
-      const result = wrapper.vm.filterColumns();
-      expect(result).toEqual(wrapper.vm.columns);
-    });
-
-    it("slices off first column for 'scheduled' tab", () => {
-      wrapper.vm.activeTab = "scheduled";
-      wrapper.vm.columns = [{ name: "#" }, { name: "name" }];
-      const result = wrapper.vm.filterColumns();
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("name");
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  describe("Row Expansion Management", () => {
-    it("expands a scheduled pipeline row", () => {
-      const props = {
-        row: { pipeline_id: "test-id", source: { source_type: "scheduled" } },
-      };
-      wrapper.vm.triggerExpand(props);
-      expect(wrapper.vm.expandedRow).toBe("test-id");
-    });
-
-    it("collapses an already-expanded row when clicked again", () => {
-      const props = {
-        row: { pipeline_id: "test-id", source: { source_type: "scheduled" } },
-      };
-      wrapper.vm.expandedRow = "test-id";
-      wrapper.vm.triggerExpand(props);
-      expect(wrapper.vm.expandedRow).toBeNull();
-    });
-
-    it("does not expand a realtime pipeline row", () => {
-      const props = {
-        row: { pipeline_id: "test-id", source: { source_type: "realtime" } },
-      };
-      wrapper.vm.triggerExpand(props);
-      expect(wrapper.vm.expandedRow).toBeNull();
+      expect(cols.some((c: any) => c.id === "type")).toBe(true);
     });
   });
 
@@ -399,6 +342,7 @@ describe("PipelinesList", () => {
   describe("Dialog Management", () => {
     it("openDeleteDialog shows confirm dialog with pipeline data", () => {
       wrapper.vm.openDeleteDialog(mockRealtimePipeline);
+
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
       expect(wrapper.vm.confirmDialogMeta.data).toStrictEqual(
         mockRealtimePipeline
@@ -426,14 +370,18 @@ describe("PipelinesList", () => {
           node_errors: {},
         },
       };
+
       wrapper.vm.showErrorDialog(pipelineWithError);
+
       expect(wrapper.vm.errorDialog.show).toBe(true);
       expect(wrapper.vm.errorDialog.data).toStrictEqual(pipelineWithError);
     });
 
     it("closeErrorDialog hides error dialog", () => {
       wrapper.vm.errorDialog.show = true;
+
       wrapper.vm.closeErrorDialog();
+
       expect(wrapper.vm.errorDialog.show).toBe(false);
     });
   });
@@ -445,7 +393,9 @@ describe("PipelinesList", () => {
         {}
       );
       const row = { pipeline_id: "test", enabled: true, type: "realtime" };
+
       wrapper.vm.togglePipeline(row);
+
       expect(pipelineService.toggleState).toHaveBeenCalledWith(
         "test-org",
         "test",
@@ -459,13 +409,17 @@ describe("PipelinesList", () => {
         {}
       );
       const row = { pipeline_id: "rt1", enabled: false, type: "realtime" };
+
       wrapper.vm.togglePipeline(row);
+
       expect(pipelineService.toggleState).toHaveBeenCalled();
     });
 
     it("togglePipeline shows resume dialog for disabled scheduled pipeline", async () => {
       const row = { enabled: false, type: "scheduled" };
+
       await wrapper.vm.togglePipeline(row);
+
       expect(wrapper.vm.resumePipelineDialogMeta.show).toBe(true);
       expect(wrapper.vm.resumePipelineDialogMeta.data).toStrictEqual(row);
     });
@@ -475,7 +429,9 @@ describe("PipelinesList", () => {
         {}
       );
       const row = { pipeline_id: "test", enabled: true };
+
       await wrapper.vm.togglePipelineState(row, true);
+
       expect(pipelineService.toggleState).toHaveBeenCalledWith(
         "test-org",
         "test",
@@ -492,7 +448,9 @@ describe("PipelinesList", () => {
         error
       );
       const row = { pipeline_id: "test", enabled: true };
+
       await wrapper.vm.togglePipelineState(row, true);
+
       expect(pipelineService.toggleState).toHaveBeenCalled();
     });
 
@@ -502,7 +460,9 @@ describe("PipelinesList", () => {
         error
       );
       const row = { pipeline_id: "test", enabled: true };
+
       await wrapper.vm.togglePipelineState(row, true);
+
       expect(pipelineService.toggleState).toHaveBeenCalled();
     });
   });
@@ -529,7 +489,9 @@ describe("PipelinesList", () => {
 
     it("handleCancelResumePipeline closes the resume dialog", () => {
       wrapper.vm.resumePipelineDialogMeta.show = true;
+
       wrapper.vm.handleCancelResumePipeline();
+
       expect(wrapper.vm.resumePipelineDialogMeta.show).toBe(false);
     });
   });
@@ -558,7 +520,9 @@ describe("PipelinesList", () => {
 
     it("savePipeline calls createPipeline with org_identifier", () => {
       const data = { name: "New Pipeline" };
+
       wrapper.vm.savePipeline(data);
+
       expect(pipelineService.createPipeline).toHaveBeenCalledWith({
         ...data,
         org_identifier: "test-org",
@@ -567,6 +531,7 @@ describe("PipelinesList", () => {
 
     it("savePipeline sets showCreatePipeline to false", () => {
       wrapper.vm.savePipeline({ name: "New Pipeline" });
+
       expect(wrapper.vm.showCreatePipeline).toBe(false);
     });
 
@@ -577,7 +542,9 @@ describe("PipelinesList", () => {
       (pipelineService.createPipeline as MockedFunction<any>).mockRejectedValue(
         error
       );
+
       await wrapper.vm.savePipeline({ name: "New Pipeline" });
+
       expect(pipelineService.createPipeline).toHaveBeenCalled();
     });
 
@@ -613,7 +580,9 @@ describe("PipelinesList", () => {
         error
       );
       wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
+
       await wrapper.vm.deletePipeline();
+
       expect(pipelineService.deletePipeline).toHaveBeenCalled();
     });
   });
@@ -622,6 +591,7 @@ describe("PipelinesList", () => {
   describe("Navigation Methods", () => {
     it("routeToAddPipeline navigates to createPipeline with org_identifier", () => {
       wrapper.vm.routeToAddPipeline();
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createPipeline",
         query: { org_identifier: "test-org" },
@@ -630,6 +600,7 @@ describe("PipelinesList", () => {
 
     it("routeToImportPipeline navigates to importPipeline with org_identifier", () => {
       wrapper.vm.routeToImportPipeline();
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "importPipeline",
         query: { org_identifier: "test-org" },
@@ -638,6 +609,7 @@ describe("PipelinesList", () => {
 
     it("goToPipelineHistory navigates to pipelineHistory", () => {
       wrapper.vm.goToPipelineHistory();
+
       expect(mockRouter.push).toHaveBeenCalledWith(
         expect.objectContaining({ name: "pipelineHistory" })
       );
@@ -645,6 +617,7 @@ describe("PipelinesList", () => {
 
     it("goToBackfillJobs navigates to backfillJobs", () => {
       wrapper.vm.goToBackfillJobs();
+
       expect(mockRouter.push).toHaveBeenCalledWith(
         expect.objectContaining({ name: "pipelineBackfill" })
       );
@@ -655,18 +628,27 @@ describe("PipelinesList", () => {
   describe("Export Methods", () => {
     it("exportPipeline triggers a download for a single pipeline", () => {
       wrapper.vm.exportPipeline(mockRealtimePipeline);
+
       expect(global.URL.createObjectURL).toHaveBeenCalled();
       expect(global.URL.revokeObjectURL).toHaveBeenCalled();
     });
 
     it("exportBulkPipelines downloads all selected pipelines and clears selection", () => {
-      wrapper.vm.selectedPipelines = [
+      // Populate filteredPipelines so the computed selectedPipelines can resolve them
+      wrapper.vm.filteredPipelines = [
         mockRealtimePipeline,
         mockScheduledPipeline,
       ];
+      // Set selection by IDs (the read-only computed derives values from this)
+      wrapper.vm.selectedPipelineIds = [
+        mockRealtimePipeline.pipeline_id,
+        mockScheduledPipeline.pipeline_id,
+      ];
+
       wrapper.vm.exportBulkPipelines();
+
       expect(global.URL.createObjectURL).toHaveBeenCalled();
-      expect(wrapper.vm.selectedPipelines).toEqual([]);
+      expect(wrapper.vm.selectedPipelineIds).toEqual([]);
     });
   });
 
@@ -765,7 +747,9 @@ describe("PipelinesList", () => {
       (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
         data: { list: [] },
       });
+
       await wrapper.vm.getPipelines();
+
       expect(wrapper.vm.pipelines).toHaveLength(0);
     });
 
@@ -792,13 +776,17 @@ describe("PipelinesList", () => {
 
     it("'all' tab shows all pipelines", async () => {
       wrapper.vm.activeTab = "all";
+
       await wrapper.vm.updateActiveTab();
-      expect(wrapper.vm.resultTotal).toBe(2);
+
+      expect(wrapper.vm.filteredPipelines.length).toBe(2);
     });
 
     it("'realtime' tab filters to realtime pipelines only", async () => {
       wrapper.vm.activeTab = "realtime";
+
       await wrapper.vm.updateActiveTab();
+
       wrapper.vm.filteredPipelines.forEach((p: any) => {
         expect(p.source.source_type).toBe("realtime");
       });
@@ -806,7 +794,9 @@ describe("PipelinesList", () => {
 
     it("'scheduled' tab filters to scheduled pipelines only", async () => {
       wrapper.vm.activeTab = "scheduled";
+
       await wrapper.vm.updateActiveTab();
+
       wrapper.vm.filteredPipelines.forEach((p: any) => {
         expect(p.source.source_type).toBe("scheduled");
       });
@@ -814,9 +804,11 @@ describe("PipelinesList", () => {
 
     it("'all' tab updates columns via getColumnsForActiveTab", async () => {
       wrapper.vm.activeTab = "all";
+
       await wrapper.vm.updateActiveTab();
+
       expect(
-        wrapper.vm.columns.some((c: any) => c.name === "actions")
+        wrapper.vm.columns.some((c: any) => c.id === "actions")
       ).toBe(true);
     });
   });
@@ -827,17 +819,29 @@ describe("PipelinesList", () => {
       (pipelineService.bulkToggleState as MockedFunction<any>).mockResolvedValue(
         {}
       );
-      wrapper.vm.selectedPipelines = [
+      // Populate filteredPipelines so selectedPipelines computed can resolve them
+      wrapper.vm.filteredPipelines = [
         { ...mockRealtimePipeline, enabled: true },
         { ...mockScheduledPipeline, enabled: true },
       ];
+      // Select both pipelines by ID
+      wrapper.vm.selectedPipelineIds = [
+        mockRealtimePipeline.pipeline_id,
+        mockScheduledPipeline.pipeline_id,
+      ];
+
       await wrapper.vm.bulkTogglePipelines("pause");
+
       expect(pipelineService.bulkToggleState).toHaveBeenCalledTimes(1);
     });
 
     it("openBulkDeleteDialog sets confirmDialogMeta for bulk delete", () => {
-      wrapper.vm.selectedPipelines = [mockRealtimePipeline];
+      // Populate filteredPipelines so selectedPipelines computed can find the pipeline
+      wrapper.vm.filteredPipelines = [mockRealtimePipeline];
+      wrapper.vm.selectedPipelineIds = [mockRealtimePipeline.pipeline_id];
+
       wrapper.vm.openBulkDeleteDialog();
+
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
     });
   });
@@ -856,11 +860,156 @@ describe("PipelinesList", () => {
           },
         },
       };
+
       wrapper.vm.openBackfillDialog(pipeline);
+
       expect(wrapper.vm.backfillDialog.show).toBe(true);
       expect(wrapper.vm.backfillDialog.pipelineId).toBe(
         mockScheduledPipeline.pipeline_id
       );
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("ODrawer (Create Pipeline) Migration", () => {
+    it("renders ODrawer stub for the create-pipeline drawer", () => {
+      const drawer = wrapper.findComponent(ODrawerStub);
+
+      expect(drawer.exists()).toBe(true);
+    });
+
+    it("forwards showCreatePipeline=false to ODrawer open prop initially", () => {
+      const drawer = wrapper.findComponent(ODrawerStub);
+
+      expect(drawer.props("open")).toBe(false);
+    });
+
+    it("passes size='lg' to the create-pipeline ODrawer", () => {
+      const drawer = wrapper.findComponent(ODrawerStub);
+
+      expect(drawer.props("size")).toBe("lg");
+    });
+
+    it("forwards showCreatePipeline=true to ODrawer when drawer is opened", async () => {
+      wrapper.vm.showCreatePipeline = true;
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+
+      expect(drawer.props("open")).toBe(true);
+    });
+
+    it("updates showCreatePipeline when ODrawer emits update:open", async () => {
+      wrapper.vm.showCreatePipeline = true;
+      await nextTick();
+      const drawer = wrapper.findComponent(ODrawerStub);
+
+      await drawer.vm.$emit("update:open", false);
+      await nextTick();
+
+      expect(wrapper.vm.showCreatePipeline).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("ODialog (Pipeline Error) Migration", () => {
+    const pipelineWithError = {
+      pipeline_id: "err-1",
+      name: "Errored Pipeline",
+      last_error: {
+        last_error_timestamp: 1700000000000,
+        error_summary: "Node failed",
+        node_errors: {},
+      },
+    };
+
+    it("renders ODialog stub for the error dialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.exists()).toBe(true);
+    });
+
+    it("ODialog is closed by default", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.props("open")).toBe(false);
+    });
+
+    it("passes size='md' to ODialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.props("size")).toBe("md");
+    });
+
+    it("forwards errorDialog.show=true to ODialog open prop when opened", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("forwards pipeline name as title prop on ODialog", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.props("title")).toBe(pipelineWithError.name);
+    });
+
+    it("forwards the last-error timestamp as subTitle prop on ODialog", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      const subTitle = dialog.props("subTitle");
+
+      expect(subTitle).toBeTruthy();
+      expect(subTitle).toContain(":");
+    });
+
+    it("forwards primaryButtonLabel (close translation) to ODialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(typeof dialog.props("primaryButtonLabel")).toBe("string");
+      expect(dialog.props("primaryButtonLabel")?.length).toBeGreaterThan(0);
+    });
+
+    it("closes the error dialog when ODialog emits click:primary", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      await dialog.vm.$emit("click:primary");
+      await nextTick();
+
+      expect(wrapper.vm.errorDialog.show).toBe(false);
+      expect(wrapper.vm.errorDialog.data).toBeNull();
+    });
+
+    it("closes the error dialog when ODialog emits update:open=false", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      await dialog.vm.$emit("update:open", false);
+      await nextTick();
+
+      expect(wrapper.vm.errorDialog.show).toBe(false);
+    });
+
+    it("does not clear errorDialog state when ODialog emits update:open=true", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      await dialog.vm.$emit("update:open", true);
+      await nextTick();
+
+      // truthy `v` should NOT trigger closeErrorDialog()
+      expect(wrapper.vm.errorDialog.data).toStrictEqual(pipelineWithError);
     });
   });
 
@@ -870,7 +1019,6 @@ describe("PipelinesList", () => {
       const required = [
         "togglePipeline",
         "togglePipelineState",
-        "triggerExpand",
         "getColumnsForActiveTab",
         "getPipelines",
         "editPipeline",
@@ -878,7 +1026,6 @@ describe("PipelinesList", () => {
         "savePipeline",
         "deletePipeline",
         "resetConfirmDialog",
-        "filterData",
         "routeToAddPipeline",
         "exportPipeline",
         "routeToImportPipeline",
@@ -886,11 +1033,17 @@ describe("PipelinesList", () => {
         "handleResumePipeline",
         "handleCancelResumePipeline",
         "updateActiveTab",
-        "changePagination",
-        "filterColumns",
         "showErrorDialog",
         "closeErrorDialog",
+        "goToPipelineHistory",
+        "goToBackfillJobs",
+        "bulkTogglePipelines",
+        "openBulkDeleteDialog",
+        "bulkDeletePipelines",
+        "openBackfillDialog",
+        "onBackfillSuccess",
       ];
+
       required.forEach((m) => {
         expect(typeof wrapper.vm[m]).toBe("function");
       });

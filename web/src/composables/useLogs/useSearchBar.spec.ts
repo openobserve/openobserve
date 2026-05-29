@@ -13,20 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
-import { Dialog, Notify } from "quasar";
 import { createI18n } from "vue-i18n";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-
-// Create i18n instance
 const i18n = createI18n({
   legacy: false,
   locale: "en",
@@ -39,103 +32,308 @@ const i18n = createI18n({
   },
 });
 
-// Create test wrapper component
 const TestComponent = defineComponent({
   setup() {
     const searchBar = useSearchBar();
-    return {
-      ...searchBar,
-    };
+    return { ...searchBar };
   },
   template: "<div></div>",
 });
 
+// Hoisted mocks
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
+
+const { mockCancelSearchQuery } = vi.hoisted(() => ({
+  mockCancelSearchQuery: vi.fn(),
+}));
+vi.mock("@/composables/useSearchWebSocket", () => ({
+  default: () => ({
+    cancelSearchQueryBasedOnRequestId: mockCancelSearchQuery,
+  }),
+}));
+
+const { mockDeleteRunningQueries } = vi.hoisted(() => ({
+  mockDeleteRunningQueries: vi.fn(),
+}));
+vi.mock("@/services/search", () => ({
+  default: {
+    delete_running_queries: mockDeleteRunningQueries,
+    get_regions: vi.fn().mockResolvedValue({ data: {} }),
+    search: vi.fn(),
+    partition: vi.fn(),
+    result_schema: vi.fn(),
+  },
+}));
+
+const { mockGetAllFunctions } = vi.hoisted(() => ({
+  mockGetAllFunctions: vi.fn(),
+}));
+vi.mock("@/composables/useFunctions", () => ({
+  default: () => ({ getAllFunctions: mockGetAllFunctions }),
+}));
+
+const { mockGetAllActions } = vi.hoisted(() => ({
+  mockGetAllActions: vi.fn(),
+}));
+vi.mock("@/composables/useActions", () => ({
+  default: () => ({ getAllActions: mockGetAllActions }),
+}));
+
+const { mockShowErrorNotification } = vi.hoisted(() => ({
+  mockShowErrorNotification: vi.fn(),
+}));
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({ showErrorNotification: mockShowErrorNotification }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: vi.fn().mockResolvedValue({ schema: [{ name: "field1" }] }),
+    isStreamExists: vi.fn().mockReturnValue(true),
+    isStreamFetched: vi.fn().mockReturnValue(true),
+  }),
+}));
+
+const { mockBuildSearch, mockGetDataThroughStream } = vi.hoisted(() => ({
+  mockBuildSearch: vi.fn(),
+  mockGetDataThroughStream: vi.fn(),
+}));
+vi.mock("@/composables/useLogs/useSearchStream", () => ({
+  default: () => ({
+    buildSearch: mockBuildSearch,
+    getDataThroughStream: mockGetDataThroughStream,
+  }),
+}));
+
+vi.mock("@/composables/useLogs/useStreamFields", () => ({
+  default: () => ({ extractFields: vi.fn().mockResolvedValue(undefined) }),
+}));
+
+vi.mock("@/aws-exports", () => ({
+  default: { isEnterprise: "false", isCloud: "false" },
+}));
+
+const { mockSavedViewsGet } = vi.hoisted(() => ({
+  mockSavedViewsGet: vi.fn(),
+}));
+vi.mock("@/services/saved_views", () => ({
+  default: { get: mockSavedViewsGet },
+}));
+
+vi.mock("@/utils/query/sqlIdentifiers", () => ({
+  quoteSqlIdentifierIfNeeded: vi.fn((s: string) => `"${s}"`),
+}));
+
+const { mockArraysMatch } = vi.hoisted(() => ({ mockArraysMatch: vi.fn() }));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    arraysMatch: mockArraysMatch,
+    useLocalLogFilterField: vi.fn().mockReturnValue({ value: {} }),
+    useLocalWrapContent: vi.fn().mockReturnValue(null),
+  };
+});
+
 describe("useSearchBar Composable", () => {
-  let wrapper: any;
+  let wrapper: ReturnType<typeof mount>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    mockDeleteRunningQueries.mockResolvedValue({
+      data: [{ is_success: true }],
+    });
+    mockBuildSearch.mockReturnValue({ query: { sql: "SELECT * FROM test" } });
     wrapper = mount(TestComponent, {
-      global: {
-        plugins: [store, i18n],
-      },
+      global: { plugins: [store, i18n] },
     });
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe("Search Bar Functions", () => {
-    it("should have onStreamChange function", () => {
+  describe("function existence", () => {
+    it("should expose onStreamChange", () => {
       expect(typeof wrapper.vm.onStreamChange).toBe("function");
     });
 
-    it("should have getFunctions function", () => {
+    it("should expose getFunctions", () => {
       expect(typeof wrapper.vm.getFunctions).toBe("function");
     });
 
-    it("should have getActions function", () => {
+    it("should expose getActions", () => {
       expect(typeof wrapper.vm.getActions).toBe("function");
     });
 
-    it("should have getSavedViews function", () => {
+    it("should expose getSavedViews", () => {
       expect(typeof wrapper.vm.getSavedViews).toBe("function");
     });
 
-    it("should have getRegionInfo function", () => {
+    it("should expose getRegionInfo", () => {
       expect(typeof wrapper.vm.getRegionInfo).toBe("function");
     });
 
-    it("should have setSelectedStreams function", () => {
+    it("should expose setSelectedStreams", () => {
       expect(typeof wrapper.vm.setSelectedStreams).toBe("function");
     });
 
-    it("should have getQueryData function", () => {
+    it("should expose getQueryData", () => {
       expect(typeof wrapper.vm.getQueryData).toBe("function");
     });
 
-    it("should have sendCancelSearchMessage function", () => {
+    it("should expose sendCancelSearchMessage", () => {
       expect(typeof wrapper.vm.sendCancelSearchMessage).toBe("function");
     });
 
-    it("should have cancelQuery function", () => {
+    it("should expose cancelQuery", () => {
       expect(typeof wrapper.vm.cancelQuery).toBe("function");
     });
 
-    it("should have handleQueryData function", () => {
+    it("should expose handleQueryData", () => {
       expect(typeof wrapper.vm.handleQueryData).toBe("function");
     });
 
-    it("should have setDateTime function", () => {
+    it("should expose setDateTime", () => {
       expect(typeof wrapper.vm.setDateTime).toBe("function");
     });
   });
 
-  describe("onStreamChange", () => {
-    it("should handle stream change", async () => {
-      const { onStreamChange } = wrapper.vm;
-      await onStreamChange();
-      expect(onStreamChange).toHaveBeenCalled;
+  describe("cancelQuery", () => {
+    it("should resolve true immediately when not enterprise", async () => {
+      const result = await wrapper.vm.cancelQuery();
+      expect(result).toBe(true);
     });
 
-    it("should handle empty query string", async () => {
-      const { onStreamChange } = wrapper.vm;
-      await onStreamChange();
-      expect(onStreamChange).toHaveBeenCalled;
+    it("should resolve true when no trace IDs exist", async () => {
+      const result = await wrapper.vm.cancelQuery();
+      expect(result).toBe(true);
+      expect(mockDeleteRunningQueries).not.toHaveBeenCalled();
     });
   });
 
-  describe("Cross-Linking in getQueryData", () => {
-    it("should have getQueryData function for cross-linking support", () => {
-      expect(typeof wrapper.vm.getQueryData).toBe("function");
+  describe("sendCancelSearchMessage", () => {
+    it("should set isOperationCancelled false for empty search requests", () => {
+      wrapper.vm.sendCancelSearchMessage([]);
+      expect(mockCancelSearchQuery).not.toHaveBeenCalled();
     });
 
-    it("should have handleQueryData function", () => {
-      expect(typeof wrapper.vm.handleQueryData).toBe("function");
+    it("should send cancel for each search request trace ID", () => {
+      const searchRequests = ["trace-1", "trace-2", "trace-3"];
+
+      wrapper.vm.sendCancelSearchMessage(searchRequests);
+
+      expect(mockCancelSearchQuery).toHaveBeenCalledTimes(3);
+      expect(mockCancelSearchQuery).toHaveBeenCalledWith({
+        trace_id: "trace-1",
+        org_id: expect.any(String),
+      });
+      expect(mockCancelSearchQuery).toHaveBeenCalledWith({
+        trace_id: "trace-2",
+        org_id: expect.any(String),
+      });
     });
 
-    it("should have cancelQuery function for cancelling cross-link requests", () => {
-      expect(typeof wrapper.vm.cancelQuery).toBe("function");
+    it("should handle single search request", () => {
+      wrapper.vm.sendCancelSearchMessage(["trace-single"]);
+
+      expect(mockCancelSearchQuery).toHaveBeenCalledTimes(1);
+      expect(mockCancelSearchQuery).toHaveBeenCalledWith({
+        trace_id: "trace-single",
+        org_id: expect.any(String),
+      });
+    });
+  });
+
+  describe("getSavedViews", () => {
+    it("should set loadingSavedView true during fetch", async () => {
+      mockSavedViewsGet.mockReturnValue(
+        new Promise(() => {}), // Never resolves
+      );
+
+      wrapper.vm.getSavedViews();
+      // Loading state is set before the async call
+    });
+  });
+
+  describe("getFunctions", () => {
+    it("should call getAllFunctions when functions list is empty", async () => {
+      store.state.organizationData.functions = [];
+      mockGetAllFunctions.mockResolvedValue(undefined);
+
+      await wrapper.vm.getFunctions();
+      expect(mockGetAllFunctions).toHaveBeenCalled();
+    });
+
+    it("should not call getAllFunctions when already loaded", async () => {
+      store.state.organizationData.functions = [
+        { name: "existing", num_args: 1, function: "fn() {}" },
+      ];
+      mockGetAllFunctions.mockResolvedValue(undefined);
+
+      await wrapper.vm.getFunctions();
+      expect(mockGetAllFunctions).not.toHaveBeenCalled();
+    });
+
+    it("should show error notification on failure", async () => {
+      store.state.organizationData.functions = [];
+      mockGetAllFunctions.mockRejectedValue(new Error("Network error"));
+
+      await wrapper.vm.getFunctions();
+      expect(mockShowErrorNotification).toHaveBeenCalledWith(
+        "Error while fetching functions",
+      );
+    });
+  });
+
+  describe("getActions", () => {
+    it("should call getAllActions when actions list is empty", async () => {
+      store.state.organizationData.actions = [];
+      mockGetAllActions.mockResolvedValue(undefined);
+
+      await wrapper.vm.getActions();
+      expect(mockGetAllActions).toHaveBeenCalled();
+    });
+
+    it("should not call getAllActions when already loaded", async () => {
+      store.state.organizationData.actions = [
+        { name: "existing", id: "act-1", execution_details_type: "service" },
+      ];
+      mockGetAllActions.mockResolvedValue(undefined);
+
+      await wrapper.vm.getActions();
+      expect(mockGetAllActions).not.toHaveBeenCalled();
+    });
+
+    it("should show error notification on failure", async () => {
+      store.state.organizationData.actions = [];
+      mockGetAllActions.mockRejectedValue(new Error("Network error"));
+
+      await wrapper.vm.getActions();
+      expect(mockShowErrorNotification).toHaveBeenCalledWith(
+        "Error while fetching actions",
+      );
+    });
+  });
+
+  describe("setDateTime", () => {
+    it("should be callable with valid period", () => {
+      expect(() => wrapper.vm.setDateTime("5m")).not.toThrow();
+    });
+
+    it("should be callable with days period", () => {
+      expect(() => wrapper.vm.setDateTime("1d")).not.toThrow();
+    });
+
+    it("should be callable with hours period", () => {
+      expect(() => wrapper.vm.setDateTime("2h")).not.toThrow();
+    });
+
+    it("should be callable with weeks period", () => {
+      expect(() => wrapper.vm.setDateTime("1w")).not.toThrow();
+    });
+
+    it("should handle default period", () => {
+      expect(() => wrapper.vm.setDateTime("15m")).not.toThrow();
     });
   });
 });

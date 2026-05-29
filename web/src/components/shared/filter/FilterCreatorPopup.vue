@@ -1,62 +1,45 @@
 <template>
-  <q-dialog class="filter-container">
-    <q-card class="q-pa-md">
-      <q-card-section class="q-pa-none">
-        <div class="text-h6">{{ fieldName }}</div>
-      </q-card-section>
-      <q-card-section class="q-pa-none">
-        <q-select
+  <ODialog data-test="filter-creator-popup-dialog" v-model:open="show" size="sm" :title="fieldName"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('common.apply')"
+    @click:secondary="show = false"
+    @click:primary="applyFilter"
+  >
+    <div class="tw:p-3 filter-container">
+      <OCardSection class="tw:p-0">
+        <OSelect
           v-model="selectedOperator"
           :options="operators"
           :label="t('filter.operator')"
-          :popup-content-style="{ textTransform: 'capitalize' }"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || 'Field is required!']"
+          class="tw:py-2"
+          :error="!!selectedOperatorError"
+          :error-message="selectedOperatorError"
+          @update:model-value="selectedOperatorError = ''"
         />
-      </q-card-section>
-      <q-card-section class="q-pa-none">
-        <div class="text-bold q-pb-xs q-pt-sm">Values</div>
+      </OCardSection>
+      <OCardSection class="tw:p-0">
+        <div class="tw:font-bold tw:pb-1 tw:pt-2">Values</div>
         <div class="filter-values-container">
           <div v-show="!fieldValues?.length">No values present</div>
-          <div v-for="value in fieldValues" :key="value">
-            <q-list dense>
-              <q-item tag="label">
-                <q-item-section avatar>
-                  <q-checkbox
-                    size="xs"
-                    dense
-                    v-model="selectedValues"
-                    :val="value"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="ellipsis">{{ value }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
+          <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+            <li v-for="value in fieldValues" :key="value">
+              <label
+                :data-test="`filter-creator-popup-value-${value}`"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+              >
+                <OCheckbox
+                  v-model="selectedValues"
+                  :value="value"
+                  class="tw:shrink-0"
+                />
+                <span class="tw:text-sm tw:flex-1 tw:min-w-0 tw:truncate">{{ value }}</span>
+              </label>
+            </li>
+          </ul>
         </div>
-      </q-card-section>
-      <q-card-actions align="right">
-        <OButton
-          v-close-popup
-          variant="outline"
-          size="sm-action"
-        >{{ t('common.cancel') }}</OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="applyFilter"
-        >{{ t('common.apply') }}</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </OCardSection>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -64,10 +47,13 @@
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 export default defineComponent({
   name: "FilterCreatorPopup",
-  components: { OButton },
+  components: { ODialog, OSelect, OCheckbox, OCardSection },
   props: [
     "fieldName",
     "fieldValues",
@@ -76,8 +62,10 @@ export default defineComponent({
     "defaultValues",
   ],
   setup(props, { emit }) {
+    const show = ref(true);
     const selectedValues = ref(props.defaultValues);
     const selectedOperator = ref(props.defaultOperator);
+    const selectedOperatorError = ref("");
     const { t } = useI18n();
 
     onBeforeMount(() => {});
@@ -88,6 +76,10 @@ export default defineComponent({
       selectedOperator: string;
     }
     const applyFilter = () => {
+      if (!selectedOperator.value) {
+        selectedOperatorError.value = "Field is required!";
+        return;
+      }
       emit("apply", {
         fieldName: props.fieldName,
         selectedValues: selectedValues.value,
@@ -96,8 +88,10 @@ export default defineComponent({
     };
     return {
       t,
+      show,
       selectedValues,
       selectedOperator,
+      selectedOperatorError,
       applyFilter,
     };
   },
@@ -112,15 +106,5 @@ export default defineComponent({
 .filter-values-container {
   max-height: 150px;
   overflow: auto;
-}
-</style>
-<style lang="scss">
-.filter-values-container {
-  .q-item {
-    padding-left: 2px !important;
-  }
-  .q-focus-helper {
-    background: transparent !important;
-  }
 }
 </style>

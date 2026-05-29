@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="error-404-page">
+  <div class="tw:rounded-md error-404-page">
     <div class="error-404-content">
       <div class="error-404-illustration">
         <svg
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t('common.redirectingHome', { countdown }) }}
       </p>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">

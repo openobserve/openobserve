@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { Quasar } from 'quasar';
 import { createI18n } from 'vue-i18n';
 import Functions from './Functions.vue';
 
@@ -18,6 +17,7 @@ const MockRouterView = {
     return { MockComponent };
   },
 };
+
 
 describe('Functions.vue', () => {
   let wrapper: any;
@@ -85,12 +85,9 @@ describe('Functions.vue', () => {
         plugins: [
           store,
           router,
-          i18n,
-          [Quasar, {}],
-        ],
+          i18n, ],
         stubs: {
-          'q-page': { template: '<div class="q-page"><slot /></div>' },
-          'q-btn': {
+                    'q-btn': {
             template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
             emits: ['click'],
           },
@@ -152,8 +149,9 @@ describe('Functions.vue', () => {
     it('should render the component with default configuration', async () => {
       wrapper = await createWrapper();
 
-      expect(wrapper.find('.q-page').exists()).toBe(true);
-      expect(wrapper.find('.q-splitter').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:rounded-md').exists()).toBe(true);
+      // Verify a known tab renders — functions-page data-test doesn't exist on this component
+      expect(wrapper.find('[data-test="stream-pipelines-tab"]').exists()).toBe(true);
       // The tabs now use 'card-container' class instead of 'functions-tabs'
       expect(wrapper.find('.card-container').exists()).toBe(true);
     });

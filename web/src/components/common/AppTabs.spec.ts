@@ -1,9 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-installQuasar();
 
 describe("AppTabs", () => {
   let wrapper: any = null;
@@ -47,21 +45,23 @@ describe("AppTabs", () => {
   });
 
   it("should highlight active tab", () => {
-    const activeTab = wrapper.find('[data-test="tab-tab1"]');
-    expect(activeTab.attributes("data-state")).toBe("on");
+    // OToggleGroupItem forwards $attrs (including data-test) to the reka-ui
+    // ToggleGroupItem which renders as a <button> — data-test is ON the button.
+    const activeTabBtn = wrapper.find('[data-test="tab-tab1"]');
+    expect(activeTabBtn.attributes("data-state")).toBe("on");
   });
 
   it("should emit update:activeTab when non-disabled tab is clicked", async () => {
-    const tab2 = wrapper.find('[data-test="tab-tab2"]');
-    await tab2.trigger("click");
+    const tab2Btn = wrapper.find('[data-test="tab-tab2"]');
+    await tab2Btn.trigger("click");
 
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
     expect(wrapper.emitted("update:activeTab")[0]).toEqual(["tab2"]);
   });
 
   it("should not emit when disabled tab is clicked", async () => {
-    const disabledTab = wrapper.find('[data-test="tab-tab3"]');
-    await disabledTab.trigger("click");
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"]');
+    await disabledTabBtn.trigger("click");
 
     expect(wrapper.emitted("update:activeTab")).toBeFalsy();
   });
@@ -73,9 +73,10 @@ describe("AppTabs", () => {
     expect(wrapper.emitted("update:activeTab")).toBeFalsy();
   });
 
-  it("should apply disabled class to disabled tabs", () => {
-    const disabledTab = wrapper.find('[data-test="tab-tab3"]');
-    expect(disabledTab.attributes("data-disabled")).toBeDefined();
+  it("should apply disabled state to disabled tabs", () => {
+    // reka-ui sets data-disabled on the button; data-test is also on the button.
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"]');
+    expect(disabledTabBtn.attributes("data-disabled")).toBeDefined();
   });
 
   it("should apply hidden class to hidden tabs", () => {
@@ -115,14 +116,13 @@ describe("AppTabs", () => {
   });
 
   it("should handle changeTab function correctly", async () => {
-    // onSelect is internal and not exposed; test tab selection via clicks
-    const tab2 = wrapper.find('[data-test="tab-tab2"]');
-    await tab2.trigger("click");
+    const tab2Btn = wrapper.find('[data-test="tab-tab2"]');
+    await tab2Btn.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
 
     // Disabled tab click should not add more emits
-    const disabledTab = wrapper.find('[data-test="tab-tab3"]');
-    await disabledTab.trigger("click");
+    const disabledTabBtn = wrapper.find('[data-test="tab-tab3"]');
+    await disabledTabBtn.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1); // Still 1
 
     // Hidden tab is not in DOM

@@ -15,14 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import DashboardGeoMapsQueryBuilder from "@/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock the composables
 const mockDashboardPanelData = {
@@ -130,7 +125,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
           SanitizedHtmlRenderer: true,
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
-          "q-icon": true,
+          "OIcon": true,
           "q-tooltip": true,
           "q-btn-group": true,
           "q-btn": true,

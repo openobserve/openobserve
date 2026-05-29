@@ -6,7 +6,7 @@
       <div class="tw:mr-2 add-script-back-btn">
         <div
           data-test="add-script-back-btn"
-          class="flex justify-center items-center cursor-pointer"
+          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -16,57 +16,39 @@
           title="Go Back"
           @click="redirectToScripts"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
-      <div class="tw:text-lg tw:w-full add-script-title q-mr-md">
+      <div class="tw:text-lg tw:w-full add-script-title tw:mr-3">
         Add Action
       </div>
-      <q-form ref="addScriptForm" class="o2-input">
+      <div class="o2-input">
         <div class="tw:flex tw:items-center">
-          <q-input
+          <OInput
             data-test="add-script-name-input"
             v-model.trim="actionName"
             :label="t('actions.name')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pa-none tw:w-full"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="disableName"
-            v-bind:disable="disableName"
-            :rules="[
-              (val: any) => !!val || 'Field is required!',
-              isValidMethodName,
-            ]"
-            no-error-icon
-            tabindex="0"
-            style="min-width: 300px"
+            class="tw:p-0 tw:w-full"
+            :readonly="disableName"
+            :disabled="disableName"
+            :error="!!scriptNameError"
+            :error-message="scriptNameError"
             @update:model-value="onUpdate"
             @blur="onUpdate"
+            style="min-width: 300px"
           />
-          <q-icon
+          <OIcon
             :key="actionName"
             v-if="isValidMethodName() !== true && showInputError"
-            :name="outlinedInfo"
-            size="20px"
-            class="q-ml-xs cursor-pointer"
+            name="info"
+            size="md"
+            class="tw:ml-1 tw:cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              :offset="[2, 0]"
-              class="tw:text-[12px]"
-            >
-              {{ isValidMethodName() }}
-            </q-tooltip>
-          </q-icon>
+            <OTooltip side="right" :content="String(isValidMethodName())" />
+          </OIcon>
         </div>
-      </q-form>
+      </div>
     </div>
     <div class="add-script-actions tw:flex tw:items-center tw:gap-2">
       <OButton
@@ -75,7 +57,7 @@
         variant="outline"
         size="sm"
         @click="handleFullScreen"
-        ><q-icon name="fullscreen" size="18px" class="tw:mr-1" />{{
+        ><OIcon name="fullscreen" size="sm" class="tw:mr-1" />{{
           t("common.fullscreen")
         }}</OButton
       >
@@ -100,15 +82,15 @@
 <script setup lang="ts">
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toggleFullscreen } from "@/utils/dom";
 
 const { t } = useI18n();
-
-const q = useQuasar();
 
 const router = useRouter();
 
@@ -128,6 +110,13 @@ const props = defineProps({
 const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 
 const addScriptForm = ref(null);
+
+const scriptNameError = computed(() => {
+  if (!showInputError.value) return '';
+  if (!actionName.value) return 'Field is required!';
+  const result = isValidMethodName();
+  return result === true ? '' : result;
+});
 
 const showInputError = ref(false);
 
@@ -150,7 +139,7 @@ const actionName = computed({
 });
 
 const handleFullScreen = () => {
-  q.fullscreen.toggle();
+  toggleFullscreen();
 };
 
 const redirectToScripts = () => {

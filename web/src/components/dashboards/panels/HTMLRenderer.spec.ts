@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import DOMPurify from "dompurify";
 import HTMLRenderer from "./HTMLRenderer.vue";
 
@@ -53,6 +52,7 @@ const getAfterSanitizeAttributesHook = () => {
   return hookCall ? hookCall[1] : undefined;
 };
 
+
 describe("HTMLRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -60,7 +60,7 @@ describe("HTMLRenderer", () => {
     return mount(HTMLRenderer, {
       props,
       global: {
-        plugins: [Quasar],
+        plugins: [],
       },
     });
   };
@@ -255,7 +255,7 @@ describe("HTMLRenderer", () => {
       // Create wrapper with dark theme store from the start
       wrapper = mount(HTMLRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -281,7 +281,7 @@ describe("HTMLRenderer", () => {
       
       wrapper = mount(HTMLRenderer, {
         global: {
-          plugins: [Quasar],
+          plugins: [],
           mocks: {
             store: {
               state: { theme: "dark" }
@@ -416,7 +416,7 @@ describe("HTMLRenderer", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
       expect(container.exists()).toBe(true);
       expect(container.attributes('style')).toContain('width: 100%');
       expect(container.attributes('style')).toContain('height: 100%');
@@ -437,7 +437,7 @@ describe("HTMLRenderer", () => {
       
       wrapper = createWrapper({ htmlContent: longContent });
       
-      const container = wrapper.find('.scroll');
+      const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
       expect(container.attributes('style')).toContain('overflow: auto');
     });
   });

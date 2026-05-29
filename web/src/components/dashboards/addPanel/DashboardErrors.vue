@@ -16,36 +16,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="props.errors.errors.length" :data-test="`dashboard-error`">
-    <q-separator />
+    <OSeparator />
     <div>
-      <q-bar class="row q-pa-sm expand-bar">
-        <div style="flex: 1" @click="onDropDownClick">
-          <q-icon
-            flat
-            :name="!showErrors ? 'arrow_right' : 'arrow_drop_down'"
-            text-color="black"
-            class="q-mr-sm"
-          />
-          <span class="text-subtitle2 text-weight-bold" style="color: red"
-            >Errors ({{ props.errors.errors.length }})</span
-          >
-          <q-space />
-        </div>
-      </q-bar>
+      <div
+        data-test="dashboard-errors-expand-bar"
+        class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:cursor-pointer expand-bar"
+        :style="{ backgroundColor: store.state.theme === 'dark' ? 'var(--o2-header-menu-bg)' : 'var(--color-primary-100)' }"
+        @click="onDropDownClick"
+      >
+        <OIcon
+          :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'"
+          size="sm"
+          class="tw:mr-1"
+        />
+        <span class="tw:text-sm tw:font-semibold tw:text-red-500">
+          Errors ({{ props.errors.errors.length }})
+        </span>
+      </div>
     </div>
     <div
-      class="row"
+      class="tw:flex"
       :style="!showErrors ? 'height: 0px;' : 'height: auto;'"
       style="overflow: hidden"
     >
-      <div class="col">
+      <div class="tw:flex tw:flex-col">
         <div data-test="dashboard-error">
-          <ul class="tw:list-disc tw:list-inside tw:px-3">
+          <ul
+            data-test="dashboard-errors-list"
+            class="tw:list-disc tw:list-inside tw:px-3"
+          >
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
               style="color: red"
               class="tw:py-1"
+              data-test="dashboard-errors-list-item"
             >
               {{ item }}
             </li>
@@ -59,14 +64,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "DashboardErrorsComponent",
+  components: {
+    OSeparator,
+    OIcon,
+  },
   props: ["errors"],
 
   setup(props, { emit }) {
     const showErrors = ref(false);
     const { t } = useI18n();
+    const store = useStore();
 
     const onDropDownClick = () => {
       showErrors.value = !showErrors.value;
@@ -89,6 +102,7 @@ export default defineComponent({
     return {
       props,
       t,
+      store,
       onDropDownClick,
       showErrors,
     };

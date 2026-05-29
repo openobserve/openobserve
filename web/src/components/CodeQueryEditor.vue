@@ -32,15 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
-      <q-icon size="20px">
+      <OIcon size="md">
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
-      </q-icon>
-      <q-tooltip>
-        {{
-          disableAiReason ||
-          t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
-        }}
-      </q-tooltip>
+      </OIcon>
+      <OTooltip side="top" align="center">
+        <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>
+      </OTooltip>
     </OButton>
   </div>
 </template>
@@ -73,17 +70,18 @@ const loadMonaco = async () => {
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
-import { debounce } from "quasar";
+import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   inheritAttrs: false,
-  components: { OButton },
+  components: { OButton, OIcon, OTooltip },
   props: {
     editorId: {
       type: String,
@@ -581,6 +579,12 @@ export default defineComponent({
       // Lazy load Monaco Editor on first use
       const monacoModule = await loadMonaco();
       monaco = monacoModule;
+
+      // Expose Monaco on window for e2e tests (read-only assertions against editor model).
+      // Tests use: window.monaco.editor.getModels()[0].getValue()
+      if (typeof window !== "undefined") {
+        (window as any).monaco = monacoModule;
+      }
 
       // Initialize Monaco constants after loading
       initializeMonacoConstants();

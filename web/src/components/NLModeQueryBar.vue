@@ -27,19 +27,12 @@
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           class="toolbar-toggle-container element-box-shadow"
         >
-          <q-toggle
+          <OSwitch
             :data-test="`${dataTestPrefix}-nlp-mode-toggle`"
             v-model="nlpMode"
-            class="o2-toggle-button-xs"
-            size="xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
           />
           <img :src="nlpIcon" alt="NL Mode" class="toolbar-icon" />
-          <q-tooltip>{{ t('nlMode.toggle') }}</q-tooltip>
+          <OTooltip :content="t('nlMode.toggle')" side="top" />
         </div>
 
         <!-- Action Buttons (always present) -->
@@ -55,17 +48,17 @@
             :disabled="disabled || (isAIMode && isGenerating)"
             @click="handleButtonClick"
           >
-            <q-icon
+            <OIcon
               v-if="showIcon"
-              :name="isAIMode ? 'auto_awesome' : 'search'"
-              class="q-mr-xs"
+              :name="isAIMode ? 'auto-awesome' : 'search'" size="sm"
+              class="tw:mr-1"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
           </OButton>
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
-            <q-separator class="tw:h-[29px] tw:w-[1px]" />
+            <OSeparator class="tw:h-[29px] tw:w-[1px]" />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
@@ -74,7 +67,7 @@
                   class="tw:h-[29px] search-button-dropdown"
                   :class="dropdownClasses"
                 >
-                  <q-icon name="arrow_drop_down" size="18px" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                 </OButton>
               </template>
               <!-- Normal Mode: Refresh option -->
@@ -84,7 +77,7 @@
                   @select="$emit('refresh')"
                 >
                   <template #icon-left>
-                    <q-icon name="refresh" size="16px" />
+                    <OIcon name="refresh" size="sm" />
                   </template>
                   {{ t('search.refreshCacheAndRunQuery') }}
                 </ODropdownItem>
@@ -112,24 +105,22 @@
           <!-- Show streaming status with spinner -->
           <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
-            <q-spinner-dots color="primary" size="1.2em" />
+            <OSpinner variant="dots" size="xs" />
             <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
-          <q-input
+          <OInput
             v-else
             v-model="aiInputText"
-            dense
-            borderless
             :placeholder="t('search.askAIPlaceholder')"
             class="ai-input-field"
             :data-test="`${dataTestPrefix}-ai-input-field`"
             @keydown.enter="handleAIInputEnter"
           >
-            <template v-slot:prepend>
+            <template v-slot:icon-left>
               <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
             </template>
-          </q-input>
+          </OInput>
         </div>
 
         <!-- Code Editor -->
@@ -162,6 +153,12 @@ import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
 import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
 import { getImageURL } from '@/utils/zincutils';
 import config from '@/aws-exports';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface Props {
   // Query props
@@ -237,7 +234,7 @@ const isAIMode = computed(() => nlpMode.value || isNaturalLanguageDetected.value
 // Computed: Button classes
 const buttonClasses = computed(() => {
   const classes = [
-    'q-pa-none',
+    'tw:p-0',
     `tw:h-[${props.height}]`,
     'element-box-shadow',
   ];

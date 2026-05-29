@@ -14,16 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createApp } from "vue";
-import { Notify, Dialog, Quasar, AppFullscreen } from "quasar";
-import "quasar/src/css/index.sass";
-import "@quasar/extras/roboto-font/roboto-font.css";
-import "@quasar/extras/material-icons/material-icons.css";
-
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
 import i18n from "./locales";
-import "./styles/quasar-overrides.scss";
 import "./styles/tailwind.css";
 import config from "./aws-exports";
 import configService from "./services/config";
@@ -36,19 +30,12 @@ import {
   createDefaultContextProvider,
 } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const app = createApp(App);
 const router = createRouter(store);
 
-app
-  .use(Quasar, {
-    plugins: {
-      Dialog,
-      Notify,
-      AppFullscreen,
-    },
-  })
-  .use(i18n);
+app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
@@ -188,25 +175,17 @@ function showNewVersionNotification() {
   }
 
   staleNotificationShown = true;
-  Notify.create({
-    type: "negative",
+  toast({
+    variant: "error",
     message: i18n.global.t("common.chunkLoadErrorMsg"),
-    html: true,
     timeout: 0, // Don't auto-dismiss
-    actions: [
-      {
-        label: i18n.global.t("common.refresh"),
-        color: "white",
-        handler: () => {
-          window.location.reload();
-        },
+    action: {
+      label: i18n.global.t("common.refresh"),
+      handler: () => {
+        window.location.reload();
       },
-    ],
-    position: "top",
-    icon: "update",
-    color: "negative",
-    textColor: "white",
-    classes: "stale-build-notification",
+    },
+    position: "top-center",
   });
 }
 

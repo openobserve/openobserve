@@ -15,10 +15,7 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PerformanceMetrics from "./PerformanceMetrics.vue";
-
-installQuasar();
 
 vi.mock("./performance/ViewPerformanceMetrics.vue", () => ({
   default: {
@@ -58,92 +55,163 @@ describe("PerformanceMetrics", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
-    wrapper?.unmount();
-    vi.clearAllMocks();
+    if (wrapper) wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
   describe("initial render", () => {
-    it("should render without errors", () => {
+    it("renders without errors when eventType and metrics are provided", () => {
+      // Arrange + Act
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "view", metrics: sampleMetrics },
       });
+
+      // Assert
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have data-test=performance-metrics on root", () => {
+    it("renders root container with data-test=performance-metrics", () => {
+      // Arrange
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "view", metrics: sampleMetrics },
       });
-      expect(wrapper.find('[data-test="performance-metrics"]').exists()).toBe(true);
+
+      // Assert
+      expect(wrapper.find('[data-test="performance-metrics"]').exists()).toBe(
+        true,
+      );
     });
   });
 
   describe("eventType routing", () => {
-    it("should render ViewPerformanceMetrics when eventType=view", () => {
+    it("renders ViewPerformanceMetrics and only ViewPerformanceMetrics when eventType=view", () => {
+      // Arrange
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "view", metrics: sampleMetrics },
       });
-      expect(wrapper.find('[data-test="view-performance-metrics"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="action-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="resource-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="error-performance-metrics"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="view-performance-metrics"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="action-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="resource-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="error-performance-metrics"]').exists(),
+      ).toBe(false);
     });
 
-    it("should render ActionPerformanceMetrics when eventType=action", () => {
+    it("renders ActionPerformanceMetrics and only ActionPerformanceMetrics when eventType=action", () => {
+      // Arrange
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "action", metrics: sampleMetrics },
       });
-      expect(wrapper.find('[data-test="action-performance-metrics"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="view-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="resource-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="error-performance-metrics"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="action-performance-metrics"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="view-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="resource-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="error-performance-metrics"]').exists(),
+      ).toBe(false);
     });
 
-    it("should render ResourcePerformanceMetrics when eventType=resource", () => {
+    it("renders ResourcePerformanceMetrics and only ResourcePerformanceMetrics when eventType=resource", () => {
+      // Arrange
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "resource", metrics: sampleMetrics },
       });
-      expect(wrapper.find('[data-test="resource-performance-metrics"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="view-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="action-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="error-performance-metrics"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="resource-performance-metrics"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="view-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="action-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="error-performance-metrics"]').exists(),
+      ).toBe(false);
     });
 
-    it("should render ErrorPerformanceMetrics when eventType=error", () => {
+    it("renders ErrorPerformanceMetrics and only ErrorPerformanceMetrics when eventType=error", () => {
+      // Arrange
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "error", metrics: sampleMetrics },
       });
-      expect(wrapper.find('[data-test="error-performance-metrics"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="view-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="action-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="resource-performance-metrics"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="error-performance-metrics"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="view-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="action-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="resource-performance-metrics"]').exists(),
+      ).toBe(false);
     });
 
-    it("should render fallback message for unknown eventType", () => {
+    it("renders fallback message and no child metrics component for unknown eventType", () => {
+      // Arrange
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "unknown" as any, metrics: sampleMetrics },
       });
-      expect(wrapper.find('[data-test="view-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="action-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="resource-performance-metrics"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="error-performance-metrics"]').exists()).toBe(false);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="view-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="action-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="resource-performance-metrics"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="error-performance-metrics"]').exists(),
+      ).toBe(false);
       expect(wrapper.text()).toContain("No performance data available");
     });
   });
 
   describe("metrics prop passing", () => {
-    it("should pass metrics to the child component", () => {
+    it("renders child component when metrics are provided", () => {
+      // Arrange
       const metrics = { view: { lcp: 3000000000 } };
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "view", metrics },
       });
-      expect(wrapper.find('[data-test="view-performance-metrics"]').exists()).toBe(true);
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="view-performance-metrics"]').exists(),
+      ).toBe(true);
     });
 
-    it("should handle null metrics without crashing", () => {
+    it("renders without crashing when metrics prop is null", () => {
+      // Arrange + Act
       wrapper = mount(PerformanceMetrics, {
         props: { eventType: "view", metrics: null as any },
       });
+
+      // Assert
       expect(wrapper.exists()).toBe(true);
     });
   });

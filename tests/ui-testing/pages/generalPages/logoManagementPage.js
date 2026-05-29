@@ -38,18 +38,18 @@ export
 
     async goToManagement() {
         await this.managementMenuItem.click({ force: true });
-        await expect(this.page.getByRole('main')).toContainText('Management');
+        await expect(this.page.locator('[data-test="menu-link-settings-item"]')).toBeVisible();
     }
 
     async managementPageDefaultMultiOrg() {
-        await this.navbarOrganizationsSelect.getByText('arrow_drop_down').click();
-        await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+        await this.navbarOrganizationsSelect.click();
+        await this.page.locator('[data-test="navbar-organizations-select-option"]', { hasText: /defaulttestmulti/i }).first().click();
     }
 
     async managementOrg(orgName) {
         await this.page.waitForTimeout(2000);
         await this.page.reload();
-        await this.navbarOrganizationsSelect.getByText('arrow_drop_down').click();
+        await this.navbarOrganizationsSelect.click();
         await this.page.waitForTimeout(2000);
 
         // Search for the organization
@@ -74,14 +74,14 @@ export
     }
 
     async updateCustomLogoText(text) {
-    await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible(); // Check Unauthorized Access
+    await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Unauthorized/i }).first()).not.toBeVisible(); // Check Unauthorized Access
 
     // Step 1: Check if the text input is already visible (no existing data scenario)
     try {
         await this.customLogoTextBox.waitFor({ state: 'visible', timeout: 5000 });
         // Input is visible, proceed directly
         await this.customLogoTextBox.click();
-        await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible(); // Check Unauthorized Access
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Unauthorized/i }).first()).not.toBeVisible(); // Check Unauthorized Access
         await this.customLogoTextBox.fill(text);
         await this.saveButton.first().waitFor({ state: 'visible' });
         await this.saveButton.first().click({ force: true });
@@ -103,7 +103,7 @@ export
     // Step 4: Enter the text
     await this.customLogoTextBox.waitFor({ state: 'visible', timeout: 30000 });
     await this.customLogoTextBox.click();
-    await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible(); // Check Unauthorized Access
+    await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Unauthorized/i }).first()).not.toBeVisible(); // Check Unauthorized Access
     await this.customLogoTextBox.fill(text);
     await this.saveButton.first().waitFor({ state: 'visible' });
     await this.saveButton.first().click({ force: true });
@@ -123,7 +123,7 @@ export
         // Click the save button after logo upload (light mode)
         await this.saveButtonLight.waitFor({ state: 'visible' });
         await this.saveButtonLight.click({ force: true });
-        await expect(this.page.getByText("Logo updated successfully")).toBeVisible({
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Logo updated successfully/i }).first()).toBeVisible({
             timeout: 30000,
         });
     }
@@ -136,7 +136,7 @@ export
             await this.deleteLogoButtonDark.click({ force: true });
             await this.confirmDeleteButton.waitFor({ state: 'visible' });
             await this.confirmDeleteButton.click({ force: true });
-            await expect(this.page.getByText("Dark mode logo deleted")).toBeVisible({
+            await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Dark mode logo deleted/i }).first()).toBeVisible({
                 timeout: 10000,
             });
         }
@@ -153,7 +153,7 @@ export
         await this.saveButtonDark.click({ force: true });
 
         // Verify success message
-        await expect(this.page.getByText("Dark mode logo updated")).toBeVisible({
+        await expect(this.page.locator('[data-test="o-toast"]').filter({ hasText: /Dark mode logo updated/i }).first()).toBeVisible({
             timeout: 30000,
         });
     }

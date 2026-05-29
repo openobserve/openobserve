@@ -106,9 +106,11 @@ test.describe("Schema Load testcases", () => {
         testLogger.info('Large payload ingestion completed successfully');
         
         // Wait for indexing to complete - crucial for large payloads
-        testLogger.debug('Waiting for indexing to complete after large payload ingestion');
-        await page.waitForTimeout(5000);
-        
+        // The schemaLoadPage workflow polls the streams list deterministically for the new
+        // stream cell (waitFor on `log-stream-name-cell-<name>`), which is the
+        // post-indexing signal. No blanket timeout needed.
+        testLogger.debug('Indexing will be polled by the streams-page verification step');
+
         // Navigate to logs page and verify data
         const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${getOrgIdentifier()}`;
         testLogger.navigation('Navigating to logs page', { url: logsUrl });

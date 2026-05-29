@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <div
       style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
     >
@@ -42,20 +42,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="subscription_message q-btn-primary"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
-      <OButton variant="primary" class="q-mt-md" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
+      <OButton variant="primary" class="tw:mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
     </div> -->
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useLocalOrganization, getPath } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageUser",
@@ -88,8 +88,8 @@ export default defineComponent({
         .process_subscription(s, action, invited_org_id)
         .then((res) => {
           this.status = "completed";
-          const dismiss = this.$q.notify({
-            type: "positive",
+          const dismiss = toast({
+            variant: "success",
             message: res.data.message,
           });
 
@@ -111,7 +111,6 @@ export default defineComponent({
   },
   setup() {
     const $store = useStore();
-    const $q = useQuasar();
     const $router = useRouter();
 
     return {

@@ -15,66 +15,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="show-legends-popup"
-    data-test="dashboard-show-legends-popup"
-    style="min-width: 700px"
+  <ODialog
+    :open="open"
+    @update:open="$emit('update:open', $event)"
+    :title=" t('dashboard.legendsOfCharts') "
+    size="lg"
+    data-test="dashboard-show-legends-dialog"
   >
-    <q-card-section>
-      <!-- Header -->
-      <div
-        class="flex justify-between items-center q-px-md q-py-sm header tw:top-0 tw:sticky"
-        style="margin-bottom: 5px"
-      >
-        <div class="flex items-center q-table__title q-mr-md">
-          <span>{{ t("dashboard.legendsOfCharts") }}</span>
-        </div>
-        <div class="flex items-center">
-          <span class="legend-count q-mr-md" style="font-size: 14px">
-            {{ t("dashboard.totalLegends", { count: legends.length }) }}
-          </span>
-          <OButton
-            variant="outline"
-            size="sm"
-            @click.stop="copyAllLegends"
-            data-test="dashboard-show-legends-copy-all"
-          >
-            <template #icon-left
-              ><q-icon :name="isAllCopied ? 'check' : 'content_copy'"
-            /></template>
-            {{ isAllCopied ? "Copied" : "Copy all" }}
-          </OButton>
-          <OButton
-            variant="ghost"
-            size="icon"
-            class="tw:ml-1"
-            :title="t('common.close')"
-            @click.stop="closePopup"
-            data-test="dashboard-show-legends-close"
-          >
-            <template #icon-left><q-icon name="close" /></template>
-          </OButton>
-        </div>
+    <template #header-right>
+      <div class="tw:flex tw:items-center">
+        <span class="legend-count tw:mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
+          {{ t("dashboard.totalLegends", { count: legends.length }) }}
+        </span>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click.stop="copyAllLegends"
+          data-test="dashboard-show-legends-copy-all"
+        >
+          <template #icon-left
+            ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
+          /></template>
+          {{ isAllCopied ? "Copied" : "Copy all" }}
+        </OButton>
       </div>
+    </template>
 
-      <!-- Legends List -->
-      <q-card-section class="legends-content scroll">
-        <div v-if="legends.length === 0" class="no-legends q-pa-md text-center">
+    <!-- Legends List -->
+    <div
+      class="show-legends-popup"
+      data-test="dashboard-show-legends-popup"
+    >
+      <div class="legends-content scroll">
+        <div v-if="legends.length === 0" class="no-legends tw:p-3 tw:text-center">
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
         <div v-else class="legends-list">
           <div
             v-for="(legend, index) in legends"
             :key="index"
-            class="legend-item q-px-sm q-py-xs"
+            class="legend-item tw:px-2 tw:py-1"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="flex items-center legend-row">
+            <div class="tw:flex tw:items-center legend-row">
               <div
                 class="legend-color-box"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"
               ></div>
-              <div class="legend-text">
+              <div class="legend-text" data-test="dashboard-legend-item-text">
                 {{ legend.name }}
               </div>
               <OButton
@@ -82,45 +70,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon"
                 class="tw:ml-1"
                 data-test="dashboard-legend-copy-btn"
+                :data-copied="isLegendCopied(index) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, index)"
               >
                 <template #icon-left
-                  ><q-icon
-                    :name="isLegendCopied(index) ? 'check' : 'content_copy'"
+                  ><OIcon
+                    :name="isLegendCopied(index) ? 'check' : 'content-copy'" size="sm"
                 /></template>
-                <q-tooltip>{{
-                  isLegendCopied(index) ? "Copied!" : "Copy legend"
-                }}</q-tooltip>
+                <OTooltip :content="isLegendCopied(index) ? 'Copied!' : 'Copy legend'" />
               </OButton>
             </div>
           </div>
         </div>
-      </q-card-section>
-    </q-card-section>
-  </q-card>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import {
   getSeriesColor,
   getColorPalette,
 } from "@/utils/dashboard/colorPalette";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ShowLegendsPopup",
-  components: { OButton },
+  components: { OButton, ODialog, OIcon, OTooltip },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     panelData: {
       type: Object,
       default: () => ({}),
     },
   },
-  emits: ["close"],
+  emits: ["update:open"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -243,7 +237,7 @@ export default defineComponent({
     });
 
     const closePopup = () => {
-      emit("close");
+      emit("update:open", false);
     };
 
     const isLegendCopied = (index: number) => {
@@ -251,7 +245,7 @@ export default defineComponent({
     };
 
     const copyLegend = (text: string, index: number) => {
-      copyToClipboard(text).then(() => {
+      copyToClipboard(text, { silent: true, timeout: 3000 }).then(() => {
         copiedLegendIndices.value.add(index);
         setTimeout(() => {
           copiedLegendIndices.value.delete(index);
@@ -261,7 +255,7 @@ export default defineComponent({
 
     const copyAllLegends = () => {
       const allLegendsText = legends.value.map((l: any) => l.name).join("\n");
-      copyToClipboard(allLegendsText).then(() => {
+      copyToClipboard(allLegendsText, { silent: true, timeout: 3000 }).then(() => {
         isAllCopied.value = true;
         setTimeout(() => {
           isAllCopied.value = false;

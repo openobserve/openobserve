@@ -14,26 +14,14 @@ limitations under the License.
 -->
 
 <template>
-  <q-dialog v-model="isOpen" data-test="destination-preview-dialog">
-    <q-card data-test="destination-preview-card" class="preview-card">
-      <q-card-section class="row items-center no-wrap">
-        <div class="text-h6" data-test="preview-title">
-          {{ t('alerts.destinationPreview') }} - {{ getDestinationTypeName(type) }}
-        </div>
-        <q-space />
-        <OButton
-          variant="ghost"
-          size="icon-circle-sm"
-          data-test="preview-close-button"
-          @click="isOpen = false"
-        >
-          <q-icon name="close" />
-        </OButton>
-      </q-card-section>
+  <ODialog
+    v-model:open="isOpen"
+    size="md"
+    :title="`${t('alerts.destinationPreview')} - ${getDestinationTypeName(type)}`"
+    data-test="destination-preview-dialog"
+  >
 
-      <q-separator />
-
-      <q-card-section class="preview-container">
+    <div data-test="destination-preview-card" class="preview-card">
         <!-- Slack Preview -->
         <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message">
           <div class="slack-message-container">
@@ -252,34 +240,37 @@ limitations under the License.
             </div>
           </div>
         </div>
-      </q-card-section>
+    </div>
 
-      <q-card-actions align="center">
+    <template #footer>
+      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:w-full">
         <OButton
           data-test="preview-copy-button"
           variant="outline"
-          size="sm"
+          size="sm-action"
           @click="copyTemplate"
+          icon-left="content-copy"
         >
-          <template #icon-left><q-icon name="content_copy" /></template>
           Copy Template
         </OButton>
         <OButton
-          data-test="preview-close-button"
-          variant="ghost"
-          size="sm"
+          variant="outline"
+          size="sm-action"
           @click="isOpen = false"
-        >Close</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+        >
+          Close
+        </OButton>
+      </div>
+    </template>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
 import { computed } from 'vue';
-import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps({
   modelValue: {
@@ -297,7 +288,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
-const $q = useQuasar();
 const { t } = useI18n();
 
 const isOpen = computed({
@@ -325,26 +315,17 @@ const getDestinationTypeName = (type: string): string => {
 
 // Copy template to clipboard
 const copyTemplate = () => {
-  navigator.clipboard.writeText(props.templateContent).then(() => {
-    $q.notify({
-      type: 'positive',
-      message: 'Template copied to clipboard',
-      timeout: 2000
-    });
-  }).catch(() => {
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to copy template',
-      timeout: 2000
-    });
+  copyToClipboard(props.templateContent, {
+    successMessage: 'Template copied to clipboard',
+    errorMessage: 'Failed to copy template',
+    timeout: 2000,
   });
 };
 </script>
 
 <style lang="scss" scoped>
 .preview-card {
-  width: 700px;
-  max-width: 90vw;
+  width: 100%;
 }
 
 .preview-container {

@@ -396,7 +396,10 @@
     "traces": "トレース",
     "switchToLogs": "クリックしてログに戻る",
     "patternNoValuesAvailable": "使用可能な値はありません",
-    "selectLogStream": "ログストリームを選択"
+    "selectLogStream": "ログストリームを選択",
+    "noData": "データはありません",
+    "functionEditorLabel": "関数エディター",
+    "loadingStream": "ストリームをロード中..."
   },
   "menu": {
     "home": "ホーム",
@@ -1434,7 +1437,7 @@
     "markLineYAxis": "Y 軸",
     "colorPalette": "カラーパレット",
     "colorSeriesBy": "カラーシリーズ別：",
-    "colorBySeries": "<b>シリーズ別</b>",
+    "colorBySeries": "シリーズ別",
     "colorDefaultPaletteBySeries": "デフォルトパレット (シリーズ別)",
     "colorDefaultPaletteBySeriesSubLabel": "同じ名前のシリーズは同じ色を使用します",
     "colorPaletteClassic": "パレット-クラシック",
@@ -1443,7 +1446,7 @@
     "colorSingleColorSubLabel": "すべてのシリーズに特定の色を設定",
     "colorShadesOfSpecificColor": "特定の色のシェード",
     "colorShadesOfSpecificColorSubLabel": "特定の色のさまざまな色合い",
-    "colorByValue": "<b>[値別]</b>",
+    "colorByValue": "[値別]",
     "colorGreenYellowRed": "緑-黄-赤 (値別)",
     "colorRedYellowGreen": "赤-黄-緑 (値別)",
     "colorTemperature": "温度 (値別)",
@@ -1613,7 +1616,9 @@
     "axisLabelRotateTooltipText": "X 軸のラベルテキストを選択した角度 (度単位) で回転させると、ラベルが長い場合やラベルが混み合っている場合に読みやすくなります。",
     "axisLabelTruncateTooltipText": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。",
     "axisLabelTooltipNotePrefix": "注記:",
-    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。"
+    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。",
+    "allFolders": "すべてのフォルダー",
+    "selectFile": "[ファイルを選択]"
   },
   "panel": {
     "header": "パネル",
@@ -2647,6 +2652,7 @@
     "quota": "クォータ",
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
+    "organizationMembers": "組織メンバー",
     "externalUserWarningTitle": "外部ユーザー警告",
     "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
     "invitations": "招待状"
@@ -3075,7 +3081,10 @@
     "algorithm": "アルゴリズム",
     "storeType": "ストアタイプ",
     "mechanismType": "方式タイプ",
-    "actions": "操作"
+    "actions": "操作",
+    "providerTypeRequired": "プロバイダのタイプが必要です",
+    "algorithmRequired": "アルゴリズムが必要です",
+    "secretRequired": "シークレットが必要です"
   },
   "quota": {
     "header": "クォータ",
@@ -3413,7 +3422,8 @@
     "serviceGroupProtected": "サービスグループは削除できません。変更できるのはマップされたフィールドだけです。",
     "noDataFound": "データが見つかりません",
     "isWorkloadType": "サービス識別子",
-    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。"
+    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。",
+    "loadingCorrelation": "相関データを読み込んでいます..."
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
@@ -3750,7 +3760,8 @@
     "errSave": "保存できませんでした",
     "errLoadModel": "モデルを読み込めませんでした",
     "tierDefaultName": "デフォルト",
-    "tierConditionalName": "条件付き階層"
+    "tierConditionalName": "条件付き階層",
+    "shadowedWarningBanner": "以下のルールは「{name}」に覆われています。優先度の高いルールでは無効になり、コスト計算には使用されません。"
   },
   "overview": {
     "title": "システム概要",

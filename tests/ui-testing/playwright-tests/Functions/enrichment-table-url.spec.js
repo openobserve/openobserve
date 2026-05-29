@@ -237,7 +237,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Verified back on list page');
 
         // Search for table to verify it was NOT created
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.searchEnrichmentTableInList(tableName, { expectExists: false });
 
         // Verify table does NOT exist (no rows or "No data available" message)
         await enrichmentPage.verifyTableNotCreated(tableName);
@@ -552,13 +552,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         if (hasRadioGroup) {
             // Check for "From URL" option (using POM)
-            const urlOption = enrichmentPage.page.getByText('From URL', { exact: true });
-            const hasUrlOption = await urlOption.isVisible().catch(() => false);
+            const hasUrlOption = await enrichmentPage.isFromUrlOptionVisible();
             testLogger.info(`'From URL' option visible: ${hasUrlOption}`);
 
             // Check for "Upload File" option (using POM)
-            const fileOption = enrichmentPage.page.getByText('Upload File', { exact: true });
-            const hasFileOption = await fileOption.isVisible().catch(() => false);
+            const hasFileOption = await enrichmentPage.isUploadFileOptionVisible();
             testLogger.info(`'Upload File' option visible: ${hasFileOption}`);
 
             // PRIMARY ASSERTION: At least one source option should be available
@@ -583,5 +581,95 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.cancelEnrichmentTableForm();
 
         testLogger.info('✓ Data source selection test completed');
+    });
+
+    // ============================================================================
+    // CROSS-TYPE NAME COLLISION TESTS
+    // ============================================================================
+
+    test('@P0 @smoke Cross-type collision: file upload rejected when URL enrichment exists with same name', async () => {
+        const tableName = generateTableName('cross_url_first');
+        currentTableName = tableName;
+        testLogger.info(`Test: Cross-type collision URL-first - ${tableName}`);
+
+        // Step 1: Create a URL enrichment
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('URL enrichment created');
+
+        // Step 2: Try to create a file upload with the same name
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('file');
+
+        await enrichmentPage.setFileInput('../test-data/protocols.csv');
+        testLogger.info('File selected');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Attempted to save file upload with duplicate name');
+
+        // Step 3: Verify error — should say "already exists as a URL enrichment"
+        await enrichmentPage.verifyDuplicateNameError();
+        testLogger.info('Cross-type collision error verified');
+
+        // Step 4: Navigate back to list
+        await enrichmentPage.navigateBackFromFormIfNeeded();
+
+        // Cleanup
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.clickDeleteButton(tableName);
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        await enrichmentPage.clickDeleteOK();
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table deleted');
+    });
+
+    test('@P0 @smoke Cross-type collision: URL rejected when file upload enrichment exists with same name', async () => {
+        const tableName = generateTableName('cross_file_first');
+        currentTableName = tableName;
+        testLogger.info(`Test: Cross-type collision file-first - ${tableName}`);
+
+        // Step 1: Create a file upload enrichment
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('file');
+
+        await enrichmentPage.setFileInput('../test-data/protocols.csv');
+        testLogger.info('File selected');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Save clicked for file upload');
+
+        // Wait for form to close (saved successfully)
+        await enrichmentPage.waitForAddFormToClose(15000);
+        testLogger.info('File upload enrichment created');
+
+        // Step 2: Try to create a URL enrichment with the same name
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('url');
+        await enrichmentPage.fillUrlInput(CSV_URL);
+        testLogger.info('Filled URL form with duplicate name');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Attempted to save URL enrichment with duplicate name');
+
+        // Step 3: Verify error — should say "already exists as a file upload enrichment"
+        await enrichmentPage.verifyDuplicateNameError();
+        testLogger.info('Cross-type collision error verified');
+
+        // Step 4: Navigate back to list
+        await enrichmentPage.navigateBackFromFormIfNeeded();
+
+        // Cleanup
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.clickDeleteButton(tableName);
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        await enrichmentPage.clickDeleteOK();
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table deleted');
     });
 });

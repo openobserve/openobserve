@@ -41,9 +41,6 @@ const STREAM_NAME = 'e2e_incident_corr'; // Shared stream, persists across runs
 const TEMPLATE_NAME = `e2e_incid_${RUN_ID}_tmpl`;
 const DESTINATION_NAME = `e2e_incid_${RUN_ID}_dest`;
 const FOLDER_NAME = `E2E Incidents ${RUN_ID}`;
-// Incident row selector — must match alertsPage.locators.incidentRow
-// Used only in waitForIncidents() setup helper before PageManager is available.
-const INCIDENT_ROW_SELECTOR = '[data-test="incident-row"]';
 
 const ALERTS = [
     {
@@ -303,7 +300,7 @@ async function triggerAlerts(page, folderId) {
  * Poll incidents page until at least one incident row appears.
  * Returns true if incidents found, false if timed out.
  */
-async function waitForIncidents(page, maxWaitMs = 240000) {
+async function waitForIncidents(page, pm, maxWaitMs = 240000) {
     const org = getOrgIdentifier();
     const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
     const incidentsUrl = `${baseUrl}/web/incidents?org_identifier=${org}`;
@@ -323,10 +320,10 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
         // Check for incident rows
         let rowCount = 0;
         try {
-            rowCount = await page.locator(INCIDENT_ROW_SELECTOR).count();
+            rowCount = await pm.alertsPage.getIncidentCount();
         } catch (e) {
             testLogger.warn('DOM error counting incident rows (not zero incidents)', { error: e.message });
-            await page.waitForTimeout(pollInterval);
+            await page.waitForLoadState('domcontentloaded', { timeout: pollInterval }).catch(() => {});
             continue;
         }
         if (rowCount > 0) {
@@ -343,7 +340,9 @@ async function waitForIncidents(page, maxWaitMs = 240000) {
         }
 
         testLogger.info(`No incidents yet, waiting... (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`);
-        await page.waitForTimeout(pollInterval);
+        // Deterministic wait: wait for incident rows to appear OR for the poll interval to elapse,
+        // whichever comes first. This replaces a static waitForTimeout buffer.
+        await pm.alertsPage.waitForIncidentRowsToAppear(pollInterval).catch(() => {});
         await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch((e) => {
             testLogger.warn('Page reload timeout during polling, continuing', { error: e.message });
         });
@@ -476,6 +475,7 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
             storageState: 'playwright-tests/utils/auth/user.json'
         });
         const page = await context.newPage();
+        const setupPm = new PageManager(page);
 
         try {
             // Navigate to establish auth context
@@ -506,13 +506,13 @@ test.describe("Incident Correlation Tests", { tag: '@enterprise' }, () => {
             // Cloud environments need more time for alert evaluation + incident creation
             const waitMs = isCloudEnvironment() ? 300000 : 120000;
             testLogger.info(`Step 5: Waiting for incidents to appear (${waitMs / 1000}s timeout)`);
-            let found = await waitForIncidents(page, waitMs);
+            let found = await waitForIncidents(page, setupPm, waitMs);
 
             // On cloud, re-trigger once if no incidents appeared (scheduler may need a nudge)
             if (!found && isCloudEnvironment()) {
                 testLogger.info('Re-triggering alerts on cloud...');
                 await triggerAlerts(page, setupFolderId);
-                found = await waitForIncidents(page, 120000);
+                found = await waitForIncidents(page, setupPm, 120000);
             }
 
             if (!found) {

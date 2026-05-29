@@ -83,43 +83,35 @@ const computedHeight = computed(() => {
 </script>
 
 <style scoped lang="scss">
-/* Base Skeleton Animation */
+/* Flat base colour + sliding ::after overlay.
+   The base is always solid (no moving gradient), the shimmer is a separate
+   translucent gloss that physically slides left→right via translateX.
+   ease-in-out on translateX is intentional — it mimics real light reflection. */
 .skeleton-box {
-  background: linear-gradient(90deg, 
-    transparent, 
-    rgba(255, 255, 255, 0.15), 
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: skeleton-wave 1.5s ease-in-out infinite;
+  background-color: var(--color-skeleton-base, #f5f5f5);
   position: relative;
   overflow: hidden;
   border-radius: 4px;
 }
 
-/* Theme-based skeleton colors */
-:deep(.dark-stream-container) .skeleton-box,
-:deep(.dark-tile-content) .skeleton-box,
-:deep(.chart-container-dark) .skeleton-box,
-:deep(.o2-quasar-table-dark) .skeleton-box {
-  background: linear-gradient(90deg, 
-    rgba(255, 255, 255, 0.02), 
-    rgba(255, 255, 255, 0.08), 
-    rgba(255, 255, 255, 0.02)
+.skeleton-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent       0%,
+    transparent      30%,
+    var(--color-skeleton-shimmer, rgba(255, 255, 255, 0.8)) 50%,
+    transparent      70%,
+    transparent     100%
   );
-  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
 }
 
-:deep(.light-stream-container) .skeleton-box,
-:deep(.light-tile-content) .skeleton-box,
-:deep(.chart-container-light) .skeleton-box,
-:deep(.o2-quasar-table-light) .skeleton-box {
-  background: linear-gradient(90deg, 
-    rgba(0, 0, 0, 0.02), 
-    rgba(0, 0, 0, 0.08), 
-    rgba(0, 0, 0, 0.02)
-  );
-  background-size: 200% 100%;
+@keyframes skeleton-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* Variant-specific styles */
@@ -151,16 +143,6 @@ const computedHeight = computed(() => {
 .skeleton-circle {
   border-radius: 50%;
   aspect-ratio: 1;
-}
-
-/* Wave animation */
-@keyframes skeleton-wave {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
 }
 
 /* Multiple lines support for text variant */
