@@ -169,23 +169,15 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
             file.key
         ));
     }
-    let org_id = columns[1];
-    let stream_type = StreamType::from(columns[2]);
-    let stream_name = columns[3];
-    let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or_default();
-    let bloom_filter_fields = stream_setting.bloom_filter_fields;
     let new_file = format!(
         "files{}/{}",
         get_config().common.column_all,
         file.key.strip_prefix("files/").unwrap()
     );
     let new_schema = new_batches.first().unwrap().schema();
-    let new_data =
-        write_recordbatch_to_parquet(new_schema, &new_batches, &bloom_filter_fields, &file.meta)
-            .await
-            .map_err(|e| anyhow::anyhow!("write_recordbatch_to_parquet error: {}", e))?;
+    let new_data = write_recordbatch_to_parquet(new_schema, &new_batches, &file.meta)
+        .await
+        .map_err(|e| anyhow::anyhow!("write_recordbatch_to_parquet error: {}", e))?;
     // upload filee
     storage::put(&file.account, &new_file, new_data.into()).await?;
     // delete from queue
