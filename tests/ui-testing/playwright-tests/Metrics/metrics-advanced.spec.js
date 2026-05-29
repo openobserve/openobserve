@@ -249,10 +249,11 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
     testLogger.info('Testing subqueries and nested expressions');
+    // Use ingested test metrics (cpu_usage, request_count) — not http_requests_total which doesn't exist in test data
     const subqueries = [
-      'max_over_time(rate(http_requests_total[5m])[1h:])',
-      'avg_over_time(cpu_usage_percent[5m])[10m:1m]',
-      'quantile_over_time(0.95, http_request_duration_seconds[5m])[1h:]'
+      'max_over_time(rate(request_count[5m])[1h:])',
+      'avg_over_time(cpu_usage[5m])[10m:1m]',
+      'quantile_over_time(0.95, cpu_usage[5m])[1h:]'
     ];
 
     for (const query of subqueries) {
