@@ -3845,5 +3845,56 @@
     "awsStsSelfHostedInfo": "Bu, rol üstlenmek ve işlemleri gerçekleştirmek için AWS sts kullanır. Kurulum ortamında bu role erişimi olan aws kimlik bilgilerini yapılandırdığınızdan emin olun.",
     "externalIdRequired": "Harici kimlik gereklidir",
     "storageAccountRequired": "Depolama Hesabı adı gereklidir"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Günaydın",
+      "afternoon": "Tünaydın",
+      "evening": "İyi akşamlar",
+      "night": "Geç Çalışmak"
+    },
+    "welcome": {
+      "taglineLead": "Ben",
+      "taglineHighlight": "O2 Asistanı",
+      "taglineTail": ". Senin yazabilirim",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "PromQL",
+      "taglineAnd": "ve günlükleriniz, izleriniz, metrikleriniz ve olaylarınız arasında size yol gösterir.",
+      "signedInAs": "Olarak oturum açtı",
+      "role": "Rol",
+      "tryOneOfThese": "Veya bunlardan birini deneyin"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Bir Sorgu Yazın",
+        "description": "Günlükler için SQL, izler, ölçümler için RUM veya PromQL."
+      },
+      "incident": {
+        "title": "Olayları Araştırın",
+        "description": "Günlükler, izler, uyarılar arasında kök neden — örn. “Gateway-5xx neden ateşlendi?”"
+      },
+      "dashboard": {
+        "title": "Bir Gösterge Tablosu Oluşturun",
+        "description": "Bir konudan — örn. “K8s düğüm durumu: CPU, bellek, yeniden başlatmalar”. Ayrıca paneller oluşturur."
+      },
+      "alert": {
+        "title": "Uyarı Oluştur",
+        "description": "Eşik veya zamanlanmış uyarılar ve alım zamanı VRL boru hatları."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Nginx günlüklerimden JSON'u ayrıştırmak için VRL yazın",
+      "regexRedact": "E-postaları düzenlemek için bir regex kalıbı oluşturun",
+      "mapStreamSchema": "“Varsayılan” akış şemamı eşleyin",
+      "promqlCpu": "> %80 CPU kullanan bölmeler için PromQL yazın",
+      "datadogToO2": "Bu Datadog sorgusunu OpenObserve SQL'e dönüştürün",
+      "lastAlertFired": "Son alarmım neden ateşlendi?"
+    },
+    "placeholderRotation": {
+      "one": "Bana son saatteki hataları göster...",
+      "two": "NGINX günlüklerinden JSON'u ayrıştırmak için VRL yazın...",
+      "three": "K8s düğüm sağlığı için bir gösterge tablosu oluşturun..."
+    }
   }
 }
