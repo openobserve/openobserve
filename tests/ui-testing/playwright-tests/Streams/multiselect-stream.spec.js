@@ -143,10 +143,12 @@ async function multistreamselect(page) {
     await pageManager.logsPage.selectRunQuery();
     await page.waitForTimeout(3000);
 
-    // Verify Common Group Fields are present using POM
-    const cell = await pageManager.logsPage.getCellByName(/Common Group Fields/);
+    // Verify common fields group header is present.
+    // When applyFieldGrouping is active (semantic grouping), the header renders as
+    // "Common" or "Common (N)"; legacy path renders "Common Group Fields".
+    const cell = await pageManager.logsPage.getCellByName(/^Common/);
     const cellText = await cell.textContent();
-    expect(cellText).toContain('Common Group Fields');
+    expect(cellText).toMatch(/Common/);
 
     // Verify both streams are selected in the index list
     await pageManager.logsPage.expectLogsSearchIndexListContainsText('e2e_automate, e2e_stream1');
