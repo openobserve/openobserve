@@ -84,6 +84,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   valueKey: DEFAULT_OPTION_VALUE,
   iconKey: undefined,
   labelPosition: "outside",
+  rowClickSingleSelect: false,
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
@@ -437,6 +438,34 @@ function handleListboxUpdate(value: unknown) {
   if (!props.multiple) {
     popoverOpen.value = false;
   }
+}
+
+function handleRowClickSingleSelect(rekaStringValue: string) {
+  const resolved = valueMap.has(rekaStringValue)
+    ? (valueMap.get(rekaStringValue) as SelectPrimitiveValue)
+    : rekaStringValue;
+  emit("update:modelValue", [resolved]);
+  popoverOpen.value = false;
+}
+
+function handleItemClickCapture(event: MouseEvent, rekaStringValue: string) {
+  if (!props.rowClickSingleSelect) return;
+
+  // Find the separator line rendered inside this item. Anything clicked at or
+  // to the left of the separator is the "checkbox zone" — let Reka toggle normally.
+  // Anything to the right is the "label zone" — single-select and close.
+  const separator = (event.currentTarget as HTMLElement | null)?.querySelector("[data-select-separator]");
+
+  if (separator) {
+    const { right } = separator.getBoundingClientRect();
+    if (event.clientX <= right) return; // checkbox zone — let Reka handle
+  } else {
+    // Fallback: no separator means rowClickSingleSelect isn't active for this item
+    return;
+  }
+
+  event.stopPropagation();
+  handleRowClickSingleSelect(rekaStringValue);
 }
 
 const listboxStringModelValue = computed<string | string[]>(() => {
@@ -1201,8 +1230,16 @@ const fieldWidthClass = computed(() => {
                       </div>
 
                       <!-- Regular item -->
-                      <ListboxItem
+                      <!-- rowClickSingleSelect wrapper: intercepts clicks at capture phase.
+                           Checkbox clicks (marked by @pointerdown on the checkbox span)
+                           fall through to Reka for normal toggle. Row/label clicks replace
+                           the whole selection with just this item and close the dropdown. -->
+                      <div
                         v-else
+                        class="tw:contents"
+                        @click.capture="handleItemClickCapture($event, toRekaString(filteredOptions[vRow.index].value))"
+                      >
+                      <ListboxItem
                         :value="toRekaString(filteredOptions[vRow.index].value)"
                         :disabled="filteredOptions[vRow.index].disabled"
                         :data-test="
@@ -1251,7 +1288,9 @@ const fieldWidthClass = computed(() => {
                                 : 'tw:bg-checkbox-bg tw:border-checkbox-border',
                             ]"
                             aria-hidden="true"
+                            data-select-checkbox
                           >
+
                             <svg
                               v-if="
                                 selectedValues.includes(
@@ -1270,6 +1309,14 @@ const fieldWidthClass = computed(() => {
                               <polyline points="2,6 5,9 10,3" />
                             </svg>
                           </span>
+                          <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
+                          <span
+                            v-if="rowClickSingleSelect"
+                            class="tw:w-px tw:shrink-0 tw:bg-[var(--o2-border-color)] tw:mx-1 tw:my-1"
+                            style="align-self: stretch"
+                            aria-hidden="true"
+                            data-select-separator
+                          />
                         </template>
 
                         <!-- Inline subLabel: name – url on a single row -->
@@ -1332,8 +1379,37 @@ const fieldWidthClass = computed(() => {
                           }}</span>
                         </template>
                       </ListboxItem>
+                      </div>
                     </div>
                   </div>
+                </div>
+                <!-- rowClickSingleSelect hint bar — always visible at the bottom of the dropdown -->
+                <div
+                  v-if="multiple && rowClickSingleSelect"
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-t tw:border-input-border tw:bg-select-content-bg tw:select-none tw:pointer-events-none"
+                >
+                  <!-- Checkbox zone hint -->
+                  <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                    <span
+                      class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
+                      aria-hidden="true"
+                    >
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
+                        <polyline points="1.5,5 4,8 8.5,2" />
+                      </svg>
+                    </span>
+                    <span>Multi select</span>
+                  </span>
+
+                  <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+
+                  <!-- Name zone hint -->
+                  <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
+                      <path d="M4 2h6M4 5h6M4 8h3" />
+                    </svg>
+                    <span>Single select</span>
+                  </span>
                 </div>
               </div>
               <!-- end bordered container -->

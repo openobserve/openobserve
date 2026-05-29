@@ -118,6 +118,13 @@ export interface SelectProps {
   labelPosition?: "inside" | "outside";
   /** When true, replaces the chevron with a spinner to indicate async loading */
   loading?: boolean;
+  /**
+   * In multi-select mode, controls what a row click does vs a checkbox click.
+   * - `false` (default): clicking anywhere on a row toggles that item (standard multi-select).
+   * - `true`: clicking the row label/text single-selects that item (replaces the whole selection
+   *   and closes the dropdown), while clicking the checkbox still toggles it.
+   */
+  rowClickSingleSelect?: boolean;
 }
 
 export interface SelectEmits {
