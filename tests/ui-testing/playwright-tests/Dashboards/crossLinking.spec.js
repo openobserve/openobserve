@@ -693,9 +693,13 @@ test.describe("Cross-Linking testcases", () => {
             fields: ['kubernetes_container_name']
         });
 
-        // Click Update Settings to persist to backend
+        // Click Update Settings to persist to backend and wait for the API response
+        const settingsResponsePromise = page.waitForResponse(
+            (resp) => resp.url().includes('/streams/') && resp.url().includes('/settings') && resp.request().method() === 'PUT',
+            { timeout: 15000 }
+        );
         await pm.crossLinkPage.clickUpdateSettings();
-        await page.waitForTimeout(2000);
+        await settingsResponsePromise;
 
         // Reload the page completely and navigate back
         await pm.crossLinkPage.navigateToStreams();
