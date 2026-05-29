@@ -185,7 +185,7 @@ pub async fn link_subscription(
         Ok(v) => v,
         Err(e) => {
             log::error!(
-                "[AZURE SAAS] Error checking billing group members for {org_id}: {}",
+                "[AWS SAAS] Error checking billing group members for {org_id}: {}",
                 e
             );
             return MetaHttpResponse::internal_error("Failed to check billing group members");
@@ -194,7 +194,7 @@ pub async fn link_subscription(
 
     if !members.is_empty() {
         return MetaHttpResponse::bad_request(
-            "Organizations with billing group members cannot be linked to Azure marketplace",
+            "Organizations with billing group members cannot be linked to AWS marketplace",
         );
     }
 
