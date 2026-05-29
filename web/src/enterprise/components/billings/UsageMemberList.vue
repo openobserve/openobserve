@@ -24,7 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSeparator class="tw:mb-1 tw:mt-[3px]" />
 
-        <div class="current-org-item">
+        <button
+          type="button"
+          class="current-org-item"
+          :class="{ 'current-org-item--active': activeMember === '' }"
+          :data-test="`usage-member-tab-current`"
+          @click="activeMember = ''"
+        >
           <div class="member-name" :title="currentOrgToShow.title">
             {{ currentOrgToShow.primary }}
           </div>
@@ -35,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ currentOrgToShow.secondary }}
           </div>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -156,20 +162,14 @@ export default defineComponent({
       };
     });
 
-    const options = computed(() => [
-      {
-        value: "",
-        primary: t("billing.billingGroup.usageAllMembers"),
-        secondary: "",
-        title: t("billing.billingGroup.usageAllMembers"),
-      },
-      ...props.members.map((m) => ({
+    const options = computed(() =>
+      props.members.map((m) => ({
         value: m.id,
         primary: m.name || m.id,
         secondary: m.name ? m.id : "",
         title: m.name ? `${m.name} | ${m.id}` : m.id,
       })),
-    ]);
+    );
 
     const filteredOptions = computed(() => {
       const q = searchQuery.value?.toLowerCase().trim();
@@ -197,9 +197,30 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  width: 100%;
+  width: calc(100% - 10px);
   min-width: 0;
-  padding: 0.75rem 1.25rem;
+  margin: 5px;
+  padding: 0.375rem 1rem 0.375rem 1.25rem;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+
+  &:hover {
+    background-color: var(--o2-hover-bg, rgba(0, 0, 0, 0.04));
+  }
+
+  &--active {
+    background-color: var(--o2-primary-btn-bg);
+    color: white;
+
+    .member-id {
+      opacity: 0.85;
+    }
+  }
 
   .member-name {
     font-weight: 600;

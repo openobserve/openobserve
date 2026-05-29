@@ -56,14 +56,15 @@ describe("UsageMemberList.vue", () => {
   });
 
   describe("member options", () => {
-    it("always lists the all-members option first with an empty value", () => {
-      wrapper = mountList([]);
-      expect(wrapper.vm.filteredOptions[0].value).toBe("");
+    it("lists only member organizations (no all-members entry)", () => {
+      wrapper = mountList([{ id: "child-1", name: "Child One" }]);
+      expect(wrapper.vm.filteredOptions).toHaveLength(1);
+      expect(wrapper.vm.filteredOptions[0].value).toBe("child-1");
     });
 
     it("shows member name as primary and identifier as secondary", () => {
       wrapper = mountList([{ id: "child-1", name: "Child One" }]);
-      const opt = wrapper.vm.filteredOptions[1];
+      const opt = wrapper.vm.filteredOptions[0];
       expect(opt.value).toBe("child-1");
       expect(opt.primary).toBe("Child One");
       expect(opt.secondary).toBe("child-1");
@@ -72,7 +73,7 @@ describe("UsageMemberList.vue", () => {
 
     it("falls back to the identifier when no name is present", () => {
       wrapper = mountList([{ id: "child-2", name: "" }]);
-      const opt = wrapper.vm.filteredOptions[1];
+      const opt = wrapper.vm.filteredOptions[0];
       expect(opt.primary).toBe("child-2");
       expect(opt.secondary).toBe("");
       expect(opt.title).toBe("child-2");
