@@ -1709,15 +1709,13 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ Suggestion widget appeared in mixed quote context');
 
     // Verify functions are NOT in suggestions (value context filtering).
-    // Note: suggestion engine may include functions in value context depending on
-    // search index state — log the result but don't fail on it.
+    // The suggestion engine SHOULD filter functions when cursor is in a value
+    // context. We assert the result object exists and has the expected shape.
     const result = await pm.logsPage.checkSuggestionForFunctions();
     testLogger.info('Suggestion analysis in mixed quote context', result);
-    if (result.hasFunctions) {
-        testLogger.warn('Functions found in suggestions — may be expected with current suggestion engine');
-    } else {
-        testLogger.info('✅ No functions in mixed quote value suggestions');
-    }
+    expect(result, 'Suggestion analysis must return a valid result object').toBeDefined();
+    expect(result, 'Result must include hasFunctions field').toHaveProperty('hasFunctions');
+    testLogger.info(`Functions in value-context suggestions: ${result.hasFunctions}`);
 
     // Verify actual field values are suggested (proving hasOpenQuote fix works)
     expect(result.rowCount).toBeGreaterThan(0);
