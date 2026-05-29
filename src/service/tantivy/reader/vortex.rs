@@ -33,6 +33,8 @@ use vortex::{
     session::VortexSession,
 };
 
+use super::RecordBatchIter;
+
 /// Open a vortex file, apply an optional projection, and return an async
 /// record batch stream over all rows.
 pub(super) async fn scan_vortex_async(
@@ -66,7 +68,7 @@ pub(super) fn scan_vortex_row_range(
     data: Bytes,
     projection: Option<&[String]>,
     row_range: Range<u64>,
-) -> Result<VortexRowRangeIter, anyhow::Error> {
+) -> Result<RecordBatchIter, anyhow::Error> {
     let runtime = SingleThreadRuntime::default();
     let session = VortexSession::default().with_handle(runtime.handle());
     let vxf = session.open_options().open_buffer(data)?;
@@ -75,19 +77,17 @@ pub(super) fn scan_vortex_row_range(
     let projected_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
     let data_type = DataType::Struct(projected_schema.fields().clone());
 
-    // The borrow of `runtime` ends here; the returned iterator is 'static.
     let iter_inner = scan.into_array_iter(&runtime)?;
     let iter: Box<dyn Iterator<Item = VortexResult<ArrayRef>> + 'static> = Box::new(iter_inner);
 
-    Ok(VortexRowRangeIter {
+    Ok(Box::new(VortexRowRangeIter {
         iter,
         data_type,
         _runtime: runtime,
-    })
+    }))
 }
 
-/// Lazy sync iterator over one vortex row range.
-pub(in crate::service::tantivy) struct VortexRowRangeIter {
+struct VortexRowRangeIter {
     iter: Box<dyn Iterator<Item = VortexResult<ArrayRef>> + 'static>,
     data_type: DataType,
     _runtime: SingleThreadRuntime, // dropped last — keeps Arc<Sender> alive
