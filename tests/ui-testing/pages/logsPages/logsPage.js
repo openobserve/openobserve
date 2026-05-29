@@ -5315,9 +5315,24 @@ export class LogsPage {
         // `log-search-index-list-stream-toggle-<name>` is no longer emitted.
         // Pick the OSelect option whose `data-test-value` matches streamName.
         // Caller must ensure the popover is open (e.g. via fillStreamFilter).
-        return await this.page.locator(
+        //
+        // IMPORTANT: OSelect with rowClickSingleSelect=true splits each option into a
+        // checkbox zone (left) and a label zone (right). A click at the element centre
+        // lands in the label zone and fires handleRowClickSingleSelect, which REPLACES
+        // the current selection with just this stream. To ADD to the multi-select we
+        // must click the checkbox span ([data-select-checkbox]) in the left zone.
+        const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
-        ).first().click();
+        ).first();
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        const checkbox = option.locator('[data-select-checkbox]').first();
+        const checkboxVisible = await checkbox.isVisible({ timeout: 1000 }).catch(() => false);
+        if (checkboxVisible) {
+            // Click the checkbox to toggle without replacing existing selection
+            return await checkbox.click({ force: true });
+        }
+        // Fallback: single-select mode — click the option normally
+        return await option.click();
     }
 
     async toggleQueryModeEditor() {
@@ -5395,12 +5410,16 @@ export class LogsPage {
         // (no role="cell"). Prefer the o-field-list-group locator when the
         // requested name matches a group header; fall back to ARIA cell role
         // for actual table cells elsewhere.
+        // Use waitFor instead of count() — count() is synchronous and returns 0 if the
+        // element hasn't rendered yet, causing a false fall-through to the ARIA locator.
         const groupLocator = this.page.locator('[data-test^="o-field-list-group-"]')
             .filter({ hasText: name });
-        if ((await groupLocator.count()) > 0) {
+        try {
+            await groupLocator.first().waitFor({ state: 'visible', timeout: 15000 });
             return groupLocator.first();
+        } catch {
+            return this.page.getByRole('cell', { name });
         }
-        return await this.page.getByRole('cell', { name });
     }
 
     async clickCellByName(name) {
