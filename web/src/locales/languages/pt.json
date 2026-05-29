@@ -132,7 +132,10 @@
     "error": "Erro",
     "db": "Banco de dados",
     "discardChanges": "Descartar alterações",
-    "unsavedChanges": "Alterações não salvas"
+    "unsavedChanges": "Alterações não salvas",
+    "run": "Corra",
+    "hide": "Esconder",
+    "show": "Mostra"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -404,7 +407,15 @@
     "selectLogStream": "Selecione o fluxo de registros",
     "noData": "Não há dados disponíveis",
     "functionEditorLabel": "Editor de funções",
-    "loadingStream": "Carregando Stream..."
+    "loadingStream": "Carregando Stream...",
+    "generate": "Gerar",
+    "validSql": "SQL válido",
+    "invalidSql": "Consulta inválida",
+    "filterMode": "Modo de filtro",
+    "formatQuery": "Formatar consulta",
+    "hideFunctionEditor": "Ocultar editor de funções",
+    "selectFunction": "Selecione a função",
+    "sqlModeDisabledReason": "O modo SQL não está disponível para essa visualização"
   },
   "menu": {
     "home": "Início",

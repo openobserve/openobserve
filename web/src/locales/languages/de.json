@@ -132,7 +132,10 @@
     "error": "Fehler",
     "db": "Datenbank",
     "discardChanges": "Änderungen verwerfen",
-    "unsavedChanges": "Ungespeicherte Änderungen"
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "run": "Lauf",
+    "hide": "Verstecken",
+    "show": "Zeige"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -404,7 +407,15 @@
     "selectLogStream": "Logs-Stream auswählen",
     "noData": "Keine Daten verfügbar",
     "functionEditorLabel": "Funktionseditor",
-    "loadingStream": "Stream wird geladen..."
+    "loadingStream": "Stream wird geladen...",
+    "generate": "Generieren",
+    "validSql": "Gültiges SQL",
+    "invalidSql": "Ungültige Abfrage",
+    "filterMode": "Filter-Modus",
+    "formatQuery": "Abfrage formatieren",
+    "hideFunctionEditor": "Funktionseditor ausblenden",
+    "selectFunction": "Funktion wählen",
+    "sqlModeDisabledReason": "Der SQL-Modus ist für diese Ansicht nicht verfügbar"
   },
   "menu": {
     "home": "Startseite",

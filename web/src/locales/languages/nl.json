@@ -132,7 +132,10 @@
     "error": "Fout",
     "db": "Database",
     "discardChanges": "Wijzigingen negeren",
-    "unsavedChanges": "Niet opgeslagen wijzigingen"
+    "unsavedChanges": "Niet opgeslagen wijzigingen",
+    "run": "Rennen",
+    "hide": "Verstoppen",
+    "show": "Laat zien"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -404,7 +407,15 @@
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
     "functionEditorLabel": "Functie-editor",
-    "loadingStream": "Stream wordt geladen..."
+    "loadingStream": "Stream wordt geladen...",
+    "generate": "Genereer",
+    "validSql": "Geldige SQL",
+    "invalidSql": "Ongeldige vraag",
+    "filterMode": "Filtermodus",
+    "formatQuery": "Zoekopdracht opmaken",
+    "hideFunctionEditor": "Functie-editor verbergen",
+    "selectFunction": "Functie selecteren",
+    "sqlModeDisabledReason": "SQL-modus is niet beschikbaar voor deze weergave"
   },
   "menu": {
     "home": "Home",

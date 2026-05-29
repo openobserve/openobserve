@@ -132,7 +132,10 @@
     "error": "[エラー]",
     "db": "[データベース]",
     "discardChanges": "変更を破棄",
-    "unsavedChanges": "未保存の変更"
+    "unsavedChanges": "未保存の変更",
+    "run": "実行",
+    "hide": "隠す",
+    "show": "ショー"
   },
   "search": {
     "metrics": "メトリクス",
@@ -404,7 +407,15 @@
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
     "functionEditorLabel": "関数エディター",
-    "loadingStream": "ストリームをロード中..."
+    "loadingStream": "ストリームをロード中...",
+    "generate": "生成",
+    "validSql": "有効な SQL",
+    "invalidSql": "クエリが無効です",
+    "filterMode": "フィルターモード",
+    "formatQuery": "フォーマットクエリ",
+    "hideFunctionEditor": "関数エディターを非表示",
+    "selectFunction": "選択機能",
+    "sqlModeDisabledReason": "このビューでは SQL モードは使用できません"
   },
   "menu": {
     "home": "ホーム",

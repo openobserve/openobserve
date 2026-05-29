@@ -132,7 +132,10 @@
     "error": "Hata",
     "db": "Veritabanı",
     "discardChanges": "Değişiklikleri iptal et",
-    "unsavedChanges": "Kaydedilmemiş değişiklikler"
+    "unsavedChanges": "Kaydedilmemiş değişiklikler",
+    "run": "Koş",
+    "hide": "Gizle",
+    "show": "Göster"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -404,7 +407,15 @@
     "selectLogStream": "Günlükler akışını seçin",
     "noData": "Veri yok",
     "functionEditorLabel": "İşlev Düzenleyicisi",
-    "loadingStream": "Akış Yükleniyor..."
+    "loadingStream": "Akış Yükleniyor...",
+    "generate": "Oluştur",
+    "validSql": "Geçerli SQL",
+    "invalidSql": "Geçersiz sorgu",
+    "filterMode": "Filtre modu",
+    "formatQuery": "Biçim sorgusu",
+    "hideFunctionEditor": "İşlev düzenleyicisini gizle",
+    "selectFunction": "İşlev seç",
+    "sqlModeDisabledReason": "SQL modu bu görünüm için kullanılamıyor"
   },
   "menu": {
     "home": "Ana Sayfa",

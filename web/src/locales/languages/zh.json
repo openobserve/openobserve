@@ -132,7 +132,10 @@
     "error": "错误",
     "db": "数据库",
     "discardChanges": "放弃更改",
-    "unsavedChanges": "未保存的更改"
+    "unsavedChanges": "未保存的更改",
+    "run": "跑",
+    "hide": "隐藏",
+    "show": "显示"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -404,7 +407,15 @@
     "selectLogStream": "选择日志流",
     "noData": "无可用数据",
     "functionEditorLabel": "函数编辑器",
-    "loadingStream": "正在加载直播..."
+    "loadingStream": "正在加载直播...",
+    "generate": "生成",
+    "validSql": "有效的 SQL",
+    "invalidSql": "查询无效",
+    "filterMode": "过滤器模式",
+    "formatQuery": "格式查询",
+    "hideFunctionEditor": "隐藏函数编辑器",
+    "selectFunction": "选择函数",
+    "sqlModeDisabledReason": "此视图不可用 SQL 模式"
   },
   "menu": {
     "home": "主页",

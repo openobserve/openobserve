@@ -132,7 +132,10 @@
     "error": "오류",
     "db": "데이터베이스",
     "discardChanges": "변경 내용 취소",
-    "unsavedChanges": "저장되지 않은 변경 사항"
+    "unsavedChanges": "저장되지 않은 변경 사항",
+    "run": "실행",
+    "hide": "숨기기",
+    "show": "쇼"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -404,7 +407,15 @@
     "selectLogStream": "로그 스트림 선택",
     "noData": "사용 가능한 데이터 없음",
     "functionEditorLabel": "함수 에디터",
-    "loadingStream": "스트림 로드 중..."
+    "loadingStream": "스트림 로드 중...",
+    "generate": "생성",
+    "validSql": "유효한 SQL",
+    "invalidSql": "잘못된 쿼리",
+    "filterMode": "필터 모드",
+    "formatQuery": "형식 쿼리",
+    "hideFunctionEditor": "함수 편집기 숨기기",
+    "selectFunction": "기능 선택",
+    "sqlModeDisabledReason": "이 뷰에서는 SQL 모드를 사용할 수 없습니다."
   },
   "menu": {
     "home": "홈",
