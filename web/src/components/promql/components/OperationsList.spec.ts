@@ -15,16 +15,49 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import OperationsList from "./OperationsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { PromOperationId } from "@/components/promql/types";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
+
+// ── Stubs ────────────────────────────────────────────────────────────────────
+
+const oDialogStub = {
+  inheritAttrs: false,
+  template:
+    '<div data-test="o-dialog" v-if="open">' +
+    '<slot name="header" />' +
+    "<slot />" +
+    '<slot name="footer" />' +
+    '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button>' +
+    '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondaryButtonLabel }}</button>' +
+    '<button data-test="o-dialog-neutral" @click="$emit(\'click:neutral\')">{{ neutralButtonLabel }}</button>' +
+    '<button data-test="o-dialog-close" @click="$emit(\'update:open\', false)">close</button>' +
+    "</div>",
+  props: [
+    "open",
+    "persistent",
+    "size",
+    "title",
+    "subTitle",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "primaryButtonVariant",
+    "primaryButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLabel",
+    "secondaryButtonVariant",
+    "secondaryButtonDisabled",
+    "secondaryButtonLoading",
+    "neutralButtonLabel",
+    "neutralButtonVariant",
+    "neutralButtonDisabled",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+};
 
 describe("OperationsList", () => {
   let wrapper: any;
@@ -70,6 +103,9 @@ describe("OperationsList", () => {
       },
       global: {
         plugins: [i18n, store],
+        stubs: {
+          ODialog: oDialogStub,
+        },
         mocks: {
           $t: (key: string) => key,
         },
@@ -80,7 +116,8 @@ describe("OperationsList", () => {
   describe("Component Rendering", () => {
     it("should render operations list container", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".tw\\:py-\\[0\\.25rem\\]").exists()).toBe(true);
+      // Outer tw:py-[0.25rem] wrapper removed in commit 3e7c9baf6a; check the inner row instead
+      expect(wrapper.find(".tw\\:pl-2").exists()).toBe(true);
     });
 
     it("should display layout name", () => {
@@ -229,13 +266,61 @@ describe("OperationsList", () => {
   });
 
   describe("Operation Selector Dialog", () => {
-    it("should show operation selector dialog", async () => {
+    it("should show operation selector dialog when add button clicked", async () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+
+      const addButton = wrapper.find('[data-test="promql-add-operation"]');
+      await addButton.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(true);
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(true);
+    });
+
+    it("should pass correct props to ODialog", async () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-operation"]');
       await addButton.trigger("click");
+      await flushPromises();
 
-      expect(wrapper.vm.showOperationSelector).toBe(true);
+      const dialog = wrapper.findComponent(oDialogStub);
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("size")).toBe("sm");
+      expect(dialog.props("title")).toBe("Add Operation");
+      expect(dialog.props("primaryButtonLabel")).toBe("Close");
+    });
+
+    it("should close dialog when primary button (Close) is clicked via emit", async () => {
+      wrapper = createWrapper();
+
+      // Open the dialog first
+      wrapper.vm.showOperationSelector = true;
+      await flushPromises();
+
+      const dialog = wrapper.findComponent(oDialogStub);
+      expect(dialog.exists()).toBe(true);
+
+      // Drive the primary close action via the emit
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(false);
+    });
+
+    it("should close dialog when update:open is emitted with false", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showOperationSelector = true;
+      await flushPromises();
+
+      const dialog = wrapper.findComponent(oDialogStub);
+      await dialog.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(false);
     });
 
     it("should close dialog after adding operation", () => {
@@ -329,7 +414,6 @@ describe("OperationsList", () => {
     it("should display parameter hints for select type", () => {
       wrapper = createWrapper();
 
-      const text = wrapper.html();
       // Should show hint when labels are available
       expect(wrapper.vm.availableLabels.length).toBeGreaterThan(0);
     });
@@ -442,14 +526,16 @@ describe("OperationsList", () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-operation"]');
-      expect(addButton.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      // QTooltip was replaced by OTooltip in the migration.
+      expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
     it("should have drag handle tooltips", () => {
       wrapper = createWrapper();
 
       const dragHandle = wrapper.find(".drag-handle");
-      expect(dragHandle.findComponent({ name: "QTooltip" }).exists()).toBe(
+      // QTooltip was replaced by OTooltip in the migration.
+      expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(
         true,
       );
     });

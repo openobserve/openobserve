@@ -1,7 +1,7 @@
 <template>
-    <div v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'" class="full-width usage-report-container q-pa-md" :class="bannerClass">
-        <div class="row">
-        <div class="col">
+    <div v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:w-full usage-report-container tw:p-3" :class="bannerClass">
+        <div class="tw:flex">
+        <div class="tw:flex tw:flex-col">
         <span class="o2-usage-message">{{ message }}</span>
         <br />
         <span class="o2-usage-subtitle">{{ subtitle }}</span>

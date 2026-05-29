@@ -13,61 +13,55 @@
       <!-- Show streaming status with spinner + stop button -->
       <div v-if="isGenerating" :class="aiBarStreamingClass">
         <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
-        <q-spinner-dots color="primary" size="1.2em" />
+        <OSpinner variant="dots" size="xs" />
         <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
           variant="ghost-destructive"
           size="icon-circle-sm"
+          icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
           class="ai-stop-button"
         >
-          <q-icon name="stop" />
-          <q-tooltip>{{ t('common.stopGenerating') }}</q-tooltip>
+          <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
       </div>
       <!-- Normal input when not generating -->
       <div v-else class="tw:flex tw:items-center tw:gap-2">
-        <q-input
+        <OInput
           v-model="aiInputText"
-          dense
-          borderless
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
           :class="aiInputFieldClass"
           :data-test="`${dataTestPrefix}-ai-input-field`"
           @keydown.enter="handleAIInputEnter"
         >
-          <template v-slot:prepend>
+          <template #icon-left>
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
           </template>
-        </q-input>
+        </OInput>
         <!-- Send Button -->
         <OButton
           variant="ai-gradient"
           size="icon-xs-sq"
+          icon-left="send"
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
           class="ai-send-button"
         >
-          <q-icon name="send" />
-          <q-tooltip v-if="props.disableAi && props.disableAiReason">
-            {{ props.disableAiReason }}
-          </q-tooltip>
-          <q-tooltip v-else-if="!aiInputText.trim()">
-            {{ props.aiTooltip || t("search.enterPrompt") }}
-          </q-tooltip>
+          <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
+          <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
         </OButton>
         <!-- Close Button -->
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
+          icon-left="close"
           :data-test="`${dataTestPrefix}-ai-close-btn`"
           @click="dismissAIMode"
           class="ai-close-button"
         >
-          <q-icon name="close" />
-          <q-tooltip>{{ t('common.close') }}</q-tooltip>
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
     </div>
@@ -107,7 +101,7 @@
         class="ai-floating-button"
       >
         <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
-        <q-tooltip>{{ props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle') }}</q-tooltip>
+        <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
       </OButton>
     </div>
   </div>
@@ -119,10 +113,13 @@ import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';
 import config from '@/aws-exports';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';
 
@@ -557,8 +554,8 @@ defineExpose({
 /* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
 .ai-floating-button {
   position: absolute;
-  top: 3px;
-  right: 8px;
+  top: 0.1875rem;
+  right: 1.375rem;
   z-index: 100;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   color: white !important;

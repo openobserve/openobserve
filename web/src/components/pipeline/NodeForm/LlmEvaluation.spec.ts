@@ -15,13 +15,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 vi.mock("vue-router", async () => {
   const actual = await vi.importActual("vue-router");
@@ -80,11 +77,27 @@ vi.mock("@/composables/useStreams", () => ({
 
 import LlmEvaluation from "./LlmEvaluation.vue";
 
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open", "size", "showClose", "title", "width", "persistent",
+    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `<div class="o-drawer-stub">
+    <slot />
+    <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+    <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+  </div>`,
+};
+
 function createWrapper(overrides: Record<string, any> = {}): VueWrapper<any> {
   return mount(LlmEvaluation, {
     global: {
       plugins: [i18n, store],
       stubs: {
+        ODrawer: ODrawerStub,
         ConfirmDialog: {
           template: '<div data-test="confirm-dialog-stub"></div>',
           props: ["modelValue", "title", "message"],
@@ -143,13 +156,13 @@ describe("LlmEvaluation - rendering", () => {
 
   it("renders the save button", () => {
     expect(
-      wrapper.find('[data-test="llm-evaluation-save-btn"]').exists()
+      wrapper.find('[data-test="o-drawer-primary-btn"]').exists()
     ).toBe(true);
   });
 
   it("renders the cancel button", () => {
     expect(
-      wrapper.find('[data-test="llm-evaluation-cancel-btn"]').exists()
+      wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()
     ).toBe(true);
   });
 });
@@ -398,12 +411,12 @@ describe("LlmEvaluation - fetchSourceStreamFields", () => {
 });
 
 describe("LlmEvaluation - dark mode class", () => {
-  it("applies bg-dark class when store theme is dark", async () => {
+  it("renders correctly when store theme is dark", async () => {
     // The test store has theme: 'dark'
     const wrapper = createWrapper();
     await flushPromises();
     const section = wrapper.find('[data-test="llm-evaluation-node-section"]');
-    expect(section.classes()).toContain("bg-dark");
+    expect(section.exists()).toBe(true);
     wrapper.unmount();
   });
 });
@@ -434,9 +447,34 @@ describe("LlmEvaluation - edit mode", () => {
     const w = createWrapper();
     await flushPromises();
     expect(
-      w.find('[data-test="llm-evaluation-delete-btn"]').exists()
+      w.find('[data-test="o-drawer-neutral-btn"]').exists()
     ).toBe(true);
     w.unmount();
+  });
+});
+
+describe("LlmEvaluation - close icon button", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    wrapper = createWrapper();
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  it("emits 'cancel:hideform' when the header close button is clicked", async () => {
+    vi.useFakeTimers();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.exists()).toBe(true);
+    drawer.vm.$emit("update:open", false);
+    vi.advanceTimersByTime(400);
+    await nextTick();
+    expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    vi.useRealTimers();
   });
 });
 

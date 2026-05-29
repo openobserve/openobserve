@@ -16,15 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    class="tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
+  <div class="tw:rounded-md tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
-    <div id="tracesSecondLevel" class="full-height">
-      <q-splitter
+    <div id="tracesSecondLevel" class="tw:h-full">
+      <OSplitter
         :class="[
-          'traces-horizontal-splitter full-height',
+          'traces-horizontal-splitter tw:h-full',
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'hide-splitter-separator'
             : '',
@@ -33,17 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
         "
-        horizontal
+        :horizontal="true"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
-            ? 'tw:max-h-[3.54rem]!'
+            ? 'tw:max-h-[3.125rem]!'
             : ''
         "
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -131,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="traces-search-result-container relative-position tw:h-full"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-            <q-splitter
+            <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
@@ -171,12 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   @click="collapseFieldList"
                   ><template #icon-left>
-                    <q-icon
+                    <OIcon
                       :name="
                         searchObj.meta.showFields
-                          ? 'chevron_left'
-                          : 'chevron_right'
-                      "
+                          ? 'chevron-left'
+                          : 'chevron-right'
+                      " size="sm"
                     /> </template
                 ></OButton>
               </template>
@@ -190,11 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="card-container tw:h-full"
                   >
-                    <div class="text-center tw:pt-[2rem]">
+                    <div class="tw:text-center tw:pt-[2rem]">
                       <!-- Actual error case -->
                       <div
                         data-test="traces-search-error-message"
-                        class="tw:text-[1.3rem] q-pt-lg"
+                        class="tw:text-[1.3rem] tw:pt-4"
                       >
                         {{ t("traces.errorRetrievingTraces") }}
                         <OButton
@@ -210,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
-                      <div class="text-center">
+                      <div class="tw:text-center">
                         <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
                           <span v-if="disableMoreErrorDetails">
                             <SanitizedHtmlRenderer
@@ -244,9 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
-                      <q-item-label>{{
+                      <span class="tw:text-sm">{{
                         searchObj.data.additionalErrorMsg
-                      }}</q-item-label>
+                      }}</span>
                     </div>
                   </div>
                   <div
@@ -256,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"
@@ -270,9 +269,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       data-test="logs-search-no-stream-selected-text"
-                      class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
+                      class="tw:text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </div>
                   </div>
@@ -283,9 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.searchApplied &&
                       !searchObj.data.queryResults?.hits?.length
                     "
-                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <OIcon name="info" size="md" />
                     {{ t("search.applySearch") }}
                   </div>
                   <div
@@ -305,12 +304,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </template>
-            </q-splitter>
+            </OSplitter>
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -326,7 +325,8 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { subtractRelativeTime } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -376,9 +376,11 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronLeft, ChevronRight } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -407,7 +409,6 @@ const activeTab = computed(() => {
   return "search";
 });
 const router = useRouter();
-const $q = useQuasar();
 const { t } = useI18n();
 const {
   searchObj,
@@ -608,11 +609,10 @@ async function getStreamList() {
       })
       .catch((e) => {
         searchObj.loadingStream = false;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             "Error while pulling index for selected organization" + e.message,
-          timeout: 2000,
         });
       })
       .finally(() => {
@@ -715,7 +715,7 @@ function getConsumableDateTime() {
         searchObj.data.resultGrid.currentDateTime = endTimeStamp;
       }
 
-      const startTimeStamp = date.subtractFromDate(
+      const startTimeStamp = subtractRelativeTime(
         endTimeStamp,
         JSON.parse(subtractObject),
       );
@@ -1214,7 +1214,7 @@ async function getQueryData(
             if (customMessage) errorMsg = t(customMessage);
           }
           if (trace_id) {
-            errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
+            errorMsg += ` <br><span class='tw:text-base tw:font-medium'>TraceID: ${trace_id}</span>`;
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
@@ -1290,8 +1290,8 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
     startTime: startTime,
     endTime: endTime,
   });
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: t("traces.timeRangeUpdated"),
     timeout: 5000,
   });
@@ -2316,12 +2316,8 @@ watch(
     font-size: 12px !important;
   }
 
-  .q-splitter__after {
+  .o-splitter__after {
     overflow: hidden;
-  }
-
-  .q-item__label span {
-    /* text-transform: capitalize; */
   }
 
   .index-table :hover::-webkit-scrollbar,
@@ -2354,13 +2350,13 @@ watch(
     padding-top: 0px !important;
   }
 
-  .traces-horizontal-splitter .q-splitter__before {
+  .traces-horizontal-splitter .o-splitter__before {
     z-index: auto;
     overflow: visible;
   }
 
   .traces-horizontal-splitter.hide-splitter-separator
-    > .q-splitter__separator {
+    > .o-splitter__separator {
     background: transparent !important;
     border: none !important;
   }

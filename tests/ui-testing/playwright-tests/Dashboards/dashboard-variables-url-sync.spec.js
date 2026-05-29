@@ -56,7 +56,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -112,7 +112,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
@@ -202,7 +202,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -259,7 +259,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -328,7 +328,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -389,7 +389,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -455,33 +455,19 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variables to appear on dashboard
     await page.locator(`[data-test="variable-selector-${var1}"]`).waitFor({ state: "visible", timeout: 10000 });
     await page.locator(`[data-test="variable-selector-${var2}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Set both values
-    const dropdown1 = page.getByLabel(var1, { exact: true });
-    await dropdown1.waitFor({ state: "visible", timeout: 5000 });
+    // Set both values using the established POM method (uses inner-trigger, proven reliable)
+    await scopedVars.changeVariableValue(var1, { optionIndex: 0 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await dropdown1.click();
-    // Wait for dropdown menu to open
-    await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
 
-    const dropdown2 = page.getByLabel(var2, { exact: true });
-    await dropdown2.waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.changeVariableValue(var2, { optionIndex: 0 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await dropdown2.click();
-    // Wait for dropdown menu to open
-    await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
 
     // Click refresh
     await page.locator(SELECTORS.REFRESH_BTN).click();
@@ -526,7 +512,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -598,7 +584,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
@@ -609,25 +595,26 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await page.locator(`[data-test="variable-selector-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     // Set values
-    const globalDropdown = page.getByLabel(globalVar, { exact: true });
+    const globalDropdown = page.locator(`[data-test="variable-selector-${globalVar}-inner-trigger"]`);
     await globalDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await globalDropdown.click();
     // Wait for dropdown menu to open
-    await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await page.locator(`[data-test="variable-selector-${globalVar}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(`[data-test="variable-selector-${globalVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(`[data-test="variable-selector-${globalVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().click();
+    await safeWaitForHidden(page, `[data-test="variable-selector-${globalVar}-inner-popover"]`, { timeout: 3000 });
+    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    const tabDropdown = page.getByLabel(tabVar, { exact: true });
+    const tabDropdown = page.locator(`[data-test="variable-selector-${tabVar}-inner-trigger"]`);
     await tabDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await tabDropdown.click();
     // Wait for dropdown menu to open
-    await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await page.locator(`[data-test="variable-selector-${tabVar}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(`[data-test="variable-selector-${tabVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(`[data-test="variable-selector-${tabVar}-inner-popover"]`).locator(SELECTORS.ROLE_OPTION).first().click();
+    await safeWaitForHidden(page, `[data-test="variable-selector-${tabVar}-inner-popover"]`, { timeout: 3000 });
 
     // Refresh
     await page.locator(SELECTORS.REFRESH_BTN).click();

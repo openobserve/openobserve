@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
     <!-- Sticky header: title + tabs -->
     <div class="tw:shrink-0 tw:bg-[var(--o2-card-bg)]">
-      <div class="q-px-md q-py-md">
+      <div class="tw:px-3 tw:py-3">
         <div class="general-page-title">
           {{ t("settings.correlation.title") }}
         </div>
@@ -99,17 +99,17 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Server, ScanSearch, Bell, Link2 } from "lucide-vue-next";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "CorrelationSettings",
@@ -125,7 +125,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const q = useQuasar();
+    const { confirm } = useConfirmDialog();
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -226,37 +226,32 @@ export default defineComponent({
       {
         label: t("settings.correlation.discoveredServicesTab"),
         value: "services",
-        icon: Server,
+        icon: "dns",
       },
       {
         label: t("settings.correlation.serviceDiscoveryTab"),
         value: "discovery",
-        icon: ScanSearch,
+        icon: "manage-search",
       },
       {
         label: t("settings.correlation.alertCorrelationTab"),
         value: "alert-correlation",
-        icon: Bell,
+        icon: "notifications",
       },
       {
         label: t("settings.correlation.fieldAliasesTab"),
         value: "field-aliases",
-        icon: Link2,
+        icon: "link",
       },
     ]);
 
-    const confirmDiscardUnsaved = (): Promise<boolean> => {
-      if (!isFieldAliasesDirty.value) return Promise.resolve(true);
-      return new Promise((resolve) => {
-        q.dialog({
-          title: t("common.unsavedChanges"),
-          message: t("settings.correlation.fieldAliasesUnsavedConfirm"),
-          ok: { label: t("common.discardChanges"), color: "negative", flat: true },
-          cancel: { label: t("common.cancel"), flat: true },
-          persistent: true,
-        })
-          .onOk(() => resolve(true))
-          .onCancel(() => resolve(false));
+    const confirmDiscardUnsaved = async (): Promise<boolean> => {
+      if (!isFieldAliasesDirty.value) return true;
+      return confirm({
+        title: t("common.unsavedChanges"),
+        message: t("settings.correlation.fieldAliasesUnsavedConfirm"),
+        confirmLabel: t("common.discardChanges"),
+        cancelLabel: t("common.cancel"),
       });
     };
 
@@ -298,9 +293,9 @@ export default defineComponent({
         await serviceStreamsService.updateSemanticGroups(orgId, groups);
         semanticGroups.value = groups;
         draftSemanticGroups.value = cloneGroups(groups);
-        q.notify({ type: "positive", message: t("settings.correlation.fieldAliasesSaved") });
+        toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
       } catch (_) {
-        q.notify({ type: "negative", message: t("settings.correlation.fieldAliasesSaveError") });
+        toast({ variant: "error", message: t("settings.correlation.fieldAliasesSaveError") });
       } finally {
         savingFieldAliases.value = false;
       }
@@ -320,9 +315,9 @@ export default defineComponent({
         );
         await serviceStreamsService.updateSemanticGroups(orgId, updated);
         semanticGroups.value = updated;
-        q.notify({ type: "positive", message: t("settings.correlation.fieldAliasesSaved") });
+        toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
       } catch (_) {
-        q.notify({ type: "negative", message: t("settings.correlation.fieldAliasesSaveError") });
+        toast({ variant: "error", message: t("settings.correlation.fieldAliasesSaveError") });
       }
     };
 

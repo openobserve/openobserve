@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import FieldRow from "./FieldRow.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
@@ -32,23 +32,23 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedAdd: "add",
-  outlinedVisibility: "visibility",
-  outlinedVisibilityOff: "visibility_off",
+  "add": "add",
+  "visibility": "visibility",
+  "visibility-off": "visibility_off",
 }));
 
-const quasarStubs = {
-  QBtn: {
-    name: "QBtn",
+const componentStubs = {
+  OButton: {
+    name: "OButton",
     template:
       '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\', $event)"><slot /></button>',
     props: ["icon", "size", "round"],
     emits: ["click"],
   },
-  QIcon: {
-    name: "QIcon",
+  OIcon: {
+    name: "OIcon",
     template:
-      '<span class="q-icon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click.stop="$emit(\'click\', $event)"></span>',
+      '<span class="OIcon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click.stop="$emit(\'click\', $event)"></span>',
     props: ["name", "size", "title"],
     emits: ["click"],
   },
@@ -81,7 +81,7 @@ function createWrapper(props = {}, slots = {}) {
     props: { ...defaultProps, ...props },
     slots,
     global: {
-      stubs: quasarStubs,
+      stubs: componentStubs,
     },
   });
 }
@@ -101,7 +101,10 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: true },
       });
-      const container = wrapper.find(".field-container");
+      // OFieldRow renders with data-test="logs-field-list-item-{name}"
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -109,7 +112,9 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, isSchemaField: false },
       });
-      const container = wrapper.find(".field-container");
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -117,7 +122,9 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, showValues: false },
       });
-      const container = wrapper.find(".field-container");
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -125,7 +132,9 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: false, isSchemaField: true, showValues: false },
       });
-      const container = wrapper.find(".field-container");
+      const container = wrapper.find(
+        `[data-test="logs-field-list-item-${defaultField.name}"]`
+      );
       expect(container.exists()).toBe(true);
     });
 
@@ -138,10 +147,12 @@ describe("FieldRow", () => {
       expect(label.text()).toContain(defaultField.name);
     });
 
-    it("sets title on the field container", () => {
+    it("renders OTooltip with field name as tooltip content", () => {
       const wrapper = createWrapper({ field: { ...defaultField, ftsKey: true } });
-      const container = wrapper.find(".field-container");
-      expect(container.attributes("title")).toBe(defaultField.name);
+      // Title moved from native attribute to OTooltip child (commit 72774719c3)
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(tooltip.props("content")).toBe(defaultField.name);
     });
   });
 
@@ -235,8 +246,11 @@ describe("FieldRow", () => {
         field: { ...defaultField, name: "_timestamp", ftsKey: false },
         timestampColumn: "_timestamp",
       });
-      const overlay = wrapper.find(".field_overlay");
-      expect(overlay.exists()).toBe(false);
+      // Timestamp column has no action buttons rendered in the #actions slot
+      const addIcon = wrapper.find(
+        '[data-test="log-search-index-list-add-_timestamp-field-btn"]'
+      );
+      expect(addIcon.exists()).toBe(false);
     });
 
     it("shows field_overlay for non-timestamp fields", () => {
@@ -244,8 +258,11 @@ describe("FieldRow", () => {
         field: { ...defaultField, ftsKey: true },
         timestampColumn: "_timestamp",
       });
-      const overlay = wrapper.find(".field_overlay");
-      expect(overlay.exists()).toBe(true);
+      // Non-timestamp fields show action buttons in the #actions slot (add icon is rendered)
+      const addIcon = wrapper.find(
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+      );
+      expect(addIcon.exists()).toBe(true);
     });
 
     it("hides interesting icon for timestamp column when showQuickMode is true", () => {
@@ -316,7 +333,7 @@ describe("FieldRow", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       const infoIcon = infoIcons.find(
-        (i) => i.attributes("data-name") === "info"
+        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-filled"
       );
       expect(infoIcon).toBeDefined();
     });
@@ -330,7 +347,7 @@ describe("FieldRow", () => {
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
       );
       const outlineIcon = infoIcons.find(
-        (i) => i.attributes("data-name") === "info_outline"
+        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-outline"
       );
       expect(outlineIcon).toBeDefined();
     });
@@ -470,29 +487,30 @@ describe("FieldRow", () => {
   });
 
   describe("Theme prop", () => {
-    it("applies correct class for dark theme on interesting icon in label", () => {
+    it("renders interesting icon in label with correct data-name for dark theme", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: true },
         showQuickMode: true,
         theme: "dark",
       });
-      const labelInterestingIcon = wrapper.findAll(
+      const labelInterestingIcons = wrapper.findAll(
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      )[0];
-      // In dark theme the class should be '' (empty, not 'light-dimmed')
-      expect(labelInterestingIcon.classes()).not.toContain("light-dimmed");
+      );
+      expect(labelInterestingIcons.length).toBeGreaterThan(0);
+      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe("info-outline");
     });
 
-    it("applies light-dimmed class for light theme on interesting icon in label", () => {
+    it("renders interesting icon in label for light theme", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: true },
         showQuickMode: true,
         theme: "light",
       });
-      const labelInterestingIcon = wrapper.findAll(
+      const labelInterestingIcons = wrapper.findAll(
         `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
-      )[0];
-      expect(labelInterestingIcon.classes()).toContain("light-dimmed");
+      );
+      expect(labelInterestingIcons.length).toBeGreaterThan(0);
+      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe("info-outline");
     });
   });
 

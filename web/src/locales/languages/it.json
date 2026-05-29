@@ -401,7 +401,10 @@
     "traces": "Tracce",
     "switchToLogs": "clicca per tornare a Logs",
     "patternNoValuesAvailable": "Nessun valore disponibile",
-    "selectLogStream": "Seleziona lo stream dei log"
+    "selectLogStream": "Seleziona lo stream dei log",
+    "noData": "Nessun dato disponibile",
+    "functionEditorLabel": "Editor di funzioni",
+    "loadingStream": "Caricamento dello stream..."
   },
   "menu": {
     "home": "Home",
@@ -1448,7 +1451,7 @@
     "markLineYAxis": "Asse Y",
     "colorPalette": "Palette di colori",
     "colorSeriesBy": "Serie a colori di:",
-    "colorBySeries": "<b>Per serie</b>",
+    "colorBySeries": "Per serie",
     "colorDefaultPaletteBySeries": "Palette predefinita (per serie)",
     "colorDefaultPaletteBySeriesSubLabel": "Le serie con lo stesso nome useranno lo stesso colore",
     "colorPaletteClassic": "Palette-Classic",
@@ -1457,7 +1460,7 @@
     "colorSingleColorSubLabel": "Imposta un colore specifico per tutte le serie",
     "colorShadesOfSpecificColor": "Sfumature di colore specifico",
     "colorShadesOfSpecificColorSubLabel": "Diverse tonalità di colore specifico",
-    "colorByValue": "<b>Per valore</b>",
+    "colorByValue": "Per valore",
     "colorGreenYellowRed": "Verde-Giallo-Rosso (in base al valore)",
     "colorRedYellowGreen": "Rosso-Giallo-Verde (per valore)",
     "colorTemperature": "Temperatura (per valore)",
@@ -1625,7 +1628,9 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo"
+    "configSectionBackground": "Sfondo",
+    "allFolders": "Tutte le cartelle",
+    "selectFile": "Seleziona file"
   },
   "panel": {
     "header": "Pannello",
@@ -2666,6 +2671,7 @@
     "serviceAccounts": "Account di servizio",
     "serviceAccountsName": "Nome degli account di servizio",
     "basicUsers": "Utenti",
+    "organizationMembers": "Membri dell'Organizzazione",
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
     "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
@@ -3135,7 +3141,10 @@
     "algorithm": "Algoritmo",
     "storeType": "Tipo di negozio",
     "mechanismType": "Tipo di meccanismo",
-    "actions": "Azioni"
+    "actions": "Azioni",
+    "providerTypeRequired": "Il tipo di provider è obbligatorio",
+    "algorithmRequired": "L'algoritmo è richiesto",
+    "secretRequired": "Il segreto è obbligatorio"
   },
   "quota": {
     "header": "Quote",
@@ -3455,7 +3464,8 @@
     "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
     "noDataFound": "Nessun dato trovato",
     "isWorkloadType": "Identificatore del servizio",
-    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database."
+    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database.",
+    "loadingCorrelation": "Caricamento dei dati di correlazione..."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
@@ -3792,7 +3802,8 @@
     "errSave": "Salvataggio non riuscito",
     "errLoadModel": "Caricamento del modello non riuscito",
     "tierDefaultName": "Predefinito",
-    "tierConditionalName": "Livello condizionale"
+    "tierConditionalName": "Livello condizionale",
+    "shadowedWarningBanner": "Le regole seguenti sono ombreggiate da «{name}», sostituite da una regola con priorità più alta e non verranno utilizzate per il calcolo dei costi."
   },
   "overview": {
     "title": "Panoramica del sistema",

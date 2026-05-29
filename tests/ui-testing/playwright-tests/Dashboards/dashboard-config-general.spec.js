@@ -33,14 +33,13 @@ test.describe("ConfigPanel — General Settings", () => {
 
     const descriptionField = page.locator('[data-test="dashboard-config-description"]');
     await expect(descriptionField).toBeVisible();
-    await descriptionField.click();
-    await descriptionField.fill(description);
+    await descriptionField.locator('[data-test$="-field"]').fill(description);
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.savePanel();
 
     testLogger.info("Description saved, re-opening panel to verify persistence");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-description"]')).toHaveValue(description);
+    await expect(page.locator('[data-test="dashboard-config-description"]').locator('[data-test$="-field"]')).toHaveValue(description);
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -67,8 +66,7 @@ test.describe("ConfigPanel — General Settings", () => {
     await expect(unitDropdown).toBeVisible();
     const customUnitInput = page.locator('[data-test="dashboard-config-custom-unit"]');
     await expect(customUnitInput).toBeVisible();
-    await customUnitInput.click();
-    await customUnitInput.fill("ms");
+    await customUnitInput.locator('[data-test$="-field"]').fill("ms");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
@@ -77,7 +75,7 @@ test.describe("ConfigPanel — General Settings", () => {
     testLogger.info("Verifying unit config persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-unit"]')).toContainText("Custom");
-    await expect(page.locator('[data-test="dashboard-config-custom-unit"]')).toHaveValue("ms");
+    await expect(page.locator('[data-test="dashboard-config-custom-unit"]').locator('[data-test$="-field"]')).toHaveValue("ms");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -106,7 +104,7 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying decimals config persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-decimals"]')).toHaveValue("4");
+    await expect(page.locator('[data-test="dashboard-config-decimals"]').locator('[data-test$="-field"]')).toHaveValue("4");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -129,7 +127,7 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying no-value replacement persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-no-value-replacement"]')).toHaveValue("N/A");
+    await expect(page.locator('[data-test="dashboard-config-no-value-replacement"]').locator('[data-test$="-field"]')).toHaveValue("N/A");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -152,7 +150,7 @@ test.describe("ConfigPanel — General Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying query limit persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-limit"]')).toHaveValue("100");
+    await expect(page.locator('[data-test="dashboard-config-limit"]').locator('[data-test$="-field"]')).toHaveValue("100");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

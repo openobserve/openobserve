@@ -15,11 +15,10 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// ─── Quasar mock — intercept copyToClipboard ────────────────────────────────
+// ─── Clipboard mock — intercept copyToClipboard ────────────────────────────────
 // vi.mock is hoisted by Vitest, so the factory runs before any const declarations.
 // Use vi.hoisted() to create the spy in the hoisted scope so it's available
 // both inside the factory and in test assertions.
@@ -35,11 +34,13 @@ const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
     columnDef: { meta: { disableCellAction: false } },
   },
 }));
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockQCopyToClipboard,
+}));
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    copyToClipboard: mockQCopyToClipboard,
     useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
   };
 });
@@ -177,7 +178,6 @@ vi.mock("./SpanStatusCodeBadge.vue", () => ({
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
-installQuasar();
 
 const makeHit = (id: string, errors = 0) => ({
   trace_id: id,
@@ -217,7 +217,7 @@ describe("TracesSearchResultList", () => {
     it("shows a spinner while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
       expect(
-        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
       ).toBe(true);
     });
 
@@ -247,7 +247,7 @@ describe("TracesSearchResultList", () => {
     it("does not show spinner in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
       expect(
-        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
       ).toBe(false);
     });
 
@@ -278,7 +278,7 @@ describe("TracesSearchResultList", () => {
     it("does not show spinner when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
       expect(
-        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
       ).toBe(false);
     });
 

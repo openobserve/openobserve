@@ -16,30 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="column full-height">
+    <div class="tw:flex tw:flex-col tw:h-full">
       <DashboardHeader :title="title" backButton @back="close">
       </DashboardHeader>
 
       <div class="scrollable-content">
-        <q-form greedy ref="addVariableForm" @submit="onSubmit">
-          <div class="q-mt-md">
-            <div class="q-mb-md">
-              <q-select
-                hint="Variables will be applied to all tabs and panels if global is selected."
+        <OForm
+          greedy
+          ref="addVariableForm"
+          @submit="onSubmit"
+          class="tw:px-0.5"
+        >
+          <div class="tw:mt-3">
+            <div class="tw:mb-3">
+              <OSelect
+                helpText="Variables will be applied to all tabs and panels if global is selected."
                 v-model="variableData.scope"
                 :options="scopeOptions"
                 label="Select variable scope"
-                outlined
-                dense
-                emit-value
-                map-options
-                filled
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
                 data-test="dashboard-variable-scope-select"
               />
             </div>
@@ -49,60 +43,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 variableData.scope === 'tabs' || variableData.scope === 'panels'
               "
-              class="q-mt-md q-mb-md"
+              class="tw:mt-3 tw:mb-3"
             >
-              <q-select
-                hint="Variables will be available only in the selected tabs."
+              <OSelect
+                help-text="Variables will be available only in the selected tabs."
                 v-model="selectedTabs"
                 :options="tabsOptions"
                 label="Select tabs"
                 multiple
-                stack-label
-                outlined
-                dense
-                emit-value
-                map-options
-                @update:model-value="updatePanels"
-                filled
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
+                searchable
+                :error-message="fieldErrors.tabs"
+                :error="!!fieldErrors.tabs"
+                @update:model-value="
+                  updatePanels();
+                  fieldErrors.tabs = '';
+                "
                 data-test="dashboard-variable-tabs-select"
-                :rules="[
-                  (val: any) =>
-                    (variableData.scope !== 'tabs' &&
-                      variableData.scope !== 'panels') ||
-                    (val && val.length > 0) ||
-                    'At least one tab is required',
-                ]"
-              >
-                <template v-slot:option="{ opt, selected, toggleOption }">
-                  <q-item
-                    v-if="opt.isTab"
-                    class="bg-grey-3 text-bold text-dark"
-                    style="pointer-events: none"
-                  >
-                    <q-item-section>{{ opt.label }}</q-item-section>
-                  </q-item>
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                    <q-item-section side>
-                      <q-checkbox
-                        :model-value="selected"
-                        @update:model-value="() => toggleOption(opt)"
-                        dense
-                        class="q-ma-none"
-                        :data-test="`dashboard-variable-assign-tabs-${opt.value}`"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label>{{ opt.label }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+              />
             </div>
 
             <!-- Panel selection section - shown only when scope is panels -->
@@ -111,125 +68,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variableData.scope === 'panels' &&
                 (selectedTabs.length > 0 || isFromAddPanel)
               "
-              class="q-mt-md"
+              class="tw:mt-3"
             >
-              <q-select
-                hint="Variables will be available only in the selected panels."
+              <OSelect
+                help-text="Variables will be available only in the selected panels."
                 v-model="selectedPanels"
                 :options="groupedPanelsOptions"
                 label="Select panels"
-                stack-label
                 multiple
-                filled
-                outlined
-                dense
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop q-mb-md"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
-                emit-value
-                map-options
+                searchable
+                class="tw:mb-3"
+                :error-message="fieldErrors.panels"
+                :error="!!fieldErrors.panels"
+                @update:model-value="fieldErrors.panels = ''"
                 data-test="dashboard-variable-panels-select"
-                :rules="[
-                  (val: any) =>
-                    variableData.scope !== 'panels' ||
-                    (val && val.length > 0) ||
-                    'At least one panel is required',
-                ]"
-              >
-                <template v-slot:option="{ opt, selected, toggleOption }">
-                  <!-- Tab separator -->
-                  <q-item
-                    v-if="opt.isTab"
-                    class="bg-grey-3 text-bold text-dark"
-                    style="pointer-events: none"
-                  >
-                    <q-item-section>{{ opt.label }}</q-item-section>
-                  </q-item>
-                  <!-- Panel options (including Current Panel) -->
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                    <q-item-section side>
-                      <q-checkbox
-                        :model-value="selected"
-                        @update:model-value="() => toggleOption(opt)"
-                        dense
-                        class="q-ma-none"
-                        :data-test="`dashboard-variable-assign-panels-${opt.value}`"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label
-                        :class="
-                          opt.isCurrentPanel
-                            ? 'text-primary text-weight-bold'
-                            : ''
-                        "
-                      >
-                        {{ opt.label }}
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+              />
             </div>
           </div>
-          <div class="col">
+          <div class="tw:flex tw:flex-col">
             <div>
-              <q-select
+              <OSelect
                 class="showLabelOnTop"
-                stack-label
-                input-debounce="0"
-                dense
                 v-model="variableData.type"
                 :options="variableTypes"
                 :label="t('dashboard.typeOfVariable')"
-                option-value="value"
-                map-options
-                emit-value
                 data-test="dashboard-variable-type-select"
-                borderless
-                hide-bottom-space
-              ></q-select>
+              />
             </div>
-            <div class="text-body1 text-bold q-mt-sm">
+            <div class="tw:text-base tw:font-bold tw:mt-4">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="row">
-              <div class="textbox col">
-                <q-input
+            <div class="tw:flex tw:gap-4 tw:mt-3">
+              <div class="tw:flex-1 tw:flex tw:flex-col">
+                <OInput
                   v-model="variableData.name"
-                  class="showLabelOnTop q-mr-sm"
                   :label="t('dashboard.nameOfVariable') + ' *'"
-                  dense
-                  borderless
-                  hide-bottom-space
-                  stack-label
-                  :rules="[
-                    (val: any) => !!val.trim() || 'Field is required!',
-                    (val: any) =>
-                      /^[a-zA-Z0-9_-]*$/.test(val) ||
-                      'Only letters, numbers, hyphens (-), and underscores (_) are allowed.',
-                  ]"
+                  :error-message="fieldErrors.name"
+                  :error="!!fieldErrors.name"
+                  @update:model-value="fieldErrors.name = ''"
                   data-test="dashboard-variable-name"
-                ></q-input>
+                />
               </div>
-              <div class="textbox col">
-                <q-input
+              <div class="tw:flex-1 tw:flex tw:flex-col">
+                <OInput
                   v-model="variableData.label"
-                  class="showLabelOnTop"
                   :label="t('dashboard.labelOfVariable')"
-                  dense
-                  stack-label
                   data-test="dashboard-variable-label"
-                  borderless
-                  hide-bottom-space
-                ></q-input>
+                />
               </div>
             </div>
             <div
-              class="tw:flex tw:justify-between tw:w-full text-body1 text-bold q-mt-sm"
+              class="tw:flex tw:justify-between tw:w-full tw:text-base tw:font-bold tw:mt-4"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -238,242 +127,141 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></div>
             </div>
             <div v-if="variableData.type == 'query_values'">
-              <div class="row">
-                <q-select
+              <div class="tw:flex tw:gap-x-4 tw:items-end">
+                <OSelect
                   v-model="variableData.query_data.stream_type"
                   :label="t('dashboard.selectStreamType') + ' *'"
-                  :options="data.streamType"
-                  input-debounce="0"
-                  behavior="menu"
-                  hide-bottom-space
-                  borderless
-                  dense
-                  stack-label
-                  class="showLabelOnTop col no-case q-mr-sm q-mb-xs"
-                  @update:model-value="streamTypeUpdated"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :options="streamTypeOptions"
+                  class="tw:flex-1"
+                  :error-message="fieldErrors.streamType"
+                  :error="!!fieldErrors.streamType"
+                  @update:model-value="
+                    streamTypeUpdated();
+                    fieldErrors.streamType = '';
+                  "
                   data-test="dashboard-variable-stream-type-select"
-                ></q-select>
-                <q-select
+                />
+                <OSelect
                   v-model="variableData.query_data.stream"
                   :label="t('dashboard.selectIndex') + ' *'"
-                  :options="mergedStreamsFilteredOptions"
-                  input-debounce="0"
-                  behavior="menu"
-                  use-input
-                  borderless
-                  hide-bottom-space
-                  dense
-                  stack-label
-                  @filter="mergedStreamsFilterFn"
-                  @update:model-value="streamUpdated"
-                  option-value="name"
-                  option-label="name"
-                  emit-value
-                  class="showLabelOnTop col no-case"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :options="mergedStreamOptionsWithLabel"
+                  labelKey="_displayLabel"
+                  valueKey="name"
+                  searchable
+                  class="tw:flex-1"
+                  :error-message="fieldErrors.stream"
+                  :error="!!fieldErrors.stream"
+                  @update:model-value="
+                    streamUpdated();
+                    fieldErrors.stream = '';
+                  "
                   data-test="dashboard-variable-stream-select"
                 >
-                  <template v-slot:label>
-                    <div class="row items-center all-pointer-events">
-                      {{ t("dashboard.selectIndex") + " *" }}
-                      <div>
-                        <q-icon
-                          class="q-ml-xs"
-                          size="16px"
-                          name="info"
-                          data-test="dashboard-variable-add-stream-info"
-                        />
-                        <q-tooltip
-                          class="bg-grey-8"
-                          anchor="top middle"
-                          self="bottom middle"
-                          max-width="250px"
-                        >
-                          Select a stream or use a variable like $streamVariable
-                          to dynamically choose the stream based on another
-                          value.
-                        </q-tooltip>
-                      </div>
-                    </div>
+                  <template #tooltip>
+                    <OTooltip max-width="250px">
+                      <template #content>
+                        Select a stream or use a variable like $streamVariable
+                        to dynamically choose the stream based on another value.
+                      </template>
+                    </OTooltip>
                   </template>
-                  <template v-slot:option="scope">
-                    <q-item v-bind="scope.itemProps">
-                      <q-item-section>
-                        <q-item-label>
-                          {{ scope.opt.name }}
-                          <span
-                            v-if="
-                              scope.opt.name?.startsWith('$') ||
-                              scope.opt.name?.startsWith('{{')
-                            "
-                            class="text-grey-6 text-caption"
-                          >
-                            (variable)
-                          </span>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </template>
-                </q-select>
+                </OSelect>
               </div>
-              <q-select
-                v-model="variableData.query_data.field"
-                :label="t('dashboard.selectField') + ' *'"
-                stack-label
-                use-input
-                borderless
-                dense
-                hide-selected
-                fill-input
-                behavior="menu"
-                input-debounce="0"
-                :options="mergedFieldsFilteredOptions"
-                @filter="mergedFieldsFilterFn"
-                class="showLabelOnTop no-case"
-                option-value="name"
-                option-label="name"
-                emit-value
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                data-test="dashboard-variable-field-select"
-              >
-                <template v-slot:label>
-                  <div class="row items-center all-pointer-events">
-                    {{ t("dashboard.selectField") + " *" }}
-                    <div>
-                      <q-icon
-                        class="q-ml-xs"
-                        size="16px"
-                        name="info"
-                        data-test="dashboard-variable-add-field-info"
-                      />
-                      <q-tooltip
-                        class="bg-grey-8"
-                        anchor="top middle"
-                        self="bottom middle"
-                        max-width="250px"
-                      >
+              <div class="tw:flex tw:mt-4">
+                <OSelect
+                  v-model="variableData.query_data.field"
+                  :label="t('dashboard.selectField') + ' *'"
+                  :options="mergedFieldOptionsWithLabel"
+                  labelKey="_displayLabel"
+                  valueKey="name"
+                  searchable
+                  class="tw:flex-1"
+                  data-test="dashboard-variable-field-select"
+                >
+                  <template #tooltip>
+                    <OTooltip max-width="250px">
+                      <template #content>
                         Select a field or use a variable like $fieldVariable. If
                         stream uses a variable, field list will be empty - type
                         field name manually.
-                      </q-tooltip>
-                    </div>
-                  </div>
-                </template>
-                <template v-slot:option="scope">
-                  <q-item v-bind="scope.itemProps">
-                    <q-item-section>
-                      <q-item-label>
-                        {{ scope.opt.name }}
-                        <span
-                          v-if="
-                            scope.opt.name?.startsWith('$') ||
-                            scope.opt.name?.startsWith('{{')
-                          "
-                          class="text-grey-6 text-caption"
-                        >
-                          (variable)
-                        </span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <div>
-                <q-input
-                  class="showLabelOnTop"
+                      </template>
+                    </OTooltip>
+                  </template>
+                </OSelect>
+              </div>
+              <div class="tw:mt-4">
+                <OInput
                   type="number"
                   v-model.number="variableData.query_data.max_record_size"
                   :label="t('dashboard.DefaultSize')"
-                  dense
-                  stack-label
                   data-test="dashboard-variable-max-record-size"
-                  borderless
-                  hide-bottom-space
                 >
-                  <OButton
-                    variant="ghost"
-                    size="icon"
-                    data-test="dashboard-variable-max-record-size-info"
-                  >
-                    <template #icon-left><q-icon name="info" /></template>
-                    <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
-                  </OButton>
-                </q-input>
+                  <template #tooltip
+                    ><OTooltip :content="t('dashboard.maxRecordSize')"
+                  /></template>
+                </OInput>
               </div>
-              <div>
-                <div class="flex flex-row">
+              <div class="tw:mt-4">
+                <div class="tw:flex tw:flex-row tw:items-center tw:gap-1.5">
                   <div
                     data-test="dashboard-query-values-filter"
-                    class="text-body1 text-bold q-mt-lg"
+                    class="tw:text-base tw:font-bold"
                   >
                     Filters
                   </div>
-                  <q-icon
-                    class=""
-                    style="margin-top: 25px; margin-left: 5px"
-                    size="20px"
-                    name="info_outline"
-                    data-test="dashboard-variables-setting-filter-info"
-                  >
-                    <q-tooltip style="width: 250px">
+                  <OTooltip max-width="250px">
+                    <OIcon
+                      size="sm"
+                      name="info-outline"
+                      data-test="dashboard-variables-setting-filter-info"
+                      class="tw:cursor-help"
+                    />
+                    <template #content>
                       In filters, you can use the value of another variable to
                       filter the current variable's value. This can be done by
                       using the other variable's name. For example:
                       <span class="bg-highlight">$variableName</span>.
-                    </q-tooltip>
-                  </q-icon>
+                    </template>
+                  </OTooltip>
                 </div>
-                <div class="row items-center" style="width: 100%">
+                <div>
                   <div
-                    class="row no-wrap items-center q-mb-xs"
-                    style="width: 100%"
+                    class="tw:flex tw:flex-row tw:items-center tw:gap-x-2 tw:mb-4 tw:w-full tw:min-w-0"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
-                    <q-select
-                      emit-value
-                      dense
-                      hide-selected
-                      fill-input
+                    <OSelect
                       v-model="filter.name"
-                      :display-value="filter.name ? filter.name : ''"
-                      :options="fieldsFilteredOptions"
-                      input-debounce="0"
-                      behavior="menu"
-                      @update:model-value="filterUpdated(index, $event)"
-                      use-input
-                      stack-label
-                      option-label="name"
-                      data-test="dashboard-query-values-filter-name-selector"
-                      @filter="fieldsFilterFn"
+                      :options="data.currentFieldsList"
+                      labelKey="name"
+                      valueKey="name"
+                      searchable
                       :placeholder="filter.name ? '' : 'Select Field'"
-                      class="col no-case q-ml-sm"
-                      :rules="[
-                        (val: any) => !!val.trim() || 'Field is required!',
-                      ]"
-                      style="max-width: 41%; width: 41%; flex-shrink: 0"
-                      ><q-tooltip v-if="filter.name">
-                        {{ filter.name }}
-                      </q-tooltip>
-                      <template v-slot:no-option>
-                        <q-item>
-                          <q-item-section class="text-italic text-grey"
-                            >No Data Found</q-item-section
-                          >
-                        </q-item>
+                      :title="filter.name || undefined"
+                      :error-message="filterNameErrors[index as number]"
+                      :error="!!filterNameErrors[index as number]"
+                      @update:model-value="
+                        filterUpdated(index, $event);
+                        filterNameErrors[index as number] = '';
+                      "
+                      data-test="dashboard-query-values-filter-name-selector"
+                      class="tw:flex-[2] tw:min-w-0"
+                    >
+                      <template #empty>
+                        <span class="tw:italic tw:text-gray-400"
+                          >No Data Found</span
+                        >
                       </template>
-                    </q-select>
-                    <q-select
-                      dense
+                    </OSelect>
+                    <OSelect
                       v-model="filter.operator"
-                      :display-value="filter.operator ? filter.operator : ''"
-                      style="width: 18%; flex-shrink: 0"
-                      class="operator"
+                      class="operator tw:flex-[1.5] tw:min-w-0"
+                      :error-message="filterOperatorErrors[index as number]"
+                      :error="!!filterOperatorErrors[index as number]"
+                      @update:model-value="
+                        filterOperatorErrors[index as number] = ''
+                      "
                       data-test="dashboard-query-values-filter-operator-selector"
-                      :rules="[
-                        (val: any) => !!val.trim() || 'Field is required!',
-                      ]"
                       :options="[
                         '=',
                         '!=',
@@ -496,31 +284,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'Is Not Null',
                       ]"
                     />
-                    <CommonAutoComplete
+                    <OCombobox
                       v-if="
                         !['Is Null', 'Is Not Null'].includes(filter.operator)
                       "
                       v-model="filter.value"
                       :items="dashboardVariablesFilterItems"
-                      searchRegex="(?:^|[^$])\$?(\w+)"
-                      :rules="[(val: any) => val?.length > 0 || 'Required']"
-                      debounce="1000"
-                      style="
-                        margin-top: none !important;
-                        width: 41% !important;
-                        padding-bottom: 0px !important;
-                        flex-shrink: 0;
-                      "
+                      search-regex="(?:^|[^$])\$?(\w+)"
+                      :debounce="1000"
+                      class="tw:flex-[2] tw:min-w-0"
                       placeholder="Enter Value"
-                    ></CommonAutoComplete>
+                      :data-test="`dashboard-query-values-filter-value-selector-${index}`"
+                    />
                     <OButton
                       variant="ghost"
                       size="icon"
-                      style="flex-shrink: 0"
+                      class="tw:flex-shrink-0"
                       @click="removeFilter(index)"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
+                      icon-left="close"
                     >
-                      <template #icon-left><q-icon name="close" /></template>
                     </OButton>
                   </div>
                 </div>
@@ -530,41 +313,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
+                    icon-left="add"
                   >
-                    <template #icon-left><q-icon name="add" /></template>
                     Add Filter
                   </OButton>
                 </div>
 
                 <!-- show error if filter has cycle -->
-                <div v-show="filterCycleError" style="color: red">
+                <div v-show="filterCycleError" style="color: red" data-test="dashboard-variable-cycle-error">
                   {{ filterCycleError }}
                 </div>
               </div>
             </div>
           </div>
           <div class="textbox" v-if="['constant'].includes(variableData.type)">
-            <q-input
-              class="showLabelOnTop"
+            <OInput
               v-model="variableData.value"
               :label="t('dashboard.ValueOfVariable') + ' *'"
+              :error-message="fieldErrors.constantValue"
+              :error="!!fieldErrors.constantValue"
+              @update:model-value="fieldErrors.constantValue = ''"
               data-test="dashboard-variable-constant-value"
-              dense
-              stack-label
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-            ></q-input>
+            />
           </div>
           <div class="textbox" v-if="['textbox'].includes(variableData.type)">
-            <q-input
-              class="showLabelOnTop"
+            <OInput
               v-model="variableData.value"
               :label="t('dashboard.DefaultValue')"
               data-test="dashboard-variable-textbox-default-value"
-              dense
-              stack-label
-              borderless
-              hide-bottom-space
-            ></q-input>
+            />
           </div>
           <div v-if="variableData.type == 'custom'">
             <div class="tw:flex">
@@ -575,58 +352,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
                 Value
               </div>
-              <div class="tw:w-12 tw:flex tw:flex-col tw:items-center">
+              <div class="tw:w-12 tw:flex tw:items-center tw:justify-center">
                 <span v-if="!variableData.multiSelect"> Default </span>
-                <q-checkbox
+                <OCheckbox
                   v-if="variableData.multiSelect"
-                  dense
                   v-model="customSelectAllModel"
                   data-test="dashboard-custom-variable-select-all-checkbox"
                   @click="onCustomSelectAllClick"
-                  class="tw:ml-[0.4rem]"
                 >
-                  <q-tooltip anchor="top middle" self="bottom middle">
-                    Default - Select All
-                  </q-tooltip>
-                </q-checkbox>
+                  <template #tooltip
+                    ><OTooltip content="Default - Select All"
+                  /></template>
+                </OCheckbox>
               </div>
-              <div class="tw:w-[2.62rem]"></div>
+              <div class="tw:w-6"></div>
             </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
-              class="row"
+              class="tw:flex"
             >
               <span class="tw:pt-3.5 tw:w-6">{{ index + 1 }}</span>
-              <q-input
-                dense
-                filled
-                outlined
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                class="col textbox q-mr-sm"
+              <OInput
+                class="tw:flex-1 tw:mr-2"
                 v-model="variableData.options[index].label"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="'Label ' + (index + 1)"
-                name="label"
+                :error-message="optionLabelErrors[index as number]"
+                :error="!!optionLabelErrors[index as number]"
+                @update:model-value="optionLabelErrors[index as number] = ''"
               />
-              <q-input
-                dense
-                borderless
-                hide-bottom-space
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                class="col textbox q-mr-sm"
+              <OInput
+                class="tw:flex-1 tw:mr-2"
                 v-model="variableData.options[index].value"
                 :data-test="`dashboard-custom-variable-${index}-value`"
                 :placeholder="'Value ' + (index + 1)"
-                name="value"
               />
               <div class="tw:flex tw:w-12 tw:item-center tw:justify-center">
-                <q-checkbox
-                  dense
+                <OCheckbox
                   v-model="variableData.options[index].selected"
                   :data-test="`dashboard-custom-variable-${index}-checkbox`"
                   @click="onCheckboxClick(index)"
-                  class="q-mb-lg"
                 />
               </div>
               <div>
@@ -636,20 +402,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="variableData?.options?.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
+                  icon-left="cancel"
                 >
-                  <template #icon-left><q-icon name="cancel" /></template>
                 </OButton>
               </div>
             </div>
-            <div class="flex flex-col">
+            <div class="tw:flex tw:flex-col">
               <OButton
                 variant="outline"
                 size="sm"
-                class="tw:mt-3"
+                class="tw:mt-3 tw:w-fit"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
+                icon-left="add"
               >
-                <template #icon-left><q-icon name="add" /></template>
                 Add Option
               </OButton>
             </div>
@@ -657,19 +423,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- multiselect toggle for query values and custom variables-->
           <div
             v-if="['query_values', 'custom'].includes(variableData.type)"
-            class="q-mt-md"
+            class="tw:mt-4"
           >
-            <q-toggle
+            <OSwitch
               v-model="variableData.multiSelect"
               :label="t('dashboard.multiSelect')"
               data-test="dashboard-query_values-show_multiple_values"
-              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
               size="lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
             />
           </div>
           <!-- default value for multi select variables -->
@@ -679,23 +439,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="multi-select-default-value">By Default Select:</div>
               <OToggleGroup
                 :model-value="variableData.selectAllValueForMultiSelect"
-                @update:model-value="variableData.selectAllValueForMultiSelect = ($event as string)"
+                @update:model-value="
+                  variableData.selectAllValueForMultiSelect = $event as string
+                "
               >
                 <OToggleGroupItem
                   value="first"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-first-value"
-                >First value</OToggleGroupItem>
+                  >First value</OToggleGroupItem
+                >
                 <OToggleGroupItem
                   value="all"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-all-values"
-                >All values</OToggleGroupItem>
+                  >All values</OToggleGroupItem
+                >
                 <OToggleGroupItem
                   value="custom"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-custom"
-                >Custom</OToggleGroupItem>
+                  >Custom</OToggleGroupItem
+                >
               </OToggleGroup>
             </div>
             <!-- if selectAllValueForMultiSelect is custom then show this input -->
@@ -710,20 +475,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? variableData.customMultiSelectValue
                   : [variableData.customMultiSelectValue[0]]"
                 :key="index"
-                class="q-mt-md"
+                class="tw:mt-3"
                 style="flex-wrap: wrap"
               >
-                <div class="flex q-mr-sm" style="width: 50%">
-                  <q-input
-                    dense
-                    stack-label
-                    class="col textbox showLabelOnTop"
+                <div class="tw:flex tw:mr-2" style="width: 50%">
+                  <OInput
                     v-model="variableData.customMultiSelectValue[index]"
-                    name="value"
                     placeholder="Enter value"
                     :data-test="`dashboard-variable-custom-value-${index}`"
-                    borderless
-                    hide-bottom-space
                   />
                   <OButton
                     v-if="variableData.multiSelect"
@@ -731,15 +490,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon"
                     @click="removeCustomValue(index)"
                     :data-test="`dashboard-variable-custom-close-${index}`"
+                    icon-left="close"
                   >
-                    <template #icon-left><q-icon name="close" /></template>
                   </OButton>
                 </div>
               </div>
 
               <div
                 v-if="variableData.multiSelect"
-                class="flex"
+                class="tw:flex"
                 style="width: 50%"
               >
                 <OButton
@@ -748,62 +507,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
+                  icon-left="add"
                 >
-                  <template #icon-left><q-icon name="add" /></template>
                 </OButton>
               </div>
             </div>
           </div>
           <!-- hide on dashboard toggle -->
-          <div class="q-mt-md">
-            <q-toggle
+          <div class="tw:mt-4">
+            <OSwitch
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
-              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
               size="lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
             />
           </div>
 
           <!-- escape single quotes toggle -->
-          <div>
-            <div class="row items-center all-pointer-events">
-              <q-toggle
-                v-model="variableData.escapeSingleQuotes"
-                :label="t('dashboard.escapeSingleQuotes')"
-                class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
-                size="lg"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-toggle-button-lg-dark'
-                    : 'o2-toggle-button-lg-light'
-                "
-              />
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-limit-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                >
-                  If enabled, single quotes will be escaped in the query. For
-                  example, a value like `O'Reilly` will be replaced as
-                  `O''Reilly`.
-                </q-tooltip>
-              </div>
-            </div>
+          <div class="tw:mt-4">
+            <OSwitch
+              v-model="variableData.escapeSingleQuotes"
+              :label="t('dashboard.escapeSingleQuotes')"
+              data-test="dashboard-variable-escape-single-quotes"
+              size="lg"
+            >
+              <template #tooltip>
+                <OTooltip max-width="300px">
+                  <template #content>
+                    If enabled, single quotes will be escaped in the query. For
+                    example, a value like `O'Reilly` will be replaced as
+                    `O''Reilly`.
+                  </template>
+                </OTooltip>
+              </template>
+            </OSwitch>
           </div>
-        </q-form>
+        </OForm>
       </div>
       <div class="sticky-footer">
         <OButton
@@ -852,21 +591,41 @@ import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem },
+  components: {
+    DashboardHeader,
+    OCombobox,
+    OButton,
+    OToggleGroup,
+    OToggleGroupItem,
+    OSelect,
+    OInput,
+    OSwitch,
+    OCheckbox,
+    OTooltip,
+    OForm,
+    OIcon,
+  },
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data
@@ -875,6 +634,20 @@ export default defineComponent({
     // Store selected tabs and panels
     const selectedTabs = ref<string[]>([]);
     const selectedPanels = ref<string[]>([]);
+
+    // Inline validation error messages for migrated OSelect/OInput fields
+    const fieldErrors = reactive({
+      name: "",
+      tabs: "",
+      panels: "",
+      streamType: "",
+      stream: "",
+      constantValue: "",
+    });
+    // Per-item errors for filter rows and custom option rows
+    const filterNameErrors = ref<string[]>([]);
+    const filterOperatorErrors = ref<string[]>([]);
+    const optionLabelErrors = ref<string[]>([]);
 
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
@@ -909,7 +682,7 @@ export default defineComponent({
       const options = dashboardData.value.tabs
         .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
         .flatMap((tab: any) => {
-          const panelOptions = [{ label: tab.name, isTab: true }];
+          const panelOptions: any[] = [{ label: tab.name, isTab: true }];
 
           // Add "Current Panel" option first if from Add Panel
           // But only if NOT editing an existing panel
@@ -1021,6 +794,10 @@ export default defineComponent({
       { label: "Selected Panels", value: "panels" },
     ]);
 
+    const streamTypeOptions = computed(() =>
+      data.streamType.map((t: string) => ({ label: t, value: t })),
+    );
+
     const handleCustomSelectAll = () => {
       // if all values are selected, then check customSelectAllModel = true
       if (variableData.options.every((option: any) => option.selected)) {
@@ -1035,7 +812,7 @@ export default defineComponent({
         variableData.query_data.filter = [];
       }
       variableData.query_data.filter.push({
-        name: "",
+        name: undefined,
         operator: "=",
         value: "",
       });
@@ -1060,8 +837,8 @@ export default defineComponent({
       variableData.escapeSingleQuotes = false;
     }
 
-    const filterUpdated = (index: number, filter: any) => {
-      variableData.query_data.filter[index].name = filter.name;
+    const filterUpdated = (index: number, value: any) => {
+      variableData.query_data.filter[index].name = value;
     };
 
     const removeFilter = (index: any) => {
@@ -1507,6 +1284,73 @@ export default defineComponent({
     };
 
     const onSubmit = () => {
+      // Inline validation for migrated OInput/OSelect fields
+      fieldErrors.name = !variableData.name?.trim()
+        ? "Variable name is required."
+        : !/^[a-zA-Z0-9_-]*$/.test(variableData.name)
+          ? "Only letters, numbers, hyphens (-), and underscores (_) are allowed."
+          : "";
+      fieldErrors.tabs =
+        (variableData.scope === "tabs" || variableData.scope === "panels") &&
+        selectedTabs.value.length === 0
+          ? "At least one tab is required."
+          : "";
+      fieldErrors.panels =
+        variableData.scope === "panels" && selectedPanels.value.length === 0
+          ? "At least one panel is required."
+          : "";
+      fieldErrors.streamType =
+        variableData.type === "query_values" &&
+        !variableData.query_data.stream_type
+          ? "Stream type is required."
+          : "";
+      fieldErrors.stream =
+        variableData.type === "query_values" && !variableData.query_data.stream
+          ? "Stream / index is required."
+          : "";
+      fieldErrors.constantValue =
+        variableData.type === "constant" && !variableData.value?.trim()
+          ? "Constant value is required."
+          : "";
+
+      // Validate filter rows (name and operator required per row)
+      if (variableData.type === "query_values") {
+        filterNameErrors.value = (variableData.query_data.filter ?? []).map(
+          (f: any) => (f.name ? "" : "Field is required."),
+        );
+        filterOperatorErrors.value = (variableData.query_data.filter ?? []).map(
+          (f: any) => (f.operator ? "" : "Operator is required."),
+        );
+      } else {
+        filterNameErrors.value = [];
+        filterOperatorErrors.value = [];
+      }
+      // Validate custom option labels
+      if (variableData.type === "custom") {
+        optionLabelErrors.value = (variableData.options ?? []).map((o: any) =>
+          o.label?.trim() ? "" : "Label is required.",
+        );
+      } else {
+        optionLabelErrors.value = [];
+      }
+
+      const hasFilterErrors =
+        filterNameErrors.value.some(Boolean) ||
+        filterOperatorErrors.value.some(Boolean);
+      const hasOptionErrors = optionLabelErrors.value.some(Boolean);
+
+      if (
+        fieldErrors.name ||
+        fieldErrors.tabs ||
+        fieldErrors.panels ||
+        fieldErrors.streamType ||
+        fieldErrors.stream ||
+        fieldErrors.constantValue ||
+        hasFilterErrors ||
+        hasOptionErrors
+      ) {
+        return;
+      }
       // first, validate form values
       addVariableForm.value.validate().then(async (valid: any) => {
         if (!valid) {
@@ -1718,22 +1562,34 @@ export default defineComponent({
       );
       return [...variableItems, ...(data.streams || [])];
     });
-    const {
-      filterFn: mergedStreamsFilterFn,
-      filteredOptions: mergedStreamsFilteredOptions,
-    } = useSelectAutoComplete(mergedStreamOptions, "name");
+    // Add display labels: append "(variable)" for $-prefixed or {{-prefixed option names
+    const mergedStreamOptionsWithLabel = computed(() =>
+      mergedStreamOptions.value.map((o: any) => ({
+        ...o,
+        _displayLabel:
+          o.name?.startsWith("$") || o.name?.startsWith("{{")
+            ? `${o.name} (variable)`
+            : o.name,
+      })),
+    );
 
-    // Merged field options: variables + fields for q-select
+    // Merged field options: variables + fields for OSelect
     const mergedFieldOptions = computed(() => {
       const variableItems = dashboardVariablesFilterItems.value.map(
         (v: any) => ({ name: v.value }),
       );
       return [...variableItems, ...(data.currentFieldsList || [])];
     });
-    const {
-      filterFn: mergedFieldsFilterFn,
-      filteredOptions: mergedFieldsFilteredOptions,
-    } = useSelectAutoComplete(mergedFieldOptions, "name");
+
+    const mergedFieldOptionsWithLabel = computed(() =>
+      mergedFieldOptions.value.map((o: any) => ({
+        ...o,
+        _displayLabel:
+          o.name?.startsWith("$") || o.name?.startsWith("{{")
+            ? `${o.name} (variable)`
+            : o.name,
+      })),
+    );
 
     // Add new custom value to the array
     const addCustomValue = () => {
@@ -1799,6 +1655,10 @@ export default defineComponent({
 
     return {
       variableData,
+      fieldErrors,
+      filterNameErrors,
+      filterOperatorErrors,
+      optionLabelErrors,
       store,
       t,
       data,
@@ -1823,10 +1683,8 @@ export default defineComponent({
       filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
-      mergedStreamsFilterFn,
-      mergedStreamsFilteredOptions,
-      mergedFieldsFilterFn,
-      mergedFieldsFilteredOptions,
+      mergedStreamOptionsWithLabel,
+      mergedFieldOptionsWithLabel,
       addCustomValue,
       removeCustomValue,
       onCheckboxClick,
@@ -1838,6 +1696,7 @@ export default defineComponent({
       tabsOptions,
       groupedPanelsOptions,
       scopeOptions,
+      streamTypeOptions,
       editMode,
     };
   },
@@ -1877,6 +1736,7 @@ export default defineComponent({
 }
 .scrollable-content {
   overflow-y: auto;
+  padding-inline: 3px;
   max-height: calc(100vh - 190px);
   &::-webkit-scrollbar {
     width: 6px;

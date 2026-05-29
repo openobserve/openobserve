@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
 import CrossLinkManager from "./CrossLinkManager.vue";
@@ -17,7 +16,6 @@ vi.mock("./CrossLinkDialog.vue", () => ({
   },
 }));
 
-installQuasar();
 
 describe("CrossLinkManager Component", () => {
   let wrapper: any;
@@ -54,14 +52,6 @@ describe("CrossLinkManager Component", () => {
             template:
               '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disable"><slot />{{ $attrs.label }}</button>',
             emits: ["click"],
-          },
-          "q-chip": {
-            template:
-              '<span class="q-chip"><slot /></span>',
-          },
-          "q-badge": {
-            template:
-              '<span class="q-badge">{{ $attrs.label }}</span>',
           },
         },
       },
@@ -133,7 +123,14 @@ describe("CrossLinkManager Component", () => {
   describe("Rendering Links List", () => {
     it("should render all links", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      const items = wrapper.findAll('[data-test^="cross-link-item-"]');
+      // Select only the outer row elements (cross-link-item-0, cross-link-item-1),
+      // not inner descendants like cross-link-item-name-0 or cross-link-item-url-0
+      // which also start with "cross-link-item-".
+      const list = wrapper.find('[data-test="cross-link-list"]');
+      const items = list.findAll('[data-test^="cross-link-item-"]').filter((el) => {
+        const val = el.attributes('data-test') ?? '';
+        return /^cross-link-item-\d+$/.test(val);
+      });
       expect(items.length).toBe(2);
     });
 
@@ -150,10 +147,10 @@ describe("CrossLinkManager Component", () => {
       );
     });
 
-    it("should display field chips", () => {
+    it("should display field badges", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      const chips = wrapper.findAll(".q-chip");
-      expect(chips.length).toBeGreaterThan(0);
+      const badges = wrapper.findAllComponents({ name: "OBadge" });
+      expect(badges.length).toBeGreaterThan(0);
     });
   });
 
@@ -256,7 +253,7 @@ describe("CrossLinkManager Component", () => {
   describe("removeLink", () => {
     it("should emit update:modelValue without the removed link", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      wrapper.vm.removeLink(sampleLinks[0]);
+      wrapper.vm.removeLink(0);
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0][0]).toEqual([

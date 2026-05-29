@@ -32,61 +32,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Summary toolbar — sidebar-style badge chips. -->
     <div class="thread-summary">
-      <q-chip
-        dense
-        square
+      <OBadge
+        size="sm"
         class="thread-chip thread-chip--steps"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
-        <q-icon name="auto_awesome" size="12px" class="q-mr-xs" />
+        <template #icon><OIcon name="auto-awesome" size="xs" /></template>
         <span class="thread-chip__label">Steps</span>
         <span class="thread-chip__value">{{ summary.turnCount }}</span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip dense square class="thread-chip thread-chip--tools">
-        <q-icon name="build" size="12px" class="q-mr-xs" />
+      <OBadge size="sm" class="thread-chip thread-chip--tools">
+        <template #icon><OIcon name="build" size="xs" /></template>
         <span class="thread-chip__label">Tools</span>
         <span class="thread-chip__value">{{ summary.toolCallCount }}</span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip dense square class="thread-chip thread-chip--duration">
-        <q-icon name="schedule" size="12px" class="q-mr-xs" />
+      <OBadge size="sm" class="thread-chip thread-chip--duration">
+        <template #icon><OIcon name="schedule" size="xs" /></template>
         <span class="thread-chip__label">Duration</span>
         <span class="thread-chip__value">
           {{ formatDuration(summary.totalDurationNs) }}
         </span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip dense square class="thread-chip thread-chip--cost">
-        <q-icon name="payments" size="12px" class="q-mr-xs" />
+      <OBadge size="sm" class="thread-chip thread-chip--cost">
+        <template #icon><OIcon name="payments" size="xs" /></template>
         <span class="thread-chip__label">Cost</span>
         <span class="thread-chip__value">
           {{ formatCost(summary.totalCost) }}
         </span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip
+      <OBadge
         v-if="summary.dominantModel"
-        dense
-        square
+        size="sm"
         class="thread-chip thread-chip--model"
         :title="summary.dominantModel"
       >
-        <q-icon name="bolt" size="12px" class="q-mr-xs" />
+        <template #icon><OIcon name="bolt" size="xs" /></template>
         <span class="thread-chip__label">Model</span>
         <span class="thread-chip__value">{{ summary.dominantModel }}</span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip
+      <OBadge
         v-if="summary.errorCount > 0"
-        dense
-        square
+        size="sm"
         class="thread-chip thread-chip--error"
       >
-        <q-icon name="error_outline" size="12px" class="q-mr-xs" />
+        <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span class="thread-chip__label">Errors</span>
         <span class="thread-chip__value">{{ summary.errorCount }}</span>
-      </q-chip>
+      </OBadge>
 
     </div>
 
@@ -112,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showSystemFull = !showSystemFull"
         >
           <span class="thread-system__badge">
-            <q-icon name="settings" size="11px" class="q-mr-xs" />
+            <OIcon name="settings" size="xs" class="tw:mr-1" />
             System
           </span>
           <span
@@ -123,9 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span v-else class="tw:flex-1" />
           <span class="thread-system__toggle">
-            <q-icon
-              :name="showSystemFull ? 'expand_less' : 'expand_more'"
-              size="18px"
+            <OIcon
+              :name="showSystemFull ? 'expand-less' : 'expand-more'"
+              size="sm"
             />
           </span>
         </div>
@@ -158,15 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-user-avatar"
             :title="group.userId || 'User'"
           >
-            <q-icon name="person" size="16px" />
-            <q-tooltip
+            <OIcon name="person" size="sm" />
+            <OTooltip
               v-if="group.userId"
-              anchor="bottom middle"
-              self="top middle"
-              :offset="[0, 6]"
-            >
-              {{ group.userId }}
-            </q-tooltip>
+              :content="group.userId"
+              side="bottom"
+              align="center"
+              :side-offset="6"
+            />
           </div>
           <div class="thread-user-row__text">{{ group.userQuery }}</div>
         </div>
@@ -179,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-turn"
           >
           <div class="thread-turn__avatar">
-            <q-icon name="auto_awesome" size="14px" />
+            <OIcon name="auto-awesome" size="xs" />
           </div>
           <div class="thread-turn__body">
           <!-- Genuine follow-up user message(s). -->
@@ -246,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="emit('span-selected', t.span_id)"
                   title="Open span details"
                 >
-                  <q-icon name="open_in_new" size="14px" />
+                  <OIcon name="open-in-new" size="xs" />
                 </button>
               </div>
 
@@ -280,30 +276,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Footer. -->
           <div class="thread-turn__footer">
             <span class="thread-metric" :title="`Started at ${formatTime(turn.span.start_time)}`">
-              <q-icon name="schedule" size="11px" />
+              <OIcon name="schedule" size="xs" />
               {{ formatTime(turn.span.start_time) }}
             </span>
             <span class="thread-metric thread-metric--model" :title="getModel(turn.span)">
-              <q-icon name="bolt" size="11px" />
+              <OIcon name="bolt" size="xs" />
               {{ getModel(turn.span) || "unknown" }}
             </span>
             <span class="thread-metric" title="Duration">
-              <q-icon name="timer" size="11px" />
+              <OIcon name="timer" size="xs" />
               {{ formatDuration(turn.span.duration) }}
             </span>
             <span class="thread-metric" title="Tokens">
-              <q-icon name="data_usage" size="11px" />
+              <OIcon name="data-usage" size="xs" />
               {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
             <span class="thread-metric" title="Cost">
-              <q-icon name="payments" size="11px" />
+              <OIcon name="payments" size="xs" />
               {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
               class="thread-metric thread-metric--error"
             >
-              <q-icon name="error_outline" size="11px" />
+              <OIcon name="error-outline" size="xs" />
               Error
             </span>
             <button
@@ -311,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span
-              <q-icon name="arrow_forward" size="12px" />
+              <OIcon name="arrow-forward" size="xs" />
             </button>
           </div>
           </div>
@@ -324,6 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   spans: any[];
@@ -347,6 +344,8 @@ import {
   type Turn,
   type TraceGroup,
 } from "./threadView.utils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 const store = useStore();
 
@@ -587,7 +586,7 @@ function formatTime(ns: number): string {
   font-feature-settings: "tnum";
   color: var(--o2-text-primary) !important;
 
-  :deep(.q-icon) {
+  :deep(.OIcon) {
     color: var(--o2-text-secondary);
   }
 
@@ -857,12 +856,7 @@ function formatTime(ns: number): string {
   line-height: 1;
   white-space: nowrap;
   flex-shrink: 0;
-
-  .q-icon {
-    color: var(--o2-text-3);
-  }
-
-  &--model {
+&--model {
     color: #8b5cf6;
     background: rgba(139, 92, 246, 0.06);
     border-color: rgba(139, 92, 246, 0.2);
@@ -870,22 +864,14 @@ function formatTime(ns: number): string {
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
-
-    .q-icon {
-      color: #8b5cf6;
-    }
-  }
+}
 
   &--error {
     color: #dc2626;
     background: rgba(220, 38, 38, 0.08);
     border-color: rgba(220, 38, 38, 0.25);
     font-weight: 500;
-
-    .q-icon {
-      color: #dc2626;
-    }
-  }
+}
 }
 
 /* ─── grouped tool card (secondary weight) ───────────────────────────── */
@@ -1109,21 +1095,13 @@ function formatTime(ns: number): string {
       color: #c4b5fd;
       background: rgba(139, 92, 246, 0.12);
       border-color: rgba(139, 92, 246, 0.3);
-
-      .q-icon {
-        color: #c4b5fd;
-      }
-    }
+}
 
     &--error {
       color: #f87171;
       background: rgba(248, 113, 113, 0.12);
       border-color: rgba(248, 113, 113, 0.3);
-
-      .q-icon {
-        color: #f87171;
-      }
-    }
+}
   }
 
   .thread-turn__footer {

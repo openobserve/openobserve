@@ -15,14 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdownEditor.vue";
 import i18n from "@/locales";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 describe("CustomMarkdownEditor", () => {
   let wrapper: any;
@@ -61,7 +56,6 @@ describe("CustomMarkdownEditor", () => {
             props: ['modelValue'],
             emits: ['update:modelValue']
           },
-          'q-avatar': true
         },
         mocks: {
           $t: (key: string) => key
@@ -74,13 +68,13 @@ describe("CustomMarkdownEditor", () => {
     it("should render markdown editor container", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('.markdown-editor').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]').exists()).toBe(true);
     });
 
     it("should render editor container with correct styling", () => {
       wrapper = createWrapper();
 
-      const container = wrapper.find('.markdown-editor');
+      const container = wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]');
       const style = container.element.getAttribute('style');
 
       expect(style).toContain('width: 100%');
@@ -91,12 +85,11 @@ describe("CustomMarkdownEditor", () => {
     it("should render inner container with correct dimensions", () => {
       wrapper = createWrapper();
 
-      const innerDivs = wrapper.findAll('div');
-      const hasInnerContainer = innerDivs.some(div => {
-        const style = div.attributes('style');
-        return style && style.includes('width: 100%') && style.includes('height: 100%');
-      });
-      expect(hasInnerContainer).toBe(true);
+      const innerContainer = wrapper.find('[data-test="dashboard-custom-markdown-editor-inner"]');
+      expect(innerContainer.exists()).toBe(true);
+      const style = innerContainer.attributes('style');
+      expect(style).toContain('width: 100%');
+      expect(style).toContain('height: 100%');
     });
 
     it("should render splitter component", () => {
@@ -182,7 +175,6 @@ describe("CustomMarkdownEditor", () => {
                 props: ['modelValue'],
                 emits: ['update:modelValue']
               },
-              'q-avatar': true
             },
             mocks: {
               $t: (key: string) => key
@@ -233,7 +225,6 @@ describe("CustomMarkdownEditor", () => {
                 props: ['modelValue'],
                 emits: ['update:modelValue']
               },
-              'q-avatar': true
             },
             mocks: {
               $t: (key: string) => key
@@ -472,12 +463,11 @@ console.log('Hello World');
     it("should render editor in correct container", () => {
       wrapper = createWrapper();
 
-      const colContainers = wrapper.findAll('.col');
-      const hasCorrectContainer = colContainers.some(col => {
-        const style = col.attributes('style');
-        return style && style.includes('height: 100%');
-      });
-      expect(hasCorrectContainer).toBe(true);
+      const flexCol = wrapper.find('[data-test="dashboard-custom-markdown-editor-flex-col"]');
+      expect(flexCol.exists()).toBe(true);
+      const style = flexCol.attributes('style');
+      expect(style).toContain('height: 100%');
+      expect(style).toContain('flex-direction: column');
     });
   });
 
@@ -527,7 +517,7 @@ console.log('Hello World');
     it("should render splitter separator", () => {
       wrapper = createWrapper();
 
-      const separator = wrapper.find('.splitter-vertical.splitter-enabled');
+      const separator = wrapper.find('[data-test="dashboard-custom-markdown-editor-splitter-separator"]');
       expect(separator.exists()).toBe(true);
     });
 
@@ -543,7 +533,6 @@ console.log('Hello World');
 
       const avatar = wrapper.find('[data-test="dashboard-markdown-editor-drag-indicator"]');
       expect(avatar.exists()).toBe(true);
-      // Since q-avatar is stubbed, we just verify the element exists
     });
 
     it("should position drag indicator correctly", () => {
@@ -553,7 +542,7 @@ console.log('Hello World');
       const style = avatar.attributes('style');
       
       expect(style).toContain('top: 10px');
-      expect(style).toContain('left: 3.5px');
+      expect(style).toContain('left: 50%');
     });
   });
 
@@ -627,7 +616,7 @@ console.log('Hello World');
     it("should have correct container styling", () => {
       wrapper = createWrapper();
 
-      const container = wrapper.find('.markdown-editor');
+      const container = wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]');
 
       // Check the actual style attribute
       const style = container.element.getAttribute('style');
@@ -639,7 +628,7 @@ console.log('Hello World');
     it("should apply splitter classes correctly", () => {
       wrapper = createWrapper();
 
-      const separator = wrapper.find('.splitter-vertical.splitter-enabled');
+      const separator = wrapper.find('[data-test="dashboard-custom-markdown-editor-splitter-separator"]');
       expect(separator.exists()).toBe(true);
     });
 
@@ -875,7 +864,6 @@ And some more content.
                 props: ['modelValue'],
                 emits: ['update:modelValue']
               },
-              'q-avatar': true
             },
             mocks: {
               $t: (key: string) => key

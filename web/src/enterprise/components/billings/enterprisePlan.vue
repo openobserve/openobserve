@@ -15,93 +15,170 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="col o2-card-wrapper">
-    <div class="row items-center justify-between q-px-md q-py-sm">
+  <OCard class="tw:flex tw:flex-col card-wrapper">
+    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
       <div>
-        <div class="o2-card-title q-pt-sm">{{ t("billing.enterpriseLabel") }}</div>
-        <div class="o2-card-subtitle q-mt-sm">{{ t("billing.enterpriseSubtitle") }}</div>
+        <h3 class="card-title tw:pt-2">
+          {{ t("billing.enterpriseLabel") }}
+        </h3>
+        <p class="card-subtitle tw:mt-2">
+          {{ t("billing.enterpriseSubtitle") }}
+        </p>
       </div>
-      <q-chip
-        color="indigo-1"
-        text-color="indigo-10"
-        :label="t('billing.discountTag')"
-        class="q-mt-sm text-caption q-px-sm q-py-md"
-        style="border-radius: 0px"
-        dense
-      />
+      <OBadge
+        variant="primary-soft"
+        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
+      >
+        {{ t("billing.discountTag") }}
+      </OBadge>
     </div>
 
-    <q-separator spaced />
+    <OSeparator class="tw:my-2" />
 
-    <div class="q-px-md q-pt-sm tw:h-[550px]">
-      <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
-      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
+    <div class="tw:px-3 tw:pt-2 tw:h-[550px]">
+      <h4 class="feature-title">{{ t("billing.features") }}</h4>
+      <p class="feature-subtitle tw:mb-3 tw:mt-1">
+        {{ t("billing.included") }}
+      </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="row items-center q-mb-sm text-negative"
+        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
       >
-        <q-icon name="warning" size="16px" class="q-mr-sm" />
-        <span class="o2-page-subtitle3"
+        <OIcon name="warning" size="sm" class="tw:mr-2" />
+        <span class="feature-description"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
-      <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
-        <div class="row items-center">
-          <q-icon v-if="feature.is_parent" name="check_circle" color="green" size="16px" class="q-mr-sm" />
-          <q-icon v-else name="" color="green" size="16px" class="q-mr-sm" />
-          <div class="o2-page-subtitle3">{{ feature.name }}</div>
+      <div
+        v-for="(feature, index) in features"
+        :key="index"
+        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+      >
+        <div class="tw:flex tw:items-center">
+          <OIcon
+            v-if="feature.is_parent"
+            name="check-circle"
+            size="md"
+            class="tw:mr-2 tw:text-green-500 check-icon"
+          />
+          <div class="feature-description" :class="{ 'tw:ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
-        <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
+        <div class="feature-description tw:font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
-    <div class="o2-page-subtitle2 q-px-md q-pt-sm ">
+    <p class="feature-note tw:px-3 tw:pt-2">
       {{ t("billing.enterpriseNote") }}
-    </div>
+    </p>
 
-    <div class="row justify-between q-pa-md tw:mt-[18px] ">
-      <OButton
-        variant="primary"
-        size="sm-action"
-        block
-        @click="contactSales"
-      >
-        {{ t('billing.contactLabel') }}
+    <div class="tw:flex tw:justify-between tw:p-3 tw:mt-[18px]">
+      <OButton variant="primary" size="sm-action" class="tw:w-full" @click="contactSales">
+        {{ t("billing.contactLabel") }}
       </OButton>
     </div>
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { siteURL } from "@/constants/config";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "enterprisePlan",
-  components: { OButton },
+  components: { OSeparator, OButton, OBadge, OIcon, OCard },
   props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
 
     const contactSales = () => {
       window.open(siteURL.contactSales, "_blank");
-    }
+    };
 
     return {
       t,
       contactSales,
-    }
-  }
+    };
+  },
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .full-width {
   width: 100%;
+}
+
+.card-wrapper {
+  box-shadow: none;
+  border: 1px solid var(--o2-border-color);
+  background: var(--o2-card-bg);
+  border-radius: 0.5rem;
+  width: 100%;
+  height: 100%;
+}
+
+:deep(.card-wrapper) {
+  background: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.5rem;
+}
+
+.body--dark .card-wrapper {
+  background: var(--o2-card-background);
+  border-color: var(--o2-border);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  color: var(--o2-text-heading);
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  color: var(--o2-text-secondary);
+  margin: 0;
+}
+
+.feature-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 0.983rem;
+  color: var(--o2-text-heading);
+  margin: 0;
+}
+
+.feature-subtitle {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  color: var(--o2-text-secondary);
+  margin: 0;
+}
+
+.feature-description {
+  font-size: 0.938rem;
+  line-height: 1.375rem;
+  color: var(--o2-text-body);
+}
+
+.feature-note {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  color: var(--o2-text-secondary);
+  margin: 0;
 }
 </style>

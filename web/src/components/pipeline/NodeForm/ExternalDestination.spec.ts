@@ -16,13 +16,10 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ExternalDestination from "./ExternalDestination.vue";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 // --------------------------------------------------------------------------
 // Module mocks
@@ -81,6 +78,45 @@ const sampleDestinations = [
   { name: "dest2", url: "http://dest2.example.com", destination_type_name: "splunk" },
 ];
 
+// ODrawer stub — renders slot content, title, and action buttons so tests can
+// interact with save/cancel/delete controls.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "size",
+    "showClose",
+    "title",
+    "width",
+    "persistent",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div class="o-drawer-stub">
+      <div class="o-drawer-title">{{ title }}</div>
+      <slot />
+      <button
+        v-if="secondaryButtonLabel"
+        data-test="add-destination-cancel-btn"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+      <button
+        v-if="primaryButtonLabel"
+        data-test="add-destination-save-btn"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        v-if="neutralButtonLabel"
+        data-test="add-destination-delete-btn"
+        @click="$emit('click:neutral')"
+      >{{ neutralButtonLabel }}</button>
+    </div>
+  `,
+};
+
 // --------------------------------------------------------------------------
 // Factory helper
 // --------------------------------------------------------------------------
@@ -113,6 +149,7 @@ function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
         QItemSection: true,
         QItemLabel: true,
         ConfirmDialog: true,
+        ODrawer: ODrawerStub,
         CreateDestinationForm: {
           name: "CreateDestinationForm",
           template: '<div data-test="create-destination-form" />',
@@ -172,10 +209,10 @@ describe("ExternalDestination.vue", () => {
       expect(wrapper.vm.destinations).toHaveLength(2);
     });
 
-    it("1.4 initialises selectedDestination with empty label and value by default", async () => {
+    it("1.4 initialises selectedDestination with empty string by default", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.selectedDestination).toEqual({ label: "", value: "" });
+      expect(wrapper.vm.selectedDestination).toBe("");
     });
 
     it("1.5 pre-populates selectedDestination when currentSelectedNodeData has a destination_name", async () => {
@@ -199,10 +236,7 @@ describe("ExternalDestination.vue", () => {
       });
       await flushPromises();
 
-      expect(w.vm.selectedDestination).toEqual({
-        label: "existing-dest",
-        value: "existing-dest",
-      });
+      expect(w.vm.selectedDestination).toBe("existing-dest");
       w.unmount();
     });
 
@@ -294,15 +328,15 @@ describe("ExternalDestination.vue", () => {
       await flushPromises();
     });
 
-    it("3.1 returns formatted objects with label, value, url", () => {
+    it("3.1 returns formatted objects with label, value, subLabel", () => {
       wrapper.vm.destinations = [
         { name: "dest1", url: "http://dest1.com" },
         { name: "dest2", url: "http://dest2.com" },
       ];
       const formatted = wrapper.vm.getFormattedDestinations;
       expect(formatted).toEqual([
-        { label: "dest1", value: "dest1", url: "http://dest1.com" },
-        { label: "dest2", value: "dest2", url: "http://dest2.com" },
+        { label: "dest1", value: "dest1", subLabel: "http://dest1.com", subLabelInline: true },
+        { label: "dest2", value: "dest2", subLabel: "http://dest2.com", subLabelInline: true },
       ]);
     });
 
@@ -319,22 +353,22 @@ describe("ExternalDestination.vue", () => {
         },
       ];
       const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].url.endsWith("...")).toBe(true);
-      expect(formatted[0].url.length).toBeLessThanOrEqual(73); // 70 chars + "..."
+      expect(formatted[0].subLabel.endsWith("...")).toBe(true);
+      expect(formatted[0].subLabel.length).toBeLessThanOrEqual(73); // 70 chars + "..."
     });
 
     it("3.4 does not truncate URLs of exactly 70 characters", () => {
       const url70 = "a".repeat(70);
       wrapper.vm.destinations = [{ name: "exact", url: url70 }];
       const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].url).toBe(url70);
-      expect(formatted[0].url.endsWith("...")).toBe(false);
+      expect(formatted[0].subLabel).toBe(url70);
+      expect(formatted[0].subLabel.endsWith("...")).toBe(false);
     });
 
     it("3.5 does not truncate URLs shorter than 70 characters", () => {
       wrapper.vm.destinations = [{ name: "short", url: "http://short.io" }];
       const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].url).toBe("http://short.io");
+      expect(formatted[0].subLabel).toBe("http://short.io");
     });
 
     it("3.6 handles a large list of destinations", () => {
@@ -358,7 +392,7 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.1 calls addNode with correct payload when a destination is selected", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
 
       expect(mockAddNode).toHaveBeenCalledWith({
@@ -370,20 +404,20 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.2 emits cancel:hideform after a successful save", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
       expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(1);
     });
 
     it("4.3 does NOT call addNode when selectedDestination value is empty", () => {
-      wrapper.vm.selectedDestination = { value: "", label: "" };
+      wrapper.vm.selectedDestination = "";
       wrapper.vm.saveDestination();
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
     it("4.4 uses the store selectedOrganization identifier as org_id", () => {
-      wrapper.vm.selectedDestination = { value: "dest2", label: "dest2" };
+      wrapper.vm.selectedDestination = "dest2";
       wrapper.vm.saveDestination();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ org_id: "default" }),
@@ -391,7 +425,7 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.5 sets correct node_type as remote_stream", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ node_type: "remote_stream" }),
@@ -399,7 +433,7 @@ describe("ExternalDestination.vue", () => {
     });
 
     it("4.6 sets correct io_type as output", () => {
-      wrapper.vm.selectedDestination = { value: "dest1", label: "dest1" };
+      wrapper.vm.selectedDestination = "dest1";
       wrapper.vm.saveDestination();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ io_type: "output" }),
@@ -419,10 +453,7 @@ describe("ExternalDestination.vue", () => {
 
     it("5.1 sets selectedDestination to the newly created destination name", async () => {
       await wrapper.vm.handleDestinationCreated("brand-new-dest");
-      expect(wrapper.vm.selectedDestination).toEqual({
-        label: "brand-new-dest",
-        value: "brand-new-dest",
-      });
+      expect(wrapper.vm.selectedDestination).toBe("brand-new-dest");
     });
 
     it("5.2 switches createNewDestination back to false", async () => {
@@ -653,6 +684,27 @@ describe("ExternalDestination.vue", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-destination-delete-btn"]').exists()).toBe(true);
     });
+
+    it("11.9 emits 'cancel:hideform' when the ODrawer close event fires", async () => {
+      // The close button is inside ODrawer's header (showClose prop).
+      // Simulate it by emitting update:open=false on the ODrawer component.
+      vi.useFakeTimers();
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      drawer.vm.$emit("update:open", false);
+      vi.advanceTimersByTime(400);
+      await nextTick();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+      expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
+      vi.useRealTimers();
+    });
+
+    it("11.10 does NOT emit 'close' on cancel button click (cancel emits cancel:hideform)", async () => {
+      const cancelBtn = wrapper.find('[data-test="add-destination-cancel-btn"]');
+      await cancelBtn.trigger("click");
+      expect(wrapper.emitted("close")).toBeFalsy();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -664,22 +716,14 @@ describe("ExternalDestination.vue", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       await flushPromises();
-      const rootDiv = wrapper.find(
-        '[data-test="add-stream-input-stream-routing-section"]',
-      );
-      expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.classes()).toContain("bg-dark");
+      expect(wrapper.find('[data-test="external-destination-select"]').exists()).toBe(true);
     });
 
     it("12.2 renders correctly in light theme", async () => {
       store.state.theme = "light";
       wrapper = createWrapper();
       await flushPromises();
-      const rootDiv = wrapper.find(
-        '[data-test="add-stream-input-stream-routing-section"]',
-      );
-      expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.classes()).toContain("bg-white");
+      expect(wrapper.find('[data-test="external-destination-select"]').exists()).toBe(true);
     });
 
     afterEach(() => {

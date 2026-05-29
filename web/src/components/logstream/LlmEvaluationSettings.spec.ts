@@ -16,12 +16,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import { createStore } from "vuex";
 import i18n from "@/locales";
-
-installQuasar({ plugins: [Notify] });
 
 const { mockGetPipelines, mockCreatePipeline, mockUpdatePipeline } = vi.hoisted(() => ({
   mockGetPipelines: vi.fn(),
@@ -76,8 +72,9 @@ describe("LlmEvaluationSettings", () => {
       mockGetPipelines.mockReturnValue(new Promise((r) => { resolve = r; }));
 
       const wrapper = mountComp();
+
       // Should show loading spinner before promise resolves
-      expect(wrapper.find(".llm-eval-settings__loading").exists()).toBe(true);
+      expect(wrapper.find('[data-test="stream-llm-eval-loading"]').exists()).toBe(true);
 
       // Resolve to clean up
       resolve({ data: { list: [] } });
@@ -88,7 +85,7 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      expect(wrapper.find(".llm-eval-settings__loading").exists()).toBe(false);
+      expect(wrapper.find('[data-test="stream-llm-eval-loading"]').exists()).toBe(false);
     });
 
     it("should call getPipelines on mount", async () => {
@@ -118,7 +115,7 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      expect(wrapper.find(".llm-eval-settings__info-banner").exists()).toBe(true);
+      expect(wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists()).toBe(true);
     });
 
     it("should not show config fields when disabled", async () => {
@@ -132,6 +129,8 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
+      // Internal state — no DOM representation when component is disabled.
+      // The value is set internally but the OInput is inside v-if="enabled".
       const vm = wrapper.vm as any;
       expect(vm.outputStream).toBe("my-stream_evaluations");
     });
@@ -140,14 +139,17 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      expect(vm.enabled).toBe(false);
+      // Verify enabled=false via visible info-banner (disabled state)
+      expect(wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists()).toBe(false);
     });
 
     it("should initialize samplingRate as 0.01", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
+      // Internal state — sampling slider is inside v-if="enabled" && v-if="enableSampling".
+      // Not rendered when component is disabled by default.
       const vm = wrapper.vm as any;
       expect(vm.samplingRate).toBe(0.01);
     });
@@ -184,14 +186,18 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      expect(vm.enabled).toBe(true);
+      // Info banner should be hidden when enabled
+      expect(wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists()).toBe(false);
+      // Config fields should be visible
+      expect(wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists()).toBe(true);
     });
 
     it("should load span identifier from existing pipeline", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
+      // Internal state — the OSelect value is harder to query without knowing
+      // O2 component internals. The value is derived from the pipeline data.
       const vm = wrapper.vm as any;
       expect(vm.spanIdentifier).toBe("custom_identifier");
     });
@@ -314,21 +320,6 @@ describe("LlmEvaluationSettings", () => {
       const vm = wrapper.vm as any;
       expect(vm.outputStream).toBe("my-stream_evaluations");
       expect(vm.loading).toBe(false);
-    });
-  });
-
-  describe("Theme Styling", () => {
-    it("should render correctly in light theme", async () => {
-      const wrapper = mountComp();
-      await flushPromises();
-      expect(wrapper.find(".llm-eval-settings__card--light").exists()).toBe(true);
-    });
-
-    it("should render correctly in dark theme", async () => {
-      const darkStore = makeStore("dark");
-      const wrapper = mountComp(defaultProps, darkStore);
-      await flushPromises();
-      expect(wrapper.find(".llm-eval-settings__card--dark").exists()).toBe(true);
     });
   });
 

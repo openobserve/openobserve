@@ -64,9 +64,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Save and verify panel
     await pm.dashboardPanelActions.savePanel();
-    await page
-      .locator('[data-test="dashboard-back-btn"]')
-      .waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForBackBtnVisible();
 
     // Delete panel and dashboard
     await pm.dashboardPanelEdit.deletePanel(panelName);
@@ -82,7 +80,7 @@ test.describe("dashboard UI testcases", () => {
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create dashboard and add panel
@@ -113,9 +111,7 @@ test.describe("dashboard UI testcases", () => {
     // Save and verify panel
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForBackBtnVisible();
 
     // Delete panel and dashboard
     await pm.dashboardPanelEdit.deletePanel(panelName);
@@ -274,7 +270,7 @@ test.describe("dashboard UI testcases", () => {
     page.once("dialog", (dialog) => {
       dialog.dismiss().catch(() => {});
     });
-    await expect(page.locator('[data-test="no-data"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.getNoDataLocator()).toBeVisible();
   });
   test("should display the correct output when changing relative and absolute times with different timezones after adding a breakdown", async ({
     page,
@@ -359,7 +355,7 @@ test.describe("dashboard UI testcases", () => {
     // Apply changes
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await page.locator('[data-test="dashboard-panel-discard"]').click();
+    await pm.dashboardPanelActions.discardPanel();
   });
 
   test('should plot the data when adding a "Sort by" filter, a breakdown, and other required fields', async ({

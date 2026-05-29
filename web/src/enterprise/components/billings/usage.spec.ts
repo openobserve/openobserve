@@ -17,16 +17,11 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import BillingService from "@/services/billings";
-import { Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
-installQuasar({
-  plugins: [Notify],
-});
 
 // Mock the billings service
 vi.mock("@/services/billings", () => ({
@@ -229,7 +224,9 @@ describe("Usage Component", () => {
   it("should display loading message when data is loading", async () => {
     wrapper.vm.dataLoading = true;
     await nextTick();
-    expect(wrapper.text()).toContain("Loading...");
+    // Component shows an OSpinner (aria-label="Loading") when dataLoading is true,
+    // not a "Loading..." text string.
+    expect(wrapper.find('[aria-label="Loading"]').exists()).toBe(true);
   });
 
   // Test 15: Usage tiles display when data is available
@@ -603,7 +600,7 @@ describe("Usage Component", () => {
 
   // Test 46: Component container styling
   it("should have correct container styling", () => {
-    const container = wrapper.find('.q-pa-md');
+    const container = wrapper.find('[style="height: calc(100vh - 130px); width: 100%;"]');
     expect(container.exists()).toBe(true);
     expect(container.attributes('style')).toContain('height: calc(100vh - 130px)');
     expect(container.attributes('style')).toContain('width: 100%');

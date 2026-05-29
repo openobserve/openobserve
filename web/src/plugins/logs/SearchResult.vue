@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="col column full-height"
+    class="tw:flex tw:flex-col full-height"
     style="
       overflow: hidden !important;
       padding: 0 !important;
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="search-list full-height full-width tw:flex tw:flex-col"
+      class="search-list full-height tw:w-full tw:flex tw:flex-col"
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="row tw:min-h-[28px] tw:pt-[0.375rem] tw:shrink-0">
+      <div class="tw:flex tw:min-h-[28px] tw:pt-[0.375rem] tw:shrink-0">
         <div
-          class="col-8 text-left q-pl-lg bg-warning text-white rounded-borders"
+          class="tw:w-2/3 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -41,27 +41,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-8 text-left q-pl-lg warning flex items-center" data-test="logs-search-result-title">
+        <div
+          v-else
+          class="tw:w-2/3 tw:text-left tw:pl-4 warning tw:flex tw:items-center"
+          data-test="logs-search-result-title"
+          :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
+          :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
+        >
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
               : noOfRecordsTitle
           }}
-          <span v-if="searchObj.loadingCounter" class="q-ml-md">
-            <q-spinner-hourglass
-              color="primary"
-              size="25px"
-              class="search-spinner"
-            />
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-            >
-              <span class="search-loading-text"
-                >Fetching the search events</span
-              >
-            </q-tooltip>
+          <span v-if="searchObj.loadingCounter" class="tw:ml-3">
+            <OSpinner size="xs" class="search-spinner" />
           </span>
           <div
             v-else-if="
@@ -69,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="q-ml-md tw:cursor-pointer"
+            class="tw:ml-3 tw:cursor-pointer"
             :class="
               store.state.theme == 'dark'
                 ? 'histogram-unavailable-text'
@@ -77,10 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning" size="sm"> </q-icon>
-            <q-tooltip position="top" class="tw:text-sm tw:font-semi-bold">
-              {{ searchObj.data.histogram.errorMsg }}
-            </q-tooltip>
+            <OIcon name="info-outline" size="sm"> </OIcon>
+            <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
           </div>
           <!-- Inspect Button -->
           <OButton
@@ -92,15 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.search_inspector_enabled
             "
             variant="ghost-primary"
-            size="icon-sm"
+            size="icon"
             class="analyze-button inspect-button"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
-            <q-icon name="troubleshoot" size="xs" />
-            <q-tooltip>
-              {{ t("volumeInsights.searchInspectionsLabel") }}
-            </q-tooltip>
+            <OIcon name="troubleshoot" size="sm" />
+            <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
           </OButton>
           <!-- Volume Analysis Button -->
           <OButton
@@ -109,15 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.meta.sqlMode
             "
             variant="ghost-primary"
-            size="icon-sm"
+            size="icon"
             class="analyze-button"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
-            <q-icon name="timeline" size="xs" />
-            <q-tooltip>
-              {{ t("volumeInsights.analyzeTooltipLogs") }}
-            </q-tooltip>
+            <OIcon name="timeline" size="sm" />
+            <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
           </OButton>
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
@@ -128,13 +115,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
-          <q-pagination
+        <div class="tw:w-1/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
+          <!-- Wrap Content Button -->
+          <OButton
+            v-if="
+              searchObj.meta.logsVisualizeToggle === 'logs' ||
+              searchObj.meta.logsVisualizeToggle === 'patterns'
+            "
+            data-test="logs-search-result-wrap-table-content-btn"
+            variant="ghost"
+            size="icon"
+            class="wrap-content-btn"
+            :class="{
+              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
+            }"
+            @click="
+              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
+            "
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
+          <OSelect
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs'
             "
-            :disable="searchObj.loading == true"
+            data-test="logs-search-result-records-per-page"
+            v-model="searchObj.meta.resultGrid.rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="select-pagination tw:min-w-[4.5rem]"
+            size="sm"
+            :searchable="false"
+            :disable="searchObj.loading"
+            @update:model-value="getPageData('recordsPerPage')"
+          />
+          <OPagination
+            v-if="
+              searchObj.meta.resultGrid.showPagination &&
+              searchObj.meta.logsVisualizeToggle === 'logs'
+            "
+            :disable="searchObj.loading"
             v-model="pageNumberInput"
             :key="
               searchObj.data.queryResults.total +
@@ -151,58 +172,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ?.length) || 0,
               )
             "
-            :input="false"
-            direction-links
-            :boundary-numbers="false"
-            :max-pages="5"
-            :ellipses="false"
-            icon-first="skip_previous"
-            icon-last="skip_next"
-            icon-prev="fast_rewind"
-            icon-next="fast_forward"
-            class="float-right paginator-section"
+            class="paginator-section"
             @update:model-value="getPageData('pageChange')"
-            rowsPerPageLabel="Rows per page"
-            :rows-per-page-options="rowsPerPageOptions"
-            :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
             data-test="logs-search-result-pagination"
           />
-          <q-select
-            v-if="
-              searchObj.meta.resultGrid.showPagination &&
-              searchObj.meta.logsVisualizeToggle === 'logs'
-            "
-            data-test="logs-search-result-records-per-page"
-            v-model="searchObj.meta.resultGrid.rowsPerPage"
-            :options="rowsPerPageOptions"
-            class="float-right select-pagination"
-            size="sm"
-            dense
-            borderless
-            @update:model-value="getPageData('recordsPerPage')"
-          ></q-select>
-          <!-- Wrap Content Button -->
-          <OButton
-            v-if="
-              searchObj.meta.logsVisualizeToggle === 'logs' ||
-              searchObj.meta.logsVisualizeToggle === 'patterns'
-            "
-            data-test="logs-search-result-wrap-table-content-btn"
-            variant="ghost"
-            size="icon"
-            class="wrap-content-btn float-right"
-            :class="{
-              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
-            }"
-            @click="
-              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
-            "
-          >
-            <q-icon name="wrap_text" />
-            <q-tooltip>
-              {{ t("search.messageWrapContent") }}
-            </q-tooltip>
-          </OButton>
         </div>
       </div>
 
@@ -242,15 +215,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             class="histogram-empty"
+            data-test="logs-search-no-data-histogram"
             v-else-if="
               searchObj.meta.showHistogram &&
               !searchObj.loadingHistogram &&
               !searchObj.loading
             "
           >
-            <h6 class="text-center">
+            <h6 class="tw:text-center">
               <span class="histogram-empty__message">
-                <q-icon name="warning" color="warning" size="xs"></q-icon> No
+                <OIcon name="warning" size="xs"></OIcon> No
                 data found for histogram.</span
               >
             </h6>
@@ -263,19 +237,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Object.keys(plotChart)?.length === 0
             "
           >
-            <h5 class="text-center">
+            <h5 class="tw:text-center">
               <span class="histogram-empty__message" style="color: transparent"
                 >.</span
               >
             </h5>
           </div>
 
-          <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
-            <q-spinner-hourglass
-              color="primary"
-              size="25px"
-              class="search-spinner"
-            />
+          <div class="tw:pb-2 histogram-loader" v-if="histogramLoader">
+            <OSpinner size="xs" class="search-spinner" />
           </div>
         </div>
         <div
@@ -293,13 +263,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h6
-            class="text-center histogram-error"
+            class="tw:text-center histogram-error"
             v-if="
               searchObj.data.histogram.errorCode != 0 &&
               searchObj.data.histogram.errorCode != -1
             "
           >
-            <q-icon name="warning" color="warning" size="xs"></q-icon> Error
+            <OIcon name="warning" size="xs"></OIcon> Error
             while fetching histogram data.
             <OButton
               variant="secondary"
@@ -316,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </h6>
           <h6
-            class="text-center"
+            class="tw:text-center"
             v-else-if="searchObj.data.histogram.errorCode != -1"
           >
             <SanitizedHtmlRenderer
@@ -393,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
             :highlight-query="searchObj.data.highlightQuery"
             :default-columns="!searchObj.data.stream.selectedFields.length"
-            class="col-12"
+            class="tw:w-full"
             :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
             :scroll-el="scrollContainerRef"
             :scroll-margin="0"
@@ -448,16 +418,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- end combined scroll area -->
 
-      <q-dialog
+      <ODrawer
+        lazy
         data-test="logs-search-result-detail-dialog"
-        v-model="searchObj.meta.showDetailTab"
-        position="right"
-        full-height
-        maximized
-        allow-focus-outside
-        @escap.stop="reDrawChart"
-        @hide="reDrawChart"
-        @before-hide="reDrawChart"
+        v-model:open="searchObj.meta.showDetailTab"
+        :width="85"
+        :title="t('search.rowDetail')"
+        @update:open="(v) => !v && reDrawChart()"
       >
         <DetailTable
           v-if="searchObj.data.queryResults?.hits?.length"
@@ -484,6 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
+          @close="searchObj.meta.showDetailTab = false"
           @view-trace="
             redirectToTraces(
               searchObj.data.queryResults.hits[
@@ -495,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
-      </q-dialog>
+      </ODrawer>
 
       <!-- Pattern Details Drawer -->
       <PatternDetailsDialog
@@ -528,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
+    <!-- Correlation Dashboard (for tw:inline expanded logs, opens as separate dialog) -->
     <TelemetryCorrelationDashboard
       v-if="shouldShowInlineDialog"
       mode="dialog"
@@ -563,7 +531,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -597,12 +565,24 @@ import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
     OButton,
+    ODrawer,
+    OSpinner,
+    OTooltip,
+    OSelect,
+    OPagination,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -622,7 +602,8 @@ export default defineComponent({
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
-  },
+    OIcon,
+},
   emits: [
     "update:scroll",
     "update:datetime",
@@ -761,8 +742,8 @@ export default defineComponent({
           this.pageNumberInput > Math.ceil(maxPages) &&
           this.searchObj.meta.jobId == ""
         ) {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               "Page number is out of range. Please provide valid page number.",
             timeout: 1000,
@@ -846,7 +827,6 @@ export default defineComponent({
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
     const patternSummaryText = ref("");
@@ -1211,7 +1191,7 @@ export default defineComponent({
 
       if (index === -1 || index === undefined) {
         console.error(
-          "[SearchResult] Could not find row index for correlation",
+          "[SearchResult] Could not find tw:flex index for correlation",
           {
             rowTimestamp: row[timestampColumn],
             hitsCount: searchObj.data.queryResults?.hits?.length,
@@ -1264,22 +1244,12 @@ export default defineComponent({
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
           correlationError.value = "No matching service found for correlation";
-          $q.notify({
-            type: "warning",
-            message: "No matching service found for correlation",
-            timeout: 3000,
-          });
           return;
         }
 
         if (!result.correlationData) {
           console.warn("[SearchResult] No correlation data in result");
           correlationError.value = "Unable to retrieve correlation data";
-          $q.notify({
-            type: "warning",
-            message: "Unable to retrieve correlation data",
-            timeout: 3000,
-          });
           return;
         }
 
@@ -1366,14 +1336,13 @@ export default defineComponent({
           console.warn(
             "[SearchResult] No metric streams found for correlation",
           );
-          $q.notify({
-            type: "info",
+          toast({
+            variant: "info",
             message: `No metric streams found for service "${result.correlationData.service_name}"`,
-            timeout: 3000,
           });
         }
 
-        // For inline expanded logs, open the correlation dashboard as a dialog
+        // For tw:inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)
         if (!searchObj.meta.showDetailTab) {
           showCorrelation.value = true;
@@ -1381,11 +1350,6 @@ export default defineComponent({
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
         correlationError.value = `Correlation error: ${err.message || err}`;
-        $q.notify({
-          type: "negative",
-          message: `Correlation error: ${err.message || err}`,
-          timeout: 3000,
-        });
         correlationDashboardProps.value = null;
       } finally {
         correlationLoading.value = false;
@@ -1465,13 +1429,10 @@ export default defineComponent({
 
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
-      copyToClipboard(copyData).then(() =>
-        $q.notify({
-          type: "positive",
-          message: "Content Copied Successfully!",
-          timeout: 1000,
-        }),
-      );
+      copyToClipboard(copyData, {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      });
     };
 
     const redirectToTraces = (log: any) => {
@@ -1553,7 +1514,7 @@ export default defineComponent({
 
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
-      // Clear correlation data when closing sidebar so it doesn't persist to next row
+      // Clear correlation data when closing sidebar so it doesn't persist to next "row"
       correlationDashboardProps.value = null;
       correlationLoading.value = false;
       correlationError.value = null;
@@ -1574,10 +1535,9 @@ export default defineComponent({
       const traceId = searchObj.data.lastSearchTraceId;
 
       if (!traceId) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "No trace ID available for inspection",
-          timeout: 2000,
         });
         return;
       }
@@ -1636,7 +1596,7 @@ export default defineComponent({
     );
 
     // Watch for sidebar close to clear correlation data
-    // This ensures fresh correlation data when reopening with a different row
+    // This ensures fresh correlation data when reopening with a different "row"
     watch(
       () => searchObj.meta.showDetailTab,
       (isOpen, wasOpen) => {

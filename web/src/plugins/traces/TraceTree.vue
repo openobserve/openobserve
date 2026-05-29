@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flexWrap: 'nowrap',
             height: '100%',
           }"
-          class="flex span-row"
+          class="tw:flex span-row"
           :class="{
             'span-row-selected':
               (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
@@ -115,16 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'px'
                 }`,
               }"
-              class="flex flex-col items-start justify-start ellipsis"
+              class="tw:flex tw:flex-col tw:items-start tw:justify-start tw:truncate"
               :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
-                class="flex no-wrap full-width relative-position operation-name-container tw:cursor-pointer tw:items-center"
+                class="tw:flex tw:flex-nowrap tw:w-full relative-position operation-name-container tw:cursor-pointer tw:items-center"
                 :class="[
-                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-                  isLLMTrace((spans as any[])[virtualRow.index])
-                    ? ''
-                    : 'q-pt-sm',
+                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
                 ]"
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
@@ -133,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div
-                  class="absolute view-logs-container"
+                  class="tw:absolute view-logs-container"
                   :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                 >
                   <div class="tw:mx-1 view-span-logs">
@@ -146,13 +143,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      <q-icon name="search" size="12px" />
+                      <OIcon name="search" size="xs" />
                     </OButton>
                   </div>
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]! tw:relative"
+                  class="span-count-box tw:cursor-pointer tw:border-[var(--o2-border-color)]! tw:relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -200,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div
-                    class="ellipsis q-pl-xs cursor-pointer span-name-section tw:w-[calc(100%-2rem)]!"
+                    class="tw:truncate tw:pl-1 tw:cursor-pointer span-name-section tw:w-[calc(100%-2rem)]!"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
                         ? 'tw:flex-col tw:items-start'
@@ -209,20 +206,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
                     <div
-                      class="ellipsis flex items-center span-name-section-content"
+                      class="tw:truncate tw:flex tw:items-center span-name-section-content"
                     >
-                      <q-icon
+                      <OIcon
                         v-if="
                           (spans as any[])[virtualRow.index].spanStatus ===
                           'ERROR'
                         "
-                        name="error"
-                        class="text-red-6 q-mr-xs"
+                        name="error" size="sm"
+                        class="tw:text-[var(--o2-status-error-text)]! tw:mr-1"
                         title="Error Span"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
-                        class="text-subtitle2 text-bold q-mr-sm"
+                        class="tw:text-sm tw:font-medium tw:font-bold tw:mr-2"
                         :class="{
                           highlighted: isHighlighted(
                             (spans as any[])[virtualRow.index].spanId,
@@ -257,16 +254,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :title="getSpanTech((spans as any[])[virtualRow.index])"
-                        class="q-mr-xs tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
+                        class="tw:mr-1 tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
                         aria-hidden="true"
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
-                        class="text-body2"
+                        class="tw:text-sm"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'text-grey-5'
+                            ? 'tw:text-gray-400'
                             : 'text-blue-grey-9'
                         "
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
@@ -278,21 +275,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="flex items-center text-caption text-red-6"
-                      style="
-                        margin-top: -4px;
-                        margin-bottom: 2px;
-                        line-height: 1;
-                      "
+                      class="tw:flex tw:items-center tw:text-xs tw:text-[var(--o2-status-error-text)]! tw:mt-[-0.125rem] tw:mb-[0.125rem] tw:leading-none"
                     >
                       <span
                         v-if="
                           (spans as any[])[virtualRow.index].genAiUsage?.total >
                           0
                         "
-                        class="q-mr-sm"
+                        class="tw:mr-2"
                       >
-                        <q-icon name="functions" size="10px" />
+                        <OIcon name="functions" size="xs" />
                         {{
                           formatTokens(
                             (spans as any[])[virtualRow.index].genAiUsage.total,
@@ -304,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (spans as any[])[virtualRow.index].genAiCost?.total > 0
                         "
                       >
-                        <q-icon name="attach_money" size="10px" />
+                        <OIcon name="attach-money" size="xs" />
                         {{
                           formatCost(
                             (spans as any[])[virtualRow.index].genAiCost.total,
@@ -338,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         getEventCount((spans as any[])[virtualRow.index]) > 0 &&
                         false
                       "
-                      class="flex items-center"
+                      class="tw:flex tw:items-center"
                       :style="{
                         fontSize: '0.625rem',
                         lineHeight: 1,
@@ -349,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="`${getEventCount((spans as any[])[virtualRow.index])} span event${getEventCount((spans as any[])[virtualRow.index]) > 1 ? 's' : ''}`"
                       :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      <q-icon name="event_note" size="0.625rem" />
+                      <OIcon name="event-note" size="xs" />
                       {{ getEventCount((spans as any[])[virtualRow.index]) }}
                     </span>
                   </div>
@@ -424,6 +416,7 @@ import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -841,7 +834,9 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OButton },
+  components: { SpanBlock, SpanKindBadge, OButton,
+    OIcon,
+},
 });
 </script>
 
@@ -853,15 +848,15 @@ export default defineComponent({
 }
 
 .span-count-box {
-  min-width: 1.2rem;
-  height: 1.2rem;
+  min-width: 1.25rem;
+  height: 1.25rem;
   padding: 0 0.25rem;
   border-radius: 50%;
   border: 0.0625rem solid;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   margin-right: 0.25rem;
   transition: background-color 0.2s ease;

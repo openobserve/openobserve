@@ -14,66 +14,58 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page
-    class="q-pa-none o2-custom-bg"
+  <div class="tw:rounded-md tw:p-0 o2-custom-bg"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <div
-      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
+      class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
     >
-      <div class="flex items-center tw:h-[60px]">
+      <div class="tw:flex tw:items-center tw:h-[60px]">
         <div
           no-caps
             padding="xs"
             outline
-            icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+            icon="arrow-back-ios-new"
+            class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="col" data-test="add-template-title">
-          <div v-if="isUpdatingTemplate" class="text-h6">
+        <div class="tw:flex tw:flex-col" data-test="add-template-title">
+          <div v-if="isUpdatingTemplate" class="tw:text-xl tw:font-semibold">
             {{ t("alert_templates.updateTitle") }}
           </div>
-          <div v-else class="text-h6">
+          <div v-else class="tw:text-xl tw:font-semibold">
             {{ t("alert_templates.addTitle") }}
           </div>
         </div>
       </div>
     </div>
 
-    <q-splitter
+    <OSplitter
       v-model="splitterModel"
       unit="%"
+      :horizontal="false"
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
         <div class="card-container tw:h-full tw:flex tw:flex-col">
-          <div class="q-pa-md tw:overflow-auto">
-            <div class="col-12 q-pb-sm q-pt-sm o2-input">
-            <q-input
+          <div class="tw:p-3 tw:overflow-auto">
+            <div class="tw:w-full tw:pb-2 tw:pt-2 o2-input">
+            <OInput
               data-test="add-template-name-input"
               v-model="formData.name"
               :label="t('alerts.name') + ' *'"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              v-bind:readonly="isUpdatingTemplate"
-              v-bind:disable="isUpdatingTemplate"
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
-              ]"
+              :readonly="isUpdatingTemplate"
+              :disabled="isUpdatingTemplate"
               tabindex="0"
+              :error="!!nameError"
+              :error-message="nameError"
+              @update:model-value="nameError = ''"
             />
           </div>
-          <div class="col-12 q-pb-md">
+          <div class="tw:w-full tw:pb-3">
             <div class="app-tabs-container tw:w-fit">
               <app-tabs
                 class="tabs-selection-container"
@@ -82,22 +74,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div v-if="formData.type === 'email'" class="col-12 q-pt-xs o2-input">
-            <q-input
+          <div v-if="formData.type === 'email'" class="tw:w-full tw:pt-1 o2-input">
+            <OInput
               data-test="add-template-email-title-input"
               v-model="formData.title"
               :label="t('alerts.title') + ' *'"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
+              :error="!!titleError"
+              :error-message="titleError"
+              @update:model-value="titleError = ''"
             />
           </div>
-          <div class="col-12 q-pb-md">
+          <div class="tw:w-full tw:py-3 ">
             <div
-              class="q-pb-sm text-bold"
+              class="tw:pb-2 tw:font-bold"
               data-test="add-template-body-input-title"
             >
               {{ t("alert_templates.body") + " *" }}
@@ -107,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor q-mb-md"
+                class="monaco-editor tw:mb-3"
                 language="markdown"
                 v-model:query="formData.body"
               />
@@ -117,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor q-mb-md"
+                class="monaco-editor tw:mb-3"
                 language="json"
                 v-model:query="formData.body"
               />
@@ -125,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end tw:gap-2 q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)]"
+            class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)]"
           >
             <OButton
               v-close-popup
@@ -145,13 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="q-px-sm q-pt-sm tw:h-full tw:overflow-auto card-container"
+          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container"
         >
-          <div class="text-bold q-py-sm q-px-xs text-subtitle2">
+          <div class="tw:font-bold tw:py-2 tw:px-1 tw:text-sm tw:font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
-          <q-separator style="width: 100%" />
-          <div class="q-py-md q-px-xs">
+          <OSeparator class="tw:w-full" />
+          <div class="tw:py-3 tw:px-1">
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
@@ -165,31 +155,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div><b>All of the stream fields are variables.</b></div>
             <div>{rows:N} {var:N} used to limit rows or string length.</div>
           </div>
-          <div class="q-pb-md q-px-xs">
-            <div class="text-bold text-body-1 q-pb-sm">
+          <div class="tw:pb-3 tw:px-1">
+            <div class="tw:font-bold text-body-1 tw:pb-2">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
             <div
               v-for="(template, index) in sampleTemplates"
-              class="q-pb-md"
+              class="tw:pb-3"
               :key="template.name"
               :data-test="`add-template-sample-template-${index}`"
             >
-              <div class="flex justify-between items-center">
-                <div class="q-pb-xs">{{ template.name }}</div>
-                <q-icon
+              <div class="tw:flex tw:justify-between tw:items-center">
+                <div class="tw:pb-1">{{ template.name }}</div>
+                <OIcon
                   data-test="add-template-sample-template-copy-btn"
-                  class="cursor-pointer"
-                  name="content_copy"
-                  size="14px"
+                  class="tw:cursor-pointer"
+                  name="content-copy"
+                  size="xs"
                   @click="copyTemplateBody(template.body)"
                 />
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="add-template q-px-sm rounded-borders"
+                class="add-template tw:px-2 tw:rounded"
               >
-                <pre class="example-template-body q-my-0">
+                <pre class="example-template-body tw:my-0">
                     {{ template.body }}
                   </pre
                 >
@@ -198,8 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </q-splitter>
-  </q-page>
+    </OSplitter>
+  </div>
 </template>
 <script lang="ts" setup>
 import {
@@ -214,18 +204,22 @@ import { useI18n } from "vue-i18n";
 
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Webhook, Mail } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
   validateTemplateBody,
   getTemplateValidationErrorMessage,
 } from "@/utils/templates/validation";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -242,9 +236,10 @@ const formData: Ref<Template> = ref({
   title: "",
 });
 const store = useStore();
-const q = useQuasar();
 const editorRef: any = ref(null);
 const isUpdatingTemplate = ref(false);
+const nameError = ref('');
+const titleError = ref('');
 const { track } = useReo();
 const sampleTemplates = [
   {
@@ -283,13 +278,13 @@ const tabs = computed(() => [
     label: "Web Hook",
     value: "http",
     style: {},
-    icon: Webhook,
+    icon: "webhook",
   },
   {
     label: "Email",
     value: "email",
     style: {},
-    icon: Mail,
+    icon: "mail",
   },
 ]);
 
@@ -312,8 +307,8 @@ const isTemplateBodyValid = () => {
   const result = validateTemplateBody(formData.value.body);
 
   if (!result.valid) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: getTemplateValidationErrorMessage(),
       timeout: 1500,
     });
@@ -330,8 +325,12 @@ const isTemplateFilled = () =>
 
 const saveTemplate = () => {
   if (!isTemplateFilled()) {
-    q.notify({
-      type: "negative",
+    const name = formData.value.name;
+    nameError.value = !name.trim() ? t('common.nameRequired')
+      : (!isValidResourceName(name) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : '');
+    titleError.value = (formData.value.type === 'email' && !formData.value.title?.trim()) ? 'Field is required!' : '';
+    toast({
+      variant: "error",
       message: "Please fill required fields",
       timeout: 1500,
     });
@@ -341,11 +340,11 @@ const saveTemplate = () => {
   // Here checking is template body json valid
   if (formData.value.type !== "email" && !isTemplateBodyValid()) return;
 
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
 
   if (isUpdatingTemplate.value) {
     templateService
@@ -363,8 +362,8 @@ const saveTemplate = () => {
         dismiss();
         emit("get:templates");
         emit("cancel:hideform");
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Template Saved Successfully.`,
         });
       })
@@ -373,8 +372,8 @@ const saveTemplate = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -399,8 +398,8 @@ const saveTemplate = () => {
           dismiss();
           emit("get:templates");
           emit("cancel:hideform");
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Template Saved Successfully.`,
           });
         })
@@ -409,8 +408,8 @@ const saveTemplate = () => {
             return;
           }
           dismiss();
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err.response?.data?.error || err.response?.data?.message,
           });
         });
@@ -422,13 +421,10 @@ const saveTemplate = () => {
   }
 };
 const copyTemplateBody = (text: any) => {
-  copyToClipboard(JSON.parse(JSON.stringify(text))).then(() =>
-    q.notify({
-      type: "positive",
-      message: "Content Copied Successfully!",
-      timeout: 1000,
-    }),
-  );
+  copyToClipboard(JSON.parse(JSON.stringify(text)), {
+    successMessage: "Content Copied Successfully!",
+    timeout: 1000,
+  });
 };
 </script>
 <style lang="scss" scoped>

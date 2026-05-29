@@ -16,20 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
-    style="min-height: calc(100vh - 130px)"
+    :horizontal="false"
+    class="tw:h-full"
   >
     <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-full">
           <OTabs
             v-model="ingestiontabs"
             orientation="vertical"
           >
             <ORouteTab
               name="prometheus"
+              data-test="ingestion-metrics-tab-prometheus"
               :to="{
                 name: 'prometheus',
                 query: {
@@ -78,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:after>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-full">
           <router-view
             :title="ingestiontabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -90,19 +92,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 // import { config } from "../constants/config";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
@@ -112,7 +115,7 @@ import { resolveTab } from "@/utils/routeTabMaps";
 export default defineComponent({
   name: "IngestMetrics",
   components: {
-    OTabs, OTab, ORouteTab,},
+    OTabs, OTab, ORouteTab, OSplitter,},
   data() {
     return {};
   },
@@ -125,7 +128,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
@@ -173,28 +175,20 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
+      copyToClipboard(content.innerText, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      }).then((success: boolean) => {
+        if (success) {
+          segment.track("Button Click", {
+            button: "Copy to Clipboard",
+            ingestion: router.currentRoute.value.name,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Ingestion",
           });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
+        }
       });
     };
 

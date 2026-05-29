@@ -15,7 +15,6 @@
 
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import FunctionSelector from "@/plugins/logs/FunctionSelector.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -39,7 +38,6 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalWrapContent: vi.fn(() => false),
 }));
 
-installQuasar();
 
 const mockFunctionOptions = [
   { name: "Function 1", function: "SELECT * FROM table1" },
@@ -98,8 +96,19 @@ describe("FunctionSelector", () => {
             template: '<input class="q-input" v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
             props: ["modelValue", "dense", "filled", "borderless", "clearable", "debounce", "placeholder"],
           },
-          "q-icon": {
-            template: '<span class="q-icon" :name="name"></span>',
+          // OInput stub mirrors the real component's wrapper-div + inner-<input>
+          // shape, so tests can keep using data-test on the wrapper but drill
+          // into `wrapper.find('input')` for value mutation.
+          OInput: {
+            template:
+              '<div class="o-input-stub" :data-test="$attrs[\'data-test\']">'
+              + '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
+              + '</div>',
+            props: ["modelValue", "clearable", "debounce", "placeholder"],
+            emits: ["update:modelValue"],
+          },
+          "OIcon": {
+            template: '<span class="OIcon" :name="name"></span>',
             props: ["name"],
           },
           "q-item": {
@@ -204,8 +213,16 @@ describe("FunctionSelector", () => {
   });
 
   it("should update searchTerm when input changes", async () => {
-    const searchInput = wrapper.find('[data-test="function-search-input"]');
-    await searchInput.setValue("test");
+    // OInput migration: data-test sits on the wrapper. Drill into the native
+    // <input> so setValue can fire the input event the v-model listens for.
+    const searchWrapper = wrapper.find('[data-test="function-search-input"]');
+    const nativeInput = searchWrapper.find('input');
+    if (nativeInput.exists()) {
+      await nativeInput.setValue("test");
+    } else {
+      // Fallback for old q-input stub path which exposes the wrapper as the input.
+      await searchWrapper.setValue("test");
+    }
     expect(wrapper.vm.searchTerm).toBe("test");
   });
 
@@ -288,7 +305,7 @@ describe("FunctionSelector", () => {
   });
 
   it("should render function items in the list", () => {
-    const functionItems = wrapper.findAll(".q-item");
+    const functionItems = wrapper.findAll('[data-test^="logs-search-saved-function-"]');
     // Should have function items plus the "not found" item container
     expect(functionItems.length).toBeGreaterThan(0);
   });

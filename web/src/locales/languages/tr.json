@@ -401,7 +401,10 @@
     "traces": "İzleri",
     "switchToLogs": "Günlüklere geri dönmek için tıklayın",
     "patternNoValuesAvailable": "Mevcut değer yok",
-    "selectLogStream": "Günlükler akışını seçin"
+    "selectLogStream": "Günlükler akışını seçin",
+    "noData": "Veri yok",
+    "functionEditorLabel": "İşlev Düzenleyicisi",
+    "loadingStream": "Akış Yükleniyor..."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -1448,7 +1451,7 @@
     "markLineYAxis": "Y ekseni",
     "colorPalette": "Renk paleti",
     "colorSeriesBy": "Renk serisi:",
-    "colorBySeries": "<b>Serilere Göre</b>",
+    "colorBySeries": "Serilere Göre",
     "colorDefaultPaletteBySeries": "Varsayılan Palet (Seriye Göre)",
     "colorDefaultPaletteBySeriesSubLabel": "Aynı adı taşıyan seriler aynı rengi kullanacak",
     "colorPaletteClassic": "Palet-Klasik",
@@ -1457,7 +1460,7 @@
     "colorSingleColorSubLabel": "Tüm serilere belirli bir renk ayarlayın",
     "colorShadesOfSpecificColor": "Belirli Renk Tonları",
     "colorShadesOfSpecificColorSubLabel": "Belirli rengin farklı tonları",
-    "colorByValue": "<b>Değere Göre</b>",
+    "colorByValue": "Değere Göre",
     "colorGreenYellowRed": "Yeşil-Sarı-Kırmızı (Değere Göre)",
     "colorRedYellowGreen": "Kırmızı-Sarı-Yeşil (Değere Göre)",
     "colorTemperature": "Sıcaklık (Değere Göre)",
@@ -1625,7 +1628,9 @@
     "configSectionDrilldown": "Detaya inme",
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
-    "configSectionBackground": "Arkaplan"
+    "configSectionBackground": "Arkaplan",
+    "allFolders": "Tüm Klasörler",
+    "selectFile": "Dosya Seç"
   },
   "panel": {
     "header": "Panel",
@@ -2668,6 +2673,7 @@
     "serviceAccounts": "Hizmet Hesapları",
     "serviceAccountsName": "Hizmet Hesapları Adı",
     "basicUsers": "Kullanıcılar",
+    "organizationMembers": "Organizasyon Üyeleri",
     "quota": "Kontenjanlar",
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
     "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",
@@ -3137,7 +3143,10 @@
     "algorithm": "Algoritma",
     "storeType": "Mağaza Türü",
     "mechanismType": "Mekanizma Tipi",
-    "actions": "Eylemler"
+    "actions": "Eylemler",
+    "providerTypeRequired": "Sağlayıcı tipi gereklidir",
+    "algorithmRequired": "Algoritma gerekli",
+    "secretRequired": "Sır gerekli"
   },
   "quota": {
     "header": "Kontenjanlar",
@@ -3457,7 +3466,8 @@
     "serviceGroupProtected": "Hizmet grubu kaldırılamaz. Yalnızca eşlenen alanları değiştirebilirsiniz.",
     "noDataFound": "Veri Bulunamadı",
     "isWorkloadType": "Hizmet tanımlayıcısı",
-    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın."
+    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın.",
+    "loadingCorrelation": "Korelasyon verileri yükleniyor..."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
@@ -3794,7 +3804,8 @@
     "errSave": "Kaydedilemedi",
     "errLoadModel": "Model yüklenemedi",
     "tierDefaultName": "Varsayılan",
-    "tierConditionalName": "Koşullu Katman"
+    "tierConditionalName": "Koşullu Katman",
+    "shadowedWarningBanner": "Aşağıdaki kurallar “{name}” ile gölgelenmiştir - daha yüksek öncelikli bir kural tarafından geçersiz kılınır ve maliyet hesaplamalarında kullanılmaz."
   },
   "overview": {
     "title": "Sisteme Genel Bakış",

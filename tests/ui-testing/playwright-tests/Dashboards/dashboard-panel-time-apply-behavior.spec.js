@@ -40,7 +40,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     // Step 3-4: Change global date time to "Last 6 days" and apply
     // v4.0: Add panel ALWAYS renders chart with global time picker value
     await pm.dashboardPanelTime.changeGlobalTime('6-d');
-    await page.waitForTimeout(2000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 5: Verify time range via query inspector (expects ~6 days)
     // Chart should use global picker value (6d), not any config time
@@ -84,14 +84,14 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     // v4.0 CRITICAL: Edit panel ALWAYS renders chart with global picker value
     // The chart should use 6 days, NOT the 1 hour from panel_time_range config
     await pm.dashboardPanelTime.changeGlobalTime('6-d');
-    await page.waitForTimeout(1000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 6-8: Verify the query uses NEW global time (6 days), not config time (1h)
     await verifyQueryInspectorDateTime(page, { expectedRange: "6d" });
 
     // Step 9: Change global time again to verify Apply works multiple times
     await pm.dashboardPanelTime.changeGlobalTime('1-w');
-    await page.waitForTimeout(1000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Verify time updated to ~1 week
     await verifyQueryInspectorDateTime(page, { expectedRange: "1w" });
@@ -122,11 +122,10 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
 
     // Step 3: Open date time picker and switch to absolute time
     await pm.dashboardPanelTime.openGlobalPickerAbsoluteTab();
-    await page.waitForTimeout(500);
 
     // Step 4: Click Apply button and wait for data
     await pm.dashboardPanelTime.clickDateTimeApply();
-    await page.waitForTimeout(1000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 5: Verify via query inspector
     await verifyQueryInspectorDateTime(page);
@@ -195,7 +194,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
 
     // Step 5-6: Change date time to "Last 6 days" and apply
     await pm.dashboardPanelTime.changeViewPanelDateTime('6-d');
-    await page.waitForTimeout(2000); // Wait for API call to complete
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     page.off('response', responseHandler);
 
@@ -243,7 +242,7 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
 
     // Step 4-5: Change global date time to "Last 1 day" and apply
     await pm.dashboardPanelTime.changeGlobalTime('1-d');
-    await page.waitForTimeout(1000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 6-7: Verify the query uses the new global time (1 day) via query inspector
     await verifyQueryInspectorDateTime(page, { expectedRange: "1d" });
@@ -276,17 +275,17 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
 
     // Step 3: Change to 6d and verify
     await pm.dashboardPanelTime.changeGlobalTime('6-d');
-    await page.waitForTimeout(1000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await verifyQueryInspectorDateTime(page, { expectedRange: "6d" });
 
     // Step 4: Change to 1w and verify
     await pm.dashboardPanelTime.changeGlobalTime('1-w');
-    await page.waitForTimeout(1000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await verifyQueryInspectorDateTime(page, { expectedRange: "1w" });
 
     // Step 5: Change to 15m and verify
     await pm.dashboardPanelTime.changeGlobalTime('15-m');
-    await page.waitForTimeout(1000); // Buffer for data processing
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await verifyQueryInspectorDateTime(page, { expectedRange: "15m" });
 
     // Step 6: Save panel

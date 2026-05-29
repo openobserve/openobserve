@@ -57,22 +57,28 @@ export async function verifyColorOnCanvas(page, { r, g, b }, minPixels = 5) {
 
 /**
  * Wait for the chart canvas to be fully repainted after applying data changes.
- * Uses double requestAnimationFrame + a fixed settle delay to ensure ECharts
+ * Uses double requestAnimationFrame + a canvas-pixel check to ensure ECharts
  * has finished its paint cycle before pixel inspection.
  *
  * @param {import('@playwright/test').Page} page
  * @param {object} pm - PageManager instance
- * @param {number} [settleMs=2000] - Extra ms to wait after rAF for ECharts to finish
  */
-export async function waitForChartRepaint(page, pm, settleMs = 2000) {
+export async function waitForChartRepaint(page, pm) {
   await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartRepaint: waitForChartToRender failed", e.message));
   await page.waitForFunction(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     { timeout: 5000 }
   ).catch((e) => testLogger.warn("waitForChartRepaint: rAF timeout", e.message));
-  if (settleMs > 0) {
-    await page.waitForTimeout(settleMs);
-  }
+  // Wait for ECharts to have painted actual pixels before pixel-level color assertions
+  await page.waitForFunction(() => {
+    const canvases = document.querySelectorAll('canvas');
+    return Array.from(canvases).some(c => {
+      const ctx = c.getContext('2d');
+      if (!ctx || c.width === 0 || c.height === 0) return false;
+      const d = ctx.getImageData(0, 0, Math.min(c.width, 50), Math.min(c.height, 50));
+      return d.data.some(v => v > 0);
+    });
+  }, { timeout: 15000 }).catch((e) => testLogger.warn("waitForChartRepaint: canvas pixel wait timed out", e.message));
 }
 
 /**

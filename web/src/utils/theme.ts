@@ -99,6 +99,12 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
   // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
   document.documentElement.classList.toggle('dark', isDarkMode);
 
+  // Toggle Quasar-compat body classes so legacy `body.body--dark` / `body.body--light`
+  // selectors (~200 across SCSS/Vue) and `document.body.classList.contains('body--dark')`
+  // JS checks continue to work post-Quasar removal.
+  document.body.classList.toggle('body--dark', isDarkMode);
+  document.body.classList.toggle('body--light', !isDarkMode);
+
   // Sync O2 library tokens with the custom theme color
   syncO2LibraryTokens(themeColor);
 

@@ -17,7 +17,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldListPagination from "@/plugins/logs/components/FieldListPagination.vue";
 import i18n from "@/locales";
-import { Quasar } from "quasar";
+
 
 describe("FieldListPagination.vue", () => {
   const defaultProps = {
@@ -48,7 +48,7 @@ describe("FieldListPagination.vue", () => {
           showUserDefinedSchemaToggle: true,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -62,7 +62,7 @@ describe("FieldListPagination.vue", () => {
           showUserDefinedSchemaToggle: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -76,7 +76,7 @@ describe("FieldListPagination.vue", () => {
           showUserDefinedSchemaToggle: true,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -97,7 +97,7 @@ describe("FieldListPagination.vue", () => {
           showUserDefinedSchemaToggle: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -112,7 +112,7 @@ describe("FieldListPagination.vue", () => {
           showUserDefinedSchemaToggle: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -132,7 +132,7 @@ describe("FieldListPagination.vue", () => {
           pagesNumber: 1,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -149,7 +149,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -166,7 +166,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -184,7 +184,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: true,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -202,7 +202,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -222,7 +222,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -242,7 +242,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -265,7 +265,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -284,7 +284,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -304,7 +304,7 @@ describe("FieldListPagination.vue", () => {
           isLastPage: false,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -318,7 +318,7 @@ describe("FieldListPagination.vue", () => {
       const wrapper = mount(FieldListPagination, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -329,7 +329,7 @@ describe("FieldListPagination.vue", () => {
       const wrapper = mount(FieldListPagination, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 
@@ -352,7 +352,7 @@ describe("FieldListPagination.vue", () => {
           totalFieldsCount: 123,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
         },
       });
 

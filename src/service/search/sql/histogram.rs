@@ -190,6 +190,13 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
     }
 }
 
+/// Snaps `timestamp_us` down to the nearest histogram bucket boundary.
+/// Both arguments are in microseconds. Used to ensure the first bucket
+/// returned by date_bin() is fully populated rather than partial.
+pub fn histogram_bucket_start(timestamp_us: i64, interval_us: i64) -> i64 {
+    timestamp_us - timestamp_us % interval_us
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

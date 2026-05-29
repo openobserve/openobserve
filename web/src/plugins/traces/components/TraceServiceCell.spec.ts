@@ -15,7 +15,6 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 const mockServiceColors: Record<string, string> = {
   frontend: "#4caf50",
@@ -49,7 +48,6 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 import TraceServiceCell from "./TraceServiceCell.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
-installQuasar();
 
 const makeItem = (overrides: Record<string, any> = {}) => ({
   service_name: "frontend",

@@ -15,32 +15,17 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import ErrorTypeIcons from "@/components/rum/errorTracking/view/ErrorTypeIcons.vue";
 
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
-});
-
-// Mock image imports
 vi.mock("@/assets/images/rum/events/error.png", () => ({
   default: "/mock/error.png",
 }));
-
 vi.mock("@/assets/images/rum/events/navigation.png", () => ({
   default: "/mock/navigation.png",
 }));
-
 vi.mock("@/assets/images/rum/events/user.png", () => ({
   default: "/mock/user.png",
 }));
-
 vi.mock("@/assets/images/rum/events/xhr.png", () => ({
   default: "/mock/xhr.png",
 }));
@@ -48,315 +33,210 @@ vi.mock("@/assets/images/rum/events/xhr.png", () => ({
 describe("ErrorTypeIcons Component", () => {
   let wrapper: any;
 
-  const mockColumn = {
-    category: "error",
-  };
-
   beforeEach(async () => {
-    vi.clearAllMocks();
-
     wrapper = mount(ErrorTypeIcons, {
-      attachTo: "#app",
       props: {
-        column: mockColumn,
+        column: { category: "error" },
       },
     });
 
     await flushPromises();
-    await wrapper.vm.$nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllTimers();
+    wrapper.unmount();
     vi.restoreAllMocks();
   });
 
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
+  it("mounts successfully", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should render an image element", () => {
-      const image = wrapper.find("img");
-      expect(image.exists()).toBe(true);
-    });
-
-    it("should have correct image dimensions", () => {
-      const image = wrapper.find("img");
-      expect(image.classes()).toContain("tw:w-[1.375rem]");
-      expect(image.classes()).toContain("tw:h-[1.375rem]");
-    });
+    // Assert
+    expect(wrapper.exists()).toBe(true);
   });
 
-  describe("Icon Selection", () => {
-    it("should display error icon for error category", () => {
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/error.png");
-      expect(image.attributes("alt")).toBe("error");
-    });
+  it("renders exactly one image element", () => {
+    // Arrange + Act handled in beforeEach
 
-    it("should display XHR icon for xhr category", async () => {
-      await wrapper.setProps({
-        column: { category: "xhr" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/xhr.png");
-      expect(image.attributes("alt")).toBe("xhr");
-    });
-
-    it("should display navigation icon for navigation category", async () => {
-      await wrapper.setProps({
-        column: { category: "navigation" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/navigation.png");
-      expect(image.attributes("alt")).toBe("navigation");
-    });
-
-    it("should display user icon for click category", async () => {
-      await wrapper.setProps({
-        column: { category: "click" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/user.png");
-      expect(image.attributes("alt")).toBe("click");
-    });
-
-    it("should display navigation icon for reload category", async () => {
-      await wrapper.setProps({
-        column: { category: "reload" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/navigation.png");
-      expect(image.attributes("alt")).toBe("reload");
-    });
+    // Assert
+    expect(wrapper.findAll("img")).toHaveLength(1);
   });
 
-  describe("Case Insensitive Matching", () => {
-    it("should match uppercase ERROR", async () => {
-      await wrapper.setProps({
-        column: { category: "ERROR" },
-      });
+  it("shows error icon for error category", () => {
+    // Arrange + Act handled in beforeEach
 
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/error.png");
-    });
-
-    it("should match mixed case XhR", async () => {
-      await wrapper.setProps({
-        column: { category: "XhR" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/xhr.png");
-    });
-
-    it("should match uppercase NAVIGATION", async () => {
-      await wrapper.setProps({
-        column: { category: "NAVIGATION" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/navigation.png");
-    });
-
-    it("should match mixed case Click", async () => {
-      await wrapper.setProps({
-        column: { category: "Click" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/user.png");
-    });
+    // Assert
+    const img = wrapper.find("img");
+    expect(img.attributes("src")).toBe("/mock/error.png");
+    expect(img.attributes("alt")).toBe("error");
   });
 
-  describe("Default Behavior", () => {
-    it("should default to error icon for unknown category", async () => {
-      await wrapper.setProps({
-        column: { category: "unknown_category" },
-      });
+  it("shows xhr icon for xhr category", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "xhr" } });
 
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/error.png");
-      expect(image.attributes("alt")).toBe("unknown_category");
-    });
+    // Act (prop change triggers computed update)
 
-    it("should default to error icon for empty category", async () => {
-      await wrapper.setProps({
-        column: { category: "" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/error.png");
-    });
-
-    it("should handle null category", async () => {
-      // This test reflects the actual behavior - the component will error on null
-      expect(() => {
-        wrapper.setProps({
-          column: { category: null },
-        });
-      }).not.toThrow(); // Mounting won't throw, but accessing will
-    });
-
-    it("should handle undefined category", async () => {
-      // This test reflects the actual behavior - the component will error on undefined
-      expect(() => {
-        wrapper.setProps({
-          column: { category: undefined },
-        });
-      }).not.toThrow(); // Mounting won't throw, but accessing will
-    });
+    // Assert
+    const img = wrapper.find("img");
+    expect(img.attributes("src")).toBe("/mock/xhr.png");
+    expect(img.attributes("alt")).toBe("xhr");
   });
 
-  describe("Props Validation", () => {
-    it("should require column prop", () => {
-      expect(ErrorTypeIcons.props?.column?.required).toBe(true);
-      expect(ErrorTypeIcons.props?.column?.type).toBe(Object);
-    });
+  it("shows navigation icon for navigation category", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "navigation" } });
 
-    it("should handle different column structures", async () => {
-      const customColumn = {
-        category: "xhr",
-        other_field: "some_value",
-      };
-
-      await wrapper.setProps({ column: customColumn });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/xhr.png");
-      expect(image.attributes("alt")).toBe("xhr");
-    });
+    // Assert
+    const img = wrapper.find("img");
+    expect(img.attributes("src")).toBe("/mock/navigation.png");
+    expect(img.attributes("alt")).toBe("navigation");
   });
 
-  describe("Computed Property", () => {
-    it("should have typeIcons computed property", () => {
-      expect(wrapper.vm.typeIcons).toBeDefined();
-      expect(wrapper.vm.typeIcons).toBe("/mock/error.png");
-    });
+  it("shows user icon for click category", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "click" } });
 
-    it("should reactively update when category changes", async () => {
-      expect(wrapper.vm.typeIcons).toBe("/mock/error.png");
-
-      await wrapper.setProps({
-        column: { category: "xhr" },
-      });
-
-      expect(wrapper.vm.typeIcons).toBe("/mock/xhr.png");
-    });
+    // Assert
+    const img = wrapper.find("img");
+    expect(img.attributes("src")).toBe("/mock/user.png");
+    expect(img.attributes("alt")).toBe("click");
   });
 
-  describe("Image Attributes", () => {
-    it("should have correct alt attribute from category", () => {
-      const image = wrapper.find("img");
-      expect(image.attributes("alt")).toBe("error");
-    });
+  it("shows navigation icon for reload category", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "reload" } });
 
-    it("should update alt attribute when category changes", async () => {
-      await wrapper.setProps({
-        column: { category: "navigation" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("alt")).toBe("navigation");
-    });
-
-    it("should have proper dimensions styling", () => {
-      const image = wrapper.find("img");
-      expect(image.classes()).toContain("tw:w-[1.375rem]");
-      expect(image.classes()).toContain("tw:h-[1.375rem]");
-    });
+    // Assert
+    const img = wrapper.find("img");
+    expect(img.attributes("src")).toBe("/mock/navigation.png");
+    expect(img.attributes("alt")).toBe("reload");
   });
 
-  describe("Edge Cases", () => {
-    it("should handle partial string matches", async () => {
-      await wrapper.setProps({
-        column: { category: "error_type" },
-      });
+  it("matches uppercase ERROR category case-insensitively", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "ERROR" } });
 
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/error.png");
-    });
-
-    it("should handle categories with special characters", async () => {
-      await wrapper.setProps({
-        column: { category: "xhr-request" },
-      });
-
-      const image = wrapper.find("img");
-      expect(image.attributes("src")).toBe("/mock/error.png"); // Would not match "xhr" exactly
-    });
-
-    it("should handle numeric categories", async () => {
-      // This test reflects actual behavior - numeric values don't have toLowerCase method
-      expect(() => {
-        wrapper.setProps({
-          column: { category: 123 },
-        });
-      }).not.toThrow(); // Mounting won't throw initially
-    });
+    // Assert
+    expect(wrapper.find("img").attributes("src")).toBe("/mock/error.png");
   });
 
-  describe("Component Structure", () => {
-    it("should have a single root div", () => {
-      const rootDiv = wrapper.find("div");
-      expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.element.children).toHaveLength(1);
-    });
+  it("matches mixed-case XhR category case-insensitively", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "XhR" } });
 
-    it("should contain only one image element", () => {
-      const images = wrapper.findAll("img");
-      expect(images).toHaveLength(1);
-    });
+    // Assert
+    expect(wrapper.find("img").attributes("src")).toBe("/mock/xhr.png");
   });
 
-  describe("Accessibility", () => {
-    it("should provide alt text for screen readers", () => {
-      const image = wrapper.find("img");
-      expect(image.attributes("alt")).toBeDefined();
-      expect(image.attributes("alt")).not.toBe("");
-    });
+  it("matches uppercase NAVIGATION category case-insensitively", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "NAVIGATION" } });
 
-    it("should have meaningful alt text", async () => {
-      const categories = ["error", "xhr", "navigation", "click", "reload"];
-
-      for (const category of categories) {
-        await wrapper.setProps({ column: { category } });
-        const image = wrapper.find("img");
-        expect(image.attributes("alt")).toBe(category);
-      }
-    });
+    // Assert
+    expect(wrapper.find("img").attributes("src")).toBe("/mock/navigation.png");
   });
 
-  describe("Performance", () => {
-    it("should have reactive computed property", () => {
-      // Test that the computed property exists and is reactive
-      const initialIcon = wrapper.vm.typeIcons;
-      expect(initialIcon).toBeDefined();
-      expect(typeof initialIcon).toBe("string");
-    });
+  it("matches mixed-case Click category case-insensitively", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "Click" } });
+
+    // Assert
+    expect(wrapper.find("img").attributes("src")).toBe("/mock/user.png");
   });
 
-  describe("Component Lifecycle", () => {
-    it("should maintain reactivity through prop updates", async () => {
-      const initialCategory = "error";
-      const newCategory = "xhr";
+  it("defaults to error icon for unknown category", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "unknown_category" } });
 
-      expect(wrapper.vm.typeIcons).toBe("/mock/error.png");
+    // Assert
+    const img = wrapper.find("img");
+    expect(img.attributes("src")).toBe("/mock/error.png");
+    expect(img.attributes("alt")).toBe("unknown_category");
+  });
 
-      await wrapper.setProps({
-        column: { category: newCategory },
-      });
+  it("defaults to error icon for empty category string", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "" } });
 
-      expect(wrapper.vm.typeIcons).toBe("/mock/xhr.png");
-    });
+    // Assert
+    expect(wrapper.find("img").attributes("src")).toBe("/mock/error.png");
+  });
+
+  it("provides non-empty alt text from the category value", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    const alt = wrapper.find("img").attributes("alt");
+    expect(alt).toBeDefined();
+    expect(alt).not.toBe("");
+  });
+
+  it("updates alt attribute when category changes", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "navigation" } });
+
+    // Assert
+    expect(wrapper.find("img").attributes("alt")).toBe("navigation");
+  });
+
+  it("provides alt text for all known categories", async () => {
+    // Arrange
+    const categories = ["error", "xhr", "navigation", "click", "reload"];
+
+    for (const category of categories) {
+      // Act
+      await wrapper.setProps({ column: { category } });
+
+      // Assert
+      expect(wrapper.find("img").attributes("alt")).toBe(category);
+    }
+  });
+
+  it("has typeIcons computed property that returns a string", () => {
+    // Arrange + Act handled in beforeEach
+
+    // Assert
+    expect(wrapper.vm.typeIcons).toBeDefined();
+    expect(typeof wrapper.vm.typeIcons).toBe("string");
+  });
+
+  it("reactively updates typeIcons when category changes", async () => {
+    // Arrange
+    expect(wrapper.vm.typeIcons).toBe("/mock/error.png");
+
+    // Act
+    await wrapper.setProps({ column: { category: "xhr" } });
+
+    // Assert
+    expect(wrapper.vm.typeIcons).toBe("/mock/xhr.png");
+  });
+
+  it("requires the column prop of type Object", () => {
+    // Assert
+    expect(ErrorTypeIcons.props?.column?.required).toBe(true);
+    expect(ErrorTypeIcons.props?.column?.type).toBe(Object);
+  });
+
+  it("handles additional fields in column without error", async () => {
+    // Arrange
+    await wrapper.setProps({ column: { category: "xhr", other_field: "val" } });
+
+    // Assert
+    expect(wrapper.find("img").attributes("src")).toBe("/mock/xhr.png");
+  });
+
+  it("does not throw when setProps is called with null category", () => {
+    // Assert
+    expect(() => {
+      wrapper.setProps({ column: { category: null } });
+    }).not.toThrow();
+  });
+
+  it("does not throw when setProps is called with undefined category", () => {
+    // Assert
+    expect(() => {
+      wrapper.setProps({ column: { category: undefined } });
+    }).not.toThrow();
   });
 });

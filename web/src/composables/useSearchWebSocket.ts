@@ -21,7 +21,7 @@ type TraceRecord = {
   data: any;
 };
 
-const webSocket = useWebSocket();
+let _webSocket: ReturnType<typeof useWebSocket> | null = null;
 
 const traces: Record<string, TraceRecord> = {};
 // const openHandlers: OpenHandler[] = [];
@@ -46,6 +46,11 @@ const canceledTraceIds = new Set<string>();
 
 const useSearchWebSocket = () => {
   const store = useStore();
+
+  // Lazily initialize the shared WebSocket instance during component setup
+  if (!_webSocket) {
+    _webSocket = useWebSocket();
+  }
 
   const onOpen = (response: any, socketId: string) => {
     isCreatingSocket.value = false;
@@ -166,7 +171,7 @@ const useSearchWebSocket = () => {
   //   const areAllTraceIdsActive = Object.keys(traces).every((traceId) => traces[traceId].isActive);
   //   // close the inactive socket if there are no any traces with isActive false
   //   if(areAllTraceIdsActive && inactiveSocketId.value) {
-  //     webSocket.closeSocket(inactiveSocketId.value as string);
+  //     _webSocket!.closeSocket(inactiveSocketId.value as string);
   //     inactiveSocketId.value = null;
   //   }
   // }
@@ -186,17 +191,17 @@ const useSearchWebSocket = () => {
 
     const url = getWebSocketUrl(socketId.value, org_id, store.state.API_ENDPOINT);
     // If needed we can store the socketID in global state
-    webSocket.connect(socketId.value, url);
+    _webSocket!.connect(socketId.value, url);
 
-    webSocket.addOpenHandler(socketId.value, onOpen);
+    _webSocket!.addOpenHandler(socketId.value, onOpen);
 
     // When we receive message from BE/server
-    webSocket.addMessageHandler(socketId.value, onMessage);
+    _webSocket!.addMessageHandler(socketId.value, onMessage);
 
     // On closing of ws, when search is completed Server closes the WS
-    webSocket.addCloseHandler(socketId.value, onClose);
+    _webSocket!.addCloseHandler(socketId.value, onClose);
 
-    webSocket.addErrorHandler(socketId.value, onError);
+    _webSocket!.addErrorHandler(socketId.value, onError);
   };
 
   const fetchQueryDataWithWebSocket = (
@@ -280,11 +285,11 @@ const useSearchWebSocket = () => {
       const _socketId = traces[data.content.trace_id]?.socketId
 
       if(inactiveSocketId.value && (traces[data.content.trace_id]?.socketId === inactiveSocketId.value)) {
-        webSocket.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
+        _webSocket!.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
         return;
       }
 
-      webSocket.sendMessage(_socketId as string, JSON.stringify(data));
+      _webSocket!.sendMessage(_socketId as string, JSON.stringify(data));
     } catch (error: any) {
       console.error(
         `Failed to send WebSocket message: ${error instanceof Error ? error.message : String(error)}`,
@@ -301,12 +306,12 @@ const useSearchWebSocket = () => {
     // Mark this trace ID as canceled to prevent retries
     canceledTraceIds.add(payload.trace_id);
 
-    const socket = webSocket.getWebSocketBasedOnSocketId(
+    const socket = _webSocket!.getWebSocketBasedOnSocketId(
       _socketId as string,
     );
     // check state of socket
     if (socket && socket.readyState === WebSocket.OPEN) {
-      webSocket.sendMessage(
+      _webSocket!.sendMessage(
         _socketId as string,
         JSON.stringify({
           type: "cancel",
@@ -339,7 +344,7 @@ const useSearchWebSocket = () => {
   };
 
   const closeSocketWithError = () => {
-      webSocket.sendMessage(
+      _webSocket!.sendMessage(
         socketId.value as string,
         JSON.stringify({
           type: "test_abnormal_close",
@@ -351,7 +356,7 @@ const useSearchWebSocket = () => {
   };
 
   const closeSocket = () => {
-    webSocket.cleanupSocket(socketId.value as string);
+    _webSocket!.cleanupSocket(socketId.value as string);
   }
 
   const retryActiveTrace = (traceId: string, response: any) => {

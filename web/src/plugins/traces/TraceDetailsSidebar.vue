@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
-      class="flex justify-start items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
+      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
       data-test="trace-details-sidebar-header"
-      :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+      :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     >
       <div
         :title="span.operation_name"
         :style="{ width: 'calc(100% - 24px)' }"
-        class="q-pb-none tw:pl-[0.25rem] ellipsis flex items-center"
+        class="tw:pb-0 tw:pl-[0.25rem] tw:truncate tw:flex tw:items-center"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
@@ -33,25 +33,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:inline-flex tw:items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
-          <q-icon
+          <OIcon
             name="error"
-            size="1rem"
-            class="q-mr-xs tw:text-[var(--o2-status-error-text)]!"
+            size="sm"
+            class="tw:mr-1 tw:text-[var(--o2-status-error-text)]!"
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
-        <q-badge
+        <OBadge
           v-if="isLLMSpan"
-          :label="
-            span.gen_ai_operation_name?.charAt(0) +
-            span.gen_ai_operation_name?.slice(1).toLowerCase()
-          "
-          :color="getObservationTypeColor(span.gen_ai_operation_name)"
-          class="q-mr-xs observation-type-badge"
+          :variant="getObservationTypeVariant(span.gen_ai_operation_name)"
+          class="tw:mr-1 observation-type-badge"
           data-test="trace-details-sidebar-observation-badge"
-        />
+        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OBadge>
 
-        <span class="ellipsis">{{ span.operation_name }}</span>
+        <span class="tw:truncate">{{ span.operation_name }}</span>
       </div>
 
       <OButton
@@ -60,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="closeSidebar"
         data-test="trace-details-sidebar-header-close-btn"
       >
-        <q-icon name="cancel" size="14px" />
+        <OIcon name="close" size="xs" />
       </OButton>
     </div>
     <div
@@ -69,24 +65,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Row 1: Trace Details -->
       <div
-        class="flex items-center justify-between q-pa-xs"
+        class="tw:flex tw:items-center tw:justify-between tw:p-1"
         style="overflow-x: auto; flex-wrap: nowrap"
       >
-        <div class="flex items-center" style="flex-wrap: nowrap">
+        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Service Badge -->
-          <q-chip
-            dense
-            square
-            class="toolbar-chip service-chip"
+          <OBadge
+            size="sm"
+            class="toolbar-chip service-chip tw:mr-[0.325rem]"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
-            <img
-              :src="serviceIconUrl"
-              class="q-mr-xs tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
-              aria-hidden="true"
-              alt=""
-            />
+            <template #icon>
+              <img
+                :src="serviceIconUrl"
+                class="tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
+                aria-hidden="true"
+                alt=""
+              />
+            </template>
             <span class="chip-label">Service</span>
             <span
               class="chip-value"
@@ -94,101 +91,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ span.service_name }}
             </span>
-          </q-chip>
+          </OBadge>
 
           <!-- Duration Badge -->
-          <q-chip
-            dense
-            square
-            class="toolbar-chip duration-chip"
+          <OBadge
+            size="sm"
+            class="toolbar-chip duration-chip tw:mr-[0.325rem]"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule"
-size="12px"
-class="q-mr-xs" />
+            <template #icon><OIcon name="schedule" size="xs" /></template>
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
-          </q-chip>
+          </OBadge>
 
           <!-- TTFT Badge -->
-          <q-chip
+          <OBadge
             v-if="getTTFT"
-            dense
-            square
-            class="toolbar-chip ttft-chip"
+            size="sm"
+            class="toolbar-chip ttft-chip tw:mr-[0.325rem]"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed"
-size="12px"
-class="q-mr-xs" />
+            <template #icon><OIcon name="speed" size="xs" /></template>
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
-          </q-chip>
+          </OBadge>
 
           <!-- Start Time Badge -->
-          <q-chip
-            dense
-            square
-            class="toolbar-chip time-chip"
+          <OBadge
+            size="sm"
+            class="toolbar-chip time-chip tw:mr-[0.325rem]"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time"
-size="12px"
-class="q-mr-xs" />
+            <template #icon><OIcon name="access-time" size="xs" /></template>
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
-          </q-chip>
+          </OBadge>
 
           <!-- Resend Count Badge -->
-          <q-chip
+          <OBadge
             v-if="spanHttpResendCount"
-            dense
-            square
-            class="toolbar-chip resend-chip"
+            size="sm"
+            class="toolbar-chip resend-chip tw:mr-[0.325rem]"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
-            <q-icon name="replay"
-size="12px"
-class="q-mr-xs" />
+            <template #icon><OIcon name="replay" size="xs" /></template>
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
-          </q-chip>
+          </OBadge>
         </div>
 
-        <div class="flex items-center">
+        <div class="tw:flex tw:items-center">
           <!-- Span ID Badge -->
-          <q-chip
-            dense
-            square
+          <OBadge
+            size="sm"
             clickable
-            class="toolbar-chip span-id-chip"
+            class="toolbar-chip span-id-chip tw:mr-[0.325rem]"
             :title="`Span ID: ${span.span_id}`"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag"
-size="12px"
-class="q-mr-xs" />
+            <template #icon><OIcon name="tag" size="xs" /></template>
             <span class="chip-value">{{ span.span_id }}</span>
-            <q-icon
-              name="content_copy"
-              size="10px"
-              class="q-ml-xs copy-icon"
+            <OIcon
+              name="content-copy"
+              size="xs"
+              class="tw:ml-1 copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
-          </q-chip>
+          </OBadge>
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
             <OButton
               variant="outline"
-             size="xs"
-                  class="tw:h-full tw:text-[0.75rem]!"
-:title="t('traces.viewLogs')"
+              size="xs"
+              class="tw:h-full tw:text-[0.75rem]!"
+              :title="(config.isEnterprise === 'true' && correlationLoading) ? t('correlation.loadingCorrelation') : t('traces.viewLogs')"
+              :disabled="config.isEnterprise === 'true' && correlationLoading"
+              :loading="config.isEnterprise === 'true' && correlationLoading"
               @click.stop="viewSpanLogs"
               data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
             >
@@ -201,82 +185,74 @@ class="q-mr-xs" />
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
         v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"
-        class="flex items-center justify-between q-pa-xs llm-metrics-row"
+        class="tw:flex tw:items-center tw:justify-between tw:p-1 llm-metrics-row"
         style="
           overflow-x: auto;
           flex-wrap: nowrap;
           border-top: 1px solid #e9ecef;
         "
       >
-        <div class="flex items-center" style="flex-wrap: nowrap">
+        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Model Chip -->
-          <q-chip
-            dense
-            square
-            class="llm-chip model-chip"
+          <OBadge
+            size="sm"
             icon="psychology"
+            class="llm-chip model-chip"
             :title="span.gen_ai_response_model"
           >
-            <span class="chip-value text-bold">{{ span.gen_ai_response_model }}</span>
-          </q-chip>
+            <span class="chip-value tw:font-bold">{{ span.gen_ai_response_model }}</span>
+          </OBadge>
 
           <!-- Token Usage Group -->
           <div class="tokens-group">
             <!-- Input Tokens -->
-            <q-chip
-              dense
-              square
+            <OBadge
+              size="sm"
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward"
-size="10px"
-class="q-mr-xs" />
+              <template #icon><OIcon name="arrow-upward" size="xs" /></template>
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
-            </q-chip>
+            </OBadge>
 
             <!-- Output Tokens -->
-            <q-chip
-              dense
-              square
+            <OBadge
+              size="sm"
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward"
-size="10px"
-class="q-mr-xs" />
+              <template #icon><OIcon name="arrow-downward" size="xs" /></template>
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
-            </q-chip>
+            </OBadge>
           </div>
 
           <!-- Cost Chip -->
-          <q-chip
-            dense
-            square
+          <OBadge
+            size="sm"
+            icon="attach-money"
             class="llm-chip cost-chip"
-            icon="attach_money"
             title="Total Cost"
           >
-            <span class="chip-value text-bold"
+            <span class="chip-value tw:font-bold"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
-          </q-chip>
+          </OBadge>
         </div>
 
-        <div class="flex items-center">
+        <div class="tw:flex tw:items-center">
           <!-- Provider Badge -->
-          <q-badge
+          <OBadge
             v-if="span.gen_ai_provider_name"
-            :label="span.gen_ai_provider_name"
+            variant="primary"
             class="provider-badge"
-          />
+          >{{ span.gen_ai_provider_name }}</OBadge>
         </div>
       </div>
     </div>
 
-    <div class="text-bold q-mx-sm span_details_tabs ">
+    <div class="tw:font-bold tw:mx-2 span_details_tabs ">
       <OTabs
         v-model="activeTab"
         dense
@@ -305,16 +281,16 @@ class="q-mr-xs" />
           name="error"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-error"
-                    class="tw:font-normal!"
-
+          class="tw:font-normal! tw:gap-1!"
         >
           {{ t('common.error') }}
-          <q-badge
+          <OBadge
             v-if="hasExceptionEvents.length"
-            class="tw:font-normal! q-ml-xs tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]!"
-            :label="hasExceptionEvents.length"
+            variant="error"
+            size="sm"
+            class="tw:font-normal! tw:text-[10px]!  tw:ml-0 tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]! tw:rounded!"
             data-test="trace-details-sidebar-tabs-error-count"
-          />
+          >{{ hasExceptionEvents.length }}</OBadge>
         </OTab>
         <OTab
           v-if="hasDbSpan"
@@ -360,7 +336,7 @@ class="q-mr-xs" />
         />
       </OTabs>
     </div>
-    <q-separator style="width: 100%" />
+    <OSeparator class="tw:w-full" />
     <div class="span_details_tab-panels  tw:p-2">
       <OTabPanels v-model="activeTab"
 grow
@@ -369,22 +345,22 @@ class="tw:h-full tw:overflow-y-auto">
         <OTabPanel
           v-if="isLLMSpan"
           name="preview"
-          class="llm-preview-panel q-pa-md"
+          class="llm-preview-panel tw:p-3"
         >
           <div class="llm-preview-container tw:overflow-x-auto tw:w-full tw:h-full!">
             <!-- Input and Output Side by Side -->
             <div
-              class="flex io-container tw:w-full! tw:h-full!"
+              class="tw:flex io-container tw:w-full! tw:h-full!"
               :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
               <div class="tw:w-1/2 io-section tw:pr-[0.5rem]">
                 <div
-                  class="section-label text-bold q-mb-xs flex items-center justify-between"
+                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Input</div>
-                  <div class="flex items-center gap-xs">
+                  <div class="tw:flex tw:items-center tw:gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -393,29 +369,29 @@ class="tw:h-full tw:overflow-y-auto">
                       "
                       @click="toggleFullscreen"
                     >
-                      <q-icon
-                        :name="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-                        size="14px"
+                      <OIcon
+                        :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
+                        size="xs"
                       />
                     </OButton>
                     <OButton
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       title="Copy input"
                       @click="copyContent(span.gen_ai_input_messages, 'input')"
                       :disabled="!hasContent(span.gen_ai_input_messages)"
                     >
-                      <q-icon name="content_copy" size="14px" />
+                      <OIcon name="content-copy" size="xs" />
                     </OButton>
                   </div>
                 </div>
                 <div class="llm-content-box">
                   <!-- System Instructions (when available) -->
                   <div v-if="parsedSystemInstructions" class="tw:mb-3">
-                    <q-expansion-item
+                    <OCollapsible
+                      v-model="sysInstrOpen"
                       icon="settings"
                       label="System Instructions"
-                      header-class="tw:text-xs tw:font-medium"
                     >
                       <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
                         <LLMContentRenderer
@@ -425,7 +401,7 @@ class="tw:h-full tw:overflow-y-auto">
                           view-mode="formatted"
                         />
                       </div>
-                    </q-expansion-item>
+                    </OCollapsible>
                   </div>
                   <div
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
@@ -448,10 +424,10 @@ class="tw:h-full tw:overflow-y-auto">
               <!-- Output Section -->
               <div class="tw:w-1/2 io-section">
                 <div
-                  class="section-label text-bold q-mb-xs flex items-center justify-between"
+                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
                 >
                   <div>Output</div>
-                  <div class="flex items-center gap-xs">
+                  <div class="tw:flex tw:items-center tw:gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -460,19 +436,19 @@ class="tw:h-full tw:overflow-y-auto">
                       "
                       @click="toggleFullscreen"
                     >
-                      <q-icon
-                        :name="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-                        size="14px"
+                      <OIcon
+                        :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
+                        size="xs"
                       />
                     </OButton>
                     <OButton
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       title="Copy output"
                       @click="copyContent(span.gen_ai_output_messages, 'output')"
                       :disabled="!hasContent(span.gen_ai_output_messages)"
                     >
-                      <q-icon name="content_copy" size="14px" />
+                      <OIcon name="content-copy" size="xs" />
                     </OButton>
                   </div>
                 </div>
@@ -497,21 +473,22 @@ class="tw:h-full tw:overflow-y-auto">
             </div>
 
             <!-- Model Parameters (collapsible) -->
-            <q-expansion-item
+            <OCollapsible
               v-if="span.llm_request_parameters"
+              v-model="modelParamsOpen"
               label="Model Parameters"
-              class="q-mt-md"
+              class="tw:mt-3"
             >
-              <pre class="model-params-json q-pa-sm">{{
+              <pre class="model-params-json tw:p-2">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
-            </q-expansion-item>
+            </OCollapsible>
           </div>
         </OTabPanel>
 
         <OTabPanel
           name="attributes"
-          class="q-pa-none tw:flex tw:flex-col tw:overflow-hidden"
+          class="tw:p-0 tw:flex tw:flex-col tw:overflow-hidden"
         >
           <!-- View mode toggle toolbar -->
           <div class="tw:flex tw:items-center tw:justify-start tw:pb-1.5! tw:h-fit!">
@@ -520,7 +497,7 @@ class="tw:h-full tw:overflow-y-auto">
 size="xs"
 class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
-                  ><Braces class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="data-object" size="xs" class="tw:shrink-0"
                 /></template>
                 JSON
               </OToggleGroupItem>
@@ -528,7 +505,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
 size="xs"
 class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
-                  ><Table2 class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="table-chart" size="xs" class="tw:shrink-0"
                 /></template>
                 Table
               </OToggleGroupItem>
@@ -545,37 +522,35 @@ class="tw:h-5! tw:text-[0.75rem]!">
               data-test="trace-details-sidebar-attributes-table"
             >
               <template #field-dropdown="{ field, value: fieldValue }">
-                <q-item
-                  v-for="action in filterActions"
-                  :key="action.operator"
-                  clickable
-                  v-close-popup
-                  @click.stop="
-                    $emit('apply-filter-immediately', {
-                      field,
-                      value: getFilterValue(field, fieldValue),
-                      operator: action.operator,
-                    })
-                  "
-                >
-                  <q-item-section>
-                    <q-item-label>
-                      <span class="tw:mr-1 tw:inline-flex">
-                        <OButton variant="ghost" size="icon-xs-circle">
-                          <q-icon
-                            color="currentColor"
-                            class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
-                          >
-                            <component :is="action.iconComponent" />
-                          </q-icon>
-                        </OButton>
-                      </span>
-                      <span class="tw:text-[0.85rem]!">{{
-                        $t("traces.applyAndSearch")
-                      }}</span>
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
+                <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                  <li
+                    v-for="action in filterActions"
+                    :key="action.operator"
+                    :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
+                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                    @click.stop="
+                      $emit('apply-filter-immediately', {
+                        field,
+                        value: getFilterValue(field, fieldValue),
+                        operator: action.operator,
+                      })
+                    "
+                  >
+                    <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                      <OButton variant="ghost" size="icon-xs-circle">
+                        <OIcon
+                          color="currentColor"
+                          class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                        >
+                          <component :is="action.iconComponent" />
+                        </OIcon>
+                      </OButton>
+                    </span>
+                    <span class="tw:text-[0.85rem]!">{{
+                      $t("traces.applyAndSearch")
+                    }}</span>
+                  </li>
+                </ul>
               </template>
             </json-preview>
           </div>
@@ -604,37 +579,35 @@ class="tw:h-5! tw:text-[0.75rem]!">
               <template #cell-value="{ item }">
                 <AttributeValueCell :field="item.field" :value="item.value">
                   <template #dropdown="{ field, value: fieldValue }">
-                    <q-item
-                      v-for="action in filterActions"
-                      :key="action.operator"
-                      clickable
-                      v-close-popup
-                      @click.stop="
-                        $emit('apply-filter-immediately', {
-                          field,
-                          value: getFilterValue(field, fieldValue),
-                          operator: action.operator,
-                        })
-                      "
-                    >
-                      <q-item-section>
-                        <q-item-label>
-                          <span class="tw:mr-1 tw:inline-flex">
-                            <OButton variant="ghost" size="icon-xs-circle">
-                              <q-icon
-                                color="currentColor"
-                                class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
-                              >
-                                <component :is="action.iconComponent" />
-                              </q-icon>
-                            </OButton>
-                          </span>
-                          <span class="tw:text-[0.85rem]!">{{
-                            $t("traces.applyAndSearch")
-                          }}</span>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
+                    <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                      <li
+                        v-for="action in filterActions"
+                        :key="action.operator"
+                        :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
+                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                        @click.stop="
+                          $emit('apply-filter-immediately', {
+                            field,
+                            value: getFilterValue(field, fieldValue),
+                            operator: action.operator,
+                          })
+                        "
+                      >
+                        <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                          <OButton variant="ghost" size="icon-xs-circle">
+                            <OIcon
+                              color="currentColor"
+                              class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                            >
+                              <component :is="action.iconComponent" />
+                            </OIcon>
+                          </OButton>
+                        </span>
+                        <span class="tw:text-[0.85rem]!">{{
+                          $t("traces.applyAndSearch")
+                        }}</span>
+                      </li>
+                    </ul>
                   </template>
                 </AttributeValueCell>
               </template>
@@ -647,18 +620,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
         >
           <template v-if="spanDetails.events.length">
             <!-- Wrap toggle toolbar -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
-              <q-toggle
-                class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:py-0!"
-                size="xs"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-toggle-button-xs-dark'
-                    : 'o2-toggle-button-xs-light'
-                "
+            <div class="tw:flex tw:items-center tw:gap-1 tw:pb-[0.325rem] tw:pl-1">
+              <OSwitch
                 v-model="eventsWrap"
-                label="Wrap"
+                :label="t('common.wrap')"
+                size="md"
+                class="tw:gap-1!"
               />
             </div>
             <!-- TenstackTable for events -->
@@ -700,7 +667,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
           </template>
           <div
             v-else
-            class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
+            class="tw:w-full tw:text-center tw:flex tw:items-center tw:justify-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
@@ -727,34 +694,28 @@ class="tw:h-5! tw:text-[0.75rem]!">
         </OTabPanel>
 
         <OTabPanel name="links">
-          <div v-if="spanLinks.length">
-            <q-virtual-scroll
-              type="table"
-              ref="searchTableRef"
-              style="max-height: 20rem"
-              :items="spanLinks"
-              class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+          <div v-if="spanLinks.length" class="tw:overflow-auto tw:max-h-[20rem]">
+            <table
+              class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:w-full"
               data-test="trace-details-sidebar-links-table"
             >
-              <template v-slot:before>
-                <thead
-                  class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table"
-                >
-                  <tr>
-                    <th
-                      v-for="(col, index) in linkColumns"
-                      :key="'result_' + index"
-                      class="table-header"
-                      :data-test="`trace-events-table-th-${col.label}`"
-                    >
-                      {{ col.label }}
-                    </th>
-                  </tr>
-                </thead>
-              </template>
-
-              <template v-slot="{ item: row, index }">
+              <thead
+                class="thead-sticky tw:text-left tw:bg-[var(--o2-hover-accent)]"
+              >
+                <tr>
+                  <th
+                    v-for="(col, index) in linkColumns"
+                    :key="'result_' + index"
+                    class="table-header"
+                    :data-test="`trace-events-table-th-${col.label}`"
+                  >
+                    {{ col.label }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
                 <tr
+                  v-for="(row, index) in spanLinks"
                   :data-test="`trace-event-detail-link-${index}`"
                   :key="'expand_' + index"
                   @click="openReferenceTrace('span', row)"
@@ -767,17 +728,17 @@ class="tw:h-5! tw:text-[0.75rem]!">
                     class="field_list"
                     style="cursor: pointer"
                   >
-                    <div class="flex row items-center no-wrap">
+                    <div class="tw:flex tw:flex tw:items-center tw:flex-nowrap">
                       {{ column.prop(row) }}
                     </div>
                   </td>
                 </tr>
-              </template>
-            </q-virtual-scroll>
+              </tbody>
+            </table>
           </div>
           <div
             v-else
-            class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
+            class="tw:w-full tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
@@ -792,7 +753,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
         <!-- Correlated Logs Tab Panel -->
         <OTabPanel
           name="correlated-logs"
-          class="q-pa-none full-height traces-correlated-logs-container"
+          class="tw:p-0 full-height traces-correlated-logs-container"
         >
           <CorrelatedLogsTable
             v-if="correlationProps"
@@ -821,10 +782,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             "
           >
             <div class="tw:text-center">
-              <q-spinner-hourglass
+              <OSpinner
                 v-if="correlationLoading"
-                color="primary"
-                size="3rem"
+                size="lg"
                 class="tw:mb-4"
               />
               <div
@@ -843,7 +803,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
         <!-- Correlated Metrics Tab Panel -->
         <OTabPanel
           name="correlated-metrics"
-          class="q-pa-none full-height traces-correlated-metrics-container"
+          class="tw:p-0 full-height traces-correlated-metrics-container"
         >
           <TelemetryCorrelationDashboard
             v-if="correlationProps"
@@ -880,10 +840,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             "
           >
             <div class="tw:text-center">
-              <q-spinner-hourglass
+              <OSpinner
                 v-if="correlationLoading"
-                color="primary"
-                size="3rem"
+                size="lg"
                 class="tw:mb-4"
               />
               <div
@@ -911,9 +870,12 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Braces, Table2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
-import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
+import { formatTimestamp, formatTimestampNs } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
+import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -961,6 +923,12 @@ import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -995,6 +963,7 @@ export default defineComponent({
     },
   },
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,
@@ -1002,8 +971,8 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
-    Braces,
-    Table2,
+    OIcon,
+    OCollapsible,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1017,7 +986,10 @@ export default defineComponent({
     AttributeValueCell,
     DeployedCode,
     DbSpanDetails,
-    TraceErrorTab
+    TraceErrorTab,
+    OSpinner,
+    OSwitch,
+    OBadge,
   },
   emits: [
     "close",
@@ -1068,6 +1040,8 @@ export default defineComponent({
 
     // Track fullscreen state
     const isFullscreen = ref(false);
+    const sysInstrOpen = ref(false);
+    const modelParamsOpen = ref(false);
 
     const showPendingFilter = false;
 
@@ -1078,7 +1052,6 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 0,
     });
-    const q = useQuasar();
     const { buildQueryDetails, navigateToLogs, navigateToCorrelatedLogs, searchObj } = useTraces();
     const router = useRouter();
 
@@ -1286,8 +1259,8 @@ export default defineComponent({
         name: "@timestamp",
         field: "@timestamp",
         prop: (row: any) =>
-          date.formatDate(
-            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
+          formatTimestampNs(
+            row[store.state.zoConfig.timestamp_column],
             "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
@@ -1348,8 +1321,8 @@ export default defineComponent({
           header: "Timestamp",
           size: eventsColSizes.value[tsCol] ?? 220,
           accessorFn: (row: any) =>
-            date.formatDate(
-              Math.floor(row[tsCol] / 1000000),
+            formatTimestampNs(
+              row[tsCol],
               "MMM DD, YYYY HH:mm:ss.SSS Z",
             ),
           meta: {
@@ -1443,20 +1416,18 @@ export default defineComponent({
 
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
-        date.formatDate(
-          Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
-          ),
+        formatTimestamp(
+          spanDetails.attrs[store.state.zoConfig.timestamp_column],
           "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
 
-      spanDetails.attrs["start_time"] = date.formatDate(
-        Math.floor(spanDetails.attrs["start_time"] / 1000000),
+      spanDetails.attrs["start_time"] = formatTimestampNs(
+        spanDetails.attrs["start_time"],
         "MMM DD, YYYY HH:mm:ss.SSS Z",
       );
 
-      spanDetails.attrs["end_time"] = date.formatDate(
-        Math.floor(spanDetails.attrs["end_time"] / 1000000),
+      spanDetails.attrs["end_time"] = formatTimestampNs(
+        spanDetails.attrs["end_time"],
         "MMM DD, YYYY HH:mm:ss.SSS Z",
       );
 
@@ -1509,8 +1480,8 @@ export default defineComponent({
     );
 
     const viewSpanLogs = () => {
-      if(config.isEnterprise === 'true'){
-        navigateToCorrelatedLogs(correlationProps.value)
+      if (config.isEnterprise === 'true' && correlationProps.value) {
+        navigateToCorrelatedLogs(correlationProps.value);
       } else {
         const queryDetails = buildQueryDetails(props.span);
         navigateToLogs(queryDetails);
@@ -1526,12 +1497,8 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      copyToClipboard(props.span?.span_id || "");
-
-      q?.notify?.({
-        type: "positive",
-        message: "Span ID copied to clipboard",
-        timeout: 2000,
+      copyToClipboard(props.span?.span_id || "", {
+        successMessage: "Span ID copied to clipboard",
       });
     };
 
@@ -1539,12 +1506,8 @@ export default defineComponent({
       const attributes = props.span?.attributes || {};
       const attributesText = JSON.stringify(attributes, null, 2);
 
-      copyToClipboard(attributesText);
-
-      q?.notify?.({
-        type: "positive",
-        message: "Attributes copied to clipboard",
-        timeout: 2000,
+      copyToClipboard(attributesText, {
+        successMessage: "Attributes copied to clipboard",
       });
     };
 
@@ -1846,11 +1809,8 @@ export default defineComponent({
         correlationProps.value = null;
         correlationError.value = null;
 
-        // If we're already on a correlation tab, reload the data for the new span
-        if (
-          activeTab.value === "correlated-logs" ||
-          activeTab.value === "correlated-metrics"
-        ) {
+        // Load correlation proactively so View Logs button has data
+        if (props.serviceStreamsEnabled) {
           loadCorrelation();
         }
       },
@@ -1888,29 +1848,14 @@ export default defineComponent({
         }
 
         // Copy to clipboard
-        copyToClipboard(textToCopy)
-          .then(() => {
-            q.notify({
-              type: "positive",
-              message: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
-              position: "top",
-              timeout: 2000,
-            });
-          })
-          .catch(() => {
-            q.notify({
-              type: "negative",
-              message: "Failed to copy to clipboard",
-              position: "top",
-              timeout: 2000,
-            });
-          });
+        copyToClipboard(textToCopy, {
+          successMessage: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
+          errorMessage: "Failed to copy to clipboard",
+        });
       } catch (error) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to copy content",
-          position: "top",
-          timeout: 2000,
         });
       }
     };
@@ -1978,8 +1923,7 @@ export default defineComponent({
     // Toggle fullscreen for both Input and Output side by side
     const toggleFullscreen = () => {
       if (ioContainerRef.value) {
-        q.fullscreen
-          .toggle(ioContainerRef.value)
+        domToggleFullScreen(ioContainerRef.value)
           .then(() => {
             // Check if this specific element is now fullscreen
             nextTick(() => {
@@ -2045,13 +1989,10 @@ export default defineComponent({
     );
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log)).then(() =>
-        q.notify({
-          type: "positive",
-          message: "Content Copied Successfully!",
-          timeout: 1000,
-        }),
-      );
+      copyToClipboard(JSON.stringify(log), {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      });
     };
 
     return {
@@ -2103,7 +2044,28 @@ export default defineComponent({
       copyContent,
       formatModelParams,
       getObservationTypeColor,
+      getObservationTypeVariant: (type: string | null | undefined): BadgeVariant => {
+        const color = getObservationTypeColor(type);
+        const map: Record<string, BadgeVariant> = {
+          green: "success",
+          blue: "primary",
+          purple: "primary",
+          orange: "warning",
+          indigo: "primary",
+          cyan: "primary",
+          teal: "primary",
+          pink: "primary",
+          "deep-purple": "primary",
+          "light-blue": "primary",
+          red: "error",
+          grey: "default",
+          amber: "warning",
+        };
+        return map[color] || "default";
+      },
       hasContent,
+      sysInstrOpen,
+      modelParamsOpen,
       parsedSystemInstructions,
       ioContainerRef,
       isFullscreen,
@@ -2168,7 +2130,6 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     width: 100%;
-    table-layout: fixed;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(0.625rem);
     border-radius: 0.5rem;
@@ -2181,12 +2142,27 @@ export default defineComponent({
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     border-right: 1px solid rgba(255, 255, 255, 0.15);
     text-align: left;
-    padding: 4px !important;
+    padding: 8px !important;
     font-size: 13px;
     word-break: break-word;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    min-height: 24px;
+    height: auto;
     max-width: 600px;
+  }
+
+  /* Add proper column sizing */
+  th:first-child,
+  td:first-child {
+    width: 200px;
+    min-width: 200px;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: auto;
+    min-width: 100px;
   }
   td span {
     display: inline-block;
@@ -2223,6 +2199,7 @@ export default defineComponent({
   }
 }
 
+
 .trace-detail-tab-table table.q-table {
   background: rgba(240, 240, 245, 0.8);
   backdrop-filter: blur(0.625rem);
@@ -2239,23 +2216,6 @@ export default defineComponent({
 
   .table-head-chip {
     padding: 0px;
-
-    .q-chip__content {
-      margin-right: 0.5rem;
-      font-size: 0.75rem;
-      color: $dark;
-    }
-
-    .q-chip__icon--remove {
-      height: 1rem;
-      width: 1rem;
-      opacity: 1;
-      margin: 0;
-
-      &:hover {
-        opacity: 0.7;
-      }
-    }
 
     .q-table th.sortable {
       cursor: pointer;
@@ -2420,41 +2380,24 @@ export default defineComponent({
 
     &.service-chip {
       border-left: 3px solid #0d6efd;
-      .q-icon {
-        color: #0d6efd;
-      }
-    }
+}
 
     &.duration-chip {
       border-left: 3px solid #6610f2;
-      .q-icon {
-        color: #6610f2;
-      }
-    }
+}
 
     &.ttft-chip {
       border-left: 3px solid #6f42c1;
-      .q-icon {
-        color: #6f42c1;
-      }
-    }
+}
 
     &.time-chip {
       border-left: 3px solid #d63384;
-      .q-icon {
-        color: #d63384;
-      }
-    }
+}
 
     &.span-id-chip {
       border-left: 3px solid #20c997;
       cursor: pointer;
-
-      .q-icon {
-        color: #20c997;
-      }
-
-      .copy-icon {
+.copy-icon {
         opacity: 0.6;
         transition: opacity 0.2s;
       }
@@ -2517,12 +2460,7 @@ export default defineComponent({
 
     &.model-chip {
       border-left: 3px solid #ab47bc;
-
-      .q-icon {
-        color: #7b1fa2;
-      }
-
-      .chip-value {
+.chip-value {
         color: #4a148c;
         font-weight: 600;
       }
@@ -2541,7 +2479,7 @@ export default defineComponent({
       &.input-token-chip {
         border-left: 3px solid #42a5f5;
 
-        .q-icon,
+        .OIcon,
         .chip-label,
         .chip-value {
           color: #1565c0;
@@ -2551,7 +2489,7 @@ export default defineComponent({
       &.output-token-chip {
         border-left: 3px solid #66bb6a;
 
-        .q-icon,
+        .OIcon,
         .chip-label,
         .chip-value {
           color: #2e7d32;
@@ -2561,12 +2499,7 @@ export default defineComponent({
 
     &.cost-chip {
       border-left: 3px solid #ef6c00;
-
-      .q-icon {
-        color: #ef6c00;
-      }
-
-      .chip-value {
+.chip-value {
         color: #e65100;
         font-weight: 600;
       }
@@ -2651,12 +2584,7 @@ body.body--dark {
 
       &.model-chip {
         border-left: 3px solid #ab47bc;
-
-        .q-icon {
-          color: #ce93d8;
-        }
-
-        .chip-value {
+.chip-value {
           color: #e9d8fd;
         }
       }
@@ -2665,7 +2593,7 @@ body.body--dark {
         &.input-token-chip {
           border-left: 3px solid #42a5f5;
 
-          .q-icon,
+          .OIcon,
           .chip-label,
           .chip-value {
             color: #90cdf4;
@@ -2675,7 +2603,7 @@ body.body--dark {
         &.output-token-chip {
           border-left: 3px solid #66bb6a;
 
-          .q-icon,
+          .OIcon,
           .chip-label,
           .chip-value {
             color: #9ae6b4;
@@ -2685,12 +2613,7 @@ body.body--dark {
 
       &.cost-chip {
         border-left: 3px solid #ef6c00;
-
-        .q-icon {
-          color: #ffcc80;
-        }
-
-        .chip-value {
+.chip-value {
           color: #fed7aa;
         }
       }
@@ -2853,13 +2776,7 @@ body.body--dark {
     display: flex;
     align-items: center;
     font-size: 12px;
-
-    .q-icon {
-      margin-right: 2px !important;
-      font-size: 14px;
-      margin-bottom: 1px;
-    }
-  }
+}
 }
 .highlight {
   background-color: yellow; /* Adjust background color as desired */

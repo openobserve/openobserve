@@ -7,7 +7,6 @@ const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
 const ALERT_REGISTRATION_WAIT_MS = 30000; // Wait for alert to fully register and become active
-const UI_STABILIZATION_WAIT_MS = 2000;
 const ALERT_TRIGGER_TIMEOUT_MS = 90000; // Real-time alerts need time to process and fire
 
 test.describe("Alerts Import/Export", () => {
@@ -76,13 +75,28 @@ test.describe("Alerts Import/Export", () => {
     const value = 'bangalore';    // Value that triggers the alert condition
 
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     const alertName = await pm.alertsPage.createAlert(triggerStreamName, column, value, validationInfra.destinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
     testLogger.info('Successfully created alert', { alertName });
 
-    // Wait for alert to register in the system before triggering
-    await page.waitForTimeout(ALERT_REGISTRATION_WAIT_MS);
+    // Wait for alert to register in the system before triggering — poll the alerts
+    // list endpoint until our alert appears with status active. Replaces fixed 30s wait.
+    // Uses v2 API which is the current endpoint; getOrgIdentifier() handles both cloud and self-hosted.
+    const orgId = getOrgIdentifier() || process.env.ORGNAME || 'default';
+    await expect.poll(
+      async () => {
+        const resp = await page.request.get(
+          `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/api/v2/${orgId}/alerts`,
+          { failOnStatusCode: false }
+        ).catch(() => null);
+        if (!resp || !resp.ok()) return false;
+        const body = await resp.json().catch(() => null);
+        const list = Array.isArray(body?.list) ? body.list : (Array.isArray(body?.alerts) ? body.alerts : (Array.isArray(body) ? body : []));
+        return list.some(a => (a?.name === alertName) || (a?.alert?.name === alertName));
+      },
+      { intervals: [2000, 3000, 5000, 5000, 5000, 5000, 5000], timeout: ALERT_REGISTRATION_WAIT_MS }
+    ).toBe(true);
 
     // Trigger and validate alert fires (self-referential destination approach)
     const triggerResult = await pm.alertsPage.verifyAlertTrigger(
@@ -99,7 +113,7 @@ test.describe("Alerts Import/Export", () => {
 
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
 
     const download = await pm.alertsPage.exportAlerts();
     const downloadPath = `./alerts-${new Date().toISOString().split('T')[0]}-${triggerStreamName}.json`;
@@ -109,7 +123,7 @@ test.describe("Alerts Import/Export", () => {
     // The import API (POST /api/v2/{org}/alerts) creates a new alert — if the same
     // alert ID or name already exists, the API rejects it.
     await pm.alertsPage.deleteAlertByRow(alertName);
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     testLogger.info('Deleted original alert before import round-trip test', { alertName });
 
     await pm.alertsPage.importInvalidFile('../test-data/invalid-alert.json');
@@ -217,7 +231,7 @@ test.describe("Alerts Import/Export", () => {
 
     // Cleanup templates
     await pm.alertTemplatesPage.navigateToTemplates();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
 
     await pm.alertTemplatesPage.deleteTemplateAndVerify(webhookTemplateName);
     await pm.alertTemplatesPage.deleteTemplateAndVerify(emailTemplateName);

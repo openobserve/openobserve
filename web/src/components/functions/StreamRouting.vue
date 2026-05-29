@@ -1,62 +1,53 @@
 <template>
-  <div data-test="add-stream-routing-section" class="bg-white full-height">
-    <div class="q-py-sm q-px-md flex justify-between items-center">
+  <div data-test="add-stream-routing-section" class="tw:bg-white tw:h-full">
+    <div class="tw:py-2 tw:px-3 tw:flex tw:justify-between tw:items-center">
       <div class="stream-routing-title">Stream Routing</div>
-      <q-icon
+      <OIcon
         data-test="stream-routing-close-dialog-btn"
         name="cancel"
-        class="cursor-pointer"
-        size="20px"
+        class="tw:cursor-pointer"
+        size="md"
         @click="emits('cancel:hideform')"
       />
     </div>
-    <q-separator />
-    <div class="stream-routing-container q-px-md q-pt-md">
+    <OSeparator />
+    <div class="stream-routing-container tw:px-3 tw:pt-3">
       <div
         data-test="stream-routing-name-input"
         class="o2-input"
         style="padding-top: 12px"
       >
-        <q-input
+        <OInput
           v-model="streamRoute.destinationStreamName"
           :label="t('alerts.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
+          data-test="stream-routing-destination-name-input"
           v-bind:readonly="isUpdating"
-          v-bind:disable="isUpdating"
-          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+          v-bind:disabled="isUpdating"
+          :error="!!nameError"
+          :error-message="nameError"
           tabindex="0"
           style="width: 480px"
+          @blur="nameError = !streamRoute.destinationStreamName.trim() ? 'Field is required!' : ''"
+          @update:model-value="nameError = ''"
         />
       </div>
-      <div class="flex justify-start items-center" style="padding-top: 0px">
+      <div class="tw:flex tw:justify-start tw:items-center" style="padding-top: 0px">
         <div
           data-test="add-alert-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm"
+          class="alert-stream-type o2-input tw:mr-2"
           style="padding-top: 0"
         >
-          <q-select
+          <OSelect
             v-model="streamRoute.sourceStreamType"
             :options="streamTypes"
             :label="t('alerts.streamType') + ' *'"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            outlined
-            filled
-            dense
             v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @update:model-value="updateStreams()"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            v-bind:disabled="isUpdating"
+            :error="!!streamTypeError"
+            :error-message="streamTypeError"
             style="min-width: 220px"
+            @update:model-value="() => { streamTypeError = ''; updateStreams(); }"
+            @blur="streamTypeError = !streamRoute.sourceStreamType ? 'Field is required!' : ''"
           />
         </div>
         <div
@@ -64,31 +55,21 @@
           class="o2-input"
           style="padding-top: 0"
         >
-          <q-select
+          <OSelect
             v-model="streamRoute.sourceStreamName"
             :options="filteredStreams"
             :label="t('alerts.stream_name') + ' *'"
             :loading="isFetchingStreams"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            filled
-            stack-label
-            dense
-            use-input
-            hide-selected
-            fill-input
-            :input-debounce="400"
+            searchable
+            :searchDebounce="400"
             v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @filter="filterStreams"
-            @update:model-value="
-              updateStreamFields(streamRoute.sourceStreamName)
-            "
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            v-bind:disabled="isUpdating"
+            :error="!!streamNameError"
+            :error-message="streamNameError"
             style="min-width: 250px !important; width: 250px !important"
+            @search="filterStreams"
+            @update:model-value="(val) => { streamNameError = ''; updateStreamFields(val) }"
+            @blur="streamNameError = !streamRoute.sourceStreamName ? 'Field is required!' : ''"
           />
         </div>
       </div>
@@ -101,8 +82,8 @@
       />
 
       <div
-        class="flex justify-start q-mt-lg q-py-sm full-width tw:gap-2"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        class="tw:flex tw:justify-start tw:mt-4 tw:py-2 tw:w-full tw:gap-2"
+        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
       >
         <OButton
           data-test="add-report-cancel-btn"
@@ -139,6 +120,10 @@ import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface RouteCondition {
   column: string;
@@ -166,6 +151,10 @@ const filteredColumns: any = ref([]);
 const isFetchingStreams = ref(false);
 
 const filteredStreams = ref([]);
+
+const nameError = ref('');
+const streamTypeError = ref('');
+const streamNameError = ref('');
 
 const router = useRouter();
 
@@ -239,7 +228,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   return filteredOptions;
 };
 
-const filterStreams = (val: string, update: any) => {
+const filterStreams = (val: string) => {
   // filteredStreams.value = filterColumns(indexOptions.value, val, update);
 };
 

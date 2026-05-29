@@ -15,82 +15,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="source-maps-container tw:mx-[0.625rem] card-container">
+  <div
+    class="source-maps-container card-container tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+  >
     <!-- Filters Section -->
-    <div class="filters-section q-pa-md">
-      <div class="tw:flex tw:justify-between tw:items-center">
-      <div class="tw:flex tw:gap-4 tw:items-center">
-        <!-- Version Filter -->
-          <q-select
+    <div class="filters-section tw:p-3">
+      <div class="tw:flex tw:justify-between tw:items-end">
+      <div class="tw:flex tw:gap-4 tw:items-end">
+          <!-- Version Filter -->
+          <OSelect
             v-model="filters.version"
-            :options="filteredVersionOptions"
+            :options="versionOptions"
             label="Version"
-            borderless
-            dense
             clearable
-            use-input
-            input-debounce="0"
-            @filter="filterVersions"
-            @new-value="addNewVersion"
+            searchable
+            creatable
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  Type to add custom version
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
 
         <!-- Service Filter -->
-          <q-select
+          <OSelect
             v-model="filters.service"
-            :options="filteredServiceOptions"
+            :options="serviceOptions"
             label="Service"
-            borderless
-            dense
             clearable
-            use-input
-            input-debounce="0"
-            @filter="filterServices"
-            @new-value="addNewService"
+            searchable
+            creatable
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  Type to add custom service
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
 
         <!-- Environment Filter -->
-          <q-select
+          <OSelect
             v-model="filters.environment"
-            :options="filteredEnvironmentOptions"
+            :options="environmentOptions"
             label="Environment"
-            borderless
-            dense
             clearable
-            use-input
-            input-debounce="0"
-            @filter="filterEnvironments"
-            @new-value="addNewEnvironment"
+            searchable
+            creatable
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  Type to add custom environment
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
 
         <!-- Apply Button -->
           <OButton
@@ -112,151 +78,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
     <!-- Source Maps List -->
-    <div class="source-maps-list q-pa-md">
-      <!-- Loading State -->
-      <template v-if="isLoading">
-        <div class="q-pa-lg flex items-center justify-center text-center">
-          <div>
-            <q-spinner-hourglass
-              color="primary"
-              size="2.5rem"
-              class="tw:mx-auto tw:block"
-            />
-            <div class="text-center full-width q-mt-md">
-              Loading source maps...
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- Source Maps Table -->
-      <template v-else-if="groupedSourceMaps.length > 0">
-        <q-table
-          ref="qTableRef"
-          :rows="groupedSourceMaps"
+    <div class="source-maps-list tw:flex-1 tw:min-h-0">
+      <!-- Source Maps Table (OTable handles loading skeleton) -->
+        <OTable
+          :data="groupedSourceMaps"
           :columns="columns"
-          :row-key="(row) => `${row.service}-${row.version}-${row.env}`"
-          flat
-          bordered
-          :pagination="pagination"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 200px)"
+          row-key="id"
+          :loading="isLoading"
+          pagination="client"
+          :page-size="selectedPerPage"
+          :page-size-options="perPageOptionsList"
+          :show-global-filter="false"
+          footer-title="Source Maps"
+          expansion="single"
+          expand-on-row-click
+          v-model:expanded-ids="expandedIds"
+          class="tw:w-full"
         >
-          <template v-slot:body="props">
-            <q-tr :props="props">
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                <template v-if="col.name === 'expand'">
-                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      :icon="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
-                    >
-                      <q-icon
-                        :name="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
-                        size="14px"
-                      />
-                    </OButton>
+          <template #expansion="{ row }">
+            <div class="expanded-details tw:p-3">
+              <div class="tw:text-sm tw:font-medium tw:mb-2">
+                Source Map Files ({{ row.files.length }})
+              </div>
+              <ul
+                class="tw:rounded tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                style="max-height: 400px; overflow-y: auto;"
+              >
+                <li
+                  v-for="(file, index) in row.files"
+                  :key="index"
+                  data-test="source-maps-file-item"
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                >
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
+                    <span class="text-code tw:text-sm">{{ file.source_file_name }}</span>
                   </div>
-                </template>
-                <template v-else-if="col.name === 'actions'">
-                  <OButton
-                    :data-test="`source-maps-${props.row.service}-delete`"
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    title="Delete"
-                    @click="confirmDeleteSourceMap(props.row)"
-                  >
-                    <q-icon :name="outlinedDelete" size="16px" />
-                  </OButton>
-                </template>
-                <template v-else>
-                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    {{ col.value }}
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
+                    <span class="text-code tw:text-sm">{{ file.source_map_file_name }}</span>
                   </div>
-                </template>
-              </q-td>
-            </q-tr>
-            <q-tr v-show="expandedRow === getRowKey(props.row)" :props="props">
-              <q-td colspan="100%">
-                <div class="expanded-details q-pa-md">
-                  <div class="text-subtitle2 text-weight-bold q-mb-sm">
-                    Source Map Files ({{ props.row.files.length }})
-                  </div>
-                  <q-list bordered separator class="rounded-borders" style="max-height: 400px; overflow-y: auto;">
-                    <q-item v-for="(file, index) in props.row.files" :key="index">
-                      <q-item-section>
-                        <q-item-label caption>Source File</q-item-label>
-                        <q-item-label class="text-code">{{ file.source_file_name }}</q-item-label>
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label caption>Source Map File</q-item-label>
-                        <q-item-label class="text-code">{{ file.source_map_file_name }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </div>
-              </q-td>
-            </q-tr>
+                </li>
+              </ul>
+            </div>
           </template>
 
-          <template #bottom="scope">
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
+          <template #cell-uploaded_at="{ row }">
+            <div class="tw:cursor-pointer">{{ formatTimestamp(row.uploaded_at) }}</div>
           </template>
-        </q-table>
-      </template>
 
-      <!-- Empty State -->
-      <template v-else>
-        <div class="q-pa-xl text-center text-grey-7">
-          <q-icon name="code" size="4rem" color="grey-5" class="q-mb-md" />
-          <div class="text-h6 q-mb-sm">No Source Maps Found</div>
-          <div class="text-body2">
-            Upload source maps to enable stack trace translation
-          </div>
-        </div>
-      </template>
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`source-maps-${row.service}-delete`"
+              variant="ghost-destructive"
+              size="icon-sm"
+              title="Delete"
+              @click="confirmDeleteSourceMap(row)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+          </template>
+
+          <template #empty>
+            <div class="tw:p-6 tw:text-center tw:text-gray-400">
+              <OIcon name="code" size="xl" class="tw:mb-3" />
+              <div class="tw:text-xl tw:font-semibold tw:mb-2">No Source Maps Found</div>
+              <div class="tw:text-sm">
+                Upload source maps to enable stack trace translation
+              </div>
+            </div>
+          </template>
+        </OTable>
     </div>
 
     <!-- Delete Confirmation Dialog -->
-    <q-dialog v-model="deleteDialog.show">
-      <q-card data-test="delete-source-maps-dialog" style="min-width: 300px; width: 370px;">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ deleteDialog.title }}</div>
-          <div class="para">{{ deleteDialog.message }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <div class="tw:flex tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="cancel-button"
-              @click="deleteDialog.show = false"
-            >
-              Cancel
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="deleteSourceMap(); deleteDialog.show = false"
-              data-test="confirm-button"
-            >
-              OK
-            </OButton>
-          </div>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog
+      v-model:open="deleteDialog.show"
+      size="xs"
+      :title="deleteDialog.title"
+      data-test="delete-source-maps-dialog"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="deleteDialog.show = false"
+      @click:primary="deleteSourceMap(); deleteDialog.show = false"
+    >
+      <p class="para">{{ deleteDialog.message }}</p>
+    </ODialog>
   </div>
 </template>
 
@@ -265,17 +175,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import sourcemapsService from "@/services/sourcemaps";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
-
-const qTableRef = ref<any>(null);
 
 // Delete dialog state
 const deleteDialog = ref({
@@ -296,11 +207,11 @@ const filteredServiceOptions = ref<string[]>([]);
 const filteredEnvironmentOptions = ref<string[]>([]);
 
 // Filters
-const filters = ref({
-  version: null as string | null,
-  service: null as string | null,
-  environment: null as string | null,
-});
+const filters = ref<{
+  version?: string;
+  service?: string;
+  environment?: string;
+}>({});
 
 // Fetch filter values from API
 const fetchFilterValues = async () => {
@@ -393,91 +304,62 @@ const addNewEnvironment = (val: string, done: (item?: string) => void) => {
 const isLoading = ref(false);
 const sourceMaps = ref<any[]>([]);
 const groupedSourceMaps = ref<any[]>([]);
-const expandedRow = ref<string | null>(null);
+const expandedIds = ref<string[]>([]);
 
 // Table columns
-const columns = [
+const columns: OTableColumnDef[] = [
   {
-    name: "expand",
-    label: "#",
-    field: "",
-    align: "left" as const,
-    sortable: false,
+    id: "service",
+    header: "Service",
+    accessorKey: "service",
+    sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "service",
-    label: "Service",
-    field: "service",
-    align: "left" as const,
+    id: "version",
+    header: "Version",
+    accessorKey: "version",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "version",
-    label: "Version",
-    field: "version",
-    align: "left" as const,
+    id: "environment",
+    header: "Environment",
+    accessorKey: "env",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "environment",
-    label: "Environment",
-    field: "env",
-    align: "left" as const,
+    id: "file_count",
+    header: "Files",
+    accessorKey: "fileCount",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "file_count",
-    label: "Files",
-    field: "fileCount",
-    align: "left" as const,
+    id: "uploaded_at",
+    header: "Uploaded At",
+    accessorKey: "uploaded_at",
     sortable: true,
-  },
-  {
-    name: "uploaded_at",
-    label: "Uploaded At",
-    field: "uploaded_at",
-    align: "left" as const,
-    sortable: true,
-    format: (val: number) => {
-      if (!val) return "-";
-      // Convert microseconds to milliseconds
-      return new Date(val / 1000).toLocaleString();
+    meta: {
+      align: "left",
+      format: (_v: any, row: any) => formatTimestamp(row.uploaded_at),
     },
   },
   {
-    name: "actions",
-    field: "actions",
-    label: "Actions",
-    align: "center" as const,
-    sortable: false,
-    style: "width: 100px",
+    id: "actions",
+    header: "Actions",
+    accessorKey: "actions",
+    meta: { align: "center", actionCount: 1 },
+    isAction: true,
+    size: 80,
   },
 ];
 
 // Pagination
-const pagination = ref({
-  sortBy: "created_at",
-  descending: true,
-  page: 1,
-  rowsPerPage: 20,
-});
-
 const selectedPerPage = ref<number>(20);
 
-const perPageOptions = [
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "250", value: 250 },
-];
-
-const resultTotal = computed(() => groupedSourceMaps.value.length);
-
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  qTableRef.value?.setPagination(pagination.value);
-};
+const perPageOptionsList = [20, 50, 100, 250];
 
 // Fetch source maps
 const fetchSourceMaps = async () => {
@@ -517,6 +399,7 @@ const groupSourceMaps = () => {
 
     if (!groups.has(key)) {
       groups.set(key, {
+        id: key,
         service: sourceMap.service,
         version: sourceMap.version,
         env: sourceMap.env,
@@ -547,21 +430,6 @@ const groupSourceMaps = () => {
 // Apply filters
 const applyFilters = () => {
   fetchSourceMaps();
-};
-
-// Get unique row key
-const getRowKey = (row: any) => {
-  return `${row.service}-${row.version}-${row.env}`;
-};
-
-// Toggle expand/collapse
-const toggleExpand = (row: any) => {
-  const rowKey = getRowKey(row);
-  if (expandedRow.value === rowKey) {
-    expandedRow.value = null;
-  } else {
-    expandedRow.value = rowKey;
-  }
 };
 
 // Format timestamp
@@ -596,19 +464,19 @@ const deleteSourceMap = async () => {
       }
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: `Source maps deleted successfully for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env}`,
     });
 
     // Remove from local list
     groupedSourceMaps.value = groupedSourceMaps.value.filter(
-      (item) => getRowKey(item) !== getRowKey(sourceMap)
+      (item) => item.id !== sourceMap.id
     );
   } catch (error: any) {
     console.error("Error deleting source maps:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.message || error?.message || "Failed to delete source maps",
     });
   }
@@ -633,7 +501,7 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .source-maps-container {
-  height: calc(100vh - var(--navbar-height) - 4.1rem);
+  height: 100%;
   overflow-y: auto;
 }
 

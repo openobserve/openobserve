@@ -15,63 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <transition name="slide">
-    <div
-      v-if="visible"
-      class="service-graph-side-panel"
-      data-test="service-graph-side-panel"
-    >
-      <!-- Header Section (compact with inline health badge) -->
-      <div
-        class="panel-header tw:py-[0.375rem] tw:px-[0.625rem]"
-        data-test="service-graph-side-panel-header"
-      >
-        <div class="panel-title">
-          <h2
-            class="service-name"
-            data-test="service-graph-side-panel-service-name"
-          >
-            {{ selectedNode?.name || selectedNode?.label || selectedNode?.id }}
-            <span class="health-badge" :class="serviceHealth.status">
-              {{ serviceHealth.text }}
-            </span>
-          </h2>
-        </div>
-        <div class="panel-header-actions tw:flex tw:items-center tw:gap-2">
-          <ODropdown side="bottom" align="start">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm"
-                data-test="service-graph-node-panel-view-related-btn"
-              >
-                View Related
-                <q-icon name="arrow_drop_down" size="1rem" />
-              </OButton>
-            </template>
-            <ODropdownItem
-              @select="viewRelatedLogs"
-              data-test="service-graph-node-panel-view-related-logs-btn"
-              >Logs</ODropdownItem
+  <ODrawer
+    :open="visible"
+    :width="60"
+    :seamless="true"
+    :portal-target="containerEl"
+    :title="selectedNode?.name || selectedNode?.label || selectedNode?.id"
+    data-test="service-graph-side-panel"
+    @update:open="(v) => { if (!v) handleClose() }"
+  >
+    <template #header-right>
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <span class="health-badge" :class="serviceHealth.status">
+          {{ serviceHealth.text }}
+        </span>
+        <ODropdown side="bottom" align="start">
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="service-graph-node-panel-view-related-btn"
             >
-            <ODropdownItem
-              @select="viewRelatedTraces"
-              data-test="service-graph-node-panel-view-related-traces-btn"
-              >Traces</ODropdownItem
-            >
-          </ODropdown>
-          <OButton
-            variant="ghost"
-            size="icon"
-            data-test="service-graph-side-panel-close-btn"
-            @click="handleClose"
+              View Related
+              <OIcon name="arrow-drop-down" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            @select="viewRelatedLogs"
+            data-test="service-graph-node-panel-view-related-logs-btn"
+            >Logs</ODropdownItem
           >
-            <q-icon name="cancel" size="1rem" />
-          </OButton>
-        </div>
+          <ODropdownItem
+            @select="viewRelatedTraces"
+            data-test="service-graph-node-panel-view-related-traces-btn"
+            >Traces</ODropdownItem
+          >
+        </ODropdown>
       </div>
+    </template>
 
-      <!-- Content Scrollable Area -->
+    <!-- Content Scrollable Area -->
       <div class="panel-content">
         <!-- RED Charts Section -->
         <div
@@ -98,17 +81,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <!-- Duration chip icon -->
-              <q-icon
+              <OIcon
                 v-if="chip.type === 'duration'"
                 name="schedule"
-                size="0.8rem"
+                size="xs"
                 class="tw:text-[var(--o2-latency-p95)]"
               />
               <!-- Error chip icon -->
-              <q-icon
+              <OIcon
                 v-else-if="chip.type === 'error'"
                 name="warning"
-                size="0.8rem"
+                size="xs"
                 class="tw:text-[var(--o2-status-error-text)]"
               />
               <span
@@ -126,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`service-graph-filter-chip-remove-${chip.key}`"
                 @click="removeLocalRangeFilter(chip.key)"
               >
-                <q-icon name="close" size="0.65rem" />
+                <OIcon name="close" size="xs" />
               </OButton>
             </div>
 
@@ -141,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="viewInTraces"
             >
               <template #icon-left>
-                <q-icon name="search" size="0.8rem" />
+                <OIcon name="search" size="xs" />
               </template>
               View Traces
             </OButton>
@@ -161,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="tw:my-[1rem]!" />
+        <OSeparator class="tw:my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
@@ -172,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="activeTab"
               dense
               align="left"
-              class="text-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
+              class="tw:font-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
               data-test="service-graph-node-panel-tabs"
             >
               <OTab
@@ -209,50 +192,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   data-test="service-graph-node-panel-workload-fields-btn"
                 >
-                  <q-icon name="tune" size="1.1rem" />
-                  <q-tooltip>{{ t("common.resources") }}</q-tooltip>
+                  <OIcon name="tune" size="sm" />
+                  <OTooltip :content="t('common.resources')" />
                 </OButton>
               </template>
-              <q-list
-                dense
+              <div
                 class="tw:min-w-[12rem]!"
                 data-test="service-graph-node-panel-workload-fields-menu"
               >
                 <template v-for="env in detectedEnvironments" :key="env.key">
-                  <q-item-label
-                    header
-                    class="tw:text-xs tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide"
+                  <div
+                    class="tw:text-xs tw:px-3 tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide tw:text-muted-foreground"
                   >
                     {{ env.label }}
-                  </q-item-label>
-                  <q-item
+                  </div>
+                  <ODropdownItem
                     v-for="cfg in availableResourceTabConfigs.filter(
                       (c) => c.environment === env.key,
                     )"
                     :key="cfg.id"
-                    tag="label"
-                    clickable
                     :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
                     class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
+                    @select="(e) => { e.preventDefault(); toggleWorkloadField(cfg.id); }"
                   >
-                    <q-item-section side class="tw:pr-[0rem]!">
-                      <q-checkbox
-                        v-model="selectedWorkloadFields"
-                        :val="cfg.id"
-                        size="xs"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label class="tw:text-xs">
-                        {{ cfg.label }}
-                        <q-tooltip>
-                          {{ cfg.groupField }}
-                        </q-tooltip>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
+                    <template #icon-left>
+                      <span @click.stop>
+                        <OCheckbox
+                          v-model="selectedWorkloadFields"
+                          :value="cfg.id"
+                          size="xs"
+                        />
+                      </span>
+                    </template>
+                    <span class="tw:text-xs">
+                      {{ cfg.label }}
+                      <OTooltip :content="cfg.groupField" />
+                    </span>
+                  </ODropdownItem>
                 </template>
-              </q-list>
+              </div>
             </ODropdown>
           </div>
           <OTabPanels v-model="activeTab" animated>
@@ -268,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <q-spinner color="primary" size="sm" />
+                <OSpinner size="xs" data-test="service-graph-operations-loading-indicator" />
                 <span>Loading operations...</span>
               </div>
 
@@ -359,8 +337,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <q-icon name="search" size="0.8rem" />
-                        <q-tooltip>View in Traces</q-tooltip>
+                        <OIcon name="search" size="xs" />
+                        <OTooltip content="View in Traces" />
                       </OButton>
                     </template>
                     <template #empty>
@@ -390,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <q-spinner color="primary" size="sm" />
+                <OSpinner size="xs" data-test="service-graph-resource-loading-indicator" />
                 <span>Loading {{ cfg.label.toLowerCase() }}...</span>
               </div>
               <template v-else>
@@ -448,8 +426,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <q-icon name="search" size="0.8rem" />
-                        <q-tooltip>View in Traces</q-tooltip>
+                        <OIcon name="search" size="xs" />
+                        <OTooltip content="View in Traces" />
                       </OButton>
                     </template>
                     <template #cell-errors="{ item }">
@@ -518,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-loading"
               >
-                <q-spinner color="primary" size="sm" />
+                <OSpinner size="xs" />
                 <span>Loading metrics...</span>
               </div>
 
@@ -578,8 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabPanels>
         </template>
       </div>
-    </div>
-  </transition>
+  </ODrawer>
 
   <!-- Telemetry Correlation Dialog (reuses the same component as "show related" on logs page) -->
   <TelemetryCorrelationDashboard
@@ -605,8 +582,10 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import {
   defineComponent,
   computed,
@@ -616,7 +595,6 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
@@ -644,6 +622,11 @@ import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButto
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -736,6 +719,7 @@ const envLabel = (envKey: string): string =>
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,
@@ -743,10 +727,15 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    ODrawer,
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,
-  },
+    OSpinner,
+    OTooltip,
+    OCheckbox,
+    OIcon,
+},
   props: {
     selectedNode: {
       type: Object as PropType<any>,
@@ -768,11 +757,14 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    containerEl: {
+      type: Object as PropType<HTMLElement | null>,
+      default: null,
+    },
   },
   emits: ["close", "view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
     const { t } = useI18n();
     const router = useRouter();
 
@@ -1308,6 +1300,16 @@ export default defineComponent({
     // IDs of alias entries the user has checked in the dropdown
     const selectedWorkloadFields = ref<string[]>([]);
 
+    // Toggle a workload field id in the selected set — invoked when the user
+    // selects the surrounding ODropdownItem (in addition to clicking the
+    // OCheckbox directly).
+    const toggleWorkloadField = (id: string) => {
+      const current = selectedWorkloadFields.value;
+      selectedWorkloadFields.value = current.includes(id)
+        ? current.filter((entry) => entry !== id)
+        : [...current, id];
+    };
+
     // Computed: Service Metrics
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
@@ -1398,8 +1400,6 @@ export default defineComponent({
         return {
           status: "unknown",
           text: "Unknown",
-          color: "grey",
-          icon: "help",
         };
       }
 
@@ -1410,22 +1410,16 @@ export default defineComponent({
         return {
           status: "critical",
           text: "Critical",
-          color: "negative",
-          icon: "error",
         };
       } else if (errorRate > 5) {
         return {
           status: "degraded",
           text: "Degraded",
-          color: "warning",
-          icon: "warning",
         };
       } else {
         return {
           status: "healthy",
           text: "Healthy",
-          color: "positive",
-          icon: "check_circle",
         };
       }
     });
@@ -2029,20 +2023,16 @@ export default defineComponent({
             filterQuery = filterParts;
           }
         } else {
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: t("traces.noLogsAvailableForService"),
-            timeout: 3000,
-            position: "bottom",
           });
           return;
         }
       } catch {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: t("traces.noLogsAvailableForService"),
-          timeout: 3000,
-          position: "bottom",
         });
         return;
       }
@@ -2071,11 +2061,9 @@ export default defineComponent({
       if (correlationData.value) {
         showTelemetryDialog.value = true;
       } else if (correlationError.value) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: correlationError.value,
-          timeout: 3000,
-          position: "bottom",
         });
       }
     };
@@ -2158,6 +2146,7 @@ export default defineComponent({
       // Workload Field Discovery
       resolvedWorkloadFields,
       selectedWorkloadFields,
+      toggleWorkloadField,
       // Metrics Tab
       metricsCorrelationLoading,
       metricsCorrelationError,
@@ -2178,172 +2167,61 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.service-graph-side-panel {
-  position: absolute;
-  right: 0;
-  top: 0;
-  min-width: 600px;
-  width: 60%;
-  height: 100%;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  background: #1a1f2e;
-  border-left: 1px solid #2d3548;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-// Light mode support
-.body--light .service-graph-side-panel {
-  background: #ffffff;
-  border-left: 1px solid #e0e0e0;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-// Slide animation
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.slide-enter-from,
-.slide-leave-to {
-  transform: translateX(100%);
-}
-
-.slide-enter-to,
-.slide-leave-from {
-  transform: translateX(0);
-}
-
-// Header (compact with inline health badge)
-.panel-header {
-  display: flex;
+.health-badge {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #2d3548;
-  background: #1a1f2e;
-  flex-shrink: 0;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
 
-  .panel-title {
-    flex: 1;
-
-    .service-name {
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0;
-      line-height: 1.2; // Reduce line height for compactness
-      color: #e4e7eb;
-      letter-spacing: normal;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-
-      .health-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px; // Reduced from 6px
-        padding: 2px 8px; // Reduced from 4px 10px for more compact badge
-        border-radius: 10px; // Slightly reduced from 12px
-        font-size: 11px; // Reduced from 12px
-        font-weight: 600;
-        line-height: 1;
-
-        // Add dot indicator
-        &::before {
-          content: "●";
-          font-size: 10px; // Reduced from 12px
-        }
-
-        &.healthy {
-          background: rgba(16, 185, 129, 0.15);
-          color: #10b981;
-        }
-
-        &.degraded {
-          background: rgba(251, 191, 36, 0.15);
-          color: #fbbf24;
-        }
-
-        &.critical {
-          background: rgba(239, 68, 68, 0.15);
-          color: #ef4444;
-        }
-
-        &.warning {
-          background: rgba(249, 115, 22, 0.15);
-          color: #f97316;
-        }
-      }
-    }
+  &::before {
+    content: "●";
+    font-size: 10px;
   }
 
-  .panel-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
+  &.healthy {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
   }
 
-  .telemetry-btn {
-    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
-    color: #fff !important;
-    border-radius: 6px;
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    transition: all 0.2s;
+  &.degraded {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+  }
 
-    &:hover {
-      filter: brightness(1.1);
-      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-    }
+  &.critical {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  &.warning {
+    background: rgba(249, 115, 22, 0.15);
+    color: #f97316;
   }
 }
 
-.body--light .panel-header {
-  border-bottom: 1px solid #e0e0e0;
-  background: #f5f5f5;
+.body--light .health-badge {
+  &.healthy {
+    background: rgba(16, 185, 129, 0.08);
+    color: #059669;
+  }
 
-  .panel-title {
-    .service-name {
-      color: #202124;
-      line-height: 1.2;
+  &.degraded {
+    background: rgba(251, 191, 36, 0.08);
+    color: #d97706;
+  }
 
-      .health-badge {
-        &.healthy {
-          background: rgba(16, 185, 129, 0.08);
-          color: #059669;
-        }
+  &.critical {
+    background: rgba(239, 68, 68, 0.08);
+    color: #dc2626;
+  }
 
-        &.degraded {
-          background: rgba(251, 191, 36, 0.08);
-          color: #d97706;
-        }
-
-        &.critical {
-          background: rgba(239, 68, 68, 0.08);
-          color: #dc2626;
-        }
-
-        &.warning {
-          background: rgba(249, 115, 22, 0.08);
-          color: #ea580c;
-        }
-      }
-    }
+  &.warning {
+    background: rgba(249, 115, 22, 0.08);
+    color: #ea580c;
   }
 }
 
@@ -2648,12 +2526,7 @@ export default defineComponent({
             rgba(16, 185, 129, 0.02)
           );
           border: 1px solid rgba(16, 185, 129, 0.15);
-
-          .q-icon {
-            color: #10b981;
-          }
-
-          .metric-value {
+.metric-value {
             color: #10b981;
           }
 
@@ -2674,12 +2547,7 @@ export default defineComponent({
             rgba(251, 191, 36, 0.02)
           );
           border: 1px solid rgba(251, 191, 36, 0.15);
-
-          .q-icon {
-            color: #fbbf24;
-          }
-
-          .metric-value {
+.metric-value {
             color: #fbbf24;
           }
 
@@ -2700,12 +2568,7 @@ export default defineComponent({
             rgba(239, 68, 68, 0.02)
           );
           border: 1px solid rgba(239, 68, 68, 0.15);
-
-          .q-icon {
-            color: #ef4444;
-          }
-
-          .metric-value {
+.metric-value {
             color: #ef4444;
           }
 
@@ -2726,12 +2589,7 @@ export default defineComponent({
             rgba(107, 114, 128, 0.02)
           );
           border: 1px solid rgba(107, 114, 128, 0.15);
-
-          .q-icon {
-            color: #6b7280;
-          }
-
-          .metric-value {
+.metric-value {
             color: #9ca3af;
           }
         }
@@ -2852,12 +2710,7 @@ export default defineComponent({
             rgba(16, 185, 129, 0.01)
           );
           border-color: rgba(16, 185, 129, 0.2);
-
-          .q-icon {
-            color: #059669;
-          }
-
-          .metric-value {
+.metric-value {
             color: #059669;
           }
 
@@ -2878,12 +2731,7 @@ export default defineComponent({
             rgba(217, 119, 6, 0.01)
           );
           border-color: rgba(217, 119, 6, 0.2);
-
-          .q-icon {
-            color: #d97706;
-          }
-
-          .metric-value {
+.metric-value {
             color: #d97706;
           }
 
@@ -2904,12 +2752,7 @@ export default defineComponent({
             rgba(220, 38, 38, 0.01)
           );
           border-color: rgba(220, 38, 38, 0.2);
-
-          .q-icon {
-            color: #dc2626;
-          }
-
-          .metric-value {
+.metric-value {
             color: #dc2626;
           }
 
@@ -2930,12 +2773,7 @@ export default defineComponent({
             rgba(107, 114, 128, 0.01)
           );
           border-color: rgba(107, 114, 128, 0.2);
-
-          .q-icon {
-            color: #6b7280;
-          }
-
-          .metric-value {
+.metric-value {
             color: #6b7280;
           }
         }
@@ -3007,33 +2845,5 @@ export default defineComponent({
   .metrics-correlation-dashboard .q-splitter--vertical > .q-splitter__separator
 ) {
   height: 100% !important;
-}
-</style>
-
-<style lang="scss">
-// Dark mode - consistent background
-.body--dark {
-  .service-graph-side-panel {
-    background: #1a1f2e; // Consistent panel background
-    color: #e4e7eb;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-
-    .metric-card {
-      background: rgba(255, 255, 255, 0.05);
-    }
-  }
-}
-
-// Light mode
-.body--light {
-  .service-graph-side-panel {
-    background: #ffffff;
-    color: #333333;
-    border-left: 1px solid #e0e0e0;
-
-    .metric-card {
-      background: #f9f9f9;
-    }
-  }
 }
 </style>

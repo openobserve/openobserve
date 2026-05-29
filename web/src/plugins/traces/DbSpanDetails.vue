@@ -1,7 +1,12 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+
+const performanceOpen = ref(false);
 
 const props = defineProps<{
   span: Record<string, any>;
@@ -87,8 +92,8 @@ const metadataRows = computed(() =>
 
 <template>
   <div class="tw:flex tw:flex-col tw:h-full tw:overflow-auto tw:gap-3">
-    <q-card flat data-test="traces-db-span-details-metadata-grid">
-      <q-card-section class="tw:py-0! tw:px-0!">
+    <OCard data-test="traces-db-span-details-metadata-grid">
+      <OCardSection class="tw:py-0! tw:px-0!">
         <div class="tw:flex tw:flex-wrap tw:gap-2">
           <span
             v-for="row in metadataRows"
@@ -107,16 +112,14 @@ const metadataRows = computed(() =>
             <span class="tw:break-all">{{ row.value }}</span>
           </span>
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
 
-    <q-card
-      flat
-      bordered
+    <OCard
       class="tw:flex-1 tw:flex tw:flex-col"
       data-test="traces-db-span-details-query-editor"
     >
-      <q-card-section
+      <OCardSection
         class="tw:flex-1 tw:flex tw:flex-col tw:p-0 tw:min-h-[18.75rem] tw:p-[0.375rem]!"
       >
         <CodeQueryEditor
@@ -137,17 +140,16 @@ const metadataRows = computed(() =>
         >
           No query text recorded for this span.
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
 
-    <q-expansion-item
+    <OCollapsible
       v-if="hasPerformanceData"
+      v-model="performanceOpen"
       label="Performance"
-      dense
       data-test="traces-db-span-details-performance"
     >
-      <q-card flat>
-        <q-card-section class="tw:py-2 tw:px-3">
+      <div class="tw:py-2 tw:px-3">
           <div class="tw:grid tw:grid-cols-2 tw:gap-x-4 tw:gap-y-1">
             <template v-if="span.db_response_returned_rows">
               <div class="tw:text-xs" style="color: var(--o2-text-secondary)">
@@ -179,8 +181,7 @@ const metadataRows = computed(() =>
               </div>
             </template>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-expansion-item>
+      </div>
+    </OCollapsible>
   </div>
 </template>
