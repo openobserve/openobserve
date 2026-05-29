@@ -262,7 +262,6 @@ test.describe("Alerts UI Operations", () => {
   });
 });
 
-/* ENT-only: Alerts & Incidents Page Navigation — needs rework before re-enabling
 // ============================================================================
 // Alerts & Incidents Page Navigation Tests
 // ============================================================================
@@ -415,4 +414,3 @@ test.describe("Alerts & Incidents Page Navigation", { tag: '@enterprise' }, () =
         testLogger.info('=== Edge cases COMPLETE ===');
     });
 });
-*/
