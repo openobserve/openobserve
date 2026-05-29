@@ -421,12 +421,28 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify no data or error is shown (incomplete Sankey config).
-      // Use locator.or() so whichever element becomes visible first satisfies
-      // the assertion — waitForSelector with a CSS comma selector always picks
-      // the first element in DOM order, which may be the invisible no-data div.
-      const noData = page.locator('[data-test="no-data"]');
-      const dashError = page.locator('[data-test="dashboard-error"].col-auto');
-      await expect(noData.or(dashError)).toBeVisible({ timeout: 10000 });
+      // Both elements may be visible simultaneously on CI, so check each
+      // independently rather than using .or() which throws strict mode
+      // violation when both match.
+      const noDataVisible = await page.locator('[data-test="no-data"]')
+        .isVisible().catch(() => false);
+      const dashErrorVisible = await page.locator('[data-test="dashboard-error"].col-auto')
+        .isVisible().catch(() => false);
+
+      if (!noDataVisible && !dashErrorVisible) {
+        // Neither visible yet — wait for either one to appear
+        await page.waitForFunction(() => {
+          const noData = document.querySelector('[data-test="no-data"]');
+          const dashErr = document.querySelector('[data-test="dashboard-error"]');
+          return (noData && noData.offsetParent !== null) ||
+                 (dashErr && dashErr.offsetParent !== null);
+        }, { timeout: 10000 });
+      }
+
+      expect(noDataVisible || dashErrorVisible ||
+        await page.locator('[data-test="no-data"]').isVisible().catch(() => false) ||
+        await page.locator('[data-test="dashboard-error"].col-auto').isVisible().catch(() => false)
+      ).toBe(true);
 
       testLogger.info("Sankey no data state verified");
 
