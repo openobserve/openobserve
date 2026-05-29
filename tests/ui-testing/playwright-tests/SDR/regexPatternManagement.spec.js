@@ -142,7 +142,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
 
     await pm.sdrPatternsPage.navigateToRegexPatterns();
 
-    const importFilePath = path.resolve(__dirname, '../../../../test-data/regex_patterns_import.json');
+    const importFilePath = path.resolve(__dirname, '../../../test-data/regex_patterns_import.json');
     const imported = await pm.sdrPatternsPage.importPatternsFromFile(importFilePath);
     expect(imported, 'Import should complete successfully (dialog should close)').toBeTruthy();
     testLogger.info('Import completed, verifying imported patterns');
