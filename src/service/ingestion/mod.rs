@@ -217,8 +217,8 @@ pub async fn get_stream_partition_keys(
 }
 
 #[inline(always)]
-pub async fn get_stream_executable_pipeline(stream: &StreamParams) -> Option<ExecutablePipeline> {
-    pipeline::get_executable_pipeline(stream).await
+pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
+    pipeline::get_executable_pipelines(stream).await
 }
 
 pub async fn get_stream_alerts(
