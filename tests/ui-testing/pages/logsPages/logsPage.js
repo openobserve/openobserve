@@ -994,14 +994,23 @@ export class LogsPage {
 
     async addStreamToSelection(streamName) {
         testLogger.info(`Adding stream to selection: ${streamName}`);
-        // Click the wrapper to open the OSelect popover, then fill the ListboxFilter
-        // search input (data-test="log-search-index-list-select-stream-search").
-        const wrapper = this.page.locator(this.indexDropDown);
-        await wrapper.click();
-        await this.page.waitForTimeout(500);
-        const searchInput = this.page.locator(this.indexDropDownSearch);
-        await searchInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        await searchInput.fill(streamName);
+        // Open the OSelect popover via the trigger button (same pattern as
+        // selectStream), then fill the ListboxFilter search input.
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        const popover = this.page.locator(this.indexDropDownPopover);
+        const search = this.page.locator(this.indexDropDownSearch);
+        if (await trigger.count() > 0) {
+            await trigger.click();
+        } else {
+            await this.page.locator(this.indexDropDown).click();
+        }
+        await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await search.count() > 0) {
+            await search.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            await search.press('ControlOrMeta+a').catch(() => {});
+            await search.press('Backspace').catch(() => {});
+            await search.fill(streamName);
+        }
         await this.page.waitForTimeout(1000);
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
