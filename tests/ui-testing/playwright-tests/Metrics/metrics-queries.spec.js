@@ -139,10 +139,9 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       if (q.action === 'switch') {
         // Test SQL mode switch
         await sqlToggle.click();
-        await page.waitForTimeout(500);
 
         const sqlIndicator = await pm.metricsPage.getSqlIndicator();
-        const isSqlMode = await sqlIndicator.isVisible().catch(() => false);
+        const isSqlMode = await sqlIndicator.isVisible({ timeout: 3000 }).catch(() => false);
 
         // Assert: SQL mode should be activated (if feature is available)
         if (!isSqlMode) {
@@ -157,7 +156,8 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
         const currentlyInSqlMode = await pm.metricsPage.getSqlIndicator().then(i => i.isVisible().catch(() => false));
         if (!currentlyInSqlMode) {
           await sqlToggle.click();
-          await page.waitForTimeout(500);
+          // Wait deterministically for SQL indicator to appear after toggling
+          await pm.metricsPage.getSqlIndicator().then(i => i.waitFor({ state: 'visible', timeout: 3000 })).catch(() => {});
         }
 
         // Enter and execute SQL query
@@ -219,7 +219,6 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     // First, execute a valid query to ensure the editor is initialized and get baseline state
     testLogger.info('Initializing editor with a valid query first');
     await pm.metricsPage.executeQuery('up');
-    await page.waitForTimeout(1500);
 
     // Capture if valid query showed visualization
     const validQueryHasVisualization = await pm.metricsPage.hasVisualization();
@@ -229,7 +228,7 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     testLogger.info('Testing invalid PromQL syntax');
     await pm.metricsPage.enterMetricsQuery('sum(rate(');
     await pm.metricsPage.clickApplyButton();
-    await page.waitForTimeout(3000);
+    await pm.metricsPage.waitForMetricsResults();
 
     // Check for error indicators
     let hasError = await pm.metricsPage.hasErrorIndicator();
@@ -267,15 +266,13 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       testLogger.info('Testing invalid SQL syntax');
 
       await sqlToggle.click();
-      await page.waitForTimeout(500);
 
       await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
-      await page.waitForTimeout(2000);
       await pm.metricsPage.clickApplyButton();
-      await page.waitForTimeout(3000);
+      await pm.metricsPage.waitForMetricsResults();
 
       // Check for inline error in the error list below the chart
-      const inlineError = page.locator('[data-test="dashboard-error"]');
+      const inlineError = pm.metricsPage.getInlineError();
       const hasInlineError = await inlineError.isVisible({ timeout: 3000 }).catch(() => false);
 
       if (hasInlineError) {

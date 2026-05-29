@@ -83,30 +83,30 @@ export class JobSchedulerPage {
 async deleteJobSearch(trace_id) {
 
       // Click the "Get Jobs" button
-      await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+      await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
+
+      // Click the delete button for the specified job row
+      await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
+      await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
+
+      // Cancel the deletion (tests the cancel flow)
+      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
+
 
       // Click the delete button for the specified job row
       await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
       await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
 
       // Confirm the deletion
-      await this.page.locator('[data-test="cancel-button"]').click();
-
-
-      // Click the delete button for the specified job row
-      await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
-      await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
-
-      // Confirm the deletion
-      await this.page.locator('[data-test="confirm-button"]').click();
+      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
       // Verify the success message
-      await expect(this.page.locator('#q-notify')).toContainText('Search Job has been deleted successfully');
+      await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been deleted successfully');
   }
 
   async restartJobSearch(trace_id) {
     // Click the "Get Jobs" button
-    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+    await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
     // Build the selector for the job row using the trace_id
     const jobRowSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-restart-btn"]`;
@@ -123,29 +123,29 @@ async deleteJobSearch(trace_id) {
     await this.page.locator(jobRowSelector).click();
 
     // Verify the success message
-    await expect(this.page.locator('#q-notify')).toContainText('Search Job has been restarted successfully');
+    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been restarted successfully');
 }
 
 
 async cancelJobSearch(trace_id) {
 
     // Click the "Get Jobs" button
-    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+    await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
     // Click the cancel button for the specified job row
     await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-cancel-btn"]`).click();
 
     // Confirm the cancellation
-    await this.page.locator('[data-test="confirm-button"]').click();
+    await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
     // Verify the success message
-    await expect(this.page.locator('#q-notify')).toContainText('Search Job has been cancelled successfully');   
+    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job has been cancelled successfully');   
 
 }     
 
 async exploreJob(trace_id) {
     // Click the "Get Jobs" button
-    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+    await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
 
     // Build the selector for the job row using the trace_id
     const exploreButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-explore-btn"]`;
@@ -174,7 +174,7 @@ async exploreJob(trace_id) {
             testLogger.warn(`Explore button for trace ID ${trace_id} is not enabled. Retrying...`);
             attempts++;
             await this.page.waitForTimeout(5000); // Wait before retrying
-            await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+            await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
         }
     }
 
@@ -183,14 +183,14 @@ async exploreJob(trace_id) {
     }
 
     // Verify the success message
-    await expect(this.page.locator('#q-notify')).toContainText('Search Job have been applied successfully');
+    await expect(this.page.locator('[data-test-variant="success"]')).toContainText('Search Job have been applied successfully');
 }
 
 
 async viewJobDetails(trace_id) {
     const expandButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-expand-btn"]`;
     const moreDetailsTabSelector = '[data-test="tab-more_details"]';
-    const getJobsBtn = this.page.getByRole('button', { name: 'Get Jobs' });
+    const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
 
     // Retry: newly created jobs may not appear immediately in the list.
     // Poll by clicking "Get Jobs" and waiting for the row to appear.
@@ -228,7 +228,7 @@ async viewJobDetails(trace_id) {
     }
 
     // Verify that the expected text is present in the textbox
-    await expect(this.page.getByText(`"${trace_id}"`)).toBeVisible();
+    await expect(this.page.locator('[data-test="tab-more_details"]').filter({ hasText: trace_id }).first()).toBeVisible();
 }
 
    

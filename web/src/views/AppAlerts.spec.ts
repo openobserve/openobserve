@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 
 // Mock vue-router before importing any files that use it
@@ -50,9 +48,6 @@ import AppAlerts from "@/views/AppAlerts.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock services
 vi.mock("@/services/alert_templates", () => ({
@@ -521,7 +516,7 @@ describe("AppAlerts", () => {
       const wrapper = createWrapper();
       const qPage = wrapper.find('[data-test="alerts-page"]');
       expect(qPage.exists()).toBe(true);
-      expect(qPage.classes()).toContain("q-pa-none");
+      expect(qPage.classes()).toContain("tw:p-0");
     });
 
     it("should have correct styling classes on main container", () => {

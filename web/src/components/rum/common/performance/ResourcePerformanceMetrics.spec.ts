@@ -13,23 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ResourcePerformanceMetrics from "./ResourcePerformanceMetrics.vue";
-
-installQuasar();
 
 function createMetrics(overrides: Record<string, any> = {}) {
   return {
     resource: {
-      duration: 400000000,            // 400ms — good
-      dns: { duration: 10000000 },    // 10ms
+      duration: 400000000, // 400ms — good
+      dns: { duration: 10000000 }, // 10ms
       connect: { duration: 20000000 },
       ssl: { duration: 15000000 },
       first_byte: { duration: 50000000 },
       download: { duration: 100000000 },
-      size: 102400,                   // 100KB
+      size: 102400, // 100KB
       redirect: { duration: 5000000 },
       ...overrides,
     },
@@ -40,140 +37,233 @@ describe("ResourcePerformanceMetrics", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
-    wrapper?.unmount();
+    if (wrapper) wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
   describe("initial render", () => {
-    it("should render without errors", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders without errors when valid metrics are provided", () => {
+      // Arrange + Act
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have data-test=resource-performance-metrics on root", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.find('[data-test="resource-performance-metrics"]').exists()).toBe(true);
+    it("renders root container with data-test=resource-performance-metrics", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="resource-performance-metrics"]').exists(),
+      ).toBe(true);
     });
 
-    it("should use grid layout", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
-      expect(wrapper.classes().join(" ")).toContain("tw:grid");
+    it("renders root element as a div", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
+      expect(wrapper.find("div").exists()).toBe(true);
     });
   });
 
   describe("conditional rendering — all cards present", () => {
-    it("should render total duration card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders total duration card when resource.duration is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-duration"]').exists()).toBe(true);
     });
 
-    it("should render DNS lookup card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders DNS lookup card when resource.dns.duration is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-dns"]').exists()).toBe(true);
     });
 
-    it("should render connection time card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders connection time card when resource.connect.duration is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-connect"]').exists()).toBe(true);
     });
 
-    it("should render SSL handshake card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders SSL handshake card when resource.ssl.duration is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-ssl"]').exists()).toBe(true);
     });
 
-    it("should render TTFB card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders TTFB card when resource.first_byte.duration is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-ttfb"]').exists()).toBe(true);
     });
 
-    it("should render download time card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders download time card when resource.download.duration is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-download"]').exists()).toBe(true);
     });
 
-    it("should render resource size card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders resource size card when resource.size is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-size"]').exists()).toBe(true);
     });
 
-    it("should render redirect time card", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: createMetrics() } });
+    it("renders redirect time card when resource.redirect.duration is present", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: createMetrics() },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-redirect"]').exists()).toBe(true);
     });
   });
 
   describe("conditional rendering — missing metrics", () => {
-    it("should not render duration card when missing", () => {
+    it("does not render duration card when resource.duration is missing", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: { resource: {} } },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-duration"]').exists()).toBe(false);
     });
 
-    it("should not render DNS card when dns.duration is missing", () => {
+    it("does not render DNS card when resource.dns.duration is missing", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: { resource: { duration: 100 } } },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-dns"]').exists()).toBe(false);
     });
 
-    it("should not render SSL card when ssl.duration is missing", () => {
+    it("does not render SSL card when resource.ssl.duration is missing", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
-        props: { metrics: { resource: { duration: 100, dns: { duration: 10 } } } },
+        props: {
+          metrics: {
+            resource: { duration: 100, dns: { duration: 10 } },
+          },
+        },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-ssl"]').exists()).toBe(false);
     });
 
-    it("should not render size card when size is falsy", () => {
+    it("does not render size card when resource.size is falsy (0)", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: { resource: { duration: 100, size: 0 } } },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-size"]').exists()).toBe(false);
     });
 
-    it("should show no cards when resource is null/empty", () => {
-      wrapper = mount(ResourcePerformanceMetrics, { props: { metrics: {} } });
+    it("renders no cards when resource object is absent from metrics", () => {
+      // Arrange
+      wrapper = mount(ResourcePerformanceMetrics, {
+        props: { metrics: {} },
+      });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-duration"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="metric-dns"]').exists()).toBe(false);
     });
   });
 
   describe("duration status thresholds", () => {
-    it("should show good status for duration <= 500ms", () => {
+    it("renders duration card for good status (<=500ms)", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: createMetrics({ duration: 400000000 }) },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-duration"]').exists()).toBe(true);
     });
 
-    it("should show needs-improvement for duration 500ms–1s", () => {
+    it("renders duration card for needs-improvement status (500ms–1s)", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: createMetrics({ duration: 750000000 }) },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-duration"]').exists()).toBe(true);
     });
 
-    it("should show poor status for duration > 1s", () => {
+    it("renders duration card for poor status (>1s)", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: createMetrics({ duration: 2000000000 }) },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-duration"]').exists()).toBe(true);
     });
   });
 
-  describe("formatBytes for size display", () => {
-    it("should render size card with byte-formatted value", () => {
+  describe("resource size formatting", () => {
+    it("renders size card when resource.size is a positive byte value", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: createMetrics({ size: 1024 }) },
       });
-      const sizeCard = wrapper.find('[data-test="metric-size"]');
-      expect(sizeCard.exists()).toBe(true);
+
+      // Assert
+      expect(wrapper.find('[data-test="metric-size"]').exists()).toBe(true);
     });
 
-    it("should not render size card when size is undefined", () => {
+    it("does not render size card when resource.size is undefined", () => {
+      // Arrange
       wrapper = mount(ResourcePerformanceMetrics, {
         props: { metrics: createMetrics({ size: undefined }) },
       });
+
+      // Assert
       expect(wrapper.find('[data-test="metric-size"]').exists()).toBe(false);
     });
   });

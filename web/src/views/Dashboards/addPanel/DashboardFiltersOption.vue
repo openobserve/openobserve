@@ -9,13 +9,14 @@
         )
       "
       style="display: flex; flex-direction: row"
-      class="q-pl-md"
+      class="tw:pl-3"
     >
-      <div class="layout-name">{{ t("panel.filters") }}</div>
-      <span class="layout-separator">:</span>
+      <div class="layout-name" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
+      <span class="layout-separator" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="axis-container droppable scroll row"
+        class="axis-container droppable scroll tw:flex"
         data-test="dashboard-filter-layout"
+        :data-condition-count="conditionCount"
       >
         <Group
           v-if="topLevelGroup"
@@ -75,6 +76,23 @@ export default defineComponent({
       return dashboardPanelData?.data?.queries?.[
         dashboardPanelData?.layout?.currentQueryIndex || 0
       ]?.fields?.filter;
+    });
+
+    /**
+     * Recursive count of leaf conditions (filterType === "condition"), traversing nested groups.
+     * Mirrors what `[data-test^="dashboard-add-condition-label-"]` counts in the DOM, so e2e tests
+     * can read this attribute directly instead of polling the DOM for row mounts.
+     */
+    const conditionCount = computed<number>(() => {
+      const countLeaves = (group: any): number => {
+        if (!group?.conditions?.length) return 0;
+        return group.conditions.reduce((sum: number, c: any) => {
+          if (c?.filterType === "condition") return sum + 1;
+          if (c?.filterType === "group") return sum + countLeaves(c);
+          return sum;
+        }, 0);
+      };
+      return countLeaves(topLevelGroup.value);
     });
 
     const addFilter = (filterType: string) => {
@@ -275,6 +293,7 @@ export default defineComponent({
       dashboardVariablesFilterItems,
       schemaOptions,
       topLevelGroup,
+      conditionCount,
     };
   },
 });
@@ -298,5 +317,6 @@ export default defineComponent({
 
 .axis-container {
   margin: 5px;
+  flex-wrap: wrap;
 }
 </style>

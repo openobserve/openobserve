@@ -12,7 +12,7 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard Import testcases", () => {
   test.beforeEach(async ({ page }) => {
-    console.log("running before each");
+    testLogger.info("running before each");
     await navigateToBase(page);
     await ingestion(page);
 
@@ -41,9 +41,9 @@ test.describe("dashboard Import testcases", () => {
 
     await waitForDashboardPage(page);
 
-    await expect(
-      page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
-    ).toBeVisible();
+    await pm.dashboardImport.expectImportedDashboardVisible(
+      "Cloudfront to OpenObserve"
+    );
 
     await pm.dashboardImport.deleteImportedDashboard(
       "01",
@@ -73,31 +73,22 @@ test.describe("dashboard Import testcases", () => {
 
     // Assert that the error message is displayed
 
-    await expect(page.getByText("Title is required for")).toBeVisible();
+    await expect(pm.dashboardImport.importErrorTitleMessage).toBeVisible();
 
-    await page.getByLabel("Dashboard Title").click();
+    await pm.dashboardImport.clickDashboardTitleInput();
 
     const title = "Cloudfront to OpenObserve";
 
-    await page.getByLabel("Dashboard Title").fill(title);
+    await pm.dashboardImport.fillDashboardTitleInput(title);
 
-    // Assert that the title is correctly displayed on the UI
-    await expect(page.getByText(`"${title}"`)).toBeVisible();
-
-    // Fetch the title from the JSON data - look for the line containing "title": in the JSON editor
-    const jsonLine = await page
-      .locator('.view-lines .view-line')
-      .filter({ hasText: '"title":' })
-      .first()
-      .innerText();
-
-    // Extract the title value from the JSON line (e.g., '"title": "Cloudfront to OpenObserve"')
-    const titleMatch = jsonLine.match(/"title":\s*"([^"]+)"/);
-    let jsonTitle = titleMatch ? titleMatch[1] : "";
+    // Fetch the title from the JSON data via the Monaco editor container.
+    // The PO reads the editor text via page.evaluate over the editor host id.
+    await pm.dashboardImport.waitForEditorContains(`"title": "${title}"`);
+    const jsonTitle = await pm.dashboardImport.readImportedJsonTitle();
 
     // Normalize both strings to handle any invisible characters or whitespace differences
-    const normalizedJsonTitle = jsonTitle.trim().replace(/\s+/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "");
-    const normalizedExpectedTitle = title.trim().replace(/\s+/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "");
+    const normalizedJsonTitle = jsonTitle.trim().replace(/\s+/g, " ").replace(/[​-‍﻿]/g, "");
+    const normalizedExpectedTitle = title.trim().replace(/\s+/g, " ").replace(/[​-‍﻿]/g, "");
 
     expect(normalizedJsonTitle).toBe(normalizedExpectedTitle);
     await pm.dashboardImport.clickImportButton();
@@ -123,20 +114,21 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickUrlImportTab();
 
-    await page.getByLabel("Add your url").fill(
+    await pm.dashboardImport.fillUrlImport(
       "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
     );
 
-    await expect(
-      page.locator(".view-lines").locator(".view-line").filter({ hasText: '"dashboardId": "' })
-    ).toBeVisible();
+    await pm.dashboardImport.waitForEditorContains(
+      '"dashboardId":',
+      "url"
+    );
 
     await pm.dashboardImport.clickImportButton();
     await waitForDashboardPage(page);
 
-    await expect(
-      page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
-    ).toBeVisible();
+    await pm.dashboardImport.expectImportedDashboardVisible(
+      "Cloudfront to OpenObserve"
+    );
 
     await pm.dashboardImport.deleteImportedDashboard(
       "01",
@@ -162,17 +154,17 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.uploadDashboardFile(fileContentPath);
 
-    const closeIcon = page.locator('.q-file .q-icon').filter({ hasText: 'close' });
-    await closeIcon.waitFor({ state: 'visible', timeout: 5000 });
-    await closeIcon.click();
+    await pm.dashboardImport.removeUploadedFile(0);
 
-    await expect(page.getByLabel("cloud_uploadDrop your file")).toBeVisible();
+    await pm.dashboardImport.expectFileChipAbsent(0);
 
     await pm.dashboardImport.clickImportButton();
 
-    await expect(page.getByText("Please Enter a JSON object")).toBeVisible();
+    await expect(pm.dashboardImport.toastErrorMessage).toContainText(
+      "Please Enter a JSON object"
+    );
 
-    await page.getByRole("button", { name: "Cancel" }).click();
+    await pm.dashboardImport.clickCancelButton();
   });
 
   test("Should display an error validation message when clicking the Import button if the 'Title' field is missing in the .json data.", async ({
@@ -198,9 +190,9 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportButton();
 
-    await expect(
-      page.getByText("Title is required for dashboard ")
-    ).toBeVisible();
+    await expect(pm.dashboardImport.importErrorTitleMessage).toContainText(
+      "Title is required for dashboard"
+    );
   });
 
   test("Should display an error validation message if the 'Stream type' field is missing in the .json data when clicking the Import button.", async ({
@@ -223,12 +215,10 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportButton();
 
-    await expect(
-      page.getByText("warning1 File(s) Failed to Import")
-    ).toBeVisible();
-    await expect(
-      page.getByText(" JSON 1 : Request failed with status code 422")
-    ).toBeVisible();
+    await pm.dashboardImport.expectFileRejectedWithToast(
+      "File(s) Failed to Import",
+      "Request failed with status code 422"
+    );
   });
 
   test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it", async ({
@@ -255,13 +245,9 @@ test.describe("dashboard Import testcases", () => {
     const folderName = generateUniqueFolderName();
 
     // Fill in the folder name in the input and save it
-    await page.locator('[data-test="dashboard-folder-move-new-add"]').click();
-
-    await page.locator('[data-test="dashboard-folder-add-name"]').click();
-    await page
-      .locator('[data-test="dashboard-folder-add-name"]')
-      .fill(folderName);
-    await page.locator('[data-test="dashboard-folder-add-save"]').click();
+    await pm.dashboardImport.openCreateFolderDrawerFromMove();
+    await pm.dashboardImport.fillNewFolderName(folderName);
+    await pm.dashboardImport.confirmFolderMoveDrawer();
 
     await pm.dashboardImport.clickImportButton();
 
@@ -272,27 +258,11 @@ test.describe("dashboard Import testcases", () => {
       "Cloudfront to OpenObserve"
     );
 
-    // Step 6: Find the folder card by folder name and click the More (3 dots) icon
-    const folderCard = page.locator(`[data-test^="dashboard-folder-tab-"]`, {
-      hasText: folderName,
-    });
-
-    // Hover over the folder card first
-    await folderCard.hover();
-    await folderCard.locator('[data-test="dashboard-more-icon"]').click();
-
-    // Step 7: Click Delete Folder option
-    await page.locator('[data-test="dashboard-delete-folder-icon"]').click();
-
-    // Step 8: Confirm deletion in modal
-    await page.locator('[data-test="confirm-button"]').click();
+    // Step 6: Delete the folder we created via the folder tab actions
+    await pm.dashboardImport.deleteFolderByName(folderName);
 
     //  Assert folder is deleted
-    await expect(
-      page.locator(`[data-test^="dashboard-folder-tab-"]`, {
-        hasText: folderName,
-      })
-    ).toHaveCount(0);
+    await pm.dashboardImport.expectFolderAbsent(folderName);
   });
 
   test("Should import the Version 3 dashboard successfully", async ({
@@ -301,7 +271,7 @@ test.describe("dashboard Import testcases", () => {
     //instantiate PageManager with the current page
     const pm = new PageManager(page);
 
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await pm.dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
     await pm.dashboardImport.clickImportDashboard();
@@ -315,9 +285,7 @@ test.describe("dashboard Import testcases", () => {
     await pm.dashboardImport.clickImportButton();
 
     await waitForDashboardPage(page);
-    await expect(
-      page.getByRole("cell", { name: "AWS VPC Flow Log" }).first()
-    ).toBeVisible();
+    await pm.dashboardImport.expectImportedDashboardVisible("AWS VPC Flow Log");
 
     await pm.dashboardImport.deleteImportedDashboard("01", "AWS VPC Flow Log");
   });
@@ -341,9 +309,7 @@ test.describe("dashboard Import testcases", () => {
     await pm.dashboardImport.clickImportButton();
 
     await waitForDashboardPage(page);
-    await expect(
-      page.getByRole("cell", { name: "Frontdoor" }).first()
-    ).toBeVisible();
+    await pm.dashboardImport.expectImportedDashboardVisible("Frontdoor");
 
     await pm.dashboardImport.deleteImportedDashboard("01", "Frontdoor");
   });
@@ -369,29 +335,24 @@ test.describe("dashboard Import testcases", () => {
     await pm.dashboardImport.clickImportDashboard();
 
     await pm.dashboardImport.clickUrlImportTab();
-    await page
-      .getByLabel("Add your url")
-      .fill(
-        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Azure/Azure%20Loadblancer.dashboard.json"
-      );
+    await pm.dashboardImport.fillUrlImport(
+      "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Azure/Azure%20Loadblancer.dashboard.json"
+    );
 
-    await page.waitForSelector(".view-lines", { state: "visible", timeout: 10000 });
-    await expect(
-      page
-        .locator(".view-lines")
-        .locator(".view-line")
-        .filter({ hasText: '"dashboardId": "' })
-        .nth(0)
-    ).toBeVisible();
+    await pm.dashboardImport.waitForEditorContains(
+      '"dashboardId":',
+      "url"
+    );
 
     //is used for setting the file to be imported
 
     await pm.dashboardImport.clickImportButton();
     await waitForDashboardPage(page);
 
-    await expect(
-      page.getByRole("cell", { name: "Azure Loadblancer" }).first()
-    ).toBeVisible({ timeout: 20000 });
+    await pm.dashboardImport.expectImportedDashboardVisible(
+      "Azure Loadblancer",
+      20000
+    );
 
     await pm.dashboardImport.deleteImportedDashboard("01", "Azure Loadblancer");
 
@@ -422,26 +383,20 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickUrlImportTab();
 
-    await page
-      .getByLabel("Add your url")
-      .fill(
-        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
-      );
+    await pm.dashboardImport.fillUrlImport(
+      "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
+    );
 
-    // Wait for JSON content to load
-    // await page.locator('.view-lines .view-line').first().waitFor({ state: "visible", timeout: 10000 });
-
-    await page.waitForTimeout(5000);
+    // Wait for JSON content to load in the URL editor
+    await pm.dashboardImport.waitForEditorContains('"dashboardId":', "url");
 
     await pm.dashboardImport.clickImportButton();
 
     await waitForDashboardPage(page);
 
-    await expect(
-      page
-        .locator('div[title="Kubernetes / Compute Resources / Cluster"]')
-        .first()
-    ).toBeVisible();
+    await pm.dashboardImport.expectImportedDashboardVisible(
+      "Kubernetes / Compute Resources / Cluster"
+    );
 
     await pm.dashboardImport.deleteImportedDashboard(
       "01",

@@ -9,7 +9,7 @@
         :class="['o2-ai-context-btn', props.class]"
         :style="props.style"
         >
-        <div class="row items-center no-wrap">
+        <div class="tw:flex tw:items-center tw:flex-nowrap">
             <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon" />
         </div>
     </OButton>

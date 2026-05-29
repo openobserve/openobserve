@@ -15,7 +15,6 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 const mockSearchObj = {
   meta: {
@@ -32,7 +31,6 @@ vi.mock("@/composables/useTraces", () => ({
 
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 
-installQuasar();
 
 describe("TraceLatencyCell", () => {
   let wrapper: VueWrapper;
@@ -152,9 +150,8 @@ describe("TraceLatencyCell", () => {
   });
 
   describe("tooltip content", () => {
-    // QTooltip is teleported in real Quasar; stub it as a plain div so the
-    // slot content is accessible via wrapper.text() in jsdom.
-    const tooltipStubs = { QTooltip: { template: "<div><slot /></div>" } };
+    // OTooltip renders content in a #content slot; stub it as a plain div.
+    const tooltipStubs = { OTooltip: { template: "<div><slot name='content' /></div>" } };
 
     it("shows service name in tooltip", () => {
       wrapper = mount(TraceLatencyCell, {

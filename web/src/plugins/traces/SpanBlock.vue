@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex wrap justify-start items-center"
+    class="tw:flex wrap tw:justify-start tw:items-center"
     :class="[
       defocusSpan ? 'defocus' : '',
-      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+      store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
     ]"
     :style="{
       zIndex: 2,
@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
+      class="tw:flex tw:justify-between tw:items-end tw:cursor-pointer span-block relative-position"
+      :class="[store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
         width: '100%',
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width: '100%',
           overflow: 'hidden',
         }"
-        class="cursor-pointer flex items-center no-wrap position-relative"
+        class="tw:cursor-pointer tw:flex tw:items-center tw:flex-nowrap position-relative"
         :class="defocusSpan ? 'defocus' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left: leftPosition + '%',
             position: 'relative',
           }"
-          class="flex justify-start items-center no-wrap"
+          class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
@@ -77,14 +77,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="text-caption flex items-center"
+          class="tw:text-xs tw:flex tw:items-center"
           data-test="span-block-duration"
         >
           <div>
             {{ formatTimeWithSuffix(span.durationUs) }}
           </div>
         </div>
-        <q-resize-observer debounce="300" @resize="onResize" />
       </div>
     </div>
   </div>
@@ -96,6 +95,7 @@ import {
   computed,
   ref,
   onMounted,
+  onBeforeUnmount,
   nextTick,
   watch,
   onActivated,
@@ -149,6 +149,8 @@ export default defineComponent({
     const { searchObj } = useTraces();
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
+    let _resizeObserver: ResizeObserver | null = null;
+    let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const onePixelPercent = ref(0);
     const defocusSpan = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return false;
@@ -201,6 +203,14 @@ export default defineComponent({
             inline: "nearest", // Keep horizontal alignment as close as possible
           });
         }
+      }
+
+      if (spanBlock.value) {
+        _resizeObserver = new ResizeObserver(() => {
+          if (_debounceTimer) clearTimeout(_debounceTimer);
+          _debounceTimer = setTimeout(() => onResize(), 300);
+        });
+        _resizeObserver.observe(spanBlock.value);
       }
     });
 
@@ -274,6 +284,11 @@ export default defineComponent({
     const onResize = () => {
       spanBlockWidth.value = spanBlock.value.clientWidth;
     };
+
+    onBeforeUnmount(() => {
+      if (_debounceTimer) clearTimeout(_debounceTimer);
+      _resizeObserver?.disconnect();
+    });
 
     const onSpanHover = () => {
       emit("hover");

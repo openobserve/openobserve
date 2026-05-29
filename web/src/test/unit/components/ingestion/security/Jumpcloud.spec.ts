@@ -3,7 +3,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import Jumpcloud from "@/components/ingestion/security/Jumpcloud.vue";
 
 vi.mock("@/composables/useIngestion", () => ({
@@ -14,6 +13,7 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
+
 describe("Jumpcloud.vue", () => {
   let store: any;
   beforeEach(() => {
@@ -23,7 +23,7 @@ describe("Jumpcloud.vue", () => {
   const mountComponent = () => {
     return mount(Jumpcloud, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
       },
     });

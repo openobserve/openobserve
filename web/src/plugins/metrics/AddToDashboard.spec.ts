@@ -21,16 +21,10 @@ import { nextTick } from "vue";
 // Mock all external modules before the component is imported
 // ---------------------------------------------------------------------------
 
-const mockNotify = vi.fn(() => vi.fn());
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+const mockToast = vi.fn(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => mockStore,
@@ -103,6 +97,45 @@ const mockStore = {
 };
 
 // ---------------------------------------------------------------------------
+// ODrawer stub — mirrors the migrated component's overlay surface.
+// Renders the default slot so children (form, dropdowns) are queryable.
+// Exposes all migrated props and emits so we can assert on them.
+// ---------------------------------------------------------------------------
+const ODrawerStub = {
+  name: "ODrawer",
+  template:
+    "<div class='o-drawer-stub' :data-test='$attrs[\"data-test\"]' :data-open='open'>" +
+    "<slot name='header' />" +
+    "<slot />" +
+    "<slot name='footer' />" +
+    "</div>",
+  props: [
+    "open",
+    "side",
+    "persistent",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "seamless",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+};
+
+// ---------------------------------------------------------------------------
 // Minimal dashboard panel data used across tests
 // ---------------------------------------------------------------------------
 const defaultDashboardPanelData = {
@@ -124,25 +157,16 @@ const createWrapper = (props: Record<string, any> = {}) => {
   return mount(AddToDashboard, {
     props: {
       dashboardPanelData: defaultDashboardPanelData,
+      open: true,
       ...props,
     },
     global: {
       stubs: {
-        QCard: { template: "<div class='q-card'><slot /></div>" },
-        QCardSection: {
-          template: "<div class='q-card-section'><slot /></div>",
-        },
-        QSeparator: { template: "<div class='q-separator' />" },
+        ODrawer: ODrawerStub,
         QForm: {
           template:
             "<form class='q-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
           emits: ["submit"],
-        },
-        QBtn: {
-          template:
-            "<button class='q-btn' :data-test='$attrs[\"data-test\"]' :disabled='disable' @click='$emit(\"click\", $event)'><slot /></button>",
-          props: ["label", "loading", "disable", "type", "flat", "dense", "noCaps"],
-          emits: ["click"],
         },
         QInput: {
           template:
@@ -286,6 +310,33 @@ describe("AddToDashboard — props", () => {
     // The component uses it internally; verify the prop was received
     expect(wrapper.props("dashboardPanelData")).toEqual(customData);
   });
+
+  it("accepts open prop and forwards it to ODrawer", async () => {
+    const wrapper = createWrapper({ open: true });
+    await flushPromises();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.exists()).toBe(true);
+    expect(drawer.props("open")).toBe(true);
+  });
+
+  it("defaults open prop to false when not provided", async () => {
+    const wrapper = mount(AddToDashboard, {
+      props: { dashboardPanelData: defaultDashboardPanelData },
+      global: {
+        stubs: {
+          ODrawer: ODrawerStub,
+          QForm: true,
+          QInput: true,
+          SelectFolderDropdown: true,
+          SelectDashboardDropdown: true,
+          SelectTabDropdown: true,
+        },
+      },
+    });
+    await flushPromises();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("open")).toBe(false);
+  });
 });
 
 describe("AddToDashboard — updateActiveFolderId", () => {
@@ -408,19 +459,19 @@ describe("AddToDashboard — onSubmit validation", () => {
     vi.clearAllMocks();
   });
 
-  it("shows a negative notification when selectedDashboard is null", async () => {
+  it("shows an error notification when selectedDashboard is null", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     // selectedDashboard is null, activeTabId is null
     await wrapper.vm.onSubmit.execute();
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" }),
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
     );
   });
 
-  it("shows a negative notification when selectedDashboard is set but activeTabId is null", async () => {
+  it("shows an error notification when selectedDashboard is set but activeTabId is null", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     wrapper.vm.selectedDashboard = "dash-1";
@@ -429,8 +480,8 @@ describe("AddToDashboard — onSubmit validation", () => {
     await wrapper.vm.onSubmit.execute();
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative" }),
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
     );
   });
 
@@ -483,7 +534,7 @@ describe("AddToDashboard — onSubmit validation", () => {
     expect(wrapper.emitted("save")).toBeTruthy();
   });
 
-  it("shows positive notification after successful panel addition", async () => {
+  it("shows success notification after successful panel addition", async () => {
     const wrapper = createWrapper();
     await flushPromises();
 
@@ -494,8 +545,8 @@ describe("AddToDashboard — onSubmit validation", () => {
     await wrapper.vm.onSubmit.execute();
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "positive" }),
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "success" }),
     );
   });
 
@@ -578,7 +629,7 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
   it("calls dismiss function in finally block", async () => {
     const dismissFn = vi.fn();
-    mockNotify.mockReturnValue(dismissFn);
+    mockToast.mockReturnValue(dismissFn);
     mockAddPanel.mockRejectedValue(new Error("error"));
 
     const wrapper = createWrapper();
@@ -654,29 +705,145 @@ describe("AddToDashboard — store theme integration", () => {
     await flushPromises();
     expect(wrapper.vm.store).toBe(mockStore);
   });
+});
 
-  it("renders cancel button with data-test attribute", async () => {
+// ---------------------------------------------------------------------------
+// ODrawer surface — props, emits, and wiring contract
+// ---------------------------------------------------------------------------
+
+describe("AddToDashboard — ODrawer surface", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAddPanel.mockResolvedValue({});
+    mockUseLoadingIsLoading.value = false;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the ODrawer with the migrated data-test attribute", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     expect(
-      wrapper.find('[data-test="metrics-schema-cancel-button"]').exists(),
+      wrapper.find('[data-test="add-to-dashboard-dialog"]').exists(),
     ).toBe(true);
   });
 
-  it("renders submit button with data-test attribute", async () => {
+  it("passes the localized title to ODrawer", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(
-      wrapper
-        .find('[data-test="metrics-schema-update-settings-button"]')
-        .exists(),
-    ).toBe(true);
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("title")).toBe("dashboard.addDashboard");
   });
 
-  it("renders title text element", async () => {
+  it("passes the localized primary button label to ODrawer", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(wrapper.find('[data-test="schema-title-text"]').exists()).toBe(true);
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("primaryButtonLabel")).toBe("metrics.add");
+  });
+
+  it("passes a secondary button label (Cancel) to ODrawer", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+  });
+
+  it("passes the configured width (30) to ODrawer", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("width")).toBe(30);
+  });
+
+  it("disables the primary button when panelTitle is empty", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    // panelTitle starts empty
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("primaryButtonDisabled")).toBe(true);
+  });
+
+  it("enables the primary button once panelTitle has non-whitespace content", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    wrapper.vm.panelTitle = "My Panel";
+    await nextTick();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("primaryButtonDisabled")).toBe(false);
+  });
+
+  it("keeps the primary button disabled when panelTitle is only whitespace", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    wrapper.vm.panelTitle = "   ";
+    await nextTick();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("primaryButtonDisabled")).toBe(true);
+  });
+
+  it("reflects useLoading.isLoading on the primary button loading prop", async () => {
+    mockUseLoadingIsLoading.value = true;
+    const wrapper = createWrapper();
+    await flushPromises();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.props("primaryButtonLoading")).toBe(true);
+  });
+
+  it("invokes onSubmit.execute when ODrawer emits click:primary", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+    wrapper.vm.panelTitle = "Panel";
+
+    const drawer = wrapper.findComponent(ODrawerStub);
+    await drawer.vm.$emit("click:primary");
+    await flushPromises();
+
+    expect(mockAddPanel).toHaveBeenCalled();
+  });
+
+  it("emits update:open=false when ODrawer emits click:secondary", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    const drawer = wrapper.findComponent(ODrawerStub);
+    await drawer.vm.$emit("click:secondary");
+    await nextTick();
+
+    const events = wrapper.emitted("update:open");
+    expect(events).toBeTruthy();
+    expect(events![events!.length - 1]).toEqual([false]);
+  });
+
+  it("re-emits update:open with the same value when ODrawer emits update:open", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    const drawer = wrapper.findComponent(ODrawerStub);
+    await drawer.vm.$emit("update:open", false);
+    await nextTick();
+
+    const events = wrapper.emitted("update:open");
+    expect(events).toBeTruthy();
+    expect(events![events!.length - 1]).toEqual([false]);
+  });
+
+  it("re-emits update:open=true when ODrawer emits update:open=true", async () => {
+    const wrapper = createWrapper({ open: false });
+    await flushPromises();
+
+    const drawer = wrapper.findComponent(ODrawerStub);
+    await drawer.vm.$emit("update:open", true);
+    await nextTick();
+
+    const events = wrapper.emitted("update:open");
+    expect(events).toBeTruthy();
+    expect(events![events!.length - 1]).toEqual([true]);
   });
 });
 

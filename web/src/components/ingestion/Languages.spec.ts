@@ -1,12 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import Languages from "@/components/ingestion/Languages.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { useQuasar } from "quasar";
 
-installQuasar();
 
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
@@ -71,14 +69,14 @@ describe("Languages Component", () => {
           store,
         },
         stubs: {
-          'q-splitter': {
+          'OSplitter': {
+            name: 'OSplitter',
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
           },
-          'q-input': true,
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true,
-          'q-icon': true
+          'OInput': true,
+          'OTabs': true,
+          'ORouteTab': true,
+          'router-view': true
         }
       },
     });
@@ -117,14 +115,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -155,14 +152,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -182,14 +178,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -215,14 +210,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -250,14 +244,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -518,14 +511,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -536,8 +528,8 @@ describe("Languages Component", () => {
   });
 
   describe("Template Rendering", () => {
-    it("should render q-splitter component", () => {
-      const splitterWrapper = wrapper.find('[modelValue="270"]');
+    it("should render OSplitter component", () => {
+      const splitterWrapper = wrapper.findComponent({ name: 'OSplitter' });
       expect(splitterWrapper.exists()).toBe(true);
     });
 
@@ -564,14 +556,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -593,14 +584,13 @@ describe("Languages Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-splitter': {
+              'OSplitter': {
                 template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
               },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true,
-              'q-icon': true
+              'OInput': true,
+              'OTabs': true,
+              'ORouteTab': true,
+              'router-view': true
             }
           },
         });
@@ -626,14 +616,13 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store: emptyStore },
           stubs: {
-            'q-splitter': {
+            'OSplitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
+            'OInput': true,
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
           }
         },
       });
@@ -661,14 +650,13 @@ describe("Languages Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-splitter': {
+              'OSplitter': {
                 template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
               },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true,
-              'q-icon': true
+              'OInput': true,
+              'OTabs': true,
+              'ORouteTab': true,
+              'router-view': true
             }
           },
         });

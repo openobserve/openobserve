@@ -43,22 +43,15 @@ const displayName = computed(
 </script>
 
 <template>
-  <div v-if="integration" class="q-pa-sm">
+  <div v-if="integration" class="tw:p-2">
     <div class="tw:text-[16px]">
       <CopyContent :content="aiContent" />
-      <div class="tw:pt-6">
-        <a
-          :href="docURL"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-blue-500 tw:underline"
-        >
-          Click here to check further documentation.
-        </a>
+      <div class="tw:font-bold tw:pt-6 tw:pb-2">
+        Click <a :href="docURL" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
       </div>
     </div>
   </div>
-  <div v-else class="q-pa-sm">
+  <div v-else class="tw:p-2">
     <p>Select an integration to view details.</p>
   </div>
 </template>

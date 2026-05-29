@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { ref, computed, watch } from 'vue';
-import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 
 // Services
@@ -53,6 +52,7 @@ import type {
 
 // Store
 import { useStore } from 'vuex';
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 /**
  * Parses a comma/space-separated string of email recipients into an array.
@@ -70,7 +70,6 @@ function parseEmailRecipients(recipients: string | string[]): string[] {
  * Provides functionality for template management, validation, testing, and creation
  */
 export function usePrebuiltDestinations() {
-  const $q = useQuasar();
   const { t } = useI18n();
   const store = useStore();
 
@@ -532,16 +531,15 @@ export function usePrebuiltDestinations() {
         data: destinationData
       });
 
-      $q.notify({
-        type: 'positive',
+      toast({
+        variant: "success",
         message: t('alerts.destinations.saved'),
-        timeout: 2000
       });
 
     } catch (error: any) {
       console.error('Failed to create prebuilt destination:', error);
-      $q.notify({
-        type: 'negative',
+      toast({
+        variant: "error",
         message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
@@ -652,16 +650,15 @@ export function usePrebuiltDestinations() {
         data: destinationData
       });
 
-      $q.notify({
-        type: 'positive',
+      toast({
+        variant: "success",
         message: t('alerts.destinations.saved'),
-        timeout: 2000
       });
 
     } catch (error: any) {
       console.error('Failed to update prebuilt destination:', error);
-      $q.notify({
-        type: 'negative',
+      toast({
+        variant: "error",
         message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
@@ -748,16 +745,15 @@ export function usePrebuiltDestinations() {
         data: updatedData
       });
 
-      $q.notify({
-        type: 'positive',
+      toast({
+        variant: "success",
         message: t('alerts.prebuilt.conversionSuccess'),
-        timeout: 2000
       });
 
     } catch (error: any) {
       console.error('Failed to convert destination:', error);
-      $q.notify({
-        type: 'negative',
+      toast({
+        variant: "error",
         message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;

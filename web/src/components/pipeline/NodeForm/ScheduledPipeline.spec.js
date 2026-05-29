@@ -1,7 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify, useQuasar } from "quasar";
-import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -9,27 +7,10 @@ import ScheduledPipeline from "./ScheduledPipeline.vue";
 import searchService from "@/services/search";
 import { nextTick } from 'vue';
 
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  let isFullscreenActive = false;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(() => vi.fn()),
-      fullscreen: {
-        get isActive() { return isFullscreenActive; },
-        toggle: vi.fn(() => {
-          isFullscreenActive = !isFullscreenActive;
-        }),
-      }
-    })
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock services and composables
 vi.mock("@/services/search", () => ({
@@ -150,7 +131,7 @@ describe("ScheduledPipeline Component", () => {
           'q-select': true,
           'q-input': true,
           'q-btn': true,
-          'q-icon': true,
+          'OIcon': true,
           'q-tooltip': true,
           'q-table': true,
           'DateTime': true,
@@ -377,6 +358,66 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
       expect(wrapper.vm.cursorPosition).toBe(15);
     });
+
+    it("inserts SQL filters before GROUP BY", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi
+          .fn()
+          .mockReturnValue(
+            'SELECT max(_timestamp), count(*) FROM "stream1" GROUP BY histogram(_timestamp)',
+          ),
+        setValue: vi.fn(),
+      };
+      wrapper.vm.pipelineEditorRef = mockEditorRef;
+      wrapper.vm.tab = "sql";
+
+      await wrapper.vm.handleSidebarEvent("add-field", "service='api'");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        'SELECT max(_timestamp), count(*) FROM "stream1" where service=\'api\' GROUP BY histogram(_timestamp)',
+      );
+    });
+
+    it("appends SQL filters inside existing WHERE before GROUP BY", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi
+          .fn()
+          .mockReturnValue(
+            'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' GROUP BY histogram(_timestamp)',
+          ),
+        setValue: vi.fn(),
+      };
+      wrapper.vm.pipelineEditorRef = mockEditorRef;
+      wrapper.vm.tab = "sql";
+
+      await wrapper.vm.handleSidebarEvent("add-field", "service='api'");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' AND service=\'api\' GROUP BY histogram(_timestamp)',
+      );
+    });
+
+    it("removes SQL field filters instead of adding the field name", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi
+          .fn()
+          .mockReturnValue(
+            'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' AND service=\'api\' GROUP BY histogram(_timestamp)',
+          ),
+        setValue: vi.fn(),
+      };
+      wrapper.vm.pipelineEditorRef = mockEditorRef;
+      wrapper.vm.tab = "sql";
+
+      await wrapper.vm.handleSidebarEvent("remove-field", "service");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' GROUP BY histogram(_timestamp)',
+      );
+    });
   });
 
   describe("Function Management", () => {
@@ -497,12 +538,15 @@ describe("ScheduledPipeline Component", () => {
 
       // Mock the previewPromqlQueryRef
       const mockRefreshData = vi.fn();
+
+      // Simulate run query button click
+      wrapper.vm.expandState.output = true;
+      await nextTick();
+      // Set the template ref after expandState re-render
       wrapper.vm.previewPromqlQueryRef = {
         refreshData: mockRefreshData
       };
 
-      // Simulate run query button click
-      wrapper.vm.expandState.output = true;
       await wrapper.vm.runQuery();
 
       // Wait for nextTick to complete
@@ -738,4 +782,3 @@ describe("ScheduledPipeline Component", () => {
     });
   });
 });
-

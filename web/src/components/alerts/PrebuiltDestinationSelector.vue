@@ -35,10 +35,10 @@ limitations under the License. -->
               :alt="type.name"
               class="destination-logo"
             />
-            <q-icon
+            <OIcon
               v-else
               :name="getIconName(type.icon)"
-              size="1.5rem"
+              size="md"
             />
           </div>
 
@@ -51,14 +51,14 @@ limitations under the License. -->
           <p data-test="destination-type-description" class="card-description">
             {{ type.description }}
           </p>
+        </div>
 
-          <!-- Selection Indicator -->
-          <div
-            v-if="selectedType === type.id"
-            class="check-icon"
-          >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
-          </div>
+        <!-- Selection Indicator -->
+        <div
+          v-if="selectedType === type.id"
+          class="check-icon"
+        >
+          <OIcon name="check" size="xs" />
         </div>
       </div>
 
@@ -72,7 +72,7 @@ limitations under the License. -->
       >
         <div class="card-content">
           <div class="card-icon">
-            <q-icon name="settings" size="1.5rem" />
+            <OIcon name="settings" size="md" />
           </div>
           <h3 data-test="destination-type-name" class="card-title">
             {{ t('alerts.customDestination') }}
@@ -80,12 +80,14 @@ limitations under the License. -->
           <p data-test="destination-type-description" class="card-description">
             {{ t('alerts.customDestinationDescription') }}
           </p>
-          <div
-            v-if="selectedType === 'custom'"
-            class="check-icon"
-          >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
-          </div>
+        </div>
+
+        <!-- Selection Indicator -->
+        <div
+          v-if="selectedType === 'custom'"
+          class="check-icon"
+        >
+          <OIcon name="check" size="xs" />
         </div>
       </div>
     </div>
@@ -97,6 +99,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { PREBUILT_DESTINATION_TYPES } from '@/utils/prebuilt-templates';
 import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Define component props
 interface Props {
@@ -238,8 +241,17 @@ function getIconName(icon: string): string {
       position: absolute;
       top: 0.375rem;
       right: 0.375rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--o2-positive);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
     }
   }
 }
-
 </style>

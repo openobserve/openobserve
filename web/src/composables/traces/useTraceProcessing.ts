@@ -440,20 +440,20 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
 function getStatusIcon(status?: SpanStatus): string {
   switch (status) {
     case SpanStatus.OK:
-      return "check_circle";
+      return "check-circle";
     case SpanStatus.ERROR:
       return "error";
     default:
-      return "radio_button_unchecked";
+      return "radio-button-unchecked";
   }
 }
 
 export function getKindIcon(kind?: SpanKind): string {
   switch (kind) {
     case SpanKind.CLIENT:
-      return "call_made";
+      return "call-made";
     case SpanKind.SERVER:
-      return "call_received";
+      return "call-received";
     case SpanKind.PRODUCER:
       return "send";
     case SpanKind.CONSUMER:
@@ -461,7 +461,7 @@ export function getKindIcon(kind?: SpanKind): string {
     case SpanKind.INTERNAL:
       return "settings";
     default:
-      return "help_outline";
+      return "help-outline";
   }
 }
 

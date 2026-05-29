@@ -18,17 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div :key="store.state.selectedOrganization.identifier">
-    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+    <div class="tw:pb-[0.625rem]">
       <div class="card-container">
-        <div class="flex justify-between items-center q-py-sm q-px-md">
+        <div class="tw:flex tw:justify-between tw:items-center tw:py-2 tw:px-3">
           <div class="performance_title">
             {{ t("rum.performanceSummaryLabel") }}
           </div>
-          <div class="flex items-center tw:gap-[0.5rem]">
+          <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
             <DateTimePickerDashboard
               class="rum-date-time-picker"
               ref="dateTimePicker"
               v-model="selectedDate"
+              menu-align="end"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -36,28 +37,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               trigger
-              class="app-performance-auto-refresh-interval tw:pl-0! tw:overflow-hidden!"
+              class="app-performance-auto-refresh-interval"
               @trigger="refreshData"
             />
             <OButton
+              icon-left="refresh"
               :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
               size="icon-toolbar"
               data-test="rum-performance-refresh"
               @click="refreshData"
             >
-              <q-icon name="refresh" size="16px" />
-              <q-tooltip>
-                {{
-                  isVariablesChanged
-                    ? t("dashboard.refreshToApplyVariableChanges")
-                    : t("dashboard.refresh")
-                }}
-              </q-tooltip>
+              <OTooltip :content="isVariablesChanged ? t('dashboard.refreshToApplyVariableChanges') : t('dashboard.refresh')" />
             </OButton>
           </div>
         </div>
         <OTabs
-          class="q-px-md"
+          class="tw:px-3"
           v-model="activePerformanceTab"
           align="left"
           dense
@@ -74,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div class="tw:pb-[0.375rem] tw:px-[0.625rem] tw:h-[calc(100%-101px)]!">
+        <div class="tw:flex-1 tw:min-h-0">
           <div
-            class="card-container tw:py-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="card-container tw:h-full tw:overflow-hidden"
           >
             <component
               :is="Component"
@@ -119,6 +114,7 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -128,6 +124,7 @@ export default defineComponent({
     OTab,
     DateTimePickerDashboard,
     OButton,
+    OTooltip,
   },
   setup() {
     const { t } = useI18n();
@@ -457,18 +454,6 @@ export default defineComponent({
   }
 }
 
-:deep(.app-performance-auto-refresh-interval) {
-  .q-btn {
-    height: 1.9rem !important;
-    min-height: 1.9rem !important;
-    border-radius: 0.375rem !important;
-    padding: 0.125rem 0.25rem !important;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
 </style>
 
 <style lang="scss">

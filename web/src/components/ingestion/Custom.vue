@@ -16,20 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
-    class="tw:h-[calc(100vh-140px)]"
+    class="tw:h-full"
   >
     <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-full">
           <OTabs
             v-model="tabs"
             orientation="vertical"
           >
             <ORouteTab
               name="ingestLogs"
+              data-test="ingestion-custom-tab-ingestLogs"
               :to="{
                 name: 'ingestLogs',
                 query: {
@@ -40,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <ORouteTab
               name="ingestMetrics"
+              data-test="ingestion-custom-tab-ingestMetrics"
               :to="{
                 name: 'ingestMetrics',
                 query: {
@@ -50,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <ORouteTab
               name="ingestTraces"
+              data-test="ingestion-custom-tab-ingestTraces"
               :to="{
                 name: 'ingestTraces',
                 query: {
@@ -64,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:after>
-      <div class="tw:overflow-hidden tw:h-full tw:pr-[0.625rem]">
+      <div class="tw:overflow-hidden tw:h-full">
         <router-view
           :title="tabs"
           :currOrgIdentifier="currOrgIdentifier"
@@ -74,25 +77,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </router-view>
       </div>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "CustomPage",
-  components: { OTabs, ORouteTab },
+  components: { OTabs, ORouteTab, OSplitter },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -102,7 +106,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
@@ -184,28 +187,20 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
+      copyToClipboard(content.innerText, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      }).then((success: boolean) => {
+        if (success) {
+          segment.track("Button Click", {
+            button: "Copy to Clipboard",
+            ingestion: router.currentRoute.value.name,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Ingestion",
           });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
+        }
       });
     };
 
@@ -250,7 +245,7 @@ export default defineComponent({
     }
   }
 
-  .q-icon > img {
+  .OIcon > img {
     height: auto !important;
   }
 }

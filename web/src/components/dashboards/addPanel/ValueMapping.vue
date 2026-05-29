@@ -28,23 +28,20 @@
           : t("dashboard.addValueMapping")
       }}
     </OButton>
-    <q-dialog v-model="showValueMappingPopUp">
-      <ValueMappingPopUp
-        :value-mapping="
-          JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
-        "
-        @close="showValueMappingPopUp = false"
-        @save="saveValueMappingConfig"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </q-dialog>
+    <ValueMappingPopUp
+      :open="showValueMappingPopUp"
+      :value-mapping="
+        JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
+      "
+      @close="showValueMappingPopUp = false"
+      @save="saveValueMappingConfig"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
 import { onBeforeMount } from "vue";
@@ -56,7 +53,6 @@ export default defineComponent({
   props: [],
   setup() {
     const { t } = useI18n();
-    const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -85,7 +81,6 @@ export default defineComponent({
 
     return {
       t,
-      store,
       dashboardPanelData,
       showValueMappingPopUp,
       openValueMappingPopUp,

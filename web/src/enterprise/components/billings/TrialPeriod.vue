@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width trial-period-container q-pa-md gradient-banner" v-if="showTrialPeriodMsg == true">
-    <div class="row">
-      <div class="col">
+  <div class="tw:w-full trial-period-container tw:p-3 gradient-banner" v-if="showTrialPeriodMsg == true">
+    <div class="tw:flex">
+      <div class="tw:flex tw:flex-col">
         <span class="o2-trial-message">{{ getTrialPeriodMessage() }}</span>
         <br />
         <span class="o2-trial-subtitle">Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
       </div>
-      <div class="col-2 q-mt-sm" v-if="currentPage != 'billing'">
+      <div class="tw:w-1/6 tw:mt-2" v-if="currentPage != 'billing'">
         <OButton
           variant="primary"
           size="sm"
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("billing.upgradeNow") }}</OButton
         >
       </div>
-      <div class="col-2 q-mt-sm" v-if="currentPage == 'billing'">
+      <div class="tw:w-1/6 tw:mt-2" v-if="currentPage == 'billing'">
         <OButton
           variant="primary"
           size="sm"
@@ -50,7 +50,6 @@ import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import { getDueDays } from "@/utils/zincutils";
@@ -80,7 +79,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
 
     const hasTrialExpiry = Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry")

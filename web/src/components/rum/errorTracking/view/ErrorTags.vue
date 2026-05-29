@@ -16,45 +16,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tags-title text-bold q-ml-xs">{{ t("rum.tags") }}</div>
-    <div class="row items-center">
-      <div class="q-mr-lg items-center">
+    <div class="tags-title tw:font-bold tw:ml-1">{{ t("rum.tags") }}</div>
+    <div class="tw:flex tw:items-center">
+      <div class="tw:mr-4 tw:items-center">
         <img
           :src="ip"
           alt="IP"
-          class="q-mr-sm inline-block tw:w-[1.875rem]! tw:h-auto!"
+          class="tw:mr-2 tw:inline-block tw:w-[1.875rem]! tw:h-auto!"
         />
-        <div class="inline-block">
-          <div class="q-pl-xs">IP</div>
-          <span class="q-pl-xs"> {{ error.ip }} </span>
+        <div class="tw:inline-block">
+          <div class="tw:pl-1">IP</div>
+          <span class="tw:pl-1"> {{ error.ip }} </span>
         </div>
       </div>
-      <q-separator vertical />
-      <div class="q-mx-lg items-center">
+      <OSeparator vertical />
+      <div class="tw:mx-4 tw:items-center">
         <img
           :src="browserIcon"
           alt="Chrome"
-          class="q-mr-md inline-block tw:h-auto tw:w-[1.875rem]"
+          class="tw:mr-3 tw:inline-block tw:h-auto tw:w-[1.875rem]"
         />
-        <div class="inline-block">
-          <div class="q-pl-xs">{{ error.user_agent_user_agent_family }}</div>
-          <span class="q-pl-xs"> {{ getBrowserVersion }} </span>
+        <div class="tw:inline-block">
+          <div class="tw:pl-1">{{ error.user_agent_user_agent_family }}</div>
+          <span class="tw:pl-1"> {{ getBrowserVersion }} </span>
         </div>
       </div>
-      <q-separator vertical />
-      <div class="q-mx-lg items-center">
+      <OSeparator vertical />
+      <div class="tw:mx-4 tw:items-center">
         <img
           :src="osIcon"
           alt="OS"
-          class="q-mr-md inline-block tw:h-auto tw:w-[1.875rem]"
+          class="tw:mr-3 tw:inline-block tw:h-auto tw:w-[1.875rem]"
         />
-        <div class="inline-block">
-          <div class="q-pl-xs">{{ error.user_agent_os_family }}</div>
-          <div class="q-pl-xs row">{{ getOsVersion }}</div>
+        <div class="tw:inline-block">
+          <div class="tw:pl-1">{{ error.user_agent_os_family }}</div>
+          <div class="tw:pl-1 tw:flex">{{ getOsVersion }}</div>
         </div>
       </div>
     </div>
-    <div class="row items-center wrap q-mt-md">
+    <div class="tw:flex tw:items-center tw:flex-wrap tw:mt-3">
       <template v-for="(value, tag) in getTags" :key="tag">
         <ErrorTag :tag="{ key: tag, value }" />
       </template>
@@ -75,6 +75,7 @@ import windows from "@/assets/images/rum/windows.png";
 import mac from "@/assets/images/rum/mac.png";
 import linux from "@/assets/images/rum/linux.png";
 import { useI18n } from "vue-i18n";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 const { t } = useI18n();
 

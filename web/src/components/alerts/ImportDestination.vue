@@ -37,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full" style="min-width: 400px;">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
         >
           {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
           <!-- Destination Errors Section -->
           <div
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="destination-import-name-input"
                         :model-value="userSelectedDestinationName[index] || ''"
                         @update:model-value="(val) => {
@@ -81,13 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateDestinationName(val, index);
                         }"
                         :label="'Destination Name *'"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
                         tabindex="0"
                       />
                     </div>
@@ -103,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="destination-import-url-input"
                         :model-value="userSelectedDestinationUrl[index] || ''"
                         @update:model-value="(val) => {
@@ -111,13 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateDestinationUrl(val, index);
                         }"
                         :label="'Destination URL *'"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
                         tabindex="0"
                       />
                     </div>
@@ -133,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-select
+                      <OSelect
                         data-test="destination-import-type-input"
                         :model-value="userSelectedDestinationType[index] || ''"
                         @update:model-value="(val) => {
@@ -142,20 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="destinationTypes"
                         :label="'Destination Type *'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-py-sm showLabelOnTop no-case"
-                        filled
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        :input-debounce="400"
-                        behavior="menu"
+                        class="tw:py-2 showLabelOnTop no-case"
                       />
                     </div>
                   </span>
@@ -170,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-select
+                      <OSelect
                         data-test="destination-import-method-input"
                         :model-value="userSelectedDestinationMethod[index] || ''"
                         @update:model-value="(val) => {
@@ -179,20 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="destinationMethods"
                         :label="'Destination Method *'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-py-sm showLabelOnTop no-case"
-                        filled
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        :input-debounce="400"
-                        behavior="menu"
+                        class="tw:py-2 showLabelOnTop no-case"
                       />
                     </div>
                   </span>
@@ -207,34 +169,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <q-select
+                      <OSelect
                         data-test="destination-import-template-input"
                         :model-value="userSelectedTemplates[index] || ''"
                         @update:model-value="(val) => {
                           userSelectedTemplates[index] = val;
                           updateDestinationTemplate(val, index);
+                          templateErrors[index] = val ? '' : 'Field is required!';
                         }"
                         :options="filteredTemplates"
                         label="Templates *"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-py-sm showLabelOnTop no-case"
-                        filled
-                        stack-label
-                        dense
-                        use-input
-                        input-debounce="400"
-                        behavior="menu"
-                        hide-selected
-                        fill-input
-                        @filter="filterTemplates"
-                        :rules="[(val) => !!val || 'Field is required!']"
+                        class="tw:py-2 showLabelOnTop no-case"
+                        :error="!!templateErrors[index]"
+                        :error-message="templateErrors[index]"
+                        @search="filterTemplates"
                         style="width: 300px"
-                      >
-                      </q-select>
+                      />
                     </div>
                   </span>
 
@@ -248,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="destination-import-emails-input"
                         :model-value="userSelectedEmails[index] || ''"
                         @update:model-value="(val) => {
@@ -256,13 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateDestinationEmails(val, index);
                         }"
                         :label="'Emails (comma separated) *'"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
                         tabindex="0"
                       />
                     </div>
@@ -278,36 +222,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <q-select
+                      <OSelect
                         data-test="destination-import-action-input"
                         :model-value="userSelectedActionId[index] || ''"
                         @update:model-value="(val) => {
                           userSelectedActionId[index] = val;
                           updateDestinationAction(val, index);
+                          actionErrors[index] = val ? '' : 'Field is required!';
                         }"
                         :options="filteredActions"
                         label="Actions *"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-py-sm showLabelOnTop no-case"
-                        filled
-                        stack-label
-                        dense
-                        use-input
-                        emit-value
-                        map-options
-                        input-debounce="400"
-                        behavior="menu"
-                        hide-selected
-                        fill-input
-                        @filter="filterActions"
-                        :rules="[(val) => !!val || 'Field is required!']"
+                        labelKey="label"
+                        valueKey="value"
+                        class="tw:py-2 showLabelOnTop no-case"
+                        :error="!!actionErrors[index]"
+                        :error-message="actionErrors[index]"
+                        @search="filterActions"
                         style="width: 300px"
-                      >
-                      </q-select>
+                      />
                     </div>
                   </span>
 
@@ -321,16 +253,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-toggle
+                      <OSwitch
                         data-test="destination-import-skip-tls-verify-input"
-                        :model-value="
-                          userSelectedSkipTlsVerify[index] ?? false
-                        "
+                        :model-value="userSelectedSkipTlsVerify[index] ?? false"
                         :label="t('alert_destinations.skip_tls_verify')"
-                        class="q-mt-sm"
-                        @update:model-value="
-                          updateSkipTlsVerify($event, index)
-                        "
+                        class="tw:mt-2"
+                        @update:model-value="updateSkipTlsVerify($event, index)"
                       />
                     </div>
                   </span>
@@ -357,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'error-item text-bold': true,
+                  'error-item tw:font-bold': true,
                   'text-green ': val.success,
                   'text-red': !val.success,
                 }"
@@ -378,15 +306,20 @@ import {
   defineComponent,
   ref,
   computed,
+  reactive,
   onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import destinationService from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "ImportDestination",
@@ -419,7 +352,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
     const { isActionsEnabled } = useActions();
 
     const baseImportRef = ref<any>(null);
@@ -440,6 +372,8 @@ export default defineComponent({
     const userSelectedSkipTlsVerify = ref<boolean[]>([]);
     const filteredTemplates = ref<string[]>([]);
     const filteredActions = ref<any[]>([]);
+    const templateErrors = reactive<Record<number, string>>({});
+    const actionErrors = reactive<Record<number, string>>({});
 
     // Use computed to directly reference BaseImport's jsonArrayOfObj
     const jsonArrayOfObj = computed({
@@ -595,39 +529,50 @@ export default defineComponent({
       }
     };
 
-    const filterTemplates = (val: string, update: Function) => {
-      if (val === "") {
-        update(() => {
-          filteredTemplates.value = getFormattedTemplates.value;
-        });
+    const filterTemplates = (val: string) => {
+      if (!val) {
+        filteredTemplates.value = getFormattedTemplates.value;
         return;
       }
-
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredTemplates.value = getFormattedTemplates.value.filter(
-          (v: string) => v.toLowerCase().indexOf(needle) > -1,
-        );
-      });
+      const needle = val.toLowerCase();
+      filteredTemplates.value = getFormattedTemplates.value.filter(
+        (v: string) => v.toLowerCase().indexOf(needle) > -1,
+      );
     };
 
-    const filterActions = (val: string, update: Function) => {
-      if (val === "") {
-        update(() => {
-          filteredActions.value = userSelectedActionOptions.value;
-        });
+    const filterActions = (val: string) => {
+      if (!val) {
+        filteredActions.value = userSelectedActionOptions.value;
         return;
       }
-
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredActions.value = userSelectedActionOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
-        );
-      });
+      const needle = val.toLowerCase();
+      filteredActions.value = userSelectedActionOptions.value.filter(
+        (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
+      );
     };
 
     const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+      // Validate correction fields that are currently displayed
+      let hasCorrectionErrors = false;
+      destinationErrorsToDisplay.value.forEach((errorGroup, idx) => {
+        for (const msg of errorGroup) {
+          if (typeof msg === 'object') {
+            if (msg.field === 'template_name' && !userSelectedTemplates.value[idx]) {
+              templateErrors[idx] = 'Field is required!';
+              hasCorrectionErrors = true;
+            }
+            if (msg.field === 'action_id' && !userSelectedActionId.value[idx]) {
+              actionErrors[idx] = 'Field is required!';
+              hasCorrectionErrors = true;
+            }
+          }
+        }
+      });
+      if (hasCorrectionErrors) {
+        if (baseImportRef.value) baseImportRef.value.isImporting = false;
+        return;
+      }
+
       destinationErrorsToDisplay.value = [];
       destinationCreators.value = [];
 
@@ -641,11 +586,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
+          variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -666,11 +609,9 @@ export default defineComponent({
       }
 
       if (successCount === totalCount) {
-        q.notify({
+        toast({
           message: `Successfully imported destination(s)`,
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
+          variant: "success",
         });
 
         setTimeout(() => {
@@ -706,11 +647,9 @@ export default defineComponent({
         }
         return false;
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Destination please check the JSON",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
+          variant: "error",
         });
         return false;
       }
@@ -938,7 +877,6 @@ export default defineComponent({
       t,
       importJson,
       router,
-      q,
       baseImportRef,
       destinationErrorsToDisplay,
       destinationCreators,
@@ -955,6 +893,8 @@ export default defineComponent({
       userSelectedSkipTlsVerify,
       filteredTemplates,
       filteredActions,
+      templateErrors,
+      actionErrors,
       updateDestinationType,
       updateDestinationMethod,
       updateDestinationName,
@@ -977,7 +917,11 @@ export default defineComponent({
     };
   },
   components: {
+    OSeparator,
     BaseImport,
+    OInput,
+    OSelect,
+    OSwitch,
   },
 });
 </script>

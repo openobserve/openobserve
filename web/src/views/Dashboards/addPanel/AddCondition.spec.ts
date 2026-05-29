@@ -551,7 +551,12 @@ describe("AddCondition.vue", () => {
     it("should contain AND and OR options", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.filterOptions).toEqual(["AND", "OR"]);
+      // After OSelect migration, filterOptions uses the {label, value} object
+      // shape required by OSelect instead of a flat string array.
+      expect(wrapper.vm.filterOptions).toEqual([
+        { label: "AND", value: "AND" },
+        { label: "OR", value: "OR" },
+      ]);
     });
   });
 

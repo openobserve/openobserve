@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     COMPACT_OLD_DATA_STREAM_SET,
     cluster::LOCAL_NODE,
@@ -34,9 +34,11 @@ use tokio::sync::mpsc;
 
 use crate::service::db;
 
+pub mod bloom_build;
 pub mod deleted;
 pub mod dump;
 pub mod flatten;
+pub mod incremental;
 pub mod merge;
 pub mod retention;
 pub mod stats;
@@ -272,7 +274,12 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
 /// compactor merging
 pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let jobs = infra_file_list::get_pending_jobs(&LOCAL_NODE.uuid, cfg.compact.batch_size).await?;
+    let jobs = infra_file_list::get_pending_jobs(
+        &LOCAL_NODE.uuid,
+        cfg.compact.batch_size,
+        cfg.compact.fast_mode,
+    )
+    .await?;
     if jobs.is_empty() {
         return Ok(());
     }
@@ -443,4 +450,31 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+pub(crate) fn is_past_hour(offset: i64) -> bool {
+    let time_now: DateTime<Utc> = Utc::now();
+    let time_now_hour = Utc
+        .with_ymd_and_hms(
+            time_now.year(),
+            time_now.month(),
+            time_now.day(),
+            time_now.hour(),
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
+    // must wait for at least 3 * max_file_retention_time
+    // -- first period: the last hour local file upload to storage, write file list
+    // -- second period, the last hour file list upload to storage
+    // -- third period, we can do the merge, so, at least 3 times of
+    // max_file_retention_time
+    offset < time_now_hour
+        && time_now.timestamp_micros() - offset
+            > Duration::try_seconds(get_config().limit.max_file_retention_time as i64)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
+                * 3
 }

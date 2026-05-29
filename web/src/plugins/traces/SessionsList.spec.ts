@@ -111,11 +111,8 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import SessionsList from "./SessionsList.vue";
 
-installQuasar({ plugins: [quasar.Notify] });
 
 const defaultProps = {
   streamName: "test-stream",

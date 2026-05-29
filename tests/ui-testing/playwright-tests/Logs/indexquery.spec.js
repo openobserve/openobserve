@@ -11,17 +11,21 @@ const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 // Legacy login function replaced by global authentication via navigateToBase
 
 const selectStream = async (pm, stream) => {
-  // Strategic 1000ms wait for stream selection UI stabilization - this is functionally necessary
-  await pm.page.waitForTimeout(1000);
+  // Stream selection UI stabilization - deterministic wait keyed on the index-dropdown wrapper
+  await pm.page.locator('[data-test="log-search-index-list-select-stream"]').waitFor({ state: 'visible', timeout: 15000 });
   await pm.logsPage.selectStream(stream);
 };
 
 async function applyQueryButton(pm) {
-  const search = pm.page.waitForResponse(logData.applyQuery);
-  // Strategic 1000ms wait for query preparation - this is functionally necessary
-  await pm.page.waitForTimeout(1000);
+  // Query preparation - deterministic wait keyed on refresh button readiness
+  await pm.page.locator('[data-test="logs-search-bar-refresh-btn"]').waitFor({ state: 'visible', timeout: 15000 });
+  const search = pm.page.waitForResponse(
+    (response) => /\/api\/.+\/_search/.test(response.url()),
+    { timeout: 30000 }
+  );
   await pm.logsPage.clickRefreshButton();
-  await expect.poll(async () => (await search).status()).toBe(200);
+  const response = await search;
+  expect(response.status()).toBe(200);
 }
 
 async function runQuery(page, query) {
@@ -75,9 +79,9 @@ test.describe("Compare SQL query execution times", () => {
     // Navigate to base URL with authentication
     await navigateToBase(page);
     pm = new PageManager(page);
-    
-    // Strategic 500ms wait for post-authentication stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+
+    // Post-authentication stabilization - deterministic wait keyed on DOM-ready state
+    await page.waitForLoadState('domcontentloaded');
 
     // Data ingestion for performance testing
     await ingestTestData(page);
@@ -285,8 +289,21 @@ test.describe("Compare SQL query execution times", () => {
     expect(ingestionResponse.status[0].successful).toBe(3);
     expect(ingestionResponse.status[0].failed).toBe(0);
     testLogger.info('Verified all 3 test logs were successfully ingested');
-    
-    await page.waitForTimeout(5000); // Wait for data to be indexed and available
+
+    // Wait for data to be indexed and available - poll the streams API until the new stream is discoverable
+    await expect.poll(async () => {
+      return await page.evaluate(async ({ url, headers, orgId, streamName }) => {
+        try {
+          const res = await fetch(`${url}/api/${orgId}/streams?type=logs`, { headers });
+          if (!res.ok) return false;
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data?.list || []);
+          return list.some((s) => s.name === streamName);
+        } catch {
+          return false;
+        }
+      }, { url: process.env.INGESTION_URL, headers, orgId, streamName });
+    }, { intervals: [1000, 1000, 1500, 2000], timeout: 30000 }).toBe(true);
 
     // Navigate to logs page and select test stream
     await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);

@@ -15,9 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
-import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -93,27 +91,22 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedWindow: "outlined_window",
+  "window": "outlined_window",
 }));
 
-// Mock Quasar useQuasar — notify must return a function for the dismiss pattern
+// Mock Toast — replaces quasar notify
 const mockNotifyDismiss = vi.fn();
 const mockNotify = vi.fn().mockReturnValue(mockNotifyDismiss);
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
 
 // ── Import component under test (after all mocks) ───────────────────────────
 
 import orgService from "@/services/organizations";
 import UsageTab from "./UsageTab.vue";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 // ── Mount factory ───────────────────────────────────────────────────────────
 
@@ -148,8 +141,8 @@ function mountUsageTab() {
           template: '<a data-test="usage-tab-router-link"><slot /></a>',
           props: ["to", "exact"],
         },
-        "q-icon": {
-          template: '<span class="q-icon-stub"></span>',
+        "OIcon": {
+          template: '<span class="OIcon-stub"></span>',
           props: ["name", "size"],
         },
       },
@@ -396,8 +389,9 @@ describe("UsageTab", () => {
       await flushPromises();
 
       expect(mockNotify).toHaveBeenCalledWith({
-        spinner: true,
+        variant: "loading",
         message: "Please wait while loading summary...",
+        timeout: 0,
       });
       // The returned dismiss function should have been called
       expect(mockNotifyDismiss).toHaveBeenCalled();
@@ -451,9 +445,8 @@ describe("UsageTab", () => {
       expect((wrapper.vm as any).isLoadingSummary).toBe(false);
       // Error notification should have been shown
       expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+        variant: "error",
         message: "Error while pulling summary.",
-        timeout: 2000,
       });
     });
 

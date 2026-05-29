@@ -10,23 +10,20 @@ export class CipherKeys {
 
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
         this.cipherKeyTab = page.locator('[data-test="management-cipher-key-tab"]');
-        this.addCipherKeyButton = page.getByRole('button', { name: 'New cipher key' });
+        this.addCipherKeyButton = page.locator('[data-test="cipher-keys-add-btn"]');
         this.nameInput = page.locator('[data-test="add-cipher-key-name-input"]');
         this.secretInput = page.locator('[data-test="add-cipher-key-openobserve-secret-input"]');
         this.continueButton = page.locator('[data-test="add-report-step1-continue-btn"]');
         this.saveButton = page.locator('[data-test="add-cipher-key-save-btn"]');
-        this.alert = page.getByRole('alert').first();
+        this.alert = page.locator('[data-test^="o-toast-"]').first();
 
          // this.deleteButton = cipherName => `//td[contains(text(),'${cipherName}')]/following-sibling::td/button[@title='Delete Service Account']`;
-         this.deleteButton = cipherName => `//td[contains(text(),'${cipherName}')]/following-sibling::td/button[@title='Delete']`;
-
-         this.confirmOkButton = "//div[@class='q-card']/div[2]/button/span[text()='OK']";
-         this.cancelButton = "//div[@class='q-card']/div[2]/button/span[text()='Cancel']";
-        
-         this.updateButton = cipherName => `//td[contains(text(),'${cipherName}')]/following-sibling::td/button[@title='Edit']`;
- 
+         this.deleteButton = cipherName => `[data-test="cipherkey-list-${cipherName}-delete"]`;
+         this.confirmOkButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+         this.cancelButton = '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]';
+         this.updateButton = cipherName => `[data-test="cipherkey-list-${cipherName}-update"]`;
          this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
-         this.signOutButton = page.getByText('Sign Out');
+         this.signOutButton = page.locator('[data-test="header-sign-out-btn"]');
 
 
     }
@@ -42,7 +39,7 @@ export class CipherKeys {
       }
 
       async addCipherKey() {
-        await this.page.waitForSelector('button', { name: 'New cipher key' });
+        await this.addCipherKeyButton.waitFor({ state: 'visible', timeout: 10000 });
         await this.addCipherKeyButton.click();
 
       }
@@ -70,13 +67,13 @@ export class CipherKeys {
         await this.page.locator('[data-test="cipher-key-encryption-mechanism-step"] [data-test="add-cipher-key-auth-method-input"]').click();
 
         // await this.page.locator('[data-test="add-cipher-key-auth-method-input"]').click();
-        await this.page.getByRole('option', { name: 'Tink KeySet' }).click();
+        await this.page.locator('[data-test="add-cipher-key-auth-method-input-option"]', { hasText: /Tink KeySet/i }).first().click();
       }
 
       async addCipherKeyType() {
         await this.page.waitForSelector('[data-test="add-cipher-key-type-input"]');
-        await this.page.locator('[data-test="add-cipher-key-type-input"]').getByText('OpenObserve').click();
-        await this.page.getByText('Akeyless').click();
+        await this.page.locator('[data-test="add-cipher-key-type-input"]').click();
+        await this.page.locator('[data-test="add-cipher-key-type-input-option"]', { hasText: /Akeyless/i }).first().click();
       }
 
       async addCipherKeyTypeURL(abase) {
@@ -100,7 +97,7 @@ export class CipherKeys {
       async addCipherKeyStatic() {
         await this.page.waitForSelector('[data-test="add-cipher-key-secret-type-input"]');
         await this.page.locator('[data-test="add-cipher-key-secret-type-input"]').click();
-        await this.page.getByRole('option', { name: 'Static Secret' }).locator('span').click();
+        await this.page.locator('[data-test="add-cipher-key-secret-type-input-option"]', { hasText: /Static Secret/i }).first().click();
     }
 
       async addCipherKeyStaticName(astatic) {
@@ -112,8 +109,8 @@ export class CipherKeys {
 
     async addCipherKeyDFC() {
         await this.page.waitForSelector('[data-test="add-cipher-key-secret-type-input"]');
-        await this.page.locator('[data-test="add-cipher-key-secret-type-input"]').getByText('Static Secret').click();
-        await this.page.getByRole('option', { name: 'DFC' }).click();
+        await this.page.locator('[data-test="add-cipher-key-secret-type-input"]').click();
+        await this.page.locator('[data-test="add-cipher-key-secret-type-input-option"]', { hasText: /DFC/i }).first().click();
     }
 
     async addCipherKeyNameDFC(nameDFC) {
@@ -130,12 +127,12 @@ export class CipherKeys {
 
     async addCipherKeySimple() {
         
-        await this.page.getByRole('option', { name: 'Simple' }).locator('div').nth(2).click();
+        await this.page.locator('[data-test="add-cipher-key-auth-method-input-option"]', { hasText: /Simple/i }).first().click();
      }
 
     async addCipherKeyStore() {
         
-                await this.page.getByText('Key Store Details (Type:').click();
+                await this.page.locator('[data-test="cipher-key-encryption-mechanism-step"]').click();
     }
 
       async addCipherKeySave() {
