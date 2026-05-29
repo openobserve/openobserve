@@ -21,11 +21,14 @@ use config::{
     FileFormat, TIMESTAMP_COL_NAME,
     utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
-use tantivy::directory::MmapDirectory;
+use futures::future::join_all;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use tantivy::{directory::MmapDirectory, indexer::merge_indices};
 use tokio::task::JoinHandle;
 #[cfg(all(feature = "vortex", feature = "enterprise"))]
 use {
-    ::vortex::{
+    config::PARQUET_MAX_ROW_GROUP_SIZE,
+    vortex::{
         VortexSessionDefault,
         file::OpenOptionsSessionExt,
         io::{
@@ -34,7 +37,6 @@ use {
         },
         session::VortexSession,
     },
-    config::PARQUET_MAX_ROW_GROUP_SIZE,
 };
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
@@ -51,7 +53,7 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
         FileFormat::Parquet => {
             let buf_meta = buf.clone();
             let num_row_groups = tokio::task::spawn_blocking(move || -> Result<usize, Error> {
-                ::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(buf_meta)
+                ParquetRecordBatchReaderBuilder::try_new(buf_meta)
                     .context("failed to open parquet for metadata")
                     .map(|b| b.metadata().num_row_groups())
             })
@@ -162,7 +164,7 @@ where
 
     // Await all tasks concurrently, then sort to restore chunk order.
     let mut indexed: Vec<SegmentOutput> = Vec::with_capacity(tasks.len());
-    for r in futures::future::join_all(tasks).await {
+    for r in join_all(tasks).await {
         indexed.push(r??);
     }
     indexed.sort_by_key(|s| s.chunk_idx);
@@ -176,7 +178,7 @@ where
 
     let start = std::time::Instant::now();
     let merged = tokio::task::spawn_blocking(move || {
-        tantivy::indexer::merge_indices(&indices, tantivy_dir)
+        merge_indices(&indices, tantivy_dir)
             .map_err(|e| anyhow::anyhow!("merge_indices failed: {e}"))
     })
     .await??;
