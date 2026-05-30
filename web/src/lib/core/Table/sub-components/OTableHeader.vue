@@ -8,7 +8,6 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH, TABLE_CHECKBOX_COL_PAD_LEFT } from "../OTable.types";
 
 const props = defineProps<{
   headerGroups: HeaderGroup<any>[];
@@ -147,7 +146,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="'pivot-rh-' + col.id"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.id}`"
-        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-semibold tw:text-secondary tw:text-xs"
+        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-medium tw:text-secondary tw:text-sm"
         :style="getPivotRowColStyle(col.id)"
         @click="handleSort(col.id)"
       >
@@ -189,8 +188,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         class="tw:px-2"
         :class="[
           level.isLeaf
-            ? 'pivot-value-header tw:text-secondary tw:text-xs tw:font-semibold'
-            : 'pivot-group-header tw:text-center tw:font-semibold tw:text-secondary tw:text-xs',
+            ? 'pivot-value-header tw:text-secondary tw:text-sm'
+            : 'pivot-group-header tw:text-center tw:font-medium tw:text-secondary tw:text-sm',
           {
             'tw:border-l tw:border-border-default':
               cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -271,8 +270,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="tw:text-left tw:border-b tw:border-[var(--color-table-header-border)]"
-        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+        class="tw:w-9 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -291,20 +289,16 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-primary tw:text-xs tw:select-none tw:relative`,
           'table-head',
-          dense ? 'tw:h-8' : 'tw:h-9',
+          dense ? 'tw:h-6' : 'tw:h-7',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           'tw:group',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
-          ...(isAutoWidthColumn(header)
-            ? (header.column.columnDef.minSize ? { minWidth: `${header.column.columnDef.minSize}px` } : {})
-            : (header.column.columnDef.meta as any)?.fixedWidth
-              ? { width: headerSizeVar(header), minWidth: headerSizeVar(header), maxWidth: headerSizeVar(header) }
-              : (horizontalScroll?.value ? { width: headerSizeVar(header) } : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) })),
+          ...(isAutoWidthColumn(header) ? {} : (horizontalScroll?.value ? { width: headerSizeVar(header) } : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) })),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
                 position: 'sticky',
@@ -415,8 +409,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       />
       <th
         v-if="selectionMultiple"
-        class="tw:text-left tw:border-b tw:border-[var(--color-table-header-border)]"
-        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+        class="tw:w-9 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -431,18 +424,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
-          dense ? 'tw:h-8 tw:group' : 'tw:h-9 tw:group',
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-primary tw:text-xs tw:select-none tw:relative`,
+          dense ? 'tw:h-6 tw:group' : 'tw:h-7 tw:group',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
-          ...(isAutoWidthColumn(header)
-            ? (header.column.columnDef.minSize ? { minWidth: `${header.column.columnDef.minSize}px` } : {})
-            : (header.column.columnDef.meta as any)?.fixedWidth
-              ? { width: headerSizeVar(header), minWidth: headerSizeVar(header), maxWidth: headerSizeVar(header) }
-              : (horizontalScroll?.value ? { width: headerSizeVar(header) } : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) })),
+          ...(isAutoWidthColumn(header) ? {} : (horizontalScroll?.value ? { width: headerSizeVar(header) } : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) })),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
                 position: 'sticky',

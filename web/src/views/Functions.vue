@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>{{ headerTitle }}</template>
         </template>
 
-        <!-- Level 3 — breadcrumb back to the Pipelines list -->
+        <!-- Level 3 — breadcrumb: Pipelines › <current item> -->
         <template #subtitle>
           <AppBreadcrumb
             v-if="isDetailView"
@@ -36,6 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 label: t('pipeline.header'),
                 onClick: goToPipelines,
                 dataTest: 'pipeline-breadcrumb-root',
+              },
+              {
+                label: breadcrumbLabel,
+                title: breadcrumbLabel,
+                dataTest: 'pipeline-breadcrumb-current',
               },
             ]"
           />
@@ -164,6 +169,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
             </ODropdown>
           </template>
+          <!-- Portal target: detail sub-pages (editor/history/backfill)
+               teleport their own actions here, so the shell owns the single
+               header (breadcrumb + actions) and pages never render a 2nd one. -->
+          <div
+            v-else-if="isDetailView"
+            id="o2-page-actions"
+            class="tw:flex tw:items-center tw:gap-2"
+            data-test="pipeline-detail-actions"
+          />
         </template>
       </AppPageHeader>
     </template>

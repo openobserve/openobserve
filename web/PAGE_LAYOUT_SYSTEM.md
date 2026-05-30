@@ -293,3 +293,103 @@ Each step ends with the §12 design check + a light visual pass in light & dark.
 - **Page subtitle:** keep on landing/list pages (charm) — drop on dense sub-pages?
 - **Folder rail** as a shared component (Dashboards, Alerts, Reports share it)?
 - Which first: **IAM** or **Settings** for the Template-B proof?
+
+## 15. Unified Navigation System
+
+One model for "where am I / how do I go up," at every depth, in every module.
+The user's goals: Grafana/Datadog data density, an unmistakable breadcrumb, and
+a single consistent answer for both few-section modules (Pipelines) and
+many-section modules (IAM/Settings).
+
+### 15.1 The four levels (never show more than two at once)
+
+- **L1 — Global rail** (`MainLayout` → `ONavbar`): the app's top-level modules
+  (Logs, Metrics, Dashboards, Pipelines, Alerts, …). Always present, never
+  changes. *Roadmap:* make it collapsible to a ~56px icon rail (the
+  `miniMode`/`leftDrawerOpen` plumbing already exists but is dead — wire a real
+  toggle + hover tooltips). Until then it stays the 84px icon+label rail.
+- **L2 — Module section nav**: the peer sections *within* a module. Two
+  renderings, **same** `OTabs`/`ORouteTab` primitive, chosen by count:
+  - **≤ 5 sections → horizontal tabs** in `AppPageHeader`'s `#tabs` slot, inline
+    right of the icon+title. (Pipelines: Pipelines | Functions | Enrichment |
+    Eval.)
+  - **> 5 sections → vertical left rail** in `PageLayout`'s `#sidebar`
+    (drag-collapsible via `OSplitter`). (Settings: 15 items; IAM: up to 7.)
+    Must be `dense` rows + `overflow-y-auto` (vertical `OTabs` has no built-in
+    scroll). *Roadmap:* extract one `SecondaryNav` component so IAM (220px) and
+    Settings (250px) stop being two divergent code paths (one width, one active
+    style, declarative `visible`, a `defaultTab`, built-in detail breadcrumb).
+- **L3 — Detail / drill-in**: opening an item replaces L2 with an
+  **`AppBreadcrumb`** in `AppPageHeader`'s subtitle band: `Module › … › Item`,
+  the terminal crumb bold + `aria-current`, parents clickable. Item-specific
+  actions sit in the header's `#actions`. Never show L2 tabs and an L3 breadcrumb
+  together.
+- **L4+ — Deeper** (panel inside a dashboard, variable inside a panel): same
+  `AppBreadcrumb`, which **auto-collapses** middles into a `…` dropdown
+  (`maxInline`, default 3) so the shape stays `Root › … › Parent › Current` and
+  never overflows at any depth.
+
+### 15.2 The single-header law (one header per page)
+
+`AppPageHeader` is the only header. **Row 1** (`h-12`): module icon tile +
+`#title` + right `#actions`. **Row 2** (`h-5` band): exactly one of L2 tabs
+(`#tabs`) **xor** L3 breadcrumb (`breadcrumb` prop / `#subtitle`) **xor** a
+tagline. A page must **never** render its own second title bar.
+
+**Header-actions portal** (for nested detail pages that render *inside* a module
+shell and so can't own the header): the shell renders a portal target
+`<div id="o2-page-actions">` in its `#actions` on detail routes; each detail page
+`<Teleport to="#o2-page-actions">`s its own controls there, keeping its state
+local (no provide/inject, no state hoisting). This is how Pipelines kills its
+double headers — see 15.4.
+
+**Overlays / dialogs** (drawers, near-fullscreen panels) that don't change the
+URL: don't fake a breadcrumb — use `AppPageHeader`'s `back` prop / `#back` slot
+to render a leading `‹ Parent` back-pill.
+
+### 15.3 Breadcrumb rules (so "where am I" is always answered)
+
+- Parents are links; the current item is the bold non-interactive terminal crumb
+  and **mirrors the H1 title**.
+- Distinct targets matter: e.g. ViewDashboard's `Dashboards` crumb → list (no
+  folder), `Folder` crumb → list scoped to that folder. Always carry
+  `org_identifier`.
+- A drill-in that can be left with unsaved changes (pipeline editor, add-panel):
+  the breadcrumb crumb and the explicit Cancel/Discard must share the **same**
+  dirty-check, or the crumb can silently discard edits. (Open gap on
+  PipelineEditor — the crumb currently bypasses Cancel's confirm.)
+
+### 15.4 Reference implementation — Pipelines (the most complex module)
+
+Pipelines is the deepest real nesting (`pipeline` shell → `pipelines` list → 5
+detail children through two nested `<RouterView>`s) and now demonstrates the
+whole system:
+- **L2**: `Functions.vue` renders `AppPageHeader` (icon `lan`, title `Pipelines`)
+  with the 4 module tabs inline + list actions (History/Backfill/Import/New) on
+  the right.
+- **L3**: on `pipelineEditor`/`createPipeline`/`importPipeline`/`pipelineHistory`/
+  `pipelineBackfill`, the shell swaps tabs → `Pipelines › <item>` breadcrumb and
+  exposes the `#o2-page-actions` portal target.
+- **Detail pages** (`PipelineEditor`, `PipelineHistory`, `BackfillJobsList`) had
+  their bespoke header cards removed; they now `Teleport` their controls
+  (Save/Cancel/JSON; date-picker + pipeline filter; status/pipeline filters) into
+  the shell header. Result: one header, one title, controls beside the
+  breadcrumb, ~70–80px of stacked chrome reclaimed per detail page.
+
+### 15.5 Per-module application (covers every current scenario)
+
+| Module | L2 | L3 / deeper | Status |
+|---|---|---|---|
+| **Pipelines** | horizontal tabs (4) | breadcrumb + portal actions; editor/history/backfill | **implemented (reference)** |
+| **Dashboards** | none (single landing) | `Dashboards › Folder › Dashboard` (view), `… › Panel` (add-panel, collapses), `Dashboards › Import` | **implemented** (each page owns `AppPageHeader`; overlays = Settings/JSON/Scheduled drawers → give them the `#back` pill) |
+| **IAM** | vertical rail (≤7) | edit group/role → breadcrumb `Identity & Access › <name>` (currently missing — add) | rail exists; **adopt `SecondaryNav` + add detail breadcrumb** |
+| **Settings** | vertical rail (15, scroll) | flat (no detail) | rail exists + scroll fixed; **adopt `SecondaryNav`, consider grouping the 15** |
+| **Alerts / Streams / Reports / RUM** | most are flat single lists (no L2) | add/edit routes → breadcrumb `Module › <item>` via `AppPageHeader breadcrumb` prop; today they roll bespoke `card-container`+`h-[68px]`+`text-xl` headers | **migrate to `AppPageHeader` + breadcrumb** (drop bespoke arrow-back headers) |
+
+### 15.6 Density (shipped) — "data is king"
+
+~205px of fixed chrome sat above the first table row. App-wide reclaims now in:
+`AppPageHeader` `h-14→h-12`; OTable `#toolbar` `py-1.5→py-1`; dense column header
+`h-7→h-6` (also fixed a draggable/non-draggable mismatch); pagination
+`~50→40px`; Settings rail `overflow-y-auto`. Row height stays 36px (legibility);
+dropping to 32px is the biggest remaining lever but is opt-in per table.

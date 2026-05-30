@@ -49,19 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #subtitle>
             <AppBreadcrumb
               v-if="!isFullscreen && store.state.printMode !== true"
-              :items="[
-                {
-                  label: t('dashboard.header'),
-                  onClick: goBackToDashboardList,
-                  dataTest: 'dashboard-back-btn',
-                },
-                {
-                  label: folderNameFromFolderId,
-                  onClick: goBackToDashboardList,
-                  title: folderNameFromFolderId,
-                  dataTest: 'dashboard-view-folder-breadcrumb',
-                },
-              ]"
+              :items="breadcrumbItems"
             >
               <OSpinner
                 v-if="!store.state.organizationData.folders.length"
@@ -353,7 +341,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import AppBreadcrumb from "@/components/common/AppBreadcrumb.vue";
+import AppBreadcrumb, {
+  type BreadcrumbItem,
+} from "@/components/common/AppBreadcrumb.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -1245,15 +1235,54 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // back button to render dashboard List page
+    // Breadcrumb root crumb → dashboards list (module root; folder defaults).
+    const goToDashboardList = () => {
+      return router.push({
+        path: "/dashboards",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    // back button / folder crumb → dashboards list scoped to the current folder.
     const goBackToDashboardList = () => {
       return router.push({
         path: "/dashboards",
         query: {
           folder: route.query.folder ?? "default",
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
+
+    // Level-3 ancestor path: Dashboards › <Folder> › <Dashboard> (current).
+    // The two parent crumbs now have distinct targets (root vs current folder)
+    // and the current dashboard is the terminal, non-interactive crumb.
+    const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
+      const items: BreadcrumbItem[] = [
+        {
+          label: t("dashboard.header"),
+          onClick: goToDashboardList,
+          dataTest: "dashboard-back-btn",
+        },
+        {
+          label: folderNameFromFolderId.value,
+          onClick: goBackToDashboardList,
+          title: folderNameFromFolderId.value,
+          dataTest: "dashboard-view-folder-breadcrumb",
+        },
+      ];
+      const title = currentDashboardData.data?.title;
+      if (title) {
+        items.push({
+          label: title,
+          title,
+          dataTest: "dashboard-view-current",
+        });
+      }
+      return items;
+    });
 
     //add panel
     const addPanelData = () => {
@@ -1869,6 +1898,7 @@ export default defineComponent({
       savePanelLayout,
       renderDashboardChartsRef,
       folderNameFromFolderId,
+      breadcrumbItems,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,

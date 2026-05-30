@@ -16,169 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <PageLayout resizable :sidebar-width="250" :splitter-limits="[0, 400]">
+  <PageLayout resizable :sidebar-width="220" :splitter-limits="[0, 320]">
     <template #header>
       <AppPageHeader icon="settings" :title="t('settings.header')" />
     </template>
 
     <template #sidebar>
-      <OTabs
-        class="management-tabs tw:h-full"
-        v-model="settingsTab"
-        orientation="vertical"
-      >
-        <ORouteTab
-          name="queryManagement"
-          :to="`/settings/query_management?org_identifier=${store.state.selectedOrganization?.identifier}`"
-          icon="query-stats"
-          :label="t('settings.queryManagement')"
-          v-if="config.isEnterprise == 'true' && isMetaOrg"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true' && isMetaOrg"
-          data-test="nodes-tab"
-          name="nodes"
-          :to="{
-            name: 'nodes',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="hub"
-          :label="t('settings.nodes')"
-        />
-        <ORouteTab
-          data-test="general-settings-tab"
-          name="general"
-          :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
-          icon="settings"
-          :label="t('settings.generalLabel')"
-        />
-        <ORouteTab
-          data-test="organization-settings-tab"
-          name="organization"
-          :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
-          icon="business"
-          :label="t('settings.orgLabel')"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true' && isMetaOrg"
-          data-test="domain-management-tab"
-          name="domain_management"
-          :to="{
-            name: 'domainManagement',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="dns"
-          :label="t('settings.ssoDomainRestrictions')"
-        />
-        <ORouteTab
-          data-test="alert-destinations-tab"
-          name="alert_destinations"
-          :to="{
-            name: 'alertDestinations',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="location-on"
-          :label="t('alert_destinations.header')"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true'"
-          data-test="pipeline-destinations-tab"
-          name="pipeline_destinations"
-          :to="{
-            name: 'pipelineDestinations',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="person-pin-circle"
-          :label="t('pipeline_destinations.header')"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true' && (config.isCloud != 'true' || store.state.organizationData.organizationSettings.org_storage_enabled === true)"
-          data-test="storage-settings-tab"
-          name="storageSettings"
-          :to="{
-            name: 'storageSettings',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="cloud"
-          :label="t('storage_settings.tabLabel')"
-        />
-        <ORouteTab
-          data-test="alert-templates-tab"
-          name="templates"
-          :to="{
-            name: 'alertTemplates',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="description"
-          :label="t('alert_templates.header')"
-        />
-        <ORouteTab
-          v-if="store.state.zoConfig.model_pricing_enabled"
-          data-test="model-pricing-tab"
-          name="model_pricing"
-          :to="{
-            name: 'modelPricing',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="paid"
-          :label="t('settings.llmModelPricing')"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true'"
-          data-test="management-cipher-key-tab"
-          name="cipher-keys"
-          :to="{
-            name: 'cipherKeys',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="key"
-          :label="t('settings.cipherKeys')"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true' && isMetaOrg"
-          data-test="license-tab"
-          name="license"
-          :to="{
-            name: 'license',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="card-membership"
-          :label="t('settings.license')"
-        />
-        <ORouteTab
-          v-if="config.isCloud == 'true' && isMetaOrg"
-          data-test="organization-management-tab"
-          name="organization_management"
-          :to="{
-            name: 'orgnizationManagement',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="lan"
-          :label="t('settings.organizationManagement')"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true'"
-          data-test="regex-patterns-tab"
-          name="regex_patterns"
-          :to="{
-            name: 'regexPatterns',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          :icon="`img:${regexIcon}`"
-          :label="t('regex_patterns.title')"
-        />
-        <ORouteTab
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.service_streams_enabled !== false"
-          data-test="correlation-settings-tab"
-          name="correlation_settings"
-          :to="{
-            name: 'correlationSettings',
-            query: { org_identifier: store.state.selectedOrganization?.identifier },
-          }"
-          icon="group-work"
-          :label="t('settings.correlationSettings')"
-        />
-      </OTabs>
+      <SecondaryNav v-model="settingsTab" :items="settingsItems" />
     </template>
 
     <router-view title="" />
@@ -188,8 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import PageLayout from '@/components/common/PageLayout.vue'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import SecondaryNav, {
+  type SecondaryNavItem,
+} from '@/components/common/SecondaryNav.vue'
 // @ts-ignore
 import {
   defineComponent,
@@ -210,8 +55,7 @@ export default defineComponent({
   components: {
     PageLayout,
     AppPageHeader,
-    OTabs,
-    ORouteTab,
+    SecondaryNav,
 },
   setup() {
     const { t } = useI18n();
@@ -303,7 +147,140 @@ export default defineComponent({
       return getImageURL(store.state.theme === 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
     })
 
+    // Data-driven L2 vertical-rail sections (SecondaryNav). Feature-flag
+    // visibility lives here declaratively instead of 15 per-tab v-ifs.
+    const settingsItems = computed<SecondaryNavItem[]>(() => {
+      const org = store.state.selectedOrganization?.identifier;
+      const isEnt = config.isEnterprise == "true";
+      const isCloud = config.isCloud == "true";
+      const meta = isMetaOrg.value;
+      const z = store.state.zoConfig;
+      return [
+        {
+          key: "queryManagement",
+          label: t("settings.queryManagement"),
+          icon: "query-stats",
+          to: `/settings/query_management?org_identifier=${org}`,
+          visible: isEnt && meta,
+          dataTest: "query-management-tab",
+        },
+        {
+          key: "nodes",
+          label: t("settings.nodes"),
+          icon: "hub",
+          to: { name: "nodes", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "nodes-tab",
+        },
+        {
+          key: "general",
+          label: t("settings.generalLabel"),
+          icon: "settings",
+          to: `/settings/general?org_identifier=${org}`,
+          dataTest: "general-settings-tab",
+        },
+        {
+          key: "organization",
+          label: t("settings.orgLabel"),
+          icon: "business",
+          to: `/settings/organization?org_identifier=${org}`,
+          dataTest: "organization-settings-tab",
+        },
+        {
+          key: "domain_management",
+          label: t("settings.ssoDomainRestrictions"),
+          icon: "dns",
+          to: { name: "domainManagement", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "domain-management-tab",
+        },
+        {
+          key: "alert_destinations",
+          label: t("alert_destinations.header"),
+          icon: "location-on",
+          to: { name: "alertDestinations", query: { org_identifier: org } },
+          dataTest: "alert-destinations-tab",
+        },
+        {
+          key: "pipeline_destinations",
+          label: t("pipeline_destinations.header"),
+          icon: "person-pin-circle",
+          to: { name: "pipelineDestinations", query: { org_identifier: org } },
+          visible: isEnt,
+          dataTest: "pipeline-destinations-tab",
+        },
+        {
+          key: "storageSettings",
+          label: t("storage_settings.tabLabel"),
+          icon: "cloud",
+          to: { name: "storageSettings", query: { org_identifier: org } },
+          visible:
+            isEnt &&
+            (!isCloud ||
+              store.state.organizationData.organizationSettings
+                .org_storage_enabled === true),
+          dataTest: "storage-settings-tab",
+        },
+        {
+          key: "templates",
+          label: t("alert_templates.header"),
+          icon: "description",
+          to: { name: "alertTemplates", query: { org_identifier: org } },
+          dataTest: "alert-templates-tab",
+        },
+        {
+          key: "model_pricing",
+          label: t("settings.llmModelPricing"),
+          icon: "paid",
+          to: { name: "modelPricing", query: { org_identifier: org } },
+          visible: !!z.model_pricing_enabled,
+          dataTest: "model-pricing-tab",
+        },
+        {
+          key: "cipher-keys",
+          label: t("settings.cipherKeys"),
+          icon: "key",
+          to: { name: "cipherKeys", query: { org_identifier: org } },
+          visible: isEnt,
+          dataTest: "management-cipher-key-tab",
+        },
+        {
+          key: "license",
+          label: t("settings.license"),
+          icon: "card-membership",
+          to: { name: "license", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "license-tab",
+        },
+        {
+          key: "organization_management",
+          label: t("settings.organizationManagement"),
+          icon: "lan",
+          to: { name: "orgnizationManagement", query: { org_identifier: org } },
+          visible: isCloud && meta,
+          dataTest: "organization-management-tab",
+        },
+        {
+          key: "regex_patterns",
+          label: t("regex_patterns.title"),
+          icon: `img:${regexIcon.value}`,
+          to: { name: "regexPatterns", query: { org_identifier: org } },
+          visible: isEnt,
+          dataTest: "regex-patterns-tab",
+        },
+        {
+          key: "correlation_settings",
+          label: t("settings.correlationSettings"),
+          icon: "group-work",
+          to: { name: "correlationSettings", query: { org_identifier: org } },
+          visible: isEnt && z.service_streams_enabled !== false,
+          dataTest: "correlation-settings-tab",
+        },
+      ];
+    });
+
     return {
+      settingsItems,
       t,
       store,
       router,

@@ -16,32 +16,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   AppPageHeader — the standard page header used across the app (dashboards,
-  logs, metrics, …). One <h1> title with an optional brand-tinted page-icon
-  tile, an optional subtitle/breadcrumb line, and a right-aligned actions area.
+  pipelines, logs, …). The single header contract (the "TAS law"):
 
-  Fixed height + items-center: the icon and title stay perfectly still even
-  while the title/subtitle load asynchronously (no layout shift).
+    ROW 1 (fixed h-14, never reflows): module icon tile + <h1> current-item
+      title + right-aligned actions.
+    ROW 2 (fixed h-5 band): EXACTLY ONE of —
+      • Level 2 (list w/ peer sections): peer tabs (#tabs slot).
+      • Level 3+ (detail/deeper): ancestor breadcrumb (`breadcrumb` prop or
+        #subtitle slot) — the path back to the parent list.
+      • true module index: a plain tagline (`subtitle` prop / #subtitle).
+    Tabs XOR breadcrumb XOR tagline — never two at once.
 
-  Two-level navigation: pass a #tabs slot to render module tabs inline, just to
-  the right of the title (Level-2 nav). Omit #tabs and drive #title (the current
-  item) + #subtitle (a breadcrumb back to the parent list) for the Level-3
-  detail context. The two are never shown together.
+  Breadcrumb: pass `:breadcrumb="[...]"` (BreadcrumbItem[]) for the common case;
+  it renders an AppBreadcrumb (depth-bounded, auto-collapsing) into the subtitle
+  band so detail views don't re-import it. The #subtitle slot is the escape
+  hatch (e.g. to append a spinner) and takes precedence over the prop.
+
+  Overlays/dialogs (drawers, near-fullscreen panels) that don't change the URL
+  should pass `:back="{ label, to|onClick }"` (or the #back slot) for a leading
+  "‹ Parent" back-pill instead of a full breadcrumb.
 
   NOTE: title/heading font sizes use `!important` because the app defines
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
-  Props: title | subtitle | icon
-  Slots: title-prefix | title | subtitle | actions | tabs
+  Props: title | subtitle | icon | breadcrumb | breadcrumbMaxInline | back
+  Slots: title-prefix | title | subtitle | actions | tabs | back
 -->
 <template>
   <!-- No overflow-hidden here: it clipped the focus ring of the right-most
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
   <header
-    class="app-page-header tw:shrink-0 tw:h-14 tw:flex tw:items-center tw:justify-between tw:gap-4"
+    class="app-page-header tw:shrink-0 tw:h-12 tw:flex tw:items-center tw:justify-between tw:gap-4"
   >
     <div class="tw:flex tw:items-center tw:gap-3 tw:min-w-0 tw:h-full tw:flex-1">
+      <!-- Overlay back-pill (leading, before the icon) -->
+      <div v-if="hasBack" class="tw:shrink-0">
+        <slot name="back">
+          <button
+            type="button"
+            class="tw:flex tw:items-center tw:gap-1 tw:max-w-48 tw:text-text-secondary tw:px-1.5 tw:py-1 tw:rounded-md tw:outline-none tw:transition-colors tw:hover:text-text-primary tw:hover:bg-surface-subtle tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+            :title="back?.label"
+            data-test="app-page-header-back"
+            @click="onBack"
+          >
+            <OIcon name="chevron-left" size="sm" class="tw:shrink-0" />
+            <span class="tw:truncate">{{ back?.label }}</span>
+          </button>
+        </slot>
+      </div>
+
       <slot name="title-prefix" />
 
       <span
@@ -52,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon :name="icon" size="md" />
       </span>
 
-      <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink-0">
+      <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink">
         <h1
           class="tw:text-base! tw:font-semibold! tw:leading-tight! tw:tracking-[-0.01em]! tw:text-text-primary tw:truncate tw:min-h-5"
           :title="title"
@@ -67,9 +92,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="hasSubtitle"
           class="tw:flex tw:items-center tw:h-5 tw:min-w-0 tw:text-xs tw:text-text-secondary"
         >
-          <slot name="subtitle"
-            ><span class="tw:truncate tw:min-w-0">{{ subtitle }}</span></slot
-          >
+          <slot name="subtitle">
+            <AppBreadcrumb
+              v-if="hasBreadcrumb"
+              :items="breadcrumb!"
+              :max-inline="breadcrumbMaxInline"
+            />
+            <span v-else class="tw:truncate tw:min-w-0">{{ subtitle }}</span>
+          </slot>
         </div>
       </div>
 
@@ -93,14 +123,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { Comment, Text, computed, useSlots } from "vue";
+import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import AppBreadcrumb, {
+  type BreadcrumbItem,
+} from "@/components/common/AppBreadcrumb.vue";
+
+interface BackTarget {
+  label: string;
+  to?: import("vue-router").RouteLocationRaw;
+  onClick?: () => void;
+}
 
 const props = withDefaults(
   defineProps<{
     title?: string;
     subtitle?: string;
     icon?: IconName;
+    /** Level-3+ ancestor path; renders an AppBreadcrumb into the subtitle band. */
+    breadcrumb?: BreadcrumbItem[];
+    /** Forwarded to AppBreadcrumb — inline crumbs before middles collapse. */
+    breadcrumbMaxInline?: number;
+    /** Overlay/dialog back-pill ("‹ {label}") shown leading, before the icon. */
+    back?: BackTarget;
   }>(),
   {
     title: "",
@@ -108,6 +154,7 @@ const props = withDefaults(
   },
 );
 
+const router = useRouter();
 const slots = useSlots();
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
@@ -125,9 +172,21 @@ const slotHasContent = (name: string): boolean => {
   });
 };
 
+const hasBreadcrumb = computed(
+  () => Array.isArray(props.breadcrumb) && props.breadcrumb.length > 0,
+);
 const hasSubtitle = computed(
-  () => Boolean(props.subtitle) || slotHasContent("subtitle"),
+  () =>
+    Boolean(props.subtitle) ||
+    hasBreadcrumb.value ||
+    slotHasContent("subtitle"),
 );
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
+const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
+
+const onBack = () => {
+  if (props.back?.onClick) props.back.onClick();
+  else if (props.back?.to) router.push(props.back.to);
+};
 </script>

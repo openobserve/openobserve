@@ -407,7 +407,7 @@ defineExpose({
     <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
     <div
       v-if="slots.toolbar"
-      class="tw:flex tw:items-center tw:px-2 tw:py-1.5 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      class="tw:flex tw:items-center tw:px-2 tw:py-1 tw:border-b tw:border-[var(--color-table-row-divider)]"
       data-test="o2-table-toolbar"
     >
       <slot name="toolbar" />

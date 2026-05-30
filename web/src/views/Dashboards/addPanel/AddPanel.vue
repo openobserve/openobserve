@@ -16,27 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full">
-    <!-- Header Section (row-1 breadcrumb bar) -->
-    <!-- Breadcrumb path lives in the chrome bar (published below). Row 1 carries
-         the editable panel-name field (as the title) + the editor actions. -->
-    <AppPageHeader
-      :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
-      :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-      class="tw:px-4 tw:border-b tw:border-border-default"
-    >
-          <template #tabs>
-            <OInput
-              data-test="dashboard-panel-name"
-              v-model="dashboardPanelData.data.title"
-              :label="t('panel.name') + '*'"
-              labelPosition="inside"
-              class="dynamic-input"
-              :style="inputStyle"
-              :error="!!panelNameError"
-              :error-message="panelNameError"
-              @update:model-value="panelNameError = ''"
-            />
+  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5">
+    <!-- Header Section -->
+    <div class="tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1">
+      <div class="card-container tw:px-3">
+        <AppPageHeader icon="dashboard" :breadcrumb="breadcrumbItems">
+          <template #title>
+            <span class="tw:flex tw:items-center tw:gap-3 tw:min-w-0">
+              <span class="tw:shrink-0">{{
+                editMode ? t("panel.editPanel") : t("panel.addPanel")
+              }}</span>
+              <OInput
+                data-test="dashboard-panel-name"
+                v-model="dashboardPanelData.data.title"
+                :label="t('panel.name') + '*'"
+                labelPosition="inside"
+                class="dynamic-input"
+                :style="inputStyle"
+              />
+            </span>
           </template>
           <template #actions>
             <OButton
@@ -96,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="() => runQuery(false)"
                 >{{ t("panel.apply") }}</OButton
               >
-              <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
+              <OButtonGroup v-if="config.isEnterprise === 'true'">
                 <OButton
                   :data-test="
                     searchRequestTraceIds.length > 0
@@ -125,7 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'primary'
                       "
                       size="icon-sm"
-                      class="tw:!h-[2.125rem]"
                       :disabled="searchRequestTraceIds.length > 0"
                       icon-left="keyboard-arrow-down"
                     />
@@ -140,7 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </template>
           </template>
-    </AppPageHeader>
+        </AppPageHeader>
+      </div>
+    </div>
 
     <!-- PanelEditor Content Area -->
     <PanelEditor
@@ -198,8 +197,6 @@ import {
   nextTick,
   watch,
   reactive,
-  onActivated,
-  onDeactivated,
   onUnmounted,
   onMounted,
   defineAsyncComponent,
@@ -225,7 +222,6 @@ import { provide, inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
-import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
@@ -245,10 +241,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -263,11 +255,11 @@ export default defineComponent({
     OIcon,
     OButtonGroup,
     OButton,
-    AppPageHeader,
     OInput,
     ODropdown,
     ODropdownItem,
     OTooltip,
+    AppPageHeader,
     DateTimePickerDashboard,
     AddSettingVariable,
     QueryInspector,
@@ -314,7 +306,6 @@ export default defineComponent({
     const errorData: any = reactive({
       errors: [],
     });
-    const panelNameError = ref("");
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
@@ -560,12 +551,15 @@ export default defineComponent({
           console.error("Error while parsing panel data", e);
         }
 
-        // Set the VRL toggle for the active query: on iff it has a VRL function.
-        dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
+        // check if vrl function exists
+        if (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ],
-        );
+          ].vrlFunctionQuery
+        ) {
+          // enable vrl function editor
+          dashboardPanelData.layout.vrlFunctionToggle = true;
+        }
 
         await nextTick();
         // Initialize PanelEditor's chartData after loading panel data
@@ -579,10 +573,9 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);
       }
-      // let it call the watchers and then mark the panel config watcher as activated
+      // let it call the wathcers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
-
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
@@ -832,8 +825,6 @@ export default defineComponent({
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
       if (isInitialDashboardPanelData() && !editMode.value) return false;
-      // chartData not yet initialized — don't show "not up to date" banner
-      if (!chartData.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
 
       const normalizeVariables = (obj: any) => {
@@ -1091,7 +1082,6 @@ export default defineComponent({
 
       // Clear the tracking arrays
       variablesCreatedInSession.value = [];
-      panelNameError.value = "";
       variablesWithCurrentPanel.value = [];
 
       return router.push({
@@ -1183,7 +1173,6 @@ export default defineComponent({
           dashboardData.data.title.trim() == ""
         ) {
           errors.push("Name of Panel is required");
-          panelNameError.value = "Panel name is required.";
         }
       }
 
@@ -1766,28 +1755,11 @@ export default defineComponent({
       return items;
     });
 
-    // Row-1 breadcrumb bar: Dashboards › Dashboard › <Panel> (last = current).
-    const crumbs = computed<Crumb[]>(() =>
-      breadcrumbItems.value.map((b, i, arr) => ({
-        ...b,
-        icon: i === 0 ? "dashboard" : undefined,
-        current: i === arr.length - 1,
-      })),
-    );
-
-    // Publish the breadcrumb path to the top chrome bar.
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
-
     return {
       t,
       updateDateTime,
       goBack,
       breadcrumbItems,
-      crumbs,
       savePanelChangesToDashboard,
       runQuery,
       expandedSplitterHeight,
@@ -1841,7 +1813,6 @@ export default defineComponent({
       currentPanelId,
       panelEditorRef,
       dashboardDataForPanelEditor,
-      panelNameError,
     };
   },
   methods: {
