@@ -112,6 +112,31 @@ struct SegmentOutput {
     row_count: usize,
 }
 
+/// Chunk-parallel tantivy index builder shared by the Parquet and Vortex paths.
+///
+/// ```text
+///   Bytes  (reference-counted — each worker gets one cheap clone)
+///     │
+///     │  build_index dispatches by format:
+///     │  ┌─ Parquet ── read metadata ─── num_row_groups → chunks
+///     │  └─ Vortex  ── read row_count ── ÷ PARQUET_MAX_ROW_GROUP_SIZE → chunks
+///     │
+///     ▼  spawn_blocking pool (concurrency = workers)
+///   ┌──────────────────────┬──────────────────────┬─────────────────────┐
+///   │ chunk_0              │ chunk_1              │ ...                 │
+///   │ make_selector(0)     │ make_selector(1)     │                     │
+///   │ → ChunkSelector      │ → ChunkSelector      │                     │
+///   │ → chunk_iter         │ → chunk_iter         │                     │
+///   │ → SingleSegmentIdx   │ → SingleSegmentIdx   │                     │
+///   │ → finalize → Index   │ → finalize → Index   │                     │
+///   └──────────────────────┴──────────────────────┴─────────────────────┘
+///     │
+///     ▼  sort by chunk_idx ASC
+///   merge_indices([Index_0, Index_1, ...], PuffinDirWriter)
+///     │
+///     ▼
+///   single segment, doc_id == global_row_index
+/// ```
 async fn build_parallel_index<D, F>(
     tantivy_dir: D,
     buf: Bytes,
