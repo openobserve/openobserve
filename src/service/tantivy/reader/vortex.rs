@@ -22,7 +22,6 @@ use futures::StreamExt;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
-    error::VortexResult,
     expr::{root, select},
     file::{OpenOptionsSessionExt, VortexFile},
     io::{
@@ -44,12 +43,11 @@ pub(super) async fn scan_vortex_async(
     let session = VortexSession::default().with_tokio();
     let vxf = session.open_options().open_buffer(data)?;
     let scan = open_projected_scan(&vxf, projection)?;
+
     let stream_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
-
     let data_type = DataType::Struct(stream_schema.fields().clone());
-    let vortex_stream = scan.into_array_stream()?;
 
-    let stream = vortex_stream.then(move |result| {
+    let stream = scan.into_array_stream()?.then(move |result| {
         let data_type = data_type.clone();
         async move {
             match result {
@@ -74,22 +72,25 @@ pub(super) fn scan_vortex_row_range(
     let vxf = session.open_options().open_buffer(data)?;
     let scan = open_projected_scan(&vxf, projection)?.with_row_range(row_range);
 
-    let projected_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
-    let data_type = DataType::Struct(projected_schema.fields().clone());
+    let stream_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
+    let data_type = DataType::Struct(stream_schema.fields().clone());
 
-    let iter_inner = scan.into_array_iter(&runtime)?;
-    let iter: Box<dyn Iterator<Item = VortexResult<ArrayRef>> + 'static> = Box::new(iter_inner);
+    let iter: Box<dyn Iterator<Item = Result<RecordBatch, ArrowError>> + 'static> = Box::new(
+        scan.into_array_iter(&runtime)?
+            .map(move |result| match result {
+                Ok(array) => vortex_array_to_record_batch(array, &data_type),
+                Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
+            }),
+    );
 
     Ok(Box::new(VortexRowRangeIter {
         iter,
-        data_type,
         _runtime: runtime,
     }))
 }
 
 struct VortexRowRangeIter {
-    iter: Box<dyn Iterator<Item = VortexResult<ArrayRef>> + 'static>,
-    data_type: DataType,
+    iter: Box<dyn Iterator<Item = Result<RecordBatch, ArrowError>> + 'static>,
     _runtime: SingleThreadRuntime, // dropped last — keeps Arc<Sender> alive
 }
 
@@ -97,10 +98,7 @@ impl Iterator for VortexRowRangeIter {
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(match self.iter.next()? {
-            Ok(array) => vortex_array_to_record_batch(array, &self.data_type),
-            Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
-        })
+        self.iter.next()
     }
 }
 
