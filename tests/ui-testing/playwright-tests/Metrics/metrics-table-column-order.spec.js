@@ -30,36 +30,29 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
  * - Moving a column to "1st position" in popup = "2nd position" in table (after Timestamp)
  */
 test.describe("PromQL Table Chart - Column Order Feature", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm;
-
   // Ensure metrics are ingested once for all test files
   test.beforeAll(async () => {
     await ensureMetricsIngested();
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  /** Create a fresh PageManager per test — avoids data races in parallel workers. */
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to metrics page
+    const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
     testLogger.info('Test setup completed - navigated to metrics page');
-  });
+    return pm;
+  }
 
-  test.afterEach(async ({ page }, testInfo) => {
-    // Close config sidebar if open using the collapse button
-    await pm.metricsPage.clickDashboardSidebarCollapseButton();
-    testLogger.info('Closed sidebar using collapse button');
-
+  test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   // Helper function to set up a table chart with data
-  async function setupTableChart(page, tableMode = 'all') {
+  // pm is passed explicitly so each parallel worker uses its own instance
+  async function setupTableChart(pm, page, tableMode = 'all') {
     testLogger.info(`Setting up table chart with mode: ${tableMode}`);
 
     // Set time range to Last 15 minutes
@@ -130,11 +123,12 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
   // P0 - Critical Tests
   test("Verify Column Order button is visible for Expanded Time series table mode", {
     tag: ['@metrics', '@table', '@column-order', '@P0', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing Column Order button visibility for Expanded Time series mode');
 
     // Use expanded_timeseries mode as it definitely supports Column Order
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Verify we're in the config sidebar
     const sidebarVisible = await pm.metricsPage.isSidebarVisible();
@@ -155,10 +149,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify Column Order popup opens and displays available columns", {
     tag: ['@metrics', '@table', '@column-order', '@P0', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing Column Order popup opens correctly');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Click the Column Order button
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -194,10 +189,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
   // P1 - Functional Tests
   test("Verify columns can be reordered using move up button", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing column reordering using move up button');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -235,10 +231,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify columns can be reordered using move down button", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing column reordering using move down button');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -271,10 +268,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify drag handles are present for each column", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing drag handles are present');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -296,10 +294,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify column order can be saved and persists", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing column order save functionality');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Get the current table header order before reordering
     const initialHeaderCount = await pm.metricsPage.getPromqlTableHeaderCount();
@@ -353,10 +352,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify cancel button discards column order changes", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing cancel functionality');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -399,10 +399,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify close icon also cancels column order changes", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing close icon cancel functionality');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -429,10 +430,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify column order changes are reflected in the actual table chart", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing that column order changes are applied to the table chart');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // STEP 1: Get the initial table column order from the actual table headers
     testLogger.info('Reading initial table column order');
@@ -513,10 +515,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify column order persists after re-running the query", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing column order persists after re-running the query');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
     await expect
       .poll(async () => await pm.metricsPage.getPromqlTableHeaderCount(), { timeout: 20000 })
       .toBeGreaterThan(2);
@@ -594,10 +597,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify column order persists when switching between chart types", {
     tag: ['@metrics', '@table', '@column-order', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing column order persists when switching chart types');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // STEP 1: Set custom column order
     testLogger.info('Setting custom column order');
@@ -647,10 +651,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify column order is maintained with different queries on same metric", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing column order with different queries on same metric');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // STEP 1: Set custom column order for cpu_usage query
     testLogger.info('Setting custom column order for cpu_usage');
@@ -719,10 +724,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
   // P2 - Edge Cases
   test("Verify move up button is disabled for first column", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing move up button disabled state for first column');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -742,10 +748,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify move down button is disabled for last column", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing move down button disabled state for last column');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -769,11 +776,12 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify Column Order button is NOT visible for Time series mode", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing that Column Order button is NOT visible for Time series mode');
 
     // Note: 'single' mode corresponds to "Time series" in the UI
-    await setupTableChart(page, 'single');
+    await setupTableChart(pm, page, 'single');
 
     // Verify the Column Order button is NOT visible
     const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
@@ -785,10 +793,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify Column Order feature works with Aggregate mode", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing Column Order feature with Aggregate mode');
 
-    await setupTableChart(page, 'all');
+    await setupTableChart(pm, page, 'all');
 
     // Verify the Column Order button is visible for Aggregate mode
     const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
@@ -817,10 +826,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify multiple consecutive reorders work correctly", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing multiple consecutive column reorders');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -862,10 +872,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify column numbers update correctly after reordering", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing column numbers update after reordering');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
@@ -897,10 +908,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   test("Verify empty state is not shown when columns are available", {
     tag: ['@metrics', '@table', '@column-order', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing that empty state is not shown with available columns');
 
-    await setupTableChart(page, 'expanded_timeseries');
+    await setupTableChart(pm, page, 'expanded_timeseries');
 
     // Open Column Order popup
     await pm.dashboardPanelConfigs.openColumnOrderDialog();

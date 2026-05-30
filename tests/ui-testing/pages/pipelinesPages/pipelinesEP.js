@@ -131,42 +131,25 @@ export class PipelinesEP {
         await this.page.keyboard.type(functionName, { delay: 30 });
     }
 
-    async createFirstFunction(functionName) {
-        // Wait for the button to be visible
+    async createFunction(functionName, vrlCode) {
         await this.createFunctionButton.waitFor({ state: 'visible' });
-        // Click the button
         await this.createFunctionButton.click();
         await this._fillFunctionName(functionName);
-        // Set VRL function code via Monaco API (more reliable than keyboard typing)
-        await this.setMonacoEditorValue('.a=41');
-
+        await this.setMonacoEditorValue(vrlCode);
         await this.page.locator(this.saveFunctionButton).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.saveFunctionButton).click();
-        // Wait for success notification instead of a fixed timeout
         await expect(
             this.page.locator(this.notifyContainer).filter({ hasText: 'Function saved successfully' }).first()
         ).toBeVisible({ timeout: 15000 });
-        // Wait for function list to reload
         await this.createFunctionButton.waitFor({ state: 'visible', timeout: 10000 });
     }
 
-    async createSecondFunction(functionName) {
-        // Wait for the button to be visible
-        await this.createFunctionButton.waitFor({ state: 'visible' });
-        // Click the button
-        await this.createFunctionButton.click();
-        await this._fillFunctionName(functionName);
-        // Set VRL function code via Monaco API (more reliable than keyboard typing)
-        await this.setMonacoEditorValue('.test=2');
+    async createFirstFunction(functionName) {
+        await this.createFunction(functionName, '.a=41');
+    }
 
-        await this.page.locator(this.saveFunctionButton).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.saveFunctionButton).click();
-        // Wait for success notification instead of a fixed timeout
-        await expect(
-            this.page.locator(this.notifyContainer).filter({ hasText: 'Function saved successfully' }).first()
-        ).toBeVisible({ timeout: 15000 });
-        // Wait for function list to reload
-        await this.createFunctionButton.waitFor({ state: 'visible', timeout: 10000 });
+    async createSecondFunction(functionName) {
+        await this.createFunction(functionName, '.test=2');
     }
 
 

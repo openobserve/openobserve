@@ -1221,6 +1221,21 @@ export class AlertsPage {
      * Note: Incidents menu item depends on service_graph_enabled config from the server.
      * The menu item may take time to render while the config API response is processed.
      */
+
+    /**
+     * Returns true if the incidents sidebar menu item becomes visible within the given timeout.
+     * Use this in beforeEach to skip enterprise tests on OSS environments.
+     * @param {number} timeout - ms to wait (default 5000)
+     */
+    async isIncidentsFeatureEnabled(timeout = 5000) {
+        try {
+            await this.page.locator(this.locators.incidentsMenuItem).waitFor({ state: 'visible', timeout });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     async navigateToIncidentsPage() {
         testLogger.info('Navigating to Incidents page');
         // Wait for the incidents menu item to be available (may take time for config to load)

@@ -4,42 +4,31 @@ const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 test.describe("Metrics Config Tabs Tests", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm;
-
-  // Ensure metrics are ingested once for all test files
   test.beforeAll(async () => {
     await ensureMetricsIngested();
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to metrics page
+    const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('domcontentloaded');
-
-    // Execute a query first so we have results to work with
     await pm.metricsPage.executeQuery('up');
     await pm.metricsPage.waitForChartRender(15000);
-
     testLogger.info('Test setup completed - metrics page ready with query results');
-  });
+    return pm;
+  }
 
-  test.afterEach(async ({ page }, testInfo) => {
-    // Close config sidebar if open using the collapse button
-    await pm.metricsPage.closeConfigSidebar();
-    testLogger.info('Closed sidebar using collapse button');
-
+  test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   // CONSOLIDATED TEST 1: Config sidebar open/close/navigation (3 tests → 1 test)
   test("Open config sidebar and navigate between tabs", {
     tag: ['@metrics', '@config', '@sidebar', '@tabs', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing config sidebar opening and tab navigation');
 
     // Test 1: Open config sidebar
@@ -87,7 +76,8 @@ test.describe("Metrics Config Tabs Tests", () => {
   // CONSOLIDATED TEST 2: Tab-specific configurations (Query, Legend, Axes, Options) (4 tests → 1 test)
   test("Configure settings in different config tabs (Query, Legend, Axes, Options)", {
     tag: ['@metrics', '@config', '@tabs-configuration', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing configuration settings across different tabs');
 
     await pm.metricsPage.openConfigSidebar();
@@ -130,7 +120,8 @@ test.describe("Metrics Config Tabs Tests", () => {
   // CONSOLIDATED TEST 3: Config behavior (save, persistence, chart type updates) (3 tests → 1 test)
   test("Verify config save, persistence, and chart type-specific settings", {
     tag: ['@metrics', '@config', '@save', '@persistence', '@chart-type', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing config save, persistence, and chart type behavior');
 
     // Test 1: Save configuration — set y-axis min via input

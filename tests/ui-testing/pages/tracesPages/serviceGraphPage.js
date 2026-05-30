@@ -52,6 +52,14 @@ export class ServiceGraphPage {
     this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
     this.podsTable = '[data-test="service-graph-side-panel-pods-table"]';
 
+    // ===== TELEMETRY CORRELATION (Metrics tab) =====
+    this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
+    this.metricsPanel = '[data-test="service-graph-side-panel-metrics"]';
+    this.metricsLoadingIndicator = '[data-test="service-graph-side-panel-metrics-loading"]';
+    this.metricsDashboard = '[data-test="service-graph-side-panel-metrics-dashboard"]';
+    this.metricsError = '[data-test="service-graph-side-panel-metrics-error"]';
+    this.metricsEmpty = '[data-test="service-graph-side-panel-metrics-empty"]';
+
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
     this.correlationDashboardCard = '[data-test*="correlation-dashboard"]';
@@ -98,6 +106,10 @@ export class ServiceGraphPage {
 
   async clickRefresh() {
     await this.page.locator(this.refreshButton).click();
+  }
+
+  async waitForGraphReload() {
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   }
 
   async switchToGraphView() {
@@ -353,34 +365,31 @@ export class ServiceGraphPage {
    * Returns true if metrics dashboard rendered, false if error/empty state shown.
    */
   async clickMetricsTabAndWait() {
-    const metricsTab = this.page.locator('[data-test="service-graph-node-panel-tab-metrics"]');
-    await metricsTab.click();
+    await this.page.locator(this.metricsTab).click();
 
     // Wait for loading spinner to appear and disappear
-    const metricsPanel = this.page.locator('[data-test="service-graph-side-panel-metrics"]');
-    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    const panel = this.page.locator(this.metricsPanel);
+    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
 
     // Check if the metrics dashboard rendered
-    const dashboardVisible = await this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')
+    return await this.page.locator(this.metricsDashboard)
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
-
-    return dashboardVisible;
   }
 
   async expectMetricsDashboardVisible() {
-    await expect(this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator(this.metricsDashboard)).toBeVisible({ timeout: 5000 });
   }
 
   async isMetricsErrorVisible() {
-    return await this.page.locator('[data-test="service-graph-side-panel-metrics-error"]')
+    return await this.page.locator(this.metricsError)
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
   async isMetricsEmptyVisible() {
-    return await this.page.locator('[data-test="service-graph-side-panel-metrics-empty"]')
+    return await this.page.locator(this.metricsEmpty)
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
