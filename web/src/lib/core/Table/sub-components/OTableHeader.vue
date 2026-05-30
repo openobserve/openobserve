@@ -424,7 +424,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :data-test="`o2-table-th-${header.id}`"
         :class="[
           `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-primary tw:text-xs tw:select-none tw:relative`,
-          dense ? 'tw:h-7 tw:group' : 'tw:h-8 tw:group',
+          dense ? 'tw:h-6 tw:group' : 'tw:h-7 tw:group',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',

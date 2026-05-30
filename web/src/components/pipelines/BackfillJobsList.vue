@@ -19,56 +19,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="backfill-jobs-list-page"
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
   >
-    <!-- Header -->
-    <div class="tw:shrink-0">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center tw:gap-2">
-            <!-- Filters -->
-            <OSelect
-              v-model="filters.status"
-              :options="allStatusOptions"
-              placeholder="Status"
-              clearable
-              searchable
-              class="tw:w-[150px]"
-              data-test="status-filter"
-            />
-            <OSelect
-              v-model="filters.pipelineId"
-              :options="allPipelineOptions"
-              labelKey="label"
-              valueKey="value"
-              placeholder="Pipeline"
-              clearable
-              searchable
-              class="tw:w-[250px]"
-              data-test="pipeline-filter"
-            />
-            <OButton
-              variant="outline"
-              size="sm"
-              @click="clearFilters"
-              data-test="clear-filters-btn"
-            >
-              Clear Filters
-            </OButton>
-            <OButton
-              variant="ghost-muted"
-              size="icon-sm"
-              @click="refreshJobs"
-              :disabled="loading"
-              data-test="refresh-btn"
-              icon-left="refresh"
-            >
-              <OTooltip content="Refresh" side="top" />
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
+         next to the "Pipelines › Backfill Jobs" breadcrumb. -->
+    <Teleport to="#o2-page-actions">
+      <OSelect
+        v-model="filters.status"
+        :options="allStatusOptions"
+        placeholder="Status"
+        clearable
+        searchable
+        class="tw:w-[150px]"
+        data-test="status-filter"
+      />
+      <OSelect
+        v-model="filters.pipelineId"
+        :options="allPipelineOptions"
+        labelKey="label"
+        valueKey="value"
+        placeholder="Pipeline"
+        clearable
+        searchable
+        class="tw:w-[250px]"
+        data-test="pipeline-filter"
+      />
+      <OButton
+        variant="outline"
+        size="sm"
+        @click="clearFilters"
+        data-test="clear-filters-btn"
+      >
+        Clear Filters
+      </OButton>
+      <OButton
+        variant="ghost-muted"
+        size="icon-sm"
+        @click="refreshJobs"
+        :disabled="loading"
+        data-test="refresh-btn"
+        icon-left="refresh"
+      >
+        <OTooltip content="Refresh" side="top" />
+      </OButton>
+    </Teleport>
 
     <!-- Jobs Table -->
     <div class="tw:flex-1 tw:min-h-0">

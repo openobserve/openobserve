@@ -19,129 +19,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5">
     <!-- Header Section -->
     <div class="tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1">
-      <div
-        class="tw:flex tw:items-center tw:justify-between tw:p-2 card-container"
-        :class="!store.state.isAiChatEnabled ? 'tw:justify-between' : ''"
-      >
-        <div
-          class="tw:flex tw:items-center"
-          :class="!store.state.isAiChatEnabled ? 'tw:mr-3' : 'tw:mr-2'"
-        >
-          <span class="tw:text-xl tw:tracking-[0.005em]">
-            {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
-          </span>
-          <div>
-            <OInput
-              data-test="dashboard-panel-name"
-              v-model="dashboardPanelData.data.title"
-              :label="t('panel.name') + '*'"
-              labelPosition="inside"
-              class="tw:ml-6 dynamic-input"
-              :style="inputStyle"
-            />
-          </div>
-        </div>
-        <div class="tw:flex tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm"
-            @click="showTutorial"
-            data-test="dashboard-panel-tutorial-btn"
-            >Dashboard Tutorial</OButton
-          >
-          <OButton
-            v-if="
-              !['html', 'markdown', 'custom_chart'].includes(
-                dashboardPanelData.data.type,
-              )
-            "
-            variant="outline"
-            size="icon-sm"
-            @click="showViewPanel = true"
-            data-test="dashboard-panel-data-view-query-inspector-btn"
-            icon-left="info-outline"
-          >
-            <OTooltip side="left" align="center" content="Query Inspector" />
-          </OButton>
-          <DateTimePickerDashboard
-            v-if="selectedDate"
-            v-model="selectedDate"
-            ref="dateTimePickerRef"
-            :disable="disable"
-            @hide="setTimeForVariables"
-            data-test="dashboard-global-date-time-picker"
-          />
-          <OButton
-            variant="outline-destructive"
-            size="sm-action"
-            @click="goBackToDashboardList"
-            data-test="dashboard-panel-discard"
-            >{{ t("panel.discard") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-panel-save"
-            @click.stop="savePanelData.execute()"
-            :loading="savePanelData.isLoading.value"
-            >{{ t("panel.save") }}</OButton
-          >
-          <template
-            v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          >
-            <OButton
-              v-if="config.isEnterprise === 'false'"
-              variant="primary"
-              size="sm-action"
-              data-test="dashboard-apply"
-              :loading="searchRequestTraceIds.length > 0"
-              :disabled="searchRequestTraceIds.length > 0"
-              @click="() => runQuery(false)"
-              >{{ t("panel.apply") }}</OButton
-            >
-            <OButtonGroup v-if="config.isEnterprise === 'true'">
-              <OButton
-                :data-test="
-                  searchRequestTraceIds.length > 0
-                    ? 'dashboard-cancel'
-                    : 'dashboard-apply'
-                "
-                :variant="
-                  searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'
-                "
-                size="sm-action"
-                @click="onApplyBtnClick"
-              >
-                {{
-                  searchRequestTraceIds.length > 0
-                    ? t("panel.cancel")
-                    : t("panel.apply")
-                }}
-              </OButton>
-
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    :variant="
-                      searchRequestTraceIds.length > 0
-                        ? 'destructive'
-                        : 'primary'
-                    "
-                    size="icon-sm"
-                    :disabled="searchRequestTraceIds.length > 0"
-                    icon-left="keyboard-arrow-down"
-                  />
-                </template>
-                <ODropdownItem @select="runQuery(true)">
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                  <OIcon name="refresh" size="xs" />
-                    <span>Refresh Cache &amp; Apply</span>
-                  </div>
-                </ODropdownItem>
-              </ODropdown>
-            </OButtonGroup>
+      <div class="card-container tw:px-3">
+        <AppPageHeader icon="dashboard" :breadcrumb="breadcrumbItems">
+          <template #title>
+            <span class="tw:flex tw:items-center tw:gap-3 tw:min-w-0">
+              <span class="tw:shrink-0">{{
+                editMode ? t("panel.editPanel") : t("panel.addPanel")
+              }}</span>
+              <OInput
+                data-test="dashboard-panel-name"
+                v-model="dashboardPanelData.data.title"
+                :label="t('panel.name') + '*'"
+                labelPosition="inside"
+                class="dynamic-input"
+                :style="inputStyle"
+              />
+            </span>
           </template>
-        </div>
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              @click="showTutorial"
+              data-test="dashboard-panel-tutorial-btn"
+              >Dashboard Tutorial</OButton
+            >
+            <OButton
+              v-if="
+                !['html', 'markdown', 'custom_chart'].includes(
+                  dashboardPanelData.data.type,
+                )
+              "
+              variant="outline"
+              size="icon-sm"
+              @click="showViewPanel = true"
+              data-test="dashboard-panel-data-view-query-inspector-btn"
+              icon-left="info-outline"
+            >
+              <OTooltip side="left" align="center" content="Query Inspector" />
+            </OButton>
+            <DateTimePickerDashboard
+              v-if="selectedDate"
+              v-model="selectedDate"
+              ref="dateTimePickerRef"
+              :disable="disable"
+              @hide="setTimeForVariables"
+              data-test="dashboard-global-date-time-picker"
+            />
+            <OButton
+              variant="outline-destructive"
+              size="sm-action"
+              @click="goBackToDashboardList"
+              data-test="dashboard-panel-discard"
+              >{{ t("panel.discard") }}</OButton
+            >
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="dashboard-panel-save"
+              @click.stop="savePanelData.execute()"
+              :loading="savePanelData.isLoading.value"
+              >{{ t("panel.save") }}</OButton
+            >
+            <template
+              v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+            >
+              <OButton
+                v-if="config.isEnterprise === 'false'"
+                variant="primary"
+                size="sm-action"
+                data-test="dashboard-apply"
+                :loading="searchRequestTraceIds.length > 0"
+                :disabled="searchRequestTraceIds.length > 0"
+                @click="() => runQuery(false)"
+                >{{ t("panel.apply") }}</OButton
+              >
+              <OButtonGroup v-if="config.isEnterprise === 'true'">
+                <OButton
+                  :data-test="
+                    searchRequestTraceIds.length > 0
+                      ? 'dashboard-cancel'
+                      : 'dashboard-apply'
+                  "
+                  :variant="
+                    searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'
+                  "
+                  size="sm-action"
+                  @click="onApplyBtnClick"
+                >
+                  {{
+                    searchRequestTraceIds.length > 0
+                      ? t("panel.cancel")
+                      : t("panel.apply")
+                  }}
+                </OButton>
+
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      :variant="
+                        searchRequestTraceIds.length > 0
+                          ? 'destructive'
+                          : 'primary'
+                      "
+                      size="icon-sm"
+                      :disabled="searchRequestTraceIds.length > 0"
+                      icon-left="keyboard-arrow-down"
+                    />
+                  </template>
+                  <ODropdownItem @select="runQuery(true)">
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <OIcon name="refresh" size="xs" />
+                      <span>Refresh Cache &amp; Apply</span>
+                    </div>
+                  </ODropdownItem>
+                </ODropdown>
+              </OButtonGroup>
+            </template>
+          </template>
+        </AppPageHeader>
       </div>
     </div>
 
@@ -244,6 +240,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -261,6 +259,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    AppPageHeader,
     DateTimePickerDashboard,
     AddSettingVariable,
     QueryInspector,
@@ -1715,10 +1714,52 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
 
+    // Breadcrumb root crumb → dashboards list (module root).
+    const goToDashboardList = () => {
+      return router.push({
+        path: "/dashboards",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    // Level-4 ancestor path: Dashboards › <Dashboard> › <Panel> (current).
+    // The Dashboard crumb returns to the view (goBack), discarding the
+    // in-session draft like the existing back affordance.
+    const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
+      const items: BreadcrumbItem[] = [
+        {
+          label: t("dashboard.header"),
+          onClick: goToDashboardList,
+          dataTest: "dashboard-back-btn",
+        },
+      ];
+      const dashTitle = currentDashboardData.data?.title;
+      if (dashTitle) {
+        items.push({
+          label: dashTitle,
+          title: dashTitle,
+          onClick: goBack,
+          dataTest: "add-panel-dashboard-crumb",
+        });
+      }
+      const panelTitle =
+        dashboardPanelData.data?.title ||
+        (editMode.value ? t("panel.editPanel") : t("panel.addPanel"));
+      items.push({
+        label: panelTitle,
+        title: panelTitle,
+        dataTest: "add-panel-current",
+      });
+      return items;
+    });
+
     return {
       t,
       updateDateTime,
       goBack,
+      breadcrumbItems,
       savePanelChangesToDashboard,
       runQuery,
       expandedSplitterHeight,

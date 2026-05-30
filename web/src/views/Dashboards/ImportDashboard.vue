@@ -15,18 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="tw:mx-2 tw:pt-1">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
-        <div class="tw:flex tw:flex-col tw:flex-1">
-          <div class="tw:flex">
-            <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
-
-            <div class="tw:text-xl tw:font-semibold tw:ml-3">
-              {{ t("dashboard.importDashboard") }}
-            </div>
-          </div>
-        </div>
-        <div class="tw:flex tw:justify-center tw:gap-2">
+    <div
+      class="card-container tw:mb-[0.625rem] tw:px-4 tw:h-[68px] tw:flex tw:flex-col tw:justify-center"
+    >
+      <AppPageHeader
+        icon="dashboard"
+        :title="t('dashboard.importDashboard')"
+        :breadcrumb="[
+          {
+            label: t('dashboard.header'),
+            onClick: goBack,
+            dataTest: 'dashboard-import-back-btn',
+          },
+          {
+            label: t('dashboard.importDashboard'),
+            dataTest: 'dashboard-import-current',
+          },
+        ]"
+      >
+        <template #actions>
           <OButton
             variant="outline"
             size="sm-action"
@@ -51,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="importDashboard"
             >{{ t("dashboard.import") }}</OButton
           >
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
     </div>
     <div class="tw:flex">
       <div class="tw:flex">
@@ -284,6 +291,7 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -853,7 +861,7 @@ export default defineComponent({
       streamTypes,
     };
   },
-  components: { OSeparator, SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect, OFile,
+  components: { OSeparator, SelectFolderDropdown, AppTabs, AppPageHeader, QueryEditor, OButton, OInput, OSelect, OFile,
     OIcon, OSplitter,
 },
 });
