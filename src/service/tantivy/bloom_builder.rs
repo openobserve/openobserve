@@ -128,9 +128,10 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::{
-        array::{RecordBatch, StringArray},
+        array::{Int64Array, RecordBatch, StringArray},
         datatypes::{DataType, Field, Schema},
     };
+    use config::TIMESTAMP_COL_NAME;
     use tantivy::directory::RamDirectory;
 
     use super::*;
@@ -144,6 +145,7 @@ mod tests {
     #[tokio::test]
     async fn test_build_blooms_round_trip() {
         let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("trace_id", DataType::Utf8, false),
             Field::new("user_id", DataType::Utf8, false),
             Field::new("level", DataType::Utf8, false),
@@ -155,9 +157,11 @@ mod tests {
         let levels = (0..100)
             .map(|i| if i % 2 == 0 { "info" } else { "error" })
             .collect::<Vec<_>>();
+        let timestamps: Vec<i64> = (0..100).map(|i| 1000 + i).collect();
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
+                Arc::new(Int64Array::from(timestamps)),
                 Arc::new(StringArray::from(trace_ids.clone())),
                 Arc::new(StringArray::from(user_ids.clone())),
                 Arc::new(StringArray::from(levels.clone())),
@@ -254,10 +258,18 @@ mod tests {
     async fn test_empty_field_list_returns_empty() {
         // No fields requested → no work, no error.
         let dir = RamDirectory::create();
-        let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Utf8, false)]));
-        let batch =
-            RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(vec!["x"]))])
-                .unwrap();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("f", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1000i64])),
+                Arc::new(StringArray::from(vec!["x"])),
+            ],
+        )
+        .unwrap();
         let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
         let index = build_index(
             dir,

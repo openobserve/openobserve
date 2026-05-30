@@ -286,7 +286,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_tantivy_index_without_timestamp() {
         let dir = RamDirectory::create();
-        let batch = create_test_batch(10, false, true, true);
+        let batch = create_test_batch(10, true, true, true);
         let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
         let result = build_index(
