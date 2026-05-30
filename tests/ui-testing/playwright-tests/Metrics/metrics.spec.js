@@ -459,42 +459,36 @@ test.describe("Metrics testcases", () => {
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
 
-    // Check for inline error list rendered by DashboardErrors component
-    const inlineError = pm.metricsPage.getDashboardError();
-    const hasInlineError = await inlineError.isVisible({ timeout: 5000 }).catch(() => false);
+    // Poll for any graceful-handling indicator — CI (especially enterprise) can be slower to render
+    let hasInlineError = false;
+    let hasChartError = false;
+    let hasNoData = false;
 
-    // Check for chart-area error rendered by PanelSchemaRenderer
-    // This element is shown when errorDetail.message is set; at that point [data-test="no-data"]
-    // is intentionally hidden (v-if="!errorDetail?.message"), so we must check both paths.
-    const chartError = pm.metricsPage.getChartErrorMessage();
-    const hasChartError = await chartError.isVisible({ timeout: 3000 }).catch(() => false);
+    await expect.poll(async () => {
+      const inlineError = pm.metricsPage.getDashboardError();
+      hasInlineError = await inlineError.isVisible().catch(() => false);
 
-    // Check for no-data message (only present when there is no error detail)
-    const noDataMessage = await pm.metricsPage.getNoDataMessage();
-    const hasNoData = await noDataMessage.isVisible({ timeout: 3000 }).catch(() => false);
+      const chartError = pm.metricsPage.getChartErrorMessage();
+      hasChartError = await chartError.isVisible().catch(() => false);
 
-    // Also check if page is still stable (enterprise may keep previous state visible instead of showing error)
-    const pageStable = await page.locator('body').isVisible().catch(() => false);
+      const noDataMessage = await pm.metricsPage.getNoDataMessage();
+      hasNoData = await noDataMessage.isVisible().catch(() => false);
 
-    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}, pageStable=${pageStable}`);
+      return hasInlineError || hasChartError || hasNoData;
+    }, { timeout: 10000, intervals: [500, 1000, 2000] }).toBe(true);
 
-    // System must handle invalid syntax gracefully:
-    // - show an inline/chart error, OR
-    // - show no-data, OR
-    // - keep the page stable (enterprise silently ignores and retains previous state)
-    const handledGracefully = hasInlineError || hasChartError || hasNoData || pageStable;
-    expect(handledGracefully).toBe(true);
+    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}`);
 
     if (hasInlineError) {
+      const inlineError = pm.metricsPage.getDashboardError();
       const errorText = await inlineError.textContent().catch(() => '');
       testLogger.info(`Dashboard error displayed: ${errorText.substring(0, 100)}`);
     } else if (hasChartError) {
+      const chartError = pm.metricsPage.getChartErrorMessage();
       const errorText = await chartError.textContent().catch(() => '');
       testLogger.info(`Chart error displayed: ${errorText.substring(0, 100)}`);
-    } else if (hasNoData) {
-      testLogger.info('Invalid query resulted in no-data - valid handling');
     } else {
-      testLogger.info('Page remained stable after invalid query (enterprise behavior)');
+      testLogger.info('Invalid query resulted in no-data - valid handling');
     }
   });
 
