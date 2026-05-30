@@ -6464,6 +6464,18 @@ export class LogsPage {
     }
 
     /**
+     * Wait for actual result rows to appear in the table.
+     * The table container becomes visible before Vue populates queryResults.hits, which gates
+     * the analyze button v-if. Waiting for a row ensures hits.length > 0 is true in the
+     * reactive store before callers check for the analyze button or row-dependent UI.
+     */
+    async waitForSearchResultRows(timeout = 20000) {
+        await this.page.locator(`${this.logsTable} tbody tr`).first()
+            .waitFor({ state: 'visible', timeout });
+        testLogger.info('waitForSearchResultRows: at least one result row is visible');
+    }
+
+    /**
      * Wait for SQL mode to be active after switching
      */
     async waitForSQLModeActive() {
