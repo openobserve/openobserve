@@ -529,28 +529,23 @@ export class MetricsPage {
             { timeout: 10000 }
         ).catch(() => {});
 
-        // Focus and clear via Monaco API, then type character-by-character so
-        // incremental Monaco change events fire. This is required for enterprise
-        // where programmatic setValue bypasses frontend PromQL validation hooks
-        // that must fire before runQuery() is called.
-        const focusedAndCleared = await this.page.evaluate(() => {
+        // Set the query via Monaco's setValue API. This fires onDidChangeContent
+        // (the same event keyboard typing triggers, so Vue stays in sync) without
+        // surfacing the autocomplete dropdown that blocks the subsequent Apply click.
+        const setViaApi = await this.page.evaluate((q) => {
             try {
                 const editors = window.monaco?.editor?.getEditors?.();
                 if (!editors || editors.length === 0) return false;
                 const editor = editors[editors.length - 1];
                 editor.focus();
-                editor.setValue('');
+                editor.setValue(q);
                 return true;
             } catch (e) {
                 return false;
             }
-        });
+        }, query);
 
-        if (focusedAndCleared) {
-            await this.page.keyboard.type(query, { delay: 50 });
-            // Dismiss any Monaco autocomplete/IntelliSense dropdown that opened
-            // while typing incrementally — leaving it open blocks the Apply click.
-            await this.page.keyboard.press('Escape');
+        if (setViaApi) {
             return;
         }
 
@@ -563,16 +558,14 @@ export class MetricsPage {
         if (isCodeVisible) {
             await codeElement.click();
         } else {
-            // Fallback: click on the editor container directly
             await editorContainer.click();
         }
 
-        // Select all existing content and delete it, then type the new query.
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
         await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Backspace');
         await this.page.keyboard.type(query, { delay: 50 });
-        // Dismiss any Monaco autocomplete dropdown that opened while typing.
+        // Dismiss any Monaco autocomplete dropdown the incremental typing opened.
         await this.page.keyboard.press('Escape');
     }
 
