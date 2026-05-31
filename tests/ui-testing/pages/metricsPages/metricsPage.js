@@ -529,22 +529,25 @@ export class MetricsPage {
             { timeout: 10000 }
         ).catch(() => {});
 
-        // Drive the query value through the Monaco model API (§5) so the Vue
-        // data-model stays in sync even when the editor is briefly out of focus.
-        const setViaModel = await this.page.evaluate((value) => {
+        // Focus and clear via Monaco API, then type character-by-character so
+        // incremental Monaco change events fire. This is required for enterprise
+        // where programmatic setValue bypasses frontend PromQL validation hooks
+        // that must fire before runQuery() is called.
+        const focusedAndCleared = await this.page.evaluate(() => {
             try {
                 const editors = window.monaco?.editor?.getEditors?.();
                 if (!editors || editors.length === 0) return false;
                 const editor = editors[editors.length - 1];
                 editor.focus();
-                editor.setValue(value);
+                editor.setValue('');
                 return true;
             } catch (e) {
                 return false;
             }
-        }, query);
+        });
 
-        if (setViaModel) {
+        if (focusedAndCleared) {
+            await this.page.keyboard.type(query, { delay: 50 });
             return;
         }
 
@@ -565,7 +568,7 @@ export class MetricsPage {
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
         await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Backspace');
-        await this.page.keyboard.type(query, { delay: 10 });
+        await this.page.keyboard.type(query, { delay: 50 });
     }
 
     async waitForMetricsResults() {
