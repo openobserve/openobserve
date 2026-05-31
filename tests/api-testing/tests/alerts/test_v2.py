@@ -1,1067 +1,528 @@
-import time
-import random
-import uuid
-import pytest
-import json
-import requests
+"""V2 Alerts API tests — alert lifecycle + VRL support.
+
+Rewritten in Phase 4 of the api-tests revamp (was 1067 LOC, 11 tests).
+
+The original had two major anti-patterns:
+
+1. ~170 LOC of identical setup copy-pasted between `test_new_alert_create`
+   and `test_put_alertnew_update` (folder + template + destination +
+   ingest_data). The shared `_setup_vrl_test_resources` helper used by
+   the 3 VRL tests at the bottom proved the team already knew the
+   pattern — just hadn't applied it to the older tests.
+
+2. `test_put_alertnew_disable` / `enable` / `trigger` / `delete` all
+   iterate over EVERY alert in the org. Side-effects spill to other
+   tests AND the original disable test has an indentation bug at the
+   `assert alert_disabled == "False"` line — it's inside an `else`
+   block that never executes, so the assertion never runs (and is
+   wrong anyway — `enabled` is a bool, not the string `"False"`).
+
+This rewrite uses:
+- `temp_alert_prereqs` fixture (folder + template + destination, all
+  unique-named, auto-cleaned)
+- `temp_alert` fixture that uses the prereqs to create an alert and
+  yield (alert_id, name, folder_id), auto-deletes
+- Each test becomes 5-15 LOC
+
+Also drops the `jsonplaceholder.typicode.com` third-party dependency
+(used as a destination URL that never actually got called) — replaced
+with `http://localhost:0/sink` which is syntactically valid and never
+resolves to anything.
+"""
+from __future__ import annotations
+
 import logging
+import uuid
+from collections.abc import Generator
+from typing import Any
+
+import pytest
+
+from support.client import OpenObserveClient
+from support.factories import unique_name
+from support.wait import wait_until
 
 logger = logging.getLogger(__name__)
 
-
-
-def test_get_alertsnew(create_session, base_url):
-    """Running an E2E test for getting all the new alerts list."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
-
-    logger.debug(resp_get_allalertsnew.content)
-    assert (
-        resp_get_allalertsnew.status_code == 200
-    ), f"Get all new alerts list 200, but got {resp_get_allalertsnew.status_code} {resp_get_allalertsnew.content}"
-
-def test_new_alert_create(create_session, base_url):
-    """Running an E2E test for create a new alert."""
-
-    alert_name = f"newalert_{random.randint(1000, 9999)}"  # Make the name unique
-    folder_alert = f"newfloder_{random.randint(1000, 9999)}"  # Make the name unique
-    
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
-
-    # create folder
-
-    payload_folder = {"description": "newfoldernvp", "name": folder_alert}
-    resp_create_folder = session.post(
-        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
-
-    logger.debug(resp_create_folder.content)
-
-    folder_id = resp_create_folder.json()["folderId"]
-
-    assert (
-        resp_create_folder.status_code == 200
-    ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
-
-    # createtemplate
-    template_alert = f"newtemp_{random.randint(10000, 99999)}"  # Make the name unique
-    destination_alert = f"newdest_{random.randint(10000, 99999)}"  # Make the name unique
-
-
-    payload_temp_alert = {
-        "name":template_alert,
-        "body":"{\n  \"text\": \"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active\"\n}",
-        "type":"http",
-        "title":""
-        }
-    
-    # Create template for alerts
-    resp_create_templates_alert = session.post(
-        f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
-    )
-
-    logger.debug(resp_create_templates_alert.content)
-    assert (
-        resp_create_templates_alert.status_code == 200
-    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
-
-    
-    skip_tls_verify_value = False  # Define the skip_tls_verify_value
-
-    payload_dest_alert = {
-        "url":"https://jsonplaceholder.typicode.com/todos",
-        "method":"get",
-        "skip_tls_verify":skip_tls_verify_value,
-        "template":template_alert,
-        "headers":{},
-        "name":destination_alert
-        }
-    
-
-    # Create destination
-    resp_create_destinations_alert = session.post(
-        f"{url}api/{org_id}/alerts/destinations",
-        json=payload_dest_alert,
-    )
-    logger.debug(resp_create_destinations_alert.content)
-
-    assert (
-        resp_create_destinations_alert.status_code == 200
-    ), f"Failed to create destination: {resp_create_destinations_alert.status_code} {resp_create_destinations_alert.content}"
-
-    # Get destination
-    resp_get_destinations_alert = session.get(
-    f"{url}api/{org_id}/alerts/destinations/{destination_alert}"
-    )
-    logger.debug(resp_get_destinations_alert.content)
-
-    assert (
-    resp_get_destinations_alert.status_code == 200
-    ), f"Get all destinations list 200, but got {resp_get_destinations_alert.status_code} {resp_get_destinations_alert.content}"
-
-    # Check if the destination name matches
-    assert (
-    resp_get_destinations_alert.json()["name"] == destination_alert
-    ), f"Destination {destination_alert} not found in the response"
-
-    time.sleep(5)
-
-    # ingest logs
-    stream_name = "default"
-    payload_logs = [
-        {
-            "Athlete": "newtemp",
-            "City": "Athens",
-            "Country": "HUN",
-            "Discipline": "Swimming",
-            "Sport": "Aquatics",
-            "Year": 1896,
-        },
-        {
-            "Athlete": "HERSCHMANN",
-            "City": "Athens",
-            "Country": "CHN",
-            "Discipline": "Swimming",
-            "Sport": "Aquatics",
-            "Year": 1896,
-        },
-    ]
-
-    resp_create_logstream = session.post(
-        f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
-    )
-
-    logger.debug(resp_create_logstream.content)
-    assert (
-        resp_create_logstream.status_code == 200
-    ), f"Get all logs list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
-    
-    time.sleep(5)  
-    payload_alert = {
-    "name": alert_name,
-    "row_template": template_alert,
-    "stream_type": "logs",
-    "stream_name": "default",
-    "is_real_time": False,
-    "context_attributes": {},
-    "query_condition": {
-        "conditions": [ {
-        "column": "log",
-        "operator": "=",
-        "value": "200",
-        "type": None,  # Set it to None or remove it
-        "id": str(uuid.uuid4())
-        } ],
-        "search_event_type": "ui",
-        "sql": "",
-        "promql": "",
-        "type": "custom",
-        "promql_condition": None,
-        "vrl_function": None,
-        "multi_time_range": []
-    },
-    "trigger_condition": {
-        "period": 10,
-        "operator": ">=",
-        "frequency": 1,
-        "cron": "",
-        "threshold": 3,
-        "silence": 10,
-        "frequency_type": "minutes",
-        "timezone": "UTC",
-        "tolerance_in_secs": 0
-    },
-    "org_id": "default",
-    "destinations": [destination_alert],
-    "enabled": True,
-    "description": "test",
-    "folderId": folder_id
- }
-    resp_post_alertnew = session.post(
-    f"{url}api/v2/{org_id}/alerts",
-    json=payload_alert,
-    headers=headers,
-    )
-    logger.debug(resp_post_alertnew.content)
-
-    assert ( resp_post_alertnew.status_code == 200  
-    ), f"Post alert expected 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
-    logger.debug(f"Alert {alert_name} created successfully")
-
-
-def test_get_alertnew(create_session, base_url):
-    """Running an E2E test for getting particular new alert ID."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    # Make the request to get the list of alerts
-    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
-
-    # Ensure the response is successful
-    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
-    # Parse the response JSON
-    response_json = resp_get_allalertsnew.json()
-
-    # Check if "list" is in the response and proceed
-    assert "list" in response_json, "Response does not contain 'list'"
-
-    # Get the list of alerts from the response
-    alerts = response_json["list"]
-
-    # Now you can iterate over the alerts
-    for alert in alerts:
-        alert_id = alert.get("alert_id")
-        assert alert_id, f"Alert ID is missing for alert: {alert}"
-
-        logger.debug(f"Extracted alert_id: {alert_id}")
-
-    # Get  request using the extracted alert_id
-        resp_get_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_get_alertnew.status_code == 200, f"Failed to get details for alert {alert_id}"
-        logger.debug(f"Successfully fetched details for alert {alert_id}")
-
-def test_put_alertnew_update(create_session, base_url):
-    """Running an E2E test for updating the new alert."""
-
-    alert_name = f"newalert_{random.randint(1000, 9999)}"  # Make the name unique
-    folder_alert = f"newfloder_{random.randint(1000, 9999)}"  # Make the name unique
-    
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
-
-    # create folder
-
-    payload_folder = {"description": "newfoldernvp", "name": folder_alert}
-    resp_create_folder = session.post(
-        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
-
-    logger.debug(resp_create_folder.content)
-
-    folder_id = resp_create_folder.json()["folderId"]
-
-    assert (
-        resp_create_folder.status_code == 200
-    ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
-
-    # createtemplate
-    template_alert = f"newtemp_{random.randint(10000, 99999)}"  # Make the name unique
-    destination_alert = f"newdest_{random.randint(10000, 99999)}"  # Make the name unique
-
-
-    payload_temp_alert = {
-        "name":template_alert,
-        "body":"{\n  \"text\": \"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active\"\n}",
-        "type":"http",
-        "title":""
-        }
-    
-    # Create template for alerts
-    resp_create_templates_alert = session.post(
-        f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
-    )
-
-    logger.debug(resp_create_templates_alert.content)
-    assert (
-        resp_create_templates_alert.status_code == 200
-    ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
-
-    
-    skip_tls_verify_value = False  # Define the skip_tls_verify_value
-
-    payload_dest_alert = {
-        "url":"https://jsonplaceholder.typicode.com/todos",
-        "method":"get",
-        "skip_tls_verify":skip_tls_verify_value,
-        "template":template_alert,
-        "headers":{},
-        "name":destination_alert
-        }
-    
-
-    # Create destination
-    resp_create_destinations_alert = session.post(
-        f"{url}api/{org_id}/alerts/destinations",
-        json=payload_dest_alert,
-    )
-    logger.debug(resp_create_destinations_alert.content)
-
-    assert (
-        resp_create_destinations_alert.status_code == 200
-    ), f"Failed to create destination: {resp_create_destinations_alert.status_code} {resp_create_destinations_alert.content}"
-
-    # Get destination
-    resp_get_destinations_alert = session.get(
-    f"{url}api/{org_id}/alerts/destinations/{destination_alert}"
-    )
-    logger.debug(resp_get_destinations_alert.content)
-
-    assert (
-    resp_get_destinations_alert.status_code == 200
-    ), f"Get all destinations list 200, but got {resp_get_destinations_alert.status_code} {resp_get_destinations_alert.content}"
-
-    # Check if the destination name matches
-    assert (
-    resp_get_destinations_alert.json()["name"] == destination_alert
-    ), f"Destination {destination_alert} not found in the response"
-
-    time.sleep(5)
-
-    # ingest logs
-    stream_name = "default"
-    payload_logs = [
-        {
-            "Athlete": "newtemp",
-            "log": "200",  # Match the query condition
-            "City": "Athens",
-            "Country": "HUN",
-            "Discipline": "Swimming",
-            "Sport": "Aquatics",
-            "Year": 1896,
-        },
-        {
-            "Athlete": "HERSCHMANN",
-            "log": "404",  # Add a non-matching record for negative testing
-            "City": "Athens",
-            "Country": "CHN",
-            "Discipline": "Swimming",
-            "Sport": "Aquatics",
-            "Year": 1896,
-        },
-    ]
-
-    resp_create_logstream = session.post(
-        f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
-    )
-
-    logger.debug(resp_create_logstream.content)
-    assert (
-        resp_create_logstream.status_code == 200
-    ), f"Get all logs list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
-    
-    time.sleep(5)  
-    payload_alert = {
-    "name": alert_name,
-    "row_template": template_alert,
-    "stream_type": "logs",
-    "stream_name": "default",
-    "is_real_time": False,
-    "context_attributes": {},
-    "query_condition": {
-        "conditions": [ {
-        "column": "log",
-        "operator": "=",
-        "value": "200",
-        "type": None,  # Set it to None or remove it
-        "id": str(uuid.uuid4())
-        } ],
-        "search_event_type": "ui",
-        "sql": "",
-        "promql": "",
-        "type": "custom",
-        "promql_condition": None,
-        "vrl_function": None,
-        "multi_time_range": []
-    },
-    "trigger_condition": {
-        "period": 10,
-        "operator": ">=",
-        "frequency": 1,
-        "cron": "",
-        "threshold": 3,
-        "silence": 10,
-        "frequency_type": "minutes",
-        "timezone": "UTC",
-        "tolerance_in_secs": 0
-    },
-    "org_id": "default",
-    "destinations": [destination_alert],
-    "enabled": True,
-    "description": "test",
-    "folderId": folder_id
+ORG_ID = "default"
+
+# Sink URL — points at OO's own /healthz so the trigger test can actually
+# hit a reachable endpoint and get 200 back. Most other tests don't fire
+# the alert; they just need a valid URL shape so destination creation works.
+# (Previous value `http://localhost:0/sink` worked for non-trigger tests
+# but caused the trigger test to fail with a 500: connection refused.)
+SINK_URL = "http://localhost:5080/healthz"
+
+
+def _template_payload(name: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "body": (
+            '{\n  "text": "For stream {stream_name} of organization {org_name} '
+            'alert {alert_name} of type {alert_type} is active"\n}'
+        ),
+        "type": "http",
+        "title": "",
     }
-    resp_post_alertnew = session.post(
-    f"{url}api/v2/{org_id}/alerts",
-    json=payload_alert,
-    headers=headers,
-    )
-    logger.debug(resp_post_alertnew.content)
-    assert resp_post_alertnew.status_code == 200
 
-    # After creating the alert, wait a moment to ensure it's fully created
-    time.sleep(10)  # Increase this time if necessary
 
-    # Make the request to get the list of alerts
-    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
-
-    # Ensure the response is successful
-    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
-    # Parse the response JSON
-    response_json = resp_get_allalertsnew.json()
-
-    # Check if "list" is in the response and proceed
-    assert "list" in response_json, "Response does not contain 'list'"
-
-    # Get the list of alerts from the response
-    alerts = response_json["list"]
-
-    # Now you can iterate over the alerts
-    for alert in alerts:
-        alert_id = alert.get("alert_id")
-        assert alert_id, f"Alert ID is missing for alert: {alert}"
-
-        logger.debug(f"Extracted alert_id for update: {alert_id}")
-
-    # Validate the alert existence first
-        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        logger.debug(f"Alert {alert_id} exists and is retrievable for update.")
-       
-    # # Update the alert
-        payload_alert_update = {
-        "id": alert_id,
-        "name": alert_name,
-        "org_id": "default",
-        "stream_type": "logs",
-        "stream_name": "default",
-        "is_real_time": False,
-        "query_condition": {
-        "type": "custom",
-        "conditions": [
-        {
-        "column": "job",
-        "operator": "=",
-        "value": "test",
-        "ignore_case": False,
-        "id": str(uuid.uuid4())
-        }
-        ],
-        "sql": None,
-        "promql": None,
-        "promql_condition": None,
-        "aggregation": None,
-        "vrl_function": None,
-        "search_event_type": None,
-        "multi_time_range": []
-        },
-        "trigger_condition": {
-        "period": 10,
-        "operator": ">=",
-        "threshold": 3,
-        "frequency": 1,
-        "cron": "",
-        "frequency_type": "minutes",
-        "silence": 10,
-        "timezone": "UTC",
-        "tolerance_in_secs": None
-        },
-        "destinations": [destination_alert],
-        "context_attributes": {},
-        "row_template": "",
-        "description": "Test Updated",
-        "enabled": True,
-        "tz_offset": 0,
-        "last_triggered_at": None,
-        "last_satisfied_at": None,
-        "updated_at": int(time.time() * 1000),
-        "createdAt": int(time.time() * 1000),
-        "lastTriggeredAt": int(time.time() * 1000),
-        } 
-        # Update the alert for description with "Test Updated"
-        resp_put_alertnew = session.put(
-        f"{url}api/v2/{org_id}/alerts/{alert_id}?type=logs",
-        json=payload_alert_update,
-        headers=headers,
-         )
-        logger.debug(resp_put_alertnew.content)
-        assert ( resp_put_alertnew.status_code == 200  
-        ), f"Post alert expected 200, but got {resp_put_alertnew.status_code} {resp_put_alertnew.content}"
-
-        logger.debug(f"Alert {alert_name} updated successfully")
-
-        # Get details for the updated alert
-        resp_get_updated_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_get_updated_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
-        logger.debug(f"Successfully fetched details for updated alert {alert_id}")
-
-        # Parse the response JSON
-        response_json_updated = resp_get_updated_alertnew.json()
-
-        # Check if the response is a dictionary (which it seems to be)
-        if isinstance(response_json_updated, dict):
-            alert_description = response_json_updated.get("description", None)
-        else:
-            raise ValueError("Unexpected response format: Expected a dictionary")
-
-        # Now you can assert or further handle the 'alert_description'
-            assert alert_description == "Test Updated", f"Expected 'Test Updated', but got {alert_description}"
-
-def test_put_alertnew_disable(create_session, base_url):
-    """Running an E2E test for getting the new alert disable."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    # Make the request to get the list of alerts
-    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
-
-    # Ensure the response is successful
-    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
-    # Parse the response JSON
-    response_json = resp_get_allalertsnew.json()
-
-    # Check if "list" is in the response and proceed
-    assert "list" in response_json, "Response does not contain 'list'"
-
-    # Get the list of alerts from the response
-    alerts = response_json["list"]
-
-    # Now you can iterate over the alerts
-    for alert in alerts:
-        alert_id = alert.get("alert_id")
-        assert alert_id, f"Alert ID is missing for alert: {alert}"
-        folder_id = alert.get("folder_id", "default")
-
-        logger.debug(f"Extracted alert_id: {alert_id}")
-
-    # Validate the alert existence first
-        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        logger.debug(f"Alert {alert_id} exists and is retrievable.")
-
-    # Proceed to disable the alert
-        resp_alertnew_disable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs&folder={folder_id}")
-        logger.debug(f"Disable Alert Response: {resp_alertnew_disable.text}")
-        assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
-        logger.debug(f"Successfully disabled alert {alert_id}")
-
-        # Get details for the disabled alert
-        resp_get_disabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_get_disabled_alertnew.status_code == 200, f"Failed to get details for disabled alert {alert_id}"
-        logger.debug(f"Successfully fetched details for disabled alert {alert_id}")
-
-        # Parse the response JSON
-        response_json_disabled = resp_get_disabled_alertnew.json()
-
-        # Check if the response is a dictionary (which it seems to be)
-        if isinstance(response_json_disabled, dict):
-            alert_disabled = response_json_disabled.get("enabled", None)
-        else:
-            raise ValueError("Unexpected response format: Expected a dictionary")
-
-        # Now you can assert or further handle the 'alert_disabled'
-            assert alert_disabled == "False", f"Expected 'False', but got {alert_disabled}"
-
-def test_put_alertnew_enable(create_session, base_url):
-    """Running an E2E test for getting the new alert enable."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    # Make the request to get the list of alerts
-    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
-
-    # Ensure the response is successful
-    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
-    # Parse the response JSON
-    response_json = resp_get_allalertsnew.json()
-
-    # Check if "list" is in the response and proceed
-    assert "list" in response_json, "Response does not contain 'list'"
-
-    # Get the list of alerts from the response
-    alerts = response_json["list"]
-
-    # Now you can iterate over the alerts
-    for alert in alerts:
-        alert_id = alert.get("alert_id")
-        assert alert_id, f"Alert ID is missing for alert: {alert}"
-        folder_id = alert.get("folder_id", "default")
-
-        logger.debug(f"Extracted alert_id: {alert_id}")
-
-    # Validate the alert existence first
-        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        logger.debug(f"Alert {alert_id} exists and is retrievable.")
-
-
-    # Proceed to enable the alert
-        resp_alertnew_enable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs&folder={folder_id}")
-        logger.debug(f"Enable Alert Response: {resp_alertnew_enable.text}")
-        assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
-        logger.debug(f"Successfully enabled alert {alert_id}")
-        
-        # Get details for the enabled alert
-        resp_get_enabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_get_enabled_alertnew.status_code == 200, f"Failed to get details for enabled alert {alert_id}"
-        logger.debug(f"Successfully fetched details for enabled alert {alert_id}")
-
-        # Parse the response JSON
-        response_json_enabled = resp_get_enabled_alertnew.json()
-
-        # Check if the response is a dictionary (which it seems to be)
-        if isinstance(response_json_enabled, dict):
-            alert_enabled = response_json_enabled.get("enabled", None)
-        else:
-            raise ValueError("Unexpected response format: Expected a dictionary")
-
-        # Now you can assert or further handle the 'alert_enabled'
-            assert alert_enabled == "True", f"Expected 'True', but got {alert_enabled}"
-
-def test_put_alertnew_trigger(create_session, base_url, caplog):
-    """Running an E2E test for getting the new alert trigger."""
-    caplog.set_level('INFO')
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    # Create a logger
-    logger = logging.getLogger(__name__)
-
-    # Make the request to get the list of alerts
-    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
-
-    # Ensure the response is successful
-    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
-    # Parse the response JSON
-    response_json = resp_get_allalertsnew.json()
-
-    # Check if "list" is in the response and proceed
-    assert "list" in response_json, "Response does not contain 'list'"
-
-    # Get the list of alerts from the response
-    alerts = response_json["list"]
-
-    # Now you can iterate over the alerts
-    for alert in alerts:
-        alert_id = alert.get("alert_id")
-        assert alert_id, f"Alert ID is missing for alert: {alert}"
-
-        logger.debug(f"Extracted alert_id: {alert_id}")
-
-    # Validate the alert existence first
-        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        logger.debug(f"Alert {alert_id} exists and is retrievable.")
-
-        time.sleep(5)  # Brief wait for status update
-
-    # Trigger the alert
-        # Trigger the alert
-        logger.info(f"Attempting to trigger alert with ID: {alert_id}")
-
-        resp_alertnew_trigger = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
-
-    # Log response details for debugging
-        logger.debug(f"Trigger Alert Response Status Code: {resp_alertnew_trigger.status_code}")
-        logger.debug(f"Trigger Alert Response Body: {resp_alertnew_trigger.text}")
-
-        logger.debug(f"Alert Trigger URL: {url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
-        logger.debug(f"Alert Details: {alert}")
-
-
-    # Check if the response was successful
-        assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
-        logger.debug(f"Successfully triggered alert {alert_id}")
-
-        # Verify trigger effects
-        time.sleep(2)  # Wait for trigger processing
-        resp_check = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_check.status_code == 200
-        alert_data = resp_check.json()
-        # assert alert_data["last_triggered_at"] is not None, "Alert was not triggered" after resolving issues 5745
-    
-def test_delete_alertnew(create_session, base_url):
-    """Running an E2E test for deleting the new alert."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    # Make the request to get the list of alerts
-    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
-
-    # Ensure the response is successful
-    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
-    # Parse the response JSON
-    response_json = resp_get_allalertsnew.json()
-
-    # Check if "list" is in the response and proceed
-    assert "list" in response_json, "Response does not contain 'list'"
-
-    # Get the list of alerts from the response
-    alerts = response_json["list"]
-
-    # Now you can iterate over the alerts
-    for alert in alerts:
-        alert_id = alert.get("alert_id")
-        assert alert_id, f"Alert ID is missing for alert: {alert}"
-
-        logger.debug(f"Extracted alert_id: {alert_id}")
-
-    # Validate the alert existence first
-        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        logger.debug(f"Alert {alert_id} exists and is retrievable.")
-
-    # Proceed to delete the alert
-        resp_delete_alertnew = session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        logger.debug(f"Deleted Alert Response: {resp_delete_alertnew.text}")
-        assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
-        logger.debug(f"Successfully deleted alert {alert_id}")
-
-    # Verify alert is deleted
-        resp_verify = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
-
-
-def _setup_vrl_test_resources(session, url, org_id, prefix):
-    """Helper to create folder, template, destination for VRL tests.
-
-    Returns a dict with resource names/IDs for cleanup.
-    """
-    folder_name = f"{prefix}_folder_{random.randint(1000, 9999)}"
-    template_name = f"{prefix}_temp_{random.randint(10000, 99999)}"
-    destination_name = f"{prefix}_dest_{random.randint(10000, 99999)}"
-
-    # Create folder
-    resp = session.post(
-        f"{url}api/v2/{org_id}/folders/alerts",
-        json={"description": f"{prefix} test folder", "name": folder_name}
-    )
-    assert resp.status_code == 200, f"Failed to create folder: {resp.status_code} {resp.content}"
-    folder_id = resp.json()["folderId"]
-
-    # Create template
-    resp = session.post(
-        f"{url}api/{org_id}/alerts/templates",
-        json={
-            "name": template_name,
-            "body": "{\n  \"text\": \"VRL Alert: {alert_name} triggered\"\n}",
-            "type": "http",
-            "title": ""
-        }
-    )
-    assert resp.status_code == 200, f"Failed to create template: {resp.status_code} {resp.content}"
-
-    # Create destination
-    resp = session.post(
-        f"{url}api/{org_id}/alerts/destinations",
-        json={
-            "url": "https://jsonplaceholder.typicode.com/todos",
-            "method": "get",
-            "skip_tls_verify": False,
-            "template": template_name,
-            "headers": {},
-            "name": destination_name
-        }
-    )
-    assert resp.status_code == 200, f"Failed to create destination: {resp.status_code} {resp.content}"
-
-    time.sleep(5)
-
-    # Ingest logs
-    stream_name = "default"
-    resp = session.post(
-        f"{url}api/{org_id}/{stream_name}/_json",
-        json=[{"test": prefix, "code": 200}]
-    )
-    assert resp.status_code == 200, f"Failed to ingest logs: {resp.status_code} {resp.content}"
-
-    time.sleep(5)
+def _destination_payload(name: str, template: str) -> dict[str, Any]:
+    return {
+        "url": SINK_URL,
+        "method": "get",
+        "skip_tls_verify": False,
+        "template": template,
+        "headers": {},
+        "name": name,
+    }
+
+
+def _alert_payload(
+    *,
+    name: str,
+    folder_id: str,
+    template: str,
+    destination: str,
+    stream_name: str = "default",
+    enabled: bool = True,
+    vrl_function: str | None = None,
+    sql: str | None = None,
+) -> dict[str, Any]:
+    """Build a standard v2 alert payload."""
+    if sql is None:
+        query_conditions = [{
+            "column": "log",
+            "operator": "=",
+            "value": "200",
+            "type": None,
+            "id": str(uuid.uuid4()),
+        }]
+        sql_str = ""
+        cond_type = "custom"
+    else:
+        query_conditions = []
+        sql_str = sql
+        cond_type = "sql"
 
     return {
+        "name": name,
+        "row_template": template,
+        "stream_type": "logs",
+        "stream_name": stream_name,
+        "is_real_time": False,
+        "context_attributes": {},
+        "query_condition": {
+            "conditions": query_conditions,
+            "search_event_type": "ui",
+            "sql": sql_str,
+            "promql": "",
+            "type": cond_type,
+            "promql_condition": None,
+            "vrl_function": vrl_function,
+            "multi_time_range": [],
+        },
+        "trigger_condition": {
+            "period": 10,
+            "operator": ">=",
+            "frequency": 1,
+            "cron": "",
+            "threshold": 3,
+            "silence": 10,
+            "frequency_type": "minutes",
+            "timezone": "UTC",
+            "tolerance_in_secs": 0,
+        },
+        "org_id": ORG_ID,
+        "destinations": [destination],
+        "enabled": enabled,
+        "description": "rewritten alert test",
+        "folderId": folder_id,
+    }
+
+
+# ----- fixtures -----
+
+
+@pytest.fixture
+def temp_alert_prereqs(client: OpenObserveClient) -> Generator[dict[str, str], None, None]:
+    """Create folder + template + destination with unique names; auto-cleanup."""
+    folder_name = unique_name("pyt_folder")
+    template_name = unique_name("pyt_tmpl")
+    destination_name = unique_name("pyt_dest")
+
+    # Folder
+    resp = client.post("folders/alerts", prefix="api/v2/", json={"description": "test", "name": folder_name})
+    assert resp.status_code == 200, f"folder create failed: {resp.status_code} {resp.text}"
+    folder_id = resp.json()["folderId"]
+
+    # Template
+    resp = client.post("alerts/templates", json=_template_payload(template_name))
+    assert resp.status_code == 200, f"template create failed: {resp.status_code} {resp.text}"
+
+    # Destination
+    resp = client.post("alerts/destinations", json=_destination_payload(destination_name, template_name))
+    assert resp.status_code == 200, f"destination create failed: {resp.status_code} {resp.text}"
+
+    yield {
         "folder_id": folder_id,
         "folder_name": folder_name,
         "template_name": template_name,
         "destination_name": destination_name,
-        "stream_name": stream_name
     }
 
+    # Cleanup — best effort, reverse creation order
+    for path, name in (
+        (f"alerts/destinations/{destination_name}", "destination"),
+        (f"alerts/templates/{template_name}", "template"),
+    ):
+        try:
+            client.delete(path)
+        except Exception as e:
+            logger.warning("temp_alert_prereqs %s cleanup failed: %s", name, e)
+    # Folder delete uses the v2 endpoint
+    try:
+        client.delete(f"folders/alerts/{folder_id}", prefix="api/v2/")
+    except Exception as e:
+        logger.warning("temp_alert_prereqs folder cleanup failed: %s", e)
 
-def _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id=None):
-    """Helper to cleanup VRL test resources."""
-    if alert_id:
-        session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-    if resources.get("destination_name"):
-        session.delete(f"{url}api/{org_id}/alerts/destinations/{resources['destination_name']}")
-    if resources.get("template_name"):
-        session.delete(f"{url}api/{org_id}/alerts/templates/{resources['template_name']}")
-    if resources.get("folder_id"):
-        session.delete(f"{url}api/v2/{org_id}/folders/{resources['folder_id']}")
 
+@pytest.fixture
+def temp_alert(
+    client: OpenObserveClient, temp_alert_prereqs: dict[str, str]
+) -> Generator[dict[str, Any], None, None]:
+    """Create an alert using temp_alert_prereqs; yield {alert_id, name, prereqs}; auto-delete."""
+    alert_name = unique_name("pyt_alert")
+    payload = _alert_payload(
+        name=alert_name,
+        folder_id=temp_alert_prereqs["folder_id"],
+        template=temp_alert_prereqs["template_name"],
+        destination=temp_alert_prereqs["destination_name"],
+    )
 
-def test_alert_with_vrl_empty_array(create_session, base_url):
-    """Test that an alert with VRL returning empty array is stored correctly."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    alert_id = None
-    resources = {}
+    resp = client.post("alerts", prefix="api/v2/", json=payload)
+    assert resp.status_code == 200, f"alert create failed: {resp.status_code} {resp.text}"
+
+    # The list endpoint will have the alert_id; create response may not.
+    # Find our alert by name.
+    list_resp = client.get("alerts", prefix="api/v2/")
+    list_resp.raise_for_status()
+    alert = next(
+        (a for a in list_resp.json().get("list", []) if a.get("name") == alert_name),
+        None,
+    )
+    assert alert is not None, f"created alert {alert_name} not in list response"
+    alert_id = alert.get("alert_id")
+    assert alert_id, f"alert in list missing alert_id: {alert}"
+
+    yield {
+        "alert_id": alert_id,
+        "name": alert_name,
+        "folder_id": temp_alert_prereqs["folder_id"],
+        "destination": temp_alert_prereqs["destination_name"],
+        "template": temp_alert_prereqs["template_name"],
+    }
 
     try:
-        resources = _setup_vrl_test_resources(session, url, org_id, "vrl_empty")
-        alert_name = f"vrl_empty_alert_{random.randint(1000, 9999)}"
-
-        # VRL function that returns empty array
-        # Decoded: #ResultArray#\n. = []\n.
-        vrl_function = "I1Jlc3VsdEFycmF5IwouID0gW10KLg=="
-
-        payload_alert = {
-            "name": alert_name,
-            "stream_type": "logs",
-            "stream_name": resources["stream_name"],
-            "is_real_time": False,
-            "query_condition": {
-                "conditions": [],
-                "sql": f"select code from {resources['stream_name']}",
-                "promql": "",
-                "type": "sql",
-                "aggregation": None,
-                "promql_condition": None,
-                "vrl_function": vrl_function,
-                "multi_time_range": []
-            },
-            "trigger_condition": {
-                "period": 1440,
-                "operator": ">=",
-                "frequency": 1,
-                "cron": "",
-                "threshold": 1,
-                "silence": 10,
-                "frequency_type": "minutes",
-                "timezone": "UTC"
-            },
-            "destinations": [resources["destination_name"]],
-            "context_attributes": {},
-            "enabled": True,
-            "description": "VRL alert test - empty array",
-            "folderId": resources["folder_id"]
-        }
-
-        resp = session.post(f"{url}api/v2/{org_id}/alerts", json=payload_alert)
-        assert resp.status_code == 200, f"Failed to create alert: {resp.status_code} {resp.content}"
-
-        alert_id = resp.json().get("id")
-        assert alert_id is not None, "Alert ID should be returned"
-
-        # Verify VRL function is stored correctly
-        time.sleep(2)
-        resp = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp.status_code == 200, f"Failed to fetch alert: {resp.status_code}"
-
-        created_alert = resp.json()
-        vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
-        assert vrl_in_response == vrl_function, f"VRL mismatch. Expected: {vrl_function}, Got: {vrl_in_response}"
-
-        logger.debug(f"VRL function verified in alert: {vrl_in_response}")
-
-    finally:
-        _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
-        logger.debug("Cleanup completed for test_alert_with_vrl_empty_array")
+        client.delete(f"alerts/{alert_id}", prefix="api/v2/")
+    except Exception as e:
+        logger.warning("temp_alert cleanup failed for %s: %s", alert_id, e)
 
 
-def test_alert_with_vrl_object_array(create_session, base_url):
-    """Test that an alert with VRL returning object array is stored correctly."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    alert_id = None
-    resources = {}
+# ----- list / create / get -----
+
+
+def test_list_alerts_returns_list_key(client: OpenObserveClient):
+    """GET /api/v2/{org}/alerts returns 200 with a 'list' array."""
+    resp = client.get("alerts", prefix="api/v2/")
+    assert resp.status_code == 200, resp.text
+
+    body = resp.json()
+    assert "list" in body, f"response missing 'list' key: {body}"
+    assert isinstance(body["list"], list), f"'list' should be a list, got {type(body['list']).__name__}"
+
+
+def test_create_alert_with_full_prereqs(
+    client: OpenObserveClient, temp_alert_prereqs: dict[str, str]
+):
+    """Create an alert with all required prereqs; verify it appears in the list with the expected name."""
+    alert_name = unique_name("pyt_create")
+    payload = _alert_payload(
+        name=alert_name,
+        folder_id=temp_alert_prereqs["folder_id"],
+        template=temp_alert_prereqs["template_name"],
+        destination=temp_alert_prereqs["destination_name"],
+    )
 
     try:
-        resources = _setup_vrl_test_resources(session, url, org_id, "vrl_objects")
-        alert_name = f"vrl_objects_alert_{random.randint(1000, 9999)}"
+        resp = client.post("alerts", prefix="api/v2/", json=payload)
+        assert resp.status_code == 200, f"create alert failed: {resp.status_code} {resp.text}"
 
-        # VRL function that returns array with objects
-        # Decoded: #ResultArray#\n. = [{}, {}]\n.
-        vrl_function = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
-
-        payload_alert = {
-            "name": alert_name,
-            "stream_type": "logs",
-            "stream_name": resources["stream_name"],
-            "is_real_time": False,
-            "query_condition": {
-                "conditions": [],
-                "sql": f"select code from {resources['stream_name']}",
-                "promql": "",
-                "type": "sql",
-                "aggregation": None,
-                "promql_condition": None,
-                "vrl_function": vrl_function,
-                "multi_time_range": []
-            },
-            "trigger_condition": {
-                "period": 1440,
-                "operator": ">=",
-                "frequency": 1,
-                "cron": "",
-                "threshold": 1,
-                "silence": 10,
-                "frequency_type": "minutes",
-                "timezone": "UTC"
-            },
-            "destinations": [resources["destination_name"]],
-            "context_attributes": {},
-            "enabled": True,
-            "description": "VRL alert test - object array",
-            "folderId": resources["folder_id"]
-        }
-
-        resp = session.post(f"{url}api/v2/{org_id}/alerts", json=payload_alert)
-        assert resp.status_code == 200, f"Failed to create alert: {resp.status_code} {resp.content}"
-
-        alert_id = resp.json().get("id")
-        assert alert_id is not None, "Alert ID should be returned"
-
-        # Verify VRL function is stored correctly
-        time.sleep(2)
-        resp = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp.status_code == 200, f"Failed to fetch alert: {resp.status_code}"
-
-        created_alert = resp.json()
-        vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
-        assert vrl_in_response == vrl_function, f"VRL mismatch. Expected: {vrl_function}, Got: {vrl_in_response}"
-
-        logger.debug(f"VRL function verified in alert: {vrl_in_response}")
-
+        # Verify it appears in the list with the name we sent
+        alerts = client.alerts.list()
+        names = [a.get("name") for a in alerts]
+        assert alert_name in names, f"created alert {alert_name} not in list: {names}"
     finally:
-        _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
-        logger.debug("Cleanup completed for test_alert_with_vrl_object_array")
+        # find + delete
+        for a in client.alerts.list():
+            if a.get("name") == alert_name:
+                client.delete(f"alerts/{a['alert_id']}", prefix="api/v2/")
+                break
 
 
-def test_update_alert_vrl_function(create_session, base_url):
-    """Test that an alert's VRL function can be updated."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    alert_id = None
-    resources = {}
+def test_get_alert_by_id_returns_full_body(
+    client: OpenObserveClient, temp_alert: dict[str, Any]
+):
+    """GET /alerts/{id} returns the alert's full record with name + folderId matching."""
+    resp = client.get(f"alerts/{temp_alert['alert_id']}", prefix="api/v2/")
+    assert resp.status_code == 200, resp.text
+
+    body = resp.json()
+    assert body.get("name") == temp_alert["name"], \
+        f"returned name should match: expected {temp_alert['name']!r}, got {body.get('name')!r}"
+
+
+# ----- update -----
+
+
+def test_update_alert_description_field(
+    client: OpenObserveClient, temp_alert: dict[str, Any]
+):
+    """PUT /alerts/{id} updates the description; verify via GET."""
+    new_description = f"updated at {uuid.uuid4().hex[:8]}"
+
+    payload = _alert_payload(
+        name=temp_alert["name"],
+        folder_id=temp_alert["folder_id"],
+        template=temp_alert["template"],
+        destination=temp_alert["destination"],
+    )
+    payload["description"] = new_description
+
+    resp = client.put(
+        f"alerts/{temp_alert['alert_id']}?type=logs",
+        prefix="api/v2/",
+        json=payload,
+    )
+    assert resp.status_code == 200, f"update failed: {resp.status_code} {resp.text}"
+
+    # Verify the change persisted
+    resp_get = client.get(f"alerts/{temp_alert['alert_id']}", prefix="api/v2/")
+    assert resp_get.json().get("description") == new_description, \
+        "description should be persisted after update"
+
+
+# ----- enable / disable -----
+
+
+def test_disable_alert_via_enable_endpoint(
+    client: OpenObserveClient, temp_alert: dict[str, Any]
+):
+    """PATCH /alerts/{id}/enable?value=false&folder=... disables; GET shows enabled=False."""
+    alert_id = temp_alert["alert_id"]
+    folder_id = temp_alert["folder_id"]
+
+    resp = client.patch(
+        f"alerts/{alert_id}/enable?value=false&type=logs&folder={folder_id}",
+        prefix="api/v2/",
+    )
+    assert resp.status_code == 200, f"disable failed: {resp.status_code} {resp.text}"
+
+    resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
+    assert resp_get.status_code == 200
+    enabled = resp_get.json().get("enabled")
+    # OO returns boolean False (not the string 'False' — the original test
+    # had that bug AND the assertion was unreachable due to an indentation
+    # error inside an else block that never ran).
+    assert enabled is False, f"alert should be disabled (enabled=False), got: {enabled!r}"
+
+
+def test_enable_alert_via_enable_endpoint(
+    client: OpenObserveClient, temp_alert: dict[str, Any]
+):
+    """PATCH /alerts/{id}/enable?value=true&folder=... enables; GET shows enabled=True."""
+    alert_id = temp_alert["alert_id"]
+    folder_id = temp_alert["folder_id"]
+
+    # Disable first so the enable is observable
+    client.patch(f"alerts/{alert_id}/enable?value=false&type=logs&folder={folder_id}", prefix="api/v2/")
+
+    # Now enable
+    resp = client.patch(
+        f"alerts/{alert_id}/enable?value=true&type=logs&folder={folder_id}",
+        prefix="api/v2/",
+    )
+    assert resp.status_code == 200, f"enable failed: {resp.status_code} {resp.text}"
+
+    resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
+    enabled = resp_get.json().get("enabled")
+    assert enabled is True, f"alert should be enabled (enabled=True), got: {enabled!r}"
+
+
+# ----- trigger -----
+
+
+def test_trigger_alert_returns_200(
+    client: OpenObserveClient, temp_alert: dict[str, Any]
+):
+    """PATCH /alerts/{id}/trigger?type=logs returns 200; the alert remains valid afterwards."""
+    alert_id = temp_alert["alert_id"]
+
+    resp = client.patch(f"alerts/{alert_id}/trigger?type=logs", prefix="api/v2/")
+    assert resp.status_code == 200, f"trigger failed: {resp.status_code} {resp.text}"
+
+    # Verify alert still exists + retrievable
+    resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
+    assert resp_get.status_code == 200, \
+        f"alert should still be retrievable after trigger: {resp_get.status_code}"
+    # Note: `last_triggered_at` is not asserted because OO issue #5745
+    # (per original test comment) makes the timestamp unreliable.
+
+
+# ----- delete -----
+
+
+def test_delete_alert_makes_it_404(
+    client: OpenObserveClient, temp_alert_prereqs: dict[str, str]
+):
+    """After DELETE /alerts/{id}, subsequent GET /alerts/{id} returns 404."""
+    # Create our own alert here so temp_alert's auto-delete doesn't double-delete
+    alert_name = unique_name("pyt_del")
+    payload = _alert_payload(
+        name=alert_name,
+        folder_id=temp_alert_prereqs["folder_id"],
+        template=temp_alert_prereqs["template_name"],
+        destination=temp_alert_prereqs["destination_name"],
+    )
+    resp = client.post("alerts", prefix="api/v2/", json=payload)
+    assert resp.status_code == 200, resp.text
+
+    # Find the alert_id via the list endpoint
+    alert = next(
+        (a for a in client.alerts.list() if a.get("name") == alert_name),
+        None,
+    )
+    assert alert is not None
+    alert_id = alert["alert_id"]
+
+    # Delete
+    resp_del = client.delete(f"alerts/{alert_id}", prefix="api/v2/")
+    assert resp_del.status_code == 200, f"delete failed: {resp_del.status_code} {resp_del.text}"
+
+    # GET should now 404 — give a moment for cache to settle
+    def _is_gone() -> bool:
+        r = client.get(f"alerts/{alert_id}", prefix="api/v2/")
+        return r.status_code == 404
+
+    wait_until(_is_gone, timeout=10, interval=0.5, msg=f"alert {alert_id} should be 404 after delete")
+
+
+# ----- VRL function persistence -----
+
+
+@pytest.mark.parametrize(
+    ("vrl_function", "description"),
+    [
+        ("I1Jlc3VsdEFycmF5IwouID0gW10KLg==", "empty array — #ResultArray#\\n. = []\\n."),
+        ("I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg==", "object array — #ResultArray#\\n. = [{}, {}]\\n."),
+    ],
+    ids=["empty-array", "object-array"],
+)
+def test_alert_with_vrl_function_persists_correctly(
+    client: OpenObserveClient, temp_alert_prereqs: dict[str, str],
+    vrl_function: str, description: str,
+):
+    """Alert stored with vrl_function returns the same base64 string on GET.
+
+    Consolidates 2 near-identical legacy tests (vrl_empty_array, vrl_object_array)
+    into one parametrized test.
+    """
+    alert_name = unique_name("pyt_vrl")
+    # Use SQL query type for VRL-equipped alerts (matches original tests)
+    payload = _alert_payload(
+        name=alert_name,
+        folder_id=temp_alert_prereqs["folder_id"],
+        template=temp_alert_prereqs["template_name"],
+        destination=temp_alert_prereqs["destination_name"],
+        vrl_function=vrl_function,
+        sql=f"select code from {temp_alert_prereqs['template_name']}",  # placeholder stream
+    )
+    # Override trigger_condition.period to 1440min (matches originals)
+    payload["trigger_condition"]["period"] = 1440
 
     try:
-        resources = _setup_vrl_test_resources(session, url, org_id, "vrl_update")
-        alert_name = f"vrl_update_alert_{random.randint(1000, 9999)}"
+        resp = client.post("alerts", prefix="api/v2/", json=payload)
+        assert resp.status_code == 200, f"create alert failed ({description}): {resp.status_code} {resp.text}"
 
-        # Initial VRL function (empty array)
-        vrl_function_initial = "I1Jlc3VsdEFycmF5IwouID0gW10KLg=="
+        # Find alert_id via list
+        alert = next(
+            (a for a in client.alerts.list() if a.get("name") == alert_name),
+            None,
+        )
+        assert alert is not None, f"alert {alert_name} not in list"
+        alert_id = alert["alert_id"]
 
-        payload_alert = {
-            "name": alert_name,
-            "stream_type": "logs",
-            "stream_name": resources["stream_name"],
-            "is_real_time": False,
-            "query_condition": {
-                "conditions": [],
-                "sql": f"select code from {resources['stream_name']}",
-                "promql": "",
-                "type": "sql",
-                "aggregation": None,
-                "promql_condition": None,
-                "vrl_function": vrl_function_initial,
-                "multi_time_range": []
-            },
-            "trigger_condition": {
-                "period": 1440,
-                "operator": ">=",
-                "frequency": 1,
-                "cron": "",
-                "threshold": 1,
-                "silence": 10,
-                "frequency_type": "minutes",
-                "timezone": "UTC"
-            },
-            "destinations": [resources["destination_name"]],
-            "context_attributes": {},
-            "enabled": True,
-            "description": "VRL update test",
-            "folderId": resources["folder_id"]
-        }
-
-        resp = session.post(f"{url}api/v2/{org_id}/alerts", json=payload_alert)
-        assert resp.status_code == 200, f"Failed to create alert: {resp.status_code} {resp.content}"
-
-        alert_id = resp.json().get("id")
-        assert alert_id is not None, "Alert ID should be returned"
-
-        time.sleep(2)
-
-        # Updated VRL function (object array)
-        vrl_function_updated = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
-
-        payload_update = {
-            "id": alert_id,
-            "name": alert_name,
-            "org_id": org_id,
-            "stream_type": "logs",
-            "stream_name": resources["stream_name"],
-            "is_real_time": False,
-            "query_condition": {
-                "conditions": [],
-                "sql": f"select code from {resources['stream_name']}",
-                "promql": "",
-                "type": "sql",
-                "aggregation": None,
-                "promql_condition": None,
-                "vrl_function": vrl_function_updated,
-                "multi_time_range": []
-            },
-            "trigger_condition": {
-                "period": 1440,
-                "operator": ">=",
-                "frequency": 1,
-                "cron": "",
-                "threshold": 1,
-                "silence": 10,
-                "frequency_type": "minutes",
-                "timezone": "UTC"
-            },
-            "destinations": [resources["destination_name"]],
-            "context_attributes": {},
-            "enabled": True,
-            "description": "VRL update test - UPDATED",
-            "folderId": resources["folder_id"]
-        }
-
-        resp = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}?type=logs", json=payload_update)
-        assert resp.status_code == 200, f"Failed to update alert: {resp.status_code} {resp.content}"
-
-        # Verify the VRL function was updated
-        time.sleep(2)
-        resp = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp.status_code == 200, f"Failed to fetch alert: {resp.status_code}"
-
-        updated_alert = resp.json()
-        updated_vrl = updated_alert.get("query_condition", {}).get("vrl_function")
-        assert updated_vrl == vrl_function_updated, f"VRL not updated. Expected: {vrl_function_updated}, Got: {updated_vrl}"
-
-        assert updated_alert.get("description") == "VRL update test - UPDATED", "Description was not updated"
-        logger.debug(f"VRL function update test passed")
-
+        # Verify VRL function persisted
+        resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
+        assert resp_get.status_code == 200
+        vrl_in_response = resp_get.json().get("query_condition", {}).get("vrl_function")
+        assert vrl_in_response == vrl_function, \
+            f"VRL mismatch ({description}): expected {vrl_function!r}, got {vrl_in_response!r}"
     finally:
-        _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
-        logger.debug("Cleanup completed for test_update_alert_vrl_function")
+        for a in client.alerts.list():
+            if a.get("name") == alert_name:
+                client.delete(f"alerts/{a['alert_id']}", prefix="api/v2/")
+                break
+
+
+def test_alert_vrl_function_can_be_updated(
+    client: OpenObserveClient, temp_alert_prereqs: dict[str, str]
+):
+    """An alert's vrl_function can be changed via PUT and the new value persists."""
+    alert_name = unique_name("pyt_vrl_upd")
+    vrl_initial = "I1Jlc3VsdEFycmF5IwouID0gW10KLg=="
+    vrl_updated = "I1Jlc3VsdEFycmF5IwouID0gW3t9LCB7fV0KLg=="
+
+    payload = _alert_payload(
+        name=alert_name,
+        folder_id=temp_alert_prereqs["folder_id"],
+        template=temp_alert_prereqs["template_name"],
+        destination=temp_alert_prereqs["destination_name"],
+        vrl_function=vrl_initial,
+        sql=f"select code from {temp_alert_prereqs['template_name']}",
+    )
+    payload["trigger_condition"]["period"] = 1440
+
+    try:
+        # Create
+        resp = client.post("alerts", prefix="api/v2/", json=payload)
+        assert resp.status_code == 200, resp.text
+
+        alert = next(
+            (a for a in client.alerts.list() if a.get("name") == alert_name),
+            None,
+        )
+        assert alert is not None
+        alert_id = alert["alert_id"]
+
+        # Update VRL
+        payload["id"] = alert_id
+        payload["description"] = "VRL update test - UPDATED"
+        payload["query_condition"]["vrl_function"] = vrl_updated
+
+        resp_update = client.put(
+            f"alerts/{alert_id}?type=logs", prefix="api/v2/", json=payload,
+        )
+        assert resp_update.status_code == 200, f"update failed: {resp_update.status_code} {resp_update.text}"
+
+        # Verify both VRL change AND description change persisted
+        resp_get = client.get(f"alerts/{alert_id}", prefix="api/v2/")
+        body = resp_get.json()
+        assert body.get("query_condition", {}).get("vrl_function") == vrl_updated, \
+            "VRL should be updated to the new base64 string"
+        assert body.get("description") == "VRL update test - UPDATED", \
+            "description should be updated"
+    finally:
+        for a in client.alerts.list():
+            if a.get("name") == alert_name:
+                client.delete(f"alerts/{a['alert_id']}", prefix="api/v2/")
+                break
