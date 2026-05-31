@@ -463,36 +463,23 @@ test.describe("Metrics testcases", () => {
     let hasInlineError = false;
     let hasChartError = false;
     let hasNoData = false;
-    let hasNotification = false;
 
-    // OSS backend returns a 4xx error for incomplete PromQL → error indicator shown.
-    // Enterprise backend may return an empty/complete response instead → no error event
-    // fires, old chart data persists, no indicator appears. Both are valid graceful handling.
-    let showedExplicitError = false;
-    try {
-      await expect.poll(async () => {
-        const inlineError = pm.metricsPage.getDashboardError();
-        hasInlineError = await inlineError.isVisible().catch(() => false);
+    await expect.poll(async () => {
+      const inlineError = pm.metricsPage.getDashboardError();
+      hasInlineError = await inlineError.isVisible().catch(() => false);
 
-        const chartError = pm.metricsPage.getChartErrorMessage();
-        hasChartError = await chartError.isVisible().catch(() => false);
+      const chartError = pm.metricsPage.getChartErrorMessage();
+      hasChartError = await chartError.isVisible().catch(() => false);
 
-        const noDataMessage = await pm.metricsPage.getNoDataMessage();
-        hasNoData = await noDataMessage.isVisible().catch(() => false);
+      const noDataMessage = await pm.metricsPage.getNoDataMessage();
+      hasNoData = await noDataMessage.isVisible().catch(() => false);
 
-        hasNotification = await page.locator('.q-notification').isVisible().catch(() => false);
+      const hasNotification = await page.locator('.q-notification').isVisible().catch(() => false);
 
-        return hasInlineError || hasChartError || hasNoData || hasNotification;
-      }, { timeout: 10000, intervals: [500, 1000, 2000] }).toBe(true);
-      showedExplicitError = true;
-    } catch (_) {
-      // No explicit error indicator — verify the page is still stable (not crashed)
-      const pageStable = await page.locator('[data-test="metrics-apply"]').isVisible({ timeout: 3000 }).catch(() => false);
-      testLogger.info(`Invalid PromQL: no explicit error indicator shown, page stable=${pageStable} (enterprise graceful-silent handling)`);
-      expect(pageStable, 'Expected page to remain stable after submitting invalid PromQL').toBe(true);
-    }
+      return hasInlineError || hasChartError || hasNoData || hasNotification;
+    }, { timeout: 20000, intervals: [500, 1000, 2000] }).toBe(true);
 
-    testLogger.info(`Invalid query state: showedExplicitError=${showedExplicitError}, hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}`);
+    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}`);
 
     if (hasInlineError) {
       const inlineError = pm.metricsPage.getDashboardError();
@@ -502,8 +489,6 @@ test.describe("Metrics testcases", () => {
       const chartError = pm.metricsPage.getChartErrorMessage();
       const errorText = await chartError.textContent().catch(() => '');
       testLogger.info(`Chart error displayed: ${errorText.substring(0, 100)}`);
-    } else if (!showedExplicitError) {
-      testLogger.info('Invalid query handled silently — old chart data preserved (enterprise behavior)');
     } else {
       testLogger.info('Invalid query resulted in no-data - valid handling');
     }
