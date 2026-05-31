@@ -63,27 +63,6 @@ def test_e2e_createusers_invalid_password(create_session, base_url):
     ), f"Creating a user with invalid password should yield 400, but got {resp_create_users.status_code} {resp_create_users.content}"
 
 
-# def test_e2e_createusersasmember(create_session,base_url):
-#     """Running an E2E test for new user creation."""
-
-#     session = create_session
-#     url = base_url
-#     org_id = "default"
-#     payload = {
-#     "organization": "default",
-#     "email": "pytests@gmail.com",
-#     "password": "Test@029w0",
-#     "first_name": "Nehapd",
-#     "last_name": "p",
-#     "role": "member"
-#     }
-
-#     resp_create_users = session.post(f"{url}api/{org_id}/users",json=payload)
-
-#     print(resp_create_users.content)
-#     assert resp_create_users.status_code == 200, f"Creating a user 200, but got {resp_create_users.status_code} {resp_create_users.content}"
-#     resp_delete_users = session.delete(f"{url}api/{org_id}/users/pytests@gmail.com")
-#     assert resp_delete_users.status_code == 200, f"Deleting this user, but got {resp_delete_users.status_code} {resp_delete_users.content}"
 
 
 def test_e2e_invalidrole(create_session, base_url):

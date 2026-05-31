@@ -69,22 +69,6 @@ def test_e2e_metrics_ingest_invalijson(create_session, base_url):
     ), f"Invalid json upload 400, but got {resp_ingestmetrics.status_code} {resp_ingestmetrics.content}"
 
 
-# def test_e2e_metrics_query(create_session, base_url):
-#     """Running an E2E test for metrics query."""
-
-#     session = create_session
-#     url = base_url
-#     org_id = "default"
-#     access_key = "ZTJlLnRlc3RpbmdAZXhhbXBsZS5jb206NnJCWGlWNmQxMmJ4SGdHdQ=="
-#     headers = {
-#         "Authorization": f"Basic {access_key}",
-#         "Content-Type": "application/json"
-#     }
-
-#     resp_metricsquery = session.get(f"{base_url}api/e2e/prometheus/api/v1/format_query?query=%7B__name__%3D%22prometheus_tsdb_tombstone_cleanup_seconds_count%22%7D", headers=headers)
-
-#     print(resp_metricsquery.content)
-#     assert resp_metricsquery.status_code == 200, f"valid query upload 200, but got {resp_metricsquery.status_code} {resp_metricsquery.content}"
 
 
 def test_e2e_metrics_invalidquery(create_session, base_url):
