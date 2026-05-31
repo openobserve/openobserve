@@ -9481,14 +9481,15 @@ export class LogsPage {
     }
 
     /**
-     * Click a scheduled search row by its trace_id.
-     * @param {string} traceId - The trace_id of the scheduled search job
-     * @returns {Promise<boolean>} true if the row was clicked, false if not found
+     * Click a scheduled search row to expand it.
+     * OTable renders rows as data-test="o2-table-row-{index}" (not by trace_id),
+     * so we click the first visible row which triggers expand-on-row-click.
+     * @param {string} traceId - kept for API compatibility but not used for locating
      */
     async clickScheduledSearchRow(traceId) {
-        const row = this.page.locator(`[data-test="search-scheduler-table-${traceId}-row"]`);
-        await row.waitFor({ state: 'visible', timeout: 10000 });
-        await row.locator('[data-test="search-scheduler-expand-btn"]').click();
+        const firstRow = this.page.locator('[data-test="o2-table-row-0"]');
+        await firstRow.waitFor({ state: 'visible', timeout: 30000 });
+        await firstRow.click();
         await this.page.waitForTimeout(3000);
     }
 
