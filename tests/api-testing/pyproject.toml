@@ -46,5 +46,33 @@ packages = ["src/main"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 markers = [
-    "order: mark test to run in a specific order"
+    "order: mark test to run in a specific order",
+    "framework: self-tests for the support/ framework (Phase 2)",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Phase 2 baseline: prevent the patterns the rework set out to kill.
+# We are intentionally aggressive only in NEW code paths (support/, new tests/).
+# Legacy tests still violate these — enforce on changed files in CI, not all-at-once.
+select = [
+    "E", "F", "W",      # pyflakes + pycodestyle baseline
+    "T20",              # T201: no `print()`; T203: no `pprint`
+    "PT",               # pytest-style
+    "B",                # bugbear (common bug patterns)
+    "UP",               # pyupgrade (modern syntax)
+]
+ignore = [
+    "E501",             # line length handled by formatter
+    "E402",             # module-level imports not at top (some test files structure their code this way)
+    "B008",             # function-call-in-default-argument (some factories use it intentionally)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# helpers/workflow/ is legacy code waiting for Phase 4 rewrite — keep ruff quiet there.
+"helpers/workflow/**/*.py" = ["T201", "F401", "F841", "E712", "B"]
+# Existing tests are noisy with print(); Phase 3 will sweep. Until then, only WARN.
+"tests/test_*.py" = ["T201"]
