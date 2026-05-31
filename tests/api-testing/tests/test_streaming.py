@@ -8,6 +8,10 @@ import random
 import string
 import base64
 from requests.auth import HTTPBasicAuth
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # Constants for Streaming URL and user credentials
 ZO_BASE_URL = os.environ.get("ZO_BASE_URL")
@@ -75,9 +79,9 @@ stream_name = "tdef" + random_string
 
 stream_join = "join" + random_string
 
-print("Random Stream:", stream_name)
+logger.debug("Random Stream:", stream_name)
 
-print("String Join:", stream_join)
+logger.debug("String Join:", stream_join)
 
 
 @pytest.fixture
@@ -97,7 +101,7 @@ def test_ingest_data(create_session, base_url_sc):
     resp_ing = session.post(
         url_Ing, data=data, headers={"Content-Type": "application/json"}
     )
-    print(
+    logger.debug(
         f"Data ingested in {stream_name} of {base_url_sc} env, status code: ",
         resp_ing.status_code,
     )
@@ -121,7 +125,7 @@ def test_ingest_join(create_session, base_url_sc):
     resp_ing_join = session.post(
         url_join, data=data, headers={"Content-Type": "application/json"}
     )
-    print(
+    logger.debug(
         f"Data ingested for join in {stream_join} of {base_url_sc} env, status code: ",
         resp_ing_join.status_code,
     )
@@ -146,13 +150,13 @@ def test_disable_streaming(create_session, base_url):
         "enable_streaming_search": False,
     }
 
-    print("Session headers:", session.headers)
+    logger.debug("Session headers:", session.headers)
 
     resp_disable_streaming = session.post(
         f"{url}api/{org_id}/settings", json=payload_disable_streaming
     )
 
-    print("Disable Streaming", resp_disable_streaming.content)
+    logger.debug("Disable Streaming", resp_disable_streaming.content)
 
     assert resp_disable_streaming.status_code == 200, (
         f"Streaming disable 200, but got {resp_disable_streaming.status_code} {resp_disable_streaming.content}"
@@ -269,7 +273,7 @@ def test_histogram(
         f"histogram mode {test_name} added 200, but got {res_histog.status_code} {res_histog.content}"
     )
 
-    print(
+    logger.debug(
         f"API {test_name} Response {url} Histog False Cache HTTP:",
         res_histog.status_code,
     )
@@ -306,7 +310,7 @@ def test_histogram(
         f"histogram cache {test_name} mode added 200, but got {res_histog_cache.status_code} {res_histog_cache.content}"
     )
 
-    print(f"Response {url} Cache True Histog HTTP:", res_histog_cache.status_code)
+    logger.debug(f"Response {url} Cache True Histog HTTP:", res_histog_cache.status_code)
 
     # Parse the JSON response
 
@@ -664,7 +668,7 @@ def test_sql(
         f"SQL mode {test_name_sql} added 200, but got {res_sql.status_code} {res_sql.content}"
     )
 
-    print(f"Response {url} SQL False Cache HTTP:", res_sql.status_code)
+    logger.debug(f"Response {url} SQL False Cache HTTP:", res_sql.status_code)
 
     # Parse the JSON response
 
@@ -689,7 +693,7 @@ def test_sql(
         f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
     )
 
-    print(
+    logger.debug(
         f"Response {test_name_sql} Cache True SQL {url} HTTP:",
         res_sql_cache.status_code,
     )
@@ -728,7 +732,7 @@ def test_update_max_query_range(create_session, base_url):
     response = session.put(url, json=payload)
 
     assert response.status_code == 200
-    print(f"Response {url} Update Max Query Range:", response.content)
+    logger.debug(f"Response {url} Update Max Query Range:", response.content)
     # Add more assertions as needed to validate the response content
 
 
@@ -763,7 +767,7 @@ def test_sql_query_range(create_session, base_url):
 
     # print(f"Response {url} SQL False Cache HTTP:", res_sql_query_range.content)
 
-    print(
+    logger.debug(
         f"Body {url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=false",
         json_sql_query_range,
     )
@@ -836,7 +840,7 @@ def test_search_partition(create_session, base_url):
     # Optionally, check for specific content in the response
     response_data = response.json()
 
-    print(f"Response {url} Search Partition:", response_data)
+    logger.debug(f"Response {url} Search Partition:", response_data)
 
     assert "file_num" in response_data, "Response does not contain 'file_num'"
     assert response_data["file_num"] == 0, "Unexpected 'file_num' value"
@@ -904,7 +908,7 @@ def test_values_endpoint(create_session, base_url):
 
     # Assert the expected response structure
     json_response = response.json()
-    print(f"Response {url} Values:", json_response)
+    logger.debug(f"Response {url} Values:", json_response)
     assert "took" in json_response
     assert "hits" in json_response
     assert "total" in json_response
@@ -934,11 +938,11 @@ def test_enable_streaming(create_session, base_url):
         "enable_streaming_search": True,
     }
 
-    print("Session Streaming Enabled headers:", session.headers)
+    logger.debug("Session Streaming Enabled headers:", session.headers)
 
     resp_streaming = session.post(f"{url}api/{org_id}/settings", json=payload_streaming)
 
-    print("Enable Streaming", resp_streaming.content)
+    logger.debug("Enable Streaming", resp_streaming.content)
     assert resp_streaming.status_code == 200, (
         f"Streaming enable 200, but got {resp_streaming.status_code} {resp_streaming.content}"
     )
@@ -984,7 +988,7 @@ def test_streaming_histogram(
         f"histogram mode {test_name} added 200, but got {res_histog.status_code} {res_histog.content}"
     )
 
-    print(
+    logger.debug(
         f"API {test_name} Response {url} Histog False Cache Streaming",
         res_histog.status_code,
     )
@@ -1025,7 +1029,7 @@ def test_streaming_histogram(
         f"histogram cache {test_name} mode added 200, but got {res_histog_cache.status_code} {res_histog_cache.content}"
     )
 
-    print(f"Response {url} Cache True Histog Streaming:", res_histog_cache.status_code)
+    logger.debug(f"Response {url} Cache True Histog Streaming:", res_histog_cache.status_code)
 
     res_data_histog_cache = read_response(res_histog_cache)
     # print(f"API {test_name} Response cache true Streaming Search {url} Histog:", res_data_histog_cache)
@@ -1091,7 +1095,7 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_f
         res_sql.status_code == 200
     ), f"SQL mode {test_name_sql} added 200, but got {res_sql.status_code} {res_sql.content}"
 
-    print(f"Response {url} SQL False Cache Streaming:", res_sql.status_code)
+    logger.debug(f"Response {url} SQL False Cache Streaming:", res_sql.status_code)
 
     # Parse the JSON response
 
@@ -1114,7 +1118,7 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_f
         res_sql_cache.status_code == 200
     ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
 
-    print(f"Response {test_name_sql} Cache True SQL {url} Streaming:",
+    logger.debug(f"Response {test_name_sql} Cache True SQL {url} Streaming:",
           res_sql_cache.status_code)
 
     # Parse the JSON response
@@ -1165,7 +1169,7 @@ def test_values_streaming_endpoint(create_session, base_url):
 
     # Assert the expected response structure
     res_data_values_streaming = read_response(res_values_streaming)
-    print(f"Response {url} Values Streaming:", res_data_values_streaming)
+    logger.debug(f"Response {url} Values Streaming:", res_data_values_streaming)
 
     # Check that the response is a dictionary
     assert isinstance(res_data_values_streaming, dict)
@@ -1223,7 +1227,7 @@ def test_values_streaming_endpoint_cache(create_session, base_url):
 
     # Assert the expected response structure
     res_data_values_streaming_cache = read_response(res_values_streaming_cache)
-    print(f"Response {url} Values Streaming:", res_data_values_streaming_cache)
+    logger.debug(f"Response {url} Values Streaming:", res_data_values_streaming_cache)
 
     # Check that the response is a dictionary
     assert isinstance(res_data_values_streaming_cache, dict)
@@ -1275,7 +1279,7 @@ def test_streaming_sql_query_range(create_session, base_url):
         f"SQL mode added 200, but got {res_sql_query_range.status_code} {res_sql_query_range.content}"
     )
 
-    print(f"Response {url} SQL False Cache Streaming:", res_sql_query_range.status_code)
+    logger.debug(f"Response {url} SQL False Cache Streaming:", res_sql_query_range.status_code)
 
     # Parse the JSON response
 
@@ -1308,7 +1312,7 @@ def test_streaming_sql_query_range(create_session, base_url):
         f"SQL cache mode added 200, but got {res_sql_cache_query_range.status_code} {res_sql_cache_query_range.content}"
     )
 
-    print(
+    logger.debug(
         f"Response Cache True SQL {url} Streaming:",
         res_sql_cache_query_range.status_code,
     )
@@ -1335,11 +1339,11 @@ def test_delete_stream(create_session, base_url):
     resp_delete_stream = session.delete(
         f"{url}api/{org_id}/streams/{stream_name}?type=logs"
     )
-    print(f"Deleted Stream Response: {resp_delete_stream.text}")
+    logger.debug(f"Deleted Stream Response: {resp_delete_stream.text}")
     assert resp_delete_stream.status_code == 200, (
         f"Failed to delete stream {stream_name}"
     )
-    print(f"Successfully deleted stream {stream_name}")
+    logger.debug(f"Successfully deleted stream {stream_name}")
 
 
 def test_delete_stream_join(create_session, base_url):
@@ -1350,11 +1354,11 @@ def test_delete_stream_join(create_session, base_url):
     resp_delete_stream_join = session.delete(
         f"{url}api/{org_id}/streams/{stream_join}?type=logs"
     )
-    print(f"Deleted Stream Response: {resp_delete_stream_join.text}")
+    logger.debug(f"Deleted Stream Response: {resp_delete_stream_join.text}")
     assert resp_delete_stream_join.status_code == 200, (
         f"Failed to delete stream {stream_join}"
     )
-    print(f"Successfully deleted stream {stream_join}")
+    logger.debug(f"Successfully deleted stream {stream_join}")
 
 
 # Read HTTP 2 responses from the stream
@@ -1366,48 +1370,48 @@ def read_response(reader):
     search_metadata_list = []
     search_hits_list = []
 
-    print(f"DEBUG: Raw response content length: {len(content)}")
-    print(f"DEBUG: Number of lines: {len(lines)}")
+    logger.debug(f"DEBUG: Raw response content length: {len(content)}")
+    logger.debug(f"DEBUG: Number of lines: {len(lines)}")
 
     for i, line in enumerate(lines):
         text = line.strip()
-        print(f"DEBUG: Line {i}: {text}")
+        logger.debug(f"DEBUG: Line {i}: {text}")
 
         if text.startswith("event: search_response_metadata"):
-            print(f"DEBUG: Found search_response_metadata at line {i}")
+            logger.debug(f"DEBUG: Found search_response_metadata at line {i}")
             # Get the data part which follows in the next line
             if i + 1 < len(lines):
                 data_line = lines[i + 1].strip()
-                print(f"DEBUG: Data line {i + 1}: {data_line}")
+                logger.debug(f"DEBUG: Data line {i + 1}: {data_line}")
                 if data_line.startswith("data: "):
                     try:
                         # Remove "data: " prefix
                         metadata_json = data_line[6:]
                         metadata_data = json.loads(metadata_json)
-                        print(f"DEBUG: Parsed metadata: {metadata_data}")
+                        logger.debug(f"DEBUG: Parsed metadata: {metadata_data}")
                         search_metadata_list.append(metadata_data)
                     except json.JSONDecodeError as e:
-                        print(f"Error parsing metadata JSON: {e}")
+                        logger.debug(f"Error parsing metadata JSON: {e}")
                         continue
 
         elif text.startswith("event: search_response_hits"):
-            print(f"DEBUG: Found search_response_hits at line {i}")
+            logger.debug(f"DEBUG: Found search_response_hits at line {i}")
             # Get the data part which follows in the next line
             if i + 1 < len(lines):
                 data_line = lines[i + 1].strip()
-                print(f"DEBUG: Hits data line {i + 1}: {data_line}")
+                logger.debug(f"DEBUG: Hits data line {i + 1}: {data_line}")
                 if data_line.startswith("data: "):
                     try:
                         search_hits = data_line[6:]  # Remove "data: " prefix
                         hits_data = json.loads(search_hits)
-                        print(f"DEBUG: Parsed hits: {hits_data}")
+                        logger.debug(f"DEBUG: Parsed hits: {hits_data}")
                         search_hits_list.append(hits_data)
                     except json.JSONDecodeError as e:
-                        print(f"Error parsing hits JSON: {e}")
+                        logger.debug(f"Error parsing hits JSON: {e}")
                         continue
 
-    print(f"DEBUG: Final search_metadata_list length: {len(search_metadata_list)}")
-    print(f"DEBUG: Final search_hits_list length: {len(search_hits_list)}")
+    logger.debug(f"DEBUG: Final search_metadata_list length: {len(search_metadata_list)}")
+    logger.debug(f"DEBUG: Final search_hits_list length: {len(search_hits_list)}")
 
     if search_metadata_list:
         # Use the first metadata response as the base
@@ -1425,10 +1429,10 @@ def read_response(reader):
             # Single metadata response - use its total directly
             if "results" in search_metadata_list[0] and "total" in search_metadata_list[0]["results"]:
                 total_count = search_metadata_list[0]["results"]["total"]
-                print(f"DEBUG: Single metadata response, using total: {total_count}")
+                logger.debug(f"DEBUG: Single metadata response, using total: {total_count}")
             else:
                 total_count = len(all_hits)
-                print(f"DEBUG: Single metadata response with no total, using hits count: {total_count}")
+                logger.debug(f"DEBUG: Single metadata response with no total, using hits count: {total_count}")
         else:
             # Multiple metadata responses - for aggregation queries, use max total
             # For histogram queries, use the number of distinct hits/buckets
@@ -1442,13 +1446,13 @@ def read_response(reader):
             
             # Use max total for most cases, as it represents the correct count
             total_count = max_total if max_total > 0 else len(all_hits)
-            print(f"DEBUG: Multiple metadata responses, max_total: {max_total}, total_sum: {total_sum}, using: {total_count}")
+            logger.debug(f"DEBUG: Multiple metadata responses, max_total: {max_total}, total_sum: {total_sum}, using: {total_count}")
 
         combined_metadata["results"]["total"] = total_count
         combined_metadata["results"]["hits"] = all_hits
-        print(f"DEBUG: Returning combined metadata with total: {total_count}, hits: {len(all_hits)}")
+        logger.debug(f"DEBUG: Returning combined metadata with total: {total_count}, hits: {len(all_hits)}")
 
         return combined_metadata
     else:
-        print("No valid response data found in stream")
+        logger.debug("No valid response data found in stream")
         return {"results": {"total": 0, "hits": []}}

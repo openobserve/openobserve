@@ -5,7 +5,10 @@ Tests for Function Test operations:
 - POST /api/{org_id}/functions/test - Test a VRL/JS function without saving it
 """
 
+import logging
 import pytest
+
+logger = logging.getLogger(__name__)
 
 
 class TestFunctionTestEndpoint:
@@ -51,7 +54,7 @@ class TestFunctionTestEndpoint:
         assert result["event"].get("test_field") == "added_by_test", \
             f"Function should add 'test_field': {result}"
 
-        print(f"✓ VRL function successfully added field")
+        logger.debug(f"✓ VRL function successfully added field")
 
     def test_02_vrl_function_modifies_value(self):
         """Test a VRL function that modifies an existing value"""
@@ -83,7 +86,7 @@ class TestFunctionTestEndpoint:
         assert result["event"].get("level") == "INFO", \
             f"Function should uppercase 'level': {result}"
 
-        print(f"✓ VRL function successfully modified field")
+        logger.debug(f"✓ VRL function successfully modified field")
 
     def test_03_vrl_function_with_multiple_events(self):
         """Test a VRL function with multiple events"""
@@ -114,7 +117,7 @@ class TestFunctionTestEndpoint:
             assert result["event"].get("processed") is True, \
                 f"Event {i} should have 'processed' = true: {result}"
 
-        print(f"✓ VRL function successfully processed {len(data['results'])} events")
+        logger.debug(f"✓ VRL function successfully processed {len(data['results'])} events")
 
     def test_04_vrl_function_with_conditional(self):
         """Test a VRL function with conditional logic"""
@@ -142,7 +145,7 @@ class TestFunctionTestEndpoint:
         assert data["results"][1]["event"].get("priority") == "normal", \
             f"Info event should have normal priority: {data['results'][1]}"
 
-        print(f"✓ VRL conditional logic works correctly")
+        logger.debug(f"✓ VRL conditional logic works correctly")
 
     def test_05_invalid_vrl_function(self):
         """Test that invalid VRL syntax returns an error"""
@@ -160,7 +163,7 @@ class TestFunctionTestEndpoint:
         # Invalid syntax should return 400 or have error in results
         # The API behavior may vary, so we check both possibilities
         if response.status_code == 400:
-            print(f"✓ Invalid VRL correctly returned 400 error")
+            logger.debug(f"✓ Invalid VRL correctly returned 400 error")
         else:
             data = response.json()
             # Check if error message is present in results
@@ -170,7 +173,7 @@ class TestFunctionTestEndpoint:
             )
             assert has_error or response.status_code == 400, \
                 f"Invalid VRL should produce an error: {response.status_code} - {data}"
-            print(f"✓ Invalid VRL correctly returned error in results")
+            logger.debug(f"✓ Invalid VRL correctly returned error in results")
 
     def test_06_response_structure(self):
         """Test that response has correct structure"""
@@ -197,7 +200,7 @@ class TestFunctionTestEndpoint:
             assert "message" in result, "Each result should have 'message' field"
             assert "event" in result, "Each result should have 'event' field"
 
-        print(f"✓ Response structure is correct: {data}")
+        logger.debug(f"✓ Response structure is correct: {data}")
 
     def test_07_vrl_delete_field(self):
         """Test a VRL function that deletes a field"""
@@ -229,4 +232,4 @@ class TestFunctionTestEndpoint:
         assert result["event"].get("name") == "test", \
             f"Other fields should remain: {result}"
 
-        print(f"✓ VRL function successfully deleted field")
+        logger.debug(f"✓ VRL function successfully deleted field")

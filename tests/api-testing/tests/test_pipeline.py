@@ -1,4 +1,8 @@
 import pytest
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @pytest.mark.parametrize(
     "pipeline_name, stream_name, action, expected_status",
@@ -58,7 +62,7 @@ def test_pipeline_creation_and_action_realtime(create_session, base_url, pipelin
     # Create a pipeline
     resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
-    print("Create pipeline response:", resp_create_pipeline.json())
+    logger.debug("Create pipeline response:", resp_create_pipeline.json())
 
     # Retrieve the pipeline list
     resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
@@ -76,21 +80,21 @@ def test_pipeline_creation_and_action_realtime(create_session, base_url, pipelin
             break
 
     assert pipeline_id, "Pipeline ID not found for the created pipeline."
-    print(f"Pipeline ID: {pipeline_id}")
+    logger.debug(f"Pipeline ID: {pipeline_id}")
 
     # Enable or disable the pipeline based on the action parameter
     if action == "enable":
         resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
         assert resp_enable_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_enable_pipeline.status_code}"
-        print(f"Pipeline {pipeline_id} enabled successfully.")
+        logger.debug(f"Pipeline {pipeline_id} enabled successfully.")
     elif action == "disable":
         resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=false")
         assert resp_enable_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_enable_pipeline.status_code}"
-        print(f"Pipeline {pipeline_id} disabled successfully.")
+        logger.debug(f"Pipeline {pipeline_id} disabled successfully.")
 
 
     resp_get_pipeline = session.get(f"{url}api/{org_id}/pipelines")
-    print(resp_get_pipeline.json())
+    logger.debug(resp_get_pipeline.json())
     assert resp_get_pipeline.status_code == 200
     pipeline_list = resp_get_pipeline.json()["list"]
     target_pipeline = next((p for p in pipeline_list if p["pipeline_id"] == pipeline_id), None)
@@ -211,7 +215,7 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     # Create a pipeline
     resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
-    print("Create pipeline response:", resp_create_pipeline.json())
+    logger.debug("Create pipeline response:", resp_create_pipeline.json())
 
     # Retrieve the pipeline list
     resp_list_pipelines = session.get(f"{url}api/{org_id}/pipelines")
@@ -221,13 +225,13 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     pipelines_list = resp_list_pipelines.json().get("list", [])
     pipeline_id = next((p["pipeline_id"] for p in pipelines_list if p["name"] == pipeline_name), None)
     assert pipeline_id, "Pipeline ID not found for the created pipeline."
-    print(f"Pipeline ID: {pipeline_id}")
+    logger.debug(f"Pipeline ID: {pipeline_id}")
 
     # Enable/disable pipeline based on the action
     value = "True" if action == "enable" else "False"
     resp_toggle_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value={value}")
     assert resp_toggle_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_toggle_pipeline.status_code}"
-    print(f"Pipeline {pipeline_id} {'enabled' if action == 'enable' else 'disabled'} successfully.")
+    logger.debug(f"Pipeline {pipeline_id} {'enabled' if action == 'enable' else 'disabled'} successfully.")
 
     # Verify the pipeline state
     resp_verify_pipeline = session.get(f"{url}api/{org_id}/pipelines")
@@ -237,7 +241,7 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     # Delete the pipeline
     resp_delete_pipeline = session.delete(f"{url}api/{org_id}/pipelines/{pipeline_id}")
     assert resp_delete_pipeline.status_code == 200, f"Expected status code 200 but got {resp_delete_pipeline.status_code}"
-    print(f"Pipeline {pipeline_id} deleted successfully.")
+    logger.debug(f"Pipeline {pipeline_id} deleted successfully.")
 
 
 
@@ -341,7 +345,7 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     # Create a pipeline
     resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
-    print("Create pipeline response:", resp_create_pipeline.json())
+    logger.debug("Create pipeline response:", resp_create_pipeline.json())
 
 
 @pytest.mark.parametrize(
@@ -1083,7 +1087,7 @@ def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline
     # Create a pipeline
     resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
-    print("Create pipeline response:", resp_create_pipeline.json())
+    logger.debug("Create pipeline response:", resp_create_pipeline.json())
 
     assert resp_create_pipeline.status_code == 400, "Invalid pipeline: After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
 
@@ -1137,7 +1141,7 @@ def test_e2e_pipeline_history(create_session, base_url):
         json=log_payload,
         headers=headers,
     )
-    print(f"Ingest logs response: {resp_ingest.content}")
+    logger.debug(f"Ingest logs response: {resp_ingest.content}")
     assert resp_ingest.status_code == 200, (
         f"Expected 200 for log ingestion, but got {resp_ingest.status_code} {resp_ingest.content}"
     )
@@ -1189,7 +1193,7 @@ def test_e2e_pipeline_history(create_session, base_url):
         json=pipeline_payload_1,
         headers=headers,
     )
-    print(f"Create pipeline 1 response: {resp_create_pipeline_1.content}")
+    logger.debug(f"Create pipeline 1 response: {resp_create_pipeline_1.content}")
     assert resp_create_pipeline_1.status_code == 200, (
         f"Expected 200 for create pipeline 1, but got {resp_create_pipeline_1.status_code} {resp_create_pipeline_1.content}"
     )
@@ -1204,7 +1208,7 @@ def test_e2e_pipeline_history(create_session, base_url):
             break
 
     assert pipeline_id_1, f"Pipeline ID not found for {pipeline_name_1}"
-    print(f"Pipeline 1 ID: {pipeline_id_1}")
+    logger.debug(f"Pipeline 1 ID: {pipeline_id_1}")
 
     # Enable pipeline 1
     resp_enable_1 = session.put(
@@ -1213,7 +1217,7 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert resp_enable_1.status_code == 200, (
         f"Expected 200 for enable pipeline 1, but got {resp_enable_1.status_code} {resp_enable_1.content}"
     )
-    print(f"Pipeline {pipeline_name_1} enabled")
+    logger.debug(f"Pipeline {pipeline_name_1} enabled")
 
     # Step 3: Create second pipeline (scheduled)
     pipeline_name_2 = "history_test_pipeline_2"
@@ -1269,7 +1273,7 @@ def test_e2e_pipeline_history(create_session, base_url):
         json=pipeline_payload_2,
         headers=headers,
     )
-    print(f"Create pipeline 2 response: {resp_create_pipeline_2.content}")
+    logger.debug(f"Create pipeline 2 response: {resp_create_pipeline_2.content}")
     assert resp_create_pipeline_2.status_code == 200, (
         f"Expected 200 for create pipeline 2, but got {resp_create_pipeline_2.status_code} {resp_create_pipeline_2.content}"
     )
@@ -1284,7 +1288,7 @@ def test_e2e_pipeline_history(create_session, base_url):
             break
 
     assert pipeline_id_2, f"Pipeline ID not found for {pipeline_name_2}"
-    print(f"Pipeline 2 ID: {pipeline_id_2}")
+    logger.debug(f"Pipeline 2 ID: {pipeline_id_2}")
 
     # Enable pipeline 2
     resp_enable_2 = session.put(
@@ -1293,19 +1297,19 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert resp_enable_2.status_code == 200, (
         f"Expected 200 for enable pipeline 2, but got {resp_enable_2.status_code} {resp_enable_2.content}"
     )
-    print(f"Pipeline {pipeline_name_2} enabled")
+    logger.debug(f"Pipeline {pipeline_name_2} enabled")
 
     # Wait for pipelines to potentially trigger and generate history
-    print("Waiting for pipelines to potentially trigger and generate history...")
+    logger.debug("Waiting for pipelines to potentially trigger and generate history...")
     time.sleep(20)
 
     # Step 4: Test 1 - Get all pipeline history for the organization
-    print("\n=== Test 1: Get all pipeline history ===")
+    logger.debug("\n=== Test 1: Get all pipeline history ===")
     resp_get_history = session.get(
         f"{url}api/{org_id}/pipelines/history",
         headers=headers,
     )
-    print(f"Get pipeline history response: {resp_get_history.content}")
+    logger.debug(f"Get pipeline history response: {resp_get_history.content}")
     assert resp_get_history.status_code == 200, (
         f"Expected 200 for get pipeline history, but got {resp_get_history.status_code} {resp_get_history.content}"
     )
@@ -1317,16 +1321,16 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert "hits" in history_data, "Response should contain 'hits' field"
     assert isinstance(history_data["hits"], list), "'hits' should be a list"
 
-    print(f"Total pipeline history entries: {history_data['total']}")
-    print(f"Retrieved {len(history_data['hits'])} history entries")
+    logger.debug(f"Total pipeline history entries: {history_data['total']}")
+    logger.debug(f"Retrieved {len(history_data['hits'])} history entries")
 
     # Step 5: Test 2 - Filter history by specific pipeline_id
-    print(f"\n=== Test 2: Filter history by pipeline_id: {pipeline_id_1} ===")
+    logger.debug(f"\n=== Test 2: Filter history by pipeline_id: {pipeline_id_1} ===")
     resp_filtered_history = session.get(
         f"{url}api/{org_id}/pipelines/history?pipeline_id={pipeline_id_1}",
         headers=headers,
     )
-    print(f"Filtered pipeline history response: {resp_filtered_history.content}")
+    logger.debug(f"Filtered pipeline history response: {resp_filtered_history.content}")
 
     # This might return 200 with empty results if pipeline hasn't triggered yet
     # or 404 if pipeline doesn't exist
@@ -1336,7 +1340,7 @@ def test_e2e_pipeline_history(create_session, base_url):
 
     if resp_filtered_history.status_code == 200:
         filtered_data = resp_filtered_history.json()
-        print(f"Filtered results: {filtered_data['total']} entries")
+        logger.debug(f"Filtered results: {filtered_data['total']} entries")
 
         # If there are results, verify they're for the correct pipeline
         for entry in filtered_data.get("hits", []):
@@ -1345,7 +1349,7 @@ def test_e2e_pipeline_history(create_session, base_url):
             )
 
     # Step 6: Test 3 - Test pagination parameters
-    print("\n=== Test 3: Test pagination ===")
+    logger.debug("\n=== Test 3: Test pagination ===")
     resp_paginated = session.get(
         f"{url}api/{org_id}/pipelines/history?from=0&size=10",
         headers=headers,
@@ -1357,12 +1361,12 @@ def test_e2e_pipeline_history(create_session, base_url):
     paginated_data = resp_paginated.json()
     assert paginated_data["from"] == 0, "from parameter should be 0"
     assert paginated_data["size"] == 10, "size parameter should be 10"
-    print(
+    logger.debug(
         f"Pagination test passed: from={paginated_data['from']}, size={paginated_data['size']}"
     )
 
     # Step 7: Test 4 - Test with time range
-    print("\n=== Test 4: Test time range filtering ===")
+    logger.debug("\n=== Test 4: Test time range filtering ===")
     # Get timestamps in microseconds
     end_time = int(datetime.utcnow().timestamp() * 1_000_000)
     start_time = int((datetime.utcnow() - timedelta(hours=1)).timestamp() * 1_000_000)
@@ -1376,10 +1380,10 @@ def test_e2e_pipeline_history(create_session, base_url):
     )
 
     time_range_data = resp_time_range.json()
-    print(f"Time range results: {time_range_data['total']} entries")
+    logger.debug(f"Time range results: {time_range_data['total']} entries")
 
     # Step 8: Test 5 - Test invalid time range (start > end)
-    print("\n=== Test 5: Test invalid time range (should return 400) ===")
+    logger.debug("\n=== Test 5: Test invalid time range (should return 400) ===")
     resp_invalid_time = session.get(
         f"{url}api/{org_id}/pipelines/history?start_time={end_time}&end_time={start_time}",
         headers=headers,
@@ -1387,10 +1391,10 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert resp_invalid_time.status_code == 400, (
         f"Expected 400 for invalid time range, but got {resp_invalid_time.status_code} {resp_invalid_time.content}"
     )
-    print("Invalid time range correctly rejected with 400")
+    logger.debug("Invalid time range correctly rejected with 400")
 
     # Step 9: Test 6 - Test with non-existent pipeline_id
-    print("\n=== Test 6: Test with non-existent pipeline_id (should return 404) ===")
+    logger.debug("\n=== Test 6: Test with non-existent pipeline_id (should return 404) ===")
     resp_nonexistent = session.get(
         f"{url}api/{org_id}/pipelines/history?pipeline_id=35MtcBsSRwlYwuuuaybOibAZ4gF",
         headers=headers,
@@ -1398,10 +1402,10 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert resp_nonexistent.status_code == 404, (
         f"Expected 404 for non-existent pipeline, but got {resp_nonexistent.status_code} {resp_nonexistent.content}"
     )
-    print("Non-existent pipeline correctly returned 404")
+    logger.debug("Non-existent pipeline correctly returned 404")
 
     # Step 10: Test 7 - Test size limit (max 1000)
-    print("\n=== Test 7: Test size limit enforcement ===")
+    logger.debug("\n=== Test 7: Test size limit enforcement ===")
     resp_large_size = session.get(
         f"{url}api/{org_id}/pipelines/history?size=2000",
         headers=headers,
@@ -1415,10 +1419,10 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert large_size_data["size"] == 1000, (
         f"Expected size to be clamped to 1000, but got {large_size_data['size']}"
     )
-    print("Size limit correctly enforced (clamped to 1000)")
+    logger.debug("Size limit correctly enforced (clamped to 1000)")
 
     # Cleanup: Delete pipelines
-    print("\n=== Cleanup: Deleting test resources ===")
+    logger.debug("\n=== Cleanup: Deleting test resources ===")
 
     resp_delete_pipeline_1 = session.delete(
         f"{url}api/{org_id}/pipelines/{pipeline_id_1}"
@@ -1426,7 +1430,7 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert resp_delete_pipeline_1.status_code == 200, (
         f"Expected 200 for delete pipeline 1, but got {resp_delete_pipeline_1.status_code} {resp_delete_pipeline_1.content}"
     )
-    print(f"Deleted pipeline: {pipeline_name_1}")
+    logger.debug(f"Deleted pipeline: {pipeline_name_1}")
 
     resp_delete_pipeline_2 = session.delete(
         f"{url}api/{org_id}/pipelines/{pipeline_id_2}"
@@ -1434,9 +1438,9 @@ def test_e2e_pipeline_history(create_session, base_url):
     assert resp_delete_pipeline_2.status_code == 200, (
         f"Expected 200 for delete pipeline 2, but got {resp_delete_pipeline_2.status_code} {resp_delete_pipeline_2.content}"
     )
-    print(f"Deleted pipeline: {pipeline_name_2}")
+    logger.debug(f"Deleted pipeline: {pipeline_name_2}")
 
-    print("\n=== Pipeline history E2E test completed successfully! ===")
-    print("✓ All pipeline history API endpoints validated")
-    print("✓ Filtering, pagination, and time range parameters working correctly")
-    print("✓ Error handling for invalid requests validated")
+    logger.debug("\n=== Pipeline history E2E test completed successfully! ===")
+    logger.debug("✓ All pipeline history API endpoints validated")
+    logger.debug("✓ Filtering, pagination, and time range parameters working correctly")
+    logger.debug("✓ Error handling for invalid requests validated")

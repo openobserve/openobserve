@@ -6,6 +6,9 @@ import json
 import requests
 import logging
 
+logger = logging.getLogger(__name__)
+
+
 
 def test_get_alertsnew(create_session, base_url):
     """Running an E2E test for getting all the new alerts list."""
@@ -16,7 +19,7 @@ def test_get_alertsnew(create_session, base_url):
 
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
 
-    print(resp_get_allalertsnew.content)
+    logger.debug(resp_get_allalertsnew.content)
     assert (
         resp_get_allalertsnew.status_code == 200
     ), f"Get all new alerts list 200, but got {resp_get_allalertsnew.status_code} {resp_get_allalertsnew.content}"
@@ -41,7 +44,7 @@ def test_new_alert_create(create_session, base_url):
     resp_create_folder = session.post(
         f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
 
-    print(resp_create_folder.content)
+    logger.debug(resp_create_folder.content)
 
     folder_id = resp_create_folder.json()["folderId"]
 
@@ -66,7 +69,7 @@ def test_new_alert_create(create_session, base_url):
         f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
     )
 
-    print(resp_create_templates_alert.content)
+    logger.debug(resp_create_templates_alert.content)
     assert (
         resp_create_templates_alert.status_code == 200
     ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
@@ -89,7 +92,7 @@ def test_new_alert_create(create_session, base_url):
         f"{url}api/{org_id}/alerts/destinations",
         json=payload_dest_alert,
     )
-    print(resp_create_destinations_alert.content)
+    logger.debug(resp_create_destinations_alert.content)
 
     assert (
         resp_create_destinations_alert.status_code == 200
@@ -99,7 +102,7 @@ def test_new_alert_create(create_session, base_url):
     resp_get_destinations_alert = session.get(
     f"{url}api/{org_id}/alerts/destinations/{destination_alert}"
     )
-    print(resp_get_destinations_alert.content)
+    logger.debug(resp_get_destinations_alert.content)
 
     assert (
     resp_get_destinations_alert.status_code == 200
@@ -137,7 +140,7 @@ def test_new_alert_create(create_session, base_url):
         f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
     )
 
-    print(resp_create_logstream.content)
+    logger.debug(resp_create_logstream.content)
     assert (
         resp_create_logstream.status_code == 200
     ), f"Get all logs list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
@@ -188,11 +191,11 @@ def test_new_alert_create(create_session, base_url):
     json=payload_alert,
     headers=headers,
     )
-    print(resp_post_alertnew.content)
+    logger.debug(resp_post_alertnew.content)
 
     assert ( resp_post_alertnew.status_code == 200  
     ), f"Post alert expected 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
-    print(f"Alert {alert_name} created successfully")
+    logger.debug(f"Alert {alert_name} created successfully")
 
 
 def test_get_alertnew(create_session, base_url):
@@ -222,12 +225,12 @@ def test_get_alertnew(create_session, base_url):
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-        print(f"Extracted alert_id: {alert_id}")
+        logger.debug(f"Extracted alert_id: {alert_id}")
 
     # Get  request using the extracted alert_id
         resp_get_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_get_alertnew.status_code == 200, f"Failed to get details for alert {alert_id}"
-        print(f"Successfully fetched details for alert {alert_id}")
+        logger.debug(f"Successfully fetched details for alert {alert_id}")
 
 def test_put_alertnew_update(create_session, base_url):
     """Running an E2E test for updating the new alert."""
@@ -249,7 +252,7 @@ def test_put_alertnew_update(create_session, base_url):
     resp_create_folder = session.post(
         f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
 
-    print(resp_create_folder.content)
+    logger.debug(resp_create_folder.content)
 
     folder_id = resp_create_folder.json()["folderId"]
 
@@ -274,7 +277,7 @@ def test_put_alertnew_update(create_session, base_url):
         f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
     )
 
-    print(resp_create_templates_alert.content)
+    logger.debug(resp_create_templates_alert.content)
     assert (
         resp_create_templates_alert.status_code == 200
     ), f"Expected 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
@@ -297,7 +300,7 @@ def test_put_alertnew_update(create_session, base_url):
         f"{url}api/{org_id}/alerts/destinations",
         json=payload_dest_alert,
     )
-    print(resp_create_destinations_alert.content)
+    logger.debug(resp_create_destinations_alert.content)
 
     assert (
         resp_create_destinations_alert.status_code == 200
@@ -307,7 +310,7 @@ def test_put_alertnew_update(create_session, base_url):
     resp_get_destinations_alert = session.get(
     f"{url}api/{org_id}/alerts/destinations/{destination_alert}"
     )
-    print(resp_get_destinations_alert.content)
+    logger.debug(resp_get_destinations_alert.content)
 
     assert (
     resp_get_destinations_alert.status_code == 200
@@ -347,7 +350,7 @@ def test_put_alertnew_update(create_session, base_url):
         f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
     )
 
-    print(resp_create_logstream.content)
+    logger.debug(resp_create_logstream.content)
     assert (
         resp_create_logstream.status_code == 200
     ), f"Get all logs list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
@@ -398,7 +401,7 @@ def test_put_alertnew_update(create_session, base_url):
     json=payload_alert,
     headers=headers,
     )
-    print(resp_post_alertnew.content)
+    logger.debug(resp_post_alertnew.content)
     assert resp_post_alertnew.status_code == 200
 
     # After creating the alert, wait a moment to ensure it's fully created
@@ -424,12 +427,12 @@ def test_put_alertnew_update(create_session, base_url):
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-        print(f"Extracted alert_id for update: {alert_id}")
+        logger.debug(f"Extracted alert_id for update: {alert_id}")
 
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        print(f"Alert {alert_id} exists and is retrievable for update.")
+        logger.debug(f"Alert {alert_id} exists and is retrievable for update.")
        
     # # Update the alert
         payload_alert_update = {
@@ -487,16 +490,16 @@ def test_put_alertnew_update(create_session, base_url):
         json=payload_alert_update,
         headers=headers,
          )
-        print(resp_put_alertnew.content)
+        logger.debug(resp_put_alertnew.content)
         assert ( resp_put_alertnew.status_code == 200  
         ), f"Post alert expected 200, but got {resp_put_alertnew.status_code} {resp_put_alertnew.content}"
 
-        print(f"Alert {alert_name} updated successfully")
+        logger.debug(f"Alert {alert_name} updated successfully")
 
         # Get details for the updated alert
         resp_get_updated_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_get_updated_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
-        print(f"Successfully fetched details for updated alert {alert_id}")
+        logger.debug(f"Successfully fetched details for updated alert {alert_id}")
 
         # Parse the response JSON
         response_json_updated = resp_get_updated_alertnew.json()
@@ -538,23 +541,23 @@ def test_put_alertnew_disable(create_session, base_url):
         assert alert_id, f"Alert ID is missing for alert: {alert}"
         folder_id = alert.get("folder_id", "default")
 
-        print(f"Extracted alert_id: {alert_id}")
+        logger.debug(f"Extracted alert_id: {alert_id}")
 
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        print(f"Alert {alert_id} exists and is retrievable.")
+        logger.debug(f"Alert {alert_id} exists and is retrievable.")
 
     # Proceed to disable the alert
         resp_alertnew_disable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs&folder={folder_id}")
-        print(f"Disable Alert Response: {resp_alertnew_disable.text}")
+        logger.debug(f"Disable Alert Response: {resp_alertnew_disable.text}")
         assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
-        print(f"Successfully disabled alert {alert_id}")
+        logger.debug(f"Successfully disabled alert {alert_id}")
 
         # Get details for the disabled alert
         resp_get_disabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_get_disabled_alertnew.status_code == 200, f"Failed to get details for disabled alert {alert_id}"
-        print(f"Successfully fetched details for disabled alert {alert_id}")
+        logger.debug(f"Successfully fetched details for disabled alert {alert_id}")
 
         # Parse the response JSON
         response_json_disabled = resp_get_disabled_alertnew.json()
@@ -596,24 +599,24 @@ def test_put_alertnew_enable(create_session, base_url):
         assert alert_id, f"Alert ID is missing for alert: {alert}"
         folder_id = alert.get("folder_id", "default")
 
-        print(f"Extracted alert_id: {alert_id}")
+        logger.debug(f"Extracted alert_id: {alert_id}")
 
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        print(f"Alert {alert_id} exists and is retrievable.")
+        logger.debug(f"Alert {alert_id} exists and is retrievable.")
 
 
     # Proceed to enable the alert
         resp_alertnew_enable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs&folder={folder_id}")
-        print(f"Enable Alert Response: {resp_alertnew_enable.text}")
+        logger.debug(f"Enable Alert Response: {resp_alertnew_enable.text}")
         assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
-        print(f"Successfully enabled alert {alert_id}")
+        logger.debug(f"Successfully enabled alert {alert_id}")
         
         # Get details for the enabled alert
         resp_get_enabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_get_enabled_alertnew.status_code == 200, f"Failed to get details for enabled alert {alert_id}"
-        print(f"Successfully fetched details for enabled alert {alert_id}")
+        logger.debug(f"Successfully fetched details for enabled alert {alert_id}")
 
         # Parse the response JSON
         response_json_enabled = resp_get_enabled_alertnew.json()
@@ -657,12 +660,12 @@ def test_put_alertnew_trigger(create_session, base_url, caplog):
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-        print(f"Extracted alert_id: {alert_id}")
+        logger.debug(f"Extracted alert_id: {alert_id}")
 
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        print(f"Alert {alert_id} exists and is retrievable.")
+        logger.debug(f"Alert {alert_id} exists and is retrievable.")
 
         time.sleep(5)  # Brief wait for status update
 
@@ -673,16 +676,16 @@ def test_put_alertnew_trigger(create_session, base_url, caplog):
         resp_alertnew_trigger = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
 
     # Log response details for debugging
-        print(f"Trigger Alert Response Status Code: {resp_alertnew_trigger.status_code}")
-        print(f"Trigger Alert Response Body: {resp_alertnew_trigger.text}")
+        logger.debug(f"Trigger Alert Response Status Code: {resp_alertnew_trigger.status_code}")
+        logger.debug(f"Trigger Alert Response Body: {resp_alertnew_trigger.text}")
 
-        print(f"Alert Trigger URL: {url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
-        print(f"Alert Details: {alert}")
+        logger.debug(f"Alert Trigger URL: {url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
+        logger.debug(f"Alert Details: {alert}")
 
 
     # Check if the response was successful
         assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
-        print(f"Successfully triggered alert {alert_id}")
+        logger.debug(f"Successfully triggered alert {alert_id}")
 
         # Verify trigger effects
         time.sleep(2)  # Wait for trigger processing
@@ -718,18 +721,18 @@ def test_delete_alertnew(create_session, base_url):
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-        print(f"Extracted alert_id: {alert_id}")
+        logger.debug(f"Extracted alert_id: {alert_id}")
 
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        print(f"Alert {alert_id} exists and is retrievable.")
+        logger.debug(f"Alert {alert_id} exists and is retrievable.")
 
     # Proceed to delete the alert
         resp_delete_alertnew = session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
+        logger.debug(f"Deleted Alert Response: {resp_delete_alertnew.text}")
         assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
-        print(f"Successfully deleted alert {alert_id}")
+        logger.debug(f"Successfully deleted alert {alert_id}")
 
     # Verify alert is deleted
         resp_verify = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
@@ -875,11 +878,11 @@ def test_alert_with_vrl_empty_array(create_session, base_url):
         vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
         assert vrl_in_response == vrl_function, f"VRL mismatch. Expected: {vrl_function}, Got: {vrl_in_response}"
 
-        print(f"VRL function verified in alert: {vrl_in_response}")
+        logger.debug(f"VRL function verified in alert: {vrl_in_response}")
 
     finally:
         _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
-        print("Cleanup completed for test_alert_with_vrl_empty_array")
+        logger.debug("Cleanup completed for test_alert_with_vrl_empty_array")
 
 
 def test_alert_with_vrl_object_array(create_session, base_url):
@@ -945,11 +948,11 @@ def test_alert_with_vrl_object_array(create_session, base_url):
         vrl_in_response = created_alert.get("query_condition", {}).get("vrl_function")
         assert vrl_in_response == vrl_function, f"VRL mismatch. Expected: {vrl_function}, Got: {vrl_in_response}"
 
-        print(f"VRL function verified in alert: {vrl_in_response}")
+        logger.debug(f"VRL function verified in alert: {vrl_in_response}")
 
     finally:
         _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
-        print("Cleanup completed for test_alert_with_vrl_object_array")
+        logger.debug("Cleanup completed for test_alert_with_vrl_object_array")
 
 
 def test_update_alert_vrl_function(create_session, base_url):
@@ -1057,8 +1060,8 @@ def test_update_alert_vrl_function(create_session, base_url):
         assert updated_vrl == vrl_function_updated, f"VRL not updated. Expected: {vrl_function_updated}, Got: {updated_vrl}"
 
         assert updated_alert.get("description") == "VRL update test - UPDATED", "Description was not updated"
-        print(f"VRL function update test passed")
+        logger.debug(f"VRL function update test passed")
 
     finally:
         _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id)
-        print("Cleanup completed for test_update_alert_vrl_function")
+        logger.debug("Cleanup completed for test_update_alert_vrl_function")

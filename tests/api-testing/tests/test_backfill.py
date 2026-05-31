@@ -19,11 +19,14 @@ CI/CD Configuration:
     to allow backdated data ingestion for testing.
 """
 
+import logging
 import pytest
 import random
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -83,9 +86,9 @@ class TestBackfillJob:
                 self.session.delete(
                     f"{self.base_url}api/{self.ORG_ID}/pipelines/{job_info['pipeline_id']}/backfill/{job_info['job_id']}"
                 )
-                print(f"  Cleaned up backfill job: {job_info['job_id']}")
+                logger.debug(f"  Cleaned up backfill job: {job_info['job_id']}")
             except Exception as e:
-                print(f"  Failed to cleanup backfill job {job_info['job_id']}: {e}")
+                logger.debug(f"  Failed to cleanup backfill job {job_info['job_id']}: {e}")
 
         # Delete pipelines
         for pipeline_id in self.created_pipelines:
@@ -93,9 +96,9 @@ class TestBackfillJob:
                 self.session.delete(
                     f"{self.base_url}api/{self.ORG_ID}/pipelines/{pipeline_id}"
                 )
-                print(f"  Cleaned up pipeline: {pipeline_id}")
+                logger.debug(f"  Cleaned up pipeline: {pipeline_id}")
             except Exception as e:
-                print(f"  Failed to cleanup pipeline {pipeline_id}: {e}")
+                logger.debug(f"  Failed to cleanup pipeline {pipeline_id}: {e}")
 
     def _ingest_logs_with_timestamp(self, stream_name: str, timestamp: datetime, count: int = 10) -> bool:
         """Ingest log data with specific timestamps for backfill testing."""
@@ -119,10 +122,10 @@ class TestBackfillJob:
         )
 
         if response.status_code == 200:
-            print(f"  Ingested {count} records to {stream_name}")
+            logger.debug(f"  Ingested {count} records to {stream_name}")
             return True
         else:
-            print(f"  Failed to ingest to {stream_name}: {response.status_code} - {response.text}")
+            logger.debug(f"  Failed to ingest to {stream_name}: {response.status_code} - {response.text}")
             return False
 
     def _create_scheduled_pipeline(self, source_stream: str, dest_stream: str,
@@ -206,7 +209,7 @@ class TestBackfillJob:
         assert pipeline_id, f"Pipeline {pipeline_name} not found after creation"
 
         self.created_pipelines.append(pipeline_id)
-        print(f"  Created pipeline: {pipeline_name} ({pipeline_id})")
+        logger.debug(f"  Created pipeline: {pipeline_name} ({pipeline_id})")
 
         return pipeline_id
 
@@ -239,7 +242,7 @@ class TestBackfillJob:
             "job_id": job_id
         })
 
-        print(f"  Created backfill job: {job_id}")
+        logger.debug(f"  Created backfill job: {job_id}")
         return job_id
 
     def _get_backfill_status(self, pipeline_id: str, job_id: str) -> dict:
@@ -266,7 +269,7 @@ class TestBackfillJob:
                 progress = status.get("progress_percent", 0)
 
                 if current != last_status:
-                    print(f"    Backfill status: {current} ({progress}%)")
+                    logger.debug(f"    Backfill status: {current} ({progress}%)")
                     last_status = current
 
                 if current == target_status:
@@ -274,12 +277,12 @@ class TestBackfillJob:
 
                 if current == "failed":
                     error = status.get("error", "Unknown error")
-                    print(f"    Backfill failed: {error}")
+                    logger.debug(f"    Backfill failed: {error}")
                     return status
 
             time.sleep(3)
 
-        print(f"    Timeout waiting for backfill to reach {target_status}")
+        logger.debug(f"    Timeout waiting for backfill to reach {target_status}")
         return self._get_backfill_status(pipeline_id, job_id)
 
     def _query_stream(self, stream_name: str, size: int = 100) -> list:
@@ -303,22 +306,22 @@ class TestBackfillJob:
             json=payload
         )
 
-        print(f"    Query {stream_name}: status={response.status_code}")
+        logger.debug(f"    Query {stream_name}: status={response.status_code}")
         if response.status_code == 200:
             data = response.json()
             hits = data.get("hits", [])
             total = data.get("total", 0)
-            print(f"    Query {stream_name}: total={total}, hits_returned={len(hits)}")
+            logger.debug(f"    Query {stream_name}: total={total}, hits_returned={len(hits)}")
             return hits
         else:
-            print(f"    Query {stream_name} failed: {response.text[:200]}")
+            logger.debug(f"    Query {stream_name} failed: {response.text[:200]}")
         return []
 
     # ==================== BASIC BACKFILL TESTS ====================
 
     def test_01_create_backfill_job(self):
         """Test creating a backfill job for a scheduled pipeline."""
-        print("\n=== Test: Create backfill job ===")
+        logger.debug("\n=== Test: Create backfill job ===")
 
         # 1. Ingest data with recent timestamp
         past_time = datetime.now(timezone.utc) - timedelta(minutes=RECENT_DATA_OFFSET_MINUTES)
@@ -344,12 +347,12 @@ class TestBackfillJob:
         assert status.get("pipeline_id") == pipeline_id
         assert "status" in status
 
-        print(f"  Job status: {status.get('status')}")
-        print(f"  Progress: {status.get('progress_percent', 0)}%")
+        logger.debug(f"  Job status: {status.get('status')}")
+        logger.debug(f"  Progress: {status.get('progress_percent', 0)}%")
 
     def test_02_backfill_execution_and_data_verification(self):
         """Test that backfill actually processes data and writes to destination."""
-        print("\n=== Test: Backfill execution and data verification ===")
+        logger.debug("\n=== Test: Backfill execution and data verification ===")
 
         # 1. Ingest data with RECENT timestamps
         # Using recent timestamps ensures data is in the current partition,
@@ -359,15 +362,15 @@ class TestBackfillJob:
         assert self._ingest_logs_with_timestamp(self.source_stream, past_time, count=record_count)
 
         # 2. Wait for data to be indexed and queryable
-        print("  Waiting for source data to be queryable...")
+        logger.debug("  Waiting for source data to be queryable...")
         source_hits = []
         for attempt in range(MAX_QUERY_RETRIES):
             time.sleep(QUERY_RETRY_INTERVAL_SECONDS)
             source_hits = self._query_stream(self.source_stream)
             if len(source_hits) >= record_count:
-                print(f"  Source data ready after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(source_hits)} records")
+                logger.debug(f"  Source data ready after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(source_hits)} records")
                 break
-            print(f"    Attempt {attempt+1}: found {len(source_hits)} records, waiting...")
+            logger.debug(f"    Attempt {attempt+1}: found {len(source_hits)} records, waiting...")
 
         max_wait = MAX_QUERY_RETRIES * QUERY_RETRY_INTERVAL_SECONDS
         assert len(source_hits) >= record_count, \
@@ -392,22 +395,22 @@ class TestBackfillJob:
         # Allow partial success - backfill might complete or still be processing
         assert final_status is not None, "Should get final status"
         status = final_status.get("status")
-        print(f"  Final status: {status}")
-        print(f"  Full status response: {final_status}")
+        logger.debug(f"  Final status: {status}")
+        logger.debug(f"  Full status response: {final_status}")
 
         # 6. Query destination stream to verify data was processed
         # Wait for destination data to be queryable (backfill writes + indexing)
-        print("  Waiting for destination data...")
+        logger.debug("  Waiting for destination data...")
         dest_hits = []
         for attempt in range(10):  # Up to 20 seconds
             time.sleep(2)
             dest_hits = self._query_stream(self.dest_stream)
             if len(dest_hits) > 0:
-                print(f"  Destination data ready after {(attempt+1)*2}s: {len(dest_hits)} records")
+                logger.debug(f"  Destination data ready after {(attempt+1)*2}s: {len(dest_hits)} records")
                 break
-            print(f"    Attempt {attempt+1}: destination empty, waiting...")
+            logger.debug(f"    Attempt {attempt+1}: destination empty, waiting...")
 
-        print(f"  Destination stream has {len(dest_hits)} records")
+        logger.debug(f"  Destination stream has {len(dest_hits)} records")
 
         # Backfill MUST complete successfully for this test
         assert status == "completed", \
@@ -425,11 +428,11 @@ class TestBackfillJob:
                 f"Record missing 'processing_status' field - transformation not applied: {hit}"
             assert hit["processing_status"] == "backfill_processed", \
                 f"Record should have processing_status='backfill_processed': {hit}"
-        print(f"  Data verification passed - {len(dest_hits)} records with processing_status field")
+        logger.debug(f"  Data verification passed - {len(dest_hits)} records with processing_status field")
 
     def test_03_get_backfill_job_status(self):
         """Test getting a specific backfill job status."""
-        print("\n=== Test: Get backfill job status ===")
+        logger.debug("\n=== Test: Get backfill job status ===")
 
         # Create a pipeline and backfill job
         past_time = datetime.now(timezone.utc) - timedelta(minutes=RECENT_DATA_OFFSET_MINUTES)
@@ -460,13 +463,13 @@ class TestBackfillJob:
         assert "status" in job, "Response should contain status"
         assert "progress_percent" in job, "Response should contain progress_percent"
 
-        print(f"  Job ID: {job.get('job_id')}")
-        print(f"  Status: {job.get('status')}")
-        print(f"  Progress: {job.get('progress_percent')}%")
+        logger.debug(f"  Job ID: {job.get('job_id')}")
+        logger.debug(f"  Status: {job.get('status')}")
+        logger.debug(f"  Progress: {job.get('progress_percent')}%")
 
     def test_04_pause_and_resume_backfill(self):
         """Test pausing and resuming a backfill job."""
-        print("\n=== Test: Pause and resume backfill ===")
+        logger.debug("\n=== Test: Pause and resume backfill ===")
 
         # Create pipeline and backfill with recent data
         past_time = datetime.now(timezone.utc) - timedelta(minutes=RECENT_DATA_OFFSET_MINUTES)
@@ -485,13 +488,13 @@ class TestBackfillJob:
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=5)
 
         # Wait for job to start processing (not just 'waiting')
-        print("  Waiting for job to start processing...")
+        logger.debug("  Waiting for job to start processing...")
         job_started = False
         for attempt in range(30):  # Wait up to 30 seconds
             time.sleep(1)
             status = self._get_backfill_status(pipeline_id, job_id)
             current_status = status.get('status')
-            print(f"    Attempt {attempt+1}: status={current_status}")
+            logger.debug(f"    Attempt {attempt+1}: status={current_status}")
             if current_status in ['processing', 'completed', 'failed']:
                 job_started = True
                 break
@@ -501,14 +504,14 @@ class TestBackfillJob:
                 break
 
         if not job_started:
-            print("  Warning: Job did not start within 30s, testing pause on waiting job")
+            logger.debug("  Warning: Job did not start within 30s, testing pause on waiting job")
 
         # Only test pause if job is still running (not completed/failed)
         status = self._get_backfill_status(pipeline_id, job_id)
         current_status = status.get('status')
 
         if current_status in ['completed', 'failed']:
-            print(f"  Job already {current_status}, skipping pause/resume test")
+            logger.debug(f"  Job already {current_status}, skipping pause/resume test")
             return
 
         # Pause the job (disable)
@@ -518,14 +521,14 @@ class TestBackfillJob:
 
         assert pause_resp.status_code == 200, \
             f"Pause should succeed: {pause_resp.status_code} - {pause_resp.text[:500]}"
-        print("  Paused (disabled) backfill job")
+        logger.debug("  Paused (disabled) backfill job")
 
         # Wait for pause to take effect
         time.sleep(2)
         status = self._get_backfill_status(pipeline_id, job_id)
         current_status = status.get('status')
         is_enabled = status.get('enabled', True)
-        print(f"  Status after pause: {current_status}, enabled: {is_enabled}")
+        logger.debug(f"  Status after pause: {current_status}, enabled: {is_enabled}")
 
         # Job should be paused, disabled, or still waiting (scheduler hasn't picked it up yet)
         # The key verification is that the pause API call succeeded (200 response above)
@@ -541,9 +544,9 @@ class TestBackfillJob:
 
             # Resume might fail if job completed between pause and resume - that's OK
             if resume_resp.status_code == 200:
-                print("  Resumed (enabled) backfill job")
+                logger.debug("  Resumed (enabled) backfill job")
             else:
-                print(f"  Resume returned {resume_resp.status_code}: {resume_resp.text[:200]}")
+                logger.debug(f"  Resume returned {resume_resp.status_code}: {resume_resp.text[:200]}")
                 # Accept if job completed or is not in pausable state
                 assert resume_resp.status_code in [200, 400], \
                     f"Resume should succeed or return 400 if not pausable: {resume_resp.status_code}"
@@ -551,13 +554,13 @@ class TestBackfillJob:
             # Verify resumed
             time.sleep(2)
             status = self._get_backfill_status(pipeline_id, job_id)
-            print(f"  Final status: {status.get('status')}, enabled: {status.get('enabled')}")
+            logger.debug(f"  Final status: {status.get('status')}, enabled: {status.get('enabled')}")
         else:
-            print(f"  Job already {current_status}, skipping resume test")
+            logger.debug(f"  Job already {current_status}, skipping resume test")
 
     def test_05_delete_backfill_job(self):
         """Test deleting a backfill job."""
-        print("\n=== Test: Delete backfill job ===")
+        logger.debug("\n=== Test: Delete backfill job ===")
 
         # Create pipeline and backfill
         past_time = datetime.now(timezone.utc) - timedelta(minutes=RECENT_DATA_OFFSET_MINUTES)
@@ -584,7 +587,7 @@ class TestBackfillJob:
 
         assert delete_resp.status_code == 200, \
             f"Delete should succeed: {delete_resp.status_code} - {delete_resp.text[:500]}"
-        print(f"  Deleted backfill job: {job_id}")
+        logger.debug(f"  Deleted backfill job: {job_id}")
 
         # Verify job is gone
         get_resp = self.session.get(
@@ -593,13 +596,13 @@ class TestBackfillJob:
 
         assert get_resp.status_code == 404, \
             f"Deleted job should return 404: {get_resp.status_code}"
-        print("  Verified job no longer exists")
+        logger.debug("  Verified job no longer exists")
 
     # ==================== VALIDATION TESTS ====================
 
     def test_06_invalid_time_range(self):
         """Test that invalid time ranges are rejected."""
-        print("\n=== Test: Invalid time range validation ===")
+        logger.debug("\n=== Test: Invalid time range validation ===")
 
         # Create a pipeline first
         past_time = datetime.now(timezone.utc) - timedelta(minutes=RECENT_DATA_OFFSET_MINUTES)
@@ -628,11 +631,11 @@ class TestBackfillJob:
 
         assert response.status_code == 400, \
             f"Invalid time range should return 400: {response.status_code} - {response.text[:500]}"
-        print("  Invalid time range correctly rejected with 400")
+        logger.debug("  Invalid time range correctly rejected with 400")
 
     def test_07_backfill_nonexistent_pipeline(self):
         """Test creating backfill for non-existent pipeline."""
-        print("\n=== Test: Backfill for non-existent pipeline ===")
+        logger.debug("\n=== Test: Backfill for non-existent pipeline ===")
 
         fake_pipeline_id = "nonexistent_pipeline_12345"
         now = datetime.now(timezone.utc)
@@ -651,11 +654,11 @@ class TestBackfillJob:
         # Should return 400 or 404
         assert response.status_code in [400, 404], \
             f"Non-existent pipeline should return 400/404: {response.status_code} - {response.text[:500]}"
-        print(f"  Non-existent pipeline correctly rejected with {response.status_code}")
+        logger.debug(f"  Non-existent pipeline correctly rejected with {response.status_code}")
 
     def test_08_backfill_progress_tracking(self):
         """Test that backfill progress is tracked correctly."""
-        print("\n=== Test: Progress tracking ===")
+        logger.debug("\n=== Test: Progress tracking ===")
 
         # Create pipeline
         past_time = datetime.now(timezone.utc) - timedelta(minutes=RECENT_DATA_OFFSET_MINUTES)
@@ -681,23 +684,23 @@ class TestBackfillJob:
                 progress = status.get("progress_percent", 0)
                 current_status = status.get("status", "unknown")
                 progress_readings.append(progress)
-                print(f"    Progress: {progress}% (status: {current_status})")
+                logger.debug(f"    Progress: {progress}% (status: {current_status})")
 
                 if current_status == "completed":
                     break
             time.sleep(3)
 
         # Verify progress increased or job completed
-        print(f"  Progress readings: {progress_readings}")
+        logger.debug(f"  Progress readings: {progress_readings}")
         if len(progress_readings) > 1:
             # Either progress increased or we have completion
             final_status = self._get_backfill_status(pipeline_id, job_id)
             assert final_status is not None
-            print(f"  Final status: {final_status.get('status')}")
+            logger.debug(f"  Final status: {final_status.get('status')}")
 
     def test_09_get_nonexistent_backfill_job(self):
         """Test getting a non-existent backfill job returns 404."""
-        print("\n=== Test: Get non-existent backfill job ===")
+        logger.debug("\n=== Test: Get non-existent backfill job ===")
 
         # Create a real pipeline first
         past_time = datetime.now(timezone.utc) - timedelta(minutes=RECENT_DATA_OFFSET_MINUTES)
@@ -718,11 +721,11 @@ class TestBackfillJob:
 
         assert response.status_code == 404, \
             f"Non-existent job should return 404: {response.status_code}"
-        print("  Non-existent job correctly returned 404")
+        logger.debug("  Non-existent job correctly returned 404")
 
     def test_10_backfill_realtime_pipeline_should_fail(self):
         """Test that backfill cannot be created for realtime pipelines."""
-        print("\n=== Test: Backfill for realtime pipeline should fail ===")
+        logger.debug("\n=== Test: Backfill for realtime pipeline should fail ===")
 
         # Create a REALTIME pipeline (not scheduled)
         pipeline_name = f"realtime_pipeline_{self.unique_id}"
@@ -808,4 +811,4 @@ class TestBackfillJob:
         # Should fail because realtime pipelines don't support backfill
         assert backfill_resp.status_code == 400, \
             f"Backfill for realtime pipeline should return 400: {backfill_resp.status_code} - {backfill_resp.text[:500]}"
-        print("  Backfill for realtime pipeline correctly rejected")
+        logger.debug("  Backfill for realtime pipeline correctly rejected")

@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 def test_e2e_folder(create_session, base_url):
     """Running an E2E test for all xfunctions."""
 
@@ -6,7 +10,7 @@ def test_e2e_folder(create_session, base_url):
 
     resp_get_allfunctions = session.get(f"{base_url}api/{org_id}/functions")
 
-    print(resp_get_allfunctions.content)
+    logger.debug(resp_get_allfunctions.content)
     assert (
         resp_get_allfunctions.status_code == 200
     ), f"Get all functions list 200, but got {resp_get_allfunctions.status_code} {resp_get_allfunctions.content}"
@@ -29,7 +33,7 @@ def test_e2e_createdeletefunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions", json=payload
     )
 
-    print(resp_create_function.content)
+    logger.debug(resp_create_function.content)
     assert (
         resp_create_function.status_code == 200
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
@@ -54,7 +58,7 @@ def test_e2e_invalidfunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions", json=payload
     )
 
-    print(resp_create_function.content)
+    logger.debug(resp_create_function.content)
     assert (
         resp_create_function.status_code == 400
     ), f"Invalid function creation, but got {resp_create_function.status_code} {resp_create_function.content}"
@@ -77,7 +81,7 @@ def test_e2e_updatingfunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions", json=payload
     )
 
-    print(resp_create_function.content)
+    logger.debug(resp_create_function.content)
     assert (
         resp_create_function.status_code == 200
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
@@ -94,7 +98,7 @@ def test_e2e_updatingfunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions/pytestfunctions",
         json=payload,
     )
-    print(resp_create_function.content)
+    logger.debug(resp_create_function.content)
     assert (
         resp_update_function.status_code == 200
     ), f"Updating this function, but got {resp_update_function.status_code} {resp_update_function.content}"
@@ -123,7 +127,7 @@ def test_e2e_duplicatefunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions", json=payload
     )
 
-    print(resp_create_function.content)
+    logger.debug(resp_create_function.content)
     assert (
         resp_create_function.status_code == 200
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
@@ -144,7 +148,7 @@ def test_e2e_duplicatefunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions", json=payload
     )
 
-    print(resp_create_function.content)
+    logger.debug(resp_create_function.content)
     assert (
         resp_create_function.status_code == 400
     ), f"Expected 400 function already exists, but got {resp_create_function.status_code} {resp_create_function.content}"
@@ -191,7 +195,7 @@ def test_e2e_addDeleteStreamFunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions", json=payload
     )
 
-    print(resp_create_function.content)
+    logger.debug(resp_create_function.content)
     assert (
         resp_create_function.status_code == 200
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
@@ -231,7 +235,7 @@ def test_e2e_testinvalidfunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions/test", json=payload
     )
 
-    print(resp_test_function.content)
+    logger.debug(resp_test_function.content)
     assert (
         resp_test_function.status_code == 400
     ), f"Invalid function creation, but got {resp_test_function.status_code} {resp_test_function.content}"
@@ -264,7 +268,7 @@ def test_e2e_onlytextfunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions/test", json=payload
     )
 
-    print(resp_test_function.content)
+    logger.debug(resp_test_function.content)
     assert (
         resp_test_function.status_code == 400
     ), f"Invalid function creation, but got {resp_test_function.status_code} {resp_test_function.content}"
@@ -298,7 +302,7 @@ def test_e2e_testonlyspecialcharfunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions/test", json=payload
     )
 
-    print(resp_test_function.content)
+    logger.debug(resp_test_function.content)
     assert (
         resp_test_function.status_code == 400
     ), f"Invalid function creation, but got {resp_test_function.status_code} {resp_test_function.content}"
@@ -333,7 +337,7 @@ def test_e2e_testfunction(create_session, base_url):
     )
 
     # Print the response content for debugging
-    print(resp_test_function.content)
+    logger.debug(resp_test_function.content)
 
     # Assert that the response status code is 200
     assert resp_test_function.status_code == 200, (

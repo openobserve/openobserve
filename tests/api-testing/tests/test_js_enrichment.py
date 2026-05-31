@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright 2026 OpenObserve Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -53,8 +57,8 @@ if (userData) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     # Even if enrichment table doesn't exist, function should execute
     # It will just return 'unknown' for missing data
@@ -103,8 +107,8 @@ if (category) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
@@ -137,8 +141,8 @@ if (user) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
@@ -174,8 +178,8 @@ for (var i = 0; i < rows.length; i++) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
@@ -215,8 +219,8 @@ if (data === null || data === undefined) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     # Should succeed even if table doesn't exist
     assert resp.status_code == 200, (
@@ -257,8 +261,8 @@ if (userData === null || userData === undefined) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
@@ -316,8 +320,8 @@ if (store) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
@@ -348,8 +352,8 @@ def test_js_enrichment_vrl_comparison(create_session, base_url):
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response status: {resp.status_code}")
-    print(f"Response content: {resp.content}")
+    logger.debug(f"Response status: {resp.status_code}")
+    logger.debug(f"Response content: {resp.content}")
 
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"

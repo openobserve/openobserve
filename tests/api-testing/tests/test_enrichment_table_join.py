@@ -12,11 +12,14 @@ Tests for cross-stream type JOINs between logs and enrichment tables:
 Related PR: https://github.com/openobserve/openobserve/pull/5452
 """
 
+import logging
 import pytest
 import random
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class TestEnrichmentTableJoin:
@@ -98,7 +101,7 @@ class TestEnrichmentTableJoin:
         assert response.status_code == 200, \
             f"Failed to create enrichment table: {response.status_code} - {response.text}"
 
-        print(f"✓ Created enrichment table: {self.enrichment_table_name}")
+        logger.debug(f"✓ Created enrichment table: {self.enrichment_table_name}")
 
     def _create_second_enrichment_table(self):
         """Create second enrichment table for multi-table JOIN tests."""
@@ -123,7 +126,7 @@ low,72,L4"""
         assert response.status_code == 200, \
             f"Failed to create second enrichment table: {response.status_code} - {response.text}"
 
-        print(f"✓ Created second enrichment table: {self.enrichment_table_name_2}")
+        logger.debug(f"✓ Created second enrichment table: {self.enrichment_table_name_2}")
 
     def _cleanup_enrichment_table(self, table_name: str):
         """Delete an enrichment table after tests."""
@@ -132,11 +135,11 @@ low,72,L4"""
                 f"{self.base_url}api/{self.ORG_ID}/streams/{table_name}?type=enrichment_tables"
             )
             if response.status_code == 200:
-                print(f"✓ Cleaned up enrichment table: {table_name}")
+                logger.debug(f"✓ Cleaned up enrichment table: {table_name}")
             else:
-                print(f"⚠ Cleanup returned status {response.status_code} for: {table_name}")
+                logger.debug(f"⚠ Cleanup returned status {response.status_code} for: {table_name}")
         except Exception as e:
-            print(f"⚠ Cleanup failed for {table_name}: {e}")
+            logger.debug(f"⚠ Cleanup failed for {table_name}: {e}")
 
     def _run_search(self, sql: str, size: int = 10) -> dict:
         """Run a search query and return the response."""
@@ -187,7 +190,7 @@ low,72,L4"""
 
         # Note: For LEFT JOIN with no matching data, enriched columns may be NULL
         # and the API may omit NULL columns from sparse results. This is expected behavior.
-        print(f"✓ JOIN with enrichment_tables prefix returned {len(hits)} results")
+        logger.debug(f"✓ JOIN with enrichment_tables prefix returned {len(hits)} results")
 
     def test_02_join_with_enrich_prefix(self):
         """Test JOIN using shorter enrich.{table} prefix"""
@@ -213,7 +216,7 @@ low,72,L4"""
             assert "kubernetes_namespace_name" in hit, \
                 f"Should have kubernetes_namespace_name column: {hit}"
 
-        print(f"✓ JOIN with enrich prefix returned {len(hits)} results")
+        logger.debug(f"✓ JOIN with enrich prefix returned {len(hits)} results")
 
     def test_03_both_prefixes_return_same_results(self):
         """Test that enrichment_tables and enrich prefixes return identical results"""
@@ -251,9 +254,9 @@ low,72,L4"""
             assert cnt_full == cnt_short, \
                 f"Both prefixes should return same count: {cnt_full} vs {cnt_short}"
 
-            print(f"✓ Both prefixes return identical results (count={cnt_full})")
+            logger.debug(f"✓ Both prefixes return identical results (count={cnt_full})")
         else:
-            print(f"✓ Both prefix queries succeeded (no data in stream)")
+            logger.debug(f"✓ Both prefix queries succeeded (no data in stream)")
 
     # ==================== JOIN TYPE TESTS ====================
 
@@ -275,7 +278,7 @@ low,72,L4"""
 
         hits = response.json().get("hits", [])
 
-        print(f"✓ LEFT JOIN returned {len(hits)} results")
+        logger.debug(f"✓ LEFT JOIN returned {len(hits)} results")
 
     def test_05_inner_join(self):
         """Test INNER JOIN only returns matching rows"""
@@ -309,7 +312,7 @@ low,72,L4"""
                 assert hit["priority"] is not None, \
                     f"INNER JOIN should only return matched rows with non-null priority: {hit}"
 
-        print(f"✓ INNER JOIN returned {len(hits)} matched results")
+        logger.debug(f"✓ INNER JOIN returned {len(hits)} matched results")
 
     # ==================== AGGREGATION TESTS ====================
 
@@ -338,7 +341,7 @@ low,72,L4"""
                 assert isinstance(hit["log_count"], (int, float)), \
                     f"log_count should be numeric: {hit}"
 
-        print(f"✓ GROUP BY returned {len(hits)} grouped results")
+        logger.debug(f"✓ GROUP BY returned {len(hits)} grouped results")
 
     def test_07_join_with_multiple_aggregations(self):
         """Test JOIN with multiple aggregation functions"""
@@ -367,7 +370,7 @@ low,72,L4"""
             assert "total_logs" in hit, f"Should have total_logs column: {hit}"
             assert "unique_pods" in hit, f"Should have unique_pods column: {hit}"
 
-        print(f"✓ Multiple aggregations returned {len(hits)} results")
+        logger.debug(f"✓ Multiple aggregations returned {len(hits)} results")
 
     def test_08_join_with_having_clause(self):
         """Test JOIN with HAVING clause filtering aggregated results"""
@@ -394,7 +397,7 @@ low,72,L4"""
             assert hit["log_count"] > 0, \
                 f"HAVING should filter to log_count > 0: {hit}"
 
-        print(f"✓ HAVING clause returned {len(hits)} filtered results")
+        logger.debug(f"✓ HAVING clause returned {len(hits)} filtered results")
 
     # ==================== FILTERING TESTS ====================
 
@@ -420,7 +423,7 @@ low,72,L4"""
                 assert hit["priority"] == "high", \
                     f"WHERE should filter to priority='high': {hit}"
 
-        print(f"✓ WHERE on enriched column returned {len(hits)} results")
+        logger.debug(f"✓ WHERE on enriched column returned {len(hits)} results")
 
     def test_10_join_with_where_on_both_tables(self):
         """Test JOIN with WHERE filtering on both log and enrichment columns"""
@@ -446,7 +449,7 @@ low,72,L4"""
             if hit.get("environment"):
                 assert hit["environment"] == "production"
 
-        print(f"✓ WHERE on both tables returned {len(hits)} results")
+        logger.debug(f"✓ WHERE on both tables returned {len(hits)} results")
 
     def test_11_join_with_like_pattern(self):
         """Test JOIN with LIKE pattern matching on enriched column"""
@@ -470,7 +473,7 @@ low,72,L4"""
                 assert "oncall@example.com" in hit["on_call_email"], \
                     f"LIKE pattern should match: {hit}"
 
-        print(f"✓ LIKE pattern returned {len(hits)} results")
+        logger.debug(f"✓ LIKE pattern returned {len(hits)} results")
 
     # ==================== ORDERING TESTS ====================
 
@@ -496,7 +499,7 @@ low,72,L4"""
         # Note: May return 0 results if no namespace matches enrichment table
         # The important thing is the query executes successfully with ORDER BY
 
-        print(f"✓ ORDER BY enriched column returned {len(hits)} results")
+        logger.debug(f"✓ ORDER BY enriched column returned {len(hits)} results")
 
     # ==================== MULTI-TABLE JOIN TESTS ====================
 
@@ -535,7 +538,7 @@ low,72,L4"""
         # if no namespace matches the enrichment table. The API may omit NULL columns.
         # The important verification is that the multi-table JOIN query executes successfully.
 
-        print(f"✓ Multi-table JOIN returned {len(hits)} results")
+        logger.debug(f"✓ Multi-table JOIN returned {len(hits)} results")
 
     # ==================== NULL HANDLING TESTS ====================
 
@@ -574,7 +577,7 @@ low,72,L4"""
                 assert hit["priority"] is not None, \
                     f"COALESCE should prevent NULL priority: {hit}"
 
-        print(f"✓ COALESCE returned {len(hits)} results with NULL handling")
+        logger.debug(f"✓ COALESCE returned {len(hits)} results with NULL handling")
 
     # ==================== DISTINCT TESTS ====================
 
@@ -609,7 +612,7 @@ low,72,L4"""
                     f"DISTINCT should return unique combinations, duplicate found: {hit}"
                 seen.add(key)
 
-        print(f"✓ DISTINCT returned {len(hits)} unique results")
+        logger.debug(f"✓ DISTINCT returned {len(hits)} unique results")
 
     # ==================== VERIFICATION TESTS ====================
 
@@ -647,11 +650,11 @@ low,72,L4"""
                 f"monitoring namespace should have high priority: {hit}"
             assert hit.get("environment") == "production", \
                 f"monitoring namespace should be production: {hit}"
-            print(f"✓ Enriched data values verified correctly for 'monitoring' namespace")
+            logger.debug(f"✓ Enriched data values verified correctly for 'monitoring' namespace")
         else:
-            print("⚠ No 'monitoring' namespace found in log data - skipping value verification")
+            logger.debug("⚠ No 'monitoring' namespace found in log data - skipping value verification")
 
-        print(f"✓ Verification query completed with {len(hits)} results")
+        logger.debug(f"✓ Verification query completed with {len(hits)} results")
 
     def test_17_join_returns_all_enrichment_columns(self):
         """Test that all columns from enrichment table can be retrieved"""
@@ -683,11 +686,11 @@ low,72,L4"""
             expected_columns = ["namespace_name", "team", "priority", "cost_center", "environment", "on_call_email"]
             for col in expected_columns:
                 assert col in hit, f"Should have enrichment column '{col}': {hit}"
-            print(f"✓ All enrichment columns retrieved successfully")
+            logger.debug(f"✓ All enrichment columns retrieved successfully")
         else:
-            print("⚠ No matches found between log namespaces and enrichment table")
+            logger.debug("⚠ No matches found between log namespaces and enrichment table")
 
-        print(f"✓ INNER JOIN query completed with {len(hits)} results")
+        logger.debug(f"✓ INNER JOIN query completed with {len(hits)} results")
 
     # ==================== CROSS-STREAM TYPE JOIN TESTS ====================
     # These tests verify JOINs between different stream types using prefixes:
@@ -710,7 +713,7 @@ low,72,L4"""
             f"logs. prefix JOIN should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        print(f"✓ logs. prefix JOIN with enrichment returned {len(hits)} results")
+        logger.debug(f"✓ logs. prefix JOIN with enrichment returned {len(hits)} results")
 
     def test_19_logs_to_logs_self_join(self):
         """Test self-JOIN within the same log stream"""
@@ -729,7 +732,7 @@ low,72,L4"""
             f"Logs self-JOIN should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        print(f"✓ Logs self-JOIN returned {len(hits)} results")
+        logger.debug(f"✓ Logs self-JOIN returned {len(hits)} results")
 
     def test_20_logs_prefix_both_sides(self):
         """Test JOIN with logs. prefix on both sides"""
@@ -748,7 +751,7 @@ low,72,L4"""
             f"logs. prefix on both sides should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        print(f"✓ logs. prefix on both sides JOIN returned {len(hits)} results")
+        logger.debug(f"✓ logs. prefix on both sides JOIN returned {len(hits)} results")
 
     def test_21_mixed_prefix_join(self):
         """Test JOIN with logs. prefix and enrichment_tables. prefix"""
@@ -767,7 +770,7 @@ low,72,L4"""
             f"Mixed prefix JOIN should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        print(f"✓ Mixed prefix (logs. + enrichment_tables.) JOIN returned {len(hits)} results")
+        logger.debug(f"✓ Mixed prefix (logs. + enrichment_tables.) JOIN returned {len(hits)} results")
 
     def test_22_logs_prefix_with_aggregation(self):
         """Test logs. prefix JOIN with GROUP BY aggregation"""
@@ -786,7 +789,7 @@ low,72,L4"""
             f"logs. prefix with aggregation should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        print(f"✓ logs. prefix with GROUP BY returned {len(hits)} results")
+        logger.debug(f"✓ logs. prefix with GROUP BY returned {len(hits)} results")
 
     def test_23_cross_stream_three_way_join(self):
         """Test three-way JOIN: logs + enrichment + enrichment"""
@@ -811,7 +814,7 @@ low,72,L4"""
             f"Three-way cross-stream JOIN should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        print(f"✓ Three-way cross-stream JOIN returned {len(hits)} results")
+        logger.debug(f"✓ Three-way cross-stream JOIN returned {len(hits)} results")
 
     def test_24_logs_prefix_subquery(self):
         """Test logs. prefix in subquery"""
@@ -833,7 +836,7 @@ low,72,L4"""
             f"logs. prefix in subquery should succeed: {response.status_code} - {response.text[:500]}"
 
         hits = response.json().get("hits", [])
-        print(f"✓ logs. prefix in subquery JOIN returned {len(hits)} results")
+        logger.debug(f"✓ logs. prefix in subquery JOIN returned {len(hits)} results")
 
     def test_25_logs_metrics_cross_stream_join(self):
         """Test JOIN between logs and metrics streams using stream type prefixes
@@ -857,14 +860,14 @@ low,72,L4"""
         # We're testing that the cross-stream syntax is parsed correctly
         if response.status_code == 200:
             hits = response.json().get("hits", [])
-            print(f"✓ logs-to-metrics cross-stream JOIN returned {len(hits)} results")
+            logger.debug(f"✓ logs-to-metrics cross-stream JOIN returned {len(hits)} results")
         else:
             # If metrics stream doesn't exist, log it but don't fail
-            print(f"⚠ logs-to-metrics JOIN returned {response.status_code} - metrics stream may not exist")
+            logger.debug(f"⚠ logs-to-metrics JOIN returned {response.status_code} - metrics stream may not exist")
             # Still verify it's a schema/table not found error, not a syntax error
             assert "syntax" not in response.text.lower() or "parser" not in response.text.lower(), \
                 f"Should not be a syntax error: {response.text[:500]}"
-            print(f"✓ Cross-stream syntax is valid (stream may not exist)")
+            logger.debug(f"✓ Cross-stream syntax is valid (stream may not exist)")
 
     def test_26_logs_traces_cross_stream_join(self):
         """Test JOIN between logs and traces streams using stream type prefixes
@@ -886,13 +889,13 @@ low,72,L4"""
         # The query might fail if traces stream doesn't exist, which is acceptable
         if response.status_code == 200:
             hits = response.json().get("hits", [])
-            print(f"✓ logs-to-traces cross-stream JOIN returned {len(hits)} results")
+            logger.debug(f"✓ logs-to-traces cross-stream JOIN returned {len(hits)} results")
         else:
             # If traces stream doesn't exist, log it but don't fail
-            print(f"⚠ logs-to-traces JOIN returned {response.status_code} - traces stream may not exist")
+            logger.debug(f"⚠ logs-to-traces JOIN returned {response.status_code} - traces stream may not exist")
             assert "syntax" not in response.text.lower() or "parser" not in response.text.lower(), \
                 f"Should not be a syntax error: {response.text[:500]}"
-            print(f"✓ Cross-stream syntax is valid (stream may not exist)")
+            logger.debug(f"✓ Cross-stream syntax is valid (stream may not exist)")
 
     def test_27_all_stream_type_prefixes_syntax(self):
         """Test that all stream type prefixes are syntactically valid
@@ -911,13 +914,13 @@ low,72,L4"""
 
             # We only care that the syntax is valid, not that the stream exists
             if response.status_code == 200:
-                print(f"✓ {prefix}. prefix query succeeded")
+                logger.debug(f"✓ {prefix}. prefix query succeeded")
             else:
                 # Verify it's not a syntax/parser error
                 error_text = response.text.lower()
                 is_syntax_error = "parser" in error_text or "syntax" in error_text
                 if not is_syntax_error:
-                    print(f"✓ {prefix}. prefix syntax is valid (stream may not exist)")
+                    logger.debug(f"✓ {prefix}. prefix syntax is valid (stream may not exist)")
                 else:
                     # This should not happen - syntax should be valid
                     assert False, f"{prefix}. prefix caused syntax error: {response.text[:500]}"

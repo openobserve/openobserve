@@ -1,10 +1,14 @@
 import pytest
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def retrieve_new_dashboard_folders(session, base_url, org_id, folder_id):
     resp_get_dashboard_folders = session.get(
         f"{base_url}api/v2/{org_id}/folders/dashboards/{folder_id}")
-    print(resp_get_dashboard_folders.content)
+    logger.debug(resp_get_dashboard_folders.content)
     assert (
         resp_get_dashboard_folders.status_code == 200
     ), f"Retrieve these dashboards: Expected 200, but got {resp_get_dashboard_folders.status_code} {resp_get_dashboard_folders.content}"
@@ -18,7 +22,7 @@ def test_new_dashboards_folders(create_session, base_url):
 
     resp_new_dashboards_folders = session.get(f"{base_url}api/v2/{org_id}/folders/dashboards")
 
-    print(resp_new_dashboards_folders.content)
+    logger.debug(resp_new_dashboards_folders.content)
     assert (
         resp_new_dashboards_folders.status_code == 200
     ), f"Retrieve all functions list 200, but got {resp_new_dashboards_folders.status_code} {resp_new_dashboards_folders.content}"
@@ -34,7 +38,7 @@ def test_new_create_update_delete_dashboards_folders(create_session, base_url):
     resp_create_new_dashboards_folders = session.post(
         f"{url}api/v2/{org_id}/folders/dashboards", json=payload)
 
-    print(resp_create_new_dashboards_folders.content)
+    logger.debug(resp_create_new_dashboards_folders.content)
 
     folder_id = resp_create_new_dashboards_folders.json()["folderId"]
 
@@ -55,7 +59,7 @@ def test_new_create_update_delete_dashboards_folders(create_session, base_url):
     assert (
         resp_update_new_dashboards_folders.status_code == 200
     ), f"updating this dashboard folder, but got {resp_update_new_dashboards_folders.status_code} {resp_update_new_dashboards_folders.content}"
-    print(resp_update_new_dashboards_folders.content)
+    logger.debug(resp_update_new_dashboards_folders.content)
     # Delete Dashboard Folder
     resp_delete_new_dashboards_folders = session.delete(
         f"{base_url}api/v2/{org_id}/folders/dashboards/{folder_id}")
@@ -94,7 +98,7 @@ def test_create_dashboard_folders_400_empty_name(create_session, base_url):
     resp_create_new_dashboards_folders_blank = create_session.post(
         f"{base_url}api/v2/{org_id}/folders/dashboards", json=payload
     )
-    print(create_session.headers)
+    logger.debug(create_session.headers)
     assert resp_create_new_dashboards_folders_blank.status_code == 400, (
         f"Expected 400 , but got {resp_create_new_dashboards_folders_blank.status_code} "
         f"{resp_create_new_dashboards_folders_blank.content}"
@@ -108,7 +112,7 @@ def test_create_dashboard_folders_404_empty_org(create_session, base_url):
     resp_create_new_dashboards_folders_blank = create_session.post(
         f"{base_url}api/v2/{org_id}/folders/dashboards", json=payload
     )
-    print(create_session.headers)
+    logger.debug(create_session.headers)
     assert resp_create_new_dashboards_folders_blank.status_code == 404, (
         f"Expected 404 , but got {resp_create_new_dashboards_folders_blank.status_code} "
         f"{resp_create_new_dashboards_folders_blank.content}"
@@ -141,7 +145,7 @@ def delete_new_dashboard_folders(session, base_url, org_id, folder_id):
 def retrieve_new_alerts_folder(session, base_url, org_id, folder_id):
     resp_get_alert_folder = session.get(
         f"{base_url}api/v2/{org_id}/folders/alerts/{folder_id}")
-    print(resp_get_alert_folder.content)
+    logger.debug(resp_get_alert_folder.content)
     assert (
         resp_get_alert_folder.status_code == 200
     ), f"Retrieve this folder alert: Expected 200, but got {resp_get_alert_folder.status_code} {resp_get_alert_folder.content}"
@@ -155,7 +159,7 @@ def test_new_alerts_folders(create_session, base_url):
 
     resp_new_all_alerts_folders = session.get(f"{base_url}api/v2/{org_id}/folders/alerts")
 
-    print(resp_new_all_alerts_folders.content)
+    logger.debug(resp_new_all_alerts_folders.content)
     assert (
         resp_new_all_alerts_folders.status_code == 200
     ), f"Retrieve all functions list 200, but got {resp_new_all_alerts_folders.status_code} {resp_new_all_alerts_folders.content}"
@@ -171,7 +175,7 @@ def test_new_create_alerts_update_delete_folders(create_session, base_url):
     resp_create_new_alerts_folders = session.post(
         f"{url}api/v2/{org_id}/folders/alerts", json=payload)
 
-    print(resp_create_new_alerts_folders.content)
+    logger.debug(resp_create_new_alerts_folders.content)
 
     folder_id = resp_create_new_alerts_folders.json()["folderId"]
 
@@ -192,7 +196,7 @@ def test_new_create_alerts_update_delete_folders(create_session, base_url):
     assert (
         resp_update_new_alerts_folders.status_code == 200
     ), f"updating this alerts folder, but got {resp_update_new_alerts_folders.status_code} {resp_update_new_alerts_folders.content}"
-    print(resp_update_new_alerts_folders.content)
+    logger.debug(resp_update_new_alerts_folders.content)
     # Delete Alerts Folder
     resp_delete_new_alerts_folders = session.delete(
         f"{base_url}api/v2/{org_id}/folders/alerts/{folder_id}")
@@ -220,7 +224,7 @@ def test_create_alerts_folders_400_empty_name(create_session, base_url):
     resp_create_new_alerts_folders_blank = create_session.post(
         f"{base_url}api/v2/{org_id}/folders/alerts", json=payload
     )
-    print(create_session.headers)
+    logger.debug(create_session.headers)
     assert resp_create_new_alerts_folders_blank.status_code == 400, (
         f"Expected 400 , but got {resp_create_new_alerts_folders_blank.status_code} "
         f"{resp_create_new_alerts_folders_blank.content}"
@@ -254,7 +258,7 @@ def test_create_alerts_folders_404_empty_org(create_session, base_url):
     resp_create_new_alerts_folders_blank = create_session.post(
         f"{base_url}api/v2/{org_id}/folders/alerts", json=payload
     )
-    print(create_session.headers)
+    logger.debug(create_session.headers)
     assert resp_create_new_alerts_folders_blank.status_code == 404, (
         f"Expected 404 , but got {resp_create_new_alerts_folders_blank.status_code} "
         f"{resp_create_new_alerts_folders_blank.content}"

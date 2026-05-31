@@ -1,5 +1,9 @@
 import pytest
 import time
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def test_e2e_destinations(create_session, base_url):
     """Running an E2E test for get all the destination list under alerts."""
@@ -10,7 +14,7 @@ def test_e2e_destinations(create_session, base_url):
 
     resp_get_alldestinations = session.get(f"{url}api/{org_id}/alerts/destinations")
 
-    print(resp_get_alldestinations.content)
+    logger.debug(resp_get_alldestinations.content)
     assert (
         resp_get_alldestinations.status_code == 200
     ), f"Get all alerts list 200, but got {resp_get_alldestinations.status_code} {resp_get_alldestinations.content}"
@@ -39,7 +43,7 @@ def test_e2e_templates(create_session, base_url):
 
     resp_get_alltemplates = session.get(f"{url}api/{org_id}/alerts/templates")
 
-    print(resp_get_alltemplates.content)
+    logger.debug(resp_get_alltemplates.content)
     assert (
         resp_get_alltemplates.status_code == 200
     ), f"Get all alerts list 200, but got {resp_get_alltemplates.status_code} {resp_get_alltemplates.content}"
@@ -59,7 +63,7 @@ def test_e2e_templatescreation(create_session, base_url):
         f"{url}api/{org_id}/alerts/templates", json=payload
     )
 
-    print(resp_get_alltemplates.content)
+    logger.debug(resp_get_alltemplates.content)
     assert (
         resp_get_alltemplates.status_code == 200
     ), f"Createtemplate 200, but got {resp_get_alltemplates.status_code} {resp_get_alltemplates.content}"
@@ -105,7 +109,7 @@ def test_e2e_createdestination(create_session, base_url):
         json=payload,
         headers=headers,
     )
-    print(resp_create_destinations.content)
+    logger.debug(resp_create_destinations.content)
 
     payload = {
         "url": "https://example.com/webhook",
@@ -122,14 +126,14 @@ def test_e2e_createdestination(create_session, base_url):
         json=payload,
         headers=headers,
     )
-    print(resp_create_destinations.content)
+    logger.debug(resp_create_destinations.content)
     # get destination
     resp_create_destinations = session.get(
         f"{url}api/{org_id}/alerts/destinations/{destination_name}",
         json=payload,
         headers=headers,
     )
-    print(resp_create_destinations.content)
+    logger.debug(resp_create_destinations.content)
     assert (
         resp_create_destinations.status_code == 200
     ), f"Get all alerts list 200, but got {resp_create_destinations.status_code} {resp_create_destinations.content}"
@@ -182,7 +186,7 @@ def test_e2e_alert_history(create_session, base_url):
         json=template_payload,
         headers=headers,
     )
-    print(f"Create template response: {resp_create_template.content}")
+    logger.debug(f"Create template response: {resp_create_template.content}")
     assert resp_create_template.status_code == 200, (
         f"Expected 200 for create template, but got {resp_create_template.status_code} {resp_create_template.content}"
     )
@@ -203,7 +207,7 @@ def test_e2e_alert_history(create_session, base_url):
         json=destination_payload,
         headers=headers,
     )
-    print(f"Create destination response: {resp_create_destination.content}")
+    logger.debug(f"Create destination response: {resp_create_destination.content}")
     assert resp_create_destination.status_code == 200, (
         f"Expected 200 for create destination, but got {resp_create_destination.status_code} {resp_create_destination.content}"
     )
@@ -233,7 +237,7 @@ def test_e2e_alert_history(create_session, base_url):
         json=log_payload,
         headers=headers,
     )
-    print(f"Ingest logs response: {resp_ingest.content}")
+    logger.debug(f"Ingest logs response: {resp_ingest.content}")
     assert resp_ingest.status_code == 200, (
         f"Expected 200 for log ingestion, but got {resp_ingest.status_code} {resp_ingest.content}"
     )
@@ -268,7 +272,7 @@ def test_e2e_alert_history(create_session, base_url):
         json=alert_payload_1,
         headers=headers,
     )
-    print(f"Create alert 1 response: {resp_create_alert_1.content}")
+    logger.debug(f"Create alert 1 response: {resp_create_alert_1.content}")
     assert resp_create_alert_1.status_code == 200, (
         f"Expected 200 for create alert 1, but got {resp_create_alert_1.status_code} {resp_create_alert_1.content}"
     )
@@ -303,22 +307,22 @@ def test_e2e_alert_history(create_session, base_url):
         json=alert_payload_2,
         headers=headers,
     )
-    print(f"Create alert 2 response: {resp_create_alert_2.content}")
+    logger.debug(f"Create alert 2 response: {resp_create_alert_2.content}")
     assert resp_create_alert_2.status_code == 200, (
         f"Expected 200 for create alert 2, but got {resp_create_alert_2.status_code} {resp_create_alert_2.content}"
     )
 
     # Wait a bit for alerts to be processed (if they auto-trigger)
-    print("Waiting for alerts to potentially trigger and generate history...")
+    logger.debug("Waiting for alerts to potentially trigger and generate history...")
     time.sleep(20)
 
     # Get alert list to retrieve alert IDs
-    print("\n=== Getting alert list to retrieve alert IDs ===")
+    logger.debug("\n=== Getting alert list to retrieve alert IDs ===")
     resp_get_alerts = session.get(
         f"{url}api/v2/{org_id}/alerts",
         headers=headers,
     )
-    print(f"Get alerts list response: {resp_get_alerts.content}")
+    logger.debug(f"Get alerts list response: {resp_get_alerts.content}")
     assert resp_get_alerts.status_code == 200, (
         f"Expected 200 for get alerts list, but got {resp_get_alerts.status_code} {resp_get_alerts.content}"
     )
@@ -333,21 +337,21 @@ def test_e2e_alert_history(create_session, base_url):
     for alert in alerts_list:
         if alert["name"] == alert_name_1:
             alert_id_1 = alert["alert_id"]
-            print(f"Found alert_id for {alert_name_1}: {alert_id_1}")
+            logger.debug(f"Found alert_id for {alert_name_1}: {alert_id_1}")
         elif alert["name"] == alert_name_2:
             alert_id_2 = alert["alert_id"]
-            print(f"Found alert_id for {alert_name_2}: {alert_id_2}")
+            logger.debug(f"Found alert_id for {alert_name_2}: {alert_id_2}")
 
     assert alert_id_1 is not None, f"Could not find alert_id for {alert_name_1}"
     assert alert_id_2 is not None, f"Could not find alert_id for {alert_name_2}"
 
     # Step 5: Test 1 - Get all alert history for the organization
-    print("\n=== Test 1: Get all alert history ===")
+    logger.debug("\n=== Test 1: Get all alert history ===")
     resp_get_history = session.get(
         f"{url}api/v2/{org_id}/alerts/history",
         headers=headers,
     )
-    print(f"Get alert history response: {resp_get_history.content}")
+    logger.debug(f"Get alert history response: {resp_get_history.content}")
     assert resp_get_history.status_code == 200, (
         f"Expected 200 for get alert history, but got {resp_get_history.status_code} {resp_get_history.content}"
     )
@@ -359,16 +363,16 @@ def test_e2e_alert_history(create_session, base_url):
     assert "hits" in history_data, "Response should contain 'hits' field"
     assert isinstance(history_data["hits"], list), "'hits' should be a list"
 
-    print(f"Total alert history entries: {history_data['total']}")
-    print(f"Retrieved {len(history_data['hits'])} history entries")
+    logger.debug(f"Total alert history entries: {history_data['total']}")
+    logger.debug(f"Retrieved {len(history_data['hits'])} history entries")
 
     # Step 6: Test 2 - Filter history by specific alert_id
-    print(f"\n=== Test 2: Filter history by alert_id: {alert_id_1} ===")
+    logger.debug(f"\n=== Test 2: Filter history by alert_id: {alert_id_1} ===")
     resp_filtered_history = session.get(
         f"{url}api/v2/{org_id}/alerts/history?alert_id={alert_id_1}",
         headers=headers,
     )
-    print(f"Filtered alert history response: {resp_filtered_history.content}")
+    logger.debug(f"Filtered alert history response: {resp_filtered_history.content}")
 
     # This might return 200 with empty results if alert hasn't triggered yet
     # or 404 if alert doesn't exist
@@ -378,7 +382,7 @@ def test_e2e_alert_history(create_session, base_url):
 
     if resp_filtered_history.status_code == 200:
         filtered_data = resp_filtered_history.json()
-        print(f"Filtered results: {filtered_data['total']} entries")
+        logger.debug(f"Filtered results: {filtered_data['total']} entries")
 
         # If there are results, verify they're for the correct alert
         for entry in filtered_data.get("hits", []):
@@ -387,7 +391,7 @@ def test_e2e_alert_history(create_session, base_url):
             )
 
     # Step 7: Test 3 - Test pagination parameters
-    print("\n=== Test 3: Test pagination ===")
+    logger.debug("\n=== Test 3: Test pagination ===")
     resp_paginated = session.get(
         f"{url}api/v2/{org_id}/alerts/history?from=0&size=10",
         headers=headers,
@@ -399,12 +403,12 @@ def test_e2e_alert_history(create_session, base_url):
     paginated_data = resp_paginated.json()
     assert paginated_data["from"] == 0, "from parameter should be 0"
     assert paginated_data["size"] == 10, "size parameter should be 10"
-    print(
+    logger.debug(
         f"Pagination test passed: from={paginated_data['from']}, size={paginated_data['size']}"
     )
 
     # Step 8: Test 4 - Test with time range
-    print("\n=== Test 4: Test time range filtering ===")
+    logger.debug("\n=== Test 4: Test time range filtering ===")
     # Get timestamps in microseconds
     end_time = int(datetime.utcnow().timestamp() * 1_000_000)
     start_time = int((datetime.utcnow() - timedelta(hours=1)).timestamp() * 1_000_000)
@@ -418,10 +422,10 @@ def test_e2e_alert_history(create_session, base_url):
     )
 
     time_range_data = resp_time_range.json()
-    print(f"Time range results: {time_range_data['total']} entries")
+    logger.debug(f"Time range results: {time_range_data['total']} entries")
 
     # Step 9: Test 5 - Test invalid time range (start > end)
-    print("\n=== Test 5: Test invalid time range (should return 400) ===")
+    logger.debug("\n=== Test 5: Test invalid time range (should return 400) ===")
     resp_invalid_time = session.get(
         f"{url}api/v2/{org_id}/alerts/history?start_time={end_time}&end_time={start_time}",
         headers=headers,
@@ -429,10 +433,10 @@ def test_e2e_alert_history(create_session, base_url):
     assert resp_invalid_time.status_code == 400, (
         f"Expected 400 for invalid time range, but got {resp_invalid_time.status_code} {resp_invalid_time.content}"
     )
-    print("Invalid time range correctly rejected with 400")
+    logger.debug("Invalid time range correctly rejected with 400")
 
     # Step 10: Test 6 - Test with non-existent alert_id
-    print("\n=== Test 6: Test with non-existent alert_id (should return 404) ===")
+    logger.debug("\n=== Test 6: Test with non-existent alert_id (should return 404) ===")
     resp_nonexistent = session.get(
         f"{url}api/v2/{org_id}/alerts/history?alert_id=35MtcBsSRwlYwuuuaybOibAZ4gF",
         headers=headers,
@@ -440,10 +444,10 @@ def test_e2e_alert_history(create_session, base_url):
     assert resp_nonexistent.status_code == 404, (
         f"Expected 404 for non-existent alert, but got {resp_nonexistent.status_code} {resp_nonexistent.content}"
     )
-    print("Non-existent alert correctly returned 404")
+    logger.debug("Non-existent alert correctly returned 404")
 
     # Step 11: Test 7 - Test size limit (max 1000)
-    print("\n=== Test 7: Test size limit enforcement ===")
+    logger.debug("\n=== Test 7: Test size limit enforcement ===")
     resp_large_size = session.get(
         f"{url}api/v2/{org_id}/alerts/history?size=2000",
         headers=headers,
@@ -457,10 +461,10 @@ def test_e2e_alert_history(create_session, base_url):
     assert large_size_data["size"] == 1000, (
         f"Expected size to be clamped to 1000, but got {large_size_data['size']}"
     )
-    print("Size limit correctly enforced (clamped to 1000)")
+    logger.debug("Size limit correctly enforced (clamped to 1000)")
 
     # Cleanup: Delete alerts
-    print("\n=== Cleanup: Deleting test resources ===")
+    logger.debug("\n=== Cleanup: Deleting test resources ===")
 
     # Get alert list to retrieve alert IDs for deletion
     resp_get_alerts = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -478,10 +482,10 @@ def test_e2e_alert_history(create_session, base_url):
     for alert in alerts_list:
         if alert["name"] == alert_name_1:
             alert_id_1 = alert["alert_id"]
-            print(f"Found alert_id for deletion {alert_name_1}: {alert_id_1}")
+            logger.debug(f"Found alert_id for deletion {alert_name_1}: {alert_id_1}")
         elif alert["name"] == alert_name_2:
             alert_id_2 = alert["alert_id"]
-            print(f"Found alert_id for deletion {alert_name_2}: {alert_id_2}")
+            logger.debug(f"Found alert_id for deletion {alert_name_2}: {alert_id_2}")
 
     # Delete alert 1 using alert_id
     if alert_id_1:
@@ -491,7 +495,7 @@ def test_e2e_alert_history(create_session, base_url):
         assert resp_delete_alert_1.status_code == 200, (
             f"Expected 200 for delete alert 1, but got {resp_delete_alert_1.status_code} {resp_delete_alert_1.content}"
         )
-        print(f"Deleted alert: {alert_name_1}")
+        logger.debug(f"Deleted alert: {alert_name_1}")
 
     # Delete alert 2 using alert_id
     if alert_id_2:
@@ -501,7 +505,7 @@ def test_e2e_alert_history(create_session, base_url):
         assert resp_delete_alert_2.status_code == 200, (
             f"Expected 200 for delete alert 2, but got {resp_delete_alert_2.status_code} {resp_delete_alert_2.content}"
         )
-        print(f"Deleted alert: {alert_name_2}")
+        logger.debug(f"Deleted alert: {alert_name_2}")
 
     # Delete destination
     resp_delete_destination = session.delete(
@@ -510,7 +514,7 @@ def test_e2e_alert_history(create_session, base_url):
     assert resp_delete_destination.status_code == 200, (
         f"Expected 200 for delete destination, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
     )
-    print(f"Deleted destination: {destination_name}")
+    logger.debug(f"Deleted destination: {destination_name}")
 
     # Delete template
     resp_delete_template = session.delete(
@@ -519,9 +523,9 @@ def test_e2e_alert_history(create_session, base_url):
     assert resp_delete_template.status_code == 200, (
         f"Expected 200 for delete template, but got {resp_delete_template.status_code} {resp_delete_template.content}"
     )
-    print(f"Deleted template: {template_name}")
+    logger.debug(f"Deleted template: {template_name}")
 
-    print("\n=== Alert history E2E test completed successfully! ===")
-    print("✓ All alert history API endpoints validated")
-    print("✓ Filtering, pagination, and time range parameters working correctly")
-    print("✓ Error handling for invalid requests validated")
+    logger.debug("\n=== Alert history E2E test completed successfully! ===")
+    logger.debug("✓ All alert history API endpoints validated")
+    logger.debug("✓ Filtering, pagination, and time range parameters working correctly")
+    logger.debug("✓ Error handling for invalid requests validated")

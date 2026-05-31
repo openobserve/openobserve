@@ -1,4 +1,8 @@
 import pytest
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 
 @pytest.fixture
@@ -34,7 +38,7 @@ def test_e2e_metrics_ingest_validjson(create_session, base_url, sample_payload):
         f"{url}api/{org_id}/ingest/metrics/_json", json=sample_payload
     )
 
-    print(resp_ingestmetrics.content)
+    logger.debug(resp_ingestmetrics.content)
     assert (
         resp_ingestmetrics.status_code == 200
     ), f"valid json upload 200 , but got {resp_ingestmetrics.status_code} {resp_ingestmetrics.content}"
@@ -63,7 +67,7 @@ def test_e2e_metrics_ingest_invalijson(create_session, base_url):
         f"{url}api/{org_id}/ingest/metrics/_json", json=payload
     )
 
-    print(resp_ingestmetrics.content)
+    logger.debug(resp_ingestmetrics.content)
     assert (
         resp_ingestmetrics.status_code == 400
     ), f"Invalid json upload 400, but got {resp_ingestmetrics.status_code} {resp_ingestmetrics.content}"
@@ -81,7 +85,7 @@ def test_e2e_metrics_invalidquery(create_session, base_url):
         f"{base_url}api/{org_id}/prometheus/api/v1/format_query?query=%7B__name__%3D%22%22%7D"
     )
 
-    print(resp_metricsquery.content)
+    logger.debug(resp_metricsquery.content)
     assert (
         resp_metricsquery.status_code == 400
     ), f"Invalid query upload 400, but got {resp_metricsquery.status_code} {resp_metricsquery.content}"
@@ -97,7 +101,7 @@ def test_e2e_metrics_query(create_session, base_url):
         f"{base_url}api/{org_id}/prometheus/api/v1/format_query?query=%7B__name__%3D%22prometheus_tsdb_tombstone_cleanup_seconds_count%22%7D"
     )
 
-    print(resp_metricsquery.content)
+    logger.debug(resp_metricsquery.content)
     assert (
         resp_metricsquery.status_code == 200
     ), f"valid query upload 200, but got {resp_metricsquery.status_code} {resp_metricsquery.content}"

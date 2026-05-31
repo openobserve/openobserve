@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def test_e2e_organisations(create_session, base_url):
     """Running an E2E test for get all the alerts list."""
@@ -23,7 +27,7 @@ def test_e2e_org_settings(create_session, base_url):
 
     resp_get_orgsettings = session.get(f"{url}api/{org_id}/settings")
 
-    print(resp_get_orgsettings.content)
+    logger.debug(resp_get_orgsettings.content)
     assert (
         resp_get_orgsettings.status_code == 200
     ), f"Get all alerts list 200, but got {resp_get_orgsettings.status_code} {resp_get_orgsettings.content}"
@@ -38,7 +42,7 @@ def test_e2e_org_summary(create_session, base_url):
 
     resp_get_orgsummary = session.get(f"{url}api/{org_id}/summary")
 
-    print(resp_get_orgsummary.content)
+    logger.debug(resp_get_orgsummary.content)
     assert (
         resp_get_orgsummary.status_code == 200
     ), f"Get all alerts list 200, but got {resp_get_orgsummary.status_code} {resp_get_orgsummary.content}"
@@ -53,7 +57,7 @@ def test_e2e_passcode(create_session, base_url):
 
     resp_get_passcode = session.get(f"{url}api/{org_id}/passcode")
 
-    print(resp_get_passcode.content)
+    logger.debug(resp_get_passcode.content)
     assert (
         resp_get_passcode.status_code == 200
     ), f"Get all passcode list 200, but got {resp_get_passcode.status_code} {resp_get_passcode.content}"
@@ -68,7 +72,7 @@ def test_e2e_reset_passcode(create_session, base_url):
 
     resp_put_passcode = session.put(f"{url}api/{org_id}/passcode")
 
-    print(resp_put_passcode.content)
+    logger.debug(resp_put_passcode.content)
     assert (
         resp_put_passcode.status_code == 200
     ), f"Put all passcode list 200, but got {resp_put_passcode.status_code} {resp_put_passcode.content}"
@@ -80,7 +84,7 @@ def test_create_organization(create_session, base_url, random_string):
 
     org_id_new = random_string(5)  # Call the function returned by the fixture
 
-    print("Random Org ID:", org_id_new)
+    logger.debug("Random Org ID:", org_id_new)
 
     payload = {
         "name": org_id_new
@@ -94,7 +98,7 @@ def test_create_organization(create_session, base_url, random_string):
         f"{base_url}api/organizations", json=payload
     )
 
-    print("Create organization response:", resp_create_organization.content)
+    logger.debug("Create organization response:", resp_create_organization.content)
     
     assert (
         resp_create_organization.status_code == 200
@@ -104,7 +108,7 @@ def test_create_organization(create_session, base_url, random_string):
 
     org_id = resp_create_organization.json().get("identifier")
 
-    print("Org identifier:", org_id)
+    logger.debug("Org identifier:", org_id)
 
     yield org_id
 
@@ -112,4 +116,4 @@ def test_create_organization(create_session, base_url, random_string):
     resp_delete_organization = session.delete(
         f"{base_url}api/organizations/{org_id}"
     )
-    print(f"Deleted organization {org_id}")
+    logger.debug(f"Deleted organization {org_id}")

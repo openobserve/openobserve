@@ -4,6 +4,10 @@ import pytest
 
 from datetime import datetime, timezone, timedelta
 import time
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 
 def test_e2e_getsearch(create_session, base_url):
@@ -762,7 +766,7 @@ def test_e2e_where_condition_validation(create_session, base_url):
     
     # If we have hits, validate that ALL hits contain kubernetes_container_name = 'ziox'
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits matching the WHERE condition")
+        logger.debug(f"Found {len(hits)} hits matching the WHERE condition")
         
         for i, hit in enumerate(hits):
             assert "kubernetes_container_name" in hit, f"Hit {i} should contain 'kubernetes_container_name' field"
@@ -770,14 +774,14 @@ def test_e2e_where_condition_validation(create_session, base_url):
                 f"Hit {i} kubernetes_container_name should be 'ziox', but got '{hit.get('kubernetes_container_name')}'"
             )
         
-        print(f"✅ All {len(hits)} hits have kubernetes_container_name = 'ziox' as expected")
+        logger.debug(f"✅ All {len(hits)} hits have kubernetes_container_name = 'ziox' as expected")
     else:
-        print("⚠️  No hits found for the WHERE condition query")
+        logger.debug("⚠️  No hits found for the WHERE condition query")
     
     # Log the total count and took time for monitoring
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"Query executed in {took_time}ms and found {total_hits} total matching records")
+    logger.debug(f"Query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 def test_e2e_match_all_validation(create_session, base_url):
@@ -811,22 +815,22 @@ def test_e2e_match_all_validation(create_session, base_url):
     hits = response_data["hits"]
     
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for level='info' query")
+        logger.debug(f"Found {len(hits)} hits for level='info' query")
         
         # For WHERE level = 'info' queries, ALL hits should have level = 'info'
         for i, hit in enumerate(hits):
             assert "level" in hit, f"Hit {i} should contain 'level' field"
             assert hit["level"] == "info", f"Hit {i} level should be 'info', got '{hit.get('level')}'"
         
-        print(f"✅ All {len(hits)} hits have level='info' as expected")
+        logger.debug(f"✅ All {len(hits)} hits have level='info' as expected")
     else:
-        print("⚠️  No hits found for level='info' query in the time window")
+        logger.debug("⚠️  No hits found for level='info' query in the time window")
         # This is acceptable - the test validates the query syntax works correctly
         # and that when data IS found, it's properly filtered
     
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"level='info' query executed in {took_time}ms and found {total_hits} total matching records")
+    logger.debug(f"level='info' query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 
@@ -861,7 +865,7 @@ def test_e2e_timestamp_ordering_validation(create_session, base_url):
     hits = response_data["hits"]
     
     if len(hits) > 1:
-        print(f"Found {len(hits)} hits for ORDER BY query")
+        logger.debug(f"Found {len(hits)} hits for ORDER BY query")
         
         # Validate descending timestamp order
         for i in range(len(hits) - 1):
@@ -872,13 +876,13 @@ def test_e2e_timestamp_ordering_validation(create_session, base_url):
                 f"Timestamps not in DESC order: hit {i} ({current_timestamp}) should be >= hit {i+1} ({next_timestamp})"
             )
         
-        print(f"✅ All {len(hits)} hits are properly ordered by timestamp DESC")
+        logger.debug(f"✅ All {len(hits)} hits are properly ordered by timestamp DESC")
     else:
-        print("⚠️  Need at least 2 hits to validate ordering")
+        logger.debug("⚠️  Need at least 2 hits to validate ordering")
     
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"ORDER BY query executed in {took_time}ms and found {total_hits} total matching records")
+    logger.debug(f"ORDER BY query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 def test_e2e_limit_validation(create_session, base_url):
@@ -915,13 +919,13 @@ def test_e2e_limit_validation(create_session, base_url):
     assert len(hits) <= 3, f"LIMIT 3 should return max 3 results, got {len(hits)}"
     
     if len(hits) > 0:
-        print(f"✅ LIMIT clause respected: got {len(hits)} hits (≤3) as expected")
+        logger.debug(f"✅ LIMIT clause respected: got {len(hits)} hits (≤3) as expected")
     else:
-        print("⚠️  No hits found for LIMIT query")
+        logger.debug("⚠️  No hits found for LIMIT query")
     
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"LIMIT query executed in {took_time}ms and found {total_hits} total matching records")
+    logger.debug(f"LIMIT query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 
@@ -957,7 +961,7 @@ def test_e2e_cte_query_validation(create_session, base_url):
     hits = response_data["hits"]
     
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for CTE query")
+        logger.debug(f"Found {len(hits)} hits for CTE query")
         
         # Validate that all results have level = 'info' (from the CTE WHERE clause)
         for i, hit in enumerate(hits):
@@ -967,13 +971,13 @@ def test_e2e_cte_query_validation(create_session, base_url):
                 f"Hit {i} level should be 'info', got '{hit.get('level')}'"
             )
         
-        print(f"✅ All {len(hits)} hits from CTE have level='info' as expected")
+        logger.debug(f"✅ All {len(hits)} hits from CTE have level='info' as expected")
     else:
-        print("⚠️  No hits found for CTE query")
+        logger.debug("⚠️  No hits found for CTE query")
     
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"CTE query executed in {took_time}ms and found {total_hits} total matching records")
+    logger.debug(f"CTE query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 def test_e2e_group_by_where_container_name_validation(create_session, base_url):
@@ -1016,7 +1020,7 @@ def test_e2e_group_by_where_container_name_validation(create_session, base_url):
     hits = response_data["hits"]
     
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for GROUP BY WHERE kubernetes_container_name query")
+        logger.debug(f"Found {len(hits)} hits for GROUP BY WHERE kubernetes_container_name query")
         
         # CRITICAL VALIDATION: All returned hits must have ONLY the specified container_name
         for i, hit in enumerate(hits):
@@ -1049,15 +1053,15 @@ def test_e2e_group_by_where_container_name_validation(create_session, base_url):
             f"🚨 CRITICAL BUG: Expected only 1 kubernetes_container_name ('{target_container_name}') but found {len(unique_container_names)}: {unique_container_names}"
         )
         
-        print(f"✅ All {len(hits)} hits contain ONLY kubernetes_container_name='{target_container_name}' as expected")
-        print(f"✅ Bug validation PASSED: WHERE clause properly filters GROUP BY results")
+        logger.debug(f"✅ All {len(hits)} hits contain ONLY kubernetes_container_name='{target_container_name}' as expected")
+        logger.debug(f"✅ Bug validation PASSED: WHERE clause properly filters GROUP BY results")
         
     else:
-        print(f"ℹ️  No hits found for kubernetes_container_name='{target_container_name}' (this is acceptable if no data exists)")
+        logger.debug(f"ℹ️  No hits found for kubernetes_container_name='{target_container_name}' (this is acceptable if no data exists)")
     
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"GROUP BY WHERE kubernetes_container_name query executed in {took_time}ms and found {total_hits} total matching records")
+    logger.debug(f"GROUP BY WHERE kubernetes_container_name query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base_url):
@@ -1097,7 +1101,7 @@ def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base
     hits = response_data["hits"]
     
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for str_match_ignore_case with coalesce query")
+        logger.debug(f"Found {len(hits)} hits for str_match_ignore_case with coalesce query")
         
         # Validate that ALL hits contain 'prometheus' in the expected fields
         for i, hit in enumerate(hits):
@@ -1121,19 +1125,19 @@ def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base
                 f"(kubernetes_container_name='{kubernetes_container_name}', kubernetes_namespace_name='{kubernetes_namespace_name}')"
             )
             
-            print(f"Hit {i}: ✅ 'prometheus' found in coalesce result: '{coalesce_result}'")
+            logger.debug(f"Hit {i}: ✅ 'prometheus' found in coalesce result: '{coalesce_result}'")
         
-        print(f"✅ All {len(hits)} hits contain 'prometheus' in the coalesce fields as expected")
-        print(f"✅ str_match_ignore_case with coalesce validation PASSED")
+        logger.debug(f"✅ All {len(hits)} hits contain 'prometheus' in the coalesce fields as expected")
+        logger.debug(f"✅ str_match_ignore_case with coalesce validation PASSED")
         
     else:
-        print("ℹ️  No hits found for str_match_ignore_case with coalesce query (this may indicate no matching data in the time window)")
+        logger.debug("ℹ️  No hits found for str_match_ignore_case with coalesce query (this may indicate no matching data in the time window)")
         # This is acceptable - the test validates the query syntax works correctly
         # The important thing is that it returns 200 status and doesn't throw SQL parser errors
     
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"str_match_ignore_case with coalesce query executed in {took_time}ms and found {total_hits} total matching records")
+    logger.debug(f"str_match_ignore_case with coalesce query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 # Camel Case Token Tests for PR #9185
@@ -1215,14 +1219,14 @@ def test_e2e_camel_case_edge_cases(create_session, base_url):
             for hit in hits:
                 if hit.get(test_case["expected_field"]) == test_case["expected_value"]:
                     matching_hits += 1
-                    print(f"✅ {test_case['description']}: Found expected value '{test_case['expected_value']}'")
+                    logger.debug(f"✅ {test_case['description']}: Found expected value '{test_case['expected_value']}'")
             
             if matching_hits > 0:
-                print(f"✅ Edge case search '{test_case['search_term']}' found {matching_hits} matching hits")
+                logger.debug(f"✅ Edge case search '{test_case['search_term']}' found {matching_hits} matching hits")
             else:
-                print(f"⚠️  Edge case search '{test_case['search_term']}' found {len(hits)} hits but none matched expected field/value")
+                logger.debug(f"⚠️  Edge case search '{test_case['search_term']}' found {len(hits)} hits but none matched expected field/value")
         else:
-            print(f"⚠️  No hits found for edge case search '{test_case['search_term']}'")
+            logger.debug(f"⚠️  No hits found for edge case search '{test_case['search_term']}'")
 
 
 def test_e2e_camel_case_backward_compatibility(create_session, base_url):
@@ -1278,9 +1282,9 @@ def test_e2e_camel_case_backward_compatibility(create_session, base_url):
         total_hits = response_data.get("total", 0)
         took_time = response_data.get("took", 0)
         
-        print(f"✅ {test_case['description']} ('{test_case['search_term']}'): {total_hits} hits in {took_time}ms")
+        logger.debug(f"✅ {test_case['description']} ('{test_case['search_term']}'): {total_hits} hits in {took_time}ms")
     
-    print("✅ All backward compatibility tests passed - existing searches still work")
+    logger.debug("✅ All backward compatibility tests passed - existing searches still work")
 
 
 def test_e2e_camel_case_full_token_search(create_session, base_url):
@@ -1303,14 +1307,14 @@ def test_e2e_camel_case_full_token_search(create_session, base_url):
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     if resp.status_code != 200:
-        print(f"DEBUG DbException: Status {resp.status_code}, Response: {resp.text}")
+        logger.debug(f"DEBUG DbException: Status {resp.status_code}, Response: {resp.text}")
     assert resp.status_code == 200, f"DbException test failed - Status {resp.status_code}: {resp.text}"
     
     response_data = resp.json()
     hits = response_data["hits"]
-    print(f"DEBUG DbException: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    logger.debug(f"DEBUG DbException: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
     if len(hits) == 0:
-        print(f"DEBUG DbException: Full response: {response_data}")
+        logger.debug(f"DEBUG DbException: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'DbException'"
 
 
@@ -1334,14 +1338,14 @@ def test_e2e_camel_case_atomic_token_search(create_session, base_url):
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     if resp.status_code != 200:
-        print(f"DEBUG UserAccountService: Status {resp.status_code}, Response: {resp.text}")
+        logger.debug(f"DEBUG UserAccountService: Status {resp.status_code}, Response: {resp.text}")
     assert resp.status_code == 200, f"UserAccountService test failed - Status {resp.status_code}: {resp.text}"
     
     response_data = resp.json()
     hits = response_data["hits"]
-    print(f"DEBUG UserAccountService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    logger.debug(f"DEBUG UserAccountService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
     if len(hits) == 0:
-        print(f"DEBUG UserAccountService: Full response: {response_data}")
+        logger.debug(f"DEBUG UserAccountService: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'UserAccountService'"
 
 
@@ -1365,14 +1369,14 @@ def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     if resp.status_code != 200:
-        print(f"DEBUG XMLHttpRequest: Status {resp.status_code}, Response: {resp.text}")
+        logger.debug(f"DEBUG XMLHttpRequest: Status {resp.status_code}, Response: {resp.text}")
     assert resp.status_code == 200, f"XMLHttpRequest test failed - Status {resp.status_code}: {resp.text}"
     
     response_data = resp.json()
     hits = response_data["hits"]
-    print(f"DEBUG XMLHttpRequest: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    logger.debug(f"DEBUG XMLHttpRequest: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
     if len(hits) == 0:
-        print(f"DEBUG XMLHttpRequest: Full response: {response_data}")
+        logger.debug(f"DEBUG XMLHttpRequest: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'XMLHttpRequest'"
 
 
@@ -1396,14 +1400,14 @@ def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     if resp.status_code != 200:
-        print(f"DEBUG OAuth2TokenHandler: Status {resp.status_code}, Response: {resp.text}")
+        logger.debug(f"DEBUG OAuth2TokenHandler: Status {resp.status_code}, Response: {resp.text}")
     assert resp.status_code == 200, f"OAuth2TokenHandler test failed - Status {resp.status_code}: {resp.text}"
     
     response_data = resp.json()
     hits = response_data["hits"]
-    print(f"DEBUG OAuth2TokenHandler: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    logger.debug(f"DEBUG OAuth2TokenHandler: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
     if len(hits) == 0:
-        print(f"DEBUG OAuth2TokenHandler: Full response: {response_data}")
+        logger.debug(f"DEBUG OAuth2TokenHandler: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'OAuth2TokenHandler'"
 
 
@@ -1427,14 +1431,14 @@ def test_e2e_camel_case_multi_token_search(create_session, base_url):
 
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     if resp.status_code != 200:
-        print(f"DEBUG UserManagementService: Status {resp.status_code}, Response: {resp.text}")
+        logger.debug(f"DEBUG UserManagementService: Status {resp.status_code}, Response: {resp.text}")
     assert resp.status_code == 200, f"UserManagementService test failed - Status {resp.status_code}: {resp.text}"
 
     response_data = resp.json()
     hits = response_data["hits"]
-    print(f"DEBUG UserManagementService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    logger.debug(f"DEBUG UserManagementService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
     if len(hits) == 0:
-        print(f"DEBUG UserManagementService: Full response: {response_data}")
+        logger.debug(f"DEBUG UserManagementService: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'UserManagementService'"
 
 
@@ -1537,8 +1541,8 @@ def test_histogram_interval_weekly_preserved(create_session, base_url):
         context_msg="7 days/weekly - REGRESSION TEST for PR #10169"
     )
 
-    print(f"Weekly interval test: Sent {weekly_interval}s, Got back {returned_interval}s")
-    print(f"✅ Weekly histogram interval correctly preserved: {returned_interval}s (7 days)")
+    logger.debug(f"Weekly interval test: Sent {weekly_interval}s, Got back {returned_interval}s")
+    logger.debug(f"✅ Weekly histogram interval correctly preserved: {returned_interval}s (7 days)")
 
 
 def test_histogram_interval_multiples_of_24h_preserved(create_session, base_url):
@@ -1588,9 +1592,9 @@ def test_histogram_interval_multiples_of_24h_preserved(create_session, base_url)
             context_msg=f"{days} days (multiple of 24h)"
         )
 
-        print(f"{days}-day interval test: Sent {expected_interval}s, Got back {returned_interval}s")
+        logger.debug(f"{days}-day interval test: Sent {expected_interval}s, Got back {returned_interval}s")
 
-    print(f"✅ All multiples of 24h correctly preserved")
+    logger.debug(f"✅ All multiples of 24h correctly preserved")
 
 
 def test_histogram_interval_factors_of_24h_preserved(create_session, base_url):
@@ -1638,9 +1642,9 @@ def test_histogram_interval_factors_of_24h_preserved(create_session, base_url):
             context_msg=f"{hours} hours (factor of 24h)"
         )
 
-        print(f"{hours}-hour interval test: Sent {expected_interval}s, Got back {returned_interval}s")
+        logger.debug(f"{hours}-hour interval test: Sent {expected_interval}s, Got back {returned_interval}s")
 
-    print(f"✅ All factors of 24h correctly preserved")
+    logger.debug(f"✅ All factors of 24h correctly preserved")
 
 
 def test_histogram_interval_invalid_adjusted_to_nearest_factor(create_session, base_url):
@@ -1688,9 +1692,9 @@ def test_histogram_interval_invalid_adjusted_to_nearest_factor(create_session, b
             context_msg=f"invalid {invalid_interval}s should adjust to {expected_adjusted}s"
         )
 
-        print(f"Invalid interval test: Sent {invalid_interval}s, Expected adjustment to {expected_adjusted}s, Got {returned_interval}s")
+        logger.debug(f"Invalid interval test: Sent {invalid_interval}s, Expected adjustment to {expected_adjusted}s, Got {returned_interval}s")
 
-    print(f"✅ All invalid intervals correctly adjusted")
+    logger.debug(f"✅ All invalid intervals correctly adjusted")
 
 
 def test_histogram_interval_with_human_readable_format(create_session, base_url):
@@ -1738,9 +1742,9 @@ def test_histogram_interval_with_human_readable_format(create_session, base_url)
             context_msg=f"human-readable '{interval_str}'"
         )
 
-        print(f"Human-readable interval test: '{interval_str}' -> Expected {expected_interval}s, Got {returned_interval}s")
+        logger.debug(f"Human-readable interval test: '{interval_str}' -> Expected {expected_interval}s, Got {returned_interval}s")
 
-    print(f"✅ All human-readable intervals correctly processed")
+    logger.debug(f"✅ All human-readable intervals correctly processed")
 
 
 def test_histogram_interval_consistency_across_requests(create_session, base_url):
@@ -1785,7 +1789,7 @@ def test_histogram_interval_consistency_across_requests(create_session, base_url
             context_msg=f"consistency check request {i+1}"
         )
         intervals.append(returned_interval)
-        print(f"Request {i+1}: histogram_interval = {returned_interval}s")
+        logger.debug(f"Request {i+1}: histogram_interval = {returned_interval}s")
 
     # All intervals should be the same (this is redundant after _assert_histogram_interval
     # but provides a clearer error message for consistency issues)
@@ -1793,4 +1797,4 @@ def test_histogram_interval_consistency_across_requests(create_session, base_url
         f"Histogram interval inconsistent across requests: {intervals}"
     )
 
-    print(f"✅ Histogram interval consistent across {len(intervals)} requests: {intervals[0]}s")
+    logger.debug(f"✅ Histogram interval consistent across {len(intervals)} requests: {intervals[0]}s")

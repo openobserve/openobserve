@@ -3,6 +3,10 @@ import requests
 import pytest
 import time
 from datetime import datetime, timezone, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def get_dynamic_timestamps():
     """Generate dynamic timestamps for the query."""
@@ -20,9 +24,9 @@ def post_query(session, base_url, org_id, query, retries=3, delay=2):
             response_data = response.json()
             if "hits" in response_data and len(response_data["hits"]) > 0:
                 return response_data
-            print(f"Attempt {attempt+1}: No logs found, retrying...")
+            logger.debug(f"Attempt {attempt+1}: No logs found, retrying...")
         else:
-            print(f"Attempt {attempt+1}: Received status {response.status_code}, Response: {response.content}")
+            logger.debug(f"Attempt {attempt+1}: Received status {response.status_code}, Response: {response.content}")
         time.sleep(delay)
     return response.json()  # Return last response even if unsuccessful
 

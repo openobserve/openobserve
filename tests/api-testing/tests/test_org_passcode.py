@@ -6,7 +6,10 @@ Tests for Organization Passcode/Ingestion Token operations:
 - PUT /api/{org_id}/passcode - Update/regenerate user's ingestion token
 """
 
+import logging
 import pytest
+
+logger = logging.getLogger(__name__)
 
 
 class TestOrgPasscode:
@@ -39,8 +42,8 @@ class TestOrgPasscode:
         assert isinstance(data["data"]["passcode"], str), "Passcode should be a string"
         assert len(data["data"]["passcode"]) > 0, "Passcode should not be empty"
 
-        print(f"✓ Got passcode for user: {data['data']['user']}")
-        print(f"✓ Passcode length: {len(data['data']['passcode'])} chars")
+        logger.debug(f"✓ Got passcode for user: {data['data']['user']}")
+        logger.debug(f"✓ Passcode length: {len(data['data']['passcode'])} chars")
 
     def test_02_update_passcode(self):
         """Test updating user's passcode - PUT /api/{org_id}/passcode"""
@@ -75,8 +78,8 @@ class TestOrgPasscode:
         assert new_passcode != old_passcode, \
             "New passcode should be different from old passcode"
 
-        print(f"✓ Updated passcode for user: {data['data']['user']}")
-        print(f"✓ Passcode was successfully regenerated (old != new)")
+        logger.debug(f"✓ Updated passcode for user: {data['data']['user']}")
+        logger.debug(f"✓ Passcode was successfully regenerated (old != new)")
 
     def test_03_verify_updated_passcode_persists(self):
         """Test that updated passcode persists after update"""
@@ -102,7 +105,7 @@ class TestOrgPasscode:
         assert retrieved_passcode == new_passcode, \
             "Retrieved passcode should match the updated passcode"
 
-        print(f"✓ Updated passcode persists correctly")
+        logger.debug(f"✓ Updated passcode persists correctly")
 
     def test_04_passcode_response_structure(self):
         """Test that passcode response has correct structure"""
@@ -128,5 +131,5 @@ class TestOrgPasscode:
         user = inner_data["user"]
         assert "@" in user, f"User should be an email, got: {user}"
 
-        print(f"✓ Response structure is correct")
-        print(f"✓ User email: {user}")
+        logger.debug(f"✓ Response structure is correct")
+        logger.debug(f"✓ User email: {user}")

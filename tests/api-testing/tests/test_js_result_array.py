@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright 2026 OpenObserve Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -50,7 +54,7 @@ for (var i = 0; i < filtered.length; i++) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )
@@ -100,7 +104,7 @@ for (var i = 0; i < filtered.length; i++) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )
@@ -153,7 +157,7 @@ for (var i = 0; i < rows.length; i++) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )
@@ -204,7 +208,7 @@ if (rows.length > 0) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )
@@ -244,7 +248,7 @@ for (var i = 0; i < rows.length; i++) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )
@@ -278,7 +282,7 @@ row.doubled = (row.value || 0) * 2;""",
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )
@@ -332,7 +336,7 @@ for (var i = 0; i < rows.length; i++) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )
@@ -379,7 +383,7 @@ for (var i = 0; i < rows.length; i++) {
 
     resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-    print(f"Response: {resp.content}")
+    logger.debug(f"Response: {resp.content}")
     assert resp.status_code == 200, (
         f"Expected 200, but got {resp.status_code}. Response: {resp.content}"
     )

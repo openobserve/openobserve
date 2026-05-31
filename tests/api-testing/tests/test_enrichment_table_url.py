@@ -11,11 +11,14 @@ Tests for creating enrichment tables from public URLs:
 Uses the EnrichmentPage page object for API calls.
 """
 
+import logging
 import pytest
 import random
 import time
 import os
 from helpers.workflow.pages.enrichment_page import EnrichmentPage
+
+logger = logging.getLogger(__name__)
 
 
 class TestEnrichmentTableURL:
@@ -57,11 +60,11 @@ class TestEnrichmentTableURL:
         try:
             resp = self.session.delete(url)
             if resp.status_code == 200:
-                print(f"Cleaned up enrichment table: {table_name}")
+                logger.debug(f"Cleaned up enrichment table: {table_name}")
             else:
-                print(f"Cleanup returned {resp.status_code} for {table_name}")
+                logger.debug(f"Cleanup returned {resp.status_code} for {table_name}")
         except Exception as e:
-            print(f"Cleanup failed for {table_name}: {e}")
+            logger.debug(f"Cleanup failed for {table_name}: {e}")
 
     def test_create_enrichment_table_from_url(self):
         """Test creating an enrichment table from a public URL."""

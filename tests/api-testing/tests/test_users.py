@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 def test_e2e_users(create_session, base_url):
     """Running an E2E test for get all the users list."""
 
@@ -7,7 +11,7 @@ def test_e2e_users(create_session, base_url):
 
     resp_get_allusers = session.get(f"{url}api/{org_id}/users")
 
-    print(resp_get_allusers.content)
+    logger.debug(resp_get_allusers.content)
     assert (
         resp_get_allusers.status_code == 200
     ), f"Get all functions list 200, but got {resp_get_allusers.status_code} {resp_get_allusers.content}"
@@ -30,7 +34,7 @@ def test_e2e_createusers(create_session, base_url):
 
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 200
     ), f"Creating a user 200, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -57,7 +61,7 @@ def test_e2e_createusers_invalid_password(create_session, base_url):
 
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 400
     ), f"Creating a user with invalid password should yield 400, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -82,7 +86,7 @@ def test_e2e_invalidrole(create_session, base_url):
 
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 400
     ), f"Invalid role added, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -104,7 +108,7 @@ def test_e2e_invalidorganization(create_session, base_url):
 
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 404
     ), f"Invalid org added, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -133,7 +137,7 @@ def test_e2e_addinvalidusertoOrg(create_session, base_url):
         f"{url}api/{org_id}/users/pynew@gmail.com", json=payload
     )
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 422
     ), f"Invalid user returning 422, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -156,7 +160,7 @@ def test_e2e_updateuser(create_session, base_url):
 
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 200
     ), f"Creating a user 200, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -198,7 +202,7 @@ def test_e2e_updateusernotfound(create_session, base_url):
 
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 200
     ), f"Creating a user 200, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -240,7 +244,7 @@ def test_e2e_updateuserexists(create_session, base_url):
 
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
 
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     assert (
         resp_create_users.status_code == 200
     ), f"Creating a user 200, but got {resp_create_users.status_code} {resp_create_users.content}"
@@ -253,7 +257,7 @@ def test_e2e_updateuserexists(create_session, base_url):
         "last_name": "p",
         "role": "admin",
     }
-    print(resp_create_users.content)
+    logger.debug(resp_create_users.content)
     resp_create_users = session.post(f"{url}api/{org_id}/users", json=payload)
     assert (
         resp_create_users.status_code == 400

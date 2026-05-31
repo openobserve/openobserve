@@ -3,6 +3,10 @@ import requests
 import uuid
 from datetime import datetime, timezone, timedelta
 import time
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 
 def parse_json(input_str):
@@ -18,7 +22,7 @@ def test_e2e_rumtoken(create_session, base_url):
     resp_get_rumtoken = session.get(f"{base_url}api/{org_id}/rumtoken")
 
     # get rumtoken
-    print(resp_get_rumtoken.content)
+    logger.debug(resp_get_rumtoken.content)
     assert (
         resp_get_rumtoken.status_code == 200
     ), f"Get all functions list 200, but got {resp_get_rumtoken.status_code} {resp_get_rumtoken.content}"
@@ -38,7 +42,7 @@ def test_e2e_invalidrumtoken(create_session, base_url):
         "oo-evp-origin": "browser",
     }
     unique_test_identifier = f"pytest-{uuid.uuid4()}"
-    print(unique_test_identifier)
+    logger.debug(unique_test_identifier)
 
     logs_payload = """{"service":""}"""
     logs_payload_json = parse_json(logs_payload)
@@ -68,7 +72,7 @@ def test_e2e_rumdataingestioninvalidtoken(create_session, base_url):
         "oo-evp-origin": "browser",
     }
     unique_test_identifier = f"pytest-{uuid.uuid4()}"
-    print(unique_test_identifier)
+    logger.debug(unique_test_identifier)
 
     rumdata_payload = """{"_oo":{"format_version":2,"drift":0,"session":{"plan":2},"configuration":{"session_sample_rate":100,"session_replay_sample_rate":100},"discarded":false},"application":{"id":"1"},"date":1698048457936,"service":"my-web-application","version":"0.0.1","source":"browser","session":{"id":"30e6488a-3c60-4ffa-8549-468da66f6512","type":"user"},"view":{"id":"105d0f30-ea01-4cd9-96ff-dfbbafd8f7c3","url":"http://127.0.0.1:5173/","referrer":""},"display":{"viewport":{"width":1920,"height":941}},"resource":{"id":"42c413d1-2863-45ce-830c-68a3699ca98f","type":"image","url":"http://127.0.0.1:5173/src/assets/logo.svg?import","duration":16900000,"size":37,"download":{"duration":3200000,"start":13700000},"first_byte":{"duration":2800000,"start":10900000},"connect":{"duration":0,"start":10700000},"dns":{"duration":100000,"start":10600000}},"type":"resource"}"""
     rumdata_payload_json = parse_json(rumdata_payload)
@@ -83,7 +87,7 @@ def test_e2e_rumdataingestioninvalidtoken(create_session, base_url):
     assert (
         expected == got
     ), f"Failed to post to rum-data, expected={expected} got={got}, {resp_post_rumdata.content}"
-    print(resp_post_rumdata)
+    logger.debug(resp_post_rumdata)
 
 
 def test_e2e_rumingestinglogs(create_session, base_url):
@@ -95,7 +99,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/rumtoken")
 
     # get rumtoken
-    print(resp_get_rumtoken.content)
+    logger.debug(resp_get_rumtoken.content)
     assert (
         resp_get_rumtoken.status_code == 200
     ), f"Get all functions list 200, but got {resp_get_rumtoken.status_code} {resp_get_rumtoken.content}"
@@ -110,7 +114,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
         "oo-evp-origin": "browser",
     }
     unique_test_identifier = f"pytest-{uuid.uuid4()}"
-    print(unique_test_identifier)
+    logger.debug(unique_test_identifier)
 
     logs_payload = """{"service":"my-web-application","session_id":"30e6488a-3c60-4ffa-8549-468da66f6512","view":{"referrer":"http://127.0.0.1:5173/about","url":"http://127.0.0.1:5173/about","id":"5a6c4bc6-f0cb-49ec-b4fb-460eda745efe"},"application_id":"1","date":1698049336226,"message":"what is happening???","origin":"console","status":"info"}"""
     logs_payload_json = parse_json(logs_payload)
@@ -175,7 +179,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
             if retries > 0:
                 retries -= 1
                 time.sleep(3)
-                print("retrying - exception was ", e)
+                logger.debug("retrying - exception was ", e)
                 continue
             else:
                 raise e

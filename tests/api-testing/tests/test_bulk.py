@@ -1,4 +1,8 @@
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def test_e2e_bulk_ingest(create_session, base_url):
     """
@@ -19,7 +23,7 @@ def test_e2e_bulk_ingest(create_session, base_url):
     )
 
     resp_valid_bulk = session.post(url, data=valid_bulk_payload, headers=headers)
-    print("Positive Test Response:", resp_valid_bulk.content)
+    logger.debug("Positive Test Response:", resp_valid_bulk.content)
 
     # Assert positive case
     assert resp_valid_bulk.status_code == 200, (
@@ -43,14 +47,14 @@ def test_e2e_bulk_ingest(create_session, base_url):
     resp_invalid_bulk_2 = session.post(url, data=invalid_bulk_payload2_json, headers=headers)
 
     # Print the raw response and content for debugging
-    print("Negative Test Response 2 (Raw Content):", resp_invalid_bulk_2.content)
+    logger.debug("Negative Test Response 2 (Raw Content):", resp_invalid_bulk_2.content)
 
     # Try to parse and print the JSON response
     try:
         response_json = resp_invalid_bulk_2.json()  # Attempt to parse the JSON response
-        print("Negative Test Response 2 (JSON):", response_json)
+        logger.debug("Negative Test Response 2 (JSON):", response_json)
     except Exception as e:
-        print("Error parsing JSON response:", str(e))
+        logger.debug("Error parsing JSON response:", str(e))
 
     # Assert that we get a 200 status code (as observed in Postman behavior)
     assert resp_invalid_bulk_2.status_code == 200, (
@@ -73,7 +77,7 @@ def test_e2e_bulk_ingest(create_session, base_url):
     )
 
     resp_valid_bulk = session.post(url, data=valid_bulk_payload, headers=headers)
-    print("Negative Test Response:", resp_valid_bulk.content)
+    logger.debug("Negative Test Response:", resp_valid_bulk.content)
 
     # Assert positive case
     assert resp_valid_bulk.status_code == 200, (
