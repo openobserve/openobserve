@@ -548,6 +548,9 @@ export class MetricsPage {
 
         if (focusedAndCleared) {
             await this.page.keyboard.type(query, { delay: 50 });
+            // Dismiss any Monaco autocomplete/IntelliSense dropdown that opened
+            // while typing incrementally — leaving it open blocks the Apply click.
+            await this.page.keyboard.press('Escape');
             return;
         }
 
@@ -569,6 +572,8 @@ export class MetricsPage {
         await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Backspace');
         await this.page.keyboard.type(query, { delay: 50 });
+        // Dismiss any Monaco autocomplete dropdown that opened while typing.
+        await this.page.keyboard.press('Escape');
     }
 
     async waitForMetricsResults() {
