@@ -545,6 +545,13 @@ pub async fn enable_pipeline(
     Path((org_id, pipeline_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline not found: {pipeline_id}"));
+    }
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())

@@ -1502,7 +1502,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     "min-width": `${width}px`,
     "max-width": `${width}px`,
     // Opaque background so scrolled body content doesn't bleed through
-    "background-color": "inherit",
+    "background-color": "var(--o2-sticky-col-header-bg)",
     "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
