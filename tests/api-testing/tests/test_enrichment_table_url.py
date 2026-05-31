@@ -15,7 +15,7 @@ import pytest
 import random
 import time
 import os
-from pages.enrichment_page import EnrichmentPage
+from helpers.workflow.pages.enrichment_page import EnrichmentPage
 
 
 class TestEnrichmentTableURL:

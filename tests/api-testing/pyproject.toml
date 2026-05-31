@@ -44,6 +44,7 @@ packages = ["src/main"]
 "Bug Tracker" = "https://github.com/openobserve/openobserve/issues"
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 markers = [
     "order: mark test to run in a specific order"
 ]
