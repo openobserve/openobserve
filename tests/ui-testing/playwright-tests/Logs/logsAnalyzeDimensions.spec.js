@@ -34,6 +34,7 @@ test.describe("Logs Analyze Dimensions testcases", () => {
     await pm.logsPage.setDateTimeTo15Minutes();
     await pm.logsPage.clickRefresh();
     await pm.logsPage.waitForSearchResultsToLoad();
+    await pm.logsPage.waitForSearchResultRows();
 
     const hasResults = await pm.logsPage.isLogsSearchResultTableVisible();
     expect(hasResults, 'Search must return results — check data ingestion').toBeTruthy();

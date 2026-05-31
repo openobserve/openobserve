@@ -4,27 +4,21 @@ const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 test.describe("Metrics Visualization and Chart Tests", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm;
-
-  // Ensure metrics are ingested once for all test files
   test.beforeAll(async () => {
     await ensureMetricsIngested();
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to metrics page
+    const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
     testLogger.info('Test setup completed - navigated to metrics page');
-  });
+    return pm;
+  }
 
-  test.afterEach(async ({ page }, testInfo) => {
+  test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
@@ -34,7 +28,8 @@ test.describe("Metrics Visualization and Chart Tests", () => {
   // Available (not tested): geomap, maps, html, markdown, sankey, custom_chart
   test("Verify all chart type selections render correctly", {
     tag: ['@metrics', '@visualization', '@chart-types', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing all chart type selections and rendering');
 
     // Set time range to Last 15 minutes for all chart tests
@@ -286,7 +281,8 @@ test.describe("Metrics Visualization and Chart Tests", () => {
   // CONSOLIDATED TEST 2: Chart variations (stacked bar, stacked area, multi-series) (3 tests → 1 test)
   test("Verify chart variations with stacking and multiple series", {
     tag: ['@metrics', '@visualization', '@chart-variations', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing chart variations with stacking and multiple series');
 
     const variations = [
@@ -398,7 +394,8 @@ test.describe("Metrics Visualization and Chart Tests", () => {
   // CONSOLIDATED TEST 3: Advanced chart features (scatter correlation, table sorting) (2 tests → 1 test)
   test("Verify advanced chart features and customizations", {
     tag: ['@metrics', '@visualization', '@advanced-features', '@P3', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing advanced chart features');
 
     // Test 1: Scatter plot with correlation
@@ -459,7 +456,8 @@ test.describe("Metrics Visualization and Chart Tests", () => {
   // CONSOLIDATED TEST 4: Chart interactions (zoom, pan, export, customization) (3 tests → 1 test)
   test("Verify chart interaction features (zoom, pan, export, settings)", {
     tag: ['@metrics', '@visualization', '@interaction', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing chart interaction features');
 
     await pm.metricsPage.executeQuery('rate(http_requests_total[1h])');

@@ -496,7 +496,7 @@ describe("Index List", async () => {
 
   it("handles multi stream selection correctly", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleMultiStreamSelection();
+    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
     expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
   });
 
@@ -582,7 +582,7 @@ describe("Index List", async () => {
 
   it("handles multiple stream selection", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleMultiStreamSelection();
+    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
     expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
   });
 
@@ -1031,7 +1031,7 @@ describe("Index List", async () => {
       wrapper.vm.searchObj.data.stream.selectedStream = ["oldStream"];
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
 
-      wrapper.vm.handleMultiStreamSelection();
+      wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
 
       expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
     });
@@ -1564,7 +1564,7 @@ describe("Index List", async () => {
 
   it("handles multi stream selection correctly", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleMultiStreamSelection();
+    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
     expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
   });
 
@@ -1672,7 +1672,7 @@ describe("Index List", async () => {
 
   it("handles multiple stream selection", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleMultiStreamSelection();
+    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
     expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
   });
 
@@ -2121,7 +2121,7 @@ describe("Index List", async () => {
       wrapper.vm.searchObj.data.stream.selectedStream = ["oldStream"];
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
 
-      wrapper.vm.handleMultiStreamSelection();
+      wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
 
       expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
     });

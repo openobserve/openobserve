@@ -1,4 +1,4 @@
-import { reactive } from "vue"
+import { reactive, ref } from "vue"
 import type { ToastVariant, ToastOptions, ToastPosition } from "./OToast.types"
 
 // ── Internal record shape ────────────────────────────────────────────────────
@@ -45,6 +45,35 @@ const defaultPositions: Record<ToastVariant, ToastPosition> = {
 const toastRecords = reactive<ToastRecord[]>([])
 
 let idCounter = 0
+
+// ── Page-visibility tracking (single listener for all toasts) ────────────────
+// `visibilitychange` fires for both internal Chrome tab switching AND external
+// app switching. Tracking it once at module level is more reliable than
+// per-component listeners, which can race with Vue's reactive flush.
+
+export const isPageVisible = ref(
+  typeof document !== "undefined" ? !document.hidden : true,
+)
+
+function pauseAllTimers(): void {
+  toastRecords.forEach((r) => pauseTimer(r.id))
+}
+
+function resumeAllTimers(): void {
+  toastRecords.forEach((r) => resumeTimer(r.id))
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      isPageVisible.value = false
+      pauseAllTimers()
+    } else {
+      isPageVisible.value = true
+      resumeAllTimers()
+    }
+  })
+}
 
 // ── Public dismiss-function type ─────────────────────────────────────────────
 

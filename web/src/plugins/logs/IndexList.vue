@@ -41,12 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           ref="streamSelect"
           data-test="log-search-index-list-select-stream"
-          v-model="searchObj.data.stream.selectedStream"
+          :model-value="selectionMode === 'single' ? searchObj.data.stream.selectedStream[0] ?? null : searchObj.data.stream.selectedStream"
           :options="streamOptions"
           :placeholder="placeHolderText"
-          multiple
+          :multiple="selectionMode === 'multi'"
+          :row-click-single-select="selectionMode === 'multi'"
           class="tw:w-full"
-          @update:model-value="handleMultiStreamSelection"
+          @update:model-value="handleStreamSelection"
         >
           <template #empty>{{ t("search.noResult") }}</template>
         </OSelect>
@@ -224,6 +225,12 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
+  props: {
+    selectionMode: {
+      type: String as () => "single" | "multi",
+      default: "multi",
+    },
+  },
   components: {
     EqualIcon,
     NotEqualIcon,
@@ -250,7 +257,12 @@ export default defineComponent({
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
-    handleMultiStreamSelection() {
+    handleStreamSelection(value: string | string[] | null) {
+      if (this.selectionMode === "single") {
+        this.searchObj.data.stream.selectedStream = value ? [value as string] : [];
+      } else {
+        this.searchObj.data.stream.selectedStream = (value as string[]) ?? [];
+      }
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect as any;
         if (indexListSelectField?.updateInputValue) {
