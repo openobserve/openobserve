@@ -323,6 +323,21 @@ export default defineComponent({
     const roleError = ref('');
     const passwordError = ref('');
 
+    // ----------------------------------------------------------------------
+    //  password policy  (mirrors src/config/src/utils/password.rs)
+    //  Length 8-128 AND lower AND upper AND digit AND special.
+    // ----------------------------------------------------------------------
+    const PASSWORD_POLICY_HINT =
+      "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.";
+    const isStrongPassword = (val: string) => {
+      if (!val || val.length < 8 || val.length > 128) return false;
+      const hasLower = /[a-z]/.test(val);
+      const hasUpper = /[A-Z]/.test(val);
+      const hasDigit = /[0-9]/.test(val);
+      const hasSpecial = /[^A-Za-z0-9]/.test(val);
+      return hasLower && hasUpper && hasDigit && hasSpecial;
+    };
+
     watch(
       () => props.customRoles,
       (next) => {
@@ -431,6 +446,8 @@ export default defineComponent({
       passwordError,
       invalidateLoginData,
       config,
+      isStrongPassword,
+      PASSWORD_POLICY_HINT,
       filterFn(val: any, update: any) {
         if (val === "") {
           update(() => {
@@ -460,7 +477,6 @@ export default defineComponent({
     },
     onSubmit() {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const pwdMinLen = 8;
 
       if (this.existingUser && !this.beingUpdated) {
         if (!this.formData.email || !emailRegex.test(this.formData.email)) {
@@ -482,8 +498,8 @@ export default defineComponent({
           this.passwordError = 'Password is required.';
           return;
         }
-        if (this.formData.password.length < pwdMinLen) {
-          this.passwordError = 'Password must be at least 8 characters long.';
+        if (!this.isStrongPassword(this.formData.password)) {
+          this.passwordError = this.PASSWORD_POLICY_HINT;
           return;
         }
       }
@@ -497,17 +513,15 @@ export default defineComponent({
             toast({ variant: "error", message: 'Current password is required.' });
             return;
           }
-          if (this.formData.old_password.length < pwdMinLen) {
-            toast({ variant: "error", message: 'Password must be at least 8 characters long.' });
-            return;
-          }
+          // Old/current password is never re-validated against the new policy:
+          // it was set under whatever rule was active then. Backend rejects on mismatch.
         }
         if (!this.formData.new_password) {
           toast({ variant: "error", message: 'New password is required.' });
           return;
         }
-        if (this.formData.new_password.length < pwdMinLen) {
-          toast({ variant: "error", message: 'New password must be at least 8 characters long.' });
+        if (!this.isStrongPassword(this.formData.new_password)) {
+          toast({ variant: "error", message: this.PASSWORD_POLICY_HINT });
           return;
         }
       }

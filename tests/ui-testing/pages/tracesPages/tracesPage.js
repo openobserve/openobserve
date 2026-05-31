@@ -124,6 +124,7 @@ export class TracesPage {
     this.queryEditor = '[data-test="query-editor"]';
     this.queryEditorContainer = '[data-test="query-editor"]';
     this.queryErrorMessage = '[data-test="traces-search-error-message"]';
+    this.viewLines = '.view-lines';
 
     // Time Range Selectors
     this.dateTimeRelative15mButton = '[data-test="date-time-relative-15-m-btn"]';
@@ -2185,14 +2186,33 @@ export class TracesPage {
   }
 
   /**
-   * Check if any logs query mode toggle is visible
+   * Check if any logs query mode toggle is visible.
+   * These toggles live inside the utilities dropdown menu, so we open the menu first.
+   * Also checks for the always-visible OToggleGroup items (logs-logs-toggle, etc.)
+   * as a fallback indicator that logs-specific UI is active.
    * @returns {Promise<{quickMode: boolean, sqlMode: boolean}>}
    */
   async isAnyLogsQueryToggleVisible() {
+    // First check the always-visible OToggleGroup items (not in any dropdown)
+    const logsToggle = this.page.locator('[data-test="logs-logs-toggle"]');
+    const logsToggleVisible = await logsToggle.isVisible({ timeout: 3000 }).catch(() => false);
+    if (logsToggleVisible) {
+      return { quickMode: true, sqlMode: true };
+    }
+
+    // Fallback: open the utilities menu and check dropdown items
+    try {
+      const utilsBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+      if (await utilsBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await utilsBtn.click();
+        await this.page.waitForTimeout(500);
+      }
+    } catch {}
+
     const toggles = this.getLogsQueryModeToggles();
     return {
-      quickMode: await toggles.quickMode.isVisible({ timeout: 5000 }).catch(() => false),
-      sqlMode: await toggles.sqlMode.isVisible({ timeout: 5000 }).catch(() => false),
+      quickMode: await toggles.quickMode.isVisible({ timeout: 3000 }).catch(() => false),
+      sqlMode: await toggles.sqlMode.isVisible({ timeout: 3000 }).catch(() => false),
     };
   }
 

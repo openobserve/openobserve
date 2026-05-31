@@ -180,10 +180,12 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
     }
 
     if (timeInput) {
-      // Clear existing value and type a decimal
+      // Clear existing value and type a decimal.
+      // Use pressSequentially to bypass native input[type=time] validation that
+      // rejects "12.5:00" at the fill() level.
       await timeInput.click();
       await timeInput.fill('');
-      await timeInput.fill('12.5:00');
+      await timeInput.pressSequentially('12.5:00');
       await page.waitForTimeout(500);
 
       // Click outside to trigger validation

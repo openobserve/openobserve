@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
 
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
 
@@ -214,7 +215,7 @@ const stubs = {
 function mountO2AIChat(props: Record<string, unknown> = {}) {
   return mount(O2AIChat, {
     global: {
-      plugins: [store],
+      plugins: [store, i18n],
       stubs,
     },
     props: {
