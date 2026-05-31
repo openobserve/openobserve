@@ -177,8 +177,8 @@ def test_pipeline_dynamic_template_substitution(create_session, base_url, source
     output_node_id = str(uuid.uuid4())
     
     # Load test data for later ingestion using absolute path
-    # Path structure: tests/api-testing/tests/test_pipeline_dynamic.py -> tests/test-data/logs_data.json
-    test_data_path = Path(__file__).parent.parent.parent / "test-data" / "logs_data.json"
+    # Path: tests/api-testing/tests/pipelines/test_pipeline_dynamic.py -> tests/test-data/logs_data.json (4 parents)
+    test_data_path = Path(__file__).parent.parent.parent.parent / "test-data" / "logs_data.json"
     with open(test_data_path) as f:
         logs_data = json.load(f)
 
@@ -412,8 +412,8 @@ def test_pipeline_complex_templates(create_session, base_url, source_stream, des
     condition_node_id = str(uuid.uuid4())
     output_node_id = str(uuid.uuid4())
     
-    # Load test data for later ingestion using absolute path
-    test_data_path = Path(__file__).parent.parent.parent / "test-data" / "logs_data.json"
+    # Load test data for later ingestion using absolute path (4 parents — see note above)
+    test_data_path = Path(__file__).parent.parent.parent.parent / "test-data" / "logs_data.json"
     with open(test_data_path) as f:
         logs_data = json.load(f)
 

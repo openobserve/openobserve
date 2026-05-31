@@ -73,7 +73,8 @@ class TestLogsToLogsJoin:
 
     def _ingest_test_data(self):
         """Ingest small and large log datasets to unique streams."""
-        root_dir = Path(__file__).parent.parent.parent
+        # 4 parents because this file is at tests/api-testing/tests/regression/test_logs_to_logs_join.py
+        root_dir = Path(__file__).parent.parent.parent.parent
 
         # Ingest small dataset
         small_data_path = root_dir / "test-data" / "joins" / "logs_small.json"

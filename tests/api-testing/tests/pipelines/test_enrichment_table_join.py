@@ -81,8 +81,8 @@ class TestEnrichmentTableJoin:
 
     def _create_enrichment_table(self):
         """Create main enrichment table from test-data CSV file."""
-        # Read CSV from test-data folder
-        csv_path = Path(__file__).parent.parent.parent / "test-data" / "enrichment_namespace_lookup.csv"
+        # Read CSV from test-data folder (4 parents to reach repo's tests/)
+        csv_path = Path(__file__).parent.parent.parent.parent / "test-data" / "enrichment_namespace_lookup.csv"
         with open(csv_path, "r") as f:
             csv_content = f.read()
 

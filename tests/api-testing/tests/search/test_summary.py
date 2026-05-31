@@ -18,8 +18,10 @@ ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
 ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
 
-# Directory for test data
-root_dir = Path(__file__).parent.parent.parent
+# Directory for test data — 4 parents because this file lives at
+# tests/api-testing/tests/search/test_summary.py (4 levels deep from repo root)
+# Resolves to .../openobserve/tests/ where test-data/ lives.
+root_dir = Path(__file__).parent.parent.parent.parent
 
 def generate_random_string(length=5):
     """Generate a random string of lowercase letters."""

@@ -157,7 +157,8 @@ def test_sourcemaps_zip():
     Uses pre-built sourcemaps from fixtures directory.
     """
     from pathlib import Path
-    zip_path = Path(__file__).parent.parent / "fixtures" / "sourcemaps" / "sourcemaps.zip"
+    # 3 parents from tests/api-testing/tests/rum/test_sourcemap_rbac.py -> tests/api-testing/ where fixtures/ lives
+    zip_path = Path(__file__).parent.parent.parent / "fixtures" / "sourcemaps" / "sourcemaps.zip"
 
     if not zip_path.exists():
         pytest.skip(f"Sourcemaps ZIP not found at {zip_path}. Static fixture missing.")

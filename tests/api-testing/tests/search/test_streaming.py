@@ -27,7 +27,8 @@ ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
 
 org_id = "default"
 
-root_dir = Path(__file__).parent.parent.parent
+# 4 parents because this file is at tests/api-testing/tests/search/test_streaming.py
+root_dir = Path(__file__).parent.parent.parent.parent
 
 
 def generate_random_string(length=5):
