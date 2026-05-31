@@ -715,7 +715,7 @@ export class StreamsPage {
     get closeStreamButton() { return this.page.locator('[data-test="add-stream-close-btn"]'); }
     get streamsTable() { return this.page.locator('[data-test="log-stream-table"]'); }
     get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input-field"]'); }
-    get indexTypeSelect() { return this.page.locator('[data-test="schema-stream-index-select"]').first(); }
+    get indexTypeSelect() { return this.page.locator('[data-test="schema-field-kubernetes_host-index-type-select"]').first(); }
     get fieldSearchInput() { return this.page.locator('[data-test="schema-field-search-input-field"]'); }
     get quickModeIcons() { return this.page.locator('img[alt*="quick"], img[alt*="Quick"]'); }
     get quickModeTooltip() { return this.page.locator('[data-test*="quick-mode-tooltip"]'); }

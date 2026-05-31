@@ -468,7 +468,7 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Verify alert saved successfully
       await expect(
-        page.getByText("Alert saved successfully.")
+        page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert saved successfully.' })
       ).toBeVisible({ timeout: 30000 });
       testLogger.info("Alert created successfully from dashboard panel", {
         alertName,
