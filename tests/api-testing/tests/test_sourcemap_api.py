@@ -30,7 +30,7 @@ pytestmark = [
     pytest.mark.order(1),
     pytest.mark.skip(reason="Sourcemaps is an enterprise feature and cannot be tested in CI with non-enterprise build")
 ]
-from sourcemap_helpers import (
+from helpers.sourcemap_helpers import (
     load_static_sourcemaps,
     upload_sourcemaps,
     list_sourcemaps,
