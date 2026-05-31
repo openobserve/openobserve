@@ -311,6 +311,7 @@ def test_dashboard_with_custom_folder(create_session, base_url):
         session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
 
 
+@pytest.mark.xfail(reason="backend currently panics with 500 for missing required fields instead of returning 400/422; remove xfail when backend is fixed")
 def test_dashboard_missing_required_fields(create_session, base_url):
     """Test creating dashboard without required fields"""
     session = create_session
@@ -323,8 +324,10 @@ def test_dashboard_missing_required_fields(create_session, base_url):
     }
 
     resp = session.post(url, json=dashboard_data)
-    # API currently returns 500 for missing required fields in v5, accepting it for now
-    assert resp.status_code in [400, 422, 500], f"Should fail without required fields: {resp.status_code}"
+    # Correct behavior: 400 (bad request) or 422 (unprocessable entity).
+    # If backend returns 500 (server panic), this assert fails — but the xfail
+    # marker converts that into an XFAIL (visible in CI) instead of a silent pass.
+    assert resp.status_code in [400, 422], f"Should fail without required fields: {resp.status_code}"
 
 
 def test_get_nonexistent_dashboard(create_session, base_url):
@@ -338,7 +341,7 @@ def test_get_nonexistent_dashboard(create_session, base_url):
 
 
 def test_update_nonexistent_dashboard(create_session, base_url):
-    """Test updating a dashboard that doesn't exist"""
+    """Test updating a dashboard that doesn't exist returns 404"""
     session = create_session
     url = f"{base_url}api/{ORG_ID}/dashboards/nonexistent_dashboard_id_12345"
 
@@ -350,8 +353,7 @@ def test_update_nonexistent_dashboard(create_session, base_url):
     }
 
     resp = session.put(url, json=update_data)
-    # API currently returns 500 for updating nonexistent dashboard, accepting it for now
-    assert resp.status_code in [200, 400, 404, 500], f"Should return error for nonexistent dashboard: {resp.status_code}"
+    assert resp.status_code == 404, f"PUT on nonexistent dashboard should return 404: {resp.status_code}"
 
     # Clean up if dashboard was created
     if resp.status_code == 200:
