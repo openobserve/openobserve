@@ -161,6 +161,8 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
+    permissions:
+      contents: read  # only need to checkout the repo
     strategy:
       fail-fast: false
       matrix:
@@ -257,6 +259,8 @@ jobs:
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
     continue-on-error: true
+    permissions:
+      contents: read  # only need to checkout the repo
     steps:
       - name: Remove unused tools
         run: |

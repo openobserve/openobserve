@@ -20,6 +20,7 @@ import json
 import logging
 
 from support.client import OpenObserveClient
+from support.wait import wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -92,17 +93,19 @@ def test_bulk_invalid_index_name_is_silently_sanitized(client: OpenObserveClient
     - HTTP 200 with `errors: false`
     - The per-item response shows `_index: '_'` (disallowed chars stripped)
     - No warning/error field
+    - Records DO actually ingest into the sanitized stream (verified via search)
 
     This is a footgun: a client sending bad data won't know their records
     landed in a different index. Worth flagging to the backend team. For now
     the test asserts the observed behavior so any future change (rejection,
-    warning field) shows up as a test failure rather than a silent regression.
+    warning field, or data being silently dropped) shows up as a test
+    failure rather than a silent regression.
     """
     bulk_body = (
         '{ "index" : { "_index" : "****", "_id" : "1" } }\n'
-        '{ "field1" : "value1" }\n'
+        '{ "field1" : "value1_for_sanitization_test" }\n'
         '{ "index" : { "_index" : "****", "_id" : "2" } }\n'
-        '{ "field1" : "value2" }'
+        '{ "field1" : "value2_for_sanitization_test" }'
     )
     resp = _bulk_post(client, bulk_body)
     assert resp.status_code == 200, f"bulk POST failed: {resp.status_code} {resp.text}"
@@ -122,3 +125,34 @@ def test_bulk_invalid_index_name_is_silently_sanitized(client: OpenObserveClient
         "Bulk API silently sanitized _index '****' -> %r (likely backend bug)",
         sanitized_index,
     )
+
+    # Verify the records actually landed in the sanitized index (not silently
+    # dropped). Poll the search endpoint until both records become visible,
+    # since ingestion-to-search-visible has indexing latency.
+    def _records_visible() -> bool:
+        hits = client.search.hits(
+            f'SELECT field1 FROM "{sanitized_index}" '
+            "WHERE field1 LIKE 'value%_for_sanitization_test'",
+            minutes=10,
+            size=10,
+        )
+        return len(hits) >= 2
+
+    try:
+        wait_until(
+            _records_visible,
+            timeout=30,
+            interval=1.0,
+            msg=(
+                f"after silent sanitization to {sanitized_index!r}, expected "
+                f"2 records to be searchable but never became visible — "
+                f"backend may be silently DROPPING data rather than just renaming"
+            ),
+        )
+    finally:
+        # Best-effort cleanup: delete the sanitized stream so it doesn't
+        # accumulate across runs.
+        try:
+            client.streams.delete(sanitized_index)
+        except Exception as e:
+            logger.warning("cleanup failed for sanitized stream %s: %s", sanitized_index, e)

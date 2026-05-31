@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 
+import pytest
 
 from support.client import OpenObserveClient
 
@@ -242,11 +243,10 @@ def test_metadata_extraction_with_regex(client: OpenObserveClient):
     GROUP BY array_extract(regexp_match(log, 'caller=([^\\s]+)'), 1)"""
     hits = _query(client, sql)
 
-    # Some test datasets may not contain 'caller=' patterns. Don't hard-fail
-    # if empty; log so the absence is visible.
+    # Some test datasets may not contain 'caller=' patterns. Skip (visible in
+    # pytest output) rather than silently passing if the pattern isn't present.
     if not hits:
-        logger.info("test_metadata_extraction_with_regex: 0 hits — 'caller=' pattern absent in test data")
-        return
+        pytest.skip("'caller=' pattern absent in test data — test data dependent")
 
     _require_fields(hits, ["caller", "count"], "metadata_extraction")
     for i, hit in enumerate(hits):
@@ -340,8 +340,7 @@ def test_api_log_analysis_with_message_filter(client: OpenObserveClient):
     hits = _query(client, sql)
 
     if not hits:
-        logger.info("test_api_log_analysis: 0 hits — no messages containing 'bulk' in test data")
-        return
+        pytest.skip("no messages containing 'bulk' in test data — test data dependent")
     _require_fields(hits, ["api", "log_level", "api_info_log_count", "component", "platform", "counter"], "api_log")
 
 
@@ -383,11 +382,10 @@ def test_time_series_window_functions(client: OpenObserveClient):
     hits = _query(client, sql)
 
     if not hits:
-        logger.info(
-            "test_time_series_window_functions: 0 hits — test data lacks namespaces in "
-            "('production','staging','monitoring','default')"
+        pytest.skip(
+            "test data lacks namespaces in ('production','staging','monitoring','default') "
+            "— test data dependent"
         )
-        return
     _require_fields(
         hits, ["time_bucket", "environment", "current_count", "growth_rate_percent"], "window_fn"
     )
@@ -431,11 +429,10 @@ def test_advanced_regex_json_path_extraction(client: OpenObserveClient):
     hits = _query(client, sql)
 
     if not hits:
-        logger.info(
-            "test_advanced_regex_json_path_extraction: 0 hits — test data lacks "
-            "message LIKE '/api/%' rows with method/took/code"
+        pytest.skip(
+            "test data lacks message LIKE '/api/%' rows with method/took/code "
+            "— test data dependent"
         )
-        return
     _require_fields(
         hits,
         ["api_group", "endpoint", "http_method", "avg_response_time", "error_count",
