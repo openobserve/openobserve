@@ -52,9 +52,15 @@ def search_payload(
     size: int = 100,
     from_: int = 0,
     quick_mode: bool = False,
-    track_total_hits: bool = True,
+    track_total_hits: bool = False,
 ) -> dict[str, Any]:
-    """SQL search request body for POST /api/{org}/_search."""
+    """SQL search request body for POST /api/{org}/_search.
+
+    Note: `track_total_hits` defaults to **False**. When True, OO switches
+    to histogram-aggregate mode and returns `{"zo_sql_num": <count>}` instead
+    of raw hits, which surprises callers expecting individual records.
+    Callers that genuinely want the aggregate count can pass True explicitly.
+    """
     if start_time is None or end_time is None:
         s, e = time_window(minutes=15)
         start_time = start_time if start_time is not None else s
