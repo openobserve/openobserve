@@ -239,7 +239,7 @@ test.describe("Users and Organizations", () => {
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
         await pageManager.userPage.editUser(uniqueEmail);
-        await pageManager.userPage.addNewPassword('1234567890');
+        await pageManager.userPage.addNewPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await pageManager.userPage.userCreate();
         await pageManager.userPage.verifySuccessMessage('User updated successfully.');
         

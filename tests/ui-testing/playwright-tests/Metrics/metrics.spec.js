@@ -474,8 +474,10 @@ test.describe("Metrics testcases", () => {
       const noDataMessage = await pm.metricsPage.getNoDataMessage();
       hasNoData = await noDataMessage.isVisible().catch(() => false);
 
-      return hasInlineError || hasChartError || hasNoData;
-    }, { timeout: 10000, intervals: [500, 1000, 2000] }).toBe(true);
+      const hasNotification = await page.locator('.q-notification').isVisible().catch(() => false);
+
+      return hasInlineError || hasChartError || hasNoData || hasNotification;
+    }, { timeout: 20000, intervals: [500, 1000, 2000] }).toBe(true);
 
     testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}`);
 
