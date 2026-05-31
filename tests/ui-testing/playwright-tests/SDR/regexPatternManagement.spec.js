@@ -22,7 +22,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   // ===== VALIDATION TESTS =====
 
   test("should disable save button when required fields are empty", {
-    tag: ['@sdr', '@regexPatterns', '@negative', '@validation']
+    tag: ['@sdr', '@regexPatterns', '@negative', '@validation', '@P2']
   }, async ({ page }) => {
     testLogger.info('Testing that save button is disabled when required fields are empty');
 
@@ -57,7 +57,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   // ===== ERROR HANDLING TESTS =====
 
   test("should show error when pattern contains invalid regex syntax", {
-    tag: ['@sdr', '@regexPatterns', '@negative']
+    tag: ['@sdr', '@regexPatterns', '@negative', '@P2']
   }, async ({ page }) => {
     testLogger.info('Testing invalid regex syntax');
 
@@ -76,7 +76,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   });
 
   test("should handle duplicate pattern name and allow fixing", {
-    tag: ['@sdr', '@regexPatterns', '@negative']
+    tag: ['@sdr', '@regexPatterns', '@negative', '@P2']
   }, async ({ page }) => {
     const patternName = `duplicate_test_${testRunId}`;
     const fixedPatternName = `duplicate_test_fixed_${testRunId}`;
@@ -115,7 +115,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   });
 
   test("should cancel pattern creation", {
-    tag: ['@sdr', '@regexPatterns', '@negative']
+    tag: ['@sdr', '@regexPatterns', '@negative', '@P2']
   }, async ({ page }) => {
     testLogger.info('Testing cancel pattern creation');
 
@@ -136,13 +136,13 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   // ===== IMPORT FUNCTIONALITY =====
 
   test("should test import functionality with valid JSON file", {
-    tag: ['@sdr', '@import', '@all']
+    tag: ['@sdr', '@import', '@all', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing regex pattern import');
 
     await pm.sdrPatternsPage.navigateToRegexPatterns();
 
-    const importFilePath = path.resolve(__dirname, '../../../../test-data/regex_patterns_import.json');
+    const importFilePath = path.resolve(__dirname, '../../../test-data/regex_patterns_import.json');
     const imported = await pm.sdrPatternsPage.importPatternsFromFile(importFilePath);
     expect(imported, 'Import should complete successfully (dialog should close)').toBeTruthy();
     testLogger.info('Import completed, verifying imported patterns');

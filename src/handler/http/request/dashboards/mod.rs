@@ -34,11 +34,18 @@ use crate::{
         },
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::dashboards::{self, DashboardError},
+    service::{
+        dashboards::{self, DashboardError},
+        db::dashboards as dashboards_db,
+    },
 };
 
 pub mod reports;
 pub mod timed_annotations;
+
+async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
+    dashboards_db::dashboard_in_org(org_id, dashboard_id).await
+}
 
 impl From<DashboardError> for Response {
     fn from(value: DashboardError) -> Self {
@@ -184,6 +191,9 @@ pub async fn update_dashboard(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<DashboardRequestBody>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
@@ -274,6 +284,9 @@ pub async fn list_dashboards(
     )
 )]
 pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
@@ -311,6 +324,9 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
     )
 )]
 pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     match dashboards::delete_dashboard(&org_id, &dashboard_id).await {
         Ok(()) => MetaHttpResponse::ok("Dashboard deleted"),
         Err(err) => err.into(),
@@ -356,6 +372,10 @@ pub async fn delete_dashboard_bulk(
 ) -> Response {
     let _user_id = user_email.user_id;
     let _folder_id = crate::common::utils::http::get_folder(&query);
+
+    if !dashboards_db::all_dashboards_in_org(&org_id, &req.ids).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
@@ -436,6 +456,9 @@ pub async fn move_dashboard(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<MoveDashboardRequestBody>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     // For this endpoint, openfga check is already done in the middleware
     match dashboards::move_dashboard(
         &org_id,
@@ -482,6 +505,9 @@ pub async fn move_dashboards(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<MoveDashboardsRequestBody>,
 ) -> Response {
+    if !dashboards_db::all_dashboards_in_org(&org_id, &req_body.dashboard_ids).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     // For this endpoint, openfga check is needed here, as we don't do openfga check in the
     // middleware for this api endpoint, because it includes a batch of dashboards
     match dashboards::move_dashboards(
@@ -540,6 +566,9 @@ pub async fn add_panel(
     Query(query): Query<HashMap<String, String>>,
     axum::Json(req_body): axum::Json<PanelRequestBody>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),
@@ -603,6 +632,9 @@ pub async fn update_panel(
     Query(query): Query<HashMap<String, String>>,
     axum::Json(req_body): axum::Json<PanelRequestBody>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),
@@ -666,6 +698,9 @@ pub async fn delete_panel(
     Path((org_id, dashboard_id, panel_id)): Path<(String, String, String)>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("Dashboard not found");
+    }
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),

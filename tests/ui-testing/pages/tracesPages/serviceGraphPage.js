@@ -24,13 +24,15 @@ export class ServiceGraphPage {
     this.searchInput = 'input[placeholder="Search Services"]';
 
     // ===== NODE DETAIL PANEL (ServiceGraphNodeSidePanel.vue) =====
+    // ODrawer forwards data-test to <DialogContent> — panel root is [data-test="service-graph-side-panel"].
+    // Close button: ODrawer renders it as [data-test="o-drawer-close-btn"] inside the panel.
+    // Title: Reka UI DialogTitle renders as an <h2> (sr-only) — accessible via locator('h2').
     this.sidePanel = '[data-test="service-graph-side-panel"]';
-    this.sidePanelHeader = '[data-test="service-graph-side-panel-header"]';
-    this.sidePanelServiceName = '[data-test="service-graph-side-panel-service-name"]';
+    this.sidePanelHeader = '[data-test="service-graph-side-panel"]';
     this.sidePanelViewRelatedBtn = '[data-test="service-graph-node-panel-view-related-btn"]';
     this.sidePanelViewRelatedLogsBtn = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
     this.sidePanelViewRelatedTracesBtn = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
-    this.sidePanelCloseBtn = '[data-test="service-graph-side-panel-close-btn"]';
+    this.sidePanelCloseBtn = '[data-test="service-graph-side-panel"] [data-test="o-drawer-close-btn"]';
 
     // RED charts section (Rate/Errors/Duration dashboards)
     this.sidePanelRedCharts = '[data-test="service-graph-side-panel-red-charts"]';
@@ -49,6 +51,14 @@ export class ServiceGraphPage {
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
     this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
     this.podsTable = '[data-test="service-graph-side-panel-pods-table"]';
+
+    // ===== TELEMETRY CORRELATION (Metrics tab) =====
+    this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
+    this.metricsPanel = '[data-test="service-graph-side-panel-metrics"]';
+    this.metricsLoadingIndicator = '[data-test="service-graph-side-panel-metrics-loading"]';
+    this.metricsDashboard = '[data-test="service-graph-side-panel-metrics-dashboard"]';
+    this.metricsError = '[data-test="service-graph-side-panel-metrics-error"]';
+    this.metricsEmpty = '[data-test="service-graph-side-panel-metrics-empty"]';
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
@@ -98,26 +108,31 @@ export class ServiceGraphPage {
     await this.page.locator(this.refreshButton).click();
   }
 
+  async waitForGraphReload() {
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  }
+
   async switchToGraphView() {
     await this.page.locator(this.graphViewTab).click();
-    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-    await expect(this.page.locator(`${this.graphViewTab} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    // OToggleGroupItem uses inheritAttrs:false + v-bind="$attrs" on the inner Reka UI <button>,
+    // so data-test and data-state land on the SAME element. Use compound selector (no space).
+    await expect(this.page.locator(`${this.graphViewTab}[data-state="on"]`)).toBeVisible({ timeout: 5000 });
   }
 
   async switchToTreeView() {
     await this.page.locator(this.treeViewTab).click();
-    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-    await expect(this.page.locator(`${this.treeViewTab} [data-state]`)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    // Same OToggleGroupItem pattern — compound selector, no space between data-test and data-state.
+    await expect(this.page.locator(`${this.treeViewTab}[data-state="on"]`)).toBeVisible({ timeout: 5000 });
   }
 
   async getActiveViewTab() {
-    // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-    const treeSelected = await this.page.locator(`${this.treeViewTab} [data-state]`)
-      .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
+    // OToggleGroupItem: data-test and data-state are on the same element — use compound selector.
+    const treeSelected = await this.page.locator(`${this.treeViewTab}[data-state="on"]`)
+      .isVisible({ timeout: 1000 }).catch(() => false);
     if (treeSelected) return 'Tree View';
 
-    const graphSelected = await this.page.locator(`${this.graphViewTab} [data-state]`)
-      .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
+    const graphSelected = await this.page.locator(`${this.graphViewTab}[data-state="on"]`)
+      .isVisible({ timeout: 1000 }).catch(() => false);
     if (graphSelected) return 'Graph View';
 
     return 'Unknown';
@@ -288,12 +303,15 @@ export class ServiceGraphPage {
   }
 
   async getSidePanelServiceName() {
-    return await this.page.locator(this.sidePanelServiceName).textContent();
+    // ODrawer renders the :title prop via Reka UI's <DialogTitle> (an <h2>) —
+    // also visible as a styled <span> in the header. The <h2> is sr-only but
+    // still has textContent. Scope to panel to avoid picking up other headings.
+    return await this.page.locator(this.sidePanel).locator('h2').first().textContent();
   }
 
   async getHealthStatus() {
-    const nameEl = this.page.locator(this.sidePanelServiceName);
-    const badge = nameEl.locator('.health-badge');
+    // .health-badge is a plain CSS class on a <span> in the ODrawer #header-right slot
+    const badge = this.page.locator(`${this.sidePanel} .health-badge`);
     const badgeExists = await badge.count() > 0;
     if (!badgeExists) return 'unknown';
     const classes = await badge.getAttribute('class') || '';
@@ -347,34 +365,31 @@ export class ServiceGraphPage {
    * Returns true if metrics dashboard rendered, false if error/empty state shown.
    */
   async clickMetricsTabAndWait() {
-    const metricsTab = this.page.locator('[data-test="service-graph-node-panel-tab-metrics"]');
-    await metricsTab.click();
+    await this.page.locator(this.metricsTab).click();
 
     // Wait for loading spinner to appear and disappear
-    const metricsPanel = this.page.locator('[data-test="service-graph-side-panel-metrics"]');
-    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await metricsPanel.locator('[data-test="service-graph-side-panel-metrics-loading"]').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    const panel = this.page.locator(this.metricsPanel);
+    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
 
     // Check if the metrics dashboard rendered
-    const dashboardVisible = await this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')
+    return await this.page.locator(this.metricsDashboard)
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
-
-    return dashboardVisible;
   }
 
   async expectMetricsDashboardVisible() {
-    await expect(this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator(this.metricsDashboard)).toBeVisible({ timeout: 5000 });
   }
 
   async isMetricsErrorVisible() {
-    return await this.page.locator('[data-test="service-graph-side-panel-metrics-error"]')
+    return await this.page.locator(this.metricsError)
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
   async isMetricsEmptyVisible() {
-    return await this.page.locator('[data-test="service-graph-side-panel-metrics-empty"]')
+    return await this.page.locator(this.metricsEmpty)
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
