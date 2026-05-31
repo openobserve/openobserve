@@ -21,6 +21,10 @@ dependencies = [
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
+    # Phase 5: schemathesis runs OpenAPI-spec-driven fuzz tests in its own
+    # CI job (api_fuzz_tests). Looks for 5xx panics across the 150 endpoints
+    # OO exposes at /api-doc/openapi.json.
+    "schemathesis>=3.27",
 ]
 
 [build-system]

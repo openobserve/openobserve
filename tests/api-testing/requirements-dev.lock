@@ -12,16 +12,56 @@
 -e file:.
 absl-py==2.1.0
     # via tink
+anyio==4.13.0
+    # via httpx
+    # via starlette
+attrs==26.1.0
+    # via jsonschema
+    # via referencing
 certifi==2023.11.17
+    # via httpcore
+    # via httpx
     # via requests
 charset-normalizer==3.3.2
     # via requests
+click==8.4.1
+    # via schemathesis
+graphql-core==3.2.8
+    # via hypothesis-graphql
+h11==0.16.0
+    # via httpcore
+harfile==0.5.0
+    # via schemathesis
+httpcore==1.0.9
+    # via httpx
+httpx==0.28.1
+    # via schemathesis
+hypothesis==6.155.1
+    # via hypothesis-graphql
+    # via hypothesis-jsonschema
+    # via schemathesis
+hypothesis-graphql==0.13.0
+    # via schemathesis
+hypothesis-jsonschema==0.23.1
+    # via schemathesis
 idna==3.6
+    # via anyio
+    # via httpx
     # via requests
 iniconfig==2.0.0
     # via pytest
+jsonschema==4.26.0
+    # via hypothesis-jsonschema
+jsonschema-rs==0.46.5
+    # via schemathesis
+jsonschema-specifications==2025.9.1
+    # via jsonschema
+junit-xml==1.9
+    # via schemathesis
 markdown-it-py==3.0.0
     # via rich
+markupsafe==3.0.3
+    # via werkzeug
 mdurl==0.1.2
     # via markdown-it-py
 packaging==23.2
@@ -33,27 +73,61 @@ protobuf==4.25.6
     # via pytest-openobserve
     # via tink
 pygments==2.17.2
+    # via pytest
     # via rich
-pytest==8.3.4
+pyrate-limiter==4.1.0
+    # via schemathesis
+pytest==9.0.3
     # via pytest-openobserve
     # via pytest-order
     # via pytest-pretty
     # via pytest-sugar
+    # via schemathesis
 pytest-order==1.3.0
     # via pytest-openobserve
 pytest-pretty==1.2.0
     # via pytest-openobserve
 pytest-sugar==0.9.7
     # via pytest-openobserve
+pyyaml==6.0.3
+    # via schemathesis
+referencing==0.37.0
+    # via jsonschema
+    # via jsonschema-specifications
 requests==2.31.0
     # via pytest-openobserve
-rich==13.7.0
+    # via schemathesis
+    # via starlette-testclient
+rich==15.0.0
     # via pytest-pretty
+    # via schemathesis
+rpds-py==2026.5.1
+    # via jsonschema
+    # via referencing
 ruff==0.9.4
     # via pytest-openobserve
+schemathesis==4.20.3
+    # via pytest-openobserve
+six==1.17.0
+    # via junit-xml
+sortedcontainers==2.4.0
+    # via hypothesis
+starlette==1.2.1
+    # via starlette-testclient
+starlette-testclient==0.4.1
+    # via schemathesis
+tenacity==9.1.4
+    # via schemathesis
 termcolor==2.3.0
     # via pytest-sugar
 tink==1.10.0
     # via pytest-openobserve
+typing-extensions==4.15.0
+    # via anyio
+    # via referencing
+    # via schemathesis
+    # via starlette
 urllib3==2.1.0
     # via requests
+werkzeug==3.1.8
+    # via schemathesis

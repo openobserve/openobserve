@@ -212,6 +212,105 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # Phase 5: schemathesis fuzz job — informational (continue-on-error),
+  # surfaces 5xx panics across the 150 OpenAPI endpoints. Decoupled from
+  # api_integration_tests so its findings don't block merges yet; teams
+  # can promote it to blocking after the noise floor is understood.
+  api_fuzz_tests:
+    name: api_fuzz_tests
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    continue-on-error: true
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-11-11
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false  # don't write cache from this job (the main job does)
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync (schemathesis dep installed)
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Start OpenObserve
+        run: target/debug/openobserve > o2_fuzz.log 2>&1 &
+
+      - name: Wait for /healthz
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Run schemathesis fuzz tests
+        # `--checks not_a_server_error` focuses on 5xx panics (the most
+        # actionable category — actual backend bugs vs spec-compliance
+        # nits). `--hypothesis-max-examples 20` keeps the run time bounded.
+        # Tags `--data-generation-method positive` to focus on realistic
+        # inputs; negative inputs (random bytes) will surface separately.
+        run: |
+          rye run schemathesis run \
+            --base-url http://localhost:5080 \
+            --auth "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
+            --auth-type basic \
+            --checks not_a_server_error \
+            --hypothesis-max-examples 20 \
+            --hypothesis-deadline 5000 \
+            --data-generation-method positive \
+            http://localhost:5080/api-doc/openapi.json
+        working-directory: tests/api-testing/
+
+      - name: Upload OpenObserve server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-fuzz-log
+          path: tests/api-testing/o2_fuzz.log
+          if-no-files-found: warn
+          retention-days: 14
+
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
