@@ -124,82 +124,22 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Run tests
+      - name: Run default-set tests
+        # Phase 6.b: regression matrix tests moved to their own
+        # api_regression_tests job below — they now run in parallel
+        # with this default-set job instead of sequentially within it.
+        # Cuts ~8 min off CI wall time at the cost of more runner minutes.
         run: |
-          wait_for_server() {
-            for i in $(seq 1 60); do
-              if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
-                echo "Server ready after ${i}s"
-                return 0
-              fi
-              sleep 1
-            done
-            echo "Server failed to start in 60s"
-            return 1
-          }
-
-          echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=false ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false target/debug/openobserve > o2_utf8_false.log 2>&1 &
-          SERVER_PID_FALSE=$!
-          echo "OpenObserve PID for UTF8_VIEW=false: $SERVER_PID_FALSE"
-          wait_for_server
-
-          # Run regression tests with UTF8_VIEW=false
-          rye run pytest tests/regression/test_subquery_join_match.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_FALSE || true
-          sleep 5
-
-          echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=true ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true target/debug/openobserve > o2_utf8_true.log 2>&1 &
-          SERVER_PID_TRUE=$!
-          echo "OpenObserve PID for UTF8_VIEW=true: $SERVER_PID_TRUE"
-          wait_for_server
-
-          # Run regression tests with UTF8_VIEW=true
-          rye run pytest tests/regression/test_subquery_join_match.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_TRUE || true
-          sleep 5
-
-          echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true target/debug/openobserve > o2_join_match_one_true.log 2>&1 &
-          SERVER_PID_JOIN_TRUE=$!
-          echo "OpenObserve PID for JOIN_MATCH_ONE=true: $SERVER_PID_JOIN_TRUE"
-          wait_for_server
-
-          # Run logs-to-logs join tests with JOIN_MATCH_ONE=true
-          rye run pytest tests/regression/test_logs_to_logs_join.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_JOIN_TRUE || true
-          sleep 5
-
-          echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false target/debug/openobserve > o2_join_match_one_false.log 2>&1 &
-          SERVER_PID_JOIN_FALSE=$!
-          echo "OpenObserve PID for JOIN_MATCH_ONE=false: $SERVER_PID_JOIN_FALSE"
-          wait_for_server
-
-          # Run logs-to-logs join tests with JOIN_MATCH_ONE=false
-          rye run pytest tests/regression/test_logs_to_logs_join.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_JOIN_FALSE || true
-          sleep 5
-
-          echo "=== Running all other API tests with default settings ==="
           target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
-          echo "OpenObserve PID for other tests: $SERVER_PID_DEFAULT"
-          wait_for_server
-
-          # Run all other tests (excluding regression and feature flag tests)
+          echo "OpenObserve PID for default tests: $SERVER_PID_DEFAULT"
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
           rye run pytest --ignore=tests/regression --force-sugar
-
-          # Kill the server
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
 
@@ -209,6 +149,101 @@ jobs:
         with:
           name: openobserve-server-logs
           path: tests/api-testing/o2_*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Phase 6.b: regression matrix split. The 4 env-flag-sensitive test
+  # configurations now run as 4 parallel jobs instead of 4 sequential
+  # restarts in one job. Each job builds OO once and runs its single
+  # configured pytest target.
+  api_regression_tests:
+    name: "api_regression / ${{ matrix.config.label }}"
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - label: utf8_view_false
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
+            target: tests/regression/test_subquery_join_match.py
+          - label: utf8_view_true
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
+            target: tests/regression/test_subquery_join_match.py
+          - label: join_match_one_true
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true"
+            target: tests/regression/test_logs_to_logs_join.py
+          - label: join_match_one_false
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
+            target: tests/regression/test_logs_to_logs_join.py
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-11-11
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false  # main api_integration_tests job writes the cache
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11.6" }
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: "Run ${{ matrix.config.label }} regression test"
+        run: |
+          ${{ matrix.config.env }} target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          rye run pytest ${{ matrix.config.target }} --force-sugar -v
+          kill $SERVER_PID || true
+        working-directory: tests/api-testing/
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "openobserve-regression-${{ matrix.config.label }}-log"
+          path: "tests/api-testing/o2_${{ matrix.config.label }}.log"
           if-no-files-found: warn
           retention-days: 14
 
@@ -314,7 +349,7 @@ jobs:
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, api_integration_tests]
+    needs: [check_changes, api_integration_tests, api_regression_tests]
     if: always()
     steps:
       - name: Check test results
@@ -323,10 +358,13 @@ jobs:
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
             exit 1
           fi
-          if [ "${{ needs.api_integration_tests.result }}" == "success" ] || [ "${{ needs.api_integration_tests.result }}" == "skipped" ]; then
-            echo "API tests passed or skipped"
+          # Both api_integration_tests AND api_regression_tests must pass
+          # (or be skipped because there were no changes).
+          ok() { [ "$1" == "success" ] || [ "$1" == "skipped" ]; }
+          if ok "${{ needs.api_integration_tests.result }}" && ok "${{ needs.api_regression_tests.result }}"; then
+            echo "All API test jobs passed or skipped"
             exit 0
           else
-            echo "API tests failed"
+            echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
             exit 1
           fi
