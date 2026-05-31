@@ -145,7 +145,7 @@ jobs:
           wait_for_server
 
           # Run regression tests with UTF8_VIEW=false
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
+          rye run pytest tests/regression/test_subquery_join_match.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_FALSE || true
@@ -158,7 +158,7 @@ jobs:
           wait_for_server
 
           # Run regression tests with UTF8_VIEW=true
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
+          rye run pytest tests/regression/test_subquery_join_match.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_TRUE || true
@@ -171,7 +171,7 @@ jobs:
           wait_for_server
 
           # Run logs-to-logs join tests with JOIN_MATCH_ONE=true
-          rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
+          rye run pytest tests/regression/test_logs_to_logs_join.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_JOIN_TRUE || true
@@ -184,7 +184,7 @@ jobs:
           wait_for_server
 
           # Run logs-to-logs join tests with JOIN_MATCH_ONE=false
-          rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
+          rye run pytest tests/regression/test_logs_to_logs_join.py --force-sugar -v
 
           # Kill the server
           kill $SERVER_PID_JOIN_FALSE || true
@@ -197,11 +197,20 @@ jobs:
           wait_for_server
 
           # Run all other tests (excluding regression and feature flag tests)
-          rye run pytest --ignore=tests/test_subquery_join_match.py --ignore=tests/test_logs_to_logs_join.py --force-sugar
+          rye run pytest --ignore=tests/regression --force-sugar
 
           # Kill the server
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
+
+      - name: Upload OpenObserve server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-server-logs
+          path: tests/api-testing/o2_*.log
+          if-no-files-found: warn
+          retention-days: 14
 
   api_tests_summary:
     runs-on: ubuntu-latest
