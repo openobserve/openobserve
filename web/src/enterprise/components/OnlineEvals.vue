@@ -49,7 +49,6 @@ the Free Software Foundation, either version 3 of the License, or
             type="button"
             @click="activeTab = tab.value"
           >
-            <OIcon :name="tab.icon" size="xs" />
             <span>{{ tab.label }}</span>
             <strong>{{ tab.count }}</strong>
           </button>
@@ -115,7 +114,6 @@ import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type EvalJob,
@@ -198,9 +196,9 @@ const filteredRows = computed(() => {
 });
 
 const tabs = computed(() => [
-  { value: "jobs" as ActiveTab, label: t("onlineEvals.tabs.jobs"), icon: "rule", count: jobs.value.length },
-  { value: "scorers" as ActiveTab, label: t("onlineEvals.tabs.scorers"), icon: "grading", count: scorers.value.length },
-  { value: "scoreConfigs" as ActiveTab, label: t("onlineEvals.tabs.scoreConfigs"), icon: "fact-check", count: scoreConfigs.value.length },
+  { value: "jobs" as ActiveTab, label: t("onlineEvals.tabs.jobs"), count: jobs.value.length },
+  { value: "scorers" as ActiveTab, label: t("onlineEvals.tabs.scorers"), count: scorers.value.length },
+  { value: "scoreConfigs" as ActiveTab, label: t("onlineEvals.tabs.scoreConfigs"), count: scoreConfigs.value.length },
 ]);
 
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
