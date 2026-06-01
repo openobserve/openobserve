@@ -3429,10 +3429,14 @@ export default defineComponent({
       } else {
         this.searchObj.meta.sqlMode = false;
 
-        // IMPORTANT: Don't clear query when switching from SQL mode to NLP mode
-        // User may want to refine/fix their existing SQL query using AI
-        // Only clear when not in NLP mode (i.e., switching to Quick mode or other modes)
-        if (!this.searchObj.meta.nlpMode) {
+        if (this.searchObj.meta.sqlModeEditTransition) {
+          // Mode turned off because user edited away the SELECT prefix — keep
+          // whatever they typed so it becomes a filter expression in non-SQL mode.
+          this.searchObj.meta.sqlModeEditTransition = false;
+        } else if (!this.searchObj.meta.nlpMode) {
+          // IMPORTANT: Don't clear query when switching from SQL mode to NLP mode
+          // User may want to refine/fix their existing SQL query using AI
+          // Only clear when not in NLP mode (i.e., switching to Quick mode or other modes)
           this.searchObj.data.query = "";
           this.searchObj.data.editorValue = "";
         }

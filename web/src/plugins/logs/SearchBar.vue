@@ -2238,8 +2238,11 @@ export default defineComponent({
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
 
-      // Turn off SQL mode when the query no longer looks like SQL
+      // Turn off SQL mode when the query no longer looks like SQL.
+      // Set sqlModeEditTransition so the watcher in Index.vue preserves the
+      // remaining query text instead of clearing the editor.
       if (!isSqlQuery(value) && searchObj.meta.sqlMode === true) {
+        searchObj.meta.sqlModeEditTransition = true;
         searchObj.meta.sqlMode = false;
       }
 
