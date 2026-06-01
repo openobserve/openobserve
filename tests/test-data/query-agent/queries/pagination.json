@@ -1,69 +1,68 @@
 {
   "queries": [
     {
-      "id": "Q044",
-      "sql": "SELECT _timestamp, level, method, took FROM \"query_agent_test\" ORDER BY _timestamp DESC LIMIT 5 OFFSET 3",
+      "id": "Q103",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, throughput_rate FROM \"query_agent_test\" ORDER BY throughput_rate DESC LIMIT 8 OFFSET 4",
       "category": "pagination",
       "time_range": {
-        "start": 1780143821086521,
-        "end": 1780144001086521
+        "start": 1780314117000000,
+        "end": 1780314285000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 6,
         "columns": [
           "_timestamp",
-          "level",
-          "method",
-          "took"
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate"
         ],
-        "note": "LIMIT 5 OFFSET 3 \u2014 skips first 3 rows in DESC order"
+        "note": "LIMIT 8 OFFSET 4 \u2014 skips first 4 rows in DESC throughput order"
       }
     },
     {
-      "id": "Q045",
-      "sql": "SELECT level, code, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY level, code ORDER BY cnt DESC LIMIT 6 OFFSET 2",
+      "id": "Q104",
+      "sql": "SELECT sorter_model, operation_mode, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY sorter_model, operation_mode ORDER BY cnt DESC LIMIT 6 OFFSET 2",
       "category": "pagination",
       "time_range": {
-        "start": 1780144121086521,
-        "end": 1780144301086521
+        "start": 1780314177000000,
+        "end": 1780314345000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
-          "level",
-          "code",
+          "sorter_model",
+          "operation_mode",
           "cnt"
         ],
         "note": "GROUP BY with LIMIT/OFFSET pagination on aggregates"
       }
     },
     {
-      "id": "Q046",
-      "sql": "WITH numbered AS (  SELECT _timestamp, level, method, took,   ROW_NUMBER() OVER (ORDER BY took DESC) AS row_num   FROM \"query_agent_test\" WHERE took IS NOT NULL) SELECT _timestamp, level, method, took, row_num FROM numbered WHERE row_num BETWEEN 4 AND 8 ORDER BY row_num",
+      "id": "Q105",
+      "sql": "WITH numbered AS (SELECT _timestamp, sorter_model, throughput_rate, ROW_NUMBER() OVER (ORDER BY throughput_rate DESC) AS row_num FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL) SELECT _timestamp, sorter_model, throughput_rate, row_num FROM numbered WHERE row_num BETWEEN 5 AND 10 ORDER BY row_num",
       "category": "pagination",
       "time_range": {
-        "start": 1780144421086521,
-        "end": 1780144601086521
+        "start": 1780314237000000,
+        "end": 1780314405000000
       },
       "expected": {
         "row_count": null,
         "columns": [
           "_timestamp",
-          "level",
-          "method",
-          "took",
+          "sorter_model",
+          "throughput_rate",
           "row_num"
         ],
-        "note": "CTE with ROW_NUMBER for pagination; rows 4-8"
+        "note": "CTE with ROW_NUMBER for pagination; rows 5-10"
       }
     },
     {
-      "id": "Q143",
-      "sql": "WITH reference AS (SELECT _timestamp FROM \"query_agent_test\" ORDER BY _timestamp ASC LIMIT 1 OFFSET 5)\nSELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate\nFROM \"query_agent_test\"\nWHERE _timestamp > (SELECT _timestamp FROM reference)\nORDER BY _timestamp ASC, pallet_id ASC\nLIMIT 8",
+      "id": "Q106",
+      "sql": "WITH reference AS (SELECT _timestamp FROM \"query_agent_test\" ORDER BY _timestamp ASC LIMIT 1 OFFSET 5) SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate FROM \"query_agent_test\" WHERE _timestamp > (SELECT _timestamp FROM reference) ORDER BY _timestamp ASC LIMIT 8",
       "category": "pagination",
       "time_range": {
-        "start": 1780313520000000,
-        "end": 1780313682000000
+        "start": 1780314297000000,
+        "end": 1780314465000000
       },
       "expected": {
         "row_count": null,
@@ -74,16 +73,16 @@
           "sorter_model",
           "throughput_rate"
         ],
-        "note": "Keyset pagination using row-value comparison (> subquery with OFFSET)"
+        "note": "Keyset pagination using subquery with OFFSET as reference"
       }
     },
     {
-      "id": "Q144",
-      "sql": "\nWITH page AS (SELECT _timestamp, pallet_id, control_center, load_factor, throughput_rate, ROW_NUMBER() OVER (ORDER BY throughput_rate DESC, _timestamp ASC) AS row_idx FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL)\nSELECT * FROM page WHERE row_idx > 6 AND row_idx <= 14\nORDER BY row_idx ASC\n",
+      "id": "Q107",
+      "sql": "WITH page AS (SELECT _timestamp, pallet_id, control_center, load_factor, throughput_rate, ROW_NUMBER() OVER (ORDER BY throughput_rate DESC, _timestamp ASC) AS row_idx FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL) SELECT * FROM page WHERE row_idx > 6 AND row_idx <= 14 ORDER BY row_idx ASC",
       "category": "pagination",
       "time_range": {
-        "start": 1780313580000000,
-        "end": 1780313742000000
+        "start": 1780314357000000,
+        "end": 1780314525000000
       },
       "expected": {
         "row_count": null,
@@ -95,19 +94,19 @@
           "throughput_rate",
           "row_idx"
         ],
-        "note": "CTE with ROW_NUMBER for page 2 (rows 7-14) ordered by throughput DESC"
+        "note": "CTE with ROW_NUMBER for page 2 (rows 7-14)"
       }
     },
     {
-      "id": "Q145",
-      "sql": "\nSELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput\nFROM \"query_agent_test\"\nGROUP BY facility_zone, operation_mode\nORDER BY cnt DESC, avg_tput DESC\nLIMIT 6 OFFSET 3\n",
+      "id": "Q108",
+      "sql": "SELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode ORDER BY cnt DESC, avg_tput DESC LIMIT 6 OFFSET 3",
       "category": "pagination",
       "time_range": {
-        "start": 1780313640000000,
-        "end": 1780313802000000
+        "start": 1780314417000000,
+        "end": 1780314585000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 3,
         "columns": [
           "facility_zone",
           "operation_mode",
@@ -118,12 +117,12 @@
       }
     },
     {
-      "id": "Q146",
-      "sql": "\nWITH zoned AS (SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL)\nSELECT * FROM zoned WHERE rn BETWEEN 2 AND 4\nORDER BY facility_zone ASC, rn ASC\n",
+      "id": "Q109",
+      "sql": "WITH zoned AS (SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL) SELECT * FROM zoned WHERE rn BETWEEN 2 AND 4 ORDER BY facility_zone ASC, rn ASC",
       "category": "pagination",
       "time_range": {
-        "start": 1780313700000000,
-        "end": 1780313862000000
+        "start": 1780314477000000,
+        "end": 1780314645000000
       },
       "expected": {
         "row_count": null,
@@ -138,15 +137,15 @@
       }
     },
     {
-      "id": "Q147",
-      "sql": "\nSELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining\nFROM \"query_agent_test\"\nWHERE load_factor IS NOT NULL\nORDER BY load_factor DESC, charge_remaining ASC\nLIMIT 7 OFFSET 7\n",
+      "id": "Q110",
+      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining FROM \"query_agent_test\" WHERE load_factor IS NOT NULL ORDER BY load_factor DESC, charge_remaining ASC LIMIT 7 OFFSET 7",
       "category": "pagination",
       "time_range": {
-        "start": 1780313760000000,
-        "end": 1780313922000000
+        "start": 1780314537000000,
+        "end": 1780314705000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 3,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -154,16 +153,16 @@
           "load_factor",
           "charge_remaining"
         ],
-        "note": "Second page (OFFSET 7, LIMIT 7) with dual ORDER BY (DESC + ASC)"
+        "note": "Second page (OFFSET 7, LIMIT 7) with dual ORDER BY"
       }
     },
     {
-      "id": "Q148",
-      "sql": "\nWITH inner_page AS (SELECT _timestamp, pallet_id, facility_zone, cell_temp, RANK() OVER (ORDER BY cell_temp DESC) AS temp_rank FROM \"query_agent_test\" WHERE cell_temp IS NOT NULL)\nSELECT * FROM inner_page WHERE temp_rank <= 8\nUNION ALL\nSELECT _timestamp, pallet_id, facility_zone, cell_temp, RANK() OVER (ORDER BY cell_temp ASC) AS temp_rank FROM \"query_agent_test\" WHERE cell_temp IS NOT NULL\nORDER BY temp_rank ASC\nLIMIT 16\n",
+      "id": "Q111",
+      "sql": "WITH inner_page AS (SELECT _timestamp, pallet_id, facility_zone, cell_temp, RANK() OVER (ORDER BY cell_temp DESC) AS temp_rank FROM \"query_agent_test\" WHERE cell_temp IS NOT NULL) SELECT * FROM inner_page WHERE temp_rank <= 8 UNION ALL SELECT _timestamp, pallet_id, facility_zone, cell_temp, RANK() OVER (ORDER BY cell_temp ASC) AS temp_rank FROM \"query_agent_test\" WHERE cell_temp IS NOT NULL ORDER BY temp_rank ASC LIMIT 16",
       "category": "pagination",
       "time_range": {
-        "start": 1780313820000000,
-        "end": 1780313982000000
+        "start": 1780314597000000,
+        "end": 1780314765000000
       },
       "expected": {
         "row_count": null,
@@ -174,16 +173,16 @@
           "cell_temp",
           "temp_rank"
         ],
-        "note": "Top-8 hottest + coldest via UNION of two RANK windows with LIMIT 16 total"
+        "note": "Top-8 hottest + coldest via UNION of two RANK windows with LIMIT 16"
       }
     },
     {
-      "id": "Q149",
-      "sql": "\nWITH dense_ranked AS (SELECT *, DENSE_RANK() OVER (ORDER BY throughput_rate DESC) AS dr FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL),\ndistinct_page AS (SELECT MIN(_timestamp) AS _timestamp, throughput_rate, dr FROM dense_ranked GROUP BY throughput_rate, dr)\nSELECT * FROM distinct_page WHERE dr > 3 AND dr <= 8\nORDER BY dr ASC\n",
+      "id": "Q112",
+      "sql": "WITH dense_ranked AS (SELECT *, DENSE_RANK() OVER (ORDER BY throughput_rate DESC) AS dr FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL), distinct_page AS (SELECT MIN(_timestamp) AS _timestamp, throughput_rate, dr FROM dense_ranked GROUP BY throughput_rate, dr) SELECT * FROM distinct_page WHERE dr > 3 AND dr <= 8 ORDER BY dr ASC",
       "category": "pagination",
       "time_range": {
-        "start": 1780313880000000,
-        "end": 1780314042000000
+        "start": 1780314657000000,
+        "end": 1780314825000000
       },
       "expected": {
         "row_count": null,
@@ -196,5 +195,5 @@
       }
     }
   ],
-  "last_query_id": 149
+  "last_query_id": 112
 }

@@ -1,65 +1,65 @@
 {
   "queries": [
     {
-      "id": "Q035",
-      "sql": "SELECT _timestamp, log, level FROM \"query_agent_test\" WHERE match_all('error') ORDER BY _timestamp DESC LIMIT 10",
+      "id": "Q074",
+      "sql": "SELECT _timestamp, log, facility_zone FROM \"query_agent_test\" WHERE match_all('warehouse') ORDER BY _timestamp DESC LIMIT 10",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780141121086521,
-        "end": 1780141301086521
+        "start": 1780312377000000,
+        "end": 1780312545000000
       },
       "expected": {
         "row_count": null,
         "columns": [
           "_timestamp",
           "log",
-          "level"
+          "facility_zone"
         ],
-        "note": "match_all full-text search for 'error'"
+        "note": "match_all full-text search for 'warehouse'"
       }
     },
     {
-      "id": "Q036",
-      "sql": "SELECT _timestamp, log, level FROM \"query_agent_test\" WHERE match_all('error') ORDER BY _timestamp ASC",
+      "id": "Q075",
+      "sql": "SELECT _timestamp, log, pallet_id FROM \"query_agent_test\" WHERE match_all('event') ORDER BY _timestamp ASC",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780141421086521,
-        "end": 1780141601086521
+        "start": 1780312437000000,
+        "end": 1780312605000000
       },
       "expected": {
         "row_count": null,
         "columns": [
           "_timestamp",
           "log",
-          "level"
+          "pallet_id"
         ],
-        "note": "match_all('error') full-text search (case-insensitive in practice)"
+        "note": "match_all('event') full-text search (case-insensitive in practice)"
       }
     },
     {
-      "id": "Q037",
-      "sql": "SELECT level, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE match_all('test') AND code = 200 GROUP BY level ORDER BY level ASC",
+      "id": "Q076",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE match_all('record') AND throughput_rate > 200.0 GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780141721086521,
-        "end": 1780141901086521
+        "start": 1780312497000000,
+        "end": 1780312665000000
       },
       "expected": {
         "row_count": null,
         "columns": [
-          "level",
+          "facility_zone",
           "cnt"
         ],
-        "note": "match_all + field filter (code=200) + GROUP BY; 3 level groups"
+        "note": "match_all + field filter + GROUP BY"
       }
     },
     {
-      "id": "Q038",
-      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS match_count FROM \"query_agent_test\" WHERE match_all('request') GROUP BY _time ORDER BY _time ASC",
+      "id": "Q077",
+      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS match_count FROM \"query_agent_test\" WHERE match_all('warehouse') GROUP BY _time ORDER BY _time ASC",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780142021086521,
-        "end": 1780142201086521
+        "start": 1780312557000000,
+        "end": 1780312725000000
       },
       "expected": {
         "row_count": null,
@@ -71,12 +71,12 @@
       }
     },
     {
-      "id": "Q138",
-      "sql": "\nSELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor\nFROM \"query_agent_test\"\nWHERE match_all('warehouse') AND throughput_rate > 400.0 AND facility_zone IN ('ZONE-1', 'ZONE-2')\nORDER BY throughput_rate DESC\nLIMIT 10\n",
+      "id": "Q078",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor FROM \"query_agent_test\" WHERE match_all('warehouse') AND throughput_rate > 400.0 AND facility_zone IN ('ZONE-1', 'ZONE-2') ORDER BY throughput_rate DESC LIMIT 10",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780313220000000,
-        "end": 1780313382000000
+        "start": 1780312617000000,
+        "end": 1780312785000000
       },
       "expected": {
         "row_count": null,
@@ -88,16 +88,16 @@
           "throughput_rate",
           "load_factor"
         ],
-        "note": "match_all + numeric filter + IN clause, ordered by throughput"
+        "note": "match_all + numeric filter + IN clause"
       }
     },
     {
-      "id": "Q139",
-      "sql": "\nSELECT facility_zone, COUNT(*) AS match_cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load\nFROM \"query_agent_test\"\nWHERE match_all('event') AND operation_mode != 'manual'\nGROUP BY facility_zone\nHAVING COUNT(*) >= 1\nORDER BY match_cnt DESC\n",
+      "id": "Q079",
+      "sql": "SELECT facility_zone, COUNT(*) AS match_cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test\" WHERE match_all('event') AND operation_mode != 'manual' GROUP BY facility_zone HAVING COUNT(*) >= 1 ORDER BY match_cnt DESC",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780313280000000,
-        "end": 1780313442000000
+        "start": 1780312677000000,
+        "end": 1780312845000000
       },
       "expected": {
         "row_count": null,
@@ -111,12 +111,12 @@
       }
     },
     {
-      "id": "Q140",
-      "sql": "\nSELECT histogram(_timestamp, '1 minute') AS time_block, COUNT(*) FILTER (WHERE match_all('warehouse')) AS warehouse_hits, COUNT(*) AS total_events, ROUND(CAST(COUNT(*) FILTER (WHERE match_all('warehouse')) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS hit_rate_pct\nFROM \"query_agent_test\"\nGROUP BY time_block\nORDER BY time_block ASC\n",
+      "id": "Q080",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS time_block, COUNT(*) FILTER (WHERE match_all('warehouse')) AS warehouse_hits, COUNT(*) AS total_events, ROUND(CAST(COUNT(*) FILTER (WHERE match_all('warehouse')) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS hit_rate_pct FROM \"query_agent_test\" GROUP BY time_block ORDER BY time_block ASC",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780313340000000,
-        "end": 1780313502000000
+        "start": 1780312737000000,
+        "end": 1780312905000000
       },
       "expected": {
         "row_count": null,
@@ -126,16 +126,16 @@
           "total_events",
           "hit_rate_pct"
         ],
-        "note": "match_all FILTER in histogram with hit-rate percentage calculation"
+        "note": "match_all FILTER in histogram with hit-rate percentage"
       }
     },
     {
-      "id": "Q141",
-      "sql": "\nSELECT _timestamp, log, pallet_id, facility_zone, sorter_model, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp DESC) AS recency_rank\nFROM \"query_agent_test\"\nWHERE match_all('record')\nORDER BY facility_zone ASC, recency_rank ASC\n",
+      "id": "Q081",
+      "sql": "SELECT _timestamp, log, pallet_id, facility_zone, sorter_model, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp DESC) AS recency_rank FROM \"query_agent_test\" WHERE match_all('record') ORDER BY facility_zone ASC, recency_rank ASC",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780313400000000,
-        "end": 1780313562000000
+        "start": 1780312797000000,
+        "end": 1780312965000000
       },
       "expected": {
         "row_count": null,
@@ -147,16 +147,16 @@
           "sorter_model",
           "recency_rank"
         ],
-        "note": "match_all with ROW_NUMBER window partitioned by zone, recency ranking"
+        "note": "match_all with ROW_NUMBER window partitioned by zone for recency"
       }
     },
     {
-      "id": "Q142",
-      "sql": "\nSELECT 'primary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"query_agent_test\" WHERE match_all('warehouse') AND throughput_rate >= 500.0\nUNION ALL\nSELECT 'secondary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"query_agent_test\" WHERE match_all('event') AND throughput_rate < 500.0\nORDER BY source ASC, throughput_rate DESC\nLIMIT 15\n",
+      "id": "Q082",
+      "sql": "SELECT 'primary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"query_agent_test\" WHERE match_all('warehouse') AND throughput_rate >= 500.0 UNION ALL SELECT 'secondary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"query_agent_test\" WHERE match_all('event') AND throughput_rate < 500.0 ORDER BY source ASC, throughput_rate DESC LIMIT 15",
       "category": "full_text_search",
       "time_range": {
-        "start": 1780313460000000,
-        "end": 1780313622000000
+        "start": 1780312857000000,
+        "end": 1780313025000000
       },
       "expected": {
         "row_count": null,
@@ -167,9 +167,9 @@
           "facility_zone",
           "throughput_rate"
         ],
-        "note": "UNION ALL of two match_all queries with different thresholds, labeled by source"
+        "note": "UNION ALL of two match_all queries with different thresholds"
       }
     }
   ],
-  "last_query_id": 142
+  "last_query_id": 82
 }

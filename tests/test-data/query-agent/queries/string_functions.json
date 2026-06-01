@@ -1,30 +1,30 @@
 {
   "queries": [
     {
-      "id": "Q011",
-      "sql": "SELECT _timestamp, coalesce(kubernetes_namespace_name, 'unknown') AS ns, concat(method, ' - ', level) AS request_info FROM \"query_agent_test\" ORDER BY _timestamp ASC",
+      "id": "Q113",
+      "sql": "SELECT _timestamp, COALESCE(facility_zone, 'UNKNOWN_ZONE') AS safe_zone, CONCAT(sorter_model, ' @ ', control_center) AS sorter_op_label FROM \"query_agent_test\" ORDER BY _timestamp ASC LIMIT 12",
       "category": "string_functions",
       "time_range": {
-        "start": 1780133921086521,
-        "end": 1780134101086521
+        "start": 1780314717000000,
+        "end": 1780314885000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 10,
         "columns": [
           "_timestamp",
-          "ns",
-          "request_info"
+          "safe_zone",
+          "sorter_op_label"
         ],
-        "note": "2 null namespace -> 'unknown'"
+        "note": "COALESCE + CONCAT combining sorter and facility zone"
       }
     },
     {
-      "id": "Q013",
-      "sql": "SELECT _timestamp, re_match(log, 'error|test') AS matched, split_part(log, ' ', 1) AS first_word FROM \"query_agent_test\" WHERE log IS NOT NULL ORDER BY _timestamp DESC LIMIT 10",
+      "id": "Q114",
+      "sql": "SELECT _timestamp, re_match(log, 'warehouse|event') AS matched, split_part(log, ' ', 1) AS first_word FROM \"query_agent_test\" WHERE log IS NOT NULL ORDER BY _timestamp DESC LIMIT 12",
       "category": "string_functions",
       "time_range": {
-        "start": 1780134521086521,
-        "end": 1780134701086521
+        "start": 1780314777000000,
+        "end": 1780314945000000
       },
       "expected": {
         "row_count": null,
@@ -33,19 +33,19 @@
           "matched",
           "first_word"
         ],
-        "note": "LIMIT 10; re_match returns bool, split_part extracts first word"
+        "note": "re_match + split_part on log field"
       }
     },
     {
-      "id": "Q108",
-      "sql": "\nSELECT _timestamp, UPPER(pallet_id) AS pallet_upper, LOWER(conveyor_lane) AS lane_lower, CONCAT(sorter_model, '-', operation_mode) AS sorter_op, TRIM(COALESCE(build_signature, '')) AS clean_build, LENGTH(CONCAT(facility_zone, '-', control_center)) AS label_len\nFROM \"query_agent_test\"\nWHERE pallet_id IS NOT NULL\nORDER BY _timestamp DESC\nLIMIT 12\n",
+      "id": "Q115",
+      "sql": "SELECT _timestamp, UPPER(pallet_id) AS pallet_upper, LOWER(conveyor_lane) AS lane_lower, CONCAT(sorter_model, '-', operation_mode) AS sorter_op, TRIM(COALESCE(build_signature, '')) AS clean_build, LENGTH(CONCAT(facility_zone, '-', control_center)) AS label_len FROM \"query_agent_test\" WHERE pallet_id IS NOT NULL ORDER BY _timestamp DESC LIMIT 12",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311420000000,
-        "end": 1780311582000000
+        "start": 1780314837000000,
+        "end": 1780315005000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "pallet_upper",
@@ -58,12 +58,12 @@
       }
     },
     {
-      "id": "Q109",
-      "sql": "\nSELECT _timestamp, pallet_id, re_match(pallet_id, 'PL-00[1-4]') AS is_front_pallet, split_part(pallet_id, '-', 1) AS prefix, split_part(pallet_id, '-', 2) AS suffix_num\nFROM \"query_agent_test\"\nWHERE re_match(pallet_id, 'PL-00[1-8]') = TRUE\nORDER BY suffix_num ASC\n",
+      "id": "Q116",
+      "sql": "SELECT _timestamp, pallet_id, re_match(pallet_id, 'PL-00[1-4]') AS is_front_pallet, split_part(pallet_id, '-', 1) AS prefix, split_part(pallet_id, '-', 2) AS suffix_num FROM \"query_agent_test\" WHERE re_match(pallet_id, 'PL-00[1-8]') = TRUE ORDER BY suffix_num ASC",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311480000000,
-        "end": 1780311642000000
+        "start": 1780314897000000,
+        "end": 1780315065000000
       },
       "expected": {
         "row_count": null,
@@ -78,12 +78,12 @@
       }
     },
     {
-      "id": "Q110",
-      "sql": "\nSELECT control_center, STRING_AGG(DISTINCT sorter_model, ' | ' ORDER BY sorter_model ASC) AS sorter_models, STRING_AGG(DISTINCT operation_mode, ', ') AS op_modes, COUNT(*) AS event_cnt\nFROM \"query_agent_test\"\nWHERE control_center IS NOT NULL\nGROUP BY control_center\nHAVING COUNT(*) >= 2\nORDER BY event_cnt DESC\n",
+      "id": "Q117",
+      "sql": "SELECT control_center, STRING_AGG(DISTINCT sorter_model, ' | ' ORDER BY sorter_model ASC) AS sorter_models, STRING_AGG(DISTINCT operation_mode, ', ') AS op_modes, COUNT(*) AS event_cnt FROM \"query_agent_test\" WHERE control_center IS NOT NULL GROUP BY control_center HAVING COUNT(*) >= 2 ORDER BY event_cnt DESC",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311540000000,
-        "end": 1780311702000000
+        "start": 1780314957000000,
+        "end": 1780315125000000
       },
       "expected": {
         "row_count": null,
@@ -97,15 +97,15 @@
       }
     },
     {
-      "id": "Q111",
-      "sql": "\nSELECT _timestamp, pallet_id, build_signature, SUBSTR(build_signature, 1, 8) AS build_prefix, SUBSTR(build_signature, 10, 2) AS build_suffix, REPLACE(build_signature, 'BS-', 'BUILD_') AS replaced_sig\nFROM \"query_agent_test\"\nWHERE build_signature LIKE 'BS-2026-%'\nORDER BY build_signature ASC, _timestamp ASC\n",
+      "id": "Q118",
+      "sql": "SELECT _timestamp, pallet_id, build_signature, SUBSTR(build_signature, 1, 8) AS build_prefix, SUBSTR(build_signature, 10, 2) AS build_suffix, REPLACE(build_signature, 'BS-', 'BUILD_') AS replaced_sig FROM \"query_agent_test\" WHERE build_signature LIKE 'BS-2026-%' ORDER BY build_signature ASC, _timestamp ASC",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311600000000,
-        "end": 1780311762000000
+        "start": 1780315017000000,
+        "end": 1780315185000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 8,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -114,16 +114,16 @@
           "build_suffix",
           "replaced_sig"
         ],
-        "note": "SUBSTR (two positions) + REPLACE + LIKE pattern filter on build_signature"
+        "note": "SUBSTR (two positions) + REPLACE + LIKE pattern filter"
       }
     },
     {
-      "id": "Q112",
-      "sql": "\nSELECT _timestamp, pallet_id, conveyor_lane, facility_zone, LOWER(CONCAT(SUBSTR(conveyor_lane, 1, 4), '-', SUBSTR(facility_zone, 5, 1))) AS short_code, CASE WHEN re_match(CONCAT(conveyor_lane, '-', facility_zone), 'LANE-[AB]-ZONE-[12]') THEN 'core' ELSE 'edge' END AS location_type\nFROM \"query_agent_test\"\nWHERE conveyor_lane IS NOT NULL AND facility_zone IS NOT NULL\nORDER BY location_type ASC, short_code ASC\n",
+      "id": "Q119",
+      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, facility_zone, LOWER(CONCAT(SUBSTR(conveyor_lane, 1, 4), '-', SUBSTR(facility_zone, 5, 1))) AS short_code, CASE WHEN re_match(CONCAT(conveyor_lane, '-', facility_zone), 'LANE-[AB]-ZONE-[12]') THEN 'core' ELSE 'edge' END AS location_type FROM \"query_agent_test\" WHERE conveyor_lane IS NOT NULL AND facility_zone IS NOT NULL ORDER BY location_type ASC, short_code ASC",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311660000000,
-        "end": 1780311822000000
+        "start": 1780315077000000,
+        "end": 1780315245000000
       },
       "expected": {
         "row_count": null,
@@ -139,15 +139,15 @@
       }
     },
     {
-      "id": "Q113",
-      "sql": "\nSELECT _timestamp, pallet_id, sorter_model, COALESCE(sorter_model, 'UNKNOWN_SORTER') AS safe_sorter, NULLIF(sorter_model, 'SORT-Q5') AS exclude_q5, COALESCE(NULLIF(sorter_model, 'SORT-Q5'), 'FILTERED') AS filtered_sorter\nFROM \"query_agent_test\"\nORDER BY _timestamp ASC\nLIMIT 12\n",
+      "id": "Q120",
+      "sql": "SELECT _timestamp, pallet_id, sorter_model, COALESCE(sorter_model, 'UNKNOWN_SORTER') AS safe_sorter, NULLIF(sorter_model, 'SORT-Q5') AS exclude_q5, COALESCE(NULLIF(sorter_model, 'SORT-Q5'), 'FILTERED') AS filtered_sorter FROM \"query_agent_test\" ORDER BY _timestamp ASC LIMIT 12",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311720000000,
-        "end": 1780311882000000
+        "start": 1780315137000000,
+        "end": 1780315305000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -156,16 +156,16 @@
           "exclude_q5",
           "filtered_sorter"
         ],
-        "note": "COALESCE + NULLIF + chained COALESCE(NULLIF(...)) for conditional replacement"
+        "note": "COALESCE + NULLIF + chained COALESCE(NULLIF(...))"
       }
     },
     {
-      "id": "Q114",
-      "sql": "\nSELECT _timestamp, log, pallet_id, re_match(log, 'warehouse|event') AS has_keyword, re_match(log, '[0-9]+') AS has_digit, LENGTH(log) AS msg_length, POSITION('record' IN log) AS record_pos\nFROM \"query_agent_test\"\nWHERE re_match(log, 'warehouse') = TRUE\nORDER BY msg_length DESC\nLIMIT 12\n",
+      "id": "Q121",
+      "sql": "SELECT _timestamp, log, pallet_id, re_match(log, 'warehouse|event') AS has_keyword, re_match(log, '[0-9]+') AS has_digit, LENGTH(log) AS msg_length, POSITION('record' IN log) AS record_pos FROM \"query_agent_test\" WHERE re_match(log, 'warehouse') = TRUE ORDER BY msg_length DESC LIMIT 12",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311780000000,
-        "end": 1780311942000000
+        "start": 1780315197000000,
+        "end": 1780315365000000
       },
       "expected": {
         "row_count": null,
@@ -182,12 +182,12 @@
       }
     },
     {
-      "id": "Q115",
-      "sql": "\nSELECT facility_zone, STRING_AGG(DISTINCT CONCAT(operation_mode, ':', CAST(ROUND(throughput_rate, 0) AS VARCHAR)), '; ' ORDER BY throughput_rate DESC) AS mode_tput_list, COUNT(DISTINCT operation_mode) AS distinct_modes\nFROM \"query_agent_test\"\nWHERE throughput_rate IS NOT NULL\nGROUP BY facility_zone\nORDER BY distinct_modes DESC\n",
+      "id": "Q122",
+      "sql": "SELECT facility_zone, STRING_AGG(DISTINCT CONCAT(operation_mode, ':', CAST(ROUND(throughput_rate, 0) AS VARCHAR)), '; ' ORDER BY throughput_rate DESC) AS mode_tput_list, COUNT(DISTINCT operation_mode) AS distinct_modes FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone ORDER BY distinct_modes DESC",
       "category": "string_functions",
       "time_range": {
-        "start": 1780311840000000,
-        "end": 1780312002000000
+        "start": 1780315257000000,
+        "end": 1780315425000000
       },
       "expected": {
         "row_count": null,
@@ -200,5 +200,5 @@
       }
     }
   ],
-  "last_query_id": 115
+  "last_query_id": 122
 }

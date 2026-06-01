@@ -1,122 +1,123 @@
 {
   "queries": [
     {
-      "id": "Q009",
-      "sql": "SELECT duration_range, COUNT(*) AS cnt, approx_percentile_cont(CAST(took AS FLOAT), 0.95) AS p95 FROM (SELECT CASE WHEN took < 50 THEN 'fast' WHEN took < 200 THEN 'medium' ELSE 'slow' END AS duration_range, took FROM \"query_agent_test\" WHERE took IS NOT NULL) GROUP BY duration_range ORDER BY duration_range ASC",
+      "id": "Q046",
+      "sql": "SELECT load_tier, COUNT(*) AS cnt, approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.95) AS p95_tput FROM (SELECT CASE WHEN load_factor < 30.0 THEN 'light' WHEN load_factor < 65.0 THEN 'moderate' ELSE 'heavy' END AS load_tier, throughput_rate FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL AND load_factor IS NOT NULL) sub GROUP BY load_tier ORDER BY load_tier ASC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780133321086521,
-        "end": 1780133501086521
+        "start": 1780310697000000,
+        "end": 1780310865000000
       },
       "expected": {
         "row_count": null,
         "columns": [
-          "duration_range",
+          "load_tier",
           "cnt",
-          "p95"
+          "p95_tput"
         ],
-        "note": "fast=4, medium=5, slow=3"
+        "note": "Subquery with CASE classification + approx_percentile_cont"
       }
     },
     {
-      "id": "Q026",
-      "sql": "WITH level_counts AS (  SELECT level, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY level), slow_requests AS (  SELECT level, COUNT(*) AS slow_cnt FROM \"query_agent_test\"   WHERE took > 100 GROUP BY level) SELECT lc.level, lc.cnt, COALESCE(sr.slow_cnt, 0) AS slow_cnt, ROUND(CAST(COALESCE(sr.slow_cnt, 0) AS FLOAT) / CAST(lc.cnt AS FLOAT) * 100.0, 2) AS slow_pct FROM level_counts lc LEFT JOIN slow_requests sr ON lc.level = sr.level ORDER BY lc.level ASC",
+      "id": "Q047",
+      "sql": "WITH total_counts AS (SELECT facility_zone, COUNT(*) AS total_events FROM \"query_agent_test\" GROUP BY facility_zone), auto_counts AS (SELECT facility_zone, COUNT(*) AS auto_events FROM \"query_agent_test\" WHERE operation_mode = 'auto' GROUP BY facility_zone) SELECT tc.facility_zone, tc.total_events, COALESCE(ac.auto_events, 0) AS auto_events, ROUND(CAST(COALESCE(ac.auto_events, 0) AS FLOAT) / CAST(tc.total_events AS FLOAT) * 100.0, 2) AS auto_pct FROM total_counts tc LEFT JOIN auto_counts ac ON tc.facility_zone = ac.facility_zone ORDER BY auto_pct DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780138421086521,
-        "end": 1780138601086521
+        "start": 1780310757000000,
+        "end": 1780310925000000
       },
       "expected": {
         "row_count": null,
         "columns": [
-          "level",
-          "cnt",
-          "slow_cnt",
-          "slow_pct"
+          "facility_zone",
+          "total_events",
+          "auto_events",
+          "auto_pct"
         ],
-        "note": "Two CTEs with LEFT JOIN; slow_pct = slow/cnt*100"
+        "note": "Two CTEs with LEFT JOIN for percentage computation"
       }
     },
     {
-      "id": "Q027",
-      "sql": "SELECT level, took FROM \"query_agent_test\" WHERE took > (SELECT AVG(took) FROM \"query_agent_test\" WHERE took IS NOT NULL) ORDER BY took DESC",
+      "id": "Q048",
+      "sql": "SELECT pallet_id, throughput_rate, load_factor FROM \"query_agent_test\" WHERE throughput_rate > (SELECT AVG(throughput_rate) FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL) ORDER BY throughput_rate DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780138721086521,
-        "end": 1780138901086521
+        "start": 1780310817000000,
+        "end": 1780310985000000
       },
       "expected": {
         "row_count": null,
         "columns": [
-          "level",
-          "took"
+          "pallet_id",
+          "throughput_rate",
+          "load_factor"
         ],
-        "note": "Subquery in WHERE with scalar aggregate; rows with above-avg took"
+        "note": "Subquery in WHERE with scalar aggregate; above-avg throughput rows"
       }
     },
     {
-      "id": "Q028",
-      "sql": "SELECT derived.level, derived.avg_took, derived.cnt FROM (  SELECT level, AVG(took) AS avg_took, COUNT(*) AS cnt   FROM \"query_agent_test\" WHERE took IS NOT NULL   GROUP BY level) AS derived WHERE derived.avg_took > 30 ORDER BY derived.avg_took DESC",
+      "id": "Q049",
+      "sql": "SELECT derived.facility_zone, derived.avg_tput, derived.cnt FROM (SELECT facility_zone, ROUND(AVG(throughput_rate), 2) AS avg_tput, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone) AS derived WHERE derived.avg_tput > 300.0 ORDER BY derived.avg_tput DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780139021086521,
-        "end": 1780139201086521
+        "start": 1780310877000000,
+        "end": 1780311045000000
       },
       "expected": {
         "row_count": null,
         "columns": [
-          "level",
-          "avg_took",
+          "facility_zone",
+          "avg_tput",
           "cnt"
         ],
         "note": "Derived table subquery in FROM with outer WHERE filter"
       }
     },
     {
-      "id": "Q029",
-      "sql": "SELECT _timestamp, level, took, (SELECT AVG(took) FROM \"query_agent_test\" t2  WHERE t2.level = t1.level AND t2.took IS NOT NULL) AS level_avg FROM \"query_agent_test\" t1 WHERE took IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "id": "Q050",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, (SELECT ROUND(AVG(throughput_rate), 2) FROM \"query_agent_test\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.throughput_rate IS NOT NULL) AS zone_avg FROM \"query_agent_test\" t1 WHERE throughput_rate IS NOT NULL ORDER BY _timestamp ASC LIMIT 12",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780139321086521,
-        "end": 1780139501086521
+        "start": 1780310937000000,
+        "end": 1780311105000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 10,
         "columns": [
           "_timestamp",
-          "level",
-          "took",
-          "level_avg"
+          "facility_zone",
+          "throughput_rate",
+          "zone_avg"
         ],
-        "note": "Correlated scalar subquery computing per-level average"
+        "note": "Correlated scalar subquery computing per-zone average"
       }
     },
     {
-      "id": "Q030",
-      "sql": "WITH ranked AS (  SELECT *, ROW_NUMBER() OVER (PARTITION BY level ORDER BY took DESC) AS rn   FROM \"query_agent_test\" WHERE took IS NOT NULL) SELECT _timestamp, level, took, rn FROM ranked WHERE rn <= 2 ORDER BY level, rn",
+      "id": "Q051",
+      "sql": "WITH ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY sorter_model ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL) SELECT _timestamp, sorter_model, throughput_rate, rn FROM ranked WHERE rn <= 2 ORDER BY sorter_model, rn",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780139621086521,
-        "end": 1780139801086521
+        "start": 1780310997000000,
+        "end": 1780311165000000
       },
       "expected": {
         "row_count": null,
         "columns": [
           "_timestamp",
-          "level",
-          "took",
+          "sorter_model",
+          "throughput_rate",
           "rn"
         ],
-        "note": "CTE with ROW_NUMBER to get top 2 per level"
+        "note": "CTE with ROW_NUMBER to get top 2 per sorter_model"
       }
     },
     {
-      "id": "Q097",
-      "sql": "\nWITH zone_stats AS (SELECT facility_zone, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(cell_temp), 2) AS avg_temp FROM \"query_agent_test\" GROUP BY facility_zone),\nmode_stats AS (SELECT facility_zone, operation_mode, COUNT(*) AS mode_cnt FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode),\nranked_modes AS (SELECT facility_zone, operation_mode, mode_cnt, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY mode_cnt DESC) AS rn FROM mode_stats)\nSELECT zs.facility_zone, zs.cnt, zs.avg_tput, zs.avg_temp, rm.operation_mode AS top_mode, rm.mode_cnt\nFROM zone_stats zs\nJOIN ranked_modes rm ON zs.facility_zone = rm.facility_zone AND rm.rn = 1\nORDER BY zs.avg_tput DESC\n",
+      "id": "Q052",
+      "sql": "WITH zone_stats AS (SELECT facility_zone, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(cell_temp), 2) AS avg_temp FROM \"query_agent_test\" GROUP BY facility_zone), mode_stats AS (SELECT facility_zone, operation_mode, COUNT(*) AS mode_cnt FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode), ranked_modes AS (SELECT facility_zone, operation_mode, mode_cnt, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY mode_cnt DESC) AS rn FROM mode_stats) SELECT zs.facility_zone, zs.cnt, zs.avg_tput, zs.avg_temp, rm.operation_mode AS top_mode, rm.mode_cnt FROM zone_stats zs JOIN ranked_modes rm ON zs.facility_zone = rm.facility_zone AND rm.rn = 1 ORDER BY zs.avg_tput DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780310760000000,
-        "end": 1780310922000000
+        "start": 1780311057000000,
+        "end": 1780311225000000
       },
       "expected": {
         "row_count": null,
@@ -128,16 +129,16 @@
           "top_mode",
           "mode_cnt"
         ],
-        "note": "3 CTEs: zone_stats + mode_stats + ranked_modes (window) \u2192 JOIN for top mode per zone"
+        "note": "3 CTEs: stats + mode_stats + ranked with JOIN for top mode per zone"
       }
     },
     {
-      "id": "Q098",
-      "sql": "WITH base AS (SELECT * FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL AND load_factor IS NOT NULL),\nstats AS (SELECT facility_zone, operation_mode, COUNT(*) AS n, ROUND(AVG(throughput_rate), 2) AS mu, ROUND(AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate), 2) AS var_tput FROM base GROUP BY facility_zone, operation_mode)\nSELECT b._timestamp, b.facility_zone, b.operation_mode, b.throughput_rate, s.mu, s.var_tput, ROUND((b.throughput_rate - s.mu) * (b.throughput_rate - s.mu) / NULLIF(s.var_tput, 0), 3) AS sq_dev_ratio\nFROM base b\nJOIN stats s ON b.facility_zone = s.facility_zone AND b.operation_mode = s.operation_mode\nWHERE s.var_tput > 0\nORDER BY sq_dev_ratio DESC\nLIMIT 15",
+      "id": "Q053",
+      "sql": "WITH base AS (SELECT * FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL AND load_factor IS NOT NULL), stats AS (SELECT facility_zone, operation_mode, COUNT(*) AS n, ROUND(AVG(throughput_rate), 2) AS mu, ROUND(AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate), 2) AS var_tput FROM base GROUP BY facility_zone, operation_mode) SELECT b._timestamp, b.facility_zone, b.operation_mode, b.throughput_rate, s.mu, s.var_tput, ROUND((b.throughput_rate - s.mu) * (b.throughput_rate - s.mu) / NULLIF(s.var_tput, 0), 3) AS sq_dev_ratio FROM base b JOIN stats s ON b.facility_zone = s.facility_zone AND b.operation_mode = s.operation_mode WHERE s.var_tput > 0 ORDER BY sq_dev_ratio DESC LIMIT 15",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780310820000000,
-        "end": 1780310982000000
+        "start": 1780311117000000,
+        "end": 1780311285000000
       },
       "expected": {
         "row_count": null,
@@ -150,16 +151,16 @@
           "var_tput",
           "sq_dev_ratio"
         ],
-        "note": "2 CTEs with statistical computation (z-score), JOIN on 2 columns, ABS ORDER"
+        "note": "2 CTEs with statistical computation (manual variance), JOIN on 2 columns"
       }
     },
     {
-      "id": "Q099",
-      "sql": "\nWITH ranked AS (SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL),\ntop3 AS (SELECT * FROM ranked WHERE rn <= 3),\nbottom3 AS (SELECT * FROM ranked WHERE rn > (SELECT MAX(rn) - 3 FROM ranked r2 WHERE r2.facility_zone = ranked.facility_zone))\nSELECT 'top' AS segment, facility_zone, pallet_id, throughput_rate, rn FROM top3\nUNION ALL\nSELECT 'bottom' AS segment, facility_zone, pallet_id, throughput_rate, rn FROM bottom3\nORDER BY facility_zone ASC, segment ASC, rn ASC\n",
+      "id": "Q054",
+      "sql": "WITH ranked AS (SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL), top3 AS (SELECT * FROM ranked WHERE rn <= 3) SELECT 'top' AS segment, facility_zone, pallet_id, throughput_rate, rn FROM top3 UNION ALL SELECT 'bottom' AS segment, ranked.facility_zone, ranked.pallet_id, ranked.throughput_rate, ranked.rn FROM ranked WHERE ranked.rn > (SELECT MAX(rn) - 3 FROM ranked r2 WHERE r2.facility_zone = ranked.facility_zone) ORDER BY facility_zone ASC, segment ASC, rn ASC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780310880000000,
-        "end": 1780311042000000
+        "start": 1780311177000000,
+        "end": 1780311345000000
       },
       "expected": {
         "row_count": null,
@@ -170,16 +171,16 @@
           "throughput_rate",
           "rn"
         ],
-        "note": "2 CTEs (top3 + bottom3) with correlated subquery in WHERE, UNION ALL combining extremes"
+        "note": "2 CTEs with UNION ALL combining top and bottom extremes"
       }
     },
     {
-      "id": "Q100",
-      "sql": "\nWITH lane_activity AS (SELECT conveyor_lane, facility_zone, COUNT(*) AS events FROM \"query_agent_test\" GROUP BY conveyor_lane, facility_zone),\nglobal_avg AS (SELECT ROUND(AVG(CAST(events AS FLOAT)), 2) AS avg_events FROM lane_activity),\nabove_avg AS (SELECT la.conveyor_lane, la.facility_zone, la.events, ga.avg_events, ROUND(CAST(la.events AS FLOAT) - ga.avg_events, 2) AS diff_from_avg FROM lane_activity la CROSS JOIN global_avg ga WHERE la.events > ga.avg_events)\nSELECT * FROM above_avg\nORDER BY diff_from_avg DESC\n",
+      "id": "Q055",
+      "sql": "WITH lane_activity AS (SELECT conveyor_lane, facility_zone, COUNT(*) AS events FROM \"query_agent_test\" GROUP BY conveyor_lane, facility_zone), global_avg AS (SELECT ROUND(AVG(CAST(events AS FLOAT)), 2) AS avg_events FROM lane_activity), above_avg AS (SELECT la.conveyor_lane, la.facility_zone, la.events, ga.avg_events, ROUND(CAST(la.events AS FLOAT) - ga.avg_events, 2) AS diff_from_avg FROM lane_activity la CROSS JOIN global_avg ga WHERE la.events > ga.avg_events) SELECT * FROM above_avg ORDER BY diff_from_avg DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780310940000000,
-        "end": 1780311102000000
+        "start": 1780311237000000,
+        "end": 1780311405000000
       },
       "expected": {
         "row_count": null,
@@ -190,16 +191,16 @@
           "avg_events",
           "diff_from_avg"
         ],
-        "note": "CROSS JOIN between lane_activity CTE and global_avg CTE for above-average filter"
+        "note": "CROSS JOIN between lane_activity CTE and global_avg CTE for above-average"
       }
     },
     {
-      "id": "Q101",
-      "sql": "WITH zone_stats AS (SELECT facility_zone, ROUND(AVG(cell_temp), 2) AS zone_avg_temp FROM \"query_agent_test\" GROUP BY facility_zone)\nSELECT t1._timestamp, t1.pallet_id, t1.facility_zone, t1.throughput_rate, ROW_NUMBER() OVER (PARTITION BY t1.facility_zone ORDER BY t1.throughput_rate DESC) AS rank_by_zone, zs.zone_avg_temp\nFROM \"query_agent_test\" t1\nJOIN zone_stats zs ON t1.facility_zone = zs.facility_zone\nWHERE t1.throughput_rate IS NOT NULL\nORDER BY t1.facility_zone ASC, rank_by_zone ASC",
+      "id": "Q056",
+      "sql": "WITH zone_stats AS (SELECT facility_zone, ROUND(AVG(cell_temp), 2) AS zone_avg_temp FROM \"query_agent_test\" GROUP BY facility_zone) SELECT t1._timestamp, t1.pallet_id, t1.facility_zone, t1.throughput_rate, ROW_NUMBER() OVER (PARTITION BY t1.facility_zone ORDER BY t1.throughput_rate DESC) AS rank_by_zone, zs.zone_avg_temp FROM \"query_agent_test\" t1 JOIN zone_stats zs ON t1.facility_zone = zs.facility_zone WHERE t1.throughput_rate IS NOT NULL ORDER BY t1.facility_zone ASC, rank_by_zone ASC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780311000000000,
-        "end": 1780311162000000
+        "start": 1780311297000000,
+        "end": 1780311465000000
       },
       "expected": {
         "row_count": null,
@@ -211,16 +212,16 @@
           "rank_by_zone",
           "zone_avg_temp"
         ],
-        "note": "Two correlated scalar subqueries in SELECT: custom rank + zone average"
+        "note": "Correlated subquery in SELECT: custom rank + zone average via CTE JOIN"
       }
     },
     {
-      "id": "Q102",
-      "sql": "\nSELECT * FROM (SELECT facility_zone, operation_mode, avg_tput, RANK() OVER (PARTITION BY facility_zone ORDER BY avg_tput DESC) AS rnk FROM (SELECT facility_zone, operation_mode, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone, operation_mode) inner_agg) ranked_agg\nWHERE rnk <= 2\nORDER BY facility_zone ASC, rnk ASC\n",
+      "id": "Q057",
+      "sql": "SELECT * FROM (SELECT facility_zone, operation_mode, avg_tput, RANK() OVER (PARTITION BY facility_zone ORDER BY avg_tput DESC) AS rnk FROM (SELECT facility_zone, operation_mode, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone, operation_mode) inner_agg) ranked_agg WHERE rnk <= 2 ORDER BY facility_zone ASC, rnk ASC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780311060000000,
-        "end": 1780311222000000
+        "start": 1780311357000000,
+        "end": 1780311525000000
       },
       "expected": {
         "row_count": null,
@@ -230,19 +231,19 @@
           "avg_tput",
           "rnk"
         ],
-        "note": "3-level nested: innermost aggregate \u2192 middle RANK window \u2192 outer WHERE filter"
+        "note": "3-level nested: innermost aggregate -> middle RANK window -> outer WHERE filter"
       }
     },
     {
-      "id": "Q103",
-      "sql": "\nSELECT t1._timestamp, t1.pallet_id AS pallet_a, t2.pallet_id AS pallet_b, t1.facility_zone, ABS(t1.throughput_rate - t2.throughput_rate) AS tput_diff\nFROM \"query_agent_test\" t1\nJOIN \"query_agent_test\" t2 ON t1.facility_zone = t2.facility_zone AND t1._timestamp < t2._timestamp AND t1.pallet_id != t2.pallet_id\nWHERE t1.throughput_rate IS NOT NULL AND t2.throughput_rate IS NOT NULL\nORDER BY tput_diff ASC\nLIMIT 12\n",
+      "id": "Q058",
+      "sql": "SELECT t1._timestamp, t1.pallet_id AS pallet_a, t2.pallet_id AS pallet_b, t1.facility_zone, ABS(t1.throughput_rate - t2.throughput_rate) AS tput_diff FROM \"query_agent_test\" t1 JOIN \"query_agent_test\" t2 ON t1.facility_zone = t2.facility_zone AND t1._timestamp < t2._timestamp AND t1.pallet_id != t2.pallet_id WHERE t1.throughput_rate IS NOT NULL AND t2.throughput_rate IS NOT NULL ORDER BY tput_diff ASC LIMIT 12",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780311120000000,
-        "end": 1780311282000000
+        "start": 1780311417000000,
+        "end": 1780311585000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "pallet_a",
@@ -250,16 +251,16 @@
           "facility_zone",
           "tput_diff"
         ],
-        "note": "Self-join with inequality condition (_timestamp < _timestamp) for pair-wise comparison"
+        "note": "Self-join with inequality condition for pair-wise comparison"
       }
     },
     {
-      "id": "Q104",
-      "sql": "\nWITH temp_classified AS (SELECT _timestamp, pallet_id, facility_zone, cell_temp, CASE WHEN cell_temp >= 30.0 THEN 'HIGH' WHEN cell_temp >= 22.0 THEN 'MEDIUM' ELSE 'LOW' END AS temp_class FROM \"query_agent_test\" WHERE cell_temp IS NOT NULL),\nclass_summary AS (SELECT facility_zone, temp_class, COUNT(*) AS cnt, ROUND(AVG(cell_temp), 2) AS avg_temp FROM temp_classified GROUP BY facility_zone, temp_class),\npivot AS (SELECT facility_zone, SUM(CASE WHEN temp_class='HIGH' THEN cnt ELSE 0 END) AS high_cnt, SUM(CASE WHEN temp_class='MEDIUM' THEN cnt ELSE 0 END) AS med_cnt, SUM(CASE WHEN temp_class='LOW' THEN cnt ELSE 0 END) AS low_cnt FROM class_summary GROUP BY facility_zone)\nSELECT *, ROUND(CAST(high_cnt AS FLOAT) / NULLIF(high_cnt + med_cnt + low_cnt, 0) * 100.0, 2) AS high_pct FROM pivot\nORDER BY high_pct DESC\n",
+      "id": "Q059",
+      "sql": "WITH temp_classified AS (SELECT _timestamp, pallet_id, facility_zone, cell_temp, CASE WHEN cell_temp >= 30.0 THEN 'HIGH' WHEN cell_temp >= 22.0 THEN 'MEDIUM' ELSE 'LOW' END AS temp_class FROM \"query_agent_test\" WHERE cell_temp IS NOT NULL), class_summary AS (SELECT facility_zone, temp_class, COUNT(*) AS cnt, ROUND(AVG(cell_temp), 2) AS avg_temp FROM temp_classified GROUP BY facility_zone, temp_class), pivot AS (SELECT facility_zone, SUM(CASE WHEN temp_class='HIGH' THEN cnt ELSE 0 END) AS high_cnt, SUM(CASE WHEN temp_class='MEDIUM' THEN cnt ELSE 0 END) AS med_cnt, SUM(CASE WHEN temp_class='LOW' THEN cnt ELSE 0 END) AS low_cnt FROM class_summary GROUP BY facility_zone) SELECT *, ROUND(CAST(high_cnt AS FLOAT) / NULLIF(high_cnt + med_cnt + low_cnt, 0) * 100.0, 2) AS high_pct FROM pivot ORDER BY high_pct DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780311180000000,
-        "end": 1780311342000000
+        "start": 1780311477000000,
+        "end": 1780311645000000
       },
       "expected": {
         "row_count": null,
@@ -270,16 +271,16 @@
           "low_cnt",
           "high_pct"
         ],
-        "note": "3 CTEs: CASE classification \u2192 grouped summary \u2192 pivot with high_pct computation"
+        "note": "3 CTEs: CASE classification -> grouped summary -> pivot with pct computation"
       }
     },
     {
-      "id": "Q105",
-      "sql": "\nSELECT t1.facility_zone, t1.sorter_model, t1.avg_tput, t1.avg_load FROM (SELECT facility_zone, sorter_model, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test\" GROUP BY facility_zone, sorter_model) t1\nWHERE t1.avg_tput > (SELECT ROUND(AVG(throughput_rate) * 0.8, 2) FROM \"query_agent_test\")\nAND EXISTS (SELECT 1 FROM \"query_agent_test\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.charge_remaining < 20.0)\nORDER BY t1.avg_tput DESC\n",
+      "id": "Q060",
+      "sql": "SELECT t1.facility_zone, t1.sorter_model, t1.avg_tput, t1.avg_load FROM (SELECT facility_zone, sorter_model, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test\" GROUP BY facility_zone, sorter_model) t1 WHERE t1.avg_tput > (SELECT ROUND(AVG(throughput_rate) * 0.8, 2) FROM \"query_agent_test\") AND EXISTS (SELECT 1 FROM \"query_agent_test\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.charge_remaining < 20.0) ORDER BY t1.avg_tput DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780311240000000,
-        "end": 1780311402000000
+        "start": 1780311537000000,
+        "end": 1780311705000000
       },
       "expected": {
         "row_count": null,
@@ -289,16 +290,16 @@
           "avg_tput",
           "avg_load"
         ],
-        "note": "Derived table + scalar subquery in WHERE + correlated EXISTS with low-charge check"
+        "note": "Derived table + scalar subquery + EXISTS with low-charge check"
       }
     },
     {
-      "id": "Q106",
-      "sql": "WITH mode_counts AS (SELECT facility_zone, operation_mode, COUNT(*) AS peer_count FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode),\nzone_load AS (SELECT facility_zone, ROUND(AVG(load_factor), 2) AS zone_avg_load FROM \"query_agent_test\" GROUP BY facility_zone)\nSELECT t1._timestamp, t1.pallet_id, t1.facility_zone, t1.throughput_rate, t1.operation_mode, t1.cell_temp, mc.peer_count, zl.zone_avg_load\nFROM \"query_agent_test\" t1\nJOIN mode_counts mc ON t1.facility_zone = mc.facility_zone AND t1.operation_mode = mc.operation_mode\nJOIN zone_load zl ON t1.facility_zone = zl.facility_zone\nWHERE mc.peer_count >= 2\nORDER BY t1.facility_zone ASC, t1.throughput_rate DESC",
+      "id": "Q061",
+      "sql": "WITH mode_counts AS (SELECT facility_zone, operation_mode, COUNT(*) AS peer_count FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode), zone_load AS (SELECT facility_zone, ROUND(AVG(load_factor), 2) AS zone_avg_load FROM \"query_agent_test\" GROUP BY facility_zone) SELECT t1._timestamp, t1.pallet_id, t1.facility_zone, t1.throughput_rate, t1.operation_mode, t1.cell_temp, mc.peer_count, zl.zone_avg_load FROM \"query_agent_test\" t1 JOIN mode_counts mc ON t1.facility_zone = mc.facility_zone AND t1.operation_mode = mc.operation_mode JOIN zone_load zl ON t1.facility_zone = zl.facility_zone WHERE mc.peer_count >= 2 ORDER BY t1.facility_zone ASC, t1.throughput_rate DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780311300000000,
-        "end": 1780311462000000
+        "start": 1780311597000000,
+        "end": 1780311765000000
       },
       "expected": {
         "row_count": null,
@@ -312,16 +313,16 @@
           "peer_count",
           "zone_avg_load"
         ],
-        "note": "Two correlated subqueries in SELECT of derived table, outer filter on peer_count"
+        "note": "Two CTEs with JOINs for peer count and zone average"
       }
     },
     {
-      "id": "Q107",
-      "sql": "WITH chain_builder AS (SELECT _timestamp, pallet_id, facility_zone, runtime_hours, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY runtime_hours ASC) AS seq, COUNT(*) OVER (PARTITION BY facility_zone) AS zone_cnt FROM \"query_agent_test\" WHERE runtime_hours IS NOT NULL),\nchains AS (SELECT facility_zone, pallet_id, runtime_hours, seq, zone_cnt, CASE WHEN seq < zone_cnt THEN 1 ELSE 0 END AS has_next FROM chain_builder)\nSELECT facility_zone, COUNT(*) AS chain_count, ROUND(AVG(runtime_hours), 1) AS avg_hours\nFROM chains\nGROUP BY facility_zone\nORDER BY chain_count DESC",
+      "id": "Q062",
+      "sql": "WITH chain_builder AS (SELECT _timestamp, pallet_id, facility_zone, runtime_hours, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY runtime_hours ASC) AS seq, COUNT(*) OVER (PARTITION BY facility_zone) AS zone_cnt FROM \"query_agent_test\" WHERE runtime_hours IS NOT NULL), chains AS (SELECT facility_zone, pallet_id, runtime_hours, seq, zone_cnt, CASE WHEN seq < zone_cnt THEN 1 ELSE 0 END AS has_next FROM chain_builder) SELECT facility_zone, COUNT(*) AS chain_count, ROUND(AVG(runtime_hours), 1) AS avg_hours FROM chains GROUP BY facility_zone ORDER BY chain_count DESC",
       "category": "cte_subquery",
       "time_range": {
-        "start": 1780311360000000,
-        "end": 1780311522000000
+        "start": 1780311657000000,
+        "end": 1780311825000000
       },
       "expected": {
         "row_count": null,
@@ -330,9 +331,9 @@
           "chain_count",
           "avg_hours"
         ],
-        "note": "Recursive CTE chaining by increasing runtime_hours (depth-limited to 3)"
+        "note": "Non-recursive CTE with window-based chaining by runtime_hours"
       }
     }
   ],
-  "last_query_id": 107
+  "last_query_id": 62
 }
