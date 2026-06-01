@@ -43,7 +43,7 @@ const variantClasses: Record<
     <slot name="icon-left">
       <OIcon v-if="props.iconLeft" :name="props.iconLeft" size="sm" />
     </slot>
-    <slot />
+    <span class="tw:flex-1"><slot /></span>
     <slot name="icon-right" />
   </DropdownMenuItem>
 </template>
