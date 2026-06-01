@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Trace Correlation -->
         <TraceCorrelationCard
           v-if="resource._oo?.trace_id"
-          :trace-id="resource._oo.trace_id"
+          :trace-id="resource._oo_trace_id"
           :span-id="resource._oo.span_id"
           :session-id="resource.session?.id"
           :resource-duration="resource.resource_duration"

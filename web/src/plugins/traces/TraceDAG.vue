@@ -91,7 +91,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 
-interface SpanNode {
+export interface SpanNode {
   span_id: string;
   parent_span_id: string | null;
   service_name: string;
@@ -102,12 +102,12 @@ interface SpanNode {
   gen_ai_operation_name: string | null;
 }
 
-interface SpanEdge {
+export interface SpanEdge {
   from: string;
   to: string;
 }
 
-interface DAGResponse {
+export interface DAGResponse {
   trace_id: string;
   nodes: SpanNode[];
   edges: SpanEdge[];

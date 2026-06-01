@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:w-full tw:flex card-container tw:overflow-hidden tw:h-[calc(100%-3.125)]!"
     >
-      <div class="tw:w-3/4 tw:h-full">
+      <div class="tw:w-1/2 tw:h-full">
         <VideoPlayer
           ref="videoPlayerRef"
           :events="segmentEvents"
@@ -80,11 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-loading="!!isLoading.length"
         />
       </div>
-      <div class="tw:w-1/4 tw:flex">
+      <div class="tw:w-1/2 tw:flex">
         <OSeparator vertical class="tw:h-full" />
         <PlayerEventsSidebar
           :events="segmentEvents"
           :sessionDetails="sessionDetails"
+          :session-id="sessionId"
+          :current-time="currentTime"
           @event-emitted="handleSidebarEvent"
         />
       </div>
@@ -135,6 +137,7 @@ const defaultEvent = {
 };
 
 const sessionId = ref("1");
+const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
