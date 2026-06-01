@@ -203,8 +203,7 @@ export default defineComponent({
 .group-conditions {
   display: flex;
   flex-direction: row;
-  // flex-wrap: wrap;
-  overflow-x: auto;
+  flex-wrap: wrap;
   align-items: center;
 }
 
