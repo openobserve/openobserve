@@ -650,7 +650,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         if schema_versions.is_empty() {
             continue;
         }
-        schema_versions.sort_by(|a, b| a.0.cmp(&b.0));
+        schema_versions.sort_by_key(|k| k.0);
         let latest_schema: Vec<Schema> = json::from_slice(&schema_versions.last().unwrap().1)
             .map_err(|e| {
                 anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)

@@ -89,12 +89,11 @@ impl VisitorMut for ColumnVisitor<'_> {
                     }
                 }
             }
-            Expr::Function(f) => {
+            Expr::Function(f)
                 if AGGREGATE_UDF_LIST
-                    .contains(&trim_quotes(&f.name.to_string().to_lowercase()).as_str())
-                {
-                    self.has_agg_function = true;
-                }
+                    .contains(&trim_quotes(&f.name.to_string().to_lowercase()).as_str()) =>
+            {
+                self.has_agg_function = true;
             }
             _ => {}
         }

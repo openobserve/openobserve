@@ -574,7 +574,7 @@ pub async fn process_delta(
         "[HTTP2_STREAM] Found {} partitions for trace_id: {}, partitions: {:?}",
         partitions.len(),
         trace_id,
-        &partitions
+        partitions
     );
 
     // for dashboards & histograms, expect for ui

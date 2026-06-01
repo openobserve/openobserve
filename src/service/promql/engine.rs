@@ -553,15 +553,13 @@ impl Engine {
         let start = std::time::Instant::now();
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
         metric_values.par_iter_mut().for_each(|metric| {
-            metric
-                .samples
-                .sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            metric.samples.sort_unstable_by_key(|k| k.timestamp);
             if self.ctx.query_ctx.query_exemplars && metric.exemplars.is_some() {
                 metric
                     .exemplars
                     .as_mut()
                     .unwrap()
-                    .sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+                    .sort_by_key(|k| k.timestamp);
             }
         });
         let values = if metric_values.is_empty() {

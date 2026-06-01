@@ -52,7 +52,7 @@ async fn handle_format_conversion(
                 && let Some(id) = alert.id
             {
                 let alert_id = id.to_string();
-                item_key = format!("{}/{}", org_id, &alert_id);
+                item_key = format!("{}/{}", org_id, alert_id);
                 return Ok((item_key, alert_id));
             }
             return Err(anyhow::anyhow!("Failed to get alert ID for old format"));

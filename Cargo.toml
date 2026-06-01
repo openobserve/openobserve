@@ -482,3 +482,4 @@ zstd = "0.13"
 
 [patch.crates-io]
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
+proc-macro-error2 = { git = "https://github.com/hengfeiyang/proc-macro-error-2", branch = "main" }

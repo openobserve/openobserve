@@ -457,7 +457,7 @@ async fn move_files(
     let wal_dir = wal_dir.clone();
     // sort by created time
     let mut files_with_size = files.to_owned();
-    files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    files_with_size.sort_by_key(|k| k.meta.min_ts);
     // check the total size
     let total_original_size: i64 = files_with_size
         .iter()
@@ -672,7 +672,7 @@ async fn merge_files(
         new_file_size += file.meta.original_size;
         new_compressed_file_size += file.meta.compressed_size;
         new_file_list.push(file.clone());
-        log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
+        log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", file.key);
     }
     // no files need to merge
     if new_file_list.is_empty() {

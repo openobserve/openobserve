@@ -140,7 +140,7 @@ pub async fn retrieve(
             .redirect_http()
     } else {
         let redirect = RedirectResponseBuilder::default().build();
-        log::error!("Short URL not found, {}", &redirect);
+        log::error!("Short URL not found, {}", redirect);
         redirect.redirect_http()
     }
 }

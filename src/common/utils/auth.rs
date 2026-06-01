@@ -615,8 +615,8 @@ pub fn generate_presigned_url(
 ) -> String {
     // let time = chrono::Utc::now().timestamp();
     let stage1 = get_hash(password, salt);
-    let stage2 = get_hash(&format!("{}{}", &stage1, time), salt);
-    let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
+    let stage2 = get_hash(&format!("{}{}", stage1, time), salt);
+    let stage3 = get_hash(&format!("{}{}", stage2, exp_in), salt);
 
     let user_pass = format!("{username}:{stage3}");
     let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);

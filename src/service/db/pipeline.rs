@@ -436,7 +436,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     stream_exec_pl.insert(stream_params.clone(), exec_pl);
                                     log::info!(
                                         "[Pipeline::watch]: realtime pipeline {} added to cache.",
-                                        &pipeline.id
+                                        pipeline.id
                                     );
                                 }
                             };

@@ -441,13 +441,12 @@ async fn prepare_alert(
                 }
             }
         }
-        QueryType::PromQL => {
-            if alert.query_condition.promql.is_none()
+        QueryType::PromQL
+            if (alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || alert.query_condition.promql_condition.is_none()
-            {
-                return Err(AlertError::PromqlMissingQuery);
-            }
+                || alert.query_condition.promql_condition.is_none()) =>
+        {
+            return Err(AlertError::PromqlMissingQuery);
         }
         _ => {}
     }

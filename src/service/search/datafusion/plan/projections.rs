@@ -510,10 +510,8 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                                 self.timestamp_alias = Some(col.name.clone())
                             }
                         }
-                        Expr::ScalarFunction(_) => {
-                            if is_ts_hist_udf(expr, &self.timestamp_alias) {
-                                self.ts_hist_alias = Some(get_col_name(expr));
-                            }
+                        Expr::ScalarFunction(_) if is_ts_hist_udf(expr, &self.timestamp_alias) => {
+                            self.ts_hist_alias = Some(get_col_name(expr));
                         }
                         _ => {}
                     }

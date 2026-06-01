@@ -47,7 +47,7 @@ fn determine_sort_strategy(
     if let Some(order_by) = search_res.order_by {
         log::info!(
             "[trace_id: {}] Using user-specified ORDER BY: {:?}",
-            &search_res.trace_id,
+            search_res.trace_id,
             order_by
         );
         return SortStrategy::SqlOrderBy;
@@ -63,7 +63,7 @@ fn determine_sort_strategy(
     if let Some((col, is_string)) = determine_sort_column(&search_res.hits[0]) {
         log::info!(
             "[trace_id: {}] Auto-sorting by column: {}, type: {}",
-            &search_res.trace_id,
+            search_res.trace_id,
             col,
             if is_string { "string" } else { "numeric" }
         );
@@ -119,7 +119,7 @@ fn find_fallback_column(search_res: &Response, fallback_col: Option<String>) -> 
         .map(|k| {
             log::info!(
                 "[trace_id: {}] Using fallback ORDER BY: {}",
-                &search_res.trace_id,
+                search_res.trace_id,
                 k
             );
             k.to_string()

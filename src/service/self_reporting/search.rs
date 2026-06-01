@@ -112,7 +112,7 @@ pub async fn get_license_usage_data_from_node(node_id: String) -> Result<GetLice
             Err(err) => {
                 log::error!(
                     "[trace_id: license-usage-grpc-request] error getting license usage info node {} : {err:?}",
-                    &node.get_grpc_addr(),
+                    node.get_grpc_addr(),
                 );
                 let err = ErrorCodes::from_json(err.message())?;
                 Err(anyhow::anyhow!("error getting license usage info : {err}"))

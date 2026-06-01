@@ -824,14 +824,14 @@ pub async fn get_latest_traces(
     match sort_by.as_str() {
         "duration" => {
             if sort_order == "ASC" {
-                traces_data.sort_by(|a, b| a.duration.cmp(&b.duration));
+                traces_data.sort_by_key(|k| k.duration);
             } else {
                 traces_data.sort_by(|a, b| b.duration.cmp(&a.duration));
             }
         }
         _ => {
             if sort_order == "ASC" {
-                traces_data.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+                traces_data.sort_by_key(|k| k.start_time);
             } else {
                 traces_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
             }
@@ -1572,7 +1572,7 @@ async fn process_latest_traces_stream(
 
         let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
         if sort_order == "ASC" {
-            partition_hits.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+            partition_hits.sort_by_key(|k| k.start_time);
         } else {
             partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
         }

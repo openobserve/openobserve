@@ -127,7 +127,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
             node_items.iter().for_each(|item| {
                 log::info!(
                     "[broadcast] send event to node[{}]: file: {}, deleted: {}",
-                    &node_addr,
+                    node_addr,
                     item.key,
                     item.deleted,
                 );
@@ -147,7 +147,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                         if let Err(e) = send_to_node(node, &mut rx).await {
                             log::error!(
                                 "[broadcast] send event to node[{}] channel failed, channel closed: {}",
-                                &node_addr,
+                                node_addr,
                                 e
                             );
                         }
@@ -163,7 +163,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 }
                 log::error!(
                     "[broadcast] send event to node[{}] channel failed, {}, retrying...",
-                    &node_addr,
+                    node_addr,
                     e
                 );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -175,7 +175,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         if !ok {
             log::error!(
                 "[broadcast] send event to node[{}] channel failed, dropping events",
-                &node_addr
+                node_addr
             );
         }
     }
@@ -195,7 +195,7 @@ async fn send_to_node(
                     EVENTS.write().await.remove(&node.uuid);
                     log::error!(
                         "[broadcast] node[{}] leaved cluster, dropping events",
-                        &node.grpc_addr,
+                        node.grpc_addr,
                     );
                     return Ok(());
                 }
@@ -218,7 +218,7 @@ async fn send_to_node(
             Err(e) => {
                 log::error!(
                     "[broadcast] connect to node[{}] failed: {}",
-                    &node.grpc_addr,
+                    node.grpc_addr,
                     e
                 );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -243,7 +243,7 @@ async fn send_to_node(
             let items = match rx.recv().await {
                 Some(v) => v,
                 None => {
-                    log::info!("[broadcast] node[{}] channel closed", &node.grpc_addr);
+                    log::info!("[broadcast] node[{}] channel closed", node.grpc_addr);
                     EVENTS.write().await.remove(&node.uuid);
                     return Ok(());
                 }
@@ -262,7 +262,7 @@ async fn send_to_node(
                 if retry_ttl >= 1800 {
                     log::error!(
                         "[broadcast] to node[{}] timeout, dropping event, already retried for 30 minutes",
-                        &node.grpc_addr
+                        node.grpc_addr
                     );
                     break;
                 }
@@ -275,13 +275,13 @@ async fn send_to_node(
                             EVENTS.write().await.remove(&node.uuid);
                             log::error!(
                                 "[broadcast] node[{}] leaved cluster, dropping events",
-                                &node.grpc_addr,
+                                node.grpc_addr,
                             );
                             return Ok(());
                         }
                         log::error!(
                             "[broadcast] send event to node[{}] failed: {}, retrying...",
-                            &node.grpc_addr,
+                            node.grpc_addr,
                             e
                         );
                         tokio::time::sleep(tokio::time::Duration::from_secs(wait_ttl)).await;

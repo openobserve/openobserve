@@ -570,7 +570,7 @@ impl ConditionListExt for ConditionList {
                     let data_type = match schema.field_with_name(&cond.column) {
                         Ok(field) => field.data_type(),
                         Err(_) => {
-                            return Err(anyhow::anyhow!("Column {} not found", &cond.column));
+                            return Err(anyhow::anyhow!("Column {} not found", cond.column));
                         }
                     };
                     cond_sql_list.push(build_expr(cond, "", data_type)?);
@@ -591,7 +591,7 @@ impl ConditionListExt for ConditionList {
                 let data_type = match schema.field_with_name(&node.column) {
                     Ok(field) => field.data_type(),
                     Err(_) => {
-                        return Err(anyhow::anyhow!("Column {} not found", &node.column));
+                        return Err(anyhow::anyhow!("Column {} not found", node.column));
                     }
                 };
                 build_expr(node, "", data_type)
@@ -1007,7 +1007,7 @@ async fn condition_item_to_sql(
             let data_type = match schema.field_with_name(&condition.column) {
                 Ok(field) => field.data_type(),
                 Err(_) => {
-                    return Err(anyhow::anyhow!("Column {} not found", &condition.column));
+                    return Err(anyhow::anyhow!("Column {} not found", condition.column));
                 }
             };
 
@@ -1062,7 +1062,7 @@ pub async fn build_sql(
             Err(_) => {
                 return Err(anyhow::anyhow!(
                     "Aggregation column {} not found on stream {stream_name}",
-                    &agg.having.column,
+                    agg.having.column,
                 ));
             }
         };

@@ -72,7 +72,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         Ok(path) => path,
         Err(_) => return Ok(()),
     };
-    let pattern = format!("{}files/", &cfg.common.data_wal_dir);
+    let pattern = format!("{}files/", cfg.common.data_wal_dir);
     let files = scan_files(pattern, "parquet", None)
         .await
         .unwrap_or_default();
