@@ -3843,5 +3843,56 @@
     "awsStsSelfHostedInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. Assicurati di aver configurato le credenziali aws nell'ambiente di installazione che hanno accesso a questo ruolo.",
     "externalIdRequired": "È richiesto un ID esterno",
     "storageAccountRequired": "Il nome dell'account di archiviazione è obbligatorio"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Buongiorno",
+      "afternoon": "Buon pomeriggio",
+      "evening": "Buona sera",
+      "night": "Lavorare fino a tardi"
+    },
+    "welcome": {
+      "taglineLead": "Sono",
+      "taglineHighlight": "Assistente O2",
+      "taglineTail": ". Posso scrivere il tuo",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "ProMQL",
+      "taglineAnd": "e guidarti attraverso i tuoi registri, tracce, metriche e incidenti.",
+      "signedInAs": "Ha effettuato l'accesso come",
+      "role": "Ruolo",
+      "tryOneOfThese": "Oppure prova uno di questi"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Scrivere una richiesta",
+        "description": "SQL per log, trace, RUM o ProMQL per le metriche."
+      },
+      "incident": {
+        "title": "Indagare sugli incidenti",
+        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»"
+      },
+      "dashboard": {
+        "title": "Crea una dashboard",
+        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli."
+      },
+      "alert": {
+        "title": "Crea un avviso",
+        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Scrivi VRL per analizzare JSON dai miei log di nginx",
+      "regexRedact": "Genera un modello regex per oscurare le email",
+      "mapStreamSchema": "Mappa il mio schema di stream «predefinito»",
+      "promqlCpu": "Scrivi ProMQL per pod utilizzando una CPU > 80%",
+      "datadogToO2": "Converti questa query Datadog in OpenObserve SQL",
+      "lastAlertFired": "Perché è stato attivato il mio ultimo allarme?"
+    },
+    "placeholderRotation": {
+      "one": "Mostrami gli errori dell'ultima ora...",
+      "two": "Scrivi VRL per analizzare JSON dai log di nginx...",
+      "three": "Crea una dashboard per lo stato dei nodi K8s..."
+    }
   }
 }

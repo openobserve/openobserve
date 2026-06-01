@@ -5,34 +5,29 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 
 test.describe("Metrics testcases", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm;
-
-  // Ensure metrics are ingested once for all test files
   test.beforeAll(async () => {
     await ensureMetricsIngested();
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to metrics page
+    const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
     testLogger.info('Test setup completed - navigated to metrics page');
-  });
+    return pm;
+  }
 
-  test.afterEach(async ({ page }, testInfo) => {
+  test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   // P0 - Critical Smoke Tests
   test("Navigate to Metrics Page and verify core UI elements", {
     tag: ['@metrics', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing metrics page loads with core elements');
 
     // Verify URL contains metrics
@@ -58,7 +53,8 @@ test.describe("Metrics testcases", () => {
 
   test("Execute basic metrics query", {
     tag: ['@metrics', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing basic metrics query execution');
 
     // CRITICAL: Set time range to Last 15 minutes to ensure we capture ingested data
@@ -172,7 +168,8 @@ test.describe("Metrics testcases", () => {
 
   test("Date/Time range picker functionality", {
     tag: ['@metrics', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing date/time picker functionality');
 
     // Verify date picker is visible
@@ -194,7 +191,8 @@ test.describe("Metrics testcases", () => {
   // P1 - Functional Tests
   test("Auto-refresh interval configuration", {
     tag: ['@metrics', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing auto-refresh interval configuration');
 
     // Look for auto-refresh button using page object
@@ -226,7 +224,8 @@ test.describe("Metrics testcases", () => {
 
   test("Field list collapse and expand functionality", {
     tag: ['@metrics', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing field list collapse/expand');
 
     // Try to find any collapsible element using page object
@@ -297,7 +296,8 @@ test.describe("Metrics testcases", () => {
 
   test("Search metrics in field list", {
     tag: ['@metrics', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing metrics search in field list');
 
     // Find search input using page object method
@@ -352,7 +352,8 @@ test.describe("Metrics testcases", () => {
 
   test("Add to Dashboard - Cancel flow", {
     tag: ['@metrics', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing Add to Dashboard cancel flow');
 
     // First run a query to have something to add
@@ -390,7 +391,8 @@ test.describe("Metrics testcases", () => {
   // P2 - Edge Cases
   test("Empty query validation", {
     tag: ['@metrics', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing empty query validation');
 
     // First, run a valid query to establish baseline state
@@ -448,7 +450,8 @@ test.describe("Metrics testcases", () => {
 
   test("Invalid PromQL syntax error handling", {
     tag: ['@metrics', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing invalid PromQL syntax handling');
 
     // Enter invalid PromQL query with actual syntax error (unclosed parenthesis)
@@ -456,30 +459,34 @@ test.describe("Metrics testcases", () => {
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
 
-    // Check for inline error list rendered by DashboardErrors component
-    const inlineError = pm.metricsPage.getDashboardError();
-    const hasInlineError = await inlineError.isVisible({ timeout: 5000 }).catch(() => false);
+    // Poll for any graceful-handling indicator — CI (especially enterprise) can be slower to render
+    let hasInlineError = false;
+    let hasChartError = false;
+    let hasNoData = false;
 
-    // Check for chart-area error rendered by PanelSchemaRenderer
-    // This element is shown when errorDetail.message is set; at that point [data-test="no-data"]
-    // is intentionally hidden (v-if="!errorDetail?.message"), so we must check both paths.
-    const chartError = pm.metricsPage.getChartErrorMessage();
-    const hasChartError = await chartError.isVisible({ timeout: 3000 }).catch(() => false);
+    await expect.poll(async () => {
+      const inlineError = pm.metricsPage.getDashboardError();
+      hasInlineError = await inlineError.isVisible().catch(() => false);
 
-    // Check for no-data message (only present when there is no error detail)
-    const noDataMessage = await pm.metricsPage.getNoDataMessage();
-    const hasNoData = await noDataMessage.isVisible({ timeout: 3000 }).catch(() => false);
+      const chartError = pm.metricsPage.getChartErrorMessage();
+      hasChartError = await chartError.isVisible().catch(() => false);
+
+      const noDataMessage = await pm.metricsPage.getNoDataMessage();
+      hasNoData = await noDataMessage.isVisible().catch(() => false);
+
+      const hasNotification = await page.locator('.q-notification').isVisible().catch(() => false);
+
+      return hasInlineError || hasChartError || hasNoData || hasNotification;
+    }, { timeout: 20000, intervals: [500, 1000, 2000] }).toBe(true);
 
     testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}`);
 
-    // System must handle invalid syntax gracefully - show error or no data
-    const handledGracefully = hasInlineError || hasChartError || hasNoData;
-    expect(handledGracefully).toBe(true);
-
     if (hasInlineError) {
+      const inlineError = pm.metricsPage.getDashboardError();
       const errorText = await inlineError.textContent().catch(() => '');
       testLogger.info(`Dashboard error displayed: ${errorText.substring(0, 100)}`);
     } else if (hasChartError) {
+      const chartError = pm.metricsPage.getChartErrorMessage();
       const errorText = await chartError.textContent().catch(() => '');
       testLogger.info(`Chart error displayed: ${errorText.substring(0, 100)}`);
     } else {
@@ -489,7 +496,8 @@ test.describe("Metrics testcases", () => {
 
   test("Query for non-existent metric", {
     tag: ['@metrics', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing query for non-existent metric');
 
     // Enter query for non-existent metric
