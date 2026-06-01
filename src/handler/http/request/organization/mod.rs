@@ -16,6 +16,7 @@ pub mod assume_service_account;
 #[cfg(feature = "cloud")]
 pub mod billing_group;
 pub mod es;
+pub mod ingestion_tokens;
 pub mod org;
 pub mod settings;
 #[cfg(feature = "enterprise")]

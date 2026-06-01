@@ -54,6 +54,16 @@ export default class DashboardactionPage {
     return this.noDataElement;
   }
 
+  // Get chart-renderer canvas locator
+  getChartRendererCanvas() {
+    return this.chartRendererCanvas;
+  }
+
+  // Get dashboard-error locator
+  getDashboardErrorLocator() {
+    return this.page.locator('[data-test="dashboard-error"]');
+  }
+
   // Generate a unique panel name
   generateUniquePanelName(prefix = "panel") {
     const randomStr = Math.random().toString(36).substring(2, 7);

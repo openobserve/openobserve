@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="hasValidContent" class="llm-content-renderer tw:h-full">
     <!-- Tool-specific rendering -->
-    <div v-if="isToolObservation && toolContent !== null" class="tool-content">
+    <div v-if="isToolObservation && toolContent !== null" class="tool-content tw:flex tw:flex-col tw:h-full">
       <div v-if="toolMetadata" class="tool-metadata tw:mb-2">
         <OBadge
           v-if="toolMetadata.name"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="default"
         >{{ `Call ID: ${toolMetadata.callId}` }}</OBadge>
       </div>
-      <div class="tool-data">
+      <div class="tool-data tw:flex-1">
         <CodeQueryEditor
           :editor-id="`${editorIdPrefix}tool-json-viewer-${span?.llm_tool_call_id || 'unknown'}`"
           :query="toolContentJson"
