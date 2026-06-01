@@ -35,7 +35,6 @@ the Free Software Foundation, either version 3 of the License, or
       <div class="online-evals__header card-container">
         <div>
           <h1>{{ t("onlineEvals.title") }}</h1>
-          <p>{{ t("onlineEvals.description") }}</p>
         </div>
       </div>
 
@@ -1054,7 +1053,9 @@ async function deleteRow(row: AnyRow) {
 .eval-test-panel {
   min-height: 100%;
   padding: 20px;
-  background: var(--o2-bg-secondary);
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
 }
 
 .eval-test-panel h3 {

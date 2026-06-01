@@ -54,8 +54,9 @@ const { t } = useI18n();
   min-width: 0;
   overflow: auto;
   padding: 18px;
-  border-left: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: color-mix(in srgb, var(--color-text-secondary) 3%, var(--color-card-bg));
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
 }
 
 .job-preview__card {
@@ -63,7 +64,10 @@ const { t } = useI18n();
   margin-bottom: 12px;
   border: 1px solid var(--color-dialog-header-border, var(--o2-border));
   border-radius: 6px;
-  background: var(--color-card-bg);
+}
+
+.job-preview__card:last-child {
+  margin-bottom: 0;
 }
 
 .job-preview__card-head {

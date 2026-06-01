@@ -603,9 +603,7 @@ async function save() {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
+  gap: 10px;
 }
 
 .scorer-form__top {
@@ -614,7 +612,9 @@ async function save() {
   gap: 10px;
   min-height: 48px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
   flex-shrink: 0;
 }
 
@@ -686,12 +686,16 @@ async function save() {
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+  gap: 10px;
 }
 
 .scorer-form__main {
   min-width: 0;
   overflow: auto;
   padding: 18px 24px 24px;
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
 }
 
 .scorer-form__foot {
@@ -702,8 +706,9 @@ async function save() {
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 22px;
-  border-top: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
   flex-shrink: 0;
   z-index: 1;
 }
