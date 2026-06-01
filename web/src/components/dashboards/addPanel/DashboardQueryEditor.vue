@@ -30,11 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
         data-test="dashboard-query-data"
       >
-        <span
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="tw:text-sm tw:font-medium text-weight-bold tw:ml-2"
-          >{{ t("panel.sql") }}</span
-        >
         <div
           style="max-width: 600px; overflow: hidden"
         >
