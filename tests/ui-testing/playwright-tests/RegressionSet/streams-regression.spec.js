@@ -118,11 +118,10 @@ test.describe("Streams Regression Bugs", () => {
     await pm.logsPage.clickQuickModeToggle();
     await pm.logsPage.clickAllFieldsButton();
 
-    // Add remaining long-named streams
+    // Add remaining long-named streams using selectStream with skipNavigation
     testLogger.info('Adding additional long-named streams to trigger ellipsis');
     for (let i = 1; i < longStreamNames.length; i++) {
-      await pm.logsPage.fillStreamFilter(longStreamNames[i]);
-      await pm.logsPage.toggleStreamSelection(longStreamNames[i]);
+      await pm.logsPage.selectStream(longStreamNames[i], 5, 0, true);
       // Wait for stream to be selected
       await page.waitForLoadState('domcontentloaded').catch(() => {});
     }

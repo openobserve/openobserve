@@ -377,6 +377,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
+        if let Err(msg) =
+            config::utils::password::validate_password_strength(&cfg.auth.root_user_password)
+        {
+            panic!("ZO_ROOT_USER_PASSWORD is too weak: {msg}");
+        }
         let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
         if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
@@ -422,6 +427,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("organizations cache failed");
     db::org_users::cache().await.expect("org user cache failed");
+    db::org_ingestion_tokens::cache()
+        .await
+        .expect("org ingestion tokens cache failed");
 
     db::organization::org_settings_cache()
         .await
@@ -430,6 +438,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // watch org users
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
+    tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::organization::watch());
 
     #[cfg(feature = "cloud")]

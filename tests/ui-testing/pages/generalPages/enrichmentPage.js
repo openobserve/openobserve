@@ -104,6 +104,7 @@ class EnrichmentPage {
         // UI Regression / help menu (preserved from legacy spec usage)
         // ────────────────────────────────────────────────────────────────────
         this.helpMenuItem = page.locator('[data-test="menu-link-help-item"]');
+        this.openApiMenuItem = page.locator('[data-test="menu-link-openapi-item"]');
 
         // ────────────────────────────────────────────────────────────────────
         // Legacy locator names — preserved for back-compat with non-URL specs
@@ -243,6 +244,22 @@ class EnrichmentPage {
     async clickHelpMenuItem() {
         await this.helpMenuItem.waitFor({ state: 'visible', timeout: 10000 });
         await this.helpMenuItem.click();
+    }
+
+    /**
+     * Verify OpenAPI menu item is visible
+     */
+    async expectOpenApiMenuItemVisible(opts = {}) {
+        await expect(this.openApiMenuItem).toBeVisible(opts);
+    }
+
+    /**
+     * Click OpenAPI menu item if visible
+     */
+    async clickOpenApiMenuItemIfVisible() {
+        if (await this.openApiMenuItem.isVisible().then(() => true).catch(() => false)) {
+            await this.openApiMenuItem.click();
+        }
     }
 
     /**

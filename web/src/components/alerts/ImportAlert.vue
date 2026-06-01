@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
       <div class="tw:mb-1 tw:flex tw:items-start tw:gap-2" style="width: calc(100% - 10px)">
-        <div style="width: calc(69%)" class="tw:pt-[6px]">
+        <div style="width: calc(69%)">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             multiple
             drop-zone
             help-text=".json files only"
-            size="sm"
+            size="md"
           />
         </div>
         <div style="width: calc(30%)">

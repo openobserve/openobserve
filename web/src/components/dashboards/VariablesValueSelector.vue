@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div v-if="item.type == 'query_values'">
+      <div v-if="item.type == 'query_values'" class="tw:max-w-[40rem] tw:min-w-37.5">
         <VariableQueryValueSelector
           class="tw:mr-4 tw:mt-1"
           v-show="!item.hideOnDashboard"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'constant'">
+      <div v-else-if="item.type == 'constant'" class="tw:max-w-[40rem] tw:min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
           class="tw:mr-4 tw:mt-1"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
-      <div v-else-if="item.type == 'textbox'">
+      <div v-else-if="item.type == 'textbox'" class="tw:max-w-[40rem] tw:min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
           class="tw:mr-4 tw:mt-1"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
-      <div v-else-if="item.type == 'custom'">
+      <div v-else-if="item.type == 'custom'" class="tw:max-w-[40rem] tw:min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
           class="tw:mr-4 tw:mt-1"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'dynamic_filters'">
+      <div v-else-if="item.type == 'dynamic_filters'" class="tw:max-w-max">
         <VariableAdHocValueSelector
           class="tw:mr-4 tw:mt-1"
           v-model="item.value"

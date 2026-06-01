@@ -41,7 +41,7 @@ use bytes::Bytes;
 use config::{
     get_config,
     meta::stream::{FileKey, FileListDeleted, StreamType},
-    utils::{inverted_index::convert_parquet_file_name_to_tantivy_file, time::now_micros},
+    utils::{inverted_index::to_tantivy_name, time::now_micros},
 };
 use infra::{
     bloom::{BloomWriter, FieldBloom, path::bloom_path},
@@ -232,7 +232,7 @@ async fn build_for_file(
     target_fields: &[String],
     num_blocks: u32,
 ) -> anyhow::Result<Vec<FieldBloom>> {
-    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&file.key) else {
+    let Some(ttv_file_name) = to_tantivy_name(&file.key) else {
         return Ok(Vec::new()); // not an indexable file
     };
     if file.meta.index_size == 0 {

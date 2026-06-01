@@ -4,34 +4,29 @@ const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 test.describe("Metrics Configuration Tests", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm;
-
-  // Ensure metrics are ingested once for all test files
   test.beforeAll(async () => {
     await ensureMetricsIngested();
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to metrics page
+    const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
     testLogger.info('Test setup completed - navigated to metrics page');
-  });
+    return pm;
+  }
 
-  test.afterEach(async ({ page }, testInfo) => {
+  test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   // CONSOLIDATED TEST 1: Time range configurations (date picker, presets, auto-refresh) (3 tests → 1 test)
   test("Configure time range settings (custom dates, presets, auto-refresh)", {
     tag: ['@metrics', '@config', '@datetime', '@timerange', '@refresh', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing time range configuration features');
 
     // Test 1: Custom date range
@@ -120,7 +115,8 @@ test.describe("Metrics Configuration Tests", () => {
   // CONSOLIDATED TEST 2: Panel and display settings (panel settings, axis, threshold, export) (4 tests → 1 test)
   test("Configure panel display settings (settings, axis, threshold, export)", {
     tag: ['@metrics', '@config', '@panel', '@axis', '@threshold', '@export', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing panel display settings configuration');
 
     await pm.metricsPage.executeQuery('cpu_usage');
