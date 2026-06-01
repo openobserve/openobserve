@@ -1570,6 +1570,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { isSqlQuery } from "@/utils/query/sqlUtils";
 import {
   logsUtils,
   removeFieldFromWhereAST,
@@ -2236,6 +2237,20 @@ export default defineComponent({
       // }
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
+
+      // Auto-switch off SQL mode only when the user has typed something
+      // non-empty that clearly isn't a SQL statement (e.g. a filter expression
+      // after removing the SELECT … FROM prefix). An empty editor is ambiguous
+      // — keep the current mode so a blank SQL query still runs as SQL.
+      if (
+        value.trim() !== "" &&
+        !isSqlQuery(value) &&
+        searchObj.meta.sqlMode === true
+      ) {
+        searchObj.meta.sqlModeEditTransition = true;
+        searchObj.meta.sqlMode = false;
+      }
+
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
@@ -2315,8 +2330,7 @@ export default defineComponent({
       if (
         searchObj.meta.sqlMode === false &&
         searchObj.meta.logsVisualizeToggle !== "build" &&
-        value.toLowerCase().includes("select") &&
-        value.toLowerCase().includes("from")
+        isSqlQuery(value)
       ) {
         searchObj.meta.sqlMode = true;
         searchObj.meta.sqlModeManualTrigger = true;

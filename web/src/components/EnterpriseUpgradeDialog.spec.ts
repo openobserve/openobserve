@@ -390,14 +390,14 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(Array.isArray(vm.coreFeatures)).toBe(true);
       expect(vm.coreFeatures.length).toBe(11);
       expect(Array.isArray(vm.enterpriseFeatures)).toBe(true);
-      expect(vm.enterpriseFeatures.length).toBe(20);
+      expect(vm.enterpriseFeatures.length).toBe(21);
     });
 
     it("renders one feature-list-item per enterprise feature in Open Source layout", () => {
       const wrapper = createWrapper();
       const items = wrapper.findAll(".feature-list-item");
-      // Open Source variant renders only enterprise features (20).
-      expect(items.length).toBe(20);
+      // Open Source variant renders only enterprise features (21).
+      expect(items.length).toBe(21);
     });
 
     it("renders core + enterprise features for the Cloud layout", () => {
@@ -405,8 +405,8 @@ describe("EnterpriseUpgradeDialog", () => {
       (config as any).isEnterprise = "true";
       const wrapper = createWrapper();
       const items = wrapper.findAll(".feature-list-item");
-      // Cloud renders 11 core + 20 enterprise.
-      expect(items.length).toBe(31);
+      // Cloud renders 11 core + 21 enterprise.
+      expect(items.length).toBe(32);
     });
   });
 

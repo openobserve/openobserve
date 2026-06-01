@@ -527,8 +527,8 @@ export default defineComponent({
 
     const toggleOrgStorage = async (row: any) => {
       const ok = await confirm({
-        title: "Enable Storage Settings",
-        message: `Are you sure you want to enable storage settings for "${row.name}"?`,
+        title: "Enable BYOB",
+        message: `Are you sure you want to enable BYOB for "${row.name}"?`,
       });
       if (ok) {
         loading.value = true;
