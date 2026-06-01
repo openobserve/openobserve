@@ -20,21 +20,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:justify-between tw:w-full">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden">
       <div
         ref="toolbarLeftRef"
-        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap"
+        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0 tw:overflow-hidden"
       >
-        <!-- View Mode Toggle Group -->
+        <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
+        <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
+          <template #trigger>
+            <OButton
+              data-test="logs-view-mode-dropdown-btn"
+              size="xs"
+              variant="outline"
+              icon-right="chevron-down"
+            >
+              <OIcon :name="currentToggleOption.icon" size="sm" class="tw:shrink-0" />
+              {{ currentToggleOption.label }}
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="opt in toggleViewOptions"
+            :key="opt.value"
+            :data-test="`logs-view-mode-${opt.value}-item`"
+            :disabled="opt.disabled"
+            @select="onLogsVisualizeToggleUpdate(opt.value)"
+          >
+            <template #icon-left><OIcon :name="opt.icon" size="sm" /></template>
+            {{ opt.label }}
+          </ODropdownItem>
+        </ODropdown>
+
         <OToggleGroup
+          v-else
           :model-value="searchObj.meta.logsVisualizeToggle"
           @update:model-value="onLogsVisualizeToggleUpdate($event)"
         >
-          <OToggleGroupItem data-test="logs-logs-toggle" value="logs" size="sm">
+          <OToggleGroupItem
+            data-test="logs-logs-toggle"
+            value="logs"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+          >
             <template #icon-left>
               <OIcon name="search" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("common.search") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("common.search") }}</span>
           </OToggleGroupItem>
 
           <OToggleGroupItem
@@ -42,39 +71,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isVisualizeDisabled"
             :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : undefined"
             value="visualize"
-            size="sm"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
             <template #icon-left>
               <OIcon name="timeline" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("search.visualize") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("search.visualize") }}</span>
           </OToggleGroupItem>
 
           <OToggleGroupItem
             data-test="logs-build-toggle"
             value="build"
-            size="sm"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
             <template #icon-left>
               <OIcon name="build" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("search.buildQuery") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
           </OToggleGroupItem>
 
           <OToggleGroupItem
             v-if="config.isEnterprise == 'true'"
             data-test="logs-patterns-toggle"
             value="patterns"
-            size="sm"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
             <template #icon-left>
               <OIcon name="layers" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("search.showPatternsLabel") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
-        <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
+
+        <!-- reset filters button — moves into More menu at very narrow widths -->
         <OButton
+          v-if="!toolbarMoveResetToMenu"
           data-test="logs-search-bar-reset-filters-btn"
           class="tw:ms-1"
           size="icon-toolbar"
@@ -128,6 +159,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SET ONCE — view controls that persist across sessions -->
           <ODropdownGroup :label="t('search.menuGroupSetOnce')">
+            <!-- Reset filters (shown here only when toolbar is too narrow for inline button) -->
+            <ODropdownItem
+              v-if="toolbarMoveResetToMenu"
+              data-test="logs-search-bar-menu-reset-btn"
+              @select="resetFilters"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="restart-alt" size="sm" />
+                </span>
+              </template>
+              {{ t("search.resetFilters") }}
+            </ODropdownItem>
+
             <!-- Histogram (shown here only when toolbar is too narrow for inline button) -->
             <ODropdownItem
               v-if="shouldMoveButtonsToMenu"
@@ -223,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
 
-      <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
+      <div ref="toolbarRightRef" class="tw:flex tw:items-center tw:gap-1 tw:flex-shrink-0">
         <!-- Function picker + Save are now part of the in-editor function footer
              (rendered inside <unified-query-editor>). Removed from the top bar
              to avoid duplication. -->
@@ -257,8 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator v-if="shouldMoveShareToMenu" />
 
-          <!-- TOOLS section -->
-          <ODropdownGroup :label="t('search.menuGroupTools')">
+          <!-- HISTORY -->
+          <ODropdownGroup :label="t('search.menuGroupHistory')">
             <ODropdownItem
               data-test="search-history-item-btn"
               @select="showSearchHistoryfn"
@@ -270,7 +315,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.searchHistory") }}
             </ODropdownItem>
+          </ODropdownGroup>
 
+          <ODropdownSeparator />
+
+          <!-- DOWNLOADS -->
+          <ODropdownGroup :label="t('search.menuGroupDownloads')">
             <!-- Download results — nested sub-dropdown (hover to open) -->
             <div
               data-test="search-download-submenu-trigger"
@@ -286,7 +336,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="search-download-item-label">{{ t("search.downloadTable") }}</span>
               <OIcon size="sm" name="chevron-right" />
 
-              <!-- Submenu — absolutely positioned to the left of parent dropdown -->
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
                 class="search-download-submenu"
@@ -320,11 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span class="more-menu-icon-badge">
-                  <img
-                    :src="customRangeIcon"
-                    alt="Custom Range"
-                    class="tw:w-4 tw:h-4"
-                  />
+                  <img :src="customRangeIcon" alt="Custom Range" class="tw:w-4 tw:h-4" />
                 </span>
               </template>
               {{ t("search.customRange") }}
@@ -343,62 +388,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.explainQuery") }}
             </ODropdownItem>
-
-            <ODropdownItem
-              v-if="config.isEnterprise == 'true'"
-              data-test="search-scheduler-create-new-btn"
-              @select="createScheduleJob"
-            >
-              <template #icon-left>
-                <span class="more-menu-icon-badge">
-                  <img
-                    :src="createScheduledSearchIcon"
-                    alt="Create Scheduled Search"
-                    class="tw:w-4 tw:h-4"
-                  />
-                </span>
-              </template>
-              <span data-test="search-scheduler-create-new-label">
-                {{ t("search.createScheduledSearch") }}
-              </span>
-            </ODropdownItem>
-
-            <ODropdownItem
-              v-if="config.isEnterprise == 'true'"
-              data-test="search-scheduler-list-btn"
-              @select="routeToSearchSchedule"
-            >
-              <template #icon-left>
-                <span class="more-menu-icon-badge">
-                  <img
-                    :src="listScheduledSearchIcon"
-                    alt="List Scheduled Search"
-                    class="tw:w-4 tw:h-4"
-                  />
-                </span>
-              </template>
-              <span data-test="search-scheduler-list-label">
-                {{ t("search.listScheduledSearch") }}
-              </span>
-            </ODropdownItem>
-
-            <ODropdownItem
-              v-if="
-                config.isEnterprise == 'true' &&
-                config.isCloud == 'false' &&
-                store.state.zoConfig.search_inspector_enabled
-              "
-              data-test="search-inspect-btn"
-              @select="openSearchInspectDialog"
-            >
-              <template #icon-left>
-                <span class="more-menu-icon-badge">
-                  <OIcon name="troubleshoot" size="sm" />
-                </span>
-              </template>
-              <span data-test="search-inspect-label">{{ t("search.searchInspect") }}</span>
-            </ODropdownItem>
           </ODropdownGroup>
+
+          <!-- SCHEDULE (enterprise only) -->
+          <template v-if="config.isEnterprise == 'true'">
+            <ODropdownSeparator />
+            <ODropdownGroup :label="t('search.menuGroupSchedule')">
+              <ODropdownItem
+                data-test="search-scheduler-create-new-btn"
+                @select="createScheduleJob"
+              >
+                <template #icon-left>
+                  <span class="more-menu-icon-badge">
+                    <img :src="createScheduledSearchIcon" alt="Create Scheduled Search" class="tw:w-4 tw:h-4" />
+                  </span>
+                </template>
+                <span data-test="search-scheduler-create-new-label">
+                  {{ t("search.createScheduledSearch") }}
+                </span>
+              </ODropdownItem>
+
+              <ODropdownItem
+                data-test="search-scheduler-list-btn"
+                @select="routeToSearchSchedule"
+              >
+                <template #icon-left>
+                  <span class="more-menu-icon-badge">
+                    <img :src="listScheduledSearchIcon" alt="List Scheduled Search" class="tw:w-4 tw:h-4" />
+                  </span>
+                </template>
+                <span data-test="search-scheduler-list-label">
+                  {{ t("search.listScheduledSearch") }}
+                </span>
+              </ODropdownItem>
+            </ODropdownGroup>
+          </template>
+
+          <!-- INSPECT (enterprise + self-hosted + feature flag) -->
+          <template
+            v-if="
+              config.isEnterprise == 'true' &&
+              config.isCloud == 'false' &&
+              store.state.zoConfig.search_inspector_enabled
+            "
+          >
+            <ODropdownSeparator />
+            <ODropdownGroup :label="t('search.menuGroupInspect')">
+              <ODropdownItem
+                data-test="search-inspect-btn"
+                @select="openSearchInspectDialog"
+              >
+                <template #icon-left>
+                  <span class="more-menu-icon-badge">
+                    <OIcon name="troubleshoot" size="sm" />
+                  </span>
+                </template>
+                <span data-test="search-inspect-label">{{ t("search.searchInspect") }}</span>
+              </ODropdownItem>
+            </ODropdownGroup>
+          </template>
         </ODropdown>
         <share-button
           v-if="!shouldMoveShareToMenu"
@@ -1969,15 +2017,49 @@ export default defineComponent({
     };
     const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
 
-    // Observe the full toolbar bar width (parent container) so breakpoints react to
-    // window resize AND layout shifts like the O2 AI panel opening.
-    // The left section is flex-nowrap so its own width = content; we must watch the parent.
+    // Measure the ACTUAL available width for the left section:
+    //   availableLeftWidth = bar container width − right section width − bar padding (14px)
+    //
+    // Both sides are observed via ResizeObserver so any layout shift (window resize,
+    // O2 AI panel open/close, share button moving in/out) triggers a recalculation.
     const toolbarLeftRef = ref<HTMLElement | null>(null);
+    const toolbarRightRef = ref<HTMLElement | null>(null);
     const toolbarBarWidth = ref(window.innerWidth);
+    const toolbarRightWidth = ref(0);
     let toolbarResizeObserver: ResizeObserver | null = null;
-    // Histogram / Quick Mode: icon-only when bar <= 950px, move into More when bar <= 750px
-    const shouldHideToolbarButtonText = computed(() => toolbarBarWidth.value <= 950);
-    const shouldMoveButtonsToMenu = computed(() => toolbarBarWidth.value <= 750);
+    let toolbarRightObserver: ResizeObserver | null = null;
+
+    // availableLeftWidth is the exact usable space for all left-section children.
+    const availableLeftWidth = computed(() => Math.max(0, toolbarBarWidth.value - toolbarRightWidth.value - 14));
+
+    // Approximate rendered widths of left-section content at each collapse state:
+    //   Full (toggle+text, H+text, QM+text, reset, More)      ≈ 704px
+    //   H+QM icon-only                                         ≈ 552px
+    //   Toggle group icon-only (xs)                            ≈ 312px
+    //   H+QM moved into More                                   ≈ 232px
+    //   Reset also moved into More                             ≈ 196px
+    //   Toggle group → dropdown                                ≈ 160px
+    //
+    // Each threshold has a small buffer (+16px) so collapse fires before clipping.
+    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 720);
+    const toolbarToggleIconOnly       = computed(() => availableLeftWidth.value < 568);
+    const shouldMoveButtonsToMenu     = computed(() => availableLeftWidth.value < 328);
+    const toolbarMoveResetToMenu      = computed(() => availableLeftWidth.value < 248);
+    const toolbarToggleAsDropdown     = computed(() => availableLeftWidth.value < 176);
+
+    // Computed label/icon for the toggle-group-as-dropdown trigger
+    const toggleViewOptions = computed(() => [
+      { value: 'logs',      icon: 'search',   label: t('common.search'),            disabled: false },
+      { value: 'visualize', icon: 'timeline', label: t('search.visualize'),
+        disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1 },
+      { value: 'build',     icon: 'build',    label: t('search.buildQuery'),        disabled: false },
+      ...(config.isEnterprise === 'true'
+        ? [{ value: 'patterns', icon: 'layers', label: t('search.showPatternsLabel'), disabled: false }]
+        : []),
+    ]);
+    const currentToggleOption = computed(() =>
+      toggleViewOptions.value.find((o) => o.value === searchObj.meta.logsVisualizeToggle) ?? toggleViewOptions.value[0],
+    );
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
@@ -2665,9 +2747,7 @@ export default defineComponent({
       window.addEventListener("keydown", handleEscKey);
       window.addEventListener("resize", onWindowResize);
 
-      // Observe the parent bar container (not the left section itself, which is
-      // flex-nowrap and stays content-wide). The parent shrinks on window resize
-      // AND when the O2 AI panel opens — exactly what we need.
+      // Observe the bar container (parent of left section) for total width.
       const barEl = toolbarLeftRef.value?.parentElement;
       if (barEl) {
         toolbarBarWidth.value = barEl.getBoundingClientRect().width;
@@ -2675,6 +2755,14 @@ export default defineComponent({
           toolbarBarWidth.value = entries[0]?.contentRect.width ?? 0;
         });
         toolbarResizeObserver.observe(barEl);
+      }
+      // Observe the right section so its actual rendered width is always known.
+      if (toolbarRightRef.value) {
+        toolbarRightWidth.value = toolbarRightRef.value.getBoundingClientRect().width;
+        toolbarRightObserver = new ResizeObserver((entries) => {
+          toolbarRightWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        toolbarRightObserver.observe(toolbarRightRef.value);
       }
     });
 
@@ -2685,6 +2773,7 @@ export default defineComponent({
       window.removeEventListener("keydown", handleEscKey);
       window.removeEventListener("resize", onWindowResize);
       toolbarResizeObserver?.disconnect();
+      toolbarRightObserver?.disconnect();
     });
 
     onActivated(() => {
@@ -4699,9 +4788,15 @@ export default defineComponent({
       isGeneratingSQL,
       vrlEditorNlpMode,
       toolbarLeftRef,
+      toolbarRightRef,
       shouldMoveShareToMenu,
       shouldHideToolbarButtonText,
+      toolbarToggleIconOnly,
       shouldMoveButtonsToMenu,
+      toolbarMoveResetToMenu,
+      toolbarToggleAsDropdown,
+      toggleViewOptions,
+      currentToggleOption,
       toggleLiveMode,
     };
   },
