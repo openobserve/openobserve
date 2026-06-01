@@ -124,6 +124,11 @@
     "create": "Créez",
     "resources": "Ressources",
     "updated_at": "Mis à jour à",
+    "enable": "Activer",
+    "disable": "Désactiver",
+    "download": "Télécharger",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
     "error": "Erreur",
     "db": "Base de données",
     "discardChanges": "Ignorer les modifications",
@@ -1141,7 +1146,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Journaux Pub/Sub",
-    "aiLabel": "Intégrations d'IA"
+    "aiLabel": "Intégrations d'IA",
+    "manageTokensBtnLabel": "Gérer les jetons",
+    "orgLevelExplanation": "Il s'agit de jetons d'ingestion au niveau de l'organisation. Ils ne sont pas liés à des utilisateurs individuels et continueront de fonctionner même si l'utilisateur qui les a créés quitte l'organisation. Les jetons ne peuvent être utilisés que sur les points finaux d'ingestion.",
+    "resetDefaultTokenLabel": "Réinitialiser le jeton",
+    "tokenManagementTitle": "Gérer les jetons d'ingestion",
+    "defaultTokenBadge": "PAR DÉFAUT",
+    "createTokenBtn": "Créer un nouveau jeton",
+    "createTokenTitle": "Créer un jeton",
+    "tokenNameLabel": "Nom",
+    "tokenDescriptionLabel": "Descriptif",
+    "rotateTokenBtn": "Faire pivoter",
+    "deleteTokenBtn": "Supprimer",
+    "copyTokenBtn": "Copier",
+    "copyTokenWarning": "Copiez ce jeton maintenant. Il ne sera plus affiché.",
+    "newTokenRevealed": "Nouveau jeton généré",
+    "deleteTokenConfirm": "Supprimer le jeton « {name} » ? Les pipelines utilisant ce jeton cesseront de fonctionner.",
+    "rotateTokenConfirm": "Faire pivoter le jeton « {name} » ? Tous les pipelines utilisant ce jeton doivent être mis à jour avec la nouvelle valeur.",
+    "tokenCreatedSuccess": "Le jeton a été créé avec succès.",
+    "tokenRotatedSuccess": "Le jeton a été pivoté avec succès.",
+    "tokenDeletedSuccess": "Le jeton a été supprimé avec succès.",
+    "resetDefaultConfirm": "Réinitialiser le jeton d'ingestion par défaut ? Tous les pipelines utilisant ce jeton doivent être mis à jour.",
+    "tokenFetchError": "Impossible de charger les jetons.",
+    "tokenCreateError": "Impossible de créer le jeton.",
+    "tokenRotateError": "Impossible de faire pivoter le jeton.",
+    "tokenDeleteError": "Impossible de supprimer le jeton.",
+    "noTokensFound": "Aucun jeton d'ingestion n'a été trouvé.",
+    "createdBy": "Créé par"
   },
   "dashboard": {
     "selectField": "Champ",
@@ -2607,7 +2638,8 @@
     "systemDefault": "défaut du système",
     "usageStreamEnabledLabel": "Activer le flux d'utilisation",
     "aiToolsets": "Ensembles d'outils d'IA",
-    "llmModelPricing": "Tarification du modèle LLM"
+    "llmModelPricing": "Tarification du modèle LLM",
+    "ingestionTokens": "Jetons d'ingestion"
   },
   "iam": {
     "users": "Les utilisateurs",
@@ -2639,7 +2671,8 @@
     "quota": "Quotas",
     "externalUserWarningTitle": "Avertissement destiné aux utilisateurs externes",
     "externalUserWarningMessage": "L'ajout d'utilisateurs externes directement aux rôles n'accordera pas d'autorisations. Ajoutez-les plutôt aux groupes d'utilisateurs.",
-    "invitations": "Invitations"
+    "invitations": "Invitations",
+    "ingestionTokens": "Jetons d'ingestion"
   },
   "pipeline": {
     "header": "Canalisations",
@@ -3839,5 +3872,56 @@
     "awsStsSelfHostedInfo": "Cela utilise AWS sts pour assumer le rôle et effectuer des opérations. Assurez-vous d'avoir configuré les informations d'identification AWS dans l'environnement d'installation qui ont accès à ce rôle.",
     "externalIdRequired": "Un identifiant externe est requis",
     "storageAccountRequired": "Le nom du compte de stockage est obligatoire"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Bonjour",
+      "afternoon": "Bon après-midi",
+      "evening": "Bonne soirée",
+      "night": "Travailler tard"
+    },
+    "welcome": {
+      "taglineLead": "Je suis",
+      "taglineHighlight": "Assistant O2",
+      "taglineTail": ". Je peux écrire votre",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "ProMQL",
+      "taglineAnd": "et vous explique vos journaux, vos traces, vos indicateurs et vos incidents.",
+      "signedInAs": "Connecté en tant que",
+      "role": "Rôle",
+      "tryOneOfThese": "Ou essayez l'un d'entre eux"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Rédiger une requête",
+        "description": "SQL pour les logs, les traces, RUM ou ProMQL pour les métriques."
+      },
+      "incident": {
+        "title": "Étudier les incidents",
+        "description": "Cause première parmi les journaux, les traces et les alertes, par exemple « Pourquoi la passerelle -5xx s'est-elle déclenchée ? »"
+      },
+      "dashboard": {
+        "title": "Créez un tableau de bord",
+        "description": "À partir d'un sujet, par exemple « État du nœud K8s : processeur, mémoire, redémarrages ». Crée également des panneaux."
+      },
+      "alert": {
+        "title": "Créer une alerte",
+        "description": "Alertes à seuil ou planifiées et pipelines VRL à durée d'ingestion."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Écrire VRL pour analyser le JSON à partir de mes journaux nginx",
+      "regexRedact": "Générez un modèle regex pour expurger les e-mails",
+      "mapStreamSchema": "Mapper mon schéma de flux « par défaut »",
+      "promqlCpu": "Écrivez ProMQL pour les pods utilisant > 80 % du processeur",
+      "datadogToO2": "Convertissez cette requête Datadog en OpenObserve SQL",
+      "lastAlertFired": "Pourquoi ma dernière alerte a-t-elle été déclenchée ?"
+    },
+    "placeholderRotation": {
+      "one": "Montrez-moi les erreurs de la dernière heure...",
+      "two": "Écrivez VRL pour analyser le JSON à partir des journaux Nginx...",
+      "three": "Créez un tableau de bord pour l'état des nœuds K8s..."
+    }
   }
 }

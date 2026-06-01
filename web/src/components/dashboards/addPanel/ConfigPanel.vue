@@ -456,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <OIcon
                   class="tw:ml-1"
-                  size="md"
+                  size="sm"
                   name="info-outline"
                   data-test="dashboard-config-promql-legend-info"
                 />

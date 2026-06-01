@@ -33,15 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div :style="computedStyle">
         <OButton
           variant="outline"
-          size="icon-sm"
-          class="tw:h-9 tw:w-9"
+          size="icon-xs-sq"
+          class="tw:h-8! tw:w-8!"
           :data-test="`${type}-folder-move-new-add`"
           title="Add Folder"
           :disabled="disableDropdown"
+          @mousedown.prevent
           @click="() => { showAddFolderDialog = true; }"
-        >
-          <OIcon name="add" size="xs" />
-        </OButton>
+          icon-left="add"
+        />
       </div>
     </div>
     <!-- add folder -->
@@ -64,12 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
-    components: { AddFolder, OButton, OIcon, OSelect },
+    components: { AddFolder, OButton, OSelect },
     emits: ["folder-selected"],
     props: {
       activeFolderId: {

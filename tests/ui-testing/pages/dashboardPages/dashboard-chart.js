@@ -464,6 +464,16 @@ export default class ChartTypeSelector {
   }
 
   /**
+   * Wait for a field to appear in the field list (e.g. after SQL parsing).
+   * @param {string} fieldName - The field name to wait for
+   * @param {number} timeout - Max wait time in ms (default 10000)
+   */
+  async waitForFieldListRow(fieldName, timeout = 10000) {
+    const fieldRow = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`).first();
+    await fieldRow.waitFor({ state: "visible", timeout });
+  }
+
+  /**
    * Enter a custom SQL query in the Monaco editor.
    * Clicks the editor wrapper (data-test) then types via the page keyboard,
    * avoiding class/role selectors that violate the PO selector policy.

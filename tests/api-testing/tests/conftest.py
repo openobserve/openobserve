@@ -7,6 +7,10 @@ import logging
 from pathlib import Path
 import base64
 
+# Make the new framework fixtures available to all tests (Phase 4+).
+# Legacy tests still use create_session/base_url/org_id below.
+from support.fixtures import client, temp_stream_name, temp_user_email, temp_dashboard_id  # noqa: F401
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -67,8 +71,12 @@ def org_id():
 
 @pytest.fixture(scope="session", autouse=True)
 def ingest_data():
-    """Ingest data into the openobserve running instance."""
-    import time
+    """Ingest data into the openobserve running instance.
+
+    Replaces blind `time.sleep(N)` waits with a wait_until predicate that
+    polls the search endpoint until the ingested rows are visible.
+    """
+    from support.wait import wait_until
 
     # Use v2 session for consistent auth header
     session = _create_session_inner_v2()
@@ -95,21 +103,45 @@ def ingest_data():
     assert resp2.status_code == 200, \
         f"Failed to ingest camel case test data: {resp2.status_code} - {resp2.text[:500]}"
 
-    # Flush data to ensure it's indexed
+    # Flush data to ensure it's indexed (no-op in local mode; returns 404)
     flush_url = f"{base_url_with_slash}node/flush"
     logging.info("Flushing data to ensure indexing...")
     flush_resp = session.put(flush_url)
-
     if flush_resp.status_code == 200:
         logging.info("Data flushed successfully")
     elif flush_resp.status_code == 404:
-        # Node is not an ingester in local mode, data will be indexed automatically
-        logging.info("Flush not needed (local mode), waiting for auto-indexing...")
-        time.sleep(3)
+        logging.info("Flush not needed (local mode), polling for auto-indexing...")
     else:
         logging.warning("Flush request returned status %s: %s", flush_resp.status_code, flush_resp.text[:200])
 
-    # Give a small buffer for flush to complete
-    time.sleep(2)
+    # Poll the search endpoint until ingested data is visible — replaces the
+    # combined 5s of `time.sleep` with a deterministic check that exits as
+    # soon as the data is queryable (typically <1s on local, may take longer
+    # on slow CI runners).
+    def _data_is_searchable():
+        # Use the same auth/session shape that tests use.
+        search_url = f"{base_url_with_slash}api/{org}/_search?type=logs"
+        # Wide window: data fixtures may have older timestamps.
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        end_us = int(now.timestamp() * 1_000_000)
+        start_us = int((now - timedelta(weeks=2)).timestamp() * 1_000_000)
+        payload = {
+            "query": {
+                "sql": f'SELECT COUNT(*) AS c FROM "{stream_name}"',
+                "start_time": start_us,
+                "end_time": end_us,
+                "from": 0,
+                "size": 1,
+            }
+        }
+        r = session.post(search_url, json=payload)
+        if r.status_code != 200:
+            return False
+        hits = r.json().get("hits", [])
+        return bool(hits and hits[0].get("c", 0) > 0)
+
+    wait_until(_data_is_searchable, timeout=30, interval=0.5, msg="ingested data not searchable")
+    logging.info("Ingested data is searchable")
 
     return True

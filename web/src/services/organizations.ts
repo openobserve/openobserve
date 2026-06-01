@@ -102,6 +102,27 @@ const organizations = {
   revoke_external_contract: (orgIdentifier: string, targetOrgId: string) => {
     return http().delete(`/api/${orgIdentifier}/external_contract/${targetOrgId}`);
   },
+
+  // Org ingestion tokens
+  list_org_ingestion_tokens: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/ingestion-tokens`);
+  },
+  create_org_ingestion_token: (
+    orgIdentifier: string,
+    data: { name: string; description?: string },
+  ) => {
+    return http().post(`/api/${orgIdentifier}/ingestion-tokens`, data);
+  },
+  enable_disable_org_ingestion_token: (
+    orgIdentifier: string,
+    name: string,
+    enabled: boolean,
+  ) => {
+    return http().patch(
+      `/api/${orgIdentifier}/ingestion-tokens/${encodeURIComponent(name)}`,
+      { enabled },
+    );
+  },
 };
 
 export default organizations;

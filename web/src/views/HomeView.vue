@@ -341,12 +341,83 @@ export default defineComponent({
   box-shadow: none;
   border-radius: 0;
   min-width: 0;
+  overflow: visible;
+}
+
+/* Allow the input's gradient glow + shadow to spill outside the container.
+   messages-container has its own overflow-y, so the page itself won't grow. */
+.home-ai-panel :deep(.chat-content-wrapper),
+.home-ai-panel :deep(.chat-content) {
+  overflow: visible;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
 .home-ai-panel :deep(.chat-header),
 .home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
   display: none;
+}
+
+/* Gradient border on the prompt input — home tab only.
+   Uses the dual-background trick: bg color for padding-box, gradient for border-box.
+   2px border for stronger presence + layered shadows for depth. */
+.home-ai-panel :deep(.unified-input-box) {
+  position: relative;
+  border: 2px solid transparent !important;
+  background:
+    linear-gradient(
+        var(--o2-ai-input-bg, #ffffff),
+        var(--o2-ai-input-bg, #ffffff)
+      )
+      padding-box,
+    linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff) border-box !important;
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 8px 20px -2px rgba(15, 23, 42, 0.12),
+    0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
+}
+
+.home-ai-panel :deep(.unified-input-box.light-mode) {
+  --o2-ai-input-bg: #ffffff;
+}
+
+.home-ai-panel :deep(.unified-input-box.dark-mode) {
+  --o2-ai-input-bg: #191919;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 8px 22px -2px rgba(0, 0, 0, 0.55),
+    0 20px 48px -10px rgba(123, 97, 255, 0.45) !important;
+}
+
+/* Soft ambient glow behind the input */
+.home-ai-panel :deep(.unified-input-box)::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  opacity: 0.22;
+  filter: blur(22px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Stronger glow + shadow on focus, no harsh ring */
+.home-ai-panel :deep(.unified-input-box:focus-within) {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 6px 16px -2px rgba(15, 23, 42, 0.1),
+    0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
+}
+
+.home-ai-panel :deep(.unified-input-box.dark-mode:focus-within) {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 6px 20px -2px rgba(0, 0, 0, 0.55),
+    0 18px 44px -8px rgba(123, 97, 255, 0.42) !important;
+}
+
+.home-ai-panel :deep(.unified-input-box:focus-within)::before {
+  opacity: 0.4;
 }
 
 .home-page {

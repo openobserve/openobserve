@@ -13,141 +13,204 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Row-group-direct parallel tantivy index builder.
-//!
-//! Activated when `compact.tantivy_parallel_build_workers > 1` and the input
-//! file format is parquet. Each parquet row_group becomes one independent
-//! chunk segment built off the runtime in `tokio::task::spawn_blocking`; the
-//! resulting per-row_group segments are stitched together by
-//! `tantivy::indexer::merge_indices` in row_group order.
-//!
-//! Correctness of `doc_id == global_row_index` is preserved because:
-//!   1. each per-row_group `SingleSegmentIndexWriter` writes rows in stored order, so its local
-//!      doc_ids equal the row's offset inside that row_group;
-//!   2. `IndexMerger` stacks input segments in input order (current tantivy has no `sort_by_field`
-//!      path), so each segment's doc_ids land at `i * PARQUET_MAX_ROW_GROUP_SIZE`. For example,
-//!      pretending the fixed row_group size were 100, segment 0 would occupy doc_ids `[0, 100)`,
-//!      segment 1 `[100, 200)`, segment 2 `[200, 300)`, etc. (the final row_group may be shorter,
-//!      but it is always the last segment);
-//!   3. parquet stores row_groups in row order, so the global row index of row_group `i`'s row `k`
-//!      is `i * PARQUET_MAX_ROW_GROUP_SIZE + k` (with size 100, row 5 of row_group 1 maps to global
-//!      row index `100 + 5 = 105`).
-
 use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use bytes::Bytes;
 use config::{
-    TIMESTAMP_COL_NAME,
+    FileFormat, TIMESTAMP_COL_NAME,
     utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
-use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
-use tantivy::directory::MmapDirectory;
+use futures::future::join_all;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use tantivy::{directory::MmapDirectory, indexer::merge_indices};
 use tokio::task::JoinHandle;
+#[cfg(all(feature = "vortex", feature = "enterprise"))]
+use {
+    config::PARQUET_MAX_ROW_GROUP_SIZE,
+    vortex::{
+        VortexSessionDefault,
+        file::OpenOptionsSessionExt,
+        io::{
+            runtime::{BlockingRuntime, single::SingleThreadRuntime},
+            session::RuntimeSessionExt,
+        },
+        session::VortexSession,
+    },
+};
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
+use crate::service::tantivy::reader::{ChunkSelector, chunk_iter};
 
-type TaskOutput = (usize, tantivy::Index, usize);
+pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
+    tantivy_dir: D,
+    file_format: FileFormat,
+    buf: Bytes,
+    index_schema: TantivyIndexSchema,
+    thread_num: usize,
+) -> Result<Option<tantivy::Index>, Error> {
+    match file_format {
+        FileFormat::Parquet => {
+            let buf_meta = buf.clone();
+            let num_row_groups = tokio::task::spawn_blocking(move || -> Result<usize, Error> {
+                ParquetRecordBatchReaderBuilder::try_new(buf_meta)
+                    .context("failed to open parquet for metadata")
+                    .map(|b| b.metadata().num_row_groups())
+            })
+            .await??;
 
-/// Row-group-direct parallel tantivy index builder.
+            build_parallel_index(
+                tantivy_dir,
+                buf,
+                index_schema,
+                thread_num,
+                num_row_groups,
+                ChunkSelector::Parquet,
+            )
+            .await
+        }
+        #[cfg(all(feature = "vortex", feature = "enterprise"))]
+        FileFormat::Vortex => {
+            let buf_meta = buf.clone();
+            let row_count: u64 = tokio::task::spawn_blocking(move || -> Result<u64, Error> {
+                let runtime = SingleThreadRuntime::default();
+                let session = VortexSession::default().with_handle(runtime.handle());
+                session
+                    .open_options()
+                    .open_buffer(buf_meta)
+                    .context("failed to open vortex file for row_count")
+                    .map(|vxf| vxf.row_count())
+            })
+            .await??;
+
+            let chunk_size = PARQUET_MAX_ROW_GROUP_SIZE as u64;
+            let num_chunks = row_count.div_ceil(chunk_size) as usize;
+            build_parallel_index(
+                tantivy_dir,
+                buf,
+                index_schema,
+                thread_num,
+                num_chunks,
+                move |chunk_idx| {
+                    let chunk_start = chunk_idx as u64 * chunk_size;
+                    let chunk_end = std::cmp::min(chunk_start + chunk_size, row_count);
+                    ChunkSelector::Vortex(chunk_start..chunk_end)
+                },
+            )
+            .await
+        }
+        #[cfg(not(all(feature = "vortex", feature = "enterprise")))]
+        FileFormat::Vortex => Err(anyhow::anyhow!(
+            "Vortex file format requires the vortex feature"
+        )),
+    }
+}
+
+struct SegmentOutput {
+    chunk_idx: usize,
+    index: tantivy::Index,
+    row_count: usize,
+}
+
+/// Chunk-parallel tantivy index builder shared by the Parquet and Vortex paths.
 ///
 /// ```text
-///   parquet (Bytes)
+///   Bytes  (reference-counted — each worker gets one cheap clone)
 ///     │
-///     ├─ open ParquetRecordBatchReaderBuilder ── read metadata ── num_row_groups
+///     │  build_index dispatches by format:
+///     │  ┌─ Parquet ── read metadata ─── num_row_groups → chunks
+///     │  └─ Vortex  ── read row_count ── ÷ PARQUET_MAX_ROW_GROUP_SIZE → chunks
 ///     │
 ///     ▼  spawn_blocking pool (concurrency = workers)
 ///   ┌──────────────────────┬──────────────────────┬─────────────────────┐
-///   │ rg_0                 │ rg_1                 │ ...                 │
-///   │ builder              │ builder              │                     │
-///   │   .with_row_groups   │   .with_row_groups   │                     │
-///   │   ([0]).build()      │   ([1]).build()      │                     │
+///   │ chunk_0              │ chunk_1              │ ...                 │
+///   │ make_selector(0)     │ make_selector(1)     │                     │
+///   │ → ChunkSelector      │ → ChunkSelector      │                     │
+///   │ → chunk_iter         │ → chunk_iter         │                     │
 ///   │ → SingleSegmentIdx   │ → SingleSegmentIdx   │                     │
 ///   │ → finalize → Index   │ → finalize → Index   │                     │
 ///   └──────────────────────┴──────────────────────┴─────────────────────┘
 ///     │
-///     ▼  sort by rg_idx ASC
+///     ▼  sort by chunk_idx ASC
 ///   merge_indices([Index_0, Index_1, ...], PuffinDirWriter)
 ///     │
 ///     ▼
 ///   single segment, doc_id == global_row_index
 /// ```
-///
-/// `Bytes` is reference-counted, so handing one clone per worker is cheap.
-pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
+async fn build_parallel_index<D, F>(
     tantivy_dir: D,
     buf: Bytes,
     index_schema: TantivyIndexSchema,
     thread_num: usize,
-) -> Result<Option<tantivy::Index>, Error> {
-    // Parse parquet metadata once on a blocking thread (footer decode is sync I/O).
-    let num_row_groups = {
-        let buf = buf.clone();
-        tokio::task::spawn_blocking(move || -> Result<usize, Error> {
-            let builder = ParquetRecordBatchReaderBuilder::try_new(buf)
-                .context("failed to open parquet for metadata")?;
-            Ok(builder.metadata().num_row_groups())
-        })
-        .await??
-    };
-    if num_row_groups == 0 {
+    num_chunks: usize,
+    make_selector: F,
+) -> Result<Option<tantivy::Index>, Error>
+where
+    D: tantivy::Directory + Send + Sync + 'static,
+    F: Fn(usize) -> ChunkSelector,
+{
+    if num_chunks == 0 {
         return Ok(None);
     }
 
-    // single row_group fast path
-    if num_row_groups == 1 {
+    // single chunk fast path — write directly into the caller-supplied dir, no merge
+    if num_chunks == 1 {
         let start = std::time::Instant::now();
-        let (_, index, num_rows) = tokio::task::spawn_blocking(move || {
-            build_row_group_segment(0, buf, index_schema, tantivy_dir)
+        let selector = make_selector(0);
+        let SegmentOutput {
+            index, row_count, ..
+        } = tokio::task::spawn_blocking(move || {
+            build_segment(0, buf, selector, index_schema, tantivy_dir)
         })
         .await??;
         log::info!(
-            "parallel::build_index: single row_group fast path, rows={num_rows}, elapsed={} ms",
+            "parallel::build_index: single chunk, rows={row_count}, elapsed={} ms",
             start.elapsed().as_millis()
         );
         return Ok(Some(index));
     }
 
-    let thread_num = thread_num.max(1).min(num_row_groups);
+    let thread_num = thread_num.max(1).min(num_chunks);
     let semaphore = Arc::new(tokio::sync::Semaphore::new(thread_num));
 
     let start = std::time::Instant::now();
-    let mut tasks: Vec<JoinHandle<Result<TaskOutput, Error>>> = Vec::with_capacity(num_row_groups);
-    for rg_idx in 0..num_row_groups {
+    let mut tasks: Vec<JoinHandle<Result<SegmentOutput, Error>>> = Vec::with_capacity(num_chunks);
+    for chunk_idx in 0..num_chunks {
         let permit = semaphore.clone().acquire_owned().await?;
         let buf_c = buf.clone();
         let index_schema_c = index_schema.clone();
+        let selector = make_selector(chunk_idx);
         tasks.push(tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let dir = MmapDirectory::create_from_tempdir()?;
-            build_row_group_segment(rg_idx, buf_c, index_schema_c, dir)
+            build_segment(chunk_idx, buf_c, selector, index_schema_c, dir)
         }));
     }
 
-    let mut indexed: Vec<TaskOutput> = Vec::with_capacity(tasks.len());
-    for t in tasks {
-        indexed.push(t.await??);
-    }
-    // Sort by row_group index to preserve global row order in the merged index.
-    indexed.sort_by_key(|(rg, ..)| *rg);
-    let total_num_rows: usize = indexed.iter().map(|(_, _, n)| n).sum();
-    let indices: Vec<tantivy::Index> = indexed.into_iter().map(|(_, i, _)| i).collect();
+    // await all tasks concurrently, then sort to restore chunk order.
+    let mut indexed: Vec<SegmentOutput> = join_all(tasks)
+        .await
+        .into_iter()
+        .map(|r| -> Result<SegmentOutput, Error> { r? })
+        .collect::<Result<_, _>>()?;
+    indexed.sort_by_key(|s| s.chunk_idx);
+    let total_rows: usize = indexed.iter().map(|s| s.row_count).sum();
+    let indices: Vec<tantivy::Index> = indexed.into_iter().map(|s| s.index).collect();
 
     log::info!(
-        "parallel::build_index: built {num_row_groups} row_groups, total_rows={total_num_rows}, thread_num={thread_num}, elapsed={} ms",
+        "parallel::build_index: built {num_chunks} chunks, rows={total_rows}, thread_num={thread_num}, elapsed={} ms",
         start.elapsed().as_millis()
     );
 
-    // merge all row_group indices into a single index.
     let start = std::time::Instant::now();
     let merged = tokio::task::spawn_blocking(move || {
-        tantivy::indexer::merge_indices(&indices, tantivy_dir)
+        merge_indices(&indices, tantivy_dir)
             .map_err(|e| anyhow::anyhow!("merge_indices failed: {e}"))
     })
     .await??;
 
     log::info!(
-        "parallel::build_index: merged row_group indices into single tantivy index, elapsed={} ms",
+        "parallel::build_index: merged {num_chunks} segments, elapsed={} ms",
         start.elapsed().as_millis()
     );
 
@@ -159,44 +222,29 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
         ));
     }
     let merged_rows = merged_segs[0].meta().max_doc() as usize;
-    if merged_rows != total_num_rows {
+    if merged_rows != total_rows {
         return Err(anyhow::anyhow!(
-            "merged tantivy index row count mismatch: tantivy={merged_rows}, parquet={total_num_rows}",
+            "merged tantivy index row count mismatch: tantivy={merged_rows}, chunks={total_rows}",
         ));
     }
 
     Ok(Some(merged))
 }
 
-/// Synchronously builds the tantivy segment for exactly one parquet row_group
-/// into the caller-supplied directory.
-/// Return: (row_group_index, per-row_group Index, row_count)
-fn build_row_group_segment<D: tantivy::Directory>(
-    rg_idx: usize,
+/// Synchronously builds one tantivy segment from the rows described by
+/// `selector`. Used by both the parquet and vortex parallel paths.
+fn build_segment<D: tantivy::Directory>(
+    chunk_idx: usize,
     buf: Bytes,
+    selector: ChunkSelector,
     index_schema: TantivyIndexSchema,
     dir: D,
-) -> Result<(usize, tantivy::Index, usize), Error> {
-    let builder = ParquetRecordBatchReaderBuilder::try_new(buf)?;
+) -> Result<SegmentOutput, Error> {
+    let mut projection: Vec<String> = index_schema.fields.iter().cloned().collect();
+    projection.push(TIMESTAMP_COL_NAME.to_string());
 
-    let arrow_schema = builder.schema();
-    let projection_indices: Vec<usize> = arrow_schema
-        .fields()
-        .iter()
-        .enumerate()
-        .filter_map(|(i, f)| {
-            (f.name() == TIMESTAMP_COL_NAME || index_schema.fields.contains(f.name())).then_some(i)
-        })
-        .collect();
-    let projection_mask = ProjectionMask::roots(
-        builder.metadata().file_metadata().schema_descr(),
-        projection_indices,
-    );
-
-    let reader = builder
-        .with_projection(projection_mask)
-        .with_row_groups(vec![rg_idx])
-        .build()?;
+    let iter = chunk_iter(selector, buf, Some(&projection))
+        .with_context(|| format!("chunk {chunk_idx}: reader build failed"))?;
 
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
@@ -205,13 +253,13 @@ fn build_row_group_segment<D: tantivy::Directory>(
         .tokenizers(tokenizer_manager)
         .single_segment_index_writer::<tantivy::TantivyDocument>(dir, 50_000_000)?;
 
-    let mut rg_rows: usize = 0;
-    for batch_res in reader {
+    let mut row_count: usize = 0;
+    for batch_res in iter {
         let batch = batch_res?;
         if batch.num_rows() == 0 {
             continue;
         }
-        rg_rows += batch.num_rows();
+        row_count += batch.num_rows();
         let docs = convert_batch_to_docs_sync(&batch, &index_schema);
         for doc in docs {
             writer.add_document(doc)?;
@@ -220,9 +268,13 @@ fn build_row_group_segment<D: tantivy::Directory>(
 
     let index = writer
         .finalize()
-        .map_err(|e| anyhow::anyhow!("worker {rg_idx}: finalize failed: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("chunk {chunk_idx}: finalize failed: {e}"))?;
 
-    Ok((rg_idx, index, rg_rows))
+    Ok(SegmentOutput {
+        chunk_idx,
+        index,
+        row_count,
+    })
 }
 
 #[cfg(test)]
@@ -235,10 +287,12 @@ mod tests {
         record_batch::RecordBatch,
     };
     use config::{FileFormat, TIMESTAMP_COL_NAME};
-    use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
+    use parquet::{
+        arrow::{AsyncArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
+        file::properties::WriterProperties,
+    };
     use tantivy::directory::RamDirectory;
 
-    use super::*;
     use crate::service::tantivy::{
         sequential,
         tests::{create_test_parquet_bytes, make_index_schema},
@@ -332,11 +386,11 @@ mod tests {
             Field::new("marker", DataType::Utf8, false),
         ]));
 
-        let index = build_index(
+        let index = super::build_index(
             RamDirectory::create(),
+            FileFormat::Parquet,
             buf,
             make_index_schema(&[], &["marker".to_string()], &stream_schema),
-            // workers
             3, // force out-of-order completion
         )
         .await
@@ -391,8 +445,9 @@ mod tests {
             Field::new("marker", DataType::Utf8, false),
         ]));
 
-        let index = build_index(
+        let index = super::build_index(
             RamDirectory::create(),
+            FileFormat::Parquet,
             buf,
             make_index_schema(&[], &["marker".to_string()], &stream_schema),
             4,
@@ -444,8 +499,9 @@ mod tests {
             Field::new("marker", DataType::Utf8, false),
         ]));
 
-        let par = build_index(
+        let par = super::build_index(
             RamDirectory::create(),
+            FileFormat::Parquet,
             buf_par,
             make_index_schema(&[], &["marker".to_string()], &schema),
             3,
@@ -507,6 +563,209 @@ mod tests {
             let addr_seq = *hits_seq.iter().next().unwrap();
             assert_eq!(addr_par.doc_id as usize, row);
             assert_eq!(addr_seq.doc_id as usize, row);
+        }
+    }
+
+    #[cfg(all(feature = "vortex", feature = "enterprise"))]
+    mod vortex_tests {
+        use std::sync::Arc;
+
+        use arrow::{
+            array::{Int64Array, StringArray},
+            datatypes::{DataType, Field, Schema},
+            record_batch::RecordBatch,
+        };
+        use bytes::Bytes;
+        use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME};
+        use tantivy::directory::RamDirectory;
+        use vortex::{
+            VortexSessionDefault,
+            array::{ArrayRef, arrow::FromArrowArray},
+            dtype::{DType, arrow::FromArrowType},
+            file::{VortexWriteOptions, WriteStrategyBuilder},
+            io::session::RuntimeSessionExt,
+            session::VortexSession,
+        };
+
+        const CHUNK_ROWS: u64 = PARQUET_MAX_ROW_GROUP_SIZE as u64;
+
+        use crate::service::tantivy::tests::make_index_schema;
+
+        /// One row per marker, marker text is globally unique → search-by-marker
+        /// recovers the row's doc_id so we can assert it equals the global row index.
+        fn create_marker_batch(start: usize, num_rows: usize) -> RecordBatch {
+            let fields = vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("marker", DataType::Utf8, false),
+            ];
+            let timestamps: Vec<i64> = (0..num_rows).map(|i| (start + i) as i64).collect();
+            let markers: Vec<String> = (0..num_rows)
+                .map(|i| format!("row{:09}", start + i))
+                .collect();
+            let schema = Arc::new(Schema::new(fields));
+            RecordBatch::try_new(
+                schema,
+                vec![
+                    Arc::new(Int64Array::from(timestamps)),
+                    Arc::new(StringArray::from(markers)),
+                ],
+            )
+            .unwrap()
+        }
+
+        /// Writes batches into an in-memory vortex file using the default write
+        /// strategy. Test helper — production writes go through `write_vortex` in
+        /// the enterprise crate.
+        async fn create_test_vortex_bytes(batches: Vec<RecordBatch>) -> Bytes {
+            let schema = batches[0].schema();
+            let session = VortexSession::default().with_tokio();
+            let dtype = DType::from_arrow(schema.as_ref());
+            let write_options = VortexWriteOptions::new(session)
+                .with_strategy(WriteStrategyBuilder::default().build());
+            let mut buf = Vec::new();
+            let mut writer = write_options.writer(&mut buf, dtype);
+            for batch in batches {
+                let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
+                writer.push(array).await.unwrap();
+            }
+            writer.finish().await.unwrap();
+            Bytes::from(buf)
+        }
+
+        /// Core invariant test: parallel chunks (possibly out of order) must yield
+        /// `doc_id == global_row_index` after merge.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+        async fn test_vortex_parallel_preserves_row_order() {
+            // Total rows that span ≥ 2 chunks so the merge path runs. CHUNK_ROWS
+            // is PARQUET_MAX_ROW_GROUP_SIZE (128k) — using a small multiple keeps
+            // the test fast while still exercising multi-chunk merge.
+            let total_rows = (CHUNK_ROWS as usize) * 2 + 137;
+            let buf = create_test_vortex_bytes(vec![create_marker_batch(0, total_rows)]).await;
+
+            let stream_schema = Arc::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("marker", DataType::Utf8, false),
+            ]));
+
+            let index = super::super::build_index(
+                RamDirectory::create(),
+                FileFormat::Vortex,
+                buf,
+                make_index_schema(&[], &["marker".to_string()], &stream_schema),
+                3, // force out-of-order chunk completion
+            )
+            .await
+            .expect("vortex parallel build must succeed")
+            .expect("vortex parallel build must return Some(index)");
+
+            let segs = index.searchable_segments().unwrap();
+            assert_eq!(segs.len(), 1);
+            assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
+
+            let reader = index.reader().unwrap();
+            let searcher = reader.searcher();
+            let marker_field = index.schema().get_field("marker").unwrap();
+
+            // Spot-check evenly along the range — full scan of 256k+ rows is too
+            // slow for a unit test.
+            let probes = [
+                0,
+                1,
+                CHUNK_ROWS as usize - 1,
+                CHUNK_ROWS as usize,
+                CHUNK_ROWS as usize * 2 - 1,
+                CHUNK_ROWS as usize * 2,
+                total_rows - 1,
+            ];
+            for row in probes {
+                let m = format!("row{:09}", row);
+                let q = tantivy::query::TermQuery::new(
+                    tantivy::Term::from_field_text(marker_field, &m),
+                    tantivy::schema::IndexRecordOption::Basic,
+                );
+                let hits = searcher
+                    .search(&q, &tantivy::collector::DocSetCollector)
+                    .unwrap();
+                assert_eq!(
+                    hits.len(),
+                    1,
+                    "marker for row {row} must match exactly 1 doc"
+                );
+                let addr = *hits.iter().next().unwrap();
+                assert_eq!(addr.segment_ord, 0);
+                assert_eq!(
+                    addr.doc_id as usize, row,
+                    "INVARIANT VIOLATION: doc_id != row_index at row {row}"
+                );
+            }
+        }
+
+        /// Total rows < CHUNK_ROWS ⇒ single-chunk fast path that bypasses
+        /// `merge_indices` and writes the segment straight into the caller-supplied
+        /// directory.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn test_vortex_parallel_single_chunk_fast_path() {
+            let total_rows = 1234usize;
+            let buf = create_test_vortex_bytes(vec![create_marker_batch(0, total_rows)]).await;
+
+            let stream_schema = Arc::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("marker", DataType::Utf8, false),
+            ]));
+
+            let index = super::super::build_index(
+                RamDirectory::create(),
+                FileFormat::Vortex,
+                buf,
+                make_index_schema(&[], &["marker".to_string()], &stream_schema),
+                4,
+            )
+            .await
+            .expect("single chunk build must succeed")
+            .expect("single chunk build must return Some(index)");
+
+            let segs = index.searchable_segments().unwrap();
+            assert_eq!(segs.len(), 1);
+            assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
+
+            let reader = index.reader().unwrap();
+            let searcher = reader.searcher();
+            let marker_field = index.schema().get_field("marker").unwrap();
+            for row in 0..total_rows {
+                let m = format!("row{:09}", row);
+                let q = tantivy::query::TermQuery::new(
+                    tantivy::Term::from_field_text(marker_field, &m),
+                    tantivy::schema::IndexRecordOption::Basic,
+                );
+                let hits = searcher
+                    .search(&q, &tantivy::collector::DocSetCollector)
+                    .unwrap();
+                assert_eq!(hits.len(), 1);
+                let addr = *hits.iter().next().unwrap();
+                assert_eq!(addr.segment_ord, 0);
+                assert_eq!(addr.doc_id as usize, row);
+            }
+        }
+
+        /// Zero-row file ⇒ Ok(None), no panic.
+        #[tokio::test]
+        async fn test_vortex_parallel_empty_file() {
+            let empty = create_marker_batch(0, 0);
+            let buf = create_test_vortex_bytes(vec![empty.clone()]).await;
+            let stream_schema = Arc::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("marker", DataType::Utf8, false),
+            ]));
+            let result = super::super::build_index(
+                RamDirectory::create(),
+                FileFormat::Vortex,
+                buf,
+                make_index_schema(&[], &["marker".to_string()], &stream_schema),
+                2,
+            )
+            .await
+            .expect("empty build must succeed");
+            assert!(result.is_none());
         }
     }
 }

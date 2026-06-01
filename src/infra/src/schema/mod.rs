@@ -366,17 +366,25 @@ pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<S
 }
 
 pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
-    let default_fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
-    match settings {
+    // Bloom filter is built on top of the secondary index, so every bloom
+    // field must also be a secondary-index field. Fold the default bloom
+    // fields into the index defaults here; the per-stream configured bloom
+    // fields are unioned in the `Some` branch below (defensive for settings
+    // persisted before bloom fields were merged into index_fields on update).
+    let mut default_fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
+    default_fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+    let mut fields = match settings {
         Some(settings) => {
             let mut fields = settings.index_fields.clone();
             fields.extend(default_fields);
-            fields.sort();
-            fields.dedup();
+            fields.extend(settings.bloom_filter_fields.clone());
             fields
         }
         None => default_fields,
-    }
+    };
+    fields.sort();
+    fields.dedup();
+    fields
 }
 
 pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>) -> Vec<String> {

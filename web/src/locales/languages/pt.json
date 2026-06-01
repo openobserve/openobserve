@@ -124,6 +124,11 @@
     "create": "Criar",
     "resources": "Recursos",
     "updated_at": "Atualizado em",
+    "enable": "Habilitar",
+    "disable": "Desabilitar",
+    "download": "Baixar",
+    "enabled": "Ativado",
+    "disabled": "Desativado",
     "error": "Erro",
     "db": "Banco de dados",
     "discardChanges": "Descartar alterações",
@@ -1141,7 +1146,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Registros do Pub/Sub",
-    "aiLabel": "Integrações de IA"
+    "aiLabel": "Integrações de IA",
+    "manageTokensBtnLabel": "Gerenciar tokens",
+    "orgLevelExplanation": "Esses são tokens de ingestão no nível da organização. Eles não estão vinculados a usuários individuais e continuarão funcionando mesmo que o usuário que os criou deixe a organização. Os tokens só podem ser usados em terminais de ingestão.",
+    "resetDefaultTokenLabel": "Token de redefinição",
+    "tokenManagementTitle": "Gerenciar tokens de ingestão",
+    "defaultTokenBadge": "PADRÃO",
+    "createTokenBtn": "Criar novo token",
+    "createTokenTitle": "Criar token",
+    "tokenNameLabel": "Nome",
+    "tokenDescriptionLabel": "Descrição",
+    "rotateTokenBtn": "Girar",
+    "deleteTokenBtn": "Excluir",
+    "copyTokenBtn": "Copiar",
+    "copyTokenWarning": "Copie esse token agora. Não será exibido novamente.",
+    "newTokenRevealed": "Novo token gerado",
+    "deleteTokenConfirm": "Excluir o token “{name}”? Os pipelines que usam esse token deixarão de funcionar.",
+    "rotateTokenConfirm": "Girar o token “{name}”? Todos os pipelines que usam esse token devem ser atualizados com o novo valor.",
+    "tokenCreatedSuccess": "Token criado com sucesso.",
+    "tokenRotatedSuccess": "O token foi girado com sucesso.",
+    "tokenDeletedSuccess": "Token excluído com sucesso.",
+    "resetDefaultConfirm": "Redefinir o token de ingestão padrão? Todos os pipelines que usam esse token devem ser atualizados.",
+    "tokenFetchError": "Falha ao carregar tokens.",
+    "tokenCreateError": "Falha ao criar o token.",
+    "tokenRotateError": "Falha ao girar o token.",
+    "tokenDeleteError": "Falha ao excluir o token.",
+    "noTokensFound": "Nenhum token de ingestão foi encontrado.",
+    "createdBy": "Criado por"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2607,7 +2638,8 @@
     "systemDefault": "padrão do sistema",
     "usageStreamEnabledLabel": "Ativar fluxo de uso",
     "aiToolsets": "Conjuntos de ferramentas de IA",
-    "llmModelPricing": "Preços do modelo LLM"
+    "llmModelPricing": "Preços do modelo LLM",
+    "ingestionTokens": "Tokens de ingestão"
   },
   "iam": {
     "users": "Usuários",
@@ -2639,7 +2671,8 @@
     "quota": "Cotas",
     "externalUserWarningTitle": "Aviso de usuário externo",
     "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários.",
-    "invitations": "Convites"
+    "invitations": "Convites",
+    "ingestionTokens": "Tokens de ingestão"
   },
   "pipeline": {
     "header": "Oleodutos",
@@ -3839,5 +3872,56 @@
     "awsStsSelfHostedInfo": "Isso usa o AWS sts para assumir funções e realizar operações. Verifique se você configurou as credenciais da AWS no ambiente de instalação que tem acesso a essa função.",
     "externalIdRequired": "É necessário um ID externo",
     "storageAccountRequired": "O nome da conta de armazenamento é obrigatório"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Bom dia",
+      "afternoon": "Boa tarde",
+      "evening": "Boa noite",
+      "night": "Trabalhando até tarde"
+    },
+    "welcome": {
+      "taglineLead": "Eu sou",
+      "taglineHighlight": "Assistente de O2",
+      "taglineTail": ". Eu posso escrever seu",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "ProMQL",
+      "taglineAnd": "e mostre seus registros, rastreamentos, métricas e incidentes.",
+      "signedInAs": "Conectado como",
+      "role": "Função",
+      "tryOneOfThese": "Ou experimente um desses"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Escrever uma consulta",
+        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas."
+      },
+      "incident": {
+        "title": "Investigue incidentes",
+        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”"
+      },
+      "dashboard": {
+        "title": "Crie um painel",
+        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis."
+      },
+      "alert": {
+        "title": "Crie um alerta",
+        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Escreva VRL para analisar o JSON dos meus logs do nginx",
+      "regexRedact": "Gere um padrão regex para redigir e-mails",
+      "mapStreamSchema": "Mapeie meu esquema de stream “padrão”",
+      "promqlCpu": "Escreva ProMQL para pods usando > 80% de CPU",
+      "datadogToO2": "Converter essa consulta Datadog em OpenObserve SQL",
+      "lastAlertFired": "Por que meu último alerta foi disparado?"
+    },
+    "placeholderRotation": {
+      "one": "Mostre-me os erros da última hora...",
+      "two": "Escreva VRL para analisar o JSON dos logs do nginx...",
+      "three": "Crie um painel para a integridade do nó K8s..."
+    }
   }
 }

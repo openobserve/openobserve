@@ -124,6 +124,11 @@
     "create": "作成",
     "resources": "リソース",
     "updated_at": "更新日",
+    "enable": "有効にする",
+    "disable": "無効",
+    "download": "[ダウンロード]",
+    "enabled": "有効",
+    "disabled": "無効",
     "error": "[エラー]",
     "db": "[データベース]",
     "discardChanges": "変更を破棄",
@@ -1158,7 +1163,33 @@
     "iis": "IIS",
     "pubsub": "Pub/Subログ",
     "oracle": "オラクル",
-    "aiLabel": "AI インテグレーション"
+    "aiLabel": "AI インテグレーション",
+    "manageTokensBtnLabel": "トークンの管理",
+    "orgLevelExplanation": "これらは組織レベルの取り込みトークンです。これらは個々のユーザーに関連付けられることはなく、作成したユーザーが組織を離れても引き続き機能します。トークンは取り込みエンドポイントでのみ使用できます。",
+    "resetDefaultTokenLabel": "トークンをリセット",
+    "tokenManagementTitle": "取り込みトークンの管理",
+    "defaultTokenBadge": "デフォルト",
+    "createTokenBtn": "新しいトークンを作成",
+    "createTokenTitle": "トークンを作成",
+    "tokenNameLabel": "[名前]",
+    "tokenDescriptionLabel": "[説明]",
+    "rotateTokenBtn": "回転",
+    "deleteTokenBtn": "[削除]",
+    "copyTokenBtn": "[コピー]",
+    "copyTokenWarning": "このトークンを今すぐコピーしてください。今後は表示されません。",
+    "newTokenRevealed": "新しいトークンが生成されました",
+    "deleteTokenConfirm": "トークン「{name}」を削除しますか?このトークンを使用するパイプラインは動作しなくなります。",
+    "rotateTokenConfirm": "ローテーショントークン「{name}」？このトークンを使用するすべてのパイプラインは、新しい値で更新する必要があります。",
+    "tokenCreatedSuccess": "トークンは正常に作成されました。",
+    "tokenRotatedSuccess": "トークンは正常にローテーションされました。",
+    "tokenDeletedSuccess": "トークンは正常に削除されました。",
+    "resetDefaultConfirm": "デフォルトの取り込みトークンをリセットしますか?このトークンを使用するすべてのパイプラインを更新する必要があります。",
+    "tokenFetchError": "トークンを読み込めませんでした。",
+    "tokenCreateError": "トークンの作成に失敗しました。",
+    "tokenRotateError": "トークンをローテーションできませんでした。",
+    "tokenDeleteError": "トークンを削除できませんでした。",
+    "noTokensFound": "取り込みトークンが見つかりません。",
+    "createdBy": "作成者"
   },
   "dashboard": {
     "selectField": "フィールド",
@@ -2628,7 +2659,8 @@
     "systemDefault": "システムデフォルト",
     "usageStreamEnabledLabel": "使用ストリームを有効にする",
     "aiToolsets": "AI ツールセット",
-    "llmModelPricing": "LLM モデルの価格設定"
+    "llmModelPricing": "LLM モデルの価格設定",
+    "ingestionTokens": "インジェストトークン"
   },
   "iam": {
     "users": "ユーザー",
@@ -2660,7 +2692,8 @@
     "organizationMembers": "組織メンバー",
     "externalUserWarningTitle": "外部ユーザー警告",
     "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
-    "invitations": "招待状"
+    "invitations": "招待状",
+    "ingestionTokens": "インジェストトークン"
   },
   "pipeline": {
     "header": "パイプライン",
@@ -3839,5 +3872,56 @@
     "awsStsSelfHostedInfo": "これは AWS sts を使用して役割を引き受け、操作を実行します。インストール環境で、このロールにアクセスできる AWS 認証情報が設定されていることを確認してください。",
     "externalIdRequired": "外部 ID が必要です",
     "storageAccountRequired": "ストレージアカウント名が必要です"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "グッドモーニング",
+      "afternoon": "グッドアフタヌーン",
+      "evening": "こんばんは",
+      "night": "遅くまで働く"
+    },
+    "welcome": {
+      "taglineLead": "私は",
+      "taglineHighlight": "O2 アシスタント",
+      "taglineTail": "。君を書けるよ",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "PromQL",
+      "taglineAnd": "ログ、トレース、メトリクス、インシデントを順を追って確認できます。",
+      "signedInAs": "としてサインイン",
+      "role": "役割",
+      "tryOneOfThese": "または、次のいずれかを試してください"
+    },
+    "capabilities": {
+      "query": {
+        "title": "クエリーを書く",
+        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。"
+      },
+      "incident": {
+        "title": "インシデントを調査",
+        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」"
+      },
+      "dashboard": {
+        "title": "ダッシュボードの作成",
+        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。"
+      },
+      "alert": {
+        "title": "アラートを作成",
+        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。"
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "nginx ログから JSON を解析するために VRL を記述してください",
+      "regexRedact": "正規表現パターンを生成してメールを編集する",
+      "mapStreamSchema": "「デフォルト」のストリームスキーマをマップする",
+      "promqlCpu": "80% 以上の CPU を使用するポッド用の PromQL を記述する",
+      "datadogToO2": "このデータドッグクエリを OpenObserve SQL に変換",
+      "lastAlertFired": "前回のアラートはなぜ起動されたのですか？"
+    },
+    "placeholderRotation": {
+      "one": "過去 1 時間のエラーを表示...",
+      "two": "nginx ログから JSON を解析するための VRL を書き込みます...",
+      "three": "K8s ノードの状態を示すダッシュボードを作成..."
+    }
   }
 }

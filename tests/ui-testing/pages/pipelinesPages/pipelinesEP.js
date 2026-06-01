@@ -10,7 +10,9 @@ export class PipelinesEP {
         this.functionStreamTab = 'button[data-test="function-stream-tab"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
         this.createFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
-        this.functionNameInput = '[data-test="add-function-name-input-input"]';
+        // OInput: outer wrapper has data-test="foo"; inner native <input> has data-test="foo-field".
+        // Use the -field suffix for fill() and waitFor({ state: 'attached' }) + force: true.
+        this.functionNameInput = '[data-test="add-function-name-input-field"]';
         this.saveFunctionButton = '[data-test="add-function-save-btn"]';
         this.logsSearchField = '[data-test="logs-vrl-function-editor"]';
         this.logsSearchFieldCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
@@ -20,8 +22,8 @@ export class PipelinesEP {
         this.importCancelButton = '[data-test="pipeline-import-cancel-btn"]';
         this.pipelineListTitle = '[data-test="pipeline-list-title"]';
         this.importJsonButton = '[data-test="pipeline-import-json-btn"]';
-        this.pipelineImportUrlInput = '[data-test="pipeline-import-url-input-input"]';
-        this.pipelineImportNameInput = '[data-test="pipeline-import-name-input-input"]';
+        this.pipelineImportUrlInput = '[data-test="pipeline-import-url-input-field"]';
+        this.pipelineImportNameInput = '[data-test="pipeline-import-name-input-field"]';
         this.pipelineImportErrorDestinationFunctionNameInput = '[data-test="pipeline-import-error-0-1"] [data-test="pipeline-import-destination-function-name-input"]';
         this.pipelineImportErrorDestinationFunctionNameInput2 = '[data-test="pipeline-import-error-0-2"] [data-test="pipeline-import-destination-function-name-input"]';
         this.pipelineMoreOptionsButton = (name) => `[data-test="pipeline-list-${name}-more-options"]`;
@@ -35,7 +37,10 @@ export class PipelinesEP {
         this.quasarMenuScroll = '[data-test$="-popover"], [role="listbox"]';
         this.quasarMenuItem = '[data-test$="-option"]';
         this.quasarVirtualScrollContent = '[data-test$="-popover"] [role="listitem"]';
-        this.notifyContainer = '[data-test^="o-toast-"]';
+        // OToast: the message text lives in [data-test="o-toast-message"]; the toast <li> root
+        // gets a dynamic id like [data-test="o-toast-1"]. The prefix selector [data-test^="o-toast-"]
+        // matches both and causes strict mode violations — use the specific message selector.
+        this.notifyContainer = '[data-test="o-toast-message"]';
         this.monacoViewLines = '.view-lines';
     }
 
@@ -99,71 +104,52 @@ export class PipelinesEP {
     }
 
     async setMonacoEditorValue(vrlCode) {
-        // Set Monaco editor content programmatically to avoid keyboard/auto-completion issues
-        await this.page.locator(this.logsSearchField).waitFor({ state: 'visible' });
-        await this.page.waitForTimeout(500);
+        // Wait for the Monaco view-lines to appear inside the correct editor container.
+        // Scoping to [data-test="logs-vrl-function-editor"] avoids clicking the wrong editor
+        // when multiple Monaco instances are on the page.
+        const viewLines = this.page.locator(`${this.logsSearchField} .view-lines`).first();
+        await viewLines.waitFor({ state: 'visible', timeout: 15000 });
+        await viewLines.click();
+        await this.page.waitForTimeout(200);
+        // Select all existing content and replace with the new VRL code
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await this.page.keyboard.type(vrlCode, { delay: 50 });
+        // Wait for CodeQueryEditor's 500ms onDidChangeModelContent debounce to fire
+        // update:query so that formData.function is updated before we click save.
+        await this.page.waitForTimeout(600);
+    }
 
-        const success = await this.page.evaluate((code) => {
-            // Try finding Monaco editor instance via the DOM element
-            // Use querySelectorAll and get the last one (innermost editor) to handle nested .monaco-editor elements
-            const editorElements = document.querySelectorAll('[data-test="logs-vrl-function-editor"] .monaco-editor');
-            const editorElement = editorElements[editorElements.length - 1];
-            if (editorElement && editorElement.__vscode_monaco_editor__) {
-                editorElement.__vscode_monaco_editor__.setValue(code);
-                return true;
-            }
-            // Fallback: try via monaco global API
-            const editors = window.monaco?.editor?.getEditors?.();
-            if (editors && editors.length > 0) {
-                editors[editors.length - 1].setValue(code);
-                return true;
-            }
-            return false;
-        }, vrlCode);
+    async _fillFunctionName(functionName) {
+        // OInput renders the wrapper div with data-test="foo" and the inner <input>
+        // with data-test="foo-field". The inner input is a controlled input (:value binding).
+        // Clicking the outer wrapper focuses the inner input; then keyboard.type() dispatches
+        // proper input events that Vue's reactive system picks up correctly.
+        const wrapper = this.page.locator('[data-test="add-function-name-input"]');
+        await wrapper.waitFor({ state: 'visible', timeout: 15000 });
+        await wrapper.click();
+        await this.page.waitForTimeout(200);
+        await this.page.keyboard.type(functionName, { delay: 30 });
+    }
 
-        if (!success) {
-            // Fallback to keyboard typing if programmatic approach fails
-            await this.page.locator(this.monacoViewLines).first().click();
-            await this.page.keyboard.press('Control+a');
-            await this.page.keyboard.type(vrlCode, { delay: 100 });
-        }
-        await this.page.waitForTimeout(500);
+    async createFunction(functionName, vrlCode) {
+        await this.createFunctionButton.waitFor({ state: 'visible' });
+        await this.createFunctionButton.click();
+        await this._fillFunctionName(functionName);
+        await this.setMonacoEditorValue(vrlCode);
+        await this.page.locator(this.saveFunctionButton).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.saveFunctionButton).click();
+        await expect(
+            this.page.locator(this.notifyContainer).filter({ hasText: 'Function saved successfully' }).first()
+        ).toBeVisible({ timeout: 15000 });
+        await this.createFunctionButton.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async createFirstFunction(functionName) {
-        // Wait for the button to be visible
-        await this.createFunctionButton.waitFor({ state: 'visible' });
-        // Click the button
-        await this.createFunctionButton.click();
-        await this.page.locator(this.functionNameInput).waitFor({ state: 'visible' });
-        await this.page.locator(this.functionNameInput).click();
-        await this.page.locator(this.functionNameInput).fill(functionName);
-        // Set VRL function code via Monaco API (more reliable than keyboard typing)
-        await this.setMonacoEditorValue('.a=41');
-
-        await this.page.locator(this.saveFunctionButton).click();
-        // Wait for success notification instead of a fixed timeout
-        await expect(this.page.locator(this.notifyContainer)).toContainText('Function saved successfully', { timeout: 10000 });
-        // Wait for function list to reload
-        await this.createFunctionButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.createFunction(functionName, '.a=41');
     }
 
     async createSecondFunction(functionName) {
-        // Wait for the button to be visible
-        await this.createFunctionButton.waitFor({ state: 'visible' });
-        // Click the button
-        await this.createFunctionButton.click();
-        await this.page.locator(this.functionNameInput).waitFor({ state: 'visible' });
-        await this.page.locator(this.functionNameInput).click();
-        await this.page.locator(this.functionNameInput).fill(functionName);
-        // Set VRL function code via Monaco API (more reliable than keyboard typing)
-        await this.setMonacoEditorValue('.test=2');
-
-        await this.page.locator(this.saveFunctionButton).click();
-        // Wait for success notification instead of a fixed timeout
-        await expect(this.page.locator(this.notifyContainer)).toContainText('Function saved successfully', { timeout: 10000 });
-        // Wait for function list to reload
-        await this.createFunctionButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.createFunction(functionName, '.test=2');
     }
 
 
@@ -189,18 +175,18 @@ export class PipelinesEP {
     async importPipelineJson(url) {
         await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible' });
         await this.page.locator(this.importJsonUrlTab).click();
-        await this.page.locator(this.pipelineImportUrlInput).waitFor({ state: 'visible' });
-        await this.page.locator(this.pipelineImportUrlInput).click();
-        await this.page.locator(this.pipelineImportUrlInput).fill(url);
-
+        // OInput inner native <input>: use attached + force
+        const urlField = this.page.locator(this.pipelineImportUrlInput);
+        await urlField.waitFor({ state: 'attached', timeout: 10000 });
+        await urlField.fill(url, { force: true });
     }
 
 
     async fillPipelineDetails(name, functionName1, functionName2) {
-        // Wait for the name input field to be visible and then click and fill it
-        await this.page.locator(this.pipelineImportNameInput).waitFor({ state: 'visible' });
-        await this.page.locator(this.pipelineImportNameInput).click();
-        await this.page.locator(this.pipelineImportNameInput).fill(name);
+        // OInput inner native <input>: use attached + force
+        const nameField = this.page.locator(this.pipelineImportNameInput);
+        await nameField.waitFor({ state: 'attached', timeout: 10000 });
+        await nameField.fill(name, { force: true });
 
         // Check if stream dropdown exists using specific data-test attribute (more reliable than positional indexes)
         const streamDropdownExists = await this.page.locator(this.sourceStreamNameInput)
@@ -302,42 +288,40 @@ export class PipelinesEP {
     }
 
     async downloadPipeline(name) {
-        // Click on more options (three-dot menu) then export
+        // ODropdownItem has data-test="pipeline-list-{name}-export-action" (not a generic -option)
         const moreOptionsButton = this.page.locator(this.pipelineMoreOptionsButton(name));
-
-        // Wait for the element to be visible and enabled before clicking
         await moreOptionsButton.waitFor({ state: 'visible', timeout: 60000 });
-
-        // Click the more options button to open the menu
         await moreOptionsButton.click();
-        await this.page.waitForTimeout(500);
 
-        // Click export option in the menu (Quasar q-item)
-        await this.page.locator(this.quasarMenuItem).filter({ hasText: 'Export' }).click();
+        const exportItem = this.page.locator(`[data-test="pipeline-list-${name}-export-action"]`);
+        await exportItem.waitFor({ state: 'visible', timeout: 5000 });
+        await exportItem.click();
     }
 
-
-
     async deletePipeline(name) {
-        // Click on more options (three-dot menu) then delete
+        // ODropdownItem has data-test="pipeline-list-{name}-delete-pipeline" (not a generic -option)
         const moreOptionsButton = this.page.locator(this.pipelineMoreOptionsButton(name));
-        await moreOptionsButton.waitFor({ state: "visible" });
+        await moreOptionsButton.waitFor({ state: 'visible' });
         await moreOptionsButton.click();
-        await this.page.waitForTimeout(500);
-        // Click delete option in the menu (Quasar q-item)
-        await this.page.locator(this.quasarMenuItem).filter({ hasText: 'Delete' }).click();
+
+        const deleteItem = this.page.locator(`[data-test="pipeline-list-${name}-delete-pipeline"]`);
+        await deleteItem.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteItem.click();
         await this.page.locator(this.confirmButton).waitFor({ state: 'visible' });
         await this.page.locator(this.confirmButton).click();
     }
 
     async validateTextMessage(text) {
-        await expect(this.page.locator(this.notifyContainer)).toContainText(text);
+        await expect(
+            this.page.locator(this.notifyContainer).filter({ hasText: text }).first()
+        ).toBeVisible({ timeout: 10000 });
     }
 
     async fillScheduledPipelineDetails(name, functionName, remoteDestination) {
-
-        await this.page.locator(this.pipelineImportNameInput).click();
-        await this.page.locator(this.pipelineImportNameInput).fill(name);
+        // OInput inner native <input>: use attached + force
+        const nameField = this.page.locator(this.pipelineImportNameInput);
+        await nameField.waitFor({ state: 'attached', timeout: 10000 });
+        await nameField.fill(name, { force: true });
         await this.page.locator(this.destinationFunctionNameInput).click();
 
         // Wait for dropdown to open

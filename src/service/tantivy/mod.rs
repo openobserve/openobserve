@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod bloom_builder;
 mod parallel;
-pub mod puffin;
-pub mod puffin_directory;
+mod reader;
 mod sequential;
 use std::{collections::HashMap, sync::Arc};
 
@@ -28,14 +28,11 @@ use bytes::Bytes;
 use config::{
     FileFormat, INDEX_FIELD_NAME_FOR_ALL, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
     get_config,
-    utils::{
-        inverted_index::convert_parquet_file_name_to_tantivy_file, tantivy::tokenizer::O2_TOKENIZER,
-    },
+    utils::{inverted_index::to_tantivy_name, tantivy::tokenizer::O2_TOKENIZER},
 };
 use hashbrown::HashSet;
 use infra::storage;
-use puffin_directory::writer::PuffinDirWriter;
-use tantivy_utils::puffin_directory::PROP_ROW_GROUP_SIZE;
+use tantivy_utils::puffin_directory::{PROP_ROW_GROUP_SIZE, writer::PuffinDirWriter};
 
 pub(crate) async fn create_tantivy_index(
     caller: &str,
@@ -57,8 +54,8 @@ pub(crate) async fn create_tantivy_index(
     };
 
     let dir = PuffinDirWriter::new();
-    let index = if thread_num > 1 && matches!(file_format, FileFormat::Parquet) {
-        parallel::build_index(dir.clone(), buf, index_schema, thread_num).await?
+    let index = if thread_num > 1 {
+        parallel::build_index(dir.clone(), file_format, buf, index_schema, thread_num).await?
     } else {
         sequential::build_index(dir.clone(), file_format, buf, index_schema).await?
     };
@@ -73,7 +70,7 @@ pub(crate) async fn create_tantivy_index(
     let index_size = puffin_bytes.len();
 
     // write fst bytes into disk
-    let Some(idx_file_name) = convert_parquet_file_name_to_tantivy_file(parquet_file_name) else {
+    let Some(idx_file_name) = to_tantivy_name(parquet_file_name) else {
         return Ok(0);
     };
 
@@ -138,10 +135,9 @@ fn build_tantivy_schema(
     let fts_fields_filtered = fts_fields
         .iter()
         .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
-                .is_some()
+            schema_fields.get(f).is_some_and(|v| {
+                v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8
+            })
         })
         .map(String::from)
         .collect::<HashSet<_>>();
@@ -150,10 +146,7 @@ fn build_tantivy_schema(
         .filter(|f| schema_fields.contains_key(f))
         .map(String::from)
         .collect::<HashSet<_>>();
-    let tantivy_fields = fts_fields_filtered
-        .union(&index_fields_filtered)
-        .cloned()
-        .collect::<HashSet<_>>();
+    let tantivy_fields: HashSet<_> = &fts_fields_filtered | &index_fields_filtered;
 
     if tantivy_fields.is_empty() {
         return None;
@@ -263,14 +256,10 @@ pub(super) fn convert_batch_to_docs_sync(
         }
     }
 
-    // _timestamp field, should we report error when _timestamp not found
-    let ts_data: &Int64Array = match batch.column_by_name(TIMESTAMP_COL_NAME) {
-        Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
-            Some(ts) => ts,
-            None => &Int64Array::from(vec![0; num_rows]),
-        },
-        None => &Int64Array::from(vec![0; num_rows]),
-    };
+    let ts_data: &Int64Array = batch
+        .column_by_name(TIMESTAMP_COL_NAME)
+        .and_then(|c| c.as_any().downcast_ref::<Int64Array>())
+        .expect("batch must contain a valid Int64 _timestamp column");
     let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap();
     for (i, doc) in docs.iter_mut().enumerate() {
         doc.add_i64(ts_field, ts_data.value(i));
@@ -353,7 +342,6 @@ pub(super) mod tests {
         let mut writer = config::utils::parquet::new_parquet_writer(
             &mut buffer,
             &schema,
-            &[],
             &file_meta,
             false,
             None,

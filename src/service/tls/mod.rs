@@ -19,7 +19,7 @@ use std::{
 };
 
 use itertools::Itertools;
-use rustls_pemfile::{certs, private_key};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 use x509_parser::prelude::*;
 
 pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
@@ -41,8 +41,7 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
             )
         })?);
 
-    let cert_chain = certs(cert_file);
-    // let mut keys = rsa_private_keys(key_file);
+    let cert_chain = CertificateDer::pem_reader_iter(cert_file);
     let versions: &[&'_ rustls::SupportedProtocolVersion] = match cfg.http.tls_min_version.as_str()
     {
         "1.3" => &[&rustls::version::TLS13],
@@ -54,7 +53,7 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
         .with_no_client_auth()
         .with_single_cert(
             cert_chain.try_collect::<_, Vec<_>, _>()?,
-            private_key(key_file)?.unwrap(),
+            PrivateKeyDer::from_pem_reader(key_file)?,
         )?;
 
     Ok(tls_config)
@@ -87,7 +86,7 @@ pub fn client_tls_config() -> Result<rustls::ClientConfig, anyhow::Error> {
                         )
                     })?,
                 );
-                let cert_chain = certs(cert_file);
+                let cert_chain = CertificateDer::pem_reader_iter(cert_file);
                 cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
             }
             cert_store

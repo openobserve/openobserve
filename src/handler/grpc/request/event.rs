@@ -18,7 +18,7 @@ use std::ops::Range;
 use anyhow::Result;
 use config::{
     cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
-    utils::inverted_index::convert_parquet_file_name_to_tantivy_file,
+    utils::inverted_index::to_tantivy_name,
 };
 use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
@@ -78,7 +78,7 @@ impl Event for Eventer {
                 // cache index for the parquet
                 if cfg.cache_latest_files.cache_index
                     && item.meta.index_size > 0
-                    && let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key)
+                    && let Some(ttv_file) = to_tantivy_name(&item.key)
                 {
                     files_to_download.push((
                         item.id,
@@ -157,9 +157,7 @@ impl Event for Eventer {
                         .filter_map(|v| {
                             if v.deleted {
                                 match v.meta.as_ref() {
-                                    Some(m) if m.index_size > 0 => {
-                                        convert_parquet_file_name_to_tantivy_file(&v.key)
-                                    }
+                                    Some(m) if m.index_size > 0 => to_tantivy_name(&v.key),
                                     _ => None,
                                 }
                             } else {
@@ -455,7 +453,7 @@ mod tests {
         // Test parquet to tantivy filename conversion
         let parquet_file =
             "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet";
-        let tantivy_file = convert_parquet_file_name_to_tantivy_file(parquet_file);
+        let tantivy_file = to_tantivy_name(parquet_file);
 
         // The conversion should return Some for valid parquet files
         assert!(tantivy_file.is_some());
@@ -466,12 +464,12 @@ mod tests {
 
         // Test with non-parquet file
         let non_parquet_file = "test/file.txt";
-        let tantivy_result = convert_parquet_file_name_to_tantivy_file(non_parquet_file);
+        let tantivy_result = to_tantivy_name(non_parquet_file);
         assert!(tantivy_result.is_none());
 
         // Test with invalid path format
         let invalid_path = "test/file.parquet";
-        let invalid_result = convert_parquet_file_name_to_tantivy_file(invalid_path);
+        let invalid_result = to_tantivy_name(invalid_path);
         assert!(invalid_result.is_none());
     }
 

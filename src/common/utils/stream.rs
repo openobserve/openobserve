@@ -269,6 +269,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
         populate_file_meta(&[&batch], &mut file_meta, None, None)
             .await
@@ -306,6 +307,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
         populate_file_meta(&[&batch], &mut file_meta, Some("time"), Some("time"))
             .await
@@ -454,6 +456,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
 
         // This should fail because the _timestamp field is missing
@@ -504,6 +507,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
 
         populate_file_meta(&[&batch1, &batch2], &mut file_meta, None, None)
@@ -525,6 +529,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
 
         // Test with empty batches array
@@ -627,6 +632,7 @@ mod tests {
             compressed_size: 700,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
 
         populate_file_meta(

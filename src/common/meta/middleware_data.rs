@@ -21,6 +21,7 @@ use std::{
 
 use axum::{body::Body, http::Request, middleware::Next, response::Response};
 use config::axum::middlewares::RealIp;
+use http_body_util::BodyExt;
 use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
@@ -66,22 +67,65 @@ impl RumExtraData {
             .or_else(|| data.get("o2tags"))
             .map_or_else(HashMap::default, |tags| {
                 tags.split(',')
-                    .map(|tag| {
-                        let key_val: Vec<_> = tag.split(':').collect();
-                        (key_val[0].to_string(), key_val[1].into())
+                    .filter_map(|tag| {
+                        let mut parts = tag.splitn(2, ':');
+                        let key = parts.next()?.trim();
+                        let val = parts.next().unwrap_or("");
+                        if key.is_empty() {
+                            return None;
+                        }
+                        Some((key.to_string(), val.into()))
                     })
                     .collect()
             })
     }
 
+    /// Try to extract the ootags/o2tags string from the request body.
+    /// Only parses the first JSON object — either the first NDJSON line
+    /// (up to `\n`) or the entire body if it's a single JSON object.
+    /// Returns `None` if the body is empty, not a JSON object, or
+    /// doesn't contain an `ootags`/`o2tags` field.
+    fn extract_tags_from_body_bytes(body: &[u8]) -> Option<String> {
+        // Skip leading whitespace that some NDJSON encoders may emit
+        let start = body
+            .iter()
+            .position(|&b| !matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+            .unwrap_or(body.len());
+        if start >= body.len() || body[start] != b'{' {
+            return None;
+        }
+        let end = body[start..]
+            .iter()
+            .position(|&b| b == b'\n')
+            .map(|p| start + p)
+            .unwrap_or(body.len());
+        let json: serde_json::Value = serde_json::from_slice(&body[start..end]).ok()?;
+        let obj = json.as_object()?;
+        obj.get("ootags")
+            .or_else(|| obj.get("o2tags"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    }
+
     /// Middleware function for axum to extract RUM extra data
-    pub async fn extractor_middleware(mut request: Request<Body>, next: Next) -> Response {
+    pub async fn extractor_middleware(request: Request<Body>, next: Next) -> Response {
+        // Buffer the body so we can inspect it for ootags/o2tags, then
+        // reconstruct it unchanged for downstream handlers.
+        let (parts, body) = request.into_parts();
+        let body_bytes = body.collect().await.unwrap_or_default().to_bytes();
+        let body_tags = Self::extract_tags_from_body_bytes(&body_bytes);
+
         // Parse query parameters
-        let query_string = request.uri().query().unwrap_or("");
+        let query_string = parts.uri.query().unwrap_or("");
         let mut data: HashMap<String, String> =
             url::form_urlencoded::parse(query_string.as_bytes())
                 .into_owned()
                 .collect();
+
+        // Merge body tags into data — query string takes precedence
+        if let Some(tags_val) = body_tags {
+            data.entry("ootags".to_string()).or_insert(tags_val);
+        }
 
         Self::filter_api_keys(&mut data);
 
@@ -98,8 +142,8 @@ impl RumExtraData {
         {
             // Resolved up-chain by the `extract_real_ip` middleware; fall back to
             // ipv4 loopback so the downstream geo-lookup stays well-defined.
-            let ip = request
-                .extensions()
+            let ip = parts
+                .extensions
                 .get::<RealIp>()
                 .map(|r| r.0)
                 .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)));
@@ -139,8 +183,8 @@ impl RumExtraData {
 
         // User-agent parsing
         {
-            let user_agent = request
-                .headers()
+            let user_agent = parts
+                .headers
                 .get("User-Agent")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or_default();
@@ -157,7 +201,8 @@ impl RumExtraData {
             data: user_agent_hashmap,
         };
 
-        // Insert into request extensions
+        // Reconstruct the request with the original body
+        let mut request = Request::from_parts(parts, Body::from(body_bytes));
         request.extensions_mut().insert(rum_extracted_data);
 
         next.run(request).await

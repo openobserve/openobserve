@@ -16,11 +16,10 @@
 use std::sync::Arc;
 
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
-use arrow::array::RecordBatch;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME,
+    FileFormat,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::stream::{
@@ -30,7 +29,6 @@ use config::{
     metrics,
     utils::{
         parquet::read_schema_from_bytes,
-        record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
     },
@@ -42,8 +40,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     runtime::DATAFUSION_RUNTIME,
     schema::{
-        SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
-        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
+        SchemaCache, get_partition_time_level, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_created_at,
     },
     storage,
 };
@@ -446,7 +444,7 @@ pub async fn merge_by_stream(
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
+        let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
@@ -474,7 +472,7 @@ pub async fn merge_by_stream(
             let skip_group_files = false;
 
             if files_with_size.len() <= 1 && !skip_group_files {
-                return Ok(());
+                return Ok(vec![]);
             }
 
             // group files need to merge
@@ -500,9 +498,10 @@ pub async fn merge_by_stream(
                             if job_strategy == MergeStrategy::FileSize {
                                 break;
                             }
-                            new_file_size = 0;
                             new_file_list.clear();
-                            continue; // this batch don't need to merge, skip
+                            new_file_size = file.meta.original_size;
+                            new_file_list.push(file.clone());
+                            continue; // replace previous file with current file
                         }
                         batch_groups.push(MergeBatch {
                             batch_id: batch_groups.len(),
@@ -535,7 +534,7 @@ pub async fn merge_by_stream(
                 }
 
                 if batch_groups.is_empty() {
-                    return Ok(()); // no files need to merge
+                    return Ok(vec![]); // no files need to merge
                 }
             }
 
@@ -556,6 +555,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
+            let mut orphan_blooms = Vec::new();
             for ret in worker_results {
                 let (batch_id, new_files) = match ret {
                     Ok(v) => v,
@@ -599,18 +599,53 @@ pub async fn merge_by_stream(
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
+
+                // collect orphan blooms after writing file list successfully
+                for file in delete_file_list {
+                    if file.meta.bloom_ver > 0 {
+                        orphan_blooms.push(file.meta.bloom_ver);
+                    }
+                }
             }
             drop(permit);
             if let Some(e) = last_error {
                 return Err(e);
             }
-            Ok(())
+            Ok(orphan_blooms)
         });
         tasks.push(task);
     }
 
+    // collect bloom files which need to be clean
+    let mut orphan_blooms = Vec::new();
     for task in tasks {
-        task.await??;
+        orphan_blooms.extend(task.await??);
+    }
+
+    // Build bloom for the current hour
+    let build_start = std::time::Instant::now();
+    match crate::service::compact::bloom_build::build_for_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        is_incremental,
+        orphan_blooms,
+    )
+    .await
+    {
+        Ok(false) => {}
+        Ok(true) => {
+            let build_time = build_start.elapsed().as_millis();
+            log::info!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
+            );
+        }
+        Err(e) => {
+            log::warn!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
+            );
+        }
     }
 
     // update job status
@@ -727,6 +762,7 @@ pub async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        bloom_ver: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -735,7 +771,6 @@ pub async fn merge_files(
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values, storage_type) =
@@ -831,7 +866,6 @@ pub async fn merge_files(
                     &stream_name,
                     schema,
                     tables,
-                    &bloom_filter_fields,
                     new_file_meta,
                     false,
                 )
@@ -904,7 +938,6 @@ pub async fn merge_files(
             }
 
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                // generate inverted index
                 generate_inverted_index(
                     org_id,
                     &new_file_key,
@@ -952,7 +985,6 @@ pub async fn merge_files(
                 }
 
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                    // generate inverted index
                     generate_inverted_index(
                         org_id,
                         &new_file_key,
@@ -989,7 +1021,7 @@ pub async fn merge_files(
 async fn generate_inverted_index(
     org_id: &str,
     new_file_key: &str,
-    full_text_search_fields: &[String],
+    fts_fields: &[String],
     index_fields: &[String],
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
@@ -1000,7 +1032,7 @@ async fn generate_inverted_index(
         "COMPACTOR",
         org_id,
         new_file_key,
-        full_text_search_fields,
+        fts_fields,
         index_fields,
         latest_schema, // Use stream schema to include all configured fields
         buf,
@@ -1089,86 +1121,6 @@ async fn write_file_list(
     Ok(())
 }
 
-pub fn generate_inverted_idx_recordbatch(
-    schema: Arc<Schema>,
-    batches: &[RecordBatch],
-    stream_type: StreamType,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-) -> Result<Option<RecordBatch>, anyhow::Error> {
-    let cfg = get_config();
-    if !cfg.common.inverted_index_enabled || batches.is_empty() || !stream_type.support_index() {
-        return Ok(None);
-    }
-
-    let schema_fields = schema
-        .fields()
-        .iter()
-        .map(|f| f.name())
-        .collect::<HashSet<_>>();
-
-    let mut inverted_idx_columns: Vec<String> = if !full_text_search_fields.is_empty() {
-        full_text_search_fields.to_vec()
-    } else {
-        config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-    };
-    inverted_idx_columns.extend(index_fields.to_vec());
-    inverted_idx_columns.sort();
-    inverted_idx_columns.dedup();
-    inverted_idx_columns.retain(|f| schema_fields.contains(f));
-    if inverted_idx_columns.is_empty() {
-        return Ok(None);
-    }
-    // add _timestamp column to columns_to_index
-    if !inverted_idx_columns.contains(&TIMESTAMP_COL_NAME.to_string()) {
-        inverted_idx_columns.push(TIMESTAMP_COL_NAME.to_string());
-    }
-
-    let mut inverted_idx_batches = Vec::with_capacity(batches.len());
-    for batch in batches {
-        let selected_column_indices: Vec<usize> = inverted_idx_columns
-            .iter()
-            .filter_map(|name| batch.schema().index_of(name).ok())
-            .collect();
-
-        // Use the found indices to select the columns
-        let selected_columns = selected_column_indices
-            .iter()
-            .map(|&i| batch.column(i).clone())
-            .collect();
-
-        // Create a new schema for the new RecordBatch based on the selected columns
-        let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
-            .iter()
-            .map(|&i| batch.schema().field(i).clone())
-            .collect();
-        let new_schema = Arc::new(Schema::new(selected_fields));
-
-        // Create a new RecordBatch with the selected columns
-        inverted_idx_batches.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
-    }
-
-    if inverted_idx_batches.is_empty() {
-        Ok(None)
-    } else {
-        let new_batch = if inverted_idx_batches.len() == 1 {
-            inverted_idx_batches.remove(0)
-        } else {
-            let new_schema = inverted_idx_batches.first().unwrap().schema();
-            concat_batches(new_schema, inverted_idx_batches).map_err(anyhow::Error::from)?
-        };
-
-        if matches!(
-            new_batch.schema().fields().len(),
-            0 | 1 if new_batch.schema().field(0).name() == TIMESTAMP_COL_NAME
-        ) {
-            Ok(None)
-        } else {
-            Ok(Some(new_batch))
-        }
-    }
-}
-
 async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Error> {
     let cfg = get_config();
     let scan_size = files.iter().map(|f| f.meta.compressed_size).sum::<i64>();
@@ -1201,16 +1153,6 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                         log::warn!(
                             "[COMPACT] download file {file_name} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
                         );
-                        // update database
-                        // if let Err(e) =
-                        //     file_list::update_compressed_size(&file_name, data_len as i64).await
-                        // {
-                        //     log::error!(
-                        //         "[COMPACT] update file size for file {} err: {}",
-                        //         file_name,
-                        //         e
-                        //     );
-                        // }
                         // skip this file for compact
                         Some(file_name)
                     } else {
@@ -1291,9 +1233,6 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::{FileKey, FileMeta};
 
     use super::*;
@@ -1312,6 +1251,7 @@ mod tests {
                 compressed_size: original_size / 2, // assume 50% compression
                 index_size: 0,
                 flattened: false,
+                bloom_ver: 0,
             },
             deleted: false,
             segment_ids: None,
@@ -1550,358 +1490,6 @@ mod tests {
         assert!(keys.contains(&&"file3.parquet".to_string()));
     }
 
-    // Test cases for generate_inverted_idx_recordbatch function
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_empty_batches() {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("field1", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batches: Vec<RecordBatch> = vec![];
-        let full_text_search_fields = vec!["field1".to_string()];
-        let index_fields = vec![];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_none());
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_with_fts_fields() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new("level", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let message_array = StringArray::from(vec!["log message 1", "log message 2"]);
-        let level_array = StringArray::from(vec!["info", "error"]);
-        let timestamp_array = Int64Array::from(vec![1000, 2000]);
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(message_array),
-                Arc::new(level_array),
-                Arc::new(timestamp_array),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        let full_text_search_fields = vec!["message".to_string()];
-        let index_fields = vec![];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        let batch_result = result.unwrap();
-        assert!(batch_result.is_some());
-
-        let inverted_batch = batch_result.unwrap();
-        assert_eq!(inverted_batch.num_rows(), 2);
-        assert_eq!(inverted_batch.num_columns(), 2); // message + _timestamp
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_with_index_fields() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("user_id", DataType::Utf8, true),
-            Field::new("session_id", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let user_id_array = StringArray::from(vec!["user1", "user2"]);
-        let session_id_array = StringArray::from(vec!["session1", "session2"]);
-        let timestamp_array = Int64Array::from(vec![1000, 2000]);
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(user_id_array),
-                Arc::new(session_id_array),
-                Arc::new(timestamp_array),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        let full_text_search_fields = vec![];
-        let index_fields = vec!["user_id".to_string(), "session_id".to_string()];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        let batch_result = result.unwrap();
-        assert!(batch_result.is_some());
-
-        let inverted_batch = batch_result.unwrap();
-        assert_eq!(inverted_batch.num_rows(), 2);
-        assert_eq!(inverted_batch.num_columns(), 3); // user_id + session_id + _timestamp
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_with_multiple_batches() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch1 = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["message 1", "message 2"])),
-                Arc::new(Int64Array::from(vec![1000, 2000])),
-            ],
-        )
-        .unwrap();
-
-        let batch2 = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["message 3", "message 4"])),
-                Arc::new(Int64Array::from(vec![3000, 4000])),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch1, batch2];
-        let full_text_search_fields = vec!["message".to_string()];
-        let index_fields = vec![];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        let batch_result = result.unwrap();
-        assert!(batch_result.is_some());
-
-        let inverted_batch = batch_result.unwrap();
-        assert_eq!(inverted_batch.num_rows(), 4); // Combined rows from both batches
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_no_matching_fields() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("field1", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["value1", "value2"])),
-                Arc::new(Int64Array::from(vec![1000, 2000])),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        // Specify fields that don't exist in schema
-        let full_text_search_fields = vec!["nonexistent_field".to_string()];
-        let index_fields = vec!["another_nonexistent".to_string()];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        let batch_result = result.unwrap();
-        // Should return None because only _timestamp would be present
-        assert!(batch_result.is_none());
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_only_timestamp() {
-        use arrow::array::Int64Array;
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            TIMESTAMP_COL_NAME,
-            DataType::Int64,
-            false,
-        )]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int64Array::from(vec![1000, 2000]))],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        let full_text_search_fields = vec![];
-        let index_fields = vec![];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        let batch_result = result.unwrap();
-        // Should return None because only timestamp field exists
-        assert!(batch_result.is_none());
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_with_combined_fts_and_index() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new("user_id", DataType::Utf8, true),
-            Field::new("level", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["log1", "log2"])),
-                Arc::new(StringArray::from(vec!["user1", "user2"])),
-                Arc::new(StringArray::from(vec!["info", "error"])),
-                Arc::new(Int64Array::from(vec![1000, 2000])),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        let full_text_search_fields = vec!["message".to_string()];
-        let index_fields = vec!["user_id".to_string(), "level".to_string()];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        let batch_result = result.unwrap();
-        assert!(batch_result.is_some());
-
-        let inverted_batch = batch_result.unwrap();
-        assert_eq!(inverted_batch.num_rows(), 2);
-        // Should have: level, message, user_id (sorted), + _timestamp = 4 columns
-        assert_eq!(inverted_batch.num_columns(), 4);
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_duplicate_fields() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("field1", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["value1", "value2"])),
-                Arc::new(Int64Array::from(vec![1000, 2000])),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        // Same field in both FTS and index fields (should be deduped)
-        let full_text_search_fields = vec!["field1".to_string()];
-        let index_fields = vec!["field1".to_string()];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        let batch_result = result.unwrap();
-        assert!(batch_result.is_some());
-
-        let inverted_batch = batch_result.unwrap();
-        assert_eq!(inverted_batch.num_rows(), 2);
-        assert_eq!(inverted_batch.num_columns(), 2); // field1 + _timestamp (deduplicated)
-    }
-
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_unsupported_stream_type() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["msg1", "msg2"])),
-                Arc::new(Int64Array::from(vec![1000, 2000])),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        let full_text_search_fields = vec!["message".to_string()];
-        let index_fields = vec![];
-
-        // Test with a stream type that might not support indexing
-        // Note: This depends on the support_index() implementation
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Metrics, // Metrics may not support indexing
-            &full_text_search_fields,
-            &index_fields,
-        );
-
-        assert!(result.is_ok());
-        // Result depends on whether Metrics support_index() returns true
-    }
-
     // ── Additional sort_by_time_range edge-case tests ────────────────────────
 
     /// Two files share the same min_ts but have different max_ts values.
@@ -2022,434 +1610,6 @@ mod tests {
         assert_eq!(result[0].meta.max_ts, 42);
     }
 
-    // ── Additional generate_inverted_idx_recordbatch edge-case tests ─────────
-
-    /// Stream types that return false from `support_index()` must always yield None.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_non_index_stream_type() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["hello"])),
-                Arc::new(Int64Array::from(vec![1000i64])),
-            ],
-        )
-        .unwrap();
-
-        let batches = vec![batch];
-        let full_text_search_fields = vec!["message".to_string()];
-        let index_fields: Vec<String> = vec![];
-
-        // EnrichmentTables does not support indexing.
-        let result = generate_inverted_idx_recordbatch(
-            schema.clone(),
-            &batches,
-            StreamType::EnrichmentTables,
-            &full_text_search_fields,
-            &index_fields,
-        );
-        assert!(result.is_ok());
-        assert!(
-            result.unwrap().is_none(),
-            "EnrichmentTables should return None (no index support)"
-        );
-
-        // ServiceGraph does not support indexing.
-        let batch2 = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["hello"])),
-                Arc::new(Int64Array::from(vec![1000i64])),
-            ],
-        )
-        .unwrap();
-        let result2 = generate_inverted_idx_recordbatch(
-            schema.clone(),
-            &[batch2],
-            StreamType::ServiceGraph,
-            &full_text_search_fields,
-            &index_fields,
-        );
-        assert!(result2.is_ok());
-        assert!(
-            result2.unwrap().is_none(),
-            "ServiceGraph should return None (no index support)"
-        );
-
-        // Filelist does not support indexing.
-        let batch3 = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["hello"])),
-                Arc::new(Int64Array::from(vec![1000i64])),
-            ],
-        )
-        .unwrap();
-        let result3 = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch3],
-            StreamType::Filelist,
-            &full_text_search_fields,
-            &index_fields,
-        );
-        assert!(result3.is_ok());
-        assert!(
-            result3.unwrap().is_none(),
-            "Filelist should return None (no index support)"
-        );
-    }
-
-    /// When `full_text_search_fields` is empty and `index_fields` is empty the
-    /// function falls back to `SQL_FULL_TEXT_SEARCH_FIELDS`.  If none of those
-    /// default names are present in the schema either, the result is None.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_default_fts_fallback_no_match() {
-        use arrow::array::{Int64Array, StringArray};
-
-        // Schema has only a custom column and _timestamp – none of the default
-        // FTS fields (log, message, msg, content, data, body, json, error).
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("custom_col", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["v1", "v2"])),
-                Arc::new(Int64Array::from(vec![1000i64, 2000i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &[], // empty → falls back to SQL_FULL_TEXT_SEARCH_FIELDS
-            &[], // empty index_fields too
-        );
-
-        assert!(result.is_ok());
-        // None of the default FTS fields match, so inverted_idx_columns becomes
-        // empty after retain, and the function should return None.
-        assert!(
-            result.unwrap().is_none(),
-            "No default FTS field match should produce None"
-        );
-    }
-
-    /// When `full_text_search_fields` is empty but a default FTS field IS present
-    /// in the schema, the function should produce a valid RecordBatch.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_default_fts_fallback_with_match() {
-        use arrow::array::{Int64Array, StringArray};
-
-        // "log" is one of the default SQL_FULL_TEXT_SEARCH_FIELDS.
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("log", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["line1", "line2"])),
-                Arc::new(Int64Array::from(vec![1000i64, 2000i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &[], // empty → falls back to SQL_FULL_TEXT_SEARCH_FIELDS
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        assert!(rb.is_some(), "Default FTS field 'log' should produce Some");
-        let rb = rb.unwrap();
-        assert_eq!(rb.num_rows(), 2);
-        // Columns: "log" + "_timestamp"
-        assert_eq!(rb.num_columns(), 2);
-    }
-
-    /// When `_timestamp` is explicitly listed in `full_text_search_fields`, it
-    /// must not be added a second time (dedup).  The final batch should still
-    /// contain only ONE `_timestamp` column.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_timestamp_in_fts_fields_dedup() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["hello"])),
-                Arc::new(Int64Array::from(vec![5000i64])),
-            ],
-        )
-        .unwrap();
-
-        // Explicitly include _timestamp in fts_fields to exercise the dedup path.
-        let full_text_search_fields = vec![
-            "message".to_string(),
-            TIMESTAMP_COL_NAME.to_string(), // duplicate that should be deduped
-        ];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &full_text_search_fields,
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        assert!(rb.is_some());
-        let rb = rb.unwrap();
-        // Columns: message + _timestamp (no duplicate _timestamp column).
-        assert_eq!(rb.num_columns(), 2);
-        // Verify _timestamp column appears exactly once.
-        let ts_count = rb
-            .schema()
-            .fields()
-            .iter()
-            .filter(|f| f.name() == TIMESTAMP_COL_NAME)
-            .count();
-        assert_eq!(ts_count, 1, "_timestamp must appear exactly once");
-    }
-
-    /// A single-element batch vector exercises the `len() == 1` fast-path that
-    /// avoids `concat_batches` and returns the batch directly.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_single_batch_fast_path() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("body", DataType::Utf8, true),
-            Field::new("level", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["body text"])),
-                Arc::new(StringArray::from(vec!["warn"])),
-                Arc::new(Int64Array::from(vec![9999i64])),
-            ],
-        )
-        .unwrap();
-
-        // "body" is a default SQL_FULL_TEXT_SEARCH_FIELDS entry.
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch], // exactly one batch
-            StreamType::Logs,
-            &["body".to_string()],
-            &["level".to_string()],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        assert!(rb.is_some());
-        let rb = rb.unwrap();
-        assert_eq!(rb.num_rows(), 1);
-        // Columns: body + level + _timestamp (sorted, deduped)
-        assert_eq!(rb.num_columns(), 3);
-    }
-
-    /// When the batch has columns but the selected index columns are missing
-    /// (because `inverted_idx_columns` only matches `_timestamp`), the result
-    /// must be None rather than a single-column batch.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_only_timestamp_after_filter() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("irrelevant", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["x"])),
-                Arc::new(Int64Array::from(vec![100i64])),
-            ],
-        )
-        .unwrap();
-
-        // Ask for a field that IS in the schema but is the timestamp itself,
-        // plus another that does not exist.
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &[TIMESTAMP_COL_NAME.to_string()], // only _timestamp passes retain
-            &[],
-        );
-
-        assert!(result.is_ok());
-        // inverted_idx_columns after retain would contain _timestamp, then the
-        // "push _timestamp if absent" step is skipped (it's already there), so
-        // the final batch has exactly 1 column (_timestamp only) → returns None.
-        assert!(
-            result.unwrap().is_none(),
-            "Batch with only _timestamp column should return None"
-        );
-    }
-
-    /// Traces stream type supports indexing, so the function proceeds normally.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_traces_stream_type() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("msg", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["span-data"])),
-                Arc::new(Int64Array::from(vec![777i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Traces, // supports indexing
-            &["msg".to_string()],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        assert!(
-            rb.is_some(),
-            "Traces should produce Some when field matches"
-        );
-        let rb = rb.unwrap();
-        assert_eq!(rb.num_rows(), 1);
-        assert_eq!(rb.num_columns(), 2); // msg + _timestamp
-    }
-
-    /// Verify the column order in the output: `inverted_idx_columns` is sorted
-    /// and deduped, so the schema fields of the produced batch must respect that
-    /// alphabetical ordering (excluding the appended `_timestamp`).
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_column_sort_order() {
-        use arrow::array::{Int64Array, StringArray};
-
-        // Provide fields in reverse alphabetical order to confirm output is sorted.
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("zebra", DataType::Utf8, true),
-            Field::new("apple", DataType::Utf8, true),
-            Field::new("mango", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["z"])),
-                Arc::new(StringArray::from(vec!["a"])),
-                Arc::new(StringArray::from(vec!["m"])),
-                Arc::new(Int64Array::from(vec![1i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &[
-                "zebra".to_string(),
-                "apple".to_string(),
-                "mango".to_string(),
-            ],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap().expect("should produce Some");
-        let rb_schema = rb.schema();
-        let field_names: Vec<&str> = rb_schema
-            .fields()
-            .iter()
-            .map(|f| f.name().as_str())
-            .collect();
-        // Expected sorted order: apple, mango, zebra, then _timestamp appended at end.
-        assert_eq!(field_names[0], "apple");
-        assert_eq!(field_names[1], "mango");
-        assert_eq!(field_names[2], "zebra");
-        assert_eq!(field_names[3], TIMESTAMP_COL_NAME);
-    }
-
-    /// Three-batch concat path: ensure all rows survive concatenation.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_three_batches_concat() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("error", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let make_batch = |msg: &str, ts: i64| {
-            RecordBatch::try_new(
-                schema.clone(),
-                vec![
-                    Arc::new(StringArray::from(vec![msg])) as _,
-                    Arc::new(Int64Array::from(vec![ts])) as _,
-                ],
-            )
-            .unwrap()
-        };
-
-        let batches = vec![
-            make_batch("err1", 100),
-            make_batch("err2", 200),
-            make_batch("err3", 300),
-        ];
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &batches,
-            StreamType::Logs,
-            &["error".to_string()],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap().expect("should produce Some");
-        // "error" is also a default FTS field, but because we supply fts_fields
-        // explicitly the result should include it plus _timestamp.
-        assert_eq!(rb.num_rows(), 3); // one row per batch, concatenated
-        assert_eq!(rb.num_columns(), 2); // error + _timestamp
-    }
-
     // ── sort_by_time_range: additional branch-coverage tests ─────────────────
 
     /// Two files that don't overlap and have a gap between them.  The second
@@ -2554,400 +1714,6 @@ mod tests {
         assert!(keys.contains(&"C.parquet"));
         assert!(keys.contains(&"D.parquet"));
         assert!(keys.contains(&"E.parquet"));
-    }
-
-    // ── generate_inverted_idx_recordbatch: additional branch-coverage tests ───
-
-    /// StreamType::Metadata supports indexing (same as Logs/Traces).
-    /// A valid FTS field in the schema must produce Some.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_metadata_stream_type() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["meta-event"])),
-                Arc::new(Int64Array::from(vec![1234i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Metadata, // supports indexing
-            &["message".to_string()],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        assert!(
-            rb.is_some(),
-            "Metadata stream should produce Some when field matches"
-        );
-        let rb = rb.unwrap();
-        assert_eq!(rb.num_rows(), 1);
-        assert_eq!(rb.num_columns(), 2); // message + _timestamp
-    }
-
-    /// StreamType::Metrics supports indexing.  Providing explicit FTS fields
-    /// that exist in the schema must produce a valid RecordBatch (not None).
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_metrics_stream_produces_some() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("label", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["cpu_usage"])),
-                Arc::new(Int64Array::from(vec![9000i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Metrics, // also supports indexing
-            &["label".to_string()],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        assert!(
-            rb.is_some(),
-            "Metrics supports indexing, so a matching field should produce Some"
-        );
-        let rb = rb.unwrap();
-        assert_eq!(rb.num_rows(), 1);
-        assert_eq!(rb.num_columns(), 2); // label + _timestamp
-    }
-
-    /// A batch where the batch's schema has the requested field but the column
-    /// name has different casing — `index_of` is case-sensitive, so it will
-    /// fail to find the column and produce an empty selection → result is None.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_case_sensitive_field_miss() {
-        use arrow::array::{Int64Array, StringArray};
-
-        // Schema has "Message" (capital M), but we request "message" (lowercase).
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("Message", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["hello"])),
-                Arc::new(Int64Array::from(vec![100i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &["message".to_string()], // lowercase — won't match "Message"
-            &[],
-        );
-
-        assert!(result.is_ok());
-        // "message" is not found in schema fields (case-sensitive) → inverted_idx_columns
-        // becomes empty after retain → returns None early.
-        assert!(
-            result.unwrap().is_none(),
-            "Case mismatch should prevent field from being retained"
-        );
-    }
-
-    /// A batch with zero rows (but correct schema) must still produce a valid
-    /// (albeit empty) RecordBatch when the fields match.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_zero_row_batch() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("content", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        // Explicitly build a zero-row batch.
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(Vec::<&str>::new())),
-                Arc::new(Int64Array::from(Vec::<i64>::new())),
-            ],
-        )
-        .unwrap();
-        assert_eq!(batch.num_rows(), 0);
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &["content".to_string()],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        // The function does not check num_rows, only column count.
-        // "content" + "_timestamp" gives 2 columns → Some returned.
-        assert!(
-            rb.is_some(),
-            "Zero-row batch with valid fields should produce Some"
-        );
-        let rb = rb.unwrap();
-        assert_eq!(rb.num_rows(), 0);
-        assert_eq!(rb.num_columns(), 2); // content + _timestamp
-    }
-
-    /// Providing only `index_fields` (no FTS fields) for a Logs stream should
-    /// work: the columns are selected from the batch schema and returned.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_index_fields_only_logs() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("request_id", DataType::Utf8, true),
-            Field::new("status_code", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["req-1", "req-2"])),
-                Arc::new(StringArray::from(vec!["200", "500"])),
-                Arc::new(Int64Array::from(vec![1000i64, 2000i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &[], // no FTS fields → falls back to SQL defaults; none match
-            &["request_id".to_string(), "status_code".to_string()],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap();
-        assert!(rb.is_some(), "index_fields present should produce Some");
-        let rb = rb.unwrap();
-        assert_eq!(rb.num_rows(), 2);
-        // request_id + status_code + _timestamp = 3 columns
-        assert_eq!(rb.num_columns(), 3);
-    }
-
-    /// Confirm that when `inverted_idx_columns` would be empty after the retain
-    /// step (no schema field matches at all), the function returns None before
-    /// entering the per-batch loop — exercising the early-return branch.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_empty_columns_early_return() {
-        use arrow::array::{Int64Array, StringArray};
-
-        // Schema has only fields that are NOT in SQL_FULL_TEXT_SEARCH_FIELDS and
-        // are not supplied as FTS or index fields.
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("alpha", DataType::Utf8, true),
-            Field::new("beta", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["a"])),
-                Arc::new(StringArray::from(vec!["b"])),
-                Arc::new(Int64Array::from(vec![1i64])),
-            ],
-        )
-        .unwrap();
-
-        // Request fields that don't exist in the schema at all.
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &["nonexistent_fts".to_string()],
-            &["nonexistent_idx".to_string()],
-        );
-
-        assert!(result.is_ok());
-        assert!(
-            result.unwrap().is_none(),
-            "No schema field match should yield None (early return)"
-        );
-    }
-
-    /// When the same field name appears in both `full_text_search_fields` AND
-    /// `index_fields`, `dedup` must collapse it so the output batch column
-    /// appears exactly once.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_fts_and_index_overlap_dedup() {
-        use arrow::array::{Int64Array, StringArray};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("tag", DataType::Utf8, true),
-            Field::new("host", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["web", "db"])),
-                Arc::new(StringArray::from(vec!["host-1", "host-2"])),
-                Arc::new(Int64Array::from(vec![100i64, 200i64])),
-            ],
-        )
-        .unwrap();
-
-        // "tag" appears in both lists; "host" only in index_fields.
-        let result = generate_inverted_idx_recordbatch(
-            schema,
-            &[batch],
-            StreamType::Logs,
-            &["tag".to_string()],
-            &["tag".to_string(), "host".to_string()],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap().expect("should produce Some");
-        // After dedup: [host, tag] (sorted) + _timestamp = 3 columns.
-        assert_eq!(rb.num_columns(), 3);
-        // "tag" must appear exactly once.
-        let tag_count = rb
-            .schema()
-            .fields()
-            .iter()
-            .filter(|f| f.name() == "tag")
-            .count();
-        assert_eq!(tag_count, 1, "tag must be deduped to exactly one column");
-        assert_eq!(rb.num_rows(), 2);
-    }
-
-    /// When the batch's own schema is a subset of the inverted_idx_columns list
-    /// (some requested columns are absent from the batch), the missing columns
-    /// are silently skipped via `filter_map`.  The result must only contain
-    /// the fields that the batch actually has.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_partial_batch_schema_match() {
-        use arrow::array::{Int64Array, StringArray};
-
-        // Stream schema knows about "present" and "absent".
-        let stream_schema = Arc::new(Schema::new(vec![
-            Field::new("present", DataType::Utf8, true),
-            Field::new("absent", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        // But the actual batch only has "present" and _timestamp.
-        let batch_schema = Arc::new(Schema::new(vec![
-            Field::new("present", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            batch_schema,
-            vec![
-                Arc::new(StringArray::from(vec!["here"])),
-                Arc::new(Int64Array::from(vec![42i64])),
-            ],
-        )
-        .unwrap();
-
-        // Pass the stream schema (which includes "absent") but a batch that
-        // doesn't have it — exercises the filter_map miss path.
-        let result = generate_inverted_idx_recordbatch(
-            stream_schema,
-            &[batch],
-            StreamType::Logs,
-            &["present".to_string(), "absent".to_string()],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result
-            .unwrap()
-            .expect("should produce Some because 'present' matched");
-        // Only "present" + _timestamp survive (absent was not in the batch schema).
-        assert_eq!(rb.num_columns(), 2);
-        let rb_schema = rb.schema();
-        let col_names: Vec<&str> = rb_schema
-            .fields()
-            .iter()
-            .map(|f| f.name().as_str())
-            .collect();
-        assert!(col_names.contains(&"present"));
-        assert!(col_names.contains(&TIMESTAMP_COL_NAME));
-        assert!(!col_names.contains(&"absent"));
-    }
-
-    /// Two batches with different schemas (first has "msg", second has "body").
-    /// Because `inverted_idx_columns` is built from the *stream* schema and both
-    /// fields are present there, but the per-batch `filter_map` only picks what
-    /// each batch actually has.  After concat the rows from each batch survive.
-    #[test]
-    fn test_generate_inverted_idx_recordbatch_two_batches_different_schemas() {
-        use arrow::array::{Int64Array, StringArray};
-
-        // Stream schema knows about both columns.
-        let stream_schema = Arc::new(Schema::new(vec![
-            Field::new("msg", DataType::Utf8, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-        ]));
-
-        // Both batches use the same schema here for simplicity (the column-
-        // miss path is already tested above); this exercises the two-batch concat.
-        let batch1 = RecordBatch::try_new(
-            stream_schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["first"])),
-                Arc::new(Int64Array::from(vec![10i64])),
-            ],
-        )
-        .unwrap();
-
-        let batch2 = RecordBatch::try_new(
-            stream_schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["second", "third"])),
-                Arc::new(Int64Array::from(vec![20i64, 30i64])),
-            ],
-        )
-        .unwrap();
-
-        let result = generate_inverted_idx_recordbatch(
-            stream_schema,
-            &[batch1, batch2],
-            StreamType::Logs,
-            &["msg".to_string()],
-            &[],
-        );
-
-        assert!(result.is_ok());
-        let rb = result.unwrap().expect("should produce Some");
-        assert_eq!(rb.num_rows(), 3); // 1 + 2
-        assert_eq!(rb.num_columns(), 2); // msg + _timestamp
     }
 
     /// Verify `sort_by_time_range` with exactly two files where the second
