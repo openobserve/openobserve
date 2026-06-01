@@ -3867,5 +3867,56 @@
     "awsStsSelfHostedInfo": "Dabei werden AWS sts verwendet, um Rollen zu übernehmen und Operationen durchzuführen. Stellen Sie sicher, dass Sie in der Installationsumgebung AWS-Anmeldeinformationen konfiguriert haben, die Zugriff auf diese Rolle haben.",
     "externalIdRequired": "Externe ID ist erforderlich",
     "storageAccountRequired": "Name des Speicherkontos ist erforderlich"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Guten Morgen",
+      "afternoon": "Guten Tag",
+      "evening": "Guten Abend",
+      "night": "Spät arbeiten"
+    },
+    "welcome": {
+      "taglineLead": "Ich bin",
+      "taglineHighlight": "O2 Assistent",
+      "taglineTail": ". Ich kann deine schreiben",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "Pro MQL",
+      "taglineAnd": "und führen Sie durch Ihre Logs, Traces, Metriken und Incidents.",
+      "signedInAs": "Angemeldet als",
+      "role": "Rolle",
+      "tryOneOfThese": "Oder probieren Sie eines davon aus"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Schreiben Sie eine Anfrage",
+        "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken."
+      },
+      "incident": {
+        "title": "Vorfälle untersuchen",
+        "description": "Ursache für Logs, Traces und Alerts — z. B. „Warum hat Gateway-5xx gezündet?“"
+      },
+      "dashboard": {
+        "title": "Erstellen Sie ein Dashboard",
+        "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels."
+      },
+      "alert": {
+        "title": "Eine Warnung erstellen",
+        "description": "Schwellenwerte oder geplante Warnungen und VRL-Pipelines zum Zeitpunkt der Aufnahme."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Schreiben Sie VRL, um JSON aus meinen Nginx-Protokollen zu analysieren",
+      "regexRedact": "Generieren Sie ein Regex-Muster, um E-Mails zu redigieren",
+      "mapStreamSchema": "Ordne mein „Standard“ -Stream-Schema zu",
+      "promqlCpu": "Schreiben Sie PromQL für Pods mit > 80% CPU",
+      "datadogToO2": "Diese Datadog-Abfrage in OpenObserve SQL konvertieren",
+      "lastAlertFired": "Warum wurde mein letzter Alarm ausgelöst?"
+    },
+    "placeholderRotation": {
+      "one": "Zeige mir Fehler der letzten Stunde...",
+      "two": "Schreiben Sie VRL, um JSON aus Nginx-Protokollen zu analysieren...",
+      "three": "Erstellen Sie ein Dashboard für den K8s-Knotenstatus..."
+    }
   }
 }

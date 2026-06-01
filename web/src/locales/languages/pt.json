@@ -3867,5 +3867,56 @@
     "awsStsSelfHostedInfo": "Isso usa o AWS sts para assumir funções e realizar operações. Verifique se você configurou as credenciais da AWS no ambiente de instalação que tem acesso a essa função.",
     "externalIdRequired": "É necessário um ID externo",
     "storageAccountRequired": "O nome da conta de armazenamento é obrigatório"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Bom dia",
+      "afternoon": "Boa tarde",
+      "evening": "Boa noite",
+      "night": "Trabalhando até tarde"
+    },
+    "welcome": {
+      "taglineLead": "Eu sou",
+      "taglineHighlight": "Assistente de O2",
+      "taglineTail": ". Eu posso escrever seu",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "ProMQL",
+      "taglineAnd": "e mostre seus registros, rastreamentos, métricas e incidentes.",
+      "signedInAs": "Conectado como",
+      "role": "Função",
+      "tryOneOfThese": "Ou experimente um desses"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Escrever uma consulta",
+        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas."
+      },
+      "incident": {
+        "title": "Investigue incidentes",
+        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”"
+      },
+      "dashboard": {
+        "title": "Crie um painel",
+        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis."
+      },
+      "alert": {
+        "title": "Crie um alerta",
+        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Escreva VRL para analisar o JSON dos meus logs do nginx",
+      "regexRedact": "Gere um padrão regex para redigir e-mails",
+      "mapStreamSchema": "Mapeie meu esquema de stream “padrão”",
+      "promqlCpu": "Escreva ProMQL para pods usando > 80% de CPU",
+      "datadogToO2": "Converter essa consulta Datadog em OpenObserve SQL",
+      "lastAlertFired": "Por que meu último alerta foi disparado?"
+    },
+    "placeholderRotation": {
+      "one": "Mostre-me os erros da última hora...",
+      "two": "Escreva VRL para analisar o JSON dos logs do nginx...",
+      "three": "Crie um painel para a integridade do nó K8s..."
+    }
   }
 }

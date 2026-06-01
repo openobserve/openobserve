@@ -146,7 +146,7 @@ jobs:
     needs: [build_binary]
     if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: ubicloud-standard-8
     permissions:
       contents: read
       actions: read
@@ -557,6 +557,11 @@ jobs:
           install_browser "chromium_headless_shell" "headless_shell" \
             "chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip"
 
+          # ffmpeg is required for video recording (video: retain-on-failure in playwright.config.js)
+          # The custom install_browser uses CHROMIUM_REV which doesn't match ffmpeg's own revision,
+          # so use the local playwright binary (pinned via package-lock.json) to install ffmpeg only.
+          ./node_modules/.bin/playwright install ffmpeg
+
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
           RERUN_TYPE="${{ steps.check_rerun.outputs.rerun_type }}"
@@ -843,7 +848,7 @@ jobs:
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: repo-openobserve-standard-4
+      labels: ubicloud-standard-4
     permissions:
       contents: read
       actions: read
@@ -1030,7 +1035,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: repo-openobserve-standard-4
+      labels: ubicloud-standard-4
     permissions: {}
     needs:
       [

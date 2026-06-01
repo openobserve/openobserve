@@ -583,7 +583,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .dashboard-list {
-  max-height: calc(100dvh - 230px);
+  max-height: calc(100dvh - 200px);
   overflow-y: auto;
   list-style: none;
   padding: 0;

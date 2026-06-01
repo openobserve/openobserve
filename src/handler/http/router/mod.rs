@@ -550,6 +550,8 @@ pub fn basic_routes() -> Router {
 #[cfg(not(feature = "enterprise"))]
 pub fn config_routes() -> Router {
     Router::new()
+        .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(auth_middleware))
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
 }
@@ -557,6 +559,8 @@ pub fn config_routes() -> Router {
 #[cfg(feature = "enterprise")]
 pub fn config_routes() -> Router {
     Router::new()
+        .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(auth_middleware))
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
         .route("/redirect", get(status::redirect))

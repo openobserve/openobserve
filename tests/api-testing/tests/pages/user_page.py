@@ -19,7 +19,7 @@ class UserPage:
         payload = {
             "organization": org_id,
             "email": email_address,
-            "password": "12345678",
+            "password": "Complexpass#123",
             "first_name": "Shyam",
             "last_name": "P",
             "role": "admin",

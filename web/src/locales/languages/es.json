@@ -3865,5 +3865,56 @@
     "awsStsSelfHostedInfo": "Esto utiliza AWS sts para asumir funciones y realizar operaciones. Asegúrese de haber configurado las credenciales de AWS en el entorno de instalación que tienen acceso a esta función.",
     "externalIdRequired": "Se requiere un identificador externo",
     "storageAccountRequired": "El nombre de la cuenta de almacenamiento es obligatorio"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Buenos días",
+      "afternoon": "Buenas tardes",
+      "evening": "Buenas noches",
+      "night": "Trabajando hasta tarde"
+    },
+    "welcome": {
+      "taglineLead": "soy",
+      "taglineHighlight": "Asistente O2",
+      "taglineTail": ". Puedo escribir tu",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "Pro MQL",
+      "taglineAnd": "y le guiará a través de sus registros, rastreos, métricas e incidentes.",
+      "signedInAs": "Iniciado sesión como",
+      "role": "Rol",
+      "tryOneOfThese": "O prueba uno de estos"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Escribe una consulta",
+        "description": "SQL para registros, seguimientos, RUM o PromQL para métricas."
+      },
+      "incident": {
+        "title": "Investigue los incidentes",
+        "description": "Causa raíz en registros, rastreos y alertas, por ejemplo, «¿Por qué se activó Gateway-5xx?»"
+      },
+      "dashboard": {
+        "title": "Cree un tablero",
+        "description": "De un tema, por ejemplo, «Estado del nodo K8: CPU, memoria, reinicios». También crea paneles."
+      },
+      "alert": {
+        "title": "Crear una alerta",
+        "description": "Alertas de umbral o programadas y canalizaciones de VRL de tiempo de ingesta."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Escriba VRL para analizar JSON desde mis registros de nginx",
+      "regexRedact": "Genere un patrón de expresiones regulares para redactar correos electrónicos",
+      "mapStreamSchema": "Mapear mi esquema de transmisión «predeterminado»",
+      "promqlCpu": "Escriba ProMQL para pods con más del 80% de CPU",
+      "datadogToO2": "Convierta esta consulta de Datadog en OpenObserve SQL",
+      "lastAlertFired": "¿Por qué se activó mi última alerta?"
+    },
+    "placeholderRotation": {
+      "one": "Muéstrame los errores de la última hora...",
+      "two": "Escriba VRL para analizar JSON desde los registros de nginx...",
+      "three": "Cree un panel de control para el estado de los nodos de K8..."
+    }
   }
 }

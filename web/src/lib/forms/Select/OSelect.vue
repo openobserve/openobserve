@@ -84,6 +84,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   valueKey: DEFAULT_OPTION_VALUE,
   iconKey: undefined,
   labelPosition: "outside",
+  rowClickSingleSelect: false,
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
@@ -437,6 +438,34 @@ function handleListboxUpdate(value: unknown) {
   if (!props.multiple) {
     popoverOpen.value = false;
   }
+}
+
+function handleRowClickSingleSelect(rekaStringValue: string) {
+  const resolved = valueMap.has(rekaStringValue)
+    ? (valueMap.get(rekaStringValue) as SelectPrimitiveValue)
+    : rekaStringValue;
+  emit("update:modelValue", [resolved]);
+  popoverOpen.value = false;
+}
+
+function handleItemClickCapture(event: MouseEvent, rekaStringValue: string) {
+  if (!props.rowClickSingleSelect) return;
+
+  // Find the separator line rendered inside this item. Anything clicked at or
+  // to the left of the separator is the "checkbox zone" — let Reka toggle normally.
+  // Anything to the right is the "label zone" — single-select and close.
+  const separator = (event.currentTarget as HTMLElement | null)?.querySelector("[data-select-separator]");
+
+  if (separator) {
+    const { right } = separator.getBoundingClientRect();
+    if (event.clientX <= right) return; // checkbox zone — let Reka handle
+  } else {
+    // Fallback: no separator means rowClickSingleSelect isn't active for this item
+    return;
+  }
+
+  event.stopPropagation();
+  handleRowClickSingleSelect(rekaStringValue);
 }
 
 const listboxStringModelValue = computed<string | string[]>(() => {
@@ -907,7 +936,7 @@ const fieldWidthClass = computed(() => {
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               labelPosition === 'inside' && label
                 ? [
-                    'tw:flex-col tw:justify-between tw:py-0.5 tw:min-w-max',
+                    'tw:flex-col tw:justify-between tw:py-0.5',
                     heightClasses[size ?? 'md'],
                   ]
                 : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
@@ -947,7 +976,7 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
+                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:leading-none tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
                       >
                         {{ labelText }}
                       </span>
@@ -1056,7 +1085,7 @@ const fieldWidthClass = computed(() => {
             "
             :class="[
               'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
-              'tw:overflow-hidden',
+              'tw:overflow-hidden tw:flex tw:flex-col',
               'tw:rounded-md tw:shadow-lg',
               'tw:bg-select-content-bg',
             ]"
@@ -1068,13 +1097,14 @@ const fieldWidthClass = computed(() => {
               :model-value="listboxStringModelValue"
               :multiple="multiple"
               :disabled="disabled"
+              class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
               @update:model-value="handleListboxUpdate"
             >
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
                   'tw:rounded-md tw:border tw:border-input-border tw:overflow-hidden',
-                  'tw:bg-select-content-bg',
+                  'tw:bg-select-content-bg tw:flex tw:flex-col tw:flex-1 tw:min-h-0',
                 ]"
               >
                 <ListboxFilter
@@ -1085,7 +1115,7 @@ const fieldWidthClass = computed(() => {
                     parentDataTest ? `${parentDataTest}-search` : undefined
                   "
                   :class="[
-                    'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text',
+                    'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text tw:shrink-0',
                     'tw:placeholder:text-input-placeholder tw:outline-none',
                     'tw:border-b tw:border-input-border',
                     heightClasses[size ?? 'md'],
@@ -1110,7 +1140,7 @@ const fieldWidthClass = computed(() => {
                     allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'
                   "
                   :class="[
-                    'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2',
+                    'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2 tw:shrink-0',
                     'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
                     'tw:text-select-item-text tw:rounded-sm',
                     'tw:cursor-pointer tw:select-none tw:outline-none',
@@ -1156,7 +1186,7 @@ const fieldWidthClass = computed(() => {
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
                    on the ListboxFilter input above. Items are index-highlighted reactively. -->
-                <div ref="listboxScrollEl" class="tw:max-h-60 tw:overflow-auto">
+                <div ref="listboxScrollEl" :class="['tw:overflow-auto', multiple && rowClickSingleSelect ? 'tw:flex-1 tw:min-h-[6rem]' : 'tw:max-h-60']">
                   <div
                     v-if="filteredOptions.length === 0"
                     class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
@@ -1201,8 +1231,16 @@ const fieldWidthClass = computed(() => {
                       </div>
 
                       <!-- Regular item -->
-                      <ListboxItem
+                      <!-- rowClickSingleSelect wrapper: intercepts clicks at capture phase.
+                           Checkbox clicks (marked by @pointerdown on the checkbox span)
+                           fall through to Reka for normal toggle. Row/label clicks replace
+                           the whole selection with just this item and close the dropdown. -->
+                      <div
                         v-else
+                        class="tw:contents"
+                        @click.capture="handleItemClickCapture($event, toRekaString(filteredOptions[vRow.index].value))"
+                      >
+                      <ListboxItem
                         :value="toRekaString(filteredOptions[vRow.index].value)"
                         :disabled="filteredOptions[vRow.index].disabled"
                         :data-test="
@@ -1251,7 +1289,9 @@ const fieldWidthClass = computed(() => {
                                 : 'tw:bg-checkbox-bg tw:border-checkbox-border',
                             ]"
                             aria-hidden="true"
+                            data-select-checkbox
                           >
+
                             <svg
                               v-if="
                                 selectedValues.includes(
@@ -1270,6 +1310,14 @@ const fieldWidthClass = computed(() => {
                               <polyline points="2,6 5,9 10,3" />
                             </svg>
                           </span>
+                          <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
+                          <span
+                            v-if="rowClickSingleSelect"
+                            class="tw:w-px tw:shrink-0 tw:bg-[var(--o2-border-color)] tw:mx-1 tw:my-1"
+                            style="align-self: stretch"
+                            aria-hidden="true"
+                            data-select-separator
+                          />
                         </template>
 
                         <!-- Inline subLabel: name – url on a single row -->
@@ -1332,9 +1380,40 @@ const fieldWidthClass = computed(() => {
                           }}</span>
                         </template>
                       </ListboxItem>
+                      </div>
                     </div>
                   </div>
                 </div>
+              <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
+              <template v-if="multiple && rowClickSingleSelect">
+              <div class="tw:mx-2 tw:mt-1 tw:h-px tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+              <div
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:select-none tw:pointer-events-none tw:shrink-0"
+              >
+                <!-- Checkbox zone hint -->
+                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                  <span
+                    class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
+                    aria-hidden="true"
+                  >
+                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
+                      <polyline points="1.5,5 4,8 8.5,2" />
+                    </svg>
+                  </span>
+                  <span>Multi select</span>
+                </span>
+
+                <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+
+                <!-- Name zone hint -->
+                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
+                    <path d="M4 2h6M4 5h6M4 8h3" />
+                  </svg>
+                  <span>Single select</span>
+                </span>
+              </div>
+              </template>
               </div>
               <!-- end bordered container -->
             </ListboxRoot>
@@ -1376,7 +1455,7 @@ const fieldWidthClass = computed(() => {
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             labelPosition === 'inside' && label
               ? [
-                  'tw:flex-col tw:justify-between tw:py-0.5 tw:min-w-max',
+                  'tw:flex-col tw:justify-between tw:py-0.5',
                   heightClasses[size ?? 'md'],
                 ]
               : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],

@@ -16,7 +16,11 @@ const {
 test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
 
+  let pm;
+
   test.beforeAll(async ({ browser }) => {
+    // 4-min daemon wait + 30s buffer + ingestion time exceeds the default 3-5 min test timeout.
+    test.setTimeout(600000); // 10 minutes for beforeAll
     testLogger.info('=== SERVICE GRAPH SETUP: Ingesting trace data ===');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',
@@ -66,6 +70,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
+    pm = new PageManager(page);
     await navigateToBase(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -84,7 +89,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P0: Topology API returns expected nodes and edges after ingestion", {
     tag: ['@serviceGraph', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Verifying topology API data ===');
 
     const result = await pm.serviceGraphPage.getTopologyViaAPI();
@@ -114,7 +118,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P0: Navigate to service graph and verify chart renders", {
     tag: ['@serviceGraph', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Navigating to service graph ===');
 
     // Navigate directly via URL (reliable — avoids stale stream filter from traces page store)
@@ -137,7 +140,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P0: Click node and verify side panel opens with RED charts", {
     tag: ['@serviceGraph', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Testing node detail panel ===');
 
     // Step 1: API validation — confirm api-gateway exists in topology
@@ -170,7 +172,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P1: Verify api-gateway node has correct upstream and downstream services", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Verifying api-gateway connections ===');
 
     // API validation of connections
@@ -203,7 +204,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P1: Verify user-service has degraded status and high error rate", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Verifying user-service health status ===');
 
     // Step 1: API validation
@@ -233,7 +233,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P1: Verify search-service has healthy status and 0% error rate", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Verifying search-service health status ===');
 
     // Step 1: API validation
@@ -262,7 +261,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P1: Verify edge connection stats via topology API", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Verifying edge connection stats ===');
 
     // API validation — confirm edge data exists with expected metrics
@@ -285,7 +283,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P1: Switch between Tree View and Graph View", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Testing view mode switching ===');
 
     await pm.serviceGraphPage.navigateToServiceGraphUrl();
@@ -317,7 +314,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P1: Show telemetry correlation from node panel via Metrics tab", {
     tag: ['@enterprise', '@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Testing telemetry correlation via Metrics tab ===');
 
     // Step 1: API validation — confirm api-gateway exists in topology
@@ -362,7 +358,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P1: Refresh button reloads graph data", {
     tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Testing refresh functionality ===');
 
     await pm.serviceGraphPage.navigateToServiceGraphUrl();
@@ -373,7 +368,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     testLogger.info('Clicked refresh button');
 
     // Wait for graph to reload
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await pm.serviceGraphPage.waitForGraphReload();
 
     // Verify graph is still visible after refresh
     await pm.serviceGraphPage.expectServiceGraphPageVisible();
@@ -385,7 +380,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P2: Search filter narrows displayed services", {
     tag: ['@serviceGraph', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Testing search filter ===');
 
     // API validation — confirm api-gateway exists in topology
@@ -427,7 +421,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P2: Operations tab appears in side panel for a service", {
     tag: ['@serviceGraph', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Testing operations tab in side panel ===');
 
     // Step 1: API validation — confirm api-gateway has requests
@@ -457,7 +450,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P2: Close button dismisses side panel", {
     tag: ['@serviceGraph', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Testing side panel close button ===');
 
     // Step 1: API validation — confirm api-gateway exists
@@ -484,7 +476,6 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test("P2: Circular dependency services exist in topology (service-a, service-b, service-c)", {
     tag: ['@serviceGraph', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    const pm = new PageManager(page);
     testLogger.info('=== Verifying edge case: circular dependencies ===');
 
     // The service graph daemon processes traces in batches. Circular dependency

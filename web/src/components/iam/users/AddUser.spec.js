@@ -384,7 +384,7 @@ describe("AddUser Component", () => {
 
       wrapper.vm.formData = {
         email: "test@example.com",
-        password: "password123",
+        password: "Password123!",
         first_name: "John",
         last_name: "Doe",
         role: "admin",
@@ -400,7 +400,7 @@ describe("AddUser Component", () => {
       expect(userService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "test@example.com",
-          password: "password123",
+          password: "Password123!",
         }),
         "test-org",
       );
@@ -414,7 +414,7 @@ describe("AddUser Component", () => {
 
       wrapper.vm.formData = {
         email: "new@example.com",
-        password: "validpass123",
+        password: "Validpass123!",
         first_name: "Jane",
         last_name: "Roe",
         role: "admin",
@@ -513,7 +513,7 @@ describe("AddUser Component", () => {
       passwordWrapper.vm.formData = {
         email,
         change_password: true,
-        new_password: "newpassword123",
+        new_password: "Newpassword123!",
         old_password: "oldpassword123",
       };
       passwordWrapper.vm.beingUpdated = true;
@@ -775,7 +775,7 @@ describe("AddUser Component", () => {
       isValid = await wrapper.vm.$refs.updateUserForm.validate();
       expect(isValid).toBe(false);
 
-      wrapper.vm.formData.password = "validpassword123";
+      wrapper.vm.formData.password = "Validpassword123!";
       await nextTick();
       isValid = await wrapper.vm.$refs.updateUserForm.validate();
       expect(isValid).toBe(true);
@@ -896,7 +896,7 @@ describe("AddUser Component", () => {
       wrapper.vm.existingUser = false;
       wrapper.vm.formData = {
         email: "newuser@example.com",
-        password: "validPassword123",
+        password: "ValidPassword123!",
         first_name: "John",
         last_name: "Doe",
         role: "admin",
@@ -915,7 +915,7 @@ describe("AddUser Component", () => {
       expect(userService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "newuser@example.com",
-          password: "validPassword123",
+          password: "ValidPassword123!",
           first_name: "John",
           last_name: "Doe",
           role: "admin",
@@ -969,7 +969,7 @@ describe("AddUser Component", () => {
     it("handles custom organization name input", async () => {
       wrapper.vm.formData = {
         email: "user@example.com",
-        password: "validPass123",
+        password: "ValidPass123!",
         first_name: "John",
         last_name: "Doe",
         role: "admin",
@@ -989,7 +989,7 @@ describe("AddUser Component", () => {
       expect(userService.create).toHaveBeenCalledWith(
         {
           email: "user@example.com",
-          password: "validPass123",
+          password: "ValidPass123!",
           first_name: "John",
           last_name: "Doe",
           role: "admin",
@@ -1003,7 +1003,7 @@ describe("AddUser Component", () => {
     it("validates custom organization name format", async () => {
       wrapper.vm.formData = {
         email: "user@example.com",
-        password: "validPass123",
+        password: "ValidPass123!",
         first_name: "John",
         last_name: "Doe",
         role: "admin",

@@ -154,7 +154,10 @@ fn create_cli_app() -> Command {
                     arg!("stream-name", 's', "stream-name", "stream-name"),
                     arg!("top-x", 'x', "top-x", "top-x").default_value("5"),
                     arg!("org-id", 'o', "org-id", "org-id").default_value("default"),
-            ])
+            ]),
+            Command::new("bloom-inspect").about("dump fields + file names of a `.bf` file").args([
+                arg!("file", 'f', "file", "path to a `.bf` file (e.g. data/.../bloom/.../{ver}.bf)", true),
+            ]),
         ])
 }
 
@@ -189,6 +192,18 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         println!("init dir {path} successfully");
         return Ok(true);
     }
+    if name == "bloom-inspect" {
+        let file = command
+            .get_one::<String>("file")
+            .ok_or_else(|| anyhow::anyhow!("please set --file"))?;
+        // Resolving file_list ids → file names needs the DB; best-effort so
+        // the tool still works (showing bare ids) where it isn't reachable.
+        if let Err(e) = infra::init().await {
+            eprintln!("warning: infra init failed ({e}); file names will not be resolved");
+        }
+        super::bloom::inspect(file).await?;
+        return Ok(true);
+    }
 
     // init infra, create data dir & tables
     let cfg = config::get_config();
@@ -200,6 +215,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
+                    if let Err(msg) = config::utils::password::validate_password_strength(
+                        &cfg.auth.root_user_password,
+                    ) {
+                        return Err(anyhow::anyhow!(
+                            "ZO_ROOT_USER_PASSWORD does not meet policy: {msg}"
+                        ));
+                    }
                     let ret = users::update_user(
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
