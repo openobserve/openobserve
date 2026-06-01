@@ -360,6 +360,13 @@ export default defineComponent({
         name: "traces",
       },
       {
+        title: t("menu.evals"),
+        icon: "check-circle-outline",
+        link: "/online-evals",
+        name: "onlineEvals",
+        hide: config.isEnterprise !== "true" && config.isCloud !== "true",
+      },
+      {
         title: t("menu.rum"),
         icon: "devices",
         link: "/rum",

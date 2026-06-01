@@ -419,6 +419,7 @@
     "index": "Streams",
     "search": "Logs",
     "traces": "Traces",
+    "evals": "Evals",
     "template": "Template",
     "signOut": "Sign Out",
     "account": "Account",

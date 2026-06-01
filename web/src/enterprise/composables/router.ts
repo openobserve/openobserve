@@ -19,6 +19,7 @@ import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue"
 import Usage from "@/enterprise/components/billings/usage.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
+import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
 import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
 
@@ -54,6 +55,15 @@ const useEnvRoutes = () => {
 
   const homeChildRoutes = [
     {
+      path: "online-evals",
+      name: "onlineEvals",
+      component: OnlineEvals,
+      meta: {
+        title: "Online Evals",
+        keepAlive: false,
+      },
+    },
+    {
       path: "billings",
       name: "billings",
       component: Billing,
@@ -82,6 +92,10 @@ const useEnvRoutes = () => {
 
   // Child routes to merge under pipeline/pipelines path
   const pipelineChildren = [
+    {
+      path: "online-evals",
+      redirect: "/online-evals",
+    },
     {
       path: "eval-templates",
       name: "evalTemplates",
