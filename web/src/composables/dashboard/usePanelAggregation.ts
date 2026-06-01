@@ -30,17 +30,13 @@ export const usePanelAggregation = ({
 
     switch (dashboardPanelData.data.type) {
       case "heatmap":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          itemY.functionName = null;
-          // take first arg
-          itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            itemY.functionName = null;
+            // take first arg
+            itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
+          });
+          query.fields.breakdown = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -62,8 +58,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -82,21 +76,17 @@ export const usePanelAggregation = ({
       case "h-bar":
       case "stacked":
       case "h-stacked":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -119,8 +109,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -128,22 +116,18 @@ export const usePanelAggregation = ({
           getDefaultCustomChartText();
         break;
       case "table":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
         // Keep breakdown fields — they are used for pivot table mode
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -155,8 +139,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -170,24 +152,18 @@ export const usePanelAggregation = ({
       case "pie":
       case "donut":
       case "gauge":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
+          query.fields.breakdown = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -209,8 +185,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -222,24 +196,18 @@ export const usePanelAggregation = ({
         ].config.time_shift = [];
         break;
       case "metric":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
+          query.fields.breakdown = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -258,8 +226,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";

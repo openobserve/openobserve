@@ -521,6 +521,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-decimals"
         />
 
+        <!-- Multi-SQL: extra query-tabs visible when SQL has 2+ queries
+             (promql query-tabs are rendered separately above). Not for
+             geomap/maps which don't support multi-query. -->
+        <div
+          v-if="
+            !promqlMode &&
+            dashboardPanelData.data.queries.length > 1 &&
+            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.type != 'maps'
+          "
+          class="showLabelOnTop"
+          style="font-weight: 600"
+        >
+          {{ t("dashboard.query") }}
+          <OTabs
+            v-model="dashboardPanelData.layout.currentQueryIndex"
+            dense
+            mobile-arrows
+            data-test="dashboard-config-query-tab"
+          >
+            <OTab
+              v-for="(tab, index) in dashboardPanelData.data.queries"
+              :key="index"
+              :name="index"
+              :label="tab.tabName || (t('dashboard.queryLabel') + ' ' + (index + 1))"
+              :data-test="`dashboard-config-query-tab-${index}`"
+            >
+            </OTab>
+          </OTabs>
+        </div>
+
+        <!-- Multi-SQL: per-query custom legend label, visible only for SQL with 2+ queries -->
+        <div
+          v-if="
+            !promqlMode &&
+            dashboardPanelData.data.queries.length > 1 &&
+            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.type != 'maps'
+          "
+          v-show="isConfigOptionVisible('data', 'query-label')"
+          class="tw:mt-3"
+        >
+          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2" style="font-weight: 600">
+            {{ t("dashboard.multiSqlQueryLabel") }}
+            <OIcon name="info-outline" size="sm" />
+            <OTooltip
+              side="top"
+              align="center"
+              max-width="250px"
+              :content="t('dashboard.multiSqlQueryLabelHint')"
+            />
+          </div>
+          <OInput
+            v-model="
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].config.query_label
+            "
+            size="sm"
+            placeholder="{field_name}"
+            class="tw:w-full"
+            :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
+            @focus="() => {
+              const q = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+              if (!q.config.query_label) q.config.query_label = '{field_name}';
+            }"
+          />
+        </div>
+
         <OInput
           v-if="
             !promqlMode &&

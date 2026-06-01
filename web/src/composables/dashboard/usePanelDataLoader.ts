@@ -433,6 +433,15 @@ export const usePanelDataLoader = (
           endISOTimestamp,
           abortController,
         );
+      } else if (panelSchema.value.queries.length > 1) {
+        const pageType =
+          panelSchema.value.queries[0]?.fields?.stream_type;
+        await executeMultiSQL(
+          startISOTimestamp,
+          endISOTimestamp,
+          abortController,
+          pageType,
+        );
       } else {
         await executeSQL(startISOTimestamp, endISOTimestamp, abortController);
       }
@@ -602,7 +611,7 @@ export const usePanelDataLoader = (
     removeTraceId,
   });
 
-  const { executeSQL } = usePanelSQLExecutor({
+  const { executeSQL, executeMultiSQL } = usePanelSQLExecutor({
     state,
     panelSchema,
     store,

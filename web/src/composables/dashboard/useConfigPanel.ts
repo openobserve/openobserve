@@ -194,20 +194,6 @@ export function useConfigPanel(
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
       },
-      "promql-legend": {
-        label: t("dashboard.query"),
-        visible:
-          !!promqlMode.value &&
-          dashboardPanelData.data.type !== "geomap" &&
-          dashboardPanelData.data.type !== "maps",
-      },
-      "promql-legend-label": {
-        label: [t("dashboard.legendLabel"), t("common.legend")],
-        visible:
-          !!promqlMode.value &&
-          dashboardPanelData.data.type !== "geomap" &&
-          dashboardPanelData.data.type !== "maps",
-      },
     },
     data: {
       unit: { label: t("dashboard.unitLabel") },
@@ -239,6 +225,28 @@ export function useConfigPanel(
       "no-value-replacement": {
         label: t("dashboard.noValueReplacement"),
         visible: shouldShowNoValueReplacement(dashboardPanelData, promqlMode.value),
+      },
+      "query-label": {
+        label: t("dashboard.multiSqlQueryLabel"),
+        visible:
+          !promqlMode.value &&
+          dashboardPanelData.data.queries.length > 1 &&
+          dashboardPanelData.data.type !== "geomap" &&
+          dashboardPanelData.data.type !== "maps",
+      },
+      "promql-legend": {
+        label: t("dashboard.query"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type !== "geomap" &&
+          dashboardPanelData.data.type !== "maps",
+      },
+      "promql-legend-label": {
+        label: [t("dashboard.legendLabel"), t("common.legend")],
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type !== "geomap" &&
+          dashboardPanelData.data.type !== "maps",
       },
     },
     axis: {

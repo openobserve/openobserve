@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 
 // Quasar was removed entirely — no Quasar plugin mock required.
 // (Dialog.create / exportFile no longer used in the component.)
@@ -158,6 +158,7 @@ global.console = {
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 
 
 describe("PanelSchemaRenderer", () => {
@@ -1209,32 +1210,51 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("should emit updated:vrlFunctionFieldList when data has fields", async () => {
-      wrapper = createWrapper();
-      
-      const mockDataWithFields = [
+      const mockData = ref([
         [
-          { 
-            timestamp: "2024-01-01T10:00:00Z", 
-            count: 100, 
-            service: "web",
-            method: "GET",
-            status: "200"
+          {
+            ts: "2024-01-01T10:00:00Z",
+            count: 100,
           },
-          { 
-            timestamp: "2024-01-01T11:00:00Z", 
-            count: 150, 
+          {
+            ts: "2024-01-01T11:00:00Z",
+            count: 150,
             service: "api",
-            method: "POST",
-            status: "201"
-          }
-        ]
-      ];
-      
-      // Set data with multiple fields
-      wrapper.vm.data = { value: mockDataWithFields };
-      await nextTick();
-      
-      expect(wrapper.vm.data).toBeDefined();
+          },
+        ],
+        [
+          {
+            source: "a",
+            target: "b",
+            value: 12,
+          },
+        ],
+      ]);
+
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: mockData,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const emitted = wrapper.emitted("updated:vrlFunctionFieldList") || [];
+      expect(emitted.length).toBeGreaterThan(0);
+      const latestPayload = emitted[emitted.length - 1][0];
+      expect(latestPayload).toEqual([
+        ["ts", "count", "service"],
+        ["source", "target", "value"],
+      ]);
     });
 
     it("should emit update:initialVariableValues during drilldown navigation", () => {

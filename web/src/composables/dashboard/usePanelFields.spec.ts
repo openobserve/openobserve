@@ -20,6 +20,7 @@ const makeStore = (timestampColumn = "_timestamp") => ({
 
 const makeDefaultQuery = () => ({
   query: "",
+  vrlFunctionFieldList: [] as any[],
   customQuery: false,
   fields: {
     stream: "",
@@ -478,9 +479,11 @@ describe("usePanelFields", () => {
     it("clears vrlFunctionFieldList and customQueryFields", () => {
       panelData.meta.stream.vrlFunctionFieldList = [{ name: "vrl_field" }];
       panelData.meta.stream.customQueryFields = [{ name: "cq_field" }];
+      panelData.data.queries[0].vrlFunctionFieldList = [{ name: "vrl_q0" }];
       fields.removeXYFilters();
       expect(panelData.meta.stream.vrlFunctionFieldList).toHaveLength(0);
       expect(panelData.meta.stream.customQueryFields).toHaveLength(0);
+      expect(panelData.data.queries[0].vrlFunctionFieldList).toHaveLength(0);
     });
 
     it("does not clear fields for custom query (fields are preserved)", () => {

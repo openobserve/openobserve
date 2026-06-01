@@ -525,17 +525,17 @@ describe("useConfigPanel – legend section", () => {
 
   it("promql-legend is visible when promqlMode=true and type is not geomap/maps", () => {
     const c = makeComposable(makePanelData("bar"), ref(true));
-    expect(c.isConfigOptionVisible("legend", "promql-legend")).toBe(true);
+    expect(c.isConfigOptionVisible("data", "promql-legend")).toBe(true);
   });
 
   it("promql-legend is hidden for maps type even in promqlMode", () => {
     const c = makeComposable(makePanelData("maps"), ref(true));
-    expect(c.isConfigOptionVisible("legend", "promql-legend")).toBe(false);
+    expect(c.isConfigOptionVisible("data", "promql-legend")).toBe(false);
   });
 
   it("promql-legend is hidden when promqlMode=false", () => {
     const c = makeComposable(makePanelData("bar"), ref(false));
-    expect(c.isConfigOptionVisible("legend", "promql-legend")).toBe(false);
+    expect(c.isConfigOptionVisible("data", "promql-legend")).toBe(false);
   });
 });
 

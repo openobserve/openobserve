@@ -1044,7 +1044,6 @@ export default defineComponent({
           );
 
           updateArrayAlias();
-          updateArrayAlias();
         }
       }
       cleanupDraggingFields();

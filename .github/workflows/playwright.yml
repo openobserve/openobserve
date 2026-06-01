@@ -244,6 +244,7 @@ jobs:
                 "dashboard-sql-autocomplete.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
               ]
           - testfolder: "Dashboards-Settings"

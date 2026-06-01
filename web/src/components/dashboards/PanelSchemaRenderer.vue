@@ -680,11 +680,6 @@ export default defineComponent({
         return data.value;
       }
 
-      // Only filter for PromQL queries
-      if (panelSchema.value.queryType !== "promql") {
-        return data.value;
-      }
-
       // If no hidden queries or empty array, return as is
       if (
         !hiddenQueries.value ||
@@ -694,13 +689,31 @@ export default defineComponent({
         return data.value;
       }
 
-      // Filter out hidden queries
+      // Filter out hidden queries by index (works for both SQL and PromQL)
       const filtered = data.value.filter(
         (_: any, index: number) => !hiddenQueries.value.includes(index),
       );
 
-      // Return filtered data
       return filtered;
+    });
+
+    // E2: Also filter panelSchema.queries in sync with filteredData
+    // to keep data[i] aligned with queries[i] in convertMultiSQLData
+    const filteredPanelSchema = computed(() => {
+      if (
+        panelSchema.value.queryType === "promql" ||
+        !hiddenQueries.value?.length ||
+        !Array.isArray(panelSchema.value.queries)
+      ) {
+        return panelSchema.value;
+      }
+
+      return {
+        ...panelSchema.value,
+        queries: panelSchema.value.queries.filter(
+          (_: any, i: number) => !hiddenQueries.value.includes(i),
+        ),
+      };
     });
 
     // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
@@ -879,7 +892,7 @@ export default defineComponent({
       ) {
         try {
           const result = await convertPanelData(
-            panelSchema.value,
+            filteredPanelSchema.value,
             filteredData.value,
             store,
             chartPanelRef,
@@ -1089,28 +1102,33 @@ export default defineComponent({
         annotations,
       ],
       async () => {
-        // emit vrl function field list
-        if (data.value?.length && data.value[0] && data.value[0].length) {
-          // Find the index of the record with max attributes
-          const maxAttributesIndex = data.value[0].reduce(
-            (
-              maxIndex: string | number | any,
-              obj: {},
-              currentIndex: any,
-              array: Array<Record<string, unknown>>,
-            ) => {
-              const numAttributes = Object.keys(obj).length;
-              const maxNumAttributes = Object.keys(array[maxIndex]).length;
-              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
-            },
-            0,
-          );
-
-          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
-
-          const responseFields = Object.keys(recordwithMaxAttribute);
-
-          emit("updated:vrlFunctionFieldList", responseFields);
+        // emit vrl function field list per query index
+        if (data.value?.length) {
+          const perQueryFields: string[][] = [];
+          for (let qi = 0; qi < data.value.length; qi++) {
+            const queryData = data.value[qi];
+            if (queryData && queryData.length) {
+              const maxAttributesIndex = queryData.reduce(
+                (
+                  maxIndex: string | number | any,
+                  obj: {},
+                  currentIndex: any,
+                  array: Array<Record<string, unknown>>,
+                ) => {
+                  const numAttributes = Object.keys(obj).length;
+                  const maxNumAttributes = Object.keys(array[maxIndex]).length;
+                  return numAttributes > maxNumAttributes
+                    ? currentIndex
+                    : maxIndex;
+                },
+                0,
+              );
+              perQueryFields.push(Object.keys(queryData[maxAttributesIndex]));
+            } else {
+              perQueryFields.push([]);
+            }
+          }
+          emit("updated:vrlFunctionFieldList", perQueryFields);
         }
         if (panelData.value.chartType == "custom_chart")
           errorDetail.value = {
@@ -1326,6 +1344,9 @@ export default defineComponent({
     // Compute the value of the 'noData' variable.
     // Instead of re-scanning raw rows, this checks the conversion output
     // (panelData) which the pipeline already computed — O(1) property access.
+    // Multi-SQL note: panelData is built from filteredData (visible queries only)
+    // by convertSQLData and friends, so the type-specific checks below
+    // already reflect the multi-query aggregate.
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
