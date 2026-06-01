@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
-    "functionEditorLabel": "Functie-editor"
+    "functionEditorLabel": "Functie-editor",
+    "loadingStream": "Stream wordt geladen..."
   },
   "menu": {
     "home": "Home",
@@ -484,7 +485,15 @@
     "getStartedRUM": "Ga aan de slag met Real User Monitoring",
     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
     "eventID": "ID van het evenement",
-    "loadingApplicationErrors": "Wacht even, we halen toepassingsfouten op."
+    "loadingApplicationErrors": "Wacht even, we halen toepassingsfouten op.",
+    "traces": "Sporen",
+    "noCorrelatedTraces": "Geen gecorreleerde sporen gevonden voor deze sessie.",
+    "viewTraceDetails": "Trace-details bekijken",
+    "routeChange": "Route",
+    "initialView": "Initieel",
+    "failedToFetchTraces": "Het ophalen van traceergegevens is mislukt. Probeer het opnieuw.",
+    "traceNotFound": "Traceergegevens niet gevonden.",
+    "failedToFetchTraceDetails": "Het laden van de traceringsgegevens is mislukt. Probeer het opnieuw."
   },
   "about": {
     "name": "OpenObserve",
@@ -3432,7 +3441,8 @@
     "serviceGroupProtected": "De servicegroep kan niet worden verwijderd. U kunt alleen de toegewezen velden wijzigen.",
     "noDataFound": "Geen gegevens gevonden",
     "isWorkloadType": "Service-ID",
-    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam."
+    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam.",
+    "loadingCorrelation": "Correlatiedata wordt geladen..."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

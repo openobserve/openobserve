@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Mevcut değer yok",
     "selectLogStream": "Günlükler akışını seçin",
     "noData": "Veri yok",
-    "functionEditorLabel": "İşlev Düzenleyicisi"
+    "functionEditorLabel": "İşlev Düzenleyicisi",
+    "loadingStream": "Akış Yükleniyor..."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -484,7 +485,15 @@
     "getStartedRUM": "Gerçek Kullanıcı İzleme'yi kullanmaya başlayın",
     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
     "eventID": "Olay Kimliği",
-    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz."
+    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz.",
+    "traces": "İzleri",
+    "noCorrelatedTraces": "Bu oturum için ilişkili iz bulunamadı.",
+    "viewTraceDetails": "İzleme Ayrıntılarını Görüntüle",
+    "routeChange": "Güzergah",
+    "initialView": "İlk",
+    "failedToFetchTraces": "İzleme verileri alınamadı. Lütfen tekrar deneyin.",
+    "traceNotFound": "İzleme ayrıntıları bulunamadı.",
+    "failedToFetchTraceDetails": "İzleme ayrıntıları yüklenemedi. Lütfen tekrar deneyin."
   },
   "about": {
     "name": "Açık Gözlem",
@@ -3432,7 +3441,8 @@
     "serviceGroupProtected": "Hizmet grubu kaldırılamaz. Yalnızca eşlenen alanları değiştirebilirsiniz.",
     "noDataFound": "Veri Bulunamadı",
     "isWorkloadType": "Hizmet tanımlayıcısı",
-    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın."
+    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın.",
+    "loadingCorrelation": "Korelasyon verileri yükleniyor..."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

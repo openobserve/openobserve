@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "使用可能な値はありません",
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
-    "functionEditorLabel": "関数エディター"
+    "functionEditorLabel": "関数エディター",
+    "loadingStream": "ストリームをロード中..."
   },
   "menu": {
     "home": "ホーム",
@@ -484,7 +485,15 @@
     "getStartedRUM": "リアルユーザーモニタリングを始める",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
     "eventID": "イベント ID",
-    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。"
+    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。",
+    "traces": "トレース",
+    "noCorrelatedTraces": "このセッションの相関トレースは見つかりませんでした。",
+    "viewTraceDetails": "トレースの詳細を表示",
+    "routeChange": "ルート",
+    "initialView": "初期",
+    "failedToFetchTraces": "トレースデータを取得できませんでした。もう一度試してください。",
+    "traceNotFound": "トレースの詳細が見つかりません。",
+    "failedToFetchTraceDetails": "トレースの詳細を読み込めませんでした。もう一度試してください。"
   },
   "about": {
     "name": "OpenObserve",
@@ -3421,7 +3430,8 @@
     "serviceGroupProtected": "サービスグループは削除できません。変更できるのはマップされたフィールドだけです。",
     "noDataFound": "データが見つかりません",
     "isWorkloadType": "サービス識別子",
-    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。"
+    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。",
+    "loadingCorrelation": "相関データを読み込んでいます..."
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

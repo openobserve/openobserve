@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Keine Werte verfügbar",
     "selectLogStream": "Logs-Stream auswählen",
     "noData": "Keine Daten verfügbar",
-    "functionEditorLabel": "Funktionseditor"
+    "functionEditorLabel": "Funktionseditor",
+    "loadingStream": "Stream wird geladen..."
   },
   "menu": {
     "home": "Startseite",
@@ -484,7 +485,15 @@
     "getStartedRUM": "Erste Schritte mit Real User Monitoring",
     "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",
     "eventID": "ID des Ereignisses",
-    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab."
+    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab.",
+    "traces": "Spuren",
+    "noCorrelatedTraces": "Für diese Sitzung wurden keine korrelierten Spuren gefunden.",
+    "viewTraceDetails": "Trace-Details anzeigen",
+    "routeChange": "Route",
+    "initialView": "Anfänglich",
+    "failedToFetchTraces": "Ablaufverfolgungsdaten konnten nicht abgerufen werden. Bitte versuchen Sie es erneut.",
+    "traceNotFound": "Die Trace-Details wurden nicht gefunden.",
+    "failedToFetchTraceDetails": "Die Trace-Details konnten nicht geladen werden. Bitte versuchen Sie es erneut."
   },
   "about": {
     "name": "Observe öffnen",
@@ -3421,7 +3430,8 @@
     "serviceGroupProtected": "Die Dienstgruppe kann nicht entfernt werden. Sie können nur die zugewiesenen Felder ändern.",
     "noDataFound": "Keine Daten gefunden",
     "isWorkloadType": "Dienstkennzeichnung",
-    "isWorkloadTypeTooltip": "Wenn diese Gruppe aktiviert ist, wird sie verwendet, um einen Dienst eindeutig zu identifizieren (z. B. Cluster, Namespace, Deployment). Deaktiviert für Gruppen, die Operationen über einen Dienst beschreiben, z. B. eine HTTP-Methode oder einen Datenbanknamen."
+    "isWorkloadTypeTooltip": "Wenn diese Gruppe aktiviert ist, wird sie verwendet, um einen Dienst eindeutig zu identifizieren (z. B. Cluster, Namespace, Deployment). Deaktiviert für Gruppen, die Operationen über einen Dienst beschreiben, z. B. eine HTTP-Methode oder einen Datenbanknamen.",
+    "loadingCorrelation": "Korrelationsdaten werden geladen..."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

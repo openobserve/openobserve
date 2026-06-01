@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "没有可用值",
     "selectLogStream": "选择日志流",
     "noData": "无可用数据",
-    "functionEditorLabel": "函数编辑器"
+    "functionEditorLabel": "函数编辑器",
+    "loadingStream": "正在加载直播..."
   },
   "menu": {
     "home": "主页",
@@ -484,7 +485,15 @@
     "getStartedRUM": "开始使用真实用户监控",
     "loadingErrorDetails": "等一下，我们正在获取错误细节。",
     "eventID": "事件 ID",
-    "loadingApplicationErrors": "等一下，我们正在提取应用程序错误。"
+    "loadingApplicationErrors": "等一下，我们正在提取应用程序错误。",
+    "traces": "痕迹",
+    "noCorrelatedTraces": "未找到此会话的相关跟踪。",
+    "viewTraceDetails": "查看追踪详情",
+    "routeChange": "路线",
+    "initialView": "初始",
+    "failedToFetchTraces": "无法获取跟踪数据。请重试。",
+    "traceNotFound": "未找到追踪详情。",
+    "failedToFetchTraceDetails": "加载追踪详情失败。请重试。"
   },
   "about": {
     "name": "OpenObserve",
@@ -3425,7 +3434,8 @@
     "serviceGroupProtected": "无法删除服务组。您只能修改映射的字段。",
     "noDataFound": "未找到任何数据",
     "isWorkloadType": "服务标识符",
-    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。"
+    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。",
+    "loadingCorrelation": "正在加载关联数据..."
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

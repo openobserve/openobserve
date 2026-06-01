@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "No hay valores disponibles",
     "selectLogStream": "Seleccione la secuencia de registros",
     "noData": "No hay datos disponibles",
-    "functionEditorLabel": "Editor de funciones"
+    "functionEditorLabel": "Editor de funciones",
+    "loadingStream": "Cargando Stream..."
   },
   "menu": {
     "home": "Inicio",
@@ -484,7 +485,15 @@
     "getStartedRUM": "Comience con Real User Monitoring",
     "loadingErrorDetails": "Agárrate fuerte, estamos buscando los detalles del error.",
     "eventID": "ID de evento",
-    "loadingApplicationErrors": "Agárrate fuerte, estamos recibiendo errores de solicitud."
+    "loadingApplicationErrors": "Agárrate fuerte, estamos recibiendo errores de solicitud.",
+    "traces": "Huellas",
+    "noCorrelatedTraces": "No se han encontrado rastros correlacionados para esta sesión.",
+    "viewTraceDetails": "Ver detalles de rastreo",
+    "routeChange": "Ruta",
+    "initialView": "Inicial",
+    "failedToFetchTraces": "No se pudieron obtener los datos de seguimiento. Por favor, inténtelo de nuevo.",
+    "traceNotFound": "No se han encontrado detalles de rastreo.",
+    "failedToFetchTraceDetails": "No se pudieron cargar los detalles del seguimiento. Por favor, inténtelo de nuevo."
   },
   "about": {
     "name": "Abrir Observe",
@@ -3419,7 +3428,8 @@
     "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados.",
     "noDataFound": "No se han encontrado datos",
     "isWorkloadType": "Identificador de servicio",
-    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos."
+    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos.",
+    "loadingCorrelation": "Cargando datos de correlación..."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Aucune valeur disponible",
     "selectLogStream": "Sélectionnez le flux de journaux",
     "noData": "Aucune donnée disponible",
-    "functionEditorLabel": "Éditeur de fonctions"
+    "functionEditorLabel": "Éditeur de fonctions",
+    "loadingStream": "Chargement du flux..."
   },
   "menu": {
     "home": "Accueil",
@@ -484,7 +485,15 @@
     "getStartedRUM": "Commencez avec Real User Monitoring",
     "loadingErrorDetails": "Attendez, nous sommes en train de récupérer les détails de l'erreur.",
     "eventID": "ID de l'événement",
-    "loadingApplicationErrors": "Attendez, nous sommes en train de récupérer des erreurs d'application."
+    "loadingApplicationErrors": "Attendez, nous sommes en train de récupérer des erreurs d'application.",
+    "traces": "Des traces",
+    "noCorrelatedTraces": "Aucune trace corrélée n'a été trouvée pour cette session.",
+    "viewTraceDetails": "Afficher les détails de la trace",
+    "routeChange": "Parcours",
+    "initialView": "Initiale",
+    "failedToFetchTraces": "Impossible de récupérer les données de trace. Réessayez, s'il vous plaît.",
+    "traceNotFound": "Les détails de la trace sont introuvables.",
+    "failedToFetchTraceDetails": "Impossible de charger les détails de la trace. Veuillez réessayer."
   },
   "about": {
     "name": "Ouvrez Observe",
@@ -3421,7 +3430,8 @@
     "serviceGroupProtected": "Le groupe de services ne peut pas être supprimé. Vous ne pouvez modifier que les champs mappés.",
     "noDataFound": "Aucune donnée trouvée",
     "isWorkloadType": "Identifiant du service",
-    "isWorkloadTypeTooltip": "Lorsqu'il est activé, ce groupe est utilisé pour identifier de manière unique un service (par exemple, cluster, espace de noms, déploiement). Désactivez cette option pour les groupes qui décrivent des opérations via un service, comme la méthode HTTP ou le nom de la base de données."
+    "isWorkloadTypeTooltip": "Lorsqu'il est activé, ce groupe est utilisé pour identifier de manière unique un service (par exemple, cluster, espace de noms, déploiement). Désactivez cette option pour les groupes qui décrivent des opérations via un service, comme la méthode HTTP ou le nom de la base de données.",
+    "loadingCorrelation": "Chargement des données de corrélation..."
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

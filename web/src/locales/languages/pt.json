@@ -398,7 +398,8 @@
     "patternNoValuesAvailable": "Não há valores disponíveis",
     "selectLogStream": "Selecione o fluxo de registros",
     "noData": "Não há dados disponíveis",
-    "functionEditorLabel": "Editor de funções"
+    "functionEditorLabel": "Editor de funções",
+    "loadingStream": "Carregando Stream..."
   },
   "menu": {
     "home": "Início",
@@ -484,7 +485,15 @@
     "getStartedRUM": "Comece com o monitoramento real de usuários",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
     "eventID": "ID do evento",
-    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos."
+    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos.",
+    "traces": "Traços",
+    "noCorrelatedTraces": "Nenhum traço correlacionado foi encontrado para esta sessão.",
+    "viewTraceDetails": "Exibir detalhes do rastreamento",
+    "routeChange": "Rota",
+    "initialView": "Inicial",
+    "failedToFetchTraces": "Falha ao buscar dados de rastreamento. Por favor, tente novamente.",
+    "traceNotFound": "Detalhes do rastreamento não encontrados.",
+    "failedToFetchTraceDetails": "Falha ao carregar detalhes do rastreamento. Por favor, tente novamente."
   },
   "about": {
     "name": "Abra o Observe",
@@ -3421,7 +3430,8 @@
     "serviceGroupProtected": "O grupo de serviços não pode ser removido. Você só pode modificar os campos mapeados.",
     "noDataFound": "Nenhum dado encontrado",
     "isWorkloadType": "Identificador de serviço",
-    "isWorkloadTypeTooltip": "Quando ativado, esse grupo é usado para identificar exclusivamente um serviço (por exemplo, cluster, namespace, implantação). Desative para grupos que descrevem operações por meio de um serviço, como método HTTP ou nome do banco de dados."
+    "isWorkloadTypeTooltip": "Quando ativado, esse grupo é usado para identificar exclusivamente um serviço (por exemplo, cluster, namespace, implantação). Desative para grupos que descrevem operações por meio de um serviço, como método HTTP ou nome do banco de dados.",
+    "loadingCorrelation": "Carregando dados de correlação..."
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
