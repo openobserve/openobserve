@@ -1139,7 +1139,7 @@ export default defineComponent({
       }
 
       // Priority: peer_service (most specific) > db_name (logical name) > db_system (type)
-      const coalesceFields = (["peer_service", "db_name", "db_system"] as const).filter((f) =>
+      const coalesceFields = (["peer_service", "db_system", "db_name"] as const).filter((f) =>
         schemaFieldSet.has(f),
       );
       if (coalesceFields.length === 0) return { nodes: [], edges: [] };

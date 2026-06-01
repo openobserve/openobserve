@@ -173,6 +173,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`service-graph-node-panel-tab-${cfg.id}`"
               />
               <OTab
+                v-if="showNetPeerNameTab"
+                name="net-peer-name"
+                label="Net Peer Name"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-net-peer-name"
+              />
+              <OTab
+                v-if="showNetPeerPortTab"
+                name="net-peer-port"
+                label="Net Peer Port"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-net-peer-port"
+              />
+              <OTab
+                v-if="showDbNameTab"
+                name="db-name"
+                label="DB Name"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-db-name"
+              />
+              <OTab
                 name="metrics"
                 label="Metrics"
                 style="text-transform: capitalize"
@@ -478,6 +499,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         No {{ cfg.label.toLowerCase() }} data found
                       </div>
                     </template>
+                  </TenstackTable>
+                </div>
+              </template>
+            </OTabPanel>
+
+            <!-- Net Peer Name Tab — breakdown by hostname/IP address -->
+            <OTabPanel
+              v-if="showNetPeerNameTab"
+              name="net-peer-name"
+              class="tw:p-0! panel-section tw:mb-0!"
+              data-test="service-graph-side-panel-net-peer-name"
+            >
+              <div
+                v-if="netPeerNameLoading"
+                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                style="color: var(--o2-text-secondary)"
+                data-test="service-graph-side-panel-net-peer-name-loading"
+              >
+                <OSpinner size="xs" />
+                <span>Loading...</span>
+              </div>
+              <template v-else>
+                <div
+                  v-if="netPeerNameData.length === 0"
+                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                  style="color: var(--o2-text-secondary)"
+                  data-test="service-graph-side-panel-net-peer-name-empty"
+                >No data found</div>
+                <div v-else class="tw:overflow-hidden tw:rounded" data-test="service-graph-side-panel-net-peer-name-table">
+                  <TenstackTable
+                    :columns="buildEntityTableColumns('peer_name', 'Net Peer Name')"
+                    :rows="sortResourceRows(netPeerNameData.map((row) => ({ peer_name: row.name, requests: row.requestCount, errors: row.errorCount, p75: row.p75Latency, p95: row.p95Latency, p99: row.p99Latency })))"
+                    :sort-by="sortBy" :sort-order="sortOrder" :loading="false"
+                    :default-columns="false" :enable-column-reorder="false" :enable-row-expand="false"
+                    :enable-text-highlight="false" :enable-status-bar="false" :enable-ai-context-button="false"
+                    :row-height="28" @sort-change="handleSortChange"
+                  >
+                    <template #cell-errors="{ item }"><span :class="item.errors > 0 ? 'tw:text-[var(--q-negative)] tw:font-semibold' : ''">{{ item.errors }}</span></template>
+                    <template #cell-p99="{ item }"><span :class="item.p99 > 0 ? 'tw:text-[var(--o2-latency-p99)]' : ''">{{ formatOperationLatency(item.p99) }}</span></template>
+                    <template #cell-p95="{ item }"><span :class="item.p95 > 0 ? 'tw:text-[var(--o2-latency-p95)]' : ''">{{ formatOperationLatency(item.p95) }}</span></template>
+                    <template #cell-p75="{ item }"><span :class="item.p75 > 0 ? 'tw:text-[var(--o2-latency-p75)]' : ''">{{ formatOperationLatency(item.p75) }}</span></template>
+                    <template #empty><div class="tw:text-xs tw:italic tw:py-2 tw:text-center" style="color: var(--o2-text-secondary)">No data found</div></template>
+                  </TenstackTable>
+                </div>
+              </template>
+            </OTabPanel>
+
+            <!-- Net Peer Port Tab — breakdown by port number -->
+            <OTabPanel
+              v-if="showNetPeerPortTab"
+              name="net-peer-port"
+              class="tw:p-0! panel-section tw:mb-0!"
+              data-test="service-graph-side-panel-net-peer-port"
+            >
+              <div
+                v-if="netPeerPortLoading"
+                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                style="color: var(--o2-text-secondary)"
+                data-test="service-graph-side-panel-net-peer-port-loading"
+              >
+                <OSpinner size="xs" />
+                <span>Loading...</span>
+              </div>
+              <template v-else>
+                <div
+                  v-if="netPeerPortData.length === 0"
+                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                  style="color: var(--o2-text-secondary)"
+                  data-test="service-graph-side-panel-net-peer-port-empty"
+                >No data found</div>
+                <div v-else class="tw:overflow-hidden tw:rounded" data-test="service-graph-side-panel-net-peer-port-table">
+                  <TenstackTable
+                    :columns="buildEntityTableColumns('peer_port', 'Net Peer Port')"
+                    :rows="sortResourceRows(netPeerPortData.map((row) => ({ peer_port: row.name, requests: row.requestCount, errors: row.errorCount, p75: row.p75Latency, p95: row.p95Latency, p99: row.p99Latency })))"
+                    :sort-by="sortBy" :sort-order="sortOrder" :loading="false"
+                    :default-columns="false" :enable-column-reorder="false" :enable-row-expand="false"
+                    :enable-text-highlight="false" :enable-status-bar="false" :enable-ai-context-button="false"
+                    :row-height="28" @sort-change="handleSortChange"
+                  >
+                    <template #cell-errors="{ item }"><span :class="item.errors > 0 ? 'tw:text-[var(--q-negative)] tw:font-semibold' : ''">{{ item.errors }}</span></template>
+                    <template #cell-p99="{ item }"><span :class="item.p99 > 0 ? 'tw:text-[var(--o2-latency-p99)]' : ''">{{ formatOperationLatency(item.p99) }}</span></template>
+                    <template #cell-p95="{ item }"><span :class="item.p95 > 0 ? 'tw:text-[var(--o2-latency-p95)]' : ''">{{ formatOperationLatency(item.p95) }}</span></template>
+                    <template #cell-p75="{ item }"><span :class="item.p75 > 0 ? 'tw:text-[var(--o2-latency-p75)]' : ''">{{ formatOperationLatency(item.p75) }}</span></template>
+                    <template #empty><div class="tw:text-xs tw:italic tw:py-2 tw:text-center" style="color: var(--o2-text-secondary)">No data found</div></template>
+                  </TenstackTable>
+                </div>
+              </template>
+            </OTabPanel>
+
+            <!-- DB Name Tab — breakdown by db.name (database / schema / keyspace) -->
+            <OTabPanel
+              v-if="showDbNameTab"
+              name="db-name"
+              class="tw:p-0! panel-section tw:mb-0!"
+              data-test="service-graph-side-panel-db-name"
+            >
+              <div
+                v-if="dbNameLoading"
+                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                style="color: var(--o2-text-secondary)"
+                data-test="service-graph-side-panel-db-name-loading"
+              >
+                <OSpinner size="xs" />
+                <span>Loading...</span>
+              </div>
+              <template v-else>
+                <div
+                  v-if="dbNameData.length === 0"
+                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                  style="color: var(--o2-text-secondary)"
+                  data-test="service-graph-side-panel-db-name-empty"
+                >No data found</div>
+                <div v-else class="tw:overflow-hidden tw:rounded" data-test="service-graph-side-panel-db-name-table">
+                  <TenstackTable
+                    :columns="buildEntityTableColumns('db_name', 'DB Name')"
+                    :rows="sortResourceRows(dbNameData.map((row) => ({ db_name: row.name, requests: row.requestCount, errors: row.errorCount, p75: row.p75Latency, p95: row.p95Latency, p99: row.p99Latency })))"
+                    :sort-by="sortBy" :sort-order="sortOrder" :loading="false"
+                    :default-columns="false" :enable-column-reorder="false" :enable-row-expand="false"
+                    :enable-text-highlight="false" :enable-status-bar="false" :enable-ai-context-button="false"
+                    :row-height="28" @sort-change="handleSortChange"
+                  >
+                    <template #cell-errors="{ item }"><span :class="item.errors > 0 ? 'tw:text-[var(--q-negative)] tw:font-semibold' : ''">{{ item.errors }}</span></template>
+                    <template #cell-p99="{ item }"><span :class="item.p99 > 0 ? 'tw:text-[var(--o2-latency-p99)]' : ''">{{ formatOperationLatency(item.p99) }}</span></template>
+                    <template #cell-p95="{ item }"><span :class="item.p95 > 0 ? 'tw:text-[var(--o2-latency-p95)]' : ''">{{ formatOperationLatency(item.p95) }}</span></template>
+                    <template #cell-p75="{ item }"><span :class="item.p75 > 0 ? 'tw:text-[var(--o2-latency-p75)]' : ''">{{ formatOperationLatency(item.p75) }}</span></template>
+                    <template #empty><div class="tw:text-xs tw:italic tw:py-2 tw:text-center" style="color: var(--o2-text-secondary)">No data found</div></template>
                   </TenstackTable>
                 </div>
               </template>
@@ -1263,6 +1410,15 @@ export default defineComponent({
     });
     const loadingOperations = ref(false);
 
+    // Breakdown tabs state (for database/external nodes only)
+    const dbNodeSchemaFields = ref<Set<string>>(new Set()); // cached schema for the current DB node
+    const netPeerNameData = ref<any[]>([]);
+    const netPeerNameLoading = ref(false);
+    const netPeerPortData = ref<any[]>([]);
+    const netPeerPortLoading = ref(false);
+    const dbNameData = ref<any[]>([]);
+    const dbNameLoading = ref(false);
+
     // Dynamic resource tabs state (replaces per-resource recentNodes/recentPods/loadingNodes/loadingPods)
     const resourceTabData = ref<Record<string, ResourceRow[]>>({});
     const resourceTabLoading = ref<Record<string, boolean>>({});
@@ -1590,6 +1746,47 @@ export default defineComponent({
       return incoming.length > 0 && outgoing.length === 0;
     });
 
+    // Fetch and cache the stream schema for the current DB node (shared by all breakdown tabs)
+    const ensureDbNodeSchema = async (): Promise<Set<string>> => {
+      if (dbNodeSchemaFields.value.size > 0) return dbNodeSchemaFields.value;
+      if (!props.streamFilter || props.streamFilter === "all") return new Set();
+      const streamName = props.streamFilter;
+      const orgId = store.state.selectedOrganization.identifier;
+      try {
+        const schemaRes = await streamService.schema(orgId, streamName, "traces");
+        const fields: { name: string }[] =
+          schemaRes.data?.schema || schemaRes.data?.fields || [];
+        dbNodeSchemaFields.value = new Set(fields.map((f: any) => f.name));
+      } catch {
+        return new Set();
+      }
+      return dbNodeSchemaFields.value;
+    };
+
+    // Which breakdown tabs to show — only when the relevant field(s) exist in the stream schema
+    const showNetPeerNameTab = computed(() => {
+      if (!isDatabaseNode.value) return false;
+      const s = dbNodeSchemaFields.value;
+      return (
+        ["net_peer_name", "net_peer_ip", "server_address", "network_peer_address"].some((f) =>
+          s.has(f),
+        ) || [...s].some((f) => f.startsWith("net_peer_") && !f.includes("port"))
+      );
+    });
+
+    const showNetPeerPortTab = computed(() => {
+      if (!isDatabaseNode.value) return false;
+      const s = dbNodeSchemaFields.value;
+      return (
+        ["net_peer_port", "server_port"].some((f) => s.has(f)) ||
+        [...s].some((f) => f.startsWith("net_peer_") && f.includes("port"))
+      );
+    });
+
+    const showDbNameTab = computed(
+      () => isDatabaseNode.value && dbNodeSchemaFields.value.has("db_name"),
+    );
+
     // Computed: Operations table columns
     const operationsTableColumns = computed(() =>
       buildEntityTableColumns(
@@ -1632,7 +1829,7 @@ export default defineComponent({
         return; // Schema unavailable — leave operations list empty
       }
 
-      const DB_FIELDS = ["peer_service", "db_name", "db_system"] as const;
+      const DB_FIELDS = ["peer_service", "db_system", "db_name"] as const;
       const presentFields = DB_FIELDS.filter((f) => schemaFieldSet.has(f));
       if (presentFields.length === 0) return; // No db-identifier fields in schema
 
@@ -1670,6 +1867,141 @@ export default defineComponent({
         }
       } catch (err) {
         console.warn("[ServiceGraph] DB operations query failed:", err);
+      }
+    };
+
+    // Shared guard + dbFilter builder for all DB breakdown tabs
+    const buildDbBreakdownContext = async (loadingRef: { value: boolean }) => {
+      if (!props.selectedNode || !props.visible || props.streamFilter === "all") return null;
+      if (!isDatabaseNode.value) return null;
+      if (!props.timeRange?.startTime || !props.timeRange?.endTime) return null;
+      const serviceName = buildServiceName();
+      if (!serviceName) return null;
+
+      loadingRef.value = true;
+      const schemaFieldSet = await ensureDbNodeSchema();
+      if (schemaFieldSet.size === 0) { loadingRef.value = false; return null; }
+
+      const DB_FIELDS = ["peer_service", "db_system", "db_name"] as const;
+      const presentDbFields = DB_FIELDS.filter((f) => schemaFieldSet.has(f));
+      if (presentDbFields.length === 0) { loadingRef.value = false; return null; }
+
+      return {
+        serviceName,
+        streamName: props.streamFilter,
+        orgId: store.state.selectedOrganization.identifier,
+        schemaFieldSet,
+        dbFilter: presentDbFields
+          .map((f) => `${f} = '${escapeSingleQuotes(serviceName)}'`)
+          .join(" OR "),
+      };
+    };
+
+    // Shared response mapper for all breakdown tabs
+    const mapBreakdownHits = (hits: any[], valueKey = "breakdown_value") =>
+      hits.map((row: any) => ({
+        name: row[valueKey] ?? "unknown",
+        requestCount: row.request_count || 0,
+        errorCount: row.error_count || 0,
+        p75Latency: row.p75_latency || 0,
+        p95Latency: row.p95_latency || 0,
+        p99Latency: row.p99_latency || 0,
+      }));
+
+    // Shared SQL runner for breakdown tabs
+    const runBreakdownQuery = async (
+      sql: string,
+      orgId: string,
+      streamName: string,
+    ) => {
+      const response = await searchService.search({
+        org_identifier: orgId,
+        query: {
+          query: {
+            sql,
+            start_time: props.timeRange.startTime,
+            end_time: props.timeRange.endTime,
+            from: 0,
+            size: 100,
+          },
+        },
+        page_type: "traces",
+      });
+      return (response.data?.hits as any[]) || [];
+    };
+
+    // Tab: Net Peer Name — breakdown by hostname/IP (address-only, no port)
+    const fetchNetPeerNameBreakdown = async () => {
+      const ctx = await buildDbBreakdownContext(netPeerNameLoading);
+      if (!ctx) return;
+      netPeerNameData.value = [];
+
+      const ADDR_PRIORITY = [
+        "net_peer_name", "net_peer_ip", "server_address", "network_peer_address",
+      ];
+      const addrFields = [
+        ...ADDR_PRIORITY.filter((f) => ctx.schemaFieldSet.has(f)),
+        ...[...ctx.schemaFieldSet]
+          .filter((f) => f.startsWith("net_peer_") && !f.includes("port") && !ADDR_PRIORITY.includes(f))
+          .sort(),
+      ];
+      if (addrFields.length === 0) { netPeerNameLoading.value = false; return; }
+      const addrExpr = addrFields.length === 1 ? addrFields[0] : `COALESCE(${addrFields.join(", ")})`;
+
+      try {
+        const sql = `SELECT ${addrExpr} as breakdown_value, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${ctx.streamName}" WHERE span_kind = '3' AND (${ctx.dbFilter}) AND ${addrExpr} IS NOT NULL GROUP BY ${addrExpr} ORDER BY request_count DESC`;
+        const hits = await runBreakdownQuery(sql, ctx.orgId, ctx.streamName);
+        netPeerNameData.value = mapBreakdownHits(hits);
+      } catch (err) {
+        console.warn("[ServiceGraph] Net peer name breakdown failed:", err);
+      } finally {
+        netPeerNameLoading.value = false;
+      }
+    };
+
+    // Tab: Net Peer Port — breakdown by port number
+    const fetchNetPeerPortBreakdown = async () => {
+      const ctx = await buildDbBreakdownContext(netPeerPortLoading);
+      if (!ctx) return;
+      netPeerPortData.value = [];
+
+      const PORT_PRIORITY = ["net_peer_port", "server_port"];
+      const portFields = [
+        ...PORT_PRIORITY.filter((f) => ctx.schemaFieldSet.has(f)),
+        ...[...ctx.schemaFieldSet]
+          .filter((f) => f.startsWith("net_peer_") && f.includes("port") && !PORT_PRIORITY.includes(f))
+          .sort(),
+      ];
+      if (portFields.length === 0) { netPeerPortLoading.value = false; return; }
+      const portExpr = portFields.length === 1 ? portFields[0] : `COALESCE(${portFields.join(", ")})`;
+
+      try {
+        const sql = `SELECT CAST(${portExpr} AS VARCHAR) as breakdown_value, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${ctx.streamName}" WHERE span_kind = '3' AND (${ctx.dbFilter}) AND ${portExpr} IS NOT NULL GROUP BY ${portExpr} ORDER BY request_count DESC`;
+        const hits = await runBreakdownQuery(sql, ctx.orgId, ctx.streamName);
+        netPeerPortData.value = mapBreakdownHits(hits);
+      } catch (err) {
+        console.warn("[ServiceGraph] Net peer port breakdown failed:", err);
+      } finally {
+        netPeerPortLoading.value = false;
+      }
+    };
+
+    // Tab: DB Name — breakdown by db.name (database/schema/keyspace)
+    const fetchDbNameBreakdown = async () => {
+      const ctx = await buildDbBreakdownContext(dbNameLoading);
+      if (!ctx) return;
+      dbNameData.value = [];
+
+      if (!ctx.schemaFieldSet.has("db_name")) { dbNameLoading.value = false; return; }
+
+      try {
+        const sql = `SELECT db_name as breakdown_value, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${ctx.streamName}" WHERE span_kind = '3' AND (${ctx.dbFilter}) AND db_name IS NOT NULL GROUP BY db_name ORDER BY request_count DESC`;
+        const hits = await runBreakdownQuery(sql, ctx.orgId, ctx.streamName);
+        dbNameData.value = mapBreakdownHits(hits);
+      } catch (err) {
+        console.warn("[ServiceGraph] DB name breakdown failed:", err);
+      } finally {
+        dbNameLoading.value = false;
       }
     };
 
@@ -2001,6 +2333,12 @@ export default defineComponent({
           fetchResourceData(config);
         }
         if (activeTab.value === "metrics") fetchMetricsCorrelation();
+        if (activeTab.value === "net-peer-name" && !netPeerNameData.value.length)
+          fetchNetPeerNameBreakdown();
+        if (activeTab.value === "net-peer-port" && !netPeerPortData.value.length)
+          fetchNetPeerPortBreakdown();
+        if (activeTab.value === "db-name" && !dbNameData.value.length)
+          fetchDbNameBreakdown();
       },
     );
 
@@ -2012,6 +2350,14 @@ export default defineComponent({
           resolveWorkloadFields();
         }
       },
+      { immediate: true },
+    );
+
+    // Pre-fetch stream schema when a DB node becomes active so breakdown tab visibility
+    // updates immediately rather than waiting for the user to click each tab.
+    watch(
+      () => isDatabaseNode.value && props.visible && props.streamFilter !== "all",
+      (shouldFetch) => { if (shouldFetch) ensureDbNodeSchema(); },
       { immediate: true },
     );
 
@@ -2027,6 +2373,13 @@ export default defineComponent({
         metricsCorrelationData.value = null;
         metricsCorrelationError.value = null;
         metricsCorrelationLoaded.value = false;
+        dbNodeSchemaFields.value = new Set();
+        netPeerNameData.value = [];
+        netPeerNameLoading.value = false;
+        netPeerPortData.value = [];
+        netPeerPortLoading.value = false;
+        dbNameData.value = [];
+        dbNameLoading.value = false;
         activeTab.value = "operations";
         localRangeFilters.value.clear();
         rangeFiltersVersion.value++;
@@ -2242,7 +2595,17 @@ export default defineComponent({
       handleSortChange,
       sortResourceRows,
       formatOperationLatency,
-      isDurationColumn
+      isDurationColumn,
+      // DB breakdown tabs
+      showNetPeerNameTab,
+      showNetPeerPortTab,
+      showDbNameTab,
+      netPeerNameData,
+      netPeerNameLoading,
+      netPeerPortData,
+      netPeerPortLoading,
+      dbNameData,
+      dbNameLoading,
     };
   },
 });
