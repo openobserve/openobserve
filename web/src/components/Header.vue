@@ -921,20 +921,5 @@ export default defineComponent({
   }
 }
 
-/* Hover "jump" on the utility icons RIGHT of the vertical separator
- * (theme switcher, slack, help, settings, profile). Scoped to the
- * `.header-utility-icons` wrapper so buttons on the LEFT (edition,
- * AI assist, org dropdown) are unaffected. `:deep` is needed because
- * OButton renders the actual <button> as a child of the scoped root. */
-.header-utility-icons :deep(button) {
-  transition: transform 0.15s ease;
 
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-}
 </style>
