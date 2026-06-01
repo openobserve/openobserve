@@ -7,7 +7,7 @@
         : 'tw:flex tw:flex-col tw:gap-y-2'
     "
   >
-    <div style="width: auto;">
+    <div style="width: auto; flex-shrink: 0;">
       <div class="text-label-bold tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
@@ -38,7 +38,7 @@
     <div
       :style="
         !customQuery && !fields.isDerived
-          ? 'width: calc(100% - 134px); display: flex; flex-direction: column;'
+          ? 'flex: 1; min-width: 0; display: flex; flex-direction: column;'
           : 'width: max-content;'
       "
     >
@@ -71,20 +71,12 @@
       >
         <OTabPanel name="build">
           <div class="tw:pt-2" style="max-height: 26.25rem; overflow: auto;">
-            <div style="display: flex">
-              <div
-                style="
-                  width: calc(100% - 134px);
-                "
-              >
-                <div class="text-label-bold tw:pb-3">Configuration</div>
-                <SelectFunction
-                  v-model="fields"
-                  data-test="dynamic-function-popup-select-function"
-                  :allowAggregation="allowAggregation"
-                />
-              </div>
-            </div>
+            <div class="text-label-bold tw:pb-3">Configuration</div>
+            <SelectFunction
+              v-model="fields"
+              data-test="dynamic-function-popup-select-function"
+              :allowAggregation="allowAggregation"
+            />
           </div>
         </OTabPanel>
         <OTabPanel name="raw">
