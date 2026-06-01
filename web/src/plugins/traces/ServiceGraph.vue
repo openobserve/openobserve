@@ -306,7 +306,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OSelect,
-    OInput,
+    OSearchInput,
     OIcon,
     OCard,
     OCardSection,
