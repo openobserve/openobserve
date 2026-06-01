@@ -222,7 +222,7 @@ export default class LogsVisualise {
       `[data-test="selected-chart-${chartType}-item"]`
     );
     await chartOption.waitFor({ state: "visible" });
-    await chartOption.click();
+    await chartOption.click({ force: true });
   }
 
   //remove field
@@ -589,5 +589,64 @@ export default class LogsVisualise {
     const closeBtn = this.page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
     await closeBtn.click();
     await this.page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  // Verify toast message is visible with expected text
+  async verifyToastMessage(expectedText, timeout = 10000) {
+    const toast = this.page.locator('[data-test="o-toast-message"]', { hasText: expectedText }).first();
+    await expect(toast).toBeVisible({ timeout });
+    return toast;
+  }
+
+  // Open query inspector from a panel dropdown
+  async openPanelQueryInspector(panelName) {
+    // Wait for the dashboard view to fully load after panel save
+    await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    const dropdown = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    await dropdown.waitFor({ state: "visible", timeout: 20000 });
+    await dropdown.click();
+
+    const inspectorBtn = this.page.locator('[data-test="dashboard-query-inspector-panel"]');
+    await inspectorBtn.waitFor({ state: "visible", timeout: 10000 });
+    await inspectorBtn.click();
+    await this.waitForQueryInspector(this.page);
+  }
+
+  // Verify executed query in query inspector contains expected text
+  async verifyExecutedQueryContains(expectedTexts, queryIndex = 0) {
+    const executedQuery = this.page.locator(`[data-test="query-inspector-executed-query-${queryIndex}"]`);
+    await expect(executedQuery).toBeVisible({ timeout: 10000 });
+    for (const text of expectedTexts) {
+      await expect(executedQuery).toContainText(text);
+    }
+  }
+
+  // Click the dashboard back button
+  async clickDashboardBackBtn() {
+    await this.page.locator('[data-test="dashboard-back-btn"]').click();
+  }
+
+  // Get chart renderer canvas locator
+  getChartRendererCanvas() {
+    return this.page.locator('[data-test="chart-renderer"] canvas');
+  }
+
+  // Get dashboard error locator
+  getDashboardErrorLocator() {
+    return this.page.locator('[data-test="dashboard-error"]');
+  }
+
+  // Verify no dashboard errors are present
+  async verifyNoDashboardErrors() {
+    const errorLocator = this.getDashboardErrorLocator();
+    await expect(errorLocator).toHaveCount(0);
+  }
+
+  // Get connect null values toggle button locator
+  getConnectNullValuesToggle() {
+    return this.page.locator(
+      '[data-test="dashboard-config-connect-null-values"] [data-test$="-btn"]'
+    );
   }
 }
