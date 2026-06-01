@@ -2224,10 +2224,12 @@ const handleServiceGraphViewTraces = (data: any) => {
     };
   }
 
-  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
-  if (data.serviceName) {
-    const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    let filterQuery = `service_name = '${escapedServiceName}'`;
+  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY).
+  // DB nodes emit dbSpanFilter (targets CLIENT spans via peer_service/db_system/db_name)
+  // instead of the generic service_name filter used for regular service nodes.
+  const baseFilter = data.dbSpanFilter ?? (data.serviceName ? `service_name = '${escapeSingleQuotes(data.serviceName)}'` : null);
+  if (baseFilter) {
+    let filterQuery = baseFilter;
     if (data.operationName) {
       const escapedOpName = escapeSingleQuotes(data.operationName);
       filterQuery += ` AND operation_name = '${escapedOpName}'`;

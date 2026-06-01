@@ -535,6 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :default-columns="false" :enable-column-reorder="false" :enable-row-expand="false"
                     :enable-text-highlight="false" :enable-status-bar="false" :enable-ai-context-button="false"
                     :row-height="28" @sort-change="handleSortChange"
+                    @click:data-row="(row: any) => navigateToTraces({ resourceFilter: { field: primaryNetPeerAddrField, value: row.peer_name } })"
                   >
                     <template #cell-errors="{ item }"><span :class="item.errors > 0 ? 'tw:text-[var(--q-negative)] tw:font-semibold' : ''">{{ item.errors }}</span></template>
                     <template #cell-p99="{ item }"><span :class="item.p99 > 0 ? 'tw:text-[var(--o2-latency-p99)]' : ''">{{ formatOperationLatency(item.p99) }}</span></template>
@@ -577,6 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :default-columns="false" :enable-column-reorder="false" :enable-row-expand="false"
                     :enable-text-highlight="false" :enable-status-bar="false" :enable-ai-context-button="false"
                     :row-height="28" @sort-change="handleSortChange"
+                    @click:data-row="(row: any) => navigateToTraces({ resourceFilter: { field: primaryNetPeerPortField, value: row.peer_port } })"
                   >
                     <template #cell-errors="{ item }"><span :class="item.errors > 0 ? 'tw:text-[var(--q-negative)] tw:font-semibold' : ''">{{ item.errors }}</span></template>
                     <template #cell-p99="{ item }"><span :class="item.p99 > 0 ? 'tw:text-[var(--o2-latency-p99)]' : ''">{{ formatOperationLatency(item.p99) }}</span></template>
@@ -619,6 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :default-columns="false" :enable-column-reorder="false" :enable-row-expand="false"
                     :enable-text-highlight="false" :enable-status-bar="false" :enable-ai-context-button="false"
                     :row-height="28" @sort-change="handleSortChange"
+                    @click:data-row="(row: any) => navigateToTraces({ resourceFilter: { field: 'db_name', value: row.db_name } })"
                   >
                     <template #cell-errors="{ item }"><span :class="item.errors > 0 ? 'tw:text-[var(--q-negative)] tw:font-semibold' : ''">{{ item.errors }}</span></template>
                     <template #cell-p99="{ item }"><span :class="item.p99 > 0 ? 'tw:text-[var(--o2-latency-p99)]' : ''">{{ formatOperationLatency(item.p99) }}</span></template>
@@ -955,6 +958,42 @@ export default defineComponent({
       return escapeSingleQuotes(name);
     };
 
+    // Hoisted before loadDashboard — both are referenced inside it and must be
+    // initialized before the immediate watcher fires loadDashboard during setup.
+    const dbNodeSchemaFields = ref<Set<string>>(new Set());
+    const isDatabaseNode = computed(() => {
+      if (!props.selectedNode || !props.graphData) return false;
+      const edges = props.graphData.edges || [];
+      const outgoing = edges.filter((e: any) => e.from === props.selectedNode.id);
+      const incoming = edges.filter((e: any) => e.to === props.selectedNode.id);
+      return incoming.length > 0 && outgoing.length === 0;
+    });
+
+    // Span filter for CLIENT spans targeting this DB node — used in navigateToTraces
+    // and RED chart queries. Null for regular service nodes.
+    const dbNodeSpanFilter = computed((): string | null => {
+      if (!isDatabaseNode.value || dbNodeSchemaFields.value.size === 0) return null;
+      const sn = buildServiceName();
+      const DB_FIELDS = ["peer_service", "db_system", "db_name"] as const;
+      const present = DB_FIELDS.filter((f) => dbNodeSchemaFields.value.has(f));
+      if (present.length === 0) return null;
+      return `span_kind = '3' AND (${present.map((f) => `${f} = '${sn}'`).join(" OR ")})`;
+    });
+
+    // First available peer-address field in the stream schema — used for row-click
+    // filter on the Net Peer Name tab.
+    const primaryNetPeerAddrField = computed(() => {
+      const PRIORITY = ["net_peer_name", "net_peer_ip", "server_address", "network_peer_address"];
+      return PRIORITY.find((f) => dbNodeSchemaFields.value.has(f)) ?? "net_peer_name";
+    });
+
+    // First available peer-port field in the stream schema — used for row-click
+    // filter on the Net Peer Port tab.
+    const primaryNetPeerPortField = computed(() => {
+      const PRIORITY = ["net_peer_port", "server_port"];
+      return PRIORITY.find((f) => dbNodeSchemaFields.value.has(f)) ?? "net_peer_port";
+    });
+
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
         dashboardData.value = {};
@@ -979,7 +1018,34 @@ export default defineComponent({
       const convertedDashboard = convertDashboardSchemaVersion(
         deepCopy(metrics),
       );
-      const serviceFilter = `service_name = '${serviceName}'`;
+
+      // DB nodes (leaf nodes with only incoming edges) have no service_name of their
+      // own — they appear only in CLIENT spans (span_kind=3) emitted by the calling
+      // service, tagged with peer_service / db_system / db_name. Use those fields to
+      // filter so the Rate, Errors, and Duration charts actually return data.
+      //
+      // dbNodeSchemaFields is populated asynchronously by ensureDbNodeSchema() which
+      // is triggered by the schema pre-fetch watcher. When size > 0 the schema is
+      // ready and we can build the correct filter. When size === 0 (schema not yet
+      // loaded or unavailable) we fall back to service_name so charts still render
+      // immediately. A separate watcher re-calls loadDashboard once the schema loads.
+      let serviceFilter: string;
+      if (isDatabaseNode.value && dbNodeSchemaFields.value.size > 0) {
+        const DB_FIELDS = ["peer_service", "db_system", "db_name"] as const;
+        const presentDbFields = DB_FIELDS.filter((f) =>
+          dbNodeSchemaFields.value.has(f),
+        );
+        if (presentDbFields.length > 0) {
+          const dbConditions = presentDbFields
+            .map((f) => `${f} = '${escapeSingleQuotes(serviceName)}'`)
+            .join(" OR ");
+          serviceFilter = `span_kind = '3' AND (${dbConditions})`;
+        } else {
+          serviceFilter = `service_name = '${serviceName}'`;
+        }
+      } else {
+        serviceFilter = `service_name = '${serviceName}'`;
+      }
 
       convertedDashboard.tabs[0].panels.forEach((panel: any, index) => {
         let whereClause: string;
@@ -1411,7 +1477,6 @@ export default defineComponent({
     const loadingOperations = ref(false);
 
     // Breakdown tabs state (for database/external nodes only)
-    const dbNodeSchemaFields = ref<Set<string>>(new Set()); // cached schema for the current DB node
     const netPeerNameData = ref<any[]>([]);
     const netPeerNameLoading = ref(false);
     const netPeerPortData = ref<any[]>([]);
@@ -1738,14 +1803,6 @@ export default defineComponent({
     // Computed: Is this node a database/external service?
     // Such nodes only receive calls (incoming edges) and never call others (no outgoing).
     // They have no own span instrumentation, so service_name queries return empty.
-    const isDatabaseNode = computed(() => {
-      if (!props.selectedNode || !props.graphData) return false;
-      const edges = props.graphData.edges || [];
-      const outgoing = edges.filter((e: any) => e.from === props.selectedNode.id);
-      const incoming = edges.filter((e: any) => e.to === props.selectedNode.id);
-      return incoming.length > 0 && outgoing.length === 0;
-    });
-
     // Fetch and cache the stream schema for the current DB node (shared by all breakdown tabs)
     const ensureDbNodeSchema = async (): Promise<Set<string>> => {
       if (dbNodeSchemaFields.value.size > 0) return dbNodeSchemaFields.value;
@@ -2361,6 +2418,17 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Once the DB node schema finishes loading, re-run loadDashboard so the RED charts
+    // switch from the initial service_name fallback filter to the correct DB filter.
+    watch(
+      () => dbNodeSchemaFields.value,
+      (schema) => {
+        if (schema.size > 0 && isDatabaseNode.value && props.visible && props.selectedNode) {
+          loadDashboard();
+        }
+      },
+    );
+
     // Reset resource tab data, local filters, and go back to operations tab when node or stream changes
     watch(
       () => [props.selectedNode?.id, props.streamFilter],
@@ -2406,6 +2474,9 @@ export default defineComponent({
           props.selectedNode?.name ||
           props.selectedNode?.label ||
           props.selectedNode?.id,
+        // For DB nodes, the correct filter targets CLIENT spans via peer_service /
+        // db_system / db_name instead of service_name. Index.vue uses this when set.
+        dbSpanFilter: dbNodeSpanFilter.value,
         operationName: params.operationName,
         nodeName: params.nodeName,
         podName: params.podName,
@@ -2606,6 +2677,8 @@ export default defineComponent({
       netPeerPortLoading,
       dbNameData,
       dbNameLoading,
+      primaryNetPeerAddrField,
+      primaryNetPeerPortField,
     };
   },
 });
