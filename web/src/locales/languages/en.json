@@ -790,6 +790,10 @@
         "service_maps": {
           "name": "Service Graph",
           "note": "Visualize service dependencies"
+        },
+        "byob": {
+          "name": "Bring Your Own Bucket",
+          "note": "Route org data to your own cloud bucket"
         }
       },
       "buttons": {
