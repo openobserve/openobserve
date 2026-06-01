@@ -79,7 +79,7 @@ pub async fn token_validator(
                 // this is for /invites call, which is only based on user, similar to
                 // member subscription. Furthermore, because we are listing the invites of
                 // that particular user only, we can skip other checks, and allow listing
-                let is_list_invite_call = path_columns.len() <= 2
+                let is_list_invite_call = path_columns.len() == 1
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
                     && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
 

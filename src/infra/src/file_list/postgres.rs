@@ -1904,8 +1904,8 @@ WHERE org = $1 AND account = $2;"#;
             .observe(time);
         // in case there are no files ingested before settings up storage,
         // we can get null, so need to handle that with option<>
-        let (storage,index) = ret.unwrap_or_default();
-        Ok((storage.unwrap_or_default(),index.unwrap_or_default()))
+        let (storage, index) = ret.unwrap_or_default();
+        Ok((storage.unwrap_or_default(), index.unwrap_or_default()))
     }
 }
 

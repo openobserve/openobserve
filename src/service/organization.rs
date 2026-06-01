@@ -356,8 +356,6 @@ pub async fn create_org(
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
 
-    // TODO YJDoc2: add perm check for cloud and make member org
-
     #[cfg(feature = "cloud")]
     {
         let o2cfg = o2_enterprise::enterprise::common::config::get_config();
