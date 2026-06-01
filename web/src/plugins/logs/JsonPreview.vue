@@ -119,6 +119,7 @@
             {{ t("common.excludeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
+            v-if="key !== store.state.zoConfig.timestamp_column"
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
             icon-left="visibility"
