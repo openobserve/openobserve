@@ -266,11 +266,12 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Step 5 & 6: Poll until BOTH cross-links appear (backend merges from both streams).
         // The result_schema response is eventually-consistent, so use the polling helper
         // that re-opens the dropdown until late-arriving responses land.
-        await pm.crossLinkPage.expectCrossLinksFromBothStreams(
-            'kubernetes_container_name',
-            crossLinkNameA,
-            crossLinkNameB,
-        );
+        // Check each cross-link separately to isolate failures.
+        const hasA = await pm.crossLinkPage.expectLogCrossLinkVisible('kubernetes_container_name', crossLinkNameA);
+        expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible`).toBe(true);
+
+        const hasB = await pm.crossLinkPage.expectLogCrossLinkVisible('kubernetes_container_name', crossLinkNameB);
+        expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible`).toBe(true);
 
         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
     });
