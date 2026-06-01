@@ -437,7 +437,8 @@
     "pipeline": "流水线",
     "language": "语言",
     "actions": "操作",
-    "incidents": "事件"
+    "incidents": "事件",
+    "evals": "Evals"
   },
   "rum": {
     "title": "用户体验监控",

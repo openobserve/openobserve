@@ -437,7 +437,8 @@
     "pipeline": "Rohrleitungen",
     "language": "Sprache",
     "actions": "Aktionen",
-    "incidents": "Vorfälle"
+    "incidents": "Vorfälle",
+    "evals": "Evalen"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",

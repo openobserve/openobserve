@@ -437,7 +437,8 @@
     "pipeline": "파이프라인",
     "language": "언어",
     "actions": "액션",
-    "incidents": "인시던트"
+    "incidents": "인시던트",
+    "evals": "평가"
   },
   "rum": {
     "title": "실제 사용자 모니터링",

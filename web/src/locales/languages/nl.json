@@ -437,7 +437,8 @@
     "pipeline": "Pijpleidingen",
     "language": "taal",
     "actions": "Acties",
-    "incidents": "Incidenten"
+    "incidents": "Incidenten",
+    "evals": "Evalen"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",

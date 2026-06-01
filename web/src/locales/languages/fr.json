@@ -437,7 +437,8 @@
     "pipeline": "Canalisations",
     "language": "Langue",
     "actions": "Actions",
-    "incidents": "Incidents"
+    "incidents": "Incidents",
+    "evals": "Evals"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",

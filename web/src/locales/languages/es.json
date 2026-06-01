@@ -437,7 +437,8 @@
     "pipeline": "Tuberías",
     "language": "Idioma",
     "actions": "Acciones",
-    "incidents": "Incidentes"
+    "incidents": "Incidentes",
+    "evals": "Evaluaciones"
   },
   "rum": {
     "title": "Monitorización de usuarios reales",
