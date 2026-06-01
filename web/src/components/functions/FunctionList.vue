@@ -29,16 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("function.header") }}
             </div>
             <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OInput
+              <OSearchInput
                 data-test="functions-list-search-input"
                 v-model="filterQuery"
                 class="tw:ml-2 tw:w-[200px]"
                 :placeholder="t('function.search')"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
+              />
               <OButton
                 class="tw:ml-2"
                 variant="primary"
@@ -200,12 +196,11 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -218,9 +213,8 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
-    OIcon,
     ODialog,
-    OInput,
+    OSearchInput,
     OTooltip,
     OCheckbox,
     },

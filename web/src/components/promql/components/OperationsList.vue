@@ -131,15 +131,11 @@
       primary-button-label="Close"
       @click:primary="showOperationSelector = false"
     >
-      <OInput
+      <OSearchInput
         v-model="searchQuery"
         data-test="operations-list-search-input"
         clearable
-      >
-        <template v-slot:icon-left>
-          <OIcon name="search" size="sm" />
-        </template>
-      </OInput>
+      />
 
       <div style="max-height: 400px; overflow-y: auto">
         <div class="tw:border tw:border-border tw:rounded-md tw:divide-y tw:divide-border">
@@ -179,6 +175,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

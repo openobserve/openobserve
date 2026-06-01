@@ -31,15 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("serviceAccounts.header") }}
           </div>
           <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-            <OInput
+            <OSearchInput
                 v-model="filterQuery"
                 class="tw:w-[12.5rem]"
                 :placeholder="t('serviceAccounts.search')"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
+              />
               <OButton
                 data-test="service-accounts-add-btn"
                 variant="primary"
@@ -240,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useStore } from "vuex";
@@ -271,7 +267,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OInput, OTooltip, OTable, OBadge },
+  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OSearchInput, OTooltip, OTable, OBadge },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

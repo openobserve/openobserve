@@ -126,17 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OTooltip v-if="!filterKey" :content="t('settings.correlation.selectFieldFirst')" side="top" />
             </span>
-            <OInput
+            <OSearchInput
               v-model="searchQuery"
               :placeholder="t('settings.correlation.searchServiceName')"
               data-test="service-search-input"
               clearable
               class="o2-search-input"
-            >
-              <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-            </OInput>
+            />
             <OButton
               data-test="reset-discovered-services-btn"
               variant="outline"
@@ -504,7 +500,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

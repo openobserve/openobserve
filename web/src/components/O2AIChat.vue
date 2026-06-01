@@ -54,15 +54,11 @@
               <!-- History menu with search -->
               <div class="history-menu-container">
                 <div class="search-history-bar-sticky">
-                  <OInput
+                  <OSearchInput
                     v-model="historySearchTerm"
                     placeholder="Search chat history"
                     class="tw:mt-1"
-                  >
-                    <template #icon-left>
-                      <OIcon name="search" size="sm" />
-                    </template>
-                  </OInput>
+                  />
                 </div>
                 <div
                   class="history-list-container"
@@ -1400,6 +1396,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -1454,6 +1451,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OInput,
+    OSearchInput,
   },
   props: {
     isOpen: {

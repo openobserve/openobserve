@@ -25,17 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container tw:h-full el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
             <div class="tw:pt-[0.625rem] tw:px-1">
-            <OInput
+            <OSearchInput
               data-test="security-list-search-input"
               v-model="tabsFilter"
               clearable
               class="tw:w-full indexlist-search-input"
               :placeholder="t('common.search')"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" class="tw:cursor-pointer" />
-              </template>
-            </OInput>
+            />
             </div>
             <OTabs
               v-model="ingestTabType"
@@ -78,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OInput from '@/lib/forms/Input/OInput.vue'
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue'
 import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
@@ -89,12 +85,11 @@ import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "SecurityPage",
-  components: { OTabs, ORouteTab, OInput,
-    OIcon, OSplitter,
+  components: { OTabs, ORouteTab, OSearchInput,
+    OSplitter,
 },
   props: {
     currOrgIdentifier: {

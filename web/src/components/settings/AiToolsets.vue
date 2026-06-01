@@ -29,15 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("aiToolset.header") }}
         </div>
         <div class="col-auto tw:flex">
-          <OInput
+          <OSearchInput
             v-model="filterQuery"
             class="tw:ml-auto no-border o2-search-input"
             :placeholder="t('aiToolset.search')"
-          >
-            <template #icon-left>
-              <OIcon class="o2-search-input-icon" name="search" size="sm" />
-            </template>
-          </OInput>
+          />
           <OButton
             class="tw:ml-2"
             data-test="ai-toolsets-add-btn"
@@ -121,9 +117,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 // Distinct variants so each kind reads visually different (mcp=blue, cli=green,
 // skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
@@ -141,9 +136,8 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-    OIcon,
     OBadge,
-    OInput,
+    OSearchInput,
     OTable,
 },
   setup() {
