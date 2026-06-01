@@ -1526,9 +1526,23 @@ export default defineComponent({
       },
     ];
 
+    // Computed: Is this node a database/external service?
+    // Such nodes only receive calls (incoming edges) and never call others (no outgoing).
+    // They have no own span instrumentation, so service_name queries return empty.
+    const isDatabaseNode = computed(() => {
+      if (!props.selectedNode || !props.graphData) return false;
+      const edges = props.graphData.edges || [];
+      const outgoing = edges.filter((e: any) => e.from === props.selectedNode.id);
+      const incoming = edges.filter((e: any) => e.to === props.selectedNode.id);
+      return incoming.length > 0 && outgoing.length === 0;
+    });
+
     // Computed: Operations table columns
     const operationsTableColumns = computed(() =>
-      buildEntityTableColumns("operation", "Operation"),
+      buildEntityTableColumns(
+        "operation",
+        isDatabaseNode.value ? "DB Operation" : "Operation",
+      ),
     );
 
     // Computed: Operations table rows
@@ -1543,6 +1557,68 @@ export default defineComponent({
         p50: op.p50Latency,
       })),
     );
+
+    // Fetch actual DB operations for database/external nodes.
+    // Databases don't emit their own SERVER spans — the calling service emits a CLIENT
+    // span (span_kind=3) carrying db attributes (peer_service, db_name, db_system) that
+    // identify the target. We check the stream schema first so DataFusion never rejects
+    // the query for a missing column.
+    const fetchDatabaseOperations = async () => {
+      const serviceName = buildServiceName();
+      const streamName = props.streamFilter || "default";
+      const orgId = store.state.selectedOrganization.identifier;
+
+      // Resolve which db-identifier columns actually exist in this stream
+      let schemaFieldSet = new Set<string>();
+      try {
+        const schemaRes = await streamService.schema(orgId, streamName, "traces");
+        const fields: { name: string }[] =
+          schemaRes.data?.schema || schemaRes.data?.fields || [];
+        schemaFieldSet = new Set(fields.map((f: any) => f.name));
+      } catch {
+        return; // Schema unavailable — leave operations list empty
+      }
+
+      const DB_FIELDS = ["peer_service", "db_name", "db_system"] as const;
+      const presentFields = DB_FIELDS.filter((f) => schemaFieldSet.has(f));
+      if (presentFields.length === 0) return; // No db-identifier fields in schema
+
+      const dbFilter = presentFields
+        .map((f) => `${f} = '${escapeSingleQuotes(serviceName)}'`)
+        .join(" OR ");
+
+      const sql = `SELECT operation_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE span_kind = '3' AND (${dbFilter}) GROUP BY operation_name ORDER BY request_count DESC`;
+
+      try {
+        const response = await searchService.search({
+          org_identifier: orgId,
+          query: {
+            query: {
+              sql,
+              start_time: props.timeRange.startTime,
+              end_time: props.timeRange.endTime,
+              from: 0,
+              size: 100,
+            },
+          },
+          page_type: "traces",
+        });
+
+        if (response.data?.hits?.length > 0) {
+          recentOperations.value = response.data.hits.map((op: any) => ({
+            name: op.operation_name || "unknown",
+            requestCount: op.request_count || 0,
+            errorCount: op.error_count || 0,
+            p50Latency: op.p50_latency || 0,
+            p75Latency: op.p75_latency || 0,
+            p95Latency: op.p95_latency || 0,
+            p99Latency: op.p99_latency || 0,
+          }));
+        }
+      } catch (err) {
+        console.warn("[ServiceGraph] DB operations query failed:", err);
+      }
+    };
 
     // Fetch aggregated operations (grouped by operation_name with percentiles)
     const fetchAggregatedOperations = async () => {
@@ -1571,7 +1647,7 @@ export default defineComponent({
           page_type: "traces",
         });
 
-        if (response.data && response.data.hits) {
+        if (response.data?.hits?.length > 0) {
           recentOperations.value = response.data.hits.map((op: any) => ({
             name: op.operation_name || "unknown",
             requestCount: op.request_count || 0,
@@ -1581,6 +1657,11 @@ export default defineComponent({
             p95Latency: op.p95_latency || 0,
             p99Latency: op.p99_latency || 0,
           }));
+        } else if (isDatabaseNode.value) {
+          // No spans for this service_name — this is a database/external node.
+          // Query CLIENT spans in the trace stream that targeted this service via
+          // db attributes (peer_service, db_name, db_system).
+          await fetchDatabaseOperations();
         }
       } catch (error) {
         console.error("Failed to fetch aggregated operations:", error);
@@ -2056,6 +2137,7 @@ export default defineComponent({
     return {
       t,
       serviceMetrics,
+      isDatabaseNode,
       serviceHealth,
       isAllStreamsSelected,
       formatNumber,
