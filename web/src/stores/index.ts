@@ -37,6 +37,7 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 
 const organizationObj = {
   organizationPasscode: "",
+  organizationPasscodeUser: "",
   allDashboardList: {},
   allDashboardData: {},
   allAlertsListByFolderId: {},
@@ -63,7 +64,16 @@ const organizationObj = {
   isDataIngested: false,
   regexPatterns: [],
   regexPatternPrompt: "",
-  regexPatternTestValue: ""
+  regexPatternTestValue: "",
+  orgTokens: [] as Array<{
+    name: string;
+    token: string;
+    description: string;
+    is_default: boolean;
+    enabled: boolean;
+    created_by: string;
+    created_at: number;
+  }>,
 };
 
 export default createStore({
@@ -171,11 +181,17 @@ export default createStore({
     setOrganizationPasscode(state, payload) {
       state.organizationData.organizationPasscode = payload;
     },
+    setOrganizationPasscodeUser(state, payload) {
+      state.organizationData.organizationPasscodeUser = payload;
+    },
     resetOrganizationData(state, payload) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setOrgTokens(state, payload) {
+      state.organizationData.orgTokens = payload;
     },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
@@ -380,11 +396,17 @@ export default createStore({
     setOrganizationPasscode(context, payload) {
       context.commit("setOrganizationPasscode", payload);
     },
+    setOrganizationPasscodeUser(context, payload) {
+      context.commit("setOrganizationPasscodeUser", payload);
+    },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);
     },
     setRUMToken(context, payload) {
       context.commit("setRUMToken", payload);
+    },
+    setOrgTokens(context, payload) {
+      context.commit("setOrgTokens", payload);
     },
     // setAllCurrentDashboards(context, payload) {
     //   context.commit('setAllCurrentDashboards', payload);
