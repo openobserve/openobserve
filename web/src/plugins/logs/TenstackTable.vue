@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+            background: 'var(--color-table-header-bg)',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :colspan="columnOrder.length"
             class="tw:font-bold"
             :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+              background: 'var(--color-table-header-bg)',
               opacity: 0.7,
             }"
           >
