@@ -57,6 +57,8 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-4
+    permissions:
+      contents: read  # only need to checkout the repo
     steps:
       - name: Remove unused tools
         run: |
@@ -129,8 +131,13 @@ jobs:
         # api_regression_tests job below — they now run in parallel
         # with this default-set job instead of sequentially within it.
         # Cuts ~8 min off CI wall time at the cost of more runner minutes.
+        # NB: --force-sugar is intentionally omitted. pytest-sugar is already
+        # auto-loaded via the entry point; passing --force-sugar registers it
+        # a second time, which inflates the progress counter (CI displayed
+        # ~3x the real test count). Letting the plugin load via discovery
+        # alone keeps the counter honest.
         run: |
-          target/debug/openobserve > o2_default.log 2>&1 &
+          ${{ github.workspace }}/target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
           echo "OpenObserve PID for default tests: $SERVER_PID_DEFAULT"
           for i in $(seq 1 60); do
@@ -139,7 +146,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest --ignore=tests/regression --force-sugar
+          rye run pytest --ignore=tests/regression
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
 
@@ -227,8 +234,14 @@ jobs:
         working-directory: tests/api-testing/
 
       - name: "Run ${{ matrix.config.label }} regression test"
+        # Server binary lives at the repo root (target/debug/openobserve);
+        # this step uses working-directory: tests/api-testing/, so we must
+        # invoke it via ${{ github.workspace }} or the shell will fail with
+        # "No such file or directory". --force-sugar omitted on purpose —
+        # pytest-sugar auto-loads via entry point, and passing the flag
+        # registers it twice and inflates the progress counter ~3x.
         run: |
-          ${{ matrix.config.env }} target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
+          ${{ matrix.config.env }} ${{ github.workspace }}/target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
           SERVER_PID=$!
           for i in $(seq 1 60); do
             if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
@@ -236,7 +249,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest ${{ matrix.config.target }} --force-sugar -v
+          rye run pytest ${{ matrix.config.target }} -v
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 
@@ -324,20 +337,25 @@ jobs:
           exit 1
 
       - name: Run schemathesis fuzz tests
-        # `--checks not_a_server_error` focuses on 5xx panics (the most
-        # actionable category — actual backend bugs vs spec-compliance
-        # nits). `--hypothesis-max-examples 20` keeps the run time bounded.
-        # Tags `--data-generation-method positive` to focus on realistic
-        # inputs; negative inputs (random bytes) will surface separately.
+        # Schemathesis 4.x CLI flag renames vs the 3.x originals:
+        #   --base-url               -> --url / -u
+        #   --auth-type basic        -> removed (USER:PASS implies basic)
+        #   --hypothesis-max-examples -> --max-examples / -n
+        #   --hypothesis-deadline    -> no equivalent; use --request-timeout
+        #                               (seconds, not ms) to bound per-request
+        #   --data-generation-method -> --mode / -m
+        # `--checks not_a_server_error` keeps focus on 5xx panics (actual
+        # backend bugs, not spec-conformance nits). `-n 20` bounds runtime;
+        # `--mode positive` keeps inputs realistic (negative inputs are a
+        # separate exercise once the noise floor here is understood).
         run: |
           rye run schemathesis run \
-            --base-url http://localhost:5080 \
+            -u http://localhost:5080 \
             --auth "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
-            --auth-type basic \
             --checks not_a_server_error \
-            --hypothesis-max-examples 20 \
-            --hypothesis-deadline 5000 \
-            --data-generation-method positive \
+            -n 20 \
+            --request-timeout 5 \
+            -m positive \
             http://localhost:5080/api-doc/openapi.json
         working-directory: tests/api-testing/
 
