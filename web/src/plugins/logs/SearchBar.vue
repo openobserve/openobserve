@@ -1570,6 +1570,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { isSqlQuery } from "@/utils/query/sqlUtils";
 import {
   logsUtils,
   removeFieldFromWhereAST,
@@ -2237,8 +2238,8 @@ export default defineComponent({
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
 
-      // Turn off SQL mode when query is completely cleared
-      if (value.trim() === "" && searchObj.meta.sqlMode === true) {
+      // Turn off SQL mode when the query no longer looks like SQL
+      if (!isSqlQuery(value) && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
       }
 
@@ -2321,8 +2322,7 @@ export default defineComponent({
       if (
         searchObj.meta.sqlMode === false &&
         searchObj.meta.logsVisualizeToggle !== "build" &&
-        value.toLowerCase().includes("select") &&
-        value.toLowerCase().includes("from")
+        isSqlQuery(value)
       ) {
         searchObj.meta.sqlMode = true;
         searchObj.meta.sqlModeManualTrigger = true;
