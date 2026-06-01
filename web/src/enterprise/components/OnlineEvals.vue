@@ -79,6 +79,17 @@ the Free Software Foundation, either version 3 of the License, or
             @edit="(row) => openEditDialog(row)"
             @delete="(row) => deleteRow(row)"
           />
+          <ScorerList
+            v-else-if="activeTab === 'scorers'"
+            :rows="(filteredRows as Scorer[])"
+            :jobs="jobs"
+            :score-configs="scoreConfigs"
+            :search="filterQuery"
+            @update:search="filterQuery = $event"
+            @create="openCreateDialog"
+            @edit="(row: Scorer) => openEditDialog(row)"
+            @delete="(row: Scorer) => deleteRow(row)"
+          />
           <EvalListView
             v-else
             :active-tab="activeTab"
@@ -140,6 +151,7 @@ import {
 import { showError } from "./onlineEvals/utils/evalFormat";
 import EvalListView from "./onlineEvals/EvalListView.vue";
 import ScoreConfigList from "./onlineEvals/ScoreConfigList.vue";
+import ScorerList from "./onlineEvals/ScorerList.vue";
 import ScorerTypeDialog from "./onlineEvals/forms/ScorerTypeDialog.vue";
 import ScoreConfigDialog from "./onlineEvals/forms/ScoreConfigDialog.vue";
 import ProviderFormPage from "./onlineEvals/forms/ProviderFormPage.vue";
@@ -1033,6 +1045,8 @@ async function deleteRow(row: AnyRow) {
 .eval-test-panel textarea {
   padding: 8px 9px;
   resize: vertical;
+  max-height: 160px;
+  overflow-y: auto;
 }
 
 .eval-test-panel select {
