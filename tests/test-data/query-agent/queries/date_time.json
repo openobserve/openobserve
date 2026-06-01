@@ -1,0 +1,219 @@
+{
+  "queries": [
+    {
+      "id": "Q031",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY _time ORDER BY _time ASC",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780139921086521,
+        "end": 1780140101086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_time",
+          "cnt"
+        ],
+        "note": "Histogram with explicit 2-minute interval"
+      }
+    },
+    {
+      "id": "Q032",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS ts_minute, level, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY ts_minute, level ORDER BY ts_minute ASC, level ASC",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780140221086521,
+        "end": 1780140401086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "ts_minute",
+          "level",
+          "cnt"
+        ],
+        "note": "1-minute histogram + GROUP BY level (replaces date_trunc)"
+      }
+    },
+    {
+      "id": "Q033",
+      "sql": "SELECT _timestamp, level, method, log FROM \"query_agent_test\" ORDER BY _timestamp DESC LIMIT 5",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780140521086521,
+        "end": 1780140701086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "level",
+          "method",
+          "log"
+        ],
+        "note": "ORDER BY DESC LIMIT 5 (simplified from date_format)"
+      }
+    },
+    {
+      "id": "Q034",
+      "sql": "SELECT histogram(_timestamp, '5 minutes') AS _time, SUM(took) AS total_took, MIN(took) AS min_took, MAX(took) AS max_took FROM \"query_agent_test\" WHERE took IS NOT NULL GROUP BY _time ORDER BY _time ASC",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780140821086521,
+        "end": 1780141001086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_time",
+          "total_took",
+          "min_took",
+          "max_took"
+        ],
+        "note": "Histogram with SUM/MIN/MAX aggregates"
+      }
+    },
+    {
+      "id": "Q131",
+      "sql": "\nSELECT histogram(_timestamp, '1 minute') AS minute_bucket, COUNT(*) FILTER (WHERE operation_mode='auto') AS auto_cnt, COUNT(*) FILTER (WHERE operation_mode='manual') AS manual_cnt, COUNT(*) FILTER (WHERE operation_mode='hybrid') AS hybrid_cnt\nFROM \"query_agent_test\"\nGROUP BY minute_bucket\nORDER BY minute_bucket ASC\n",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780312800000000,
+        "end": 1780312962000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "minute_bucket",
+          "auto_cnt",
+          "manual_cnt",
+          "hybrid_cnt"
+        ],
+        "note": "1-min histogram with 3 FILTER-counts as pivot (auto/manual/hybrid per bucket)"
+      }
+    },
+    {
+      "id": "Q132",
+      "sql": "\nSELECT histogram(_timestamp, '30 seconds') AS half_min, facility_zone, COUNT(*) AS cnt, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(MIN(charge_remaining), 2) AS min_charge\nFROM \"query_agent_test\"\nWHERE cell_temp >= 22.0\nGROUP BY half_min, facility_zone\nHAVING ROUND(AVG(load_factor), 2) > 30.0\nORDER BY half_min ASC, facility_zone ASC\n",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780312860000000,
+        "end": 1780313022000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "half_min",
+          "facility_zone",
+          "cnt",
+          "avg_load",
+          "min_charge"
+        ],
+        "note": "30-sec histogram + zone breakdown + HAVING on avg_load > 30"
+      }
+    },
+    {
+      "id": "Q133",
+      "sql": "\nWITH bucketed AS (SELECT histogram(_timestamp, '2 minutes') AS block, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" GROUP BY block)\nSELECT *, ROUND(AVG(avg_tput) OVER (ORDER BY block ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS smoothed_avg, ROW_NUMBER() OVER (ORDER BY cnt DESC) AS peak_rank\nFROM bucketed\nORDER BY block ASC\n",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780312920000000,
+        "end": 1780313082000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "block",
+          "cnt",
+          "avg_tput",
+          "smoothed_avg",
+          "peak_rank"
+        ],
+        "note": "CTE with histogram + window over histogram buckets (smoothed avg + peak rank)"
+      }
+    },
+    {
+      "id": "Q134",
+      "sql": "\nSELECT histogram(_timestamp, '5 minutes') AS window_5m, sorter_model, COUNT(*) AS samples, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(cell_temp), 2) AS avg_temp, ROUND(CAST(SUM(CASE WHEN scan_attempts >= 3 THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS high_scan_pct\nFROM \"query_agent_test\"\nWHERE throughput_rate IS NOT NULL\nGROUP BY window_5m, sorter_model\nHAVING COUNT(*) >= 2\nORDER BY window_5m ASC, avg_tput DESC\n",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780312980000000,
+        "end": 1780313142000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "window_5m",
+          "sorter_model",
+          "samples",
+          "avg_tput",
+          "avg_temp",
+          "high_scan_pct"
+        ],
+        "note": "5-min histogram + sorter breakdown + computed high_scan_pct, HAVING >=2"
+      }
+    },
+    {
+      "id": "Q135",
+      "sql": "\nSELECT histogram(_timestamp) AS default_bucket, control_center, operation_mode, COUNT(*) AS event_count, ROUND(SUM(item_count), 0) AS total_items, ROUND(AVG(charge_remaining), 2) AS avg_charge\nFROM \"query_agent_test\"\nWHERE item_count >= 100\nGROUP BY default_bucket, control_center, operation_mode\nORDER BY default_bucket ASC, event_count DESC\n",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780313040000000,
+        "end": 1780313202000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "default_bucket",
+          "control_center",
+          "operation_mode",
+          "event_count",
+          "total_items",
+          "avg_charge"
+        ],
+        "note": "Default histogram + 3-field GROUP BY (bucket + center + mode) with item filter"
+      }
+    },
+    {
+      "id": "Q136",
+      "sql": "\nSELECT bucket_a._time AS early_window, bucket_a.cnt AS early_cnt, bucket_a.avg_tput AS early_avg_tput, bucket_b._time AS late_window, bucket_b.cnt AS late_cnt, bucket_b.avg_tput AS late_avg_tput\nFROM (SELECT histogram(_timestamp, '3 minutes') AS _time, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" WHERE _timestamp < (SELECT MIN(_timestamp) + (MAX(_timestamp) - MIN(_timestamp)) / 2 FROM \"query_agent_test\") GROUP BY _time) bucket_a\nFULL OUTER JOIN (SELECT histogram(_timestamp, '3 minutes') AS _time, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" WHERE _timestamp >= (SELECT MIN(_timestamp) + (MAX(_timestamp) - MIN(_timestamp)) / 2 FROM \"query_agent_test\") GROUP BY _time) bucket_b\nON bucket_a._time = bucket_b._time\nORDER BY early_window ASC NULLS LAST\n",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780313100000000,
+        "end": 1780313262000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "early_window",
+          "early_cnt",
+          "early_avg_tput",
+          "late_window",
+          "late_cnt",
+          "late_avg_tput"
+        ],
+        "note": "FULL OUTER JOIN of two histograms splitting data at mid-point timestamp"
+      }
+    },
+    {
+      "id": "Q137",
+      "sql": "\nSELECT histogram(_timestamp, '1 minute') AS minute_slot, COUNT(*) AS total_events, ROUND(AVG(CASE WHEN cell_temp >= 28.0 THEN throughput_rate ELSE NULL END), 2) AS avg_tput_hot, ROUND(AVG(CASE WHEN cell_temp < 28.0 THEN throughput_rate ELSE NULL END), 2) AS avg_tput_cool\nFROM \"query_agent_test\"\nWHERE throughput_rate IS NOT NULL\nGROUP BY minute_slot\nORDER BY minute_slot ASC\n",
+      "category": "date_time",
+      "time_range": {
+        "start": 1780313160000000,
+        "end": 1780313322000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "minute_slot",
+          "total_events",
+          "avg_tput_hot",
+          "avg_tput_cool"
+        ],
+        "note": "1-min histogram with conditional AVGs (hot vs cool temp split using CASE)"
+      }
+    }
+  ],
+  "last_query_id": 137
+}

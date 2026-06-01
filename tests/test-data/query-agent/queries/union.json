@@ -1,0 +1,230 @@
+{
+  "queries": [
+    {
+      "id": "Q021",
+      "sql": "SELECT level, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE level IN ('error', 'warn') GROUP BY level UNION ALL SELECT level, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE level IN ('info', 'debug') GROUP BY level ORDER BY level ASC",
+      "category": "union",
+      "time_range": {
+        "start": 1780136921086521,
+        "end": 1780137101086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "level",
+          "cnt"
+        ],
+        "note": "UNION ALL combining two filtered GROUP BY results"
+      }
+    },
+    {
+      "id": "Q022",
+      "sql": "SELECT code, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE code >= 400 GROUP BY code UNION SELECT code, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE code = 200 GROUP BY code ORDER BY code ASC",
+      "category": "union",
+      "time_range": {
+        "start": 1780137221086521,
+        "end": 1780137401086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "code",
+          "cnt"
+        ],
+        "note": "UNION (dedup) of two code partitions"
+      }
+    },
+    {
+      "id": "Q023",
+      "sql": "SELECT 'fast' AS category, COUNT(*) AS cnt, AVG(took) AS avg_took FROM \"query_agent_test\" WHERE took < 50 UNION ALL SELECT 'medium' AS category, COUNT(*) AS cnt, AVG(took) AS avg_took FROM \"query_agent_test\" WHERE took >= 50 AND took < 200 UNION ALL SELECT 'slow' AS category, COUNT(*) AS cnt, AVG(took) AS avg_took FROM \"query_agent_test\" WHERE took >= 200 ORDER BY category ASC",
+      "category": "union",
+      "time_range": {
+        "start": 1780137521086521,
+        "end": 1780137701086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "category",
+          "cnt"
+        ],
+        "note": "Triple UNION ALL with computed aggregates per speed tier (avg_took may not appear when bucket is empty)"
+      }
+    },
+    {
+      "id": "Q024",
+      "sql": "SELECT code, level, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY code, level HAVING COUNT(*) > 0 UNION ALL SELECT NULL AS code, level, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE code >= 500 GROUP BY level ORDER BY cnt DESC LIMIT 8",
+      "category": "union",
+      "time_range": {
+        "start": 1780137821086521,
+        "end": 1780138001086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "code",
+          "level",
+          "cnt"
+        ],
+        "note": "UNION with NULL literal column; LIMIT 8"
+      }
+    },
+    {
+      "id": "Q025",
+      "sql": "SELECT _timestamp, log FROM \"query_agent_test\" WHERE level = 'error' UNION ALL SELECT _timestamp, log FROM \"query_agent_test\" WHERE level = 'warn' ORDER BY _timestamp DESC LIMIT 10",
+      "category": "union",
+      "time_range": {
+        "start": 1780138121086521,
+        "end": 1780138301086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "log"
+        ],
+        "note": "UNION ALL across error+warn; DESC LIMIT 10"
+      }
+    },
+    {
+      "id": "Q124",
+      "sql": "\nWITH zone_agg AS (SELECT facility_zone AS location, 'zone' AS granularity, COUNT(*) AS total, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" GROUP BY facility_zone),\ncenter_agg AS (SELECT control_center AS location, 'center' AS granularity, COUNT(*) AS total, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" GROUP BY control_center),\ncombined AS (SELECT * FROM zone_agg UNION ALL SELECT * FROM center_agg)\nSELECT * FROM combined ORDER BY granularity ASC, avg_tput DESC\n",
+      "category": "union",
+      "time_range": {
+        "start": 1780312380000000,
+        "end": 1780312542000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "location",
+          "granularity",
+          "total",
+          "avg_tput"
+        ],
+        "note": "Two CTEs with different GROUP BY levels, UNION ALL, then ordered by granularity"
+      }
+    },
+    {
+      "id": "Q125",
+      "sql": "SELECT CASE WHEN charge_remaining < 35.0 THEN 'low_charge' WHEN charge_remaining BETWEEN 35.0 AND 70.0 THEN 'medium_charge' ELSE 'high_charge' END AS category, COUNT(*) AS cnt, ROUND(AVG(cell_temp), 2) AS avg_temp, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" GROUP BY category ORDER BY category ASC",
+      "category": "union",
+      "time_range": {
+        "start": 1780312440000000,
+        "end": 1780312602000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "category",
+          "cnt",
+          "avg_temp",
+          "avg_tput"
+        ],
+        "note": "CASE-based charge tier aggregation (single SELECT, no UNION)"
+      }
+    },
+    {
+      "id": "Q126",
+      "sql": "\nSELECT facility_zone, sorter_model, COUNT(*) AS cnt, MAX(throughput_rate) AS max_tput FROM \"query_agent_test\" WHERE operation_mode = 'auto' GROUP BY facility_zone, sorter_model\nUNION\nSELECT facility_zone, sorter_model, COUNT(*) AS cnt, MAX(throughput_rate) AS max_tput FROM \"query_agent_test\" WHERE operation_mode = 'hybrid' GROUP BY facility_zone, sorter_model\nORDER BY facility_zone ASC, max_tput DESC\n",
+      "category": "union",
+      "time_range": {
+        "start": 1780312500000000,
+        "end": 1780312662000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "cnt",
+          "max_tput"
+        ],
+        "note": "UNION (dedup) of auto vs hybrid aggregations, same shape different WHERE"
+      }
+    },
+    {
+      "id": "Q127",
+      "sql": "\nWITH auto_top AS (SELECT facility_zone, sorter_model, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE operation_mode='auto' AND throughput_rate IS NOT NULL),\nmanual_top AS (SELECT facility_zone, sorter_model, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE operation_mode='manual' AND throughput_rate IS NOT NULL)\nSELECT facility_zone, sorter_model, throughput_rate, rn, 'auto' AS mode FROM auto_top WHERE rn <= 2\nUNION ALL\nSELECT facility_zone, sorter_model, throughput_rate, rn, 'manual' AS mode FROM manual_top WHERE rn <= 2\nORDER BY mode ASC, facility_zone ASC, rn ASC\n",
+      "category": "union",
+      "time_range": {
+        "start": 1780312560000000,
+        "end": 1780312722000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "throughput_rate",
+          "rn",
+          "mode"
+        ],
+        "note": "Two CTEs with ROW_NUMBER, then UNION ALL top-2 per zone per mode"
+      }
+    },
+    {
+      "id": "Q128",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, load_factor, 'day_shift' AS shift FROM \"query_agent_test\" WHERE runtime_hours IS NOT NULL AND CAST(FLOOR(CAST(runtime_hours AS FLOAT) / 24.0) AS INTEGER) % 2 = 0\nUNION ALL\nSELECT _timestamp, pallet_id, facility_zone, load_factor, 'night_shift' AS shift FROM \"query_agent_test\" WHERE runtime_hours IS NOT NULL AND CAST(FLOOR(CAST(runtime_hours AS FLOAT) / 24.0) AS INTEGER) % 2 = 1\nORDER BY shift ASC, load_factor DESC\nLIMIT 20",
+      "category": "union",
+      "time_range": {
+        "start": 1780312620000000,
+        "end": 1780312782000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "pallet_id",
+          "facility_zone",
+          "load_factor",
+          "shift"
+        ],
+        "note": "UNION ALL splitting by computed shift (MOD of runtime_hours), ordered within shifts"
+      }
+    },
+    {
+      "id": "Q129",
+      "sql": "\nWITH ranked_all AS (SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL)\nSELECT facility_zone, pallet_id, throughput_rate, rn, 'LEADER' AS label FROM ranked_all WHERE rn = 1\nUNION ALL\nSELECT facility_zone, pallet_id, throughput_rate, rn, 'RUNNER_UP' AS label FROM ranked_all WHERE rn = 2\nUNION ALL\nSELECT facility_zone, pallet_id, throughput_rate, rn, 'TRAILING' AS label FROM ranked_all WHERE rn >= 5\nORDER BY facility_zone ASC, rn ASC\n",
+      "category": "union",
+      "time_range": {
+        "start": 1780312680000000,
+        "end": 1780312842000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "pallet_id",
+          "throughput_rate",
+          "rn",
+          "label"
+        ],
+        "note": "CTE with ROW_NUMBER, then three-way UNION ALL for LEADER/RUNNER_UP/TRAILING"
+      }
+    },
+    {
+      "id": "Q130",
+      "sql": "SELECT facility_zone, COUNT(*) FILTER (WHERE operation_mode='auto') AS auto_cnt, COUNT(*) FILTER (WHERE operation_mode='manual') AS manual_cnt, ROUND(AVG(throughput_rate) FILTER (WHERE operation_mode='auto'), 2) AS avg_tput_auto, ROUND(AVG(throughput_rate) FILTER (WHERE operation_mode='manual'), 2) AS avg_tput_manual, ROUND(AVG(cell_temp) FILTER (WHERE operation_mode='auto'), 2) AS avg_temp_auto, ROUND(AVG(cell_temp) FILTER (WHERE operation_mode='manual'), 2) AS avg_temp_manual FROM \"query_agent_test\" GROUP BY facility_zone ORDER BY facility_zone ASC",
+      "category": "union",
+      "time_range": {
+        "start": 1780312740000000,
+        "end": 1780312902000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "auto_cnt",
+          "manual_cnt",
+          "avg_tput_auto",
+          "avg_tput_manual",
+          "avg_temp_auto",
+          "avg_temp_manual"
+        ],
+        "note": "FILTER-based per-mode aggregation (auto vs manual) without UNION"
+      }
+    }
+  ],
+  "last_query_id": 130
+}

@@ -1,0 +1,481 @@
+{
+  "queries": [
+    {
+      "id": "Q001",
+      "sql": "SELECT level, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY level ORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780130921086521,
+        "end": 1780131101086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "level",
+          "cnt"
+        ],
+        "note": ""
+      }
+    },
+    {
+      "id": "Q005",
+      "sql": "SELECT kubernetes_namespace_name, AVG(floatvalue) AS avg_val FROM \"query_agent_test\" WHERE floatvalue IS NOT NULL GROUP BY kubernetes_namespace_name HAVING AVG(floatvalue) > 20",
+      "category": "group_by",
+      "time_range": {
+        "start": 1780132121086521,
+        "end": 1780132301086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "kubernetes_namespace_name",
+          "avg_val"
+        ],
+        "note": ""
+      }
+    },
+    {
+      "id": "Q007",
+      "sql": "SELECT code, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE log LIKE '%test%' GROUP BY code ORDER BY code ASC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780132721086521,
+        "end": 1780132901086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "code",
+          "cnt"
+        ],
+        "note": "codes: 200=5, 404=3, 500=2"
+      }
+    },
+    {
+      "id": "Q008",
+      "sql": "SELECT SUM(took) AS total_took FROM \"query_agent_test\" WHERE level='info'",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780133021086521,
+        "end": 1780133201086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "total_took"
+        ],
+        "note": "total_took=150.0"
+      }
+    },
+    {
+      "id": "Q014",
+      "sql": "SELECT level, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE level NOT IN ('error', 'warn') GROUP BY level ORDER BY level ASC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780134821086521,
+        "end": 1780135001086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "level",
+          "cnt"
+        ],
+        "note": "info=6, debug=4"
+      }
+    },
+    {
+      "id": "Q039",
+      "sql": "SELECT level, COUNT(*) AS cnt, MIN(took) AS min_took, MAX(took) AS max_took, AVG(took) AS avg_took, SUM(took) AS sum_took, approx_percentile_cont(CAST(took AS FLOAT), 0.50) AS p50, approx_percentile_cont(CAST(took AS FLOAT), 0.95) AS p95 FROM \"query_agent_test\" WHERE took IS NOT NULL GROUP BY level ORDER BY level ASC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780142321086521,
+        "end": 1780142501086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "level",
+          "cnt",
+          "min_took",
+          "max_took",
+          "avg_took",
+          "sum_took",
+          "p50",
+          "p95"
+        ],
+        "note": "8 aggregate columns per group: COUNT, MIN, MAX, AVG, SUM, p50, p95"
+      }
+    },
+    {
+      "id": "Q040",
+      "sql": "SELECT kubernetes_container_name, code, COUNT(*) AS cnt, ROUND(AVG(took), 1) AS avg_took, ROUND(CAST(SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS error_pct FROM \"query_agent_test\" GROUP BY kubernetes_container_name, code ORDER BY kubernetes_container_name ASC, code ASC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780142621086521,
+        "end": 1780142801086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "kubernetes_container_name",
+          "code",
+          "cnt",
+          "avg_took",
+          "error_pct"
+        ],
+        "note": "Multi-column GROUP BY with error percentage calculation; 7 groups"
+      }
+    },
+    {
+      "id": "Q041",
+      "sql": "SELECT level, code, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY level, code HAVING COUNT(*) >= 2 AND COUNT(*) <= 10 ORDER BY level ASC, cnt DESC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780142921086521,
+        "end": 1780143101086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "level",
+          "code",
+          "cnt"
+        ],
+        "note": "HAVING with range condition (cnt BETWEEN 2 AND 10); multi-column GROUP BY; expected 4 groups"
+      }
+    },
+    {
+      "id": "Q042",
+      "sql": "SELECT COALESCE(kubernetes_namespace_name, 'unknown') AS ns, COUNT(DISTINCT level) AS distinct_levels, COUNT(DISTINCT code) AS distinct_codes, COUNT(*) AS total_rows, ROUND(AVG(took), 2) AS avg_took FROM \"query_agent_test\" GROUP BY ns ORDER BY total_rows DESC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780143221086521,
+        "end": 1780143401086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "ns",
+          "distinct_levels",
+          "distinct_codes",
+          "total_rows",
+          "avg_took"
+        ],
+        "note": "COUNT(DISTINCT) with COALESCE in GROUP BY"
+      }
+    },
+    {
+      "id": "Q043",
+      "sql": "SELECT method, level, COUNT(*) AS cnt, ROUND(AVG(CAST(took AS FLOAT)), 2) AS avg_took FROM \"query_agent_test\" WHERE took IS NOT NULL GROUP BY method, level ORDER BY cnt DESC, avg_took DESC LIMIT 6",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780143521086521,
+        "end": 1780143701086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "method",
+          "level",
+          "cnt",
+          "avg_took"
+        ],
+        "note": "Multi-column GROUP BY + ORDER BY two columns DESC + LIMIT 6"
+      }
+    },
+    {
+      "id": "Q051",
+      "sql": "\nSELECT facility_zone, operation_mode, COUNT(*) AS row_total, MIN(throughput_rate) AS min_tput, MAX(throughput_rate) AS max_tput, ROUND(AVG(throughput_rate), 2) AS avg_tput, SUM(item_count) AS total_items\nFROM \"query_agent_test\"\nWHERE throughput_rate IS NOT NULL AND item_count > 0\nGROUP BY facility_zone, operation_mode\nHAVING COUNT(*) >= 2\nORDER BY facility_zone ASC, avg_tput DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308000000000,
+        "end": 1780308162000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "row_total",
+          "min_tput",
+          "max_tput",
+          "avg_tput",
+          "total_items"
+        ],
+        "note": "Multi-column GROUP BY with 6 aggregates, HAVING >=2, two-level ORDER BY"
+      }
+    },
+    {
+      "id": "Q052",
+      "sql": "SELECT sorter_model, COUNT(DISTINCT conveyor_lane) AS unique_lanes, COUNT(DISTINCT pallet_id) AS unique_pallets, COUNT(*) AS event_volume, ROUND(STDDEV(load_factor), 3) AS load_stddev, ROUND(AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate), 2) AS tput_variance\nFROM \"query_agent_test\"\nWHERE load_factor > 20.0 AND charge_remaining < 95.0\nGROUP BY sorter_model\nHAVING COUNT(DISTINCT conveyor_lane) >= 2\nORDER BY event_volume DESC",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308060000000,
+        "end": 1780308222000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "sorter_model",
+          "unique_lanes",
+          "unique_pallets",
+          "event_volume",
+          "load_stddev",
+          "tput_variance"
+        ],
+        "note": "COUNT DISTINCT on two columns + STDDEV + VARIANCE with multi-condition WHERE"
+      }
+    },
+    {
+      "id": "Q053",
+      "sql": "\nSELECT operation_mode, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_throughput, ROUND(AVG(charge_remaining), 2) AS avg_charge, ROUND(AVG(cell_temp), 2) AS avg_temp, ROUND(AVG(scan_attempts), 3) AS avg_scans\nFROM \"query_agent_test\"\nWHERE defect_limit <= 2.5 AND runtime_hours BETWEEN 24 AND 720\nGROUP BY operation_mode\nORDER BY avg_throughput DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308120000000,
+        "end": 1780308282000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "operation_mode",
+          "avg_load",
+          "avg_throughput",
+          "avg_charge",
+          "avg_temp",
+          "avg_scans"
+        ],
+        "note": "5 rounded AVGs with BETWEEN filter, GROUP BY categorical"
+      }
+    },
+    {
+      "id": "Q054",
+      "sql": "\nSELECT facility_zone, control_center, operation_mode, COUNT(*) AS cnt, SUM(package_size) AS total_pkg_size, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(CAST(SUM(CASE WHEN scan_attempts > 2 THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS rescan_pct\nFROM \"query_agent_test\"\nGROUP BY facility_zone, control_center, operation_mode\nHAVING SUM(package_size) > 500\nORDER BY facility_zone, rescan_pct DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308180000000,
+        "end": 1780308342000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "control_center",
+          "operation_mode",
+          "cnt",
+          "total_pkg_size",
+          "avg_tput",
+          "rescan_pct"
+        ],
+        "note": "3-column GROUP BY with conditional percentage (rescan rate), HAVING on SUM"
+      }
+    },
+    {
+      "id": "Q055",
+      "sql": "\nSELECT conveyor_lane, COUNT(*) FILTER (WHERE operation_mode = 'auto') AS auto_ops, COUNT(*) FILTER (WHERE operation_mode = 'manual') AS manual_ops, COUNT(*) FILTER (WHERE operation_mode = 'hybrid') AS hybrid_ops, COUNT(*) AS total_ops, ROUND(AVG(load_factor) FILTER (WHERE charge_remaining > 50.0), 2) AS avg_high_charge_load\nFROM \"query_agent_test\"\nGROUP BY conveyor_lane\nORDER BY total_ops DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308240000000,
+        "end": 1780308402000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "conveyor_lane",
+          "auto_ops",
+          "manual_ops",
+          "hybrid_ops",
+          "total_ops",
+          "avg_high_charge_load"
+        ],
+        "note": "FILTER clauses for pivot-style aggregation + filtered AVG"
+      }
+    },
+    {
+      "id": "Q056",
+      "sql": "\nSELECT build_signature, ROUND(MIN(throughput_rate), 2) AS min_tput, ROUND(approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.25), 2) AS p25, ROUND(approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.50), 2) AS p50, ROUND(approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.75), 2) AS p75, ROUND(approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.95), 2) AS p95, ROUND(MAX(throughput_rate), 2) AS max_tput\nFROM \"query_agent_test\"\nWHERE throughput_rate IS NOT NULL\nGROUP BY build_signature\nORDER BY p50 DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308300000000,
+        "end": 1780308462000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "build_signature",
+          "min_tput",
+          "p25",
+          "p50",
+          "p75",
+          "p95",
+          "max_tput"
+        ],
+        "note": "Full percentile distribution (p25/p50/p75/p95) per build_signature"
+      }
+    },
+    {
+      "id": "Q057",
+      "sql": "\nSELECT control_center, COUNT(*) AS event_cnt, SUM(item_count) AS items_processed, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(SUM(CASE WHEN cell_temp > 30.0 THEN item_count ELSE 0 END) * 100.0 / NULLIF(SUM(item_count), 0), 2) AS high_temp_item_pct\nFROM \"query_agent_test\"\nGROUP BY control_center\nHAVING SUM(item_count) > 1000\nORDER BY high_temp_item_pct DESC, avg_tput ASC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308360000000,
+        "end": 1780308522000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "control_center",
+          "event_cnt",
+          "items_processed",
+          "avg_tput",
+          "high_temp_item_pct"
+        ],
+        "note": "Conditional SUM ratio (high-temp items %) with two-column ORDER BY"
+      }
+    },
+    {
+      "id": "Q058",
+      "sql": "\nSELECT sorter_model, conveyor_lane, ROUND(AVG(defect_limit), 2) AS avg_defect, COUNT(*) AS samples, ROUND(SUM(load_factor * item_count) / NULLIF(SUM(item_count), 0), 2) AS weighted_avg_load\nFROM \"query_agent_test\"\nWHERE defect_limit IS NOT NULL AND item_count > 0\nGROUP BY sorter_model, conveyor_lane\nHAVING ROUND(AVG(defect_limit), 2) >= 1.0\nORDER BY weighted_avg_load DESC\nLIMIT 10\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308420000000,
+        "end": 1780308582000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "sorter_model",
+          "conveyor_lane",
+          "avg_defect",
+          "samples",
+          "weighted_avg_load"
+        ],
+        "note": "Weighted average (load_factor weighted by item_count) + HAVING on aggregate"
+      }
+    },
+    {
+      "id": "Q059",
+      "sql": "\nSELECT operation_mode, facility_zone, COUNT(*) AS cnt, ROUND(AVG(runtime_hours), 1) AS avg_runtime, ROUND(MAX(package_size) - MIN(package_size), 0) AS pkg_size_range, ROUND(AVG(charge_remaining), 2) AS avg_charge\nFROM \"query_agent_test\"\nWHERE package_size >= 200\nGROUP BY operation_mode, facility_zone\nHAVING ROUND(AVG(runtime_hours), 1) >= 100.0\nORDER BY facility_zone ASC, avg_runtime DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308480000000,
+        "end": 1780308642000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "operation_mode",
+          "facility_zone",
+          "cnt",
+          "avg_runtime",
+          "pkg_size_range",
+          "avg_charge"
+        ],
+        "note": "Range calculation (MAX-MIN) with multi-condition HAVING, 2-column GROUP BY"
+      }
+    },
+    {
+      "id": "Q060",
+      "sql": "\nSELECT conveyor_lane, sorter_model, operation_mode, COUNT(*) AS occurences, ROUND(AVG(scan_attempts), 2) AS avg_scans, ROUND(STDDEV(scan_attempts), 3) AS scan_stddev, MAX(runtime_hours) AS max_runtime\nFROM \"query_agent_test\"\nGROUP BY conveyor_lane, sorter_model, operation_mode\nHAVING COUNT(*) >= 2 AND ROUND(STDDEV(scan_attempts), 3) > 0.5\nORDER BY conveyor_lane ASC, occurences DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308540000000,
+        "end": 1780308702000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "conveyor_lane",
+          "sorter_model",
+          "operation_mode",
+          "occurences",
+          "avg_scans",
+          "scan_stddev",
+          "max_runtime"
+        ],
+        "note": "3-column GROUP BY with STDDEV in HAVING, combined with aggregate ordering"
+      }
+    },
+    {
+      "id": "Q061",
+      "sql": "\nSELECT facility_zone, COUNT(*) AS total, SUM(CASE WHEN operation_mode='auto' THEN 1 ELSE 0 END) AS auto_cnt, SUM(CASE WHEN operation_mode='manual' THEN 1 ELSE 0 END) AS manual_cnt, SUM(CASE WHEN operation_mode='hybrid' THEN 1 ELSE 0 END) AS hybrid_cnt, ROUND(CAST(SUM(CASE WHEN charge_remaining < 30.0 THEN 1 ELSE 0 END) AS FLOAT) / CAST(COUNT(*) AS FLOAT) * 100.0, 2) AS low_charge_pct\nFROM \"query_agent_test\"\nGROUP BY facility_zone\nORDER BY low_charge_pct DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308600000000,
+        "end": 1780308762000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "total",
+          "auto_cnt",
+          "manual_cnt",
+          "hybrid_cnt",
+          "low_charge_pct"
+        ],
+        "note": "Pivot table style: 3 CASE-based counts + low-charge percentage per zone"
+      }
+    },
+    {
+      "id": "Q062",
+      "sql": "\nSELECT control_center, operation_mode, COUNT(*) AS cnt, ROUND(AVG(item_count), 1) AS avg_items, ROUND(SUM(item_count * (1.0 - (defect_limit / 100.0))), 1) AS estimated_good_items, ROUND(AVG(cell_temp), 2) AS avg_temp\nFROM \"query_agent_test\"\nWHERE defect_limit IS NOT NULL AND defect_limit < 100.0\nGROUP BY control_center, operation_mode\nHAVING ROUND(AVG(cell_temp), 2) > 20.0\nORDER BY estimated_good_items DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308660000000,
+        "end": 1780308822000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "control_center",
+          "operation_mode",
+          "cnt",
+          "avg_items",
+          "estimated_good_items",
+          "avg_temp"
+        ],
+        "note": "Computed aggregate (estimated good items = items * (1 - defect/100))"
+      }
+    },
+    {
+      "id": "Q063",
+      "sql": "\nSELECT COALESCE(conveyor_lane, 'UNASSIGNED') AS lane, ROUND(AVG(throughput_rate), 2) AS mean_tput, ROUND(AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate), 2) AS tput_variance_computed\nFROM \"query_agent_test\"\nWHERE throughput_rate IS NOT NULL\nGROUP BY lane\nHAVING COUNT(*) >= 2\nORDER BY mean_tput DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308720000000,
+        "end": 1780308882000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "lane",
+          "mean_tput",
+          "tput_variance_computed"
+        ],
+        "note": "COALESCE in GROUP BY + manual variance computation (E[X^2] - E[X]^2)"
+      }
+    },
+    {
+      "id": "Q064",
+      "sql": "\nSELECT build_signature, COUNT(*) AS fleet_size, ROUND(AVG(runtime_hours), 1) AS avg_hours, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(SUM(CASE WHEN cell_temp > 28.0 AND charge_remaining < 40.0 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 2) AS critical_pct\nFROM \"query_agent_test\"\nWHERE runtime_hours > 0\nGROUP BY build_signature\nHAVING COUNT(*) >= 3\nORDER BY critical_pct DESC, fleet_size DESC\n",
+      "category": "aggregation",
+      "time_range": {
+        "start": 1780308780000000,
+        "end": 1780308942000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "build_signature",
+          "fleet_size",
+          "avg_hours",
+          "avg_load",
+          "critical_pct"
+        ],
+        "note": "Multi-condition critical-pct (temp > 28 AND charge < 40) with double ORDER BY"
+      }
+    }
+  ],
+  "last_query_id": 64
+}

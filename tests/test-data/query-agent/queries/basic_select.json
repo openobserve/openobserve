@@ -1,0 +1,303 @@
+{
+  "queries": [
+    {
+      "id": "Q003",
+      "sql": "SELECT * FROM \"query_agent_test\" WHERE code=200 AND level='info' LIMIT 10",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780131521086521,
+        "end": 1780131701086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "log",
+          "stream",
+          "code",
+          "level",
+          "method",
+          "took",
+          "kubernetes_namespace_name",
+          "kubernetes_container_name",
+          "kubernetes_host",
+          "kubernetes_pod_name",
+          "floatvalue"
+        ],
+        "note": ""
+      }
+    },
+    {
+      "id": "Q006",
+      "sql": "SELECT DISTINCT stream FROM \"query_agent_test\"",
+      "category": "distinct",
+      "time_range": {
+        "start": 1780132421086521,
+        "end": 1780132601086521
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "stream"
+        ],
+        "note": ""
+      }
+    },
+    {
+      "id": "Q074",
+      "sql": "\nSELECT _timestamp, pallet_id, sorter_model, facility_zone, throughput_rate, load_factor, CASE WHEN load_factor >= 80.0 THEN 'critical' WHEN load_factor >= 50.0 THEN 'elevated' WHEN load_factor >= 20.0 THEN 'normal' ELSE 'idle' END AS load_tier, CASE WHEN cell_temp >= 30.0 THEN 'hot' WHEN cell_temp >= 22.0 THEN 'warm' ELSE 'cool' END AS temp_category\nFROM \"query_agent_test\"\nWHERE (facility_zone IN ('ZONE-1', 'ZONE-2', 'ZONE-3') AND operation_mode != 'manual') OR (charge_remaining < 50.0 AND scan_attempts >= 2)\nORDER BY _timestamp DESC, load_factor DESC\nLIMIT 15\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309380000000,
+        "end": 1780309542000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "pallet_id",
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate",
+          "load_factor",
+          "load_tier",
+          "temp_category"
+        ],
+        "note": "Complex WHERE with nested AND/OR/IN/NOT, two CASE expressions, multi-column ORDER BY"
+      }
+    },
+    {
+      "id": "Q075",
+      "sql": "\nSELECT DISTINCT sorter_model, operation_mode, facility_zone, build_signature\nFROM \"query_agent_test\"\nWHERE defect_limit BETWEEN 1.0 AND 3.0 AND runtime_hours NOT IN (24, 48, 72) AND package_size >= 300\nORDER BY sorter_model ASC, operation_mode ASC\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309440000000,
+        "end": 1780309602000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "sorter_model",
+          "operation_mode",
+          "facility_zone",
+          "build_signature"
+        ],
+        "note": "DISTINCT on 4 columns with BETWEEN, NOT IN, and range filter"
+      }
+    },
+    {
+      "id": "Q076",
+      "sql": "\nSELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / 100.0, 2) AS utilization_index, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(scan_attempts AS FLOAT), 0), 1) AS items_per_scan\nFROM \"query_agent_test\"\nWHERE load_factor IS NOT NULL AND charge_remaining IS NOT NULL AND item_count > 0 AND scan_attempts > 0\nORDER BY utilization_index DESC\nLIMIT 12\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309500000000,
+        "end": 1780309662000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "pallet_id",
+          "conveyor_lane",
+          "load_factor",
+          "charge_remaining",
+          "utilization_index",
+          "items_per_scan"
+        ],
+        "note": "Computed columns (utilization_index, items_per_scan) with NULLIF guards, multi-filter"
+      }
+    },
+    {
+      "id": "Q077",
+      "sql": "\nSELECT _timestamp, log, control_center, operation_mode, cell_temp, CASE WHEN cell_temp >= 35.0 AND operation_mode = 'auto' THEN 'OVERTEMP-AUTO' WHEN cell_temp >= 35.0 THEN 'OVERTEMP' WHEN cell_temp >= 28.0 AND charge_remaining < 30.0 THEN 'WARNING-LOWCHARGE' WHEN cell_temp >= 28.0 THEN 'WARM' ELSE 'NORMAL' END AS alert_status\nFROM \"query_agent_test\"\nWHERE (cell_temp >= 28.0) OR (charge_remaining < 30.0 AND operation_mode != 'hybrid')\nORDER BY cell_temp DESC, charge_remaining ASC\nLIMIT 20\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309560000000,
+        "end": 1780309722000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "log",
+          "control_center",
+          "operation_mode",
+          "cell_temp",
+          "alert_status"
+        ],
+        "note": "4-branch nested CASE for alert classification, complex OR/NOT WHERE, multi-column ORDER"
+      }
+    },
+    {
+      "id": "Q078",
+      "sql": "\nSELECT _timestamp, sorter_model, facility_zone, throughput_rate, load_factor, charge_remaining, ROUND(CAST(throughput_rate AS FLOAT) * (CAST(load_factor AS FLOAT) / 100.0) * (CAST(charge_remaining AS FLOAT) / 100.0), 2) AS effective_capacity\nFROM \"query_agent_test\"\nWHERE throughput_rate > 300.0 AND load_factor >= 30.0 AND facility_zone != 'ZONE-4'\nORDER BY effective_capacity DESC, _timestamp ASC\nLIMIT 10\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309620000000,
+        "end": 1780309782000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate",
+          "load_factor",
+          "charge_remaining",
+          "effective_capacity"
+        ],
+        "note": "Triple-factor computed column (effective_capacity) with 3-column filtering and dual ORDER"
+      }
+    },
+    {
+      "id": "Q079",
+      "sql": "\nSELECT pallet_id, sorter_model, conveyor_lane, operation_mode, runtime_hours, ROUND(runtime_hours / 24.0, 1) AS runtime_days, CASE WHEN runtime_hours >= 500 THEN 'heavy' WHEN runtime_hours >= 168 THEN 'moderate' ELSE 'light' END AS usage_class\nFROM \"query_agent_test\"\nWHERE runtime_hours IS NOT NULL AND sorter_model LIKE 'SORT-X%' OR sorter_model LIKE 'SORT-Z%' OR (sorter_model = 'SORT-Q5' AND runtime_hours < 200)\nORDER BY runtime_days DESC\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309680000000,
+        "end": 1780309842000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "conveyor_lane",
+          "operation_mode",
+          "runtime_hours",
+          "runtime_days",
+          "usage_class"
+        ],
+        "note": "LIKE patterns with OR chain, computed days column, CASE classification"
+      }
+    },
+    {
+      "id": "Q080",
+      "sql": "\nSELECT _timestamp, control_center, facility_zone, cell_temp, COALESCE(CAST(conveyor_segment AS VARCHAR), 'N/A') AS segment_label, COALESCE(CAST(defect_limit AS VARCHAR), '0.0') AS defect_str\nFROM \"query_agent_test\"\nWHERE facility_zone IN (SELECT DISTINCT facility_zone FROM \"query_agent_test\" WHERE cell_temp > 25.0)\nORDER BY cell_temp DESC\nLIMIT 15\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309740000000,
+        "end": 1780309902000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "control_center",
+          "facility_zone",
+          "cell_temp",
+          "segment_label",
+          "defect_str"
+        ],
+        "note": "COALESCE with type casting + subquery in WHERE (IN with SELECT DISTINCT)"
+      }
+    },
+    {
+      "id": "Q081",
+      "sql": "\nSELECT _timestamp, build_signature, operation_mode, item_count, package_size, ROUND(CAST(item_count AS FLOAT) * CAST(package_size AS FLOAT) / 1000.0, 2) AS total_weight_kg, CASE WHEN item_count * package_size >= 300000 THEN 'XL' WHEN item_count * package_size >= 100000 THEN 'LG' WHEN item_count * package_size >= 30000 THEN 'MD' ELSE 'SM' END AS shipment_tier\nFROM \"query_agent_test\"\nWHERE item_count > 0 AND package_size > 0\nORDER BY total_weight_kg DESC\nLIMIT 15\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309800000000,
+        "end": 1780309962000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "build_signature",
+          "operation_mode",
+          "item_count",
+          "package_size",
+          "total_weight_kg",
+          "shipment_tier"
+        ],
+        "note": "Computed weight column + tier classification CASE, filtered non-zero values"
+      }
+    },
+    {
+      "id": "Q082",
+      "sql": "\nSELECT _timestamp, pallet_id, sorter_model, scan_attempts, retry_flag, CASE WHEN scan_attempts >= 3 THEN TRUE ELSE FALSE END AS retry_flag_derived\nFROM (SELECT _timestamp, pallet_id, sorter_model, scan_attempts, scan_attempts >= 3 AS retry_flag FROM \"query_agent_test\") sub\nWHERE retry_flag = TRUE\nORDER BY scan_attempts DESC\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309860000000,
+        "end": 1780310022000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "pallet_id",
+          "sorter_model",
+          "scan_attempts",
+          "retry_flag",
+          "retry_flag_derived"
+        ],
+        "note": "Derived table subquery computing boolean flag, outer filter on derived column"
+      }
+    },
+    {
+      "id": "Q083",
+      "sql": "\nSELECT _timestamp, conveyor_lane, facility_zone, cell_temp, ambient_deviation FROM (SELECT _timestamp, conveyor_lane, facility_zone, cell_temp, ROUND(cell_temp - (SELECT AVG(cell_temp) FROM \"query_agent_test\" t2 WHERE t2.facility_zone = t1.facility_zone), 2) AS ambient_deviation FROM \"query_agent_test\" t1 WHERE cell_temp IS NOT NULL) derived\nWHERE ABS(ambient_deviation) > 3.0\nORDER BY ABS(ambient_deviation) DESC\nLIMIT 12\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309920000000,
+        "end": 1780310082000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "conveyor_lane",
+          "facility_zone",
+          "cell_temp",
+          "ambient_deviation"
+        ],
+        "note": "Correlated scalar subquery computing per-zone deviation, outer ABS filter"
+      }
+    },
+    {
+      "id": "Q084",
+      "sql": "\nSELECT _timestamp, operation_mode, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor + (100.0 - charge_remaining)) / 2.0, 2) AS stress_index, CASE WHEN load_factor > 70.0 AND charge_remaining < 30.0 THEN 'OVERLOADED' WHEN load_factor > 70.0 THEN 'HIGH_LOAD' WHEN charge_remaining < 30.0 THEN 'LOW_CHARGE' ELSE 'STABLE' END AS health_status\nFROM \"query_agent_test\"\nORDER BY stress_index DESC, _timestamp ASC\nLIMIT 15\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780309980000000,
+        "end": 1780310142000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "_timestamp",
+          "operation_mode",
+          "conveyor_lane",
+          "load_factor",
+          "charge_remaining",
+          "stress_index",
+          "health_status"
+        ],
+        "note": "Computed stress_index + 4-branch health_status CASE, dual ORDER BY"
+      }
+    },
+    {
+      "id": "Q085",
+      "sql": "\nSELECT DISTINCT ON (facility_zone) facility_zone, _timestamp, sorter_model, throughput_rate, load_factor\nFROM \"query_agent_test\"\nWHERE throughput_rate IS NOT NULL\nORDER BY facility_zone ASC, throughput_rate DESC\n",
+      "category": "basic_select",
+      "time_range": {
+        "start": 1780310040000000,
+        "end": 1780310202000000
+      },
+      "expected": {
+        "row_count": null,
+        "columns": [
+          "facility_zone",
+          "_timestamp",
+          "sorter_model",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "note": "DISTINCT ON (facility_zone) for top-1 per zone by throughput"
+      }
+    }
+  ],
+  "last_query_id": 85
+}
