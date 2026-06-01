@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<SearchInputProps>(), {
   modelValue: "",
   placeholder: "Search...",
   size: "sm",
-  clearable: false,
+  clearable: true,
   debounce: 0,
   disabled: false,
 });

@@ -51,21 +51,21 @@ describe("OSearchInput", () => {
     expect(wrapper.find("input").attributes("placeholder")).toBe("Search...");
   });
 
-  it("should show clear button when clearable=true and modelValue is non-empty", () => {
+  it("should show clear button by default when modelValue is non-empty", () => {
     wrapper = mount(OSearchInput, {
-      props: { clearable: true, modelValue: "query" },
+      props: { modelValue: "query" },
     });
     expect(wrapper.find('button[aria-label="Clear"]').exists()).toBe(true);
   });
 
   it("should not show clear button when modelValue is empty", () => {
     wrapper = mount(OSearchInput, {
-      props: { clearable: true, modelValue: "" },
+      props: { modelValue: "" },
     });
     expect(wrapper.find('button[aria-label="Clear"]').exists()).toBe(false);
   });
 
-  it("should not show clear button when clearable is false", () => {
+  it("should not show clear button when clearable is explicitly false", () => {
     wrapper = mount(OSearchInput, {
       props: { clearable: false, modelValue: "query" },
     });
@@ -74,7 +74,7 @@ describe("OSearchInput", () => {
 
   it("should emit clear and reset modelValue when clear button is clicked", async () => {
     wrapper = mount(OSearchInput, {
-      props: { clearable: true, modelValue: "query" },
+      props: { modelValue: "query" },
     });
     await wrapper.find('button[aria-label="Clear"]').trigger("click");
     expect(wrapper.emitted("clear")).toBeTruthy();
