@@ -2,6 +2,45 @@
   width: 170px;
 }
 
+// Result info bar — count text and metric badges
+.result-count-text {
+  font-size: var(--text-sm);
+  color: var(--o2-text-body);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.result-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1875rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.4;
+  border: 0.0625rem solid transparent;
+
+  &--time {
+    background: var(--o2-status-info-bg);
+    color: var(--o2-status-info-text);
+    border-color: var(--o2-status-info-bg);
+  }
+
+  &--scan {
+    background: var(--o2-status-info-bg);
+    color: var(--o2-status-info-text);
+    border-color: var(--o2-status-info-bg);
+  }
+
+  &--partial {
+    background: var(--o2-status-warning-bg);
+    color: var(--o2-status-warning-text);
+    border-color: var(--o2-status-warning-bg);
+  }
+}
+
 .analyze-button {
   font-size: 0.75rem;
   font-weight: 600;

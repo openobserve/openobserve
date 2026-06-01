@@ -43,69 +43,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="tw:w-2/3 tw:text-left tw:pl-4 warning tw:flex tw:items-center"
+          class="tw:w-2/3 tw:text-left tw:pl-4 warning tw:flex tw:items-center tw:flex-wrap tw:gap-x-1"
           data-test="logs-search-result-title"
           :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
         >
-          {{
-            searchObj.meta.logsVisualizeToggle === "patterns"
-              ? patternSummaryText
-              : noOfRecordsTitle
-          }}
-          <span v-if="searchObj.loadingCounter" class="tw:ml-3">
+          <!-- Count range / pattern summary -->
+          <span class="result-count-text">
+            {{
+              searchObj.meta.logsVisualizeToggle === "patterns"
+                ? patternSummaryText
+                : displayCountRange
+            }}
+          </span>
+
+          <!-- Loading spinner while streaming -->
+          <span v-if="searchObj.loadingCounter" class="tw:ml-1">
             <OSpinner size="xs" class="search-spinner" />
           </span>
+          <!-- Histogram unavailable info icon -->
           <div
             v-else-if="
               searchObj.data.histogram.errorCode == -1 &&
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="tw:ml-3 tw:cursor-pointer"
+            class="tw:ml-1 tw:cursor-pointer"
             :class="
               store.state.theme == 'dark'
                 ? 'histogram-unavailable-text'
                 : 'histogram-unavailable-text-light'
             "
           >
-            <!-- {{ searchObj.data.histogram.errorMsg }} -->
             <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
           </div>
-          <!-- Inspect Button -->
+
+          <!-- Partial badge (streaming / data still loading) -->
+          <span
+            v-if="isPartialResult && searchObj.meta.logsVisualizeToggle !== 'patterns'"
+            class="result-badge result-badge--partial"
+          >
+            Partial
+          </span>
+          <!-- Time badge (shown once loading completes) -->
+          <span
+            v-else-if="queryTook != null && searchObj.meta.logsVisualizeToggle !== 'patterns'"
+            class="result-badge result-badge--time"
+          >
+            <OIcon name="timer" size="xs" class="tw:mr-0.5 tw:opacity-70" />
+            {{ queryTook }} ms
+          </span>
+
+          <!-- Scan size badge -->
+          <span
+            v-if="!isPartialResult && queryScanSize && searchObj.meta.logsVisualizeToggle !== 'patterns'"
+            class="result-badge result-badge--scan"
+          >
+            Δ {{ scanSizeLabel }} {{ queryScanSize }}
+          </span>
+
+          <!-- Inspect Button (visible on md+ screens) -->
           <OButton
-            v-if="
-              searchObj.data?.queryResults?.hits?.length > 0 &&
-              searchObj.data.lastSearchTraceId &&
-              config.isEnterprise == 'true' &&
-              config.isCloud == 'false' &&
-              store.state.zoConfig.search_inspector_enabled
-            "
+            v-if="showInspectBtn"
             variant="ghost-primary"
             size="icon"
-            class="analyze-button inspect-button"
+            class="analyze-button inspect-button tw:hidden md:tw:inline-flex"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
             <OIcon name="troubleshoot" size="sm" />
             <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
           </OButton>
-          <!-- Volume Analysis Button -->
+          <!-- Volume Analysis Button (visible on md+ screens) -->
           <OButton
-            v-if="
-              searchObj.data?.queryResults?.hits?.length > 0 &&
-              !searchObj.meta.sqlMode
-            "
+            v-if="showAnalyzeBtn"
             variant="ghost-primary"
             size="icon"
-            class="analyze-button"
+            class="analyze-button tw:hidden md:tw:inline-flex"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
             <OIcon name="timeline" size="sm" />
             <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
           </OButton>
+
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -116,16 +138,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw:w-1/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
-          <!-- Wrap Content Button -->
+          <!-- Overflow menu: Wrap + Inspect + Analyze (visible on small screens, hidden on md+) -->
+          <ODropdown
+            v-if="showWrapBtn || showInspectBtn || showAnalyzeBtn"
+            class="md:tw:hidden"
+            side="bottom"
+            align="end"
+          >
+            <template #trigger>
+              <OButton
+                variant="ghost"
+                size="icon"
+                class="wrap-content-btn"
+                data-test="logs-search-actions-overflow-btn"
+              >
+                <OIcon name="more-horiz" size="sm" />
+                <OTooltip :content="t('search.moreActions')" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-if="showWrapBtn"
+              @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+              data-test="logs-overflow-wrap-item"
+            >
+              <template #icon-left>
+                <OIcon name="wrap-text" size="sm" />
+              </template>
+              {{ t('search.messageWrapContent') }}
+              <template v-if="searchObj.meta.toggleSourceWrap" #icon-right>
+                <OIcon name="check" size="sm" />
+              </template>
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="showInspectBtn"
+              @select="openSearchJobInspector"
+              data-test="logs-overflow-inspect-item"
+            >
+              <template #icon-left>
+                <OIcon name="troubleshoot" size="sm" />
+              </template>
+              {{ t('volumeInsights.searchInspectionsLabel') }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="showAnalyzeBtn"
+              @select="openVolumeAnalysisDashboard"
+              data-test="logs-overflow-analyze-item"
+            >
+              <template #icon-left>
+                <OIcon name="timeline" size="sm" />
+              </template>
+              {{ t('volumeInsights.analyzeTooltipLogs') }}
+            </ODropdownItem>
+          </ODropdown>
+
+          <!-- Wrap Content Button (visible on md+ screens) -->
           <OButton
-            v-if="
-              searchObj.meta.logsVisualizeToggle === 'logs' ||
-              searchObj.meta.logsVisualizeToggle === 'patterns'
-            "
+            v-if="showWrapBtn"
             data-test="logs-search-result-wrap-table-content-btn"
             variant="ghost"
             size="icon"
-            class="wrap-content-btn"
+            class="wrap-content-btn tw:hidden md:tw:flex"
             :class="{
               'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
             }"
@@ -536,7 +608,11 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
 import { byString } from "../../utils/json";
-import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
+import {
+  getImageURL,
+  useLocalWrapContent,
+  formatSizeFromMB,
+} from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -567,6 +643,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -579,6 +657,8 @@ export default defineComponent({
     ORefreshButton,
     OButton,
     ODrawer,
+    ODropdown,
+    ODropdownItem,
     OSpinner,
     OTooltip,
     OSelect,
@@ -1748,6 +1828,86 @@ export default defineComponent({
   computed: {
     toggleWrapFlag() {
       return this.searchObj.meta.toggleSourceWrap;
+    },
+    showInspectBtn() {
+      return (
+        this.searchObj.data?.queryResults?.hits?.length > 0 &&
+        this.searchObj.data.lastSearchTraceId &&
+        this.config.isEnterprise == "true" &&
+        this.config.isCloud == "false" &&
+        this.store.state.zoConfig.search_inspector_enabled
+      );
+    },
+    showAnalyzeBtn() {
+      return (
+        this.searchObj.data?.queryResults?.hits?.length > 0 &&
+        !this.searchObj.meta.sqlMode
+      );
+    },
+    showWrapBtn() {
+      return (
+        this.searchObj.meta.logsVisualizeToggle === "logs" ||
+        this.searchObj.meta.logsVisualizeToggle === "patterns"
+      );
+    },
+    queryTook() {
+      const took = this.searchObj.data.queryResults?.took;
+      return took != null && took > 0 ? took : null;
+    },
+    queryScanSize() {
+      const size = this.searchObj.data.queryResults?.scan_size;
+      if (size == null || size <= 0) return null;
+      return formatSizeFromMB(size);
+    },
+    scanSizeLabel() {
+      const ratio = this.searchObj.data.queryResults?.result_cache_ratio;
+      return ratio != null && ratio > 0 ? "ΔScan" : "Scan";
+    },
+    isPartialResult() {
+      return !!this.searchObj.loadingCounter;
+    },
+    displayCountRange() {
+      try {
+        const results = this.searchObj.data.queryResults;
+        if (!results || (!results.total && !results.hits?.length)) {
+          return this.noOfRecordsTitle || "";
+        }
+        const currentPage =
+          (this.searchObj.data.resultGrid.currentPage - 1) || 0;
+        const startCount =
+          currentPage * this.searchObj.meta.resultGrid.rowsPerPage + 1;
+        let totalCount = Math.max(
+          results.hits?.length || 0,
+          results.total || 0,
+        );
+        let endCount: number;
+
+        if (!this.searchObj.meta.resultGrid.showPagination) {
+          endCount = results.hits?.length || 0;
+          totalCount = endCount;
+        } else {
+          endCount =
+            this.searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+          const paginLen =
+            this.searchObj.communicationMethod === "streaming" ||
+            this.searchObj.meta.jobId != ""
+              ? results.pagination?.length || 0
+              : results.partitionDetail?.paginations?.length || 0;
+          if (currentPage >= paginLen - 1) {
+            endCount = Math.min(
+              startCount + this.searchObj.meta.resultGrid.rowsPerPage - 1,
+              totalCount,
+            );
+          }
+        }
+
+        if (isNaN(totalCount)) totalCount = 0;
+        if (isNaN(endCount)) endCount = 0;
+
+        return `${startCount}–${endCount} of ${totalCount.toLocaleString()} events`;
+      } catch {
+        return this.noOfRecordsTitle || "";
+      }
     },
     findFTSFields() {
       return this.searchObj.data.stream.selectedStreamFields;
