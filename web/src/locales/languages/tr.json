@@ -421,7 +421,11 @@
     "menuGroupSetOnce": "Bir Kez Ayarla",
     "menuGroupSavedViews": "Kayıtlı Görünümler",
     "menuGroupTools": "Araçlar",
-    "searchInspect": "Arayın İnceleyin"
+    "searchInspect": "Arayın İnceleyin",
+    "menuGroupHistory": "Tarihçe",
+    "menuGroupDownloads": "İndirilenler",
+    "menuGroupSchedule": "Çizelge",
+    "menuGroupInspect": "İnceleyin"
   },
   "menu": {
     "home": "Ana Sayfa",

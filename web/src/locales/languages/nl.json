@@ -421,7 +421,11 @@
     "menuGroupSetOnce": "Eenmaal instellen",
     "menuGroupSavedViews": "Opgeslagen weergaven",
     "menuGroupTools": "Hulpmiddelen",
-    "searchInspect": "Zoek Inspect"
+    "searchInspect": "Zoek Inspect",
+    "menuGroupHistory": "Historie",
+    "menuGroupDownloads": "Downloads",
+    "menuGroupSchedule": "Schema",
+    "menuGroupInspect": "Inspecteer"
   },
   "menu": {
     "home": "Home",

@@ -421,7 +421,11 @@
     "menuGroupSetOnce": "Einmal einstellen",
     "menuGroupSavedViews": "Gespeicherte Ansichten",
     "menuGroupTools": "Werkzeuge",
-    "searchInspect": "Suche Inspect"
+    "searchInspect": "Suche Inspect",
+    "menuGroupHistory": "Geschichte",
+    "menuGroupDownloads": "herunterladbare",
+    "menuGroupSchedule": "Zeitplan",
+    "menuGroupInspect": "Inspizieren"
   },
   "menu": {
     "home": "Startseite",

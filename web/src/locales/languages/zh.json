@@ -421,7 +421,11 @@
     "menuGroupSetOnce": "设置一次",
     "menuGroupSavedViews": "保存的视图",
     "menuGroupTools": "工具",
-    "searchInspect": "搜索检查"
+    "searchInspect": "搜索检查",
+    "menuGroupHistory": "历史",
+    "menuGroupDownloads": "下载",
+    "menuGroupSchedule": "日程安排",
+    "menuGroupInspect": "检查"
   },
   "menu": {
     "home": "主页",

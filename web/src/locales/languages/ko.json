@@ -421,7 +421,11 @@
     "menuGroupSetOnce": "한 번 설정",
     "menuGroupSavedViews": "저장된 뷰",
     "menuGroupTools": "도구",
-    "searchInspect": "검색 검사"
+    "searchInspect": "검색 검사",
+    "menuGroupHistory": "역사",
+    "menuGroupDownloads": "다운로드",
+    "menuGroupSchedule": "스케줄",
+    "menuGroupInspect": "검사"
   },
   "menu": {
     "home": "홈",

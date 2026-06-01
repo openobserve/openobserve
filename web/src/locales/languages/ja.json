@@ -421,7 +421,11 @@
     "menuGroupSetOnce": "1 回設定",
     "menuGroupSavedViews": "保存済みビュー",
     "menuGroupTools": "ツール",
-    "searchInspect": "検索検査"
+    "searchInspect": "検索検査",
+    "menuGroupHistory": "歴史",
+    "menuGroupDownloads": "ダウンロード",
+    "menuGroupSchedule": "スケジュール",
+    "menuGroupInspect": "検査"
   },
   "menu": {
     "home": "ホーム",
