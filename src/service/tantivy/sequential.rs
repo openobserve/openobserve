@@ -13,23 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Cursor;
-
 use anyhow::Context;
-use arrow::{array::RecordBatch, error::ArrowError};
+use arrow::array::RecordBatch;
 use bytes::Bytes;
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME, get_batch_size,
-    utils::{
-        parquet::{RecordBatchStream, get_recordbatch_reader_from_bytes},
-        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
-    },
+    FileFormat, TIMESTAMP_COL_NAME,
+    utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
 use futures::TryStreamExt;
-use parquet::arrow::{ParquetRecordBatchStreamBuilder, ProjectionMask};
 use tokio::task::JoinHandle;
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
+use crate::service::tantivy::reader::file_stream;
 
 /// Create a tantivy index in the given directory for the input file bytes.
 pub(super) async fn build_index<D: tantivy::Directory>(
@@ -39,7 +34,9 @@ pub(super) async fn build_index<D: tantivy::Directory>(
     index_schema: TantivyIndexSchema,
 ) -> Result<Option<tantivy::Index>, anyhow::Error> {
     let start = std::time::Instant::now();
-    let reader = open_reader(file_format, buf, &index_schema).await?;
+    let mut projection: Vec<String> = index_schema.fields.iter().cloned().collect();
+    projection.push(TIMESTAMP_COL_NAME.to_string());
+    let reader = file_stream(file_format, buf, Some(&projection)).await?;
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Ingest));
     let index_writer = tantivy::IndexBuilder::new()
@@ -48,7 +45,7 @@ pub(super) async fn build_index<D: tantivy::Directory>(
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
-    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
 
     let producer: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
         let mut total_num_rows = 0usize;
@@ -67,7 +64,6 @@ pub(super) async fn build_index<D: tantivy::Directory>(
         Ok(total_num_rows)
     });
 
-    let mut rx = rx;
     let writer_task: JoinHandle<Result<_, anyhow::Error>> =
         tokio::task::spawn_blocking(move || {
             let mut writer = index_writer;
@@ -82,7 +78,7 @@ pub(super) async fn build_index<D: tantivy::Directory>(
             Ok(writer)
         });
 
-    let _total_num_rows = producer.await??;
+    producer.await??;
     let index_writer = writer_task.await??;
 
     log::info!(
@@ -105,38 +101,6 @@ pub(super) async fn build_index<D: tantivy::Directory>(
     );
 
     Ok(Some(index))
-}
-
-/// Open a `RecordBatch` stream that only decodes the columns we will index.
-async fn open_reader(
-    file_format: FileFormat,
-    buf: Bytes,
-    index_schema: &TantivyIndexSchema,
-) -> Result<RecordBatchStream, anyhow::Error> {
-    if !matches!(file_format, FileFormat::Parquet) {
-        let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
-        return Ok(reader);
-    }
-
-    let builder = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf)).await?;
-    let projection_indices: Vec<usize> = builder
-        .schema()
-        .fields()
-        .iter()
-        .enumerate()
-        .filter_map(|(i, f)| {
-            (f.name() == TIMESTAMP_COL_NAME || index_schema.fields.contains(f.name())).then_some(i)
-        })
-        .collect();
-    let projection_mask = ProjectionMask::roots(
-        builder.metadata().file_metadata().schema_descr(),
-        projection_indices,
-    );
-    let stream = builder
-        .with_batch_size(get_batch_size())
-        .with_projection(projection_mask)
-        .build()?;
-    Ok(Box::pin(stream.map_err(ArrowError::from)))
 }
 
 #[cfg(test)]
@@ -322,7 +286,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_tantivy_index_without_timestamp() {
         let dir = RamDirectory::create();
-        let batch = create_test_batch(10, false, true, true);
+        let batch = create_test_batch(10, true, true, true);
         let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
 
         let result = build_index(

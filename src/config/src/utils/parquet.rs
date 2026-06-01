@@ -23,18 +23,18 @@ use arrow_schema::Schema;
 use futures::StreamExt;
 use futures::{Stream, TryStreamExt};
 use parquet::{
-    arrow::{
-        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
-        arrow_reader::ArrowReaderMetadata,
-        async_reader::{AsyncFileReader, ParquetRecordBatchStream},
-    },
+    arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
 #[cfg(feature = "vortex")]
 use vortex::{
-    VortexSessionDefault, array::arrow::IntoArrowArray, buffer::Buffer,
-    file::OpenOptionsSessionExt, io::session::RuntimeSessionExt, session::VortexSession,
+    VortexSessionDefault,
+    array::{ArrayRef, arrow::IntoArrowArray},
+    buffer::Buffer,
+    file::OpenOptionsSessionExt,
+    io::session::RuntimeSessionExt,
+    session::VortexSession,
 };
 
 use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
@@ -113,18 +113,22 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
 /// Unified stream type that supports both Vortex and Parquet formats
 pub type RecordBatchStream = Pin<Box<dyn Stream<Item = Result<RecordBatch, ArrowError>> + Send>>;
 
-/// A generic wrapper for getting a record batch stream from a reader.
-/// It can be used for both bytes and file.
-async fn get_recordbatch_reader<T>(
-    reader: T,
-) -> Result<(Arc<Schema>, ParquetRecordBatchStream<T>), anyhow::Error>
-where
-    T: AsyncFileReader + Send + 'static,
-{
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(reader).await?;
-    let schema = arrow_reader.schema().clone();
-    let reader = arrow_reader.with_batch_size(get_batch_size()).build()?;
-    Ok((schema, reader))
+/// Convert a single vortex [`ArrayRef`] to an Arrow [`RecordBatch`].
+#[cfg(feature = "vortex")]
+pub fn vortex_array_to_record_batch(
+    array: ArrayRef,
+    data_type: &DataType,
+) -> Result<RecordBatch, ArrowError> {
+    let array = array
+        .into_arrow(data_type)
+        .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
+    let struct_array = array
+        .as_any()
+        .downcast_ref::<StructArray>()
+        .ok_or_else(|| {
+            ArrowError::InvalidArgumentError("Expected struct array from vortex".to_string())
+        })?;
+    Ok(RecordBatch::from(struct_array))
 }
 
 pub async fn get_recordbatch_reader_from_bytes(
@@ -133,8 +137,9 @@ pub async fn get_recordbatch_reader_from_bytes(
 ) -> Result<(Arc<Schema>, RecordBatchStream), anyhow::Error> {
     match file_format {
         FileFormat::Parquet => {
-            let schema_reader = Cursor::new(data);
-            let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
+            let arrow_reader = ParquetRecordBatchStreamBuilder::new(Cursor::new(data)).await?;
+            let schema = arrow_reader.schema().clone();
+            let reader = arrow_reader.with_batch_size(get_batch_size()).build()?;
             let stream: RecordBatchStream = Box::pin(reader.map_err(ArrowError::from));
             Ok((schema, stream))
         }
@@ -145,8 +150,6 @@ pub async fn get_recordbatch_reader_from_bytes(
             let buf = Buffer::from(data.to_vec());
             let vxf = session.open_options().open_buffer(buf)?;
             let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
-
-            // Create a stream that converts vortex arrays to record batches
             let arrow_data_type = DataType::Struct(schema.fields().clone());
             let vortex_stream = vxf.scan()?.into_array_stream()?;
 
@@ -154,24 +157,7 @@ pub async fn get_recordbatch_reader_from_bytes(
                 let arrow_data_type = arrow_data_type.clone();
                 async move {
                     match result {
-                        Ok(vortex_array) => {
-                            // Convert vortex array to arrow array
-                            let arrow_array = vortex_array
-                                .into_arrow(&arrow_data_type)
-                                .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
-
-                            // Convert to struct array and then to record batch
-                            let struct_array = arrow_array
-                                .as_any()
-                                .downcast_ref::<StructArray>()
-                                .ok_or_else(|| {
-                                ArrowError::InvalidArgumentError(
-                                    "Expected struct array from vortex".to_string(),
-                                )
-                            })?;
-
-                            Ok(RecordBatch::from(struct_array))
-                        }
+                        Ok(array) => vortex_array_to_record_batch(array, &arrow_data_type),
                         Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
                     }
                 }
