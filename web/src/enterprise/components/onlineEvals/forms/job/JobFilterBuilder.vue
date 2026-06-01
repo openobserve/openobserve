@@ -1,0 +1,62 @@
+<template>
+  <div class="eval-form-section__wide eval-condition-builder">
+    <div class="eval-form-field-head">
+      <span>Filter condition</span>
+      <small>Only spans matching this condition enter sampling and scoring.</small>
+    </div>
+    <FilterGroup
+      :group="group"
+      :depth="0"
+      :stream-fields="streamFields"
+      :stream-fields-map="streamFieldsMap"
+      :show-sql-preview="true"
+      condition-input-width="tw:w-[220px]"
+      :allow-custom-columns="true"
+      module="alerts"
+      @add-condition="handleUpdate"
+      @add-group="handleUpdate"
+      @remove-group="handleRemove"
+      @input:update="handleInputUpdate"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import {
+  removeConditionGroup as removeAlertConditionGroup,
+  updateGroup as updateAlertConditionGroup,
+  type V2Group,
+} from "@/utils/alerts/alertDataTransforms";
+import { DEFAULT_JOB_STREAM_FIELDS } from "../../utils/defaultStreamFields";
+
+const props = defineProps<{
+  group: V2Group;
+}>();
+
+const emit = defineEmits<{
+  (e: "update:group", value: V2Group): void;
+}>();
+
+const streamFields = computed(() => DEFAULT_JOB_STREAM_FIELDS);
+const streamFieldsMap = computed(() =>
+  Object.fromEntries(streamFields.value.map((field) => [field.value, { type: field.type }])),
+);
+
+function handleUpdate(updatedGroup: any) {
+  const formData = { query_condition: { conditions: props.group } };
+  updateAlertConditionGroup(updatedGroup, { formData });
+  emit("update:group", formData.query_condition.conditions);
+}
+
+function handleRemove(groupId: string) {
+  const formData = { query_condition: { conditions: props.group } };
+  removeAlertConditionGroup(groupId, props.group, { formData });
+  emit("update:group", formData.query_condition.conditions);
+}
+
+function handleInputUpdate() {
+  emit("update:group", { ...props.group });
+}
+</script>
