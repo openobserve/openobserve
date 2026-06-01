@@ -1032,6 +1032,7 @@ import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -1083,6 +1084,7 @@ export default defineComponent({
     OIcon,
     OSpinner,
     OInput,
+    OSearchInput,
     OSelect,
     OSwitch,
     OTooltip,

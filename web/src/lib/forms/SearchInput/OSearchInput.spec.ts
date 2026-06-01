@@ -93,6 +93,15 @@ describe("OSearchInput", () => {
     expect(wrapper.find('[data-test="my-search-input"]').exists()).toBe(true);
   });
 
+  it("should expose native input as data-test -field for E2E selectors", () => {
+    wrapper = mount(OSearchInput, {
+      attrs: { "data-test": "streams-search-stream-input" },
+    });
+    const fieldEl = wrapper.find('[data-test="streams-search-stream-input-field"]');
+    expect(fieldEl.exists()).toBe(true);
+    expect(fieldEl.element.tagName.toLowerCase()).toBe("input");
+  });
+
   it("should debounce update:modelValue when debounce is set", async () => {
     vi.useFakeTimers();
     wrapper = mount(OSearchInput, { props: { modelValue: "", debounce: 300 } });
