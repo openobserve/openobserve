@@ -162,7 +162,7 @@ fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
     let func = &metrics_info.func;
     let plan_with_metrics = DisplayableExecutionPlan::with_metrics(plan.as_ref())
         .set_show_statistics(false)
-        .indent(true)
+        .indent(false)
         .to_string();
     let stage = if func() {
         if is_super_cluster { 1 } else { 2 }
