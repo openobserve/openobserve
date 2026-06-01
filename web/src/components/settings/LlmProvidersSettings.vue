@@ -126,8 +126,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, ref } from "vue";
+import { computed, onBeforeMount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -149,6 +150,8 @@ import LlmProvidersEmptyState from "./LlmProvidersEmptyState.vue";
 
 const { t } = useI18n();
 const store = useStore();
+const route = useRoute();
+const router = useRouter();
 
 const providers = ref<Provider[]>([]);
 const isLoading = ref(false);
@@ -231,9 +234,15 @@ const filteredProviders = computed(() => {
   }));
 });
 
-onBeforeMount(() => {
-  void loadProviders();
+onBeforeMount(async () => {
+  await loadProviders();
+  syncFromRoute();
 });
+
+watch(
+  () => [route.query.action, route.query.id],
+  () => syncFromRoute(),
+);
 
 async function loadProviders() {
   if (!orgId.value) return;
@@ -254,21 +263,56 @@ function endpointFallback(provider: Provider) {
   return "—";
 }
 
+function pushRouteAction(extra: Record<string, string | undefined>) {
+  const query: Record<string, any> = { ...route.query };
+  for (const [k, v] of Object.entries(extra)) {
+    if (v === undefined) delete query[k];
+    else query[k] = v;
+  }
+  router.push({ name: route.name as string, query }).catch(() => {});
+}
+
+function clearRouteAction() {
+  const query: Record<string, any> = { ...route.query };
+  delete query.action;
+  delete query.id;
+  router.replace({ name: route.name as string, query }).catch(() => {});
+}
+
 function openCreate() {
-  formPage.value = { mode: "create", row: null };
+  pushRouteAction({ action: "add", id: undefined });
 }
 
 function openEdit(row: Provider) {
-  formPage.value = { mode: "edit", row };
+  pushRouteAction({ action: "update", id: String(row.id) });
 }
 
 function closeForm() {
   formPage.value = null;
+  clearRouteAction();
 }
 
 async function handleSaved() {
-  closeForm();
+  formPage.value = null;
+  clearRouteAction();
   await loadProviders();
+}
+
+function syncFromRoute() {
+  const action = route.query.action;
+  const id = route.query.id;
+
+  formPage.value = null;
+
+  if (action === "add") {
+    formPage.value = { mode: "create", row: null };
+    return;
+  }
+
+  if (action === "update" && typeof id === "string") {
+    const row = providers.value.find((p) => String(p.id) === id) ?? null;
+    if (row) formPage.value = { mode: "edit", row };
+  }
 }
 
 async function confirmDelete(row: Provider) {

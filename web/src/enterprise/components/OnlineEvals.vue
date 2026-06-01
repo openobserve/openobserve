@@ -218,25 +218,56 @@ watch(
   },
 );
 
-onBeforeMount(() => loadAll(orgId.value));
+onBeforeMount(async () => {
+  await loadAll(orgId.value);
+  syncFromRoute();
+});
+
+function rowIdOf(row: AnyRow): string {
+  if (activeTab.value === "jobs") return String((row as EvalJob).id);
+  return entityId(row as ScoreConfig | Scorer);
+}
+
+function findRowById(tab: ActiveTab, id: string): AnyRow | null {
+  const rows = rowsByTab.value[tab];
+  if (tab === "jobs") {
+    return (rows.find((r) => String((r as EvalJob).id) === id) as AnyRow) ?? null;
+  }
+  return (rows.find((r) => entityId(r as ScoreConfig | Scorer) === id) as AnyRow) ?? null;
+}
+
+function pushRouteAction(extra: Record<string, string | undefined>) {
+  const query: Record<string, any> = { ...route.query, tab: activeTab.value };
+  for (const [k, v] of Object.entries(extra)) {
+    if (v === undefined) delete query[k];
+    else query[k] = v;
+  }
+  router.push({ name: route.name as string, query }).catch(() => {});
+}
+
+function clearRouteAction() {
+  const query: Record<string, any> = { ...route.query };
+  delete query.action;
+  delete query.id;
+  delete query.scorer_type;
+  router.replace({ name: route.name as string, query }).catch(() => {});
+}
 
 function openCreateDialog() {
-  dialog.value = { open: activeTab.value === "scoreConfigs", mode: "create", row: null };
-  if (activeTab.value === "scoreConfigs") return;
   if (activeTab.value === "scorers") {
-    scorerTypeDialog.value = true;
+    pushRouteAction({ action: "add", id: undefined, scorer_type: undefined });
     return;
   }
-  openFormPage(activeTab.value as FullPageEntity, "create");
+  pushRouteAction({ action: "add", id: undefined });
 }
 
 function openEditDialog(row: AnyRow) {
-  dialog.value = { open: activeTab.value === "scoreConfigs", mode: "edit", row };
-  if (activeTab.value !== "scoreConfigs") openFormPage(activeTab.value as FullPageEntity, "edit");
+  pushRouteAction({ action: "update", id: rowIdOf(row) });
 }
 
 function closeDialog() {
   dialog.value = { open: false, mode: "create", row: null };
+  clearRouteAction();
 }
 
 function openFormPage(entity: FullPageEntity, mode: "create" | "edit") {
@@ -247,21 +278,73 @@ function openFormPage(entity: FullPageEntity, mode: "create" | "edit") {
 function closeFormPage() {
   formPage.value = null;
   dialog.value = { open: false, mode: "create", row: null };
+  scorerTypeDialog.value = false;
+  clearRouteAction();
 }
 
 function selectScorerType(type: ScorerType) {
-  scorerTypeDialog.value = false;
-  activeTab.value = "scorers";
-  pendingScorerType.value = type;
-  dialog.value = { open: false, mode: "create", row: null };
-  openFormPage("scorers", "create");
+  pushRouteAction({ action: "add", scorer_type: type });
 }
 
 async function handleSaved() {
-  closeFormPage();
-  closeDialog();
+  formPage.value = null;
+  dialog.value = { open: false, mode: "create", row: null };
+  scorerTypeDialog.value = false;
+  clearRouteAction();
   await loadAll(orgId.value);
 }
+
+function syncFromRoute() {
+  const action = route.query.action;
+  const id = route.query.id;
+  const tab = parseTabFromRoute(route.query.tab);
+
+  // Route is the source of truth — reset everything first
+  formPage.value = null;
+  dialog.value = { open: false, mode: "create", row: null };
+  scorerTypeDialog.value = false;
+
+  if (action !== "add" && action !== "update") return;
+
+  if (tab === "scoreConfigs") {
+    if (action === "add") {
+      dialog.value = { open: true, mode: "create", row: null };
+    } else if (typeof id === "string") {
+      const row = findRowById("scoreConfigs", id) as ScoreConfig | null;
+      if (row) dialog.value = { open: true, mode: "edit", row };
+    }
+    return;
+  }
+
+  if (tab === "scorers" && action === "add") {
+    const type = route.query.scorer_type;
+    if (typeof type === "string") {
+      pendingScorerType.value = type as ScorerType;
+      formPage.value = { entity: "scorers", mode: "create" };
+    } else {
+      scorerTypeDialog.value = true;
+    }
+    return;
+  }
+
+  if (action === "add") {
+    formPage.value = { entity: tab as FullPageEntity, mode: "create" };
+    return;
+  }
+
+  if (action === "update" && typeof id === "string") {
+    const row = findRowById(tab, id);
+    if (row) {
+      dialog.value = { open: false, mode: "edit", row };
+      formPage.value = { entity: tab as FullPageEntity, mode: "edit" };
+    }
+  }
+}
+
+watch(
+  () => [route.query.action, route.query.id, route.query.scorer_type, route.query.tab],
+  () => syncFromRoute(),
+);
 
 async function deleteRow(row: AnyRow) {
   if (!window.confirm(t("onlineEvals.deletePrompt", { name: row.name }))) return;
