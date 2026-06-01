@@ -27,15 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("cipherKey.header") }}
             </div>
             <div class="col-auto tw:flex">
-              <OInput
+              <OSearchInput
                 v-model="filterQuery"
                 class="tw:ml-auto no-border o2-search-input"
                 :placeholder="t('cipherKey.search')"
-              >
-                <template #icon-left>
-                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
-                </template>
-              </OInput>
+              />
               <OButton
                 variant="primary"
                 size="sm"
@@ -142,8 +138,7 @@ import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -155,8 +150,7 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
-    OInput,
-    OIcon,
+    OSearchInput,
     OTable,
 },
   setup() {

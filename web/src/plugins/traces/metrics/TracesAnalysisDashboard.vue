@@ -136,20 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:p-[0.625rem] tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
                   <!-- Search Input -->
-                  <OInput
+                  <OSearchInput
                     v-model="dimensionSearchText"
                     :placeholder="t('search.searchDimension')"
                     clearable
                     class="tw:w-full"
                     data-test="dimension-search-input"
-                  >
-                    <template #icon-left>
-                      <OIcon
-                        name="search" size="sm"
-                        class="tw:text-[1.2rem]! tw:text-[var(--o2-text-3)]"
-                      />
-                    </template>
-                  </OInput>
+                  />
                 </div>
 
                 <!-- Dimension List -->
@@ -329,7 +322,7 @@ import {
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(

@@ -425,26 +425,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div class="tw:flex tw:items-center tw:gap-2">
-                      <OInput
+                      <OSearchInput
                         data-test="schema-field-search-input"
                         v-model="filterField"
                         data-cy="schema-index-field-search-input"
                         class="tw:ml-auto no-border o2-search-input"
                         :placeholder="t('search.searchField')"
-                      >
-                        <template #icon-left>
-                          <OIcon
-                            class="o2-search-input-icon"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'o2-search-input-icon-dark'
-                                : 'o2-search-input-icon-light'
-                            "
-                            name="search"
-                            size="sm"
-                          />
-                        </template>
-                      </OInput>
+                      />
                       <OButton
                         v-if="isSchemaUDSEnabled"
                         data-test="schema-add-fields-title"
@@ -1045,6 +1032,7 @@ import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -1096,6 +1084,7 @@ export default defineComponent({
     OIcon,
     OSpinner,
     OInput,
+    OSearchInput,
     OSelect,
     OSwitch,
     OTooltip,

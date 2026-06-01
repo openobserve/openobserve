@@ -32,17 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
             >Refresh</OButton>
-            <OInput
+            <OSearchInput
               v-model="searchQuery"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
-              class="o2-search-input"
-            >
-              <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-            </OInput>
+            />
           </div>
         </div>
       </div>
@@ -177,7 +172,7 @@ import NoData from "../shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -189,7 +184,7 @@ export default defineComponent({
     NoData,
     OButton,
     OSpinner,
-    OInput,
+    OSearchInput,
     OTooltip,
     OIcon,
     OTable,

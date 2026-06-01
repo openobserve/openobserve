@@ -24,15 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alert_templates.header") }}
           </div>
           <div class="tw:flex tw:justify-end tw:gap-2">
-            <OInput
+            <OSearchInput
               v-model="filterQuery"
-              class="tw:ml-auto no-border o2-search-input"
+              class="tw:ml-auto"
               :placeholder="t('template.search')"
-            >
-              <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-            </OInput>
+            />
           <OButton
             variant="outline"
             size="sm-action"
@@ -172,7 +168,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ImportTemplate from "./ImportTemplate.vue";
