@@ -491,7 +491,15 @@
     "getStartedRUM": "Comece com o monitoramento real de usuários",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
     "eventID": "ID do evento",
-    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos."
+    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos.",
+    "traces": "Traços",
+    "noCorrelatedTraces": "Nenhum traço correlacionado foi encontrado para esta sessão.",
+    "viewTraceDetails": "Exibir detalhes do rastreamento",
+    "routeChange": "Rota",
+    "initialView": "Inicial",
+    "failedToFetchTraces": "Falha ao buscar dados de rastreamento. Por favor, tente novamente.",
+    "traceNotFound": "Detalhes do rastreamento não encontrados.",
+    "failedToFetchTraceDetails": "Falha ao carregar detalhes do rastreamento. Por favor, tente novamente."
   },
   "about": {
     "name": "Abra o Observe",

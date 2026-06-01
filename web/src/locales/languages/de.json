@@ -491,7 +491,15 @@
     "getStartedRUM": "Erste Schritte mit Real User Monitoring",
     "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",
     "eventID": "ID des Ereignisses",
-    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab."
+    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab.",
+    "traces": "Spuren",
+    "noCorrelatedTraces": "Für diese Sitzung wurden keine korrelierten Spuren gefunden.",
+    "viewTraceDetails": "Trace-Details anzeigen",
+    "routeChange": "Route",
+    "initialView": "Anfänglich",
+    "failedToFetchTraces": "Ablaufverfolgungsdaten konnten nicht abgerufen werden. Bitte versuchen Sie es erneut.",
+    "traceNotFound": "Die Trace-Details wurden nicht gefunden.",
+    "failedToFetchTraceDetails": "Die Trace-Details konnten nicht geladen werden. Bitte versuchen Sie es erneut."
   },
   "about": {
     "name": "Observe öffnen",

@@ -491,7 +491,15 @@
     "getStartedRUM": "실제 사용자 모니터링 시작하기",
     "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
     "eventID": "이벤트 ID",
-    "loadingApplicationErrors": "잠시만요. 애플리케이션 오류가 발생하고 있습니다."
+    "loadingApplicationErrors": "잠시만요. 애플리케이션 오류가 발생하고 있습니다.",
+    "traces": "트레이스",
+    "noCorrelatedTraces": "이 세션에 대해 상관관계가 있는 추적을 찾을 수 없습니다.",
+    "viewTraceDetails": "트레이스 세부 정보 보기",
+    "routeChange": "노선",
+    "initialView": "이니셜",
+    "failedToFetchTraces": "추적 데이터를 가져오지 못했습니다.다시 시도해 주세요.",
+    "traceNotFound": "추적 세부 정보를 찾을 수 없습니다.",
+    "failedToFetchTraceDetails": "추적 세부 정보를 로드하지 못했습니다.다시 시도해 주세요."
   },
   "about": {
     "name": "오픈 옵저브",

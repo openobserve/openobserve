@@ -491,7 +491,15 @@
     "getStartedRUM": "Comience con Real User Monitoring",
     "loadingErrorDetails": "Agárrate fuerte, estamos buscando los detalles del error.",
     "eventID": "ID de evento",
-    "loadingApplicationErrors": "Agárrate fuerte, estamos recibiendo errores de solicitud."
+    "loadingApplicationErrors": "Agárrate fuerte, estamos recibiendo errores de solicitud.",
+    "traces": "Huellas",
+    "noCorrelatedTraces": "No se han encontrado rastros correlacionados para esta sesión.",
+    "viewTraceDetails": "Ver detalles de rastreo",
+    "routeChange": "Ruta",
+    "initialView": "Inicial",
+    "failedToFetchTraces": "No se pudieron obtener los datos de seguimiento. Por favor, inténtelo de nuevo.",
+    "traceNotFound": "No se han encontrado detalles de rastreo.",
+    "failedToFetchTraceDetails": "No se pudieron cargar los detalles del seguimiento. Por favor, inténtelo de nuevo."
   },
   "about": {
     "name": "Abrir Observe",

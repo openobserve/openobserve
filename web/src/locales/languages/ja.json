@@ -491,7 +491,15 @@
     "getStartedRUM": "リアルユーザーモニタリングを始める",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
     "eventID": "イベント ID",
-    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。"
+    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。",
+    "traces": "トレース",
+    "noCorrelatedTraces": "このセッションの相関トレースは見つかりませんでした。",
+    "viewTraceDetails": "トレースの詳細を表示",
+    "routeChange": "ルート",
+    "initialView": "初期",
+    "failedToFetchTraces": "トレースデータを取得できませんでした。もう一度試してください。",
+    "traceNotFound": "トレースの詳細が見つかりません。",
+    "failedToFetchTraceDetails": "トレースの詳細を読み込めませんでした。もう一度試してください。"
   },
   "about": {
     "name": "OpenObserve",
