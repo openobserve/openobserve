@@ -103,21 +103,6 @@ jobs:
           working-directory: "tests/api-testing/"
           version: "0.27.0"
 
-      - name: Start OpenObserve
-        run: target/debug/openobserve &
-
-      - name: Wait for start
-        run: |
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
-              echo "Server ready after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Server failed to start in 60s"
-          exit 1
-
       - name: Pin cpython
         run: rye pin cpython@3.11.6
         working-directory: tests/api-testing/
