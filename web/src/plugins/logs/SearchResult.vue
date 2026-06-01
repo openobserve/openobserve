@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section header: static at top -->
       <div class="tw:flex tw:min-h-[28px] tw:py-[0.125rem] tw:shrink-0 result-bar">
         <div
-          class="tw:w-2/3 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
+          class="tw:w-1/3 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="tw:w-2/3 tw:text-left tw:pl-4 warning tw:flex tw:items-center tw:flex-wrap tw:gap-x-1"
+          class="tw:w-1/3 tw:text-left tw:pl-4 warning tw:flex tw:items-center tw:flex-wrap tw:gap-x-1"
           data-test="logs-search-result-title"
           :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
@@ -103,54 +103,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ isFromCache ? "△ " : "" }}scan {{ queryScanSize }}
           </span>
 
-          <!-- Inspect Button (hidden when overflow menu is active) -->
-          <OButton
-            v-if="showInspectBtn && !shouldMoveActionsToMenu"
-            variant="outline"
-            size="icon"
-            class="action-icon-btn"
-            @click="openSearchJobInspector"
-            data-test="logs-inspect-button"
-          >
-            <OIcon name="troubleshoot" size="sm" />
-            <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
-          </OButton>
-          <!-- Volume Analysis Button (hidden when overflow menu is active) -->
-          <OButton
-            v-if="showAnalyzeBtn && !shouldMoveActionsToMenu"
-            variant="outline"
-            size="icon"
-            class="action-icon-btn"
-            @click="openVolumeAnalysisDashboard"
-            data-test="logs-analyze-dimensions-button"
-          >
-            <OIcon name="timeline" size="sm" />
-            <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
-          </OButton>
-
-          <ORefreshButton
-            :last-run-at="searchObj.meta.lastRunAt"
-            :loading="searchObj.loading || searchObj.loadingHistogram"
-            :disabled="searchObj.loading || searchObj.loadingHistogram"
-            @click="$emit('run-query')"
-            class="tw:ml-2"
-          />
         </div>
 
-        <div class="tw:w-1/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
+        <div class="tw:w-2/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
+          <!-- Refresh button wrapped in outline container to match action button style -->
+          <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-[1.875rem]">
+            <ORefreshButton
+              :last-run-at="searchObj.meta.lastRunAt"
+              :loading="searchObj.loading || searchObj.loadingHistogram"
+              :disabled="searchObj.loading || searchObj.loadingHistogram"
+              @click="$emit('run-query')"
+            />
+          </div>
           <!-- Overflow menu: Wrap + Inspect + Analyze (shown when screen is too narrow) -->
-          <div
-            v-if="(showWrapBtn || showInspectBtn || showAnalyzeBtn) && shouldMoveActionsToMenu"
-          >
           <ODropdown
+            v-if="(showWrapBtn || showInspectBtn || showAnalyzeBtn) && shouldMoveActionsToMenu"
             side="bottom"
             align="end"
           >
             <template #trigger>
               <OButton
                 variant="outline"
-                size="icon"
-                class="wrap-content-btn"
+                size="icon-toolbar"
                 data-test="logs-search-actions-overflow-btn"
               >
                 <OIcon name="more-horiz" size="sm" />
@@ -191,25 +165,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('volumeInsights.analyzeTooltipLogs') }}
             </ODropdownItem>
           </ODropdown>
-          </div>
 
-          <!-- Wrap Content Button (hidden when overflow menu is active) -->
-          <OButton
-            v-if="showWrapBtn && !shouldMoveActionsToMenu"
-            data-test="logs-search-result-wrap-table-content-btn"
-            variant="outline"
-            size="icon"
-            class="wrap-content-btn"
-            :class="{
-              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
-            }"
-            @click="
-              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
-            "
+          <!-- Action buttons with individual borders (shown when not in overflow mode) -->
+          <div
+            v-if="(showInspectBtn || showAnalyzeBtn || showWrapBtn) && !shouldMoveActionsToMenu"
+            class="tw:inline-flex tw:items-center tw:gap-1"
           >
-            <OIcon name="wrap-text" size="sm" />
-            <OTooltip :content="t('search.messageWrapContent')" />
-          </OButton>
+            <OButton
+              v-if="showInspectBtn"
+              variant="outline"
+              size="icon-toolbar"
+              @click="openSearchJobInspector"
+              data-test="logs-inspect-button"
+            >
+              <OIcon name="troubleshoot" size="sm" />
+              <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
+            </OButton>
+            <OButton
+              v-if="showAnalyzeBtn"
+              variant="outline"
+              size="icon-toolbar"
+              @click="openVolumeAnalysisDashboard"
+              data-test="logs-analyze-dimensions-button"
+            >
+              <OIcon name="timeline" size="sm" />
+              <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
+            </OButton>
+            <OButton
+              v-if="showWrapBtn"
+              variant="outline"
+              size="icon-toolbar"
+              :active="searchObj.meta.toggleSourceWrap"
+              @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+              data-test="logs-search-result-wrap-table-content-btn"
+            >
+              <OIcon name="wrap-text" size="sm" />
+              <OTooltip :content="t('search.messageWrapContent')" />
+            </OButton>
+          </div>
           <OSelect
             v-if="
               searchObj.meta.resultGrid.showPagination &&

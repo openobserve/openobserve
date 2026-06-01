@@ -8,16 +8,6 @@
   border-bottom: 1px solid var(--o2-border-color);
 }
 
-// Shared style for inline action icon buttons (Inspect, Analyze)
-.action-icon-btn {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  width: 1.45rem !important;
-  padding: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
 
 // Result info bar — count text and metric badges
 .result-count-text {
@@ -58,23 +48,6 @@
   }
 }
 
-.analyze-button {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0 0.75rem;
-  transition: all 0.2s;
-  margin-left: 2px;
-
-  &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-}
-
-.inspect-button{
-  margin-left: 0.5rem;
-  margin-right: 0.5rem;
-}
 
 .pagination-block {
   .select-pagination {
@@ -105,25 +78,6 @@
     }
   }
 
-  .wrap-content-btn {
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
-    width: 1.45rem !important;
-    padding: 0 !important;
-    margin: 0;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-
-    :deep(.q-icon) {
-      font-size: 0.75rem !important;
-    }
-
-    :deep(.q-btn__content) {
-      min-height: 1.45rem !important;
-      padding: 0 !important;
-    }
-  }
 }
 
 .search-list {
