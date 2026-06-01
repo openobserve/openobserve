@@ -4150,5 +4150,25 @@
       "selectAtLeastOne": "スコアラーを少なくとも 1 人選択してください",
       "saveError": "評価ジョブの保存に失敗しました"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "LLM プロバイダー",
+    "title": "LLM プロバイダー",
+    "subtitle": "LLM Judgeスコアラーが使用するLLMプロバイダー接続を管理します。",
+    "newButton": "新しいプロバイダー",
+    "searchPlaceholder": "検索プロバイダー",
+    "defaultBadge": "デフォルト",
+    "loadError": "LLM プロバイダーを読み込めませんでした",
+    "columns": {
+      "name": "[名前]",
+      "type": "タイプ",
+      "endpoint": "終点",
+      "defaultModel": "デフォルトモデル",
+      "default": "デフォルト"
+    },
+    "empty": {
+      "title": "LLM プロバイダーはまだありません",
+      "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続詳細（エンドポイント+認証情報）を保存します。これを追加すると、ジャッジベースの評価を開始できます。"
+    }
   }
 }

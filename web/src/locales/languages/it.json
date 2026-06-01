@@ -4159,5 +4159,25 @@
       "selectAtLeastOne": "Seleziona almeno un marcatore",
       "saveError": "Impossibile salvare il lavoro di valutazione"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "Fornitori di LLM",
+    "title": "Fornitori di LLM",
+    "subtitle": "Gestisci le connessioni ai provider LLM utilizzate dai valutatori LLM Judge.",
+    "newButton": "Nuovo fornitore",
+    "searchPlaceholder": "Provider di ricerca",
+    "defaultBadge": "Predefinito",
+    "loadError": "Impossibile caricare i provider LLM",
+    "columns": {
+      "name": "Nome",
+      "type": "Tipo",
+      "endpoint": "Punto finale",
+      "defaultModel": "Modello predefinito",
+      "default": "Predefinito"
+    },
+    "empty": {
+      "title": "Non ci sono ancora fornitori di LLM",
+      "description": "I provider LLM memorizzano i dettagli di connessione (endpoint + credenziali) per i modelli linguistici chiamati dai valutatori LLM Judge. Aggiungine uno per iniziare a eseguire valutazioni basate sui giudizi."
+    }
   }
 }

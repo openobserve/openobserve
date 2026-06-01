@@ -4150,5 +4150,25 @@
       "selectAtLeastOne": "Wählen Sie mindestens einen Scorer aus",
       "saveError": "Fehler beim Speichern des Evaluierungsauftrags"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "LLM-Anbieter",
+    "title": "LLM-Anbieter",
+    "subtitle": "Verwalten Sie die LLM-Provider-Verbindungen, die von LLM Judge Scorern verwendet werden.",
+    "newButton": "Neuer Anbieter",
+    "searchPlaceholder": "Anbieter suchen",
+    "defaultBadge": "Standard",
+    "loadError": "LLM-Anbieter konnten nicht geladen werden",
+    "columns": {
+      "name": "Name",
+      "type": "Typ",
+      "endpoint": "Endpunkt",
+      "defaultModel": "Standardmodell",
+      "default": "Standard"
+    },
+    "empty": {
+      "title": "Noch keine LLM-Anbieter",
+      "description": "LLM-Anbieter speichern die Verbindungsdetails (Endpunkt und Anmeldeinformationen) für die Sprachmodelle, die Ihre LLM-Judge-Scorer aufrufen. Fügen Sie eines hinzu, um mit der Durchführung von Bewertungen durch Richter zu beginnen."
+    }
   }
 }

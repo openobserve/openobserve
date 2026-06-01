@@ -4161,5 +4161,25 @@
       "selectAtLeastOne": "En az bir golcü seçin",
       "saveError": "Eval işi kaydedilemedi"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "LLM Sağlayıcıları",
+    "title": "LLM Sağlayıcıları",
+    "subtitle": "LLM Judge puanları tarafından kullanılan LLM sağlayıcı bağlantılarını yönetin.",
+    "newButton": "Yeni Sağlayıcı",
+    "searchPlaceholder": "Arama sağlayıcıları",
+    "defaultBadge": "Varsayılan",
+    "loadError": "LLM sağlayıcıları yüklenemedi",
+    "columns": {
+      "name": "İsim",
+      "type": "Tür",
+      "endpoint": "Bitiş noktası",
+      "defaultModel": "Varsayılan Model",
+      "default": "Varsayılan"
+    },
+    "empty": {
+      "title": "Henüz LLM Sağlayıcısı Yok",
+      "description": "LLM Sağlayıcıları, LLM Judge puanlarının aradığı dil modelleri için bağlantı ayrıntılarını (uç nokta + kimlik bilgileri) depolar. Yargıç tabanlı değerlendirmeleri yürütmeye başlamak için bir tane ekleyin."
+    }
   }
 }

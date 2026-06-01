@@ -4161,5 +4161,25 @@
       "selectAtLeastOne": "Selecteer minstens één scorer",
       "saveError": "Kon de evaluatietaak niet opslaan"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "LLM-aanbieders",
+    "title": "LLM-aanbieders",
+    "subtitle": "Beheer de LLM-providerverbindingen die worden gebruikt door LLM Judge-scorers.",
+    "newButton": "Nieuwe provider",
+    "searchPlaceholder": "Zoekaanbieders",
+    "defaultBadge": "Standaard",
+    "loadError": "Laden van LLM-providers is mislukt",
+    "columns": {
+      "name": "Naam",
+      "type": "Typ",
+      "endpoint": "Eindpunt",
+      "defaultModel": "Standaardmodel",
+      "default": "Standaard"
+    },
+    "empty": {
+      "title": "Nog geen LLM-aanbieders",
+      "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
+    }
   }
 }

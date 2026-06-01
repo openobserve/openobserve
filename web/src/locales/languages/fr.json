@@ -4150,5 +4150,25 @@
       "selectAtLeastOne": "Sélectionnez au moins un buteur",
       "saveError": "Impossible d'enregistrer la tâche d'évaluation"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "Fournisseurs de LLM",
+    "title": "Fournisseurs de LLM",
+    "subtitle": "Gérez les connexions aux fournisseurs LLM utilisées par les évaluateurs LLM Judge.",
+    "newButton": "Nouveau fournisseur",
+    "searchPlaceholder": "Fournisseurs de recherche",
+    "defaultBadge": "Par défaut",
+    "loadError": "Impossible de charger les fournisseurs LLM",
+    "columns": {
+      "name": "Nom",
+      "type": "Tapez",
+      "endpoint": "Point final",
+      "defaultModel": "Modèle par défaut",
+      "default": "Par défaut"
+    },
+    "empty": {
+      "title": "Pas encore de fournisseurs LLM",
+      "description": "Les fournisseurs LLM stockent les informations de connexion (point de terminaison + informations d'identification) pour les modèles linguistiques que vos évaluateurs LLM Judge appellent. Ajoutez-en un pour commencer à effectuer des évaluations par des juges."
+    }
   }
 }

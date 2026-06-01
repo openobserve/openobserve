@@ -4148,5 +4148,25 @@
       "selectAtLeastOne": "Selecciona al menos un anotador",
       "saveError": "No se pudo guardar el trabajo de evaluación"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "Proveedores de LLM",
+    "title": "Proveedores de LLM",
+    "subtitle": "Administre las conexiones de proveedores de LLM utilizadas por los puntuadores de LLM Judge.",
+    "newButton": "Nuevo proveedor",
+    "searchPlaceholder": "Buscar proveedores",
+    "defaultBadge": "Predeterminado",
+    "loadError": "No se pudieron cargar los proveedores de LLM",
+    "columns": {
+      "name": "Nombre",
+      "type": "Tipo",
+      "endpoint": "Punto final",
+      "defaultModel": "Modelo predeterminado",
+      "default": "Predeterminado"
+    },
+    "empty": {
+      "title": "Aún no hay proveedores de LLM",
+      "description": "Los proveedores de LLM almacenan los detalles de conexión (punto final y credenciales) de los modelos lingüísticos a los que llaman los evaluadores de LLM Judge. Agregue uno para comenzar a realizar evaluaciones basadas en jueces."
+    }
   }
 }

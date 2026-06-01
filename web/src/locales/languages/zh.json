@@ -4154,5 +4154,25 @@
       "selectAtLeastOne": "至少选择一名记分员",
       "saveError": "无法保存评估作业"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "LLM 提供商",
+    "title": "LLM 提供商",
+    "subtitle": "管理 LLM Judge 评分员使用的 LLM 提供商连接。",
+    "newButton": "新提供商",
+    "searchPlaceholder": "搜索提供商",
+    "defaultBadge": "默认",
+    "loadError": "无法加载 LLM 提供商",
+    "columns": {
+      "name": "姓名",
+      "type": "类型",
+      "endpoint": "端点",
+      "defaultModel": "默认型号",
+      "default": "默认"
+    },
+    "empty": {
+      "title": "还没有 LLM 提供商",
+      "description": "LLM 提供商存储您的 LLM Judge 评分员调用的语言模型的连接详细信息（端点 + 凭据）。添加一个即可开始进行基于法官的评估。"
+    }
   }
 }
