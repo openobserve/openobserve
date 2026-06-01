@@ -4330,6 +4330,41 @@
       }
     },
     "job": {
+      "listTitle": "Eval Jobs",
+      "listSubtitle": "Deploy scorers on your production trace stream.",
+      "searchPlaceholder": "Search jobs",
+      "allStatuses": "All statuses",
+      "newButton": "New job",
+      "scorersCount": "{count} scorers",
+      "scorerCount": "{count} scorer",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "stream": "Stream",
+        "scorers": "Scorers",
+        "successRate": "Success rate",
+        "lastRun": "Last run",
+        "created": "Created",
+        "actions": "Actions"
+      },
+      "empty": {
+        "title": "No Eval Jobs Yet",
+        "description": "Eval Jobs deploy scorers against your production trace stream. They sample matching spans, run the scorers asynchronously, and store the resulting scores for analysis.",
+        "chipStreams": "Production Stream",
+        "chipScorers": "Multiple Scorers",
+        "chipSampling": "Sampling Control"
+      },
+      "nameHelp": "A friendly name for this job. Cannot be renamed after creation.",
+      "streamHelp": "Lists trace-enabled streams in this project. Cannot be changed after creation.",
+      "descriptionPlaceholder": "What does this job monitor?",
+      "samplingValueHelp": "JSON: rate is a number 0-1, count is a positive integer.",
+      "samplingHelp": "Apply after Filter. Controls cost — only matched spans count toward the rate.",
+      "presets": {
+        "label": "Quick presets",
+        "rootSpans": "Root spans only",
+        "llmCalls": "LLM calls",
+        "toolCalls": "Tool calls"
+      },
       "backTo": "Back to Eval Jobs",
       "createTitle": "Create Online Eval Job",
       "editTitle": "Edit Online Eval Job",
@@ -4373,8 +4408,8 @@
         "variableCount": "{count} variables"
       },
       "preview": {
-        "title": "Preview",
-        "hint": "Use the fields on the left to define the production evaluation target.",
+        "title": "Matched Spans",
+        "hint": "Once you've picked a stream and filter, this panel will show how many spans your job will match.",
         "summaryTitle": "Summary",
         "summaryName": "Name",
         "summaryType": "Type",

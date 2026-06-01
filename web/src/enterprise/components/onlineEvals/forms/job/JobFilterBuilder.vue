@@ -1,23 +1,25 @@
 <template>
-  <div class="eval-form-section__wide eval-condition-builder">
-    <div class="eval-form-field-head">
-      <span>{{ t("onlineEvals.job.filter.title") }}</span>
-      <small>{{ t("onlineEvals.job.filter.hint") }}</small>
+  <div class="job-filter">
+    <div class="job-filter__head">
+      <span class="job-filter__title">{{ t("onlineEvals.job.filter.title") }}</span>
+      <span class="job-filter__hint">{{ t("onlineEvals.job.filter.hint") }}</span>
     </div>
-    <FilterGroup
-      :group="group"
-      :depth="0"
-      :stream-fields="streamFields"
-      :stream-fields-map="streamFieldsMap"
-      :show-sql-preview="true"
-      condition-input-width="tw:w-[220px]"
-      :allow-custom-columns="true"
-      module="alerts"
-      @add-condition="handleUpdate"
-      @add-group="handleUpdate"
-      @remove-group="handleRemove"
-      @input:update="handleInputUpdate"
-    />
+    <div class="job-filter__group">
+      <FilterGroup
+        :group="group"
+        :depth="0"
+        :stream-fields="streamFields"
+        :stream-fields-map="streamFieldsMap"
+        :show-sql-preview="true"
+        condition-input-width="tw:w-[220px]"
+        :allow-custom-columns="true"
+        module="alerts"
+        @add-condition="handleUpdate"
+        @add-group="handleUpdate"
+        @remove-group="handleRemove"
+        @input:update="handleInputUpdate"
+      />
+    </div>
   </div>
 </template>
 
@@ -63,3 +65,43 @@ function handleInputUpdate() {
   emit("update:group", { ...props.group });
 }
 </script>
+
+<style lang="scss" scoped>
+.job-filter {
+  margin-bottom: 16px;
+}
+
+.job-filter__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.job-filter__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
+}
+
+.job-filter__hint {
+  font-size: 11.5px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.job-filter__group {
+  min-width: 0;
+}
+
+.job-filter__group :deep(.el-border) {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0 !important;
+  margin-left: 0 !important;
+  border-color: var(--color-dialog-header-border, var(--o2-border));
+}
+
+.job-filter__group :deep(.group-container) {
+  width: 100%;
+}
+</style>

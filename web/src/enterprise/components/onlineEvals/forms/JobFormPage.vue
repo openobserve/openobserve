@@ -1,63 +1,102 @@
 <template>
-  <form class="eval-form-page" @submit.prevent="save">
-    <div class="eval-form-page__top">
-      <button class="eval-form-page__back" type="button" @click="$emit('cancel')">
-        <OIcon name="chevron-left" size="xs" />
-        {{ t("onlineEvals.job.backTo") }}
+  <form class="job-form" @submit.prevent="save">
+    <div class="job-form__top">
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="arrow-back-ios-new"
+        data-test="job-form-back-btn"
+        :title="t('onlineEvals.job.backTo')"
+        @click="$emit('cancel')"
+      />
+      <h1 class="job-form__title">
+        {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
+      </h1>
+      <span class="job-form__subtitle">{{ t("onlineEvals.job.subtitle") }}</span>
+      <div class="job-form__top-spacer" />
+      <button
+        type="button"
+        class="job-form__close"
+        :aria-label="t('onlineEvals.buttons.cancel')"
+        data-test="job-form-close-btn"
+        @click="$emit('cancel')"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </button>
-      <div class="eval-form-page__top-actions">
-        <OButton type="button" icon-left="close" variant="ghost" size="icon-sm" @click="$emit('cancel')" />
-      </div>
     </div>
 
-    <div class="eval-form-page__head">
-      <h1>{{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}</h1>
-      <p>{{ t("onlineEvals.job.subtitle") }}</p>
-    </div>
+    <div class="job-form__body">
+      <div class="job-form__main">
+        <!-- Section 01: Target -->
+        <section class="job-section">
+          <div class="job-section__head">
+            <span class="job-section__num">01</span>
+            <h3 class="job-section__title">{{ t("onlineEvals.job.targetSection") }}</h3>
+          </div>
 
-    <div class="eval-form-page__body eval-form-page__body--split">
-      <div class="eval-form-page__main">
-        <div class="eval-stepper">
-          <span class="is-active"><i>1</i> {{ t("onlineEvals.job.stepper.target") }}</span>
-          <span><i>2</i> {{ t("onlineEvals.job.stepper.scorers") }}</span>
-          <span><i>3</i> {{ t("onlineEvals.job.stepper.mapping") }}</span>
-          <span><i>4</i> {{ t("onlineEvals.job.stepper.sampling") }}</span>
-        </div>
+          <div class="job-field">
+            <label class="job-field__label">
+              {{ t("onlineEvals.job.nameLabel") }}
+              <span class="job-field__req">*</span>
+            </label>
+            <OInput
+              v-model.trim="form.name"
+              :placeholder="t('onlineEvals.job.namePlaceholder')"
+              size="sm"
+              data-test="job-form-name-input"
+            />
+            <div class="job-field__help">{{ t("onlineEvals.job.nameHelp") }}</div>
+          </div>
 
-        <section class="eval-form-section">
-          <div class="eval-form-section__title"><span>01</span> {{ t("onlineEvals.job.targetSection") }}</div>
-          <label>
-            {{ t("onlineEvals.job.nameLabel") }}
-            <input v-model.trim="form.name" required :placeholder="t('onlineEvals.job.namePlaceholder')" />
-          </label>
-          <label>
-            {{ t("onlineEvals.job.streamLabel") }}
-            <input v-model.trim="form.stream" required :placeholder="t('onlineEvals.job.streamPlaceholder')" />
-          </label>
-          <label>
-            {{ t("onlineEvals.job.streamTypeLabel") }}
-            <input v-model.trim="form.streamType" required :placeholder="t('onlineEvals.job.streamTypePlaceholder')" />
-          </label>
-          <label class="eval-form-section__wide">
-            {{ t("onlineEvals.job.descriptionLabel") }}
-            <textarea v-model.trim="form.description" rows="3" />
-          </label>
-          <label>
-            {{ t("onlineEvals.job.samplingModeLabel") }}
-            <select v-model="form.samplingMode">
-              <option value="rate">{{ t("onlineEvals.job.samplingModes.rate") }}</option>
-              <option value="all">{{ t("onlineEvals.job.samplingModes.all") }}</option>
-              <option value="count">{{ t("onlineEvals.job.samplingModes.count") }}</option>
-            </select>
-          </label>
-          <label>
-            {{ t("onlineEvals.job.samplingValueLabel") }}
-            <textarea v-model="form.samplingValue" rows="4" required />
-          </label>
+          <div class="job-field">
+            <label class="job-field__label">
+              {{ t("onlineEvals.job.streamLabel") }}
+              <span class="job-field__req">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
+            </label>
+            <OSelect
+              v-model="form.stream"
+              :options="streamOptions"
+              :placeholder="t('onlineEvals.job.streamPlaceholder')"
+              size="sm"
+              :disabled="mode === 'edit'"
+              data-test="job-form-stream-select"
+            />
+            <div class="job-field__help">{{ t("onlineEvals.job.streamHelp") }}</div>
+          </div>
+
+          <div class="job-field job-field--desc">
+            <label class="job-field__label">{{ t("onlineEvals.job.descriptionLabel") }}</label>
+            <OInput
+              v-model.trim="form.description"
+              type="textarea"
+              :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
+              size="sm"
+              :rows="3"
+              data-test="job-form-description-input"
+            />
+          </div>
         </section>
 
-        <section class="eval-form-section">
-          <div class="eval-form-section__title"><span>02</span> {{ t("onlineEvals.job.scorersSection") }}</div>
+        <!-- Section 02: Scorers + Filter + Mapping -->
+        <section class="job-section">
+          <div class="job-section__head">
+            <span class="job-section__num">02</span>
+            <h3 class="job-section__title">{{ t("onlineEvals.job.scorersSection") }}</h3>
+          </div>
 
           <JobScorerPicker
             :scorers="scorers"
@@ -70,32 +109,111 @@
             @update:group="filterGroup = $event"
           />
 
+          <div class="job-presets">
+            <span class="job-presets__label">{{ t("onlineEvals.job.presets.label") }}</span>
+            <button
+              type="button"
+              class="job-presets__chip"
+              data-test="job-form-preset-root-spans"
+              @click="applyPreset('rootSpans')"
+            >
+              {{ t("onlineEvals.job.presets.rootSpans") }}
+            </button>
+            <button
+              type="button"
+              class="job-presets__chip"
+              data-test="job-form-preset-llm-calls"
+              @click="applyPreset('llmCalls')"
+            >
+              {{ t("onlineEvals.job.presets.llmCalls") }}
+            </button>
+            <button
+              type="button"
+              class="job-presets__chip"
+              data-test="job-form-preset-tool-calls"
+              @click="applyPreset('toolCalls')"
+            >
+              {{ t("onlineEvals.job.presets.toolCalls") }}
+            </button>
+          </div>
+
           <JobInputMapping
             :selected-scorers="selectedScorers"
             :input-mappings="inputMappings"
             @update:input-mappings="inputMappings = $event"
           />
         </section>
+
+        <!-- Section 03: Sampling -->
+        <section class="job-section">
+          <div class="job-section__head">
+            <span class="job-section__num">03</span>
+            <h3 class="job-section__title">{{ t("onlineEvals.job.stepper.sampling") }}</h3>
+          </div>
+
+          <div class="job-field-row">
+            <div class="job-field">
+              <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
+              <OSelect
+                v-model="form.samplingMode"
+                :options="samplingModeOptions"
+                size="sm"
+                data-test="job-form-sampling-mode-select"
+              />
+              <div class="job-field__help">{{ t("onlineEvals.job.samplingHelp") }}</div>
+            </div>
+
+            <div class="job-field">
+              <label class="job-field__label">
+                {{ t("onlineEvals.job.samplingValueLabel") }}
+                <span class="job-field__req">*</span>
+              </label>
+              <OInput
+                v-model="form.samplingValue"
+                size="sm"
+                data-test="job-form-sampling-value-input"
+              />
+              <div class="job-field__help">{{ t("onlineEvals.job.samplingValueHelp") }}</div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <JobPreviewPanel :name="form.name" :stream-type="form.streamType" :mode="mode" />
     </div>
 
-    <div class="eval-form-page__foot">
-      <OButton type="button" variant="outline" @click="$emit('cancel')">{{ t("onlineEvals.buttons.cancel") }}</OButton>
-      <OButton type="submit" :loading="isSaving">
+    <footer class="job-form__foot">
+      <OButton
+        data-test="job-form-cancel-btn"
+        type="button"
+        variant="outline"
+        size="sm-action"
+        @click="$emit('cancel')"
+      >
+        {{ t("onlineEvals.buttons.cancel") }}
+      </OButton>
+      <OButton
+        data-test="job-form-save-btn"
+        type="submit"
+        variant="primary"
+        size="sm-action"
+        :loading="isSaving"
+      >
         {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
       </OButton>
-    </div>
+    </footer>
   </form>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {
   type EvalJob,
   type Scorer,
@@ -149,6 +267,38 @@ const selectedScorers = computed(() =>
     .filter((scorer): scorer is Scorer => Boolean(scorer)),
 );
 
+const { getStreams } = useStreams();
+const traceStreams = ref<string[]>([]);
+
+const streamOptions = computed(() => {
+  const opts = traceStreams.value.map((name) => ({ label: name, value: name }));
+  // Ensure currently selected value is always present (e.g. on edit before list loads)
+  if (form.value.stream && !opts.some((o) => o.value === form.value.stream)) {
+    opts.unshift({ label: form.value.stream, value: form.value.stream });
+  }
+  return opts;
+});
+
+async function loadTraceStreams() {
+  try {
+    const result: any = await getStreams("traces", false, false, false);
+    const list = result?.list || result?.data?.list || [];
+    traceStreams.value = list.map((s: any) => s.name).filter(Boolean);
+  } catch {
+    traceStreams.value = [];
+  }
+}
+
+onMounted(() => {
+  void loadTraceStreams();
+});
+
+const samplingModeOptions = computed(() => [
+  { label: t("onlineEvals.job.samplingModes.rate"), value: "rate" },
+  { label: t("onlineEvals.job.samplingModes.all"), value: "all" },
+  { label: t("onlineEvals.job.samplingModes.count"), value: "count" },
+]);
+
 watch(() => form.value.scorerIds.slice(), () => syncMappings());
 watch(() => props.scorers, () => syncMappings());
 
@@ -194,6 +344,29 @@ function initScorerVersions(row: EvalJob | null) {
   return Object.fromEntries(
     (row.scorers || []).map((scorer) => [scorerRefId(scorer), scorerRefVersion(scorer)]),
   );
+}
+
+function applyPreset(preset: "rootSpans" | "llmCalls" | "toolCalls") {
+  const presets: Record<string, { column: string; operator: string; value: string }> = {
+    rootSpans: { column: "parent_span_id", operator: "=", value: "" },
+    llmCalls: { column: "gen_ai_system", operator: "!=", value: "" },
+    toolCalls: { column: "gen_ai_operation_name", operator: "=", value: "execute_tool" },
+  };
+  const cond = presets[preset];
+  filterGroup.value = {
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [
+      {
+        filterType: "condition",
+        column: cond.column,
+        operator: cond.operator,
+        value: cond.value,
+        values: [],
+        logicalOperator: "AND",
+      },
+    ],
+  } as any;
 }
 
 function toggleScorer(scorerId: string) {
@@ -255,3 +428,215 @@ async function save() {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.job-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 6px;
+}
+
+.job-form__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  flex-shrink: 0;
+}
+
+.job-form__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+
+.job-form__subtitle {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.job-form__top-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.job-form__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.job-form__close:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  color: var(--color-primary-600, #3F7994);
+}
+
+.job-form__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+}
+
+.job-form__main {
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 24px 24px;
+}
+
+.job-form__foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  background: var(--color-card-bg);
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.job-form__main :deep(textarea) {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.job-form__main .job-field--desc :deep(textarea) {
+  max-height: 120px;
+}
+
+.job-section {
+  margin-bottom: 24px;
+}
+
+.job-section__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  margin-bottom: 12px;
+}
+
+.job-section__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.job-section__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
+}
+
+.job-field {
+  margin-bottom: 12px;
+}
+
+.job-field__label {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
+  margin-bottom: 4px;
+}
+
+.job-field__req {
+  color: var(--o2-status-error-text);
+  margin-left: 2px;
+}
+
+.job-field__help {
+  font-size: 11.5px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  margin-top: 4px;
+}
+
+.job-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.job-field__lock {
+  margin-left: 6px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.job-presets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.job-presets__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.job-presets__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 999px;
+  background: var(--color-card-bg);
+  color: var(--color-text-primary, currentColor);
+  font: 500 11px inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.job-presets__chip:hover {
+  border-color: var(--color-primary-600, #3F7994);
+  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 6%, var(--color-card-bg));
+  color: var(--color-primary-600, #3F7994);
+}
+
+@media (max-width: 1100px) {
+  .job-form__body {
+    grid-template-columns: 1fr;
+  }
+  .job-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

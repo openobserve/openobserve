@@ -90,6 +90,17 @@ the Free Software Foundation, either version 3 of the License, or
             @edit="(row: Scorer) => openEditDialog(row)"
             @delete="(row: Scorer) => deleteRow(row)"
           />
+          <EvalJobList
+            v-else-if="activeTab === 'jobs'"
+            :rows="(filteredRows as EvalJob[])"
+            :search="filterQuery"
+            :status-filter="jobStatusFilter"
+            @update:search="filterQuery = $event"
+            @update:statusFilter="jobStatusFilter = $event"
+            @create="openCreateDialog"
+            @edit="(row: EvalJob) => openEditDialog(row)"
+            @delete="(row: EvalJob) => deleteRow(row)"
+          />
           <EvalListView
             v-else
             :active-tab="activeTab"
@@ -152,6 +163,7 @@ import { showError } from "./onlineEvals/utils/evalFormat";
 import EvalListView from "./onlineEvals/EvalListView.vue";
 import ScoreConfigList from "./onlineEvals/ScoreConfigList.vue";
 import ScorerList from "./onlineEvals/ScorerList.vue";
+import EvalJobList from "./onlineEvals/EvalJobList.vue";
 import ScorerTypeDialog from "./onlineEvals/forms/ScorerTypeDialog.vue";
 import ScoreConfigDialog from "./onlineEvals/forms/ScoreConfigDialog.vue";
 import ProviderFormPage from "./onlineEvals/forms/ProviderFormPage.vue";
