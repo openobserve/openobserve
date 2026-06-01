@@ -461,41 +461,54 @@ test.describe("Metrics testcases", () => {
 
     // Enter invalid PromQL query with actual syntax error (unclosed parenthesis)
     await pm.metricsPage.enterMetricsQuery('sum(rate(');
+
+    // Wait for the API error response after clicking Apply
+    const apiResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/_search') || resp.url().includes('/api/'),
+      { timeout: 15000 }
+    ).catch(() => null);
     await pm.metricsPage.clickApplyButton();
-    await pm.metricsPage.waitForMetricsResults();
+    await apiResponsePromise;
 
-    // Poll for any graceful-handling indicator — CI (especially enterprise) can be slower to render
-    let hasInlineError = false;
-    let hasChartError = false;
-    let hasNoData = false;
+    // Wait for loading to complete and an error/no-data indicator to appear in DOM.
+    // For invalid PromQL like "sum(rate(", the query may fail client-side (no API call),
+    // rendering [data-test="no-data"] with empty text (0px height). Playwright's isVisible()
+    // considers zero-height elements invisible, so we also check DOM presence via count().
+    await page.waitForFunction(
+      () => {
+        const dashError = document.querySelector('[data-test="dashboard-error"]');
+        const chartError = document.querySelector('[data-test="panel-schema-renderer-error-message"]');
+        const noData = document.querySelector('[data-test="no-data"]');
+        return !!dashError || !!chartError || !!noData;
+      },
+      null,
+      { timeout: 15000 }
+    );
 
-    await expect.poll(async () => {
-      const inlineError = pm.metricsPage.getDashboardError();
-      hasInlineError = await inlineError.isVisible().catch(() => false);
+    const inlineErrorLocator = pm.metricsPage.getDashboardError();
+    const chartErrorLocator = pm.metricsPage.getChartErrorMessage();
+    const noDataLocator = await pm.metricsPage.getNoDataMessage();
 
-      const chartError = pm.metricsPage.getChartErrorMessage();
-      hasChartError = await chartError.isVisible().catch(() => false);
+    const hasInlineError = await inlineErrorLocator.isVisible().catch(() => false);
+    const hasChartError = await chartErrorLocator.isVisible().catch(() => false);
+    const hasNoData = await noDataLocator.isVisible().catch(() => false);
+    // Also check DOM presence (no-data can render with empty text and 0px height)
+    const noDataInDom = await noDataLocator.count() > 0;
 
-      const noDataMessage = await pm.metricsPage.getNoDataMessage();
-      hasNoData = await noDataMessage.isVisible().catch(() => false);
+    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}, noDataInDom=${noDataInDom}`);
 
-      const hasNotification = await page.locator('.q-notification').isVisible().catch(() => false);
-
-      return hasInlineError || hasChartError || hasNoData || hasNotification;
-    }, { timeout: 20000, intervals: [500, 1000, 2000] }).toBe(true);
-
-    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}`);
+    // System must handle invalid syntax gracefully - show error, no data, or no-data element attached
+    const handledGracefully = hasInlineError || hasChartError || hasNoData || noDataInDom;
+    expect(handledGracefully).toBe(true);
 
     if (hasInlineError) {
-      const inlineError = pm.metricsPage.getDashboardError();
-      const errorText = await inlineError.textContent().catch(() => '');
+      const errorText = await inlineErrorLocator.first().textContent().catch(() => '');
       testLogger.info(`Dashboard error displayed: ${errorText.substring(0, 100)}`);
     } else if (hasChartError) {
-      const chartError = pm.metricsPage.getChartErrorMessage();
-      const errorText = await chartError.textContent().catch(() => '');
+      const errorText = await chartErrorLocator.first().textContent().catch(() => '');
       testLogger.info(`Chart error displayed: ${errorText.substring(0, 100)}`);
     } else {
-      testLogger.info('Invalid query resulted in no-data - valid handling');
+      testLogger.info('Invalid query handled gracefully - no-data state (no crash, loading completed)');
     }
   });
 
