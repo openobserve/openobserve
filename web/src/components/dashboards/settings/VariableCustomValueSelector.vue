@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <OSelect
-      style="min-width: 150px"
+      style="min-width: 150px; max-width: 40rem"
       v-model="selectedValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"
@@ -70,7 +70,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .o2-custom-select-dashboard {
-  max-width: 600px;
+  max-width: 40rem;
 }
 
 :deep(.q-field__native) {

@@ -13,6 +13,7 @@ import { computed, inject } from "vue";
 
 const props = withDefaults(defineProps<CheckboxProps>(), {
   size: "md",
+  color: "primary",
   disabled: false,
 });
 
@@ -163,11 +164,15 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         // Hover
         'tw:enabled:hover:border-checkbox-hover-border',
         // Checked
-        'tw:data-[state=checked]:bg-checkbox-checked-bg',
-        'tw:data-[state=checked]:border-checkbox-checked-border',
+        color === 'primary' && 'tw:data-[state=checked]:bg-checkbox-checked-bg',
+        color === 'primary' && 'tw:data-[state=checked]:border-checkbox-checked-border',
+        color === 'negative' && 'tw:data-[state=checked]:bg-error-600',
+        color === 'negative' && 'tw:data-[state=checked]:border-error-600',
         // Indeterminate
-        'tw:data-[state=indeterminate]:bg-checkbox-checked-bg',
-        'tw:data-[state=indeterminate]:border-checkbox-checked-border',
+        color === 'primary' && 'tw:data-[state=indeterminate]:bg-checkbox-checked-bg',
+        color === 'primary' && 'tw:data-[state=indeterminate]:border-checkbox-checked-border',
+        color === 'negative' && 'tw:data-[state=indeterminate]:bg-error-600',
+        color === 'negative' && 'tw:data-[state=indeterminate]:border-error-600',
         // Disabled
         'tw:disabled:bg-checkbox-disabled-bg',
         'tw:disabled:border-checkbox-disabled-border',

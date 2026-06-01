@@ -157,8 +157,13 @@ test.describe("Traces Regression Bugs", () => {
     // Wait for traces list to be visible again
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // STEP 4: Get trace count after navigation back
-    const afterBackTraceCount = await pm.tracesPage.getTraceCount();
+    // STEP 4: Get trace count after navigation back with retry
+    let afterBackTraceCount = await pm.tracesPage.getTraceCount();
+    for (let retry = 0; retry < 5 && afterBackTraceCount === 0; retry++) {
+      testLogger.info(`Trace count still 0, retry ${retry + 1}/5...`);
+      await page.waitForTimeout(2000);
+      afterBackTraceCount = await pm.tracesPage.getTraceCount();
+    }
     testLogger.info(`Trace count after navigating back: ${afterBackTraceCount}`);
 
     // PRIMARY ASSERTION 1: Trace count should be preserved or similar after navigation

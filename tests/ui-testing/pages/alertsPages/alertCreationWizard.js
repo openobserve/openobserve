@@ -1680,31 +1680,29 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran PromQL query');
 
-        // Close PromQL editor dialog — try back button, then close button
+        // Close PromQL editor dialog (ODrawer with data-test="query-editor-dialog")
+        // Step 1: Click the back arrow button
         try {
-            const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            await closeButton.click({ force: true, timeout: 10000 });
+            const backBtn = this.page.locator('[data-test="add-alert-back-btn"]').first();
+            await backBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await backBtn.click({ force: true });
+            testLogger.info('Clicked add-alert-back-btn to close PromQL editor');
         } catch (error) {
-            testLogger.warn('Close button force-click failed, trying dialog close button', { error: error.message });
-            const dialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
-            if (await dialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await dialogCloseBtn.click();
-            }
-            await this.page.waitForTimeout(500);
+            testLogger.warn('Back button click failed, pressing Escape', { error: error.message });
         }
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-        // Wait for the PromQL editor dialog content to be hidden
-        await this.page.locator(this.locators.promqlEditorDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
-            testLogger.warn('PromQL editor dialog still visible after close click, continuing anyway');
+        // Step 2: Wait for the ODrawer to close (data-state transitions from "open" to "closed")
+        await this.page.waitForFunction(() => {
+            const drawer = document.querySelector('[data-test="query-editor-dialog"]');
+            return !drawer || drawer.getAttribute('data-state') === 'closed';
+        }, { timeout: 10000 }).catch(() => {
+            testLogger.warn('ODrawer still open after back button, trying Escape key');
         });
-        // Forcefully remove any remaining q-portal elements that intercept clicks
-        // (q-dialog uses q-portal which can leave aria-hidden overlays in the DOM)
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.style.display = 'none'; });
-        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
-        await this.page.waitForTimeout(300);
-        testLogger.info('Closed PromQL Editor dialog — portal cleaned up');
+        // Step 3: Press Escape as additional cleanup
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.waitForTimeout(500);
+        // Step 4: Wait for any remaining overlay to be removed
+        await this.page.waitForSelector('[data-o2-drawer][data-state="open"]', { state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.info('Closed PromQL Editor dialog');
 
         // Fill PromQL trigger condition (in Alert Rules tab - QueryConfig.vue)
         // In v3 UI the label is "Alert if the value is *" (NOT "Trigger if the value is")

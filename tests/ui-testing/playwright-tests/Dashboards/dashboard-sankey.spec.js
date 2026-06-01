@@ -420,12 +420,30 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Verify no data or error is shown (incomplete Sankey config)
-      // Check each independently — both may be visible simultaneously
-      await page.waitForSelector(
-        '[data-test="no-data"], [data-test="dashboard-error"].col-auto',
-        { state: "visible", timeout: 10000 }
-      );
+      // Verify no data or error is shown (incomplete Sankey config).
+      // Both elements may be visible simultaneously on CI, so check each
+      // independently rather than using .or() which throws strict mode
+      // violation when both match.
+      const noDataLocator = pm.dashboardPanelActions.getNoDataLocator();
+      const dashErrorLocator = pm.dashboardPanelActions.getDashboardErrorLocator();
+
+      const noDataVisible = await noDataLocator.isVisible().catch(() => false);
+      const dashErrorVisible = await dashErrorLocator.isVisible().catch(() => false);
+
+      if (!noDataVisible && !dashErrorVisible) {
+        // Neither visible yet — wait for either one to appear
+        await page.waitForFunction(() => {
+          const noData = document.querySelector('[data-test="no-data"]');
+          const dashErr = document.querySelector('[data-test="dashboard-error"]');
+          return (noData && noData.offsetParent !== null) ||
+                 (dashErr && dashErr.offsetParent !== null);
+        }, { timeout: 10000 });
+      }
+
+      expect(noDataVisible || dashErrorVisible ||
+        await noDataLocator.isVisible().catch(() => false) ||
+        await dashErrorLocator.isVisible().catch(() => false)
+      ).toBe(true);
 
       testLogger.info("Sankey no data state verified");
 
