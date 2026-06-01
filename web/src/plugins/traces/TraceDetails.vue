@@ -2326,10 +2326,11 @@ export default defineComponent({
       ) => {
         maxHeight[depth] =
           maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
-        if (serviceName !== span.serviceName) {
+        const serviceIdentity = span.resolvedIdentity || span.serviceName || 'unknown';
+        if (serviceName !== serviceIdentity) {
           const children: any[] = [];
           currentColumn.push({
-            name: `${span.serviceName} \n (${span.durationMs}ms)`,
+            name: `${serviceIdentity} \n (${span.durationMs}ms)`,
             parent: serviceName,
             duration: span.durationMs,
             children: children,
@@ -2342,7 +2343,7 @@ export default defineComponent({
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
-              getService(_span, children, span.serviceName, depth + 1, height),
+              getService(_span, children, serviceIdentity, depth + 1, height),
             );
           } else {
             if (maxDepth < depth) maxDepth = depth;
