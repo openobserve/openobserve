@@ -277,7 +277,6 @@
       </div>
 
       <ScorerTestPanel
-        v-if="mode === 'edit'"
         :variables="scorerTestVariables"
         :inputs="scorerTestInputs"
         :state="scorerTestState"
