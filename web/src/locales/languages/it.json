@@ -3947,5 +3947,217 @@
       "two": "Scrivi VRL per analizzare JSON dai log di nginx...",
       "three": "Crea una dashboard per lo stato dei nodi K8s..."
     }
+  },
+  "onlineEvals": {
+    "title": "Valutazioni",
+    "description": "Configura i provider LLM, le definizioni dei punteggi, i punteggi e i lavori di valutazione in tempo reale.",
+    "loading": "Caricamento della configurazione di eval online...",
+    "loadError": "Impossibile caricare le valutazioni online",
+    "deletePrompt": "Eliminare {name}?",
+    "deleted": "{label} eliminato",
+    "deleteError": "Eliminazione di {label} non riuscita",
+    "saved": "{label} salvato",
+    "newButton": "Nuovo {label}",
+    "search": "Cerca {label}",
+    "refresh": "Aggiorna",
+    "allStatuses": "Tutti gli stati",
+    "noRowsFound": "Nessun {label} trovato",
+    "getStartedHint": "Creane uno per iniziare la valutazione online del cablaggio.",
+    "columns": {
+      "name": "Nome",
+      "status": "Status",
+      "updated": "Aggiornato"
+    },
+    "actions": {
+      "edit": "Modifica",
+      "delete": "Elimina"
+    },
+    "tabs": {
+      "jobs": "Offerte di lavoro Eval",
+      "scorers": "Marcatori",
+      "scoreConfigs": "Configurazioni dei punteggi",
+      "providers": "Fornitori"
+    },
+    "singular": {
+      "jobs": "Valuta il lavoro",
+      "scorers": "Marcatore",
+      "scoreConfigs": "Configurazione del punteggio",
+      "providers": "Fornitore"
+    },
+    "secondaryColumn": {
+      "jobs": "Stream",
+      "scorers": "Tipo",
+      "scoreConfigs": "Tipo di dati",
+      "providers": "Fornitore"
+    },
+    "jobStatus": {
+      "draft": "Bozza",
+      "active": "Attivo",
+      "paused": "In pausa",
+      "degraded": "Degradato",
+      "archived": "Archiviato"
+    },
+    "buttons": {
+      "cancel": "Annulla",
+      "create": "Crea",
+      "save": "Salva"
+    },
+    "scorerTypeDialog": {
+      "title": "Crea un nuovo segnapunti",
+      "intro": "Scegli il tipo di marcatore. Scegli quello che si adatta al modo in cui desideri creare ed eseguilo.",
+      "llmJudgeTitle": "Giudice LLM",
+      "llmJudgeDescription": "Usa un provider configurato per valutare semanticamente.",
+      "remoteTitle": "Telecomando",
+      "remoteDescription": "Chiama il tuo endpoint HTTP per il punteggio.",
+      "codeTitle": "Codice",
+      "codeDescription": "Presto in arrivo."
+    },
+    "provider": {
+      "backTo": "Torna a Providers",
+      "createTitle": "Crea un provider LLM",
+      "editTitle": "Modifica fornitore LLM",
+      "subtitle": "Configura l'endpoint del modello utilizzato dai giudici LLM.",
+      "sectionTitle": "Fornitore",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Produzione OpenAI",
+      "typeLabel": "Tipo di fornitore",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Punto finale",
+      "endpointPlaceholder": "Endpoint personalizzato opzionale",
+      "defaultModelLabel": "Modello predefinito",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Modelli disponibili",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Usa come provider predefinito",
+      "authConfigLabel": "Configurazione di autenticazione JSON",
+      "saveError": "Impossibile salvare il provider"
+    },
+    "scoreConfig": {
+      "createTitle": "Nuova configurazione della partitura",
+      "editTitle": "Modifica configurazione della partitura",
+      "subtitle": "Le configurazioni dei punteggi definiscono il tipo di punteggio, le soglie di salute e le categorie.",
+      "nameLabel": "Nome",
+      "dataTypeLabel": "Tipo di dati",
+      "descriptionLabel": "Descrizione",
+      "numericRangeLabel": "Intervallo numerico JSON",
+      "categoriesLabel": "Categorie JSON",
+      "healthyThresholdLabel": "Soglia sana JSON",
+      "dataTypes": {
+        "numeric": "Numerico",
+        "categorical": "Categorico",
+        "boolean": "booleano"
+      },
+      "saveError": "Impossibile salvare la configurazione della partitura"
+    },
+    "scorer": {
+      "backTo": "Torna a Scorers",
+      "badgeRemote": "Telecomando",
+      "badgeLlm": "Giudice LLM",
+      "createTitleRemote": "Crea Remote Scorer",
+      "createTitleLlm": "Crea LLM Judge Scorer",
+      "editTitleRemote": "Modifica Remote Scorer",
+      "editTitleLlm": "Modifica LLM Judge Scorer",
+      "subtitleRemote": "Chiama un endpoint HTTP ospitato. Noi eseguiamo il rendering della richiesta; tu restituisci un punteggio.",
+      "subtitleLlm": "Un modello linguistico giudica ogni traccia utilizzando il prompt fornito.",
+      "identitySection": "Identità",
+      "judgeSection": "Configurazione del giudice",
+      "endpointSection": "Punto finale",
+      "nameLabel": "Nome",
+      "namePlaceholder": "giudice_fedeltà",
+      "producesScoreConfigLabel": "Produce la configurazione del punteggio",
+      "producesScoreConfigNone": "Nessuna",
+      "scoreConfigVersionLabel": "Versione di configurazione della partitura",
+      "latestSuffix": " (più recente)",
+      "pinVersion": "Pin versione selezionata",
+      "descriptionLabel": "Descrizione",
+      "providerLabel": "Fornitore",
+      "providerPlaceholder": "Seleziona il fornitore",
+      "modelLabel": "Modello",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Richiesta del giudice",
+      "outputSchemaLabel": "Schema di output JSON",
+      "remoteEndpointLabel": "Endpoint remoto",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Richiedi modello di corpo",
+      "saveError": "Impossibile salvare il marcatore",
+      "versionsLoadError": "Impossibile caricare le versioni di configurazione della partitura",
+      "testPanel": {
+        "title": "Metti alla prova questo marcatore",
+        "hint": "Prova il tuo segnapunti con dati di esempio prima di salvare. Le esecuzioni dei test non vengono mantenute.",
+        "emptyPrefix": "Aggiungi variabili come ",
+        "emptySuffix": " al modello di punteggio per testare con campi di esempio.",
+        "runButton": "Esegui test",
+        "scenarioSuccess": "Risposta fittizia",
+        "scenarioAuth": "Errore di autenticazione",
+        "scenarioSchema": "Mancata corrispondenza dello schema",
+        "stateIdle": "Fai un test per vedere il risultato qui.",
+        "stateRunning": "Esecuzione del test del punteggio...",
+        "successHeader": "Successo",
+        "successScore": "punteggio: 0.92",
+        "successReasoning": "ragionamento: La risposta è supportata dal contesto fornito.",
+        "authHeader": "Autenticazione fallita",
+        "authHint": "Controlla le credenziali del provider prima di salvare.",
+        "schemaHeader": "Mancata corrispondenza dello schema",
+        "schemaHint": "La risposta non corrisponde allo schema di output configurato.",
+        "valuePlaceholder": "Valore per {{{variable}}}"
+      }
+    },
+    "job": {
+      "backTo": "Torna a Eval Jobs",
+      "createTitle": "Crea un lavoro di valutazione online",
+      "editTitle": "Modifica processo di valutazione online",
+      "subtitle": "Scegli lo stream, i punteggi, la mappatura e il comportamento di campionamento per questo lavoro di valutazione.",
+      "stepper": {
+        "target": "Obiettivo",
+        "scorers": "Marcatori",
+        "mapping": "Mappatura",
+        "sampling": "Campionamento"
+      },
+      "targetSection": "Obiettivo",
+      "scorersSection": "Punteggi e mappatura",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Monitoraggio della fedeltà della produzione",
+      "streamLabel": "Flusso di input",
+      "streamPlaceholder": "predefinito",
+      "streamTypeLabel": "Tipo di stream",
+      "streamTypePlaceholder": "tracce",
+      "descriptionLabel": "Descrizione",
+      "samplingModeLabel": "Modalità di campionamento",
+      "samplingValueLabel": "Valore di campionamento JSON",
+      "samplingModes": {
+        "rate": "Tariffa",
+        "all": "Tutti",
+        "count": "Conta"
+      },
+      "scorerPicker": {
+        "title": "Marcatori",
+        "hint": "Seleziona uno o più marcatori da assegnare per ogni intervallo abbinato.",
+        "meta": "{tipo} · v {versione}"
+      },
+      "filter": {
+        "title": "Condizione del filtro",
+        "hint": "Solo gli intervalli che soddisfano questa condizione inseriscono il campionamento e il punteggio."
+      },
+      "inputMapping": {
+        "title": "Mappatura degli input",
+        "hint": "Mappate i campi in ogni variabile del modello di punteggio.",
+        "selectScorers": "Seleziona i segnapunti per configurarne le mappature.",
+        "noVariables": "Questo segnapunti non ha variabili modello da mappare.",
+        "variableCount": "variabili {count}"
+      },
+      "preview": {
+        "title": "Anteprima",
+        "hint": "Utilizza i campi a sinistra per definire l'obiettivo di valutazione della produzione.",
+        "summaryTitle": "Riepilogo",
+        "summaryName": "Nome",
+        "summaryType": "Tipo",
+        "summaryStatus": "Status",
+        "statusEditing": "Redazione",
+        "statusDraft": "Bozza",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Seleziona almeno un marcatore",
+      "saveError": "Impossibile salvare il lavoro di valutazione"
+    }
   }
 }

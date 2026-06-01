@@ -3936,5 +3936,217 @@
       "two": "Escriba VRL para analizar JSON desde los registros de nginx...",
       "three": "Cree un panel de control para el estado de los nodos de K8..."
     }
+  },
+  "onlineEvals": {
+    "title": "Evaluaciones",
+    "description": "Configure los proveedores de LLM, las definiciones de puntuación, los puntajes y los trabajos de evaluación en vivo.",
+    "loading": "Cargando la configuración de evaluación en línea...",
+    "loadError": "No se pudieron cargar las evaluaciones en línea",
+    "deletePrompt": "¿Eliminar {name}?",
+    "deleted": "Se ha eliminado {label}",
+    "deleteError": "No se pudo eliminar {label}",
+    "saved": "{label} guardado",
+    "newButton": "Nueva {label}",
+    "search": "Buscar {label}",
+    "refresh": "Refrescar",
+    "allStatuses": "Todos los estados",
+    "noRowsFound": "No se encontró ninguna {label}",
+    "getStartedHint": "Cree uno para iniciar la evaluación en línea del cableado.",
+    "columns": {
+      "name": "Nombre",
+      "status": "Estado",
+      "updated": "Actualizada"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Borrar"
+    },
+    "tabs": {
+      "jobs": "Empleos en Eval",
+      "scorers": "Goleadores",
+      "scoreConfigs": "Configuraciones de puntuación",
+      "providers": "Proveedores"
+    },
+    "singular": {
+      "jobs": "Evalar un trabajo",
+      "scorers": "Goleador",
+      "scoreConfigs": "Configuración de puntuación",
+      "providers": "Proveedor"
+    },
+    "secondaryColumn": {
+      "jobs": "Transmitir",
+      "scorers": "Tipo",
+      "scoreConfigs": "Tipo de datos",
+      "providers": "Proveedor"
+    },
+    "jobStatus": {
+      "draft": "Borrador",
+      "active": "Activo",
+      "paused": "En pausa",
+      "degraded": "Degradado",
+      "archived": "Archivado"
+    },
+    "buttons": {
+      "cancel": "Cancelar",
+      "create": "Crear",
+      "save": "Guardar"
+    },
+    "scorerTypeDialog": {
+      "title": "Crear un nuevo marcador",
+      "intro": "Elige el tipo de anotador. Elige el que se adapte a la forma en que quieres crear y ejecútalo.",
+      "llmJudgeTitle": "Juez de LLM",
+      "llmJudgeDescription": "Utilice un proveedor configurado para evaluar semánticamente.",
+      "remoteTitle": "Remoto",
+      "remoteDescription": "Llame a su propio punto final HTTP para obtener la puntuación.",
+      "codeTitle": "Código",
+      "codeDescription": "Próximamente."
+    },
+    "provider": {
+      "backTo": "Volver a Proveedores",
+      "createTitle": "Crear proveedor de LLM",
+      "editTitle": "Editar proveedor de LLM",
+      "subtitle": "Configure el punto final del modelo utilizado por los evaluadores de jueces de LLM.",
+      "sectionTitle": "Proveedor",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "Producción: OpenAI",
+      "typeLabel": "Tipo de proveedor",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Punto final",
+      "endpointPlaceholder": "Punto final personalizado opcional",
+      "defaultModelLabel": "Modelo predeterminado",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Modelos disponibles",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Usar como proveedor predeterminado",
+      "authConfigLabel": "Configuración de autenticación JSON",
+      "saveError": "No se pudo guardar el proveedor"
+    },
+    "scoreConfig": {
+      "createTitle": "Nueva configuración de partituras",
+      "editTitle": "Editar configuración de partitura",
+      "subtitle": "Las configuraciones de puntuación definen el tipo de puntuación, los umbrales de estado y las categorías.",
+      "nameLabel": "Nombre",
+      "dataTypeLabel": "Tipo de datos",
+      "descriptionLabel": "Descripción",
+      "numericRangeLabel": "Rango numérico JSON",
+      "categoriesLabel": "Categorías JSON",
+      "healthyThresholdLabel": "Umbral saludable JSON",
+      "dataTypes": {
+        "numeric": "Numérico",
+        "categorical": "Categórica",
+        "boolean": "Booleano"
+      },
+      "saveError": "No se pudo guardar la configuración de la puntuación"
+    },
+    "scorer": {
+      "backTo": "Volver a Goleadores",
+      "badgeRemote": "Remoto",
+      "badgeLlm": "Juez de LLM",
+      "createTitleRemote": "Crear marcador remoto",
+      "createTitleLlm": "Crear LLM Judge Scorer",
+      "editTitleRemote": "Editar marcador remoto",
+      "editTitleLlm": "Editar LLM Judge Scorer",
+      "subtitleRemote": "Llame a un punto final HTTP que aloje. Nosotros realizamos la solicitud y tú devuelves una puntuación.",
+      "subtitleLlm": "Un modelo lingüístico juzga cada traza utilizando el indicador que usted proporciona.",
+      "identitySection": "Identidad",
+      "judgeSection": "Configuración del juez",
+      "endpointSection": "Punto final",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "juez de fidelidad",
+      "producesScoreConfigLabel": "Produce una configuración de puntuación",
+      "producesScoreConfigNone": "Ninguna",
+      "scoreConfigVersionLabel": "Versión de configuración de puntuación",
+      "latestSuffix": " (más reciente)",
+      "pinVersion": "Fijar la versión seleccionada",
+      "descriptionLabel": "Descripción",
+      "providerLabel": "Proveedor",
+      "providerPlaceholder": "Seleccione un proveedor",
+      "modelLabel": "modelo",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Juez rápido",
+      "outputSchemaLabel": "Esquema de salida JSON",
+      "remoteEndpointLabel": "Punto final remoto",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Plantilla de cuerpo de solicitud",
+      "saveError": "No se pudo guardar el marcador",
+      "versionsLoadError": "No se pudieron cargar las versiones de configuración de puntuación",
+      "testPanel": {
+        "title": "Pon a prueba este marcador",
+        "hint": "Pruebe su marcador con datos de muestra antes de guardar. Las ejecuciones de prueba no persisten.",
+        "emptyPrefix": "Agregue variables como ",
+        "emptySuffix": " a la plantilla de puntuación para realizar pruebas con campos de muestra.",
+        "runButton": "Ejecute la prueba",
+        "scenarioSuccess": "Respuesta simulada",
+        "scenarioAuth": "Error de autenticación",
+        "scenarioSchema": "Discordancia de esquemas",
+        "stateIdle": "Haz una prueba para ver el resultado aquí.",
+        "stateRunning": "Corriendo la prueba de puntuación...",
+        "successHeader": "Éxito",
+        "successScore": "puntuación: 0.92",
+        "successReasoning": "razonamiento: La respuesta está respaldada por el contexto proporcionado.",
+        "authHeader": "Fallo en la autenticación",
+        "authHint": "Compruebe las credenciales del proveedor antes de guardar.",
+        "schemaHeader": "Discordancia de esquemas",
+        "schemaHint": "La respuesta no coincidió con el esquema de salida configurado.",
+        "valuePlaceholder": "Valor para {{{variable}}}"
+      }
+    },
+    "job": {
+      "backTo": "Volver a Eval Jobs",
+      "createTitle": "Cree un trabajo de evaluación en línea",
+      "editTitle": "Editar trabajo de evaluación en línea",
+      "subtitle": "Elija el flujo, los puntajes, el mapeo y el comportamiento de muestreo para este trabajo de evaluación.",
+      "stepper": {
+        "target": "Objetivo",
+        "scorers": "Goleadores",
+        "mapping": "Cartografía",
+        "sampling": "Muestreo"
+      },
+      "targetSection": "Objetivo",
+      "scorersSection": "Marcadores y mapeo",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "Monitor de fidelidad de producción",
+      "streamLabel": "Flujo de entrada",
+      "streamPlaceholder": "predeterminado",
+      "streamTypeLabel": "Tipo de transmisión",
+      "streamTypePlaceholder": "rastros",
+      "descriptionLabel": "Descripción",
+      "samplingModeLabel": "Modo de muestreo",
+      "samplingValueLabel": "Valor de muestreo JSON",
+      "samplingModes": {
+        "rate": "Tarifa",
+        "all": "Todas",
+        "count": "Contar"
+      },
+      "scorerPicker": {
+        "title": "Goleadores",
+        "hint": "Selecciona uno o más goleadores para correr en cada tramo igualado.",
+        "meta": "{tipo} · v {versión}"
+      },
+      "filter": {
+        "title": "Estado del filtro",
+        "hint": "Solo los intervalos que cumplen con esta condición entran en el muestreo y la puntuación."
+      },
+      "inputMapping": {
+        "title": "Mapeo de entrada",
+        "hint": "Asigne campos de tamaño a cada variable de plantilla de puntuación.",
+        "selectScorers": "Seleccione los marcadores para configurar sus mapeos.",
+        "noVariables": "Este marcador no tiene variables de plantilla para mapear.",
+        "variableCount": "{count} variables"
+      },
+      "preview": {
+        "title": "Vista previa",
+        "hint": "Utilice los campos de la izquierda para definir el objetivo de evaluación de la producción.",
+        "summaryTitle": "Resumen",
+        "summaryName": "Nombre",
+        "summaryType": "Tipo",
+        "summaryStatus": "Estado",
+        "statusEditing": "Edición",
+        "statusDraft": "Borrador",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Selecciona al menos un anotador",
+      "saveError": "No se pudo guardar el trabajo de evaluación"
+    }
   }
 }

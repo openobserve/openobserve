@@ -3938,5 +3938,217 @@
       "two": "nginx ログから JSON を解析するための VRL を書き込みます...",
       "three": "K8s ノードの状態を示すダッシュボードを作成..."
     }
+  },
+  "onlineEvals": {
+    "title": "評価",
+    "description": "LLM プロバイダー、スコア定義、スコアラー、ライブ評価ジョブを設定します。",
+    "loading": "オンライン評価設定をロード中...",
+    "loadError": "オンライン評価を読み込めませんでした",
+    "deletePrompt": "{name} を削除しますか?",
+    "deleted": "{ラベル} は削除されました",
+    "deleteError": "{label} を削除できませんでした",
+    "saved": "{label} が保存されました",
+    "newButton": "新規 {ラベル}",
+    "search": "検索 {ラベル}",
+    "refresh": "リフレッシュ",
+    "allStatuses": "すべてのステータス",
+    "noRowsFound": "{label} が見つかりません",
+    "getStartedHint": "作成してオンライン評価を開始してください.",
+    "columns": {
+      "name": "[名前]",
+      "status": "ステータス",
+      "updated": "更新済み"
+    },
+    "actions": {
+      "edit": "[編集]",
+      "delete": "[削除]"
+    },
+    "tabs": {
+      "jobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア構成",
+      "providers": "プロバイダー"
+    },
+    "singular": {
+      "jobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア設定",
+      "providers": "プロバイダー"
+    },
+    "secondaryColumn": {
+      "jobs": "ストリーム",
+      "scorers": "タイプ",
+      "scoreConfigs": "データタイプ",
+      "providers": "プロバイダー"
+    },
+    "jobStatus": {
+      "draft": "ドラフト",
+      "active": "アクティブ",
+      "paused": "一時停止",
+      "degraded": "劣化しました",
+      "archived": "アーカイブ済み"
+    },
+    "buttons": {
+      "cancel": "[キャンセル]",
+      "create": "作成",
+      "save": "[保存]"
+    },
+    "scorerTypeDialog": {
+      "title": "新しいスコアラーを作成",
+      "intro": "スコアラータイプを選択します。オーサリングしたい方法に合うものを選んで実行してください。",
+      "llmJudgeTitle": "LLMジャッジ",
+      "llmJudgeDescription": "設定されたプロバイダーを使用してセマンティックに評価します。",
+      "remoteTitle": "リモート",
+      "remoteDescription": "独自の HTTP エンドポイントを呼び出してスコアリングを行います。",
+      "codeTitle": "コード",
+      "codeDescription": "近日公開予定。"
+    },
+    "provider": {
+      "backTo": "プロバイダーに戻る",
+      "createTitle": "LLM プロバイダーの作成",
+      "editTitle": "LLM プロバイダーの編集",
+      "subtitle": "LLM ジャッジスコアラーが使用するモデルエンドポイントを設定します。",
+      "sectionTitle": "プロバイダー",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "プロダクションオープンAI",
+      "typeLabel": "プロバイダーの種類",
+      "typePlaceholder": "オープンナイ",
+      "endpointLabel": "終点",
+      "endpointPlaceholder": "オプションのカスタムエンドポイント",
+      "defaultModelLabel": "デフォルトモデル",
+      "defaultModelPlaceholder": "GPT 4O-ミニ",
+      "availableModelsLabel": "ご利用可能なモデル",
+      "availableModelsPlaceholder": "GPT-4O-ミニ、GPT-4.1",
+      "useAsDefault": "デフォルトプロバイダーとして使用",
+      "authConfigLabel": "認証設定 JSON",
+      "saveError": "プロバイダを保存できませんでした"
+    },
+    "scoreConfig": {
+      "createTitle": "新しいスコア設定",
+      "editTitle": "スコア設定を編集",
+      "subtitle": "スコア設定は、スコアの種類、ヘルスしきい値、およびカテゴリを定義します。",
+      "nameLabel": "[名前]",
+      "dataTypeLabel": "データタイプ",
+      "descriptionLabel": "[説明]",
+      "numericRangeLabel": "数値範囲 JSON",
+      "categoriesLabel": "カテゴリー:JSON",
+      "healthyThresholdLabel": "ヘルシー閾値 JSON",
+      "dataTypes": {
+        "numeric": "数値",
+        "categorical": "カテゴリカル",
+        "boolean": "ブール値"
+      },
+      "saveError": "スコア設定を保存できませんでした"
+    },
+    "scorer": {
+      "backTo": "スコアラーに戻る",
+      "badgeRemote": "リモート",
+      "badgeLlm": "LLMジャッジ",
+      "createTitleRemote": "リモートスコアラーを作成",
+      "createTitleLlm": "LLM ジャッジスコアラーを作成",
+      "editTitleRemote": "リモートスコアラーの編集",
+      "editTitleLlm": "LLM ジャッジスコアラーの編集",
+      "subtitleRemote": "ホストしている HTTP エンドポイントを呼び出します。リクエストをレンダリングすると、スコアが返されます。",
+      "subtitleLlm": "言語モデルは、指定したプロンプトを使用して各トレースを判断します。",
+      "identitySection": "アイデンティティ",
+      "judgeSection": "ジャッジ構成",
+      "endpointSection": "終点",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "フェイスフルネス・ジャッジ",
+      "producesScoreConfigLabel": "スコアコンフィグを生成します",
+      "producesScoreConfigNone": "[なし]",
+      "scoreConfigVersionLabel": "スコア設定バージョン",
+      "latestSuffix": " (最新)",
+      "pinVersion": "選択したバージョンをピン留めする",
+      "descriptionLabel": "[説明]",
+      "providerLabel": "プロバイダー",
+      "providerPlaceholder": "プロバイダーを選択",
+      "modelLabel": "モデル",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "ジャッジプロンプト",
+      "outputSchemaLabel": "出力スキーマ JSON",
+      "remoteEndpointLabel": "リモートエンドポイント",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "リクエスト本文テンプレート",
+      "saveError": "スコアラーを保存できませんでした",
+      "versionsLoadError": "スコア設定バージョンを読み込めませんでした",
+      "testPanel": {
+        "title": "このスコアラーをテスト",
+        "hint": "保存する前に、サンプルデータでスコアラーを試してください。テストランは永続化されません。",
+        "emptyPrefix": "次のような変数を追加 ",
+        "emptySuffix": " スコアラーテンプレートを使用して、サンプルフィールドでテストします。",
+        "runButton": "テストを実行",
+        "scenarioSuccess": "模擬応答",
+        "scenarioAuth": "認証エラー",
+        "scenarioSchema": "スキーマのミスマッチ",
+        "stateIdle": "ここでテストを実行して結果を確認してください。",
+        "stateRunning": "スコアラーテストを実行中...",
+        "successHeader": "成功",
+        "successScore": "スコア:0.92",
+        "successReasoning": "推論：答えは提供されたコンテキストによってサポートされています。",
+        "authHeader": "認証に失敗しました",
+        "authHint": "保存する前にプロバイダの認証情報を確認してください。",
+        "schemaHeader": "スキーマのミスマッチ",
+        "schemaHint": "応答が設定された出力スキーマと一致しませんでした。",
+        "valuePlaceholder": "{{{変数}}} の値"
+      }
+    },
+    "job": {
+      "backTo": "評価ジョブに戻る",
+      "createTitle": "オンライン評価ジョブの作成",
+      "editTitle": "オンライン評価ジョブの編集",
+      "subtitle": "この評価ジョブのストリーム、スコアラー、マッピング、およびサンプリング動作を選択してください。",
+      "stepper": {
+        "target": "ターゲット",
+        "scorers": "スコアラー",
+        "mapping": "マッピング",
+        "sampling": "サンプリング"
+      },
+      "targetSection": "ターゲット",
+      "scorersSection": "スコアラーとマッピング",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "プロダクション・フィフネス・モニター",
+      "streamLabel": "入力ストリーム",
+      "streamPlaceholder": "デフォルト",
+      "streamTypeLabel": "ストリームタイプ",
+      "streamTypePlaceholder": "トレース",
+      "descriptionLabel": "[説明]",
+      "samplingModeLabel": "サンプリングモード",
+      "samplingValueLabel": "サンプリング値 JSON",
+      "samplingModes": {
+        "rate": "レート",
+        "all": "[すべて]",
+        "count": "カウント"
+      },
+      "scorerPicker": {
+        "title": "スコアラー",
+        "hint": "マッチしたすべてのスパンで走るスコアラーを 1 人以上選択します。",
+        "meta": "{タイプ} · v {バージョン}"
+      },
+      "filter": {
+        "title": "フィルター条件",
+        "hint": "この条件に一致するスパンのみがサンプリングとスコアリングに入ります。"
+      },
+      "inputMapping": {
+        "title": "入力マッピング",
+        "hint": "スパンフィールドを各スコアラーテンプレート変数にマップします。",
+        "selectScorers": "スコアラーを選択してマッピングを設定します。",
+        "noVariables": "このスコアラーには、マップするテンプレート変数がありません。",
+        "variableCount": "{カウント} 変数"
+      },
+      "preview": {
+        "title": "プレビュー",
+        "hint": "左側のフィールドを使用して、生産評価目標を定義します。",
+        "summaryTitle": "サマリー",
+        "summaryName": "[名前]",
+        "summaryType": "タイプ",
+        "summaryStatus": "ステータス",
+        "statusEditing": "編集",
+        "statusDraft": "ドラフト",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "スコアラーを少なくとも 1 人選択してください",
+      "saveError": "評価ジョブの保存に失敗しました"
+    }
   }
 }

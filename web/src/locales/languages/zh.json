@@ -3942,5 +3942,217 @@
       "two": "编写 VRL 来解析 nginx 日志中的 JSON...",
       "three": "为 K8s 节点运行状况构建仪表板..."
     }
+  },
+  "onlineEvals": {
+    "title": "评估",
+    "description": "配置 LLM 提供商、分数定义、评分器和实时评估作业。",
+    "loading": "正在加载在线评估配置...",
+    "loadError": "加载在线评估失败",
+    "deletePrompt": "删除 {姓名}？",
+    "deleted": "{label} 已删除",
+    "deleteError": "删除 {label} 失败",
+    "saved": "{label} 已保存",
+    "newButton": "新的 {标签}",
+    "search": "搜索 {标签}",
+    "refresh": "刷新",
+    "allStatuses": "所有状态",
+    "noRowsFound": "未找到 {标签}",
+    "getStartedHint": "创建一个，开始接线在线评估。",
+    "columns": {
+      "name": "姓名",
+      "status": "状态",
+      "updated": "已更新"
+    },
+    "actions": {
+      "edit": "编辑",
+      "delete": "删除"
+    },
+    "tabs": {
+      "jobs": "评估职位",
+      "scorers": "记分员",
+      "scoreConfigs": "分数配置",
+      "providers": "提供商"
+    },
+    "singular": {
+      "jobs": "评估作业",
+      "scorers": "记分员",
+      "scoreConfigs": "分数配置",
+      "providers": "提供商"
+    },
+    "secondaryColumn": {
+      "jobs": "直播",
+      "scorers": "类型",
+      "scoreConfigs": "数据类型",
+      "providers": "提供商"
+    },
+    "jobStatus": {
+      "draft": "草稿",
+      "active": "活跃",
+      "paused": "已暂停",
+      "degraded": "已降级",
+      "archived": "已存档"
+    },
+    "buttons": {
+      "cancel": "取消",
+      "create": "创建",
+      "save": "保存"
+    },
+    "scorerTypeDialog": {
+      "title": "创建新的记分员",
+      "intro": "选择记分器类型。选择你想要的创作方式并运行它。",
+      "llmJudgeTitle": "法学硕士法官",
+      "llmJudgeDescription": "使用配置的提供商进行语义评估。",
+      "remoteTitle": "远程",
+      "remoteDescription": "调用自己的 HTTP 端点进行评分。",
+      "codeTitle": "代码",
+      "codeDescription": "即将推出。"
+    },
+    "provider": {
+      "backTo": "返回提供商",
+      "createTitle": "创建 LLM 提供商",
+      "editTitle": "编辑 LLM 提供商",
+      "subtitle": "配置 LLM 评分员使用的模型端点。",
+      "sectionTitle": "提供商",
+      "nameLabel": "姓名",
+      "namePlaceholder": "制作 OpenAI",
+      "typeLabel": "提供商类型",
+      "typePlaceholder": "openai",
+      "endpointLabel": "端点",
+      "endpointPlaceholder": "可选的自定义端点",
+      "defaultModelLabel": "默认型号",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "可用型号",
+      "availableModelsPlaceholder": "gpt-4o-mini，gpt-4.1",
+      "useAsDefault": "用作默认提供商",
+      "authConfigLabel": "身份验证配置 JSON",
+      "saveError": "无法保存提供商"
+    },
+    "scoreConfig": {
+      "createTitle": "新的分数配置",
+      "editTitle": "编辑分数配置",
+      "subtitle": "分数配置定义分数类型、生命值阈值和类别。",
+      "nameLabel": "姓名",
+      "dataTypeLabel": "数据类型",
+      "descriptionLabel": "描述",
+      "numericRangeLabel": "数值范围 JSON",
+      "categoriesLabel": "分类 JSON",
+      "healthyThresholdLabel": "健康阈值 JSON",
+      "dataTypes": {
+        "numeric": "数字",
+        "categorical": "分类的",
+        "boolean": "布尔值"
+      },
+      "saveError": "无法保存分数配置"
+    },
+    "scorer": {
+      "backTo": "返回记分员",
+      "badgeRemote": "远程",
+      "badgeLlm": "法学硕士法官",
+      "createTitleRemote": "创建远程记分器",
+      "createTitleLlm": "创建 LLM 评委记分员",
+      "editTitleRemote": "编辑远程记分器",
+      "editTitleLlm": "编辑 LLM 评委记分员",
+      "subtitleRemote": "调用您托管的 HTTP 端点。我们提出请求；你返回一个分数。",
+      "subtitleLlm": "语言模型使用您提供的提示来判断每条轨迹。",
+      "identitySection": "身份",
+      "judgeSection": "法官配置",
+      "endpointSection": "端点",
+      "nameLabel": "姓名",
+      "namePlaceholder": "忠诚_法官",
+      "producesScoreConfigLabel": "生成分数配置",
+      "producesScoreConfigNone": "无",
+      "scoreConfigVersionLabel": "分数配置版本",
+      "latestSuffix": " （最新）",
+      "pinVersion": "固定所选版本",
+      "descriptionLabel": "描述",
+      "providerLabel": "提供商",
+      "providerPlaceholder": "选择提供商",
+      "modelLabel": "模型",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "法官提示音",
+      "outputSchemaLabel": "输出架构 JSON",
+      "remoteEndpointLabel": "远程端点",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "请求正文模板",
+      "saveError": "无法保存记分员",
+      "versionsLoadError": "加载分数配置版本失败",
+      "testPanel": {
+        "title": "测试这个记分器",
+        "hint": "保存之前，请使用示例数据试用记分器。测试运行不会持续下去。",
+        "emptyPrefix": "添加变量，例如 ",
+        "emptySuffix": " 到评分器模板使用示例字段进行测试。",
+        "runButton": "运行测试",
+        "scenarioSuccess": "模拟回应",
+        "scenarioAuth": "身份验证错误",
+        "scenarioSchema": "架构不匹配",
+        "stateIdle": "在此处运行测试以查看结果。",
+        "stateRunning": "跑步记分手测试...",
+        "successHeader": "成功",
+        "successScore": "分数：0.92",
+        "successReasoning": "推理：提供的上下文支持答案。",
+        "authHeader": "身份验证失败",
+        "authHint": "保存之前，请检查提供商凭据。",
+        "schemaHeader": "架构不匹配",
+        "schemaHint": "响应与配置的输出架构不匹配。",
+        "valuePlaceholder": "{{{变量}} 的值"
+      }
+    },
+    "job": {
+      "backTo": "返回 Eval Jobs",
+      "createTitle": "创建在线评估作业",
+      "editTitle": "编辑在线评估作业",
+      "subtitle": "为该评估任务选择直播、记分器、映射和采样行为。",
+      "stepper": {
+        "target": "目标",
+        "scorers": "记分员",
+        "mapping": "映射",
+        "sampling": "采样"
+      },
+      "targetSection": "目标",
+      "scorersSection": "记分器和制图",
+      "nameLabel": "姓名",
+      "namePlaceholder": "制作忠诚度监测",
+      "streamLabel": "输入流",
+      "streamPlaceholder": "默认",
+      "streamTypeLabel": "直播类型",
+      "streamTypePlaceholder": "痕迹",
+      "descriptionLabel": "描述",
+      "samplingModeLabel": "采样模式",
+      "samplingValueLabel": "采样值 JSON",
+      "samplingModes": {
+        "rate": "费率",
+        "all": "全部",
+        "count": "计数"
+      },
+      "scorerPicker": {
+        "title": "记分员",
+        "hint": "选择一个或多个记分员在每个匹配的时间段内跑步。",
+        "meta": "{类型} · v {版本}"
+      },
+      "filter": {
+        "title": "过滤条件",
+        "hint": "只有符合此条件的跨度才能进入抽样和评分。"
+      },
+      "inputMapping": {
+        "title": "输入映射",
+        "hint": "将跨度字段映射到每个记分器模板变量中。",
+        "selectScorers": "选择记分器来配置他们的映射。",
+        "noVariables": "此记分器没有模板变量可供映射。",
+        "variableCount": "{count} 变量"
+      },
+      "preview": {
+        "title": "预览",
+        "hint": "使用左边的字段定义生产评估目标。",
+        "summaryTitle": "摘要",
+        "summaryName": "姓名",
+        "summaryType": "类型",
+        "summaryStatus": "状态",
+        "statusEditing": "正在编辑",
+        "statusDraft": "草稿",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "至少选择一名记分员",
+      "saveError": "无法保存评估作业"
+    }
   }
 }

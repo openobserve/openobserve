@@ -3938,5 +3938,217 @@
       "two": "Escreva VRL para analisar o JSON dos logs do nginx...",
       "three": "Crie um painel para a integridade do nó K8s..."
     }
+  },
+  "onlineEvals": {
+    "title": "Avaliações",
+    "description": "Configure provedores de LLM, definições de pontuação, pontuadores e trabalhos de avaliação ao vivo.",
+    "loading": "Carregando a configuração de avaliação online...",
+    "loadError": "Falha ao carregar avaliações on-line",
+    "deletePrompt": "Excluir {name}?",
+    "deleted": "{label} excluído",
+    "deleteError": "Falha ao excluir {label}",
+    "saved": "{label} salvo",
+    "newButton": "Novo {label}",
+    "search": "Pesquisar {label}",
+    "refresh": "Atualizar",
+    "allStatuses": "Todos os status",
+    "noRowsFound": "Nenhum {label} encontrado",
+    "getStartedHint": "Crie um para começar a fazer uma avaliação on-line.",
+    "columns": {
+      "name": "Nome",
+      "status": "Status",
+      "updated": "Atualizado"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Excluir"
+    },
+    "tabs": {
+      "jobs": "Empregos de avaliação",
+      "scorers": "Marcadores",
+      "scoreConfigs": "Configurações de pontuação",
+      "providers": "Provedores"
+    },
+    "singular": {
+      "jobs": "Trabalho de avaliação",
+      "scorers": "Marcador",
+      "scoreConfigs": "Configuração de pontuação",
+      "providers": "Provedor"
+    },
+    "secondaryColumn": {
+      "jobs": "Transmita",
+      "scorers": "Tipo",
+      "scoreConfigs": "Tipo de dados",
+      "providers": "Provedor"
+    },
+    "jobStatus": {
+      "draft": "Esboço",
+      "active": "Ativo",
+      "paused": "Pausado",
+      "degraded": "Degradado",
+      "archived": "Arquivado"
+    },
+    "buttons": {
+      "cancel": "Cancelar",
+      "create": "Criar",
+      "save": "Salvar"
+    },
+    "scorerTypeDialog": {
+      "title": "Crie um novo marcador",
+      "intro": "Escolha o tipo de marcador. Escolha o que melhor se adequa à sua criação e execute-o.",
+      "llmJudgeTitle": "Juiz LLM",
+      "llmJudgeDescription": "Use um provedor configurado para avaliar semanticamente.",
+      "remoteTitle": "Remoto",
+      "remoteDescription": "Ligue para seu próprio endpoint HTTP para pontuar.",
+      "codeTitle": "Código",
+      "codeDescription": "Em breve."
+    },
+    "provider": {
+      "backTo": "Voltar para Provedores",
+      "createTitle": "Criar provedor LLM",
+      "editTitle": "Editar provedor LLM",
+      "subtitle": "Configure o endpoint do modelo usado pelos avaliadores do LLM.",
+      "sectionTitle": "Provedor",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Produção OpenAI",
+      "typeLabel": "Tipo de provedor",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Ponto final",
+      "endpointPlaceholder": "Endpoint personalizado opcional",
+      "defaultModelLabel": "Modelo padrão",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Modelos disponíveis",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Use como provedor padrão",
+      "authConfigLabel": "Configuração de autenticação JSON",
+      "saveError": "Falha ao salvar o provedor"
+    },
+    "scoreConfig": {
+      "createTitle": "Nova configuração de pontuação",
+      "editTitle": "Editar configuração de pontuação",
+      "subtitle": "As configurações de pontuação definem o tipo de pontuação, limites de saúde e categorias.",
+      "nameLabel": "Nome",
+      "dataTypeLabel": "Tipo de dados",
+      "descriptionLabel": "Descrição",
+      "numericRangeLabel": "Intervalo numérico JSON",
+      "categoriesLabel": "Categorias JSON",
+      "healthyThresholdLabel": "Limite saudável: JSON",
+      "dataTypes": {
+        "numeric": "Numérico",
+        "categorical": "Categórico",
+        "boolean": "boleano"
+      },
+      "saveError": "Falha ao salvar a configuração da pontuação"
+    },
+    "scorer": {
+      "backTo": "Voltar para Scorers",
+      "badgeRemote": "Remoto",
+      "badgeLlm": "Juiz LLM",
+      "createTitleRemote": "Criar marcador remoto",
+      "createTitleLlm": "Crie o Juiz Scorer do LLM",
+      "editTitleRemote": "Editar marcador remoto",
+      "editTitleLlm": "Editar LLM Judge Scorer",
+      "subtitleRemote": "Ligue para um endpoint HTTP que você hospeda. Nós renderizamos a solicitação; você retorna uma pontuação.",
+      "subtitleLlm": "Um modelo de linguagem avalia cada rastreamento usando a solicitação que você fornece.",
+      "identitySection": "Identidade",
+      "judgeSection": "Configuração do juiz",
+      "endpointSection": "Ponto final",
+      "nameLabel": "Nome",
+      "namePlaceholder": "juiz de fidelidade",
+      "producesScoreConfigLabel": "Produz configuração de pontuação",
+      "producesScoreConfigNone": "Nenhum",
+      "scoreConfigVersionLabel": "Versão de configuração de pontuação",
+      "latestSuffix": " (mais recente)",
+      "pinVersion": "Fixar versão selecionada",
+      "descriptionLabel": "Descrição",
+      "providerLabel": "Provedor",
+      "providerPlaceholder": "Selecione o provedor",
+      "modelLabel": "modelo",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Aviso do juiz",
+      "outputSchemaLabel": "Esquema de saída JSON",
+      "remoteEndpointLabel": "Endpoint remoto",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Modelo de corpo da solicitação",
+      "saveError": "Falha ao salvar o marcador",
+      "versionsLoadError": "Falha ao carregar as versões de configuração da pontuação",
+      "testPanel": {
+        "title": "Teste este marcador",
+        "hint": "Teste seu marcador com dados de amostra antes de salvar. As execuções de teste não persistem.",
+        "emptyPrefix": "Adicione variáveis como ",
+        "emptySuffix": " ao modelo de pontuação para testar com campos de amostra.",
+        "runButton": "Execute o teste",
+        "scenarioSuccess": "Resposta simulada",
+        "scenarioAuth": "Erro de autenticação",
+        "scenarioSchema": "Incompatibilidade de esquema",
+        "stateIdle": "Faça um teste para ver o resultado aqui.",
+        "stateRunning": "Executando o teste de pontuação...",
+        "successHeader": "Sucesso",
+        "successScore": "pontuação: 0.92",
+        "successReasoning": "raciocínio: A resposta é apoiada pelo contexto fornecido.",
+        "authHeader": "Falha na autenticação",
+        "authHint": "Verifique as credenciais do provedor antes de salvar.",
+        "schemaHeader": "Incompatibilidade de esquema",
+        "schemaHint": "A resposta não correspondeu ao esquema de saída configurado.",
+        "valuePlaceholder": "Valor para {{{variável}}}"
+      }
+    },
+    "job": {
+      "backTo": "Voltar para Eval Jobs",
+      "createTitle": "Crie um trabalho de avaliação online",
+      "editTitle": "Editar trabalho de avaliação online",
+      "subtitle": "Escolha o comportamento do stream, dos marcadores, do mapeamento e da amostragem para esse trabalho de avaliação.",
+      "stepper": {
+        "target": "Alvo",
+        "scorers": "Marcadores",
+        "mapping": "Mapeamento",
+        "sampling": "Amostragem"
+      },
+      "targetSection": "Alvo",
+      "scorersSection": "Marcadores e mapeamento",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Monitor de fidelidade de produção",
+      "streamLabel": "Fluxo de entrada",
+      "streamPlaceholder": "padrão",
+      "streamTypeLabel": "Tipo de stream",
+      "streamTypePlaceholder": "rastros",
+      "descriptionLabel": "Descrição",
+      "samplingModeLabel": "Modo de amostragem",
+      "samplingValueLabel": "Valor de amostragem JSON",
+      "samplingModes": {
+        "rate": "Tarifa",
+        "all": "Todos",
+        "count": "Conde"
+      },
+      "scorerPicker": {
+        "title": "Marcadores",
+        "hint": "Selecione um ou mais marcadores para disputar cada período combinado.",
+        "meta": "{tipo} · v {versão}"
+      },
+      "filter": {
+        "title": "Condição do filtro",
+        "hint": "Somente intervalos que correspondam a essa condição entram na amostragem e na pontuação."
+      },
+      "inputMapping": {
+        "title": "Mapeamento de entrada",
+        "hint": "Mapeie os campos de abrangência em cada variável do modelo de pontuação.",
+        "selectScorers": "Selecione marcadores para configurar seus mapeamentos.",
+        "noVariables": "Esse marcador não tem variáveis de modelo para mapear.",
+        "variableCount": "variáveis {count}"
+      },
+      "preview": {
+        "title": "prévia",
+        "hint": "Use os campos à esquerda para definir a meta de avaliação da produção.",
+        "summaryTitle": "Resumo",
+        "summaryName": "Nome",
+        "summaryType": "Tipo",
+        "summaryStatus": "Status",
+        "statusEditing": "Editando",
+        "statusDraft": "Esboço",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Selecione pelo menos um marcador",
+      "saveError": "Falha ao salvar o trabalho de avaliação"
+    }
   }
 }

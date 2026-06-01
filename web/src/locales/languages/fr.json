@@ -3938,5 +3938,217 @@
       "two": "Écrivez VRL pour analyser le JSON à partir des journaux Nginx...",
       "three": "Créez un tableau de bord pour l'état des nœuds K8s..."
     }
+  },
+  "onlineEvals": {
+    "title": "Évaluations",
+    "description": "Configurez les fournisseurs LLM, les définitions de scores, les évaluateurs et les tâches d'évaluation en direct.",
+    "loading": "Chargement de la configuration d'évaluation en ligne...",
+    "loadError": "Impossible de charger les évaluations en ligne",
+    "deletePrompt": "Supprimer {name} ?",
+    "deleted": "{label} supprimé",
+    "deleteError": "Impossible de supprimer {label}",
+    "saved": "{label} enregistré",
+    "newButton": "Nouveau {label}",
+    "search": "Rechercher {label}",
+    "refresh": "Actualiser",
+    "allStatuses": "Tous les statuts",
+    "noRowsFound": "Aucun {label} trouvé",
+    "getStartedHint": "Créez-en un pour commencer l'évaluation en ligne du câblage.",
+    "columns": {
+      "name": "Nom",
+      "status": "État",
+      "updated": "Mis à jour"
+    },
+    "actions": {
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "tabs": {
+      "jobs": "Emplois chez Eval",
+      "scorers": "Buteurs",
+      "scoreConfigs": "Configurations de score",
+      "providers": "Prestataires"
+    },
+    "singular": {
+      "jobs": "Emploi Eval",
+      "scorers": "Buteur",
+      "scoreConfigs": "Configuration du score",
+      "providers": "Prestataire"
+    },
+    "secondaryColumn": {
+      "jobs": "Diffusez",
+      "scorers": "Tapez",
+      "scoreConfigs": "Type de données",
+      "providers": "Prestataire"
+    },
+    "jobStatus": {
+      "draft": "Brouillon",
+      "active": "Actif",
+      "paused": "En pause",
+      "degraded": "Dégradé",
+      "archived": "Archivé"
+    },
+    "buttons": {
+      "cancel": "Annuler",
+      "create": "Créez",
+      "save": "Enregistrer"
+    },
+    "scorerTypeDialog": {
+      "title": "Créez un nouveau scorer",
+      "intro": "Choisissez le type de marqueur. Choisissez celle qui correspond à la manière dont vous souhaitez créer et exécutez-la.",
+      "llmJudgeTitle": "Juge LLM",
+      "llmJudgeDescription": "Utilisez un fournisseur configuré pour effectuer une évaluation sémantique.",
+      "remoteTitle": "télécommande",
+      "remoteDescription": "Appelez votre propre point de terminaison HTTP pour le score.",
+      "codeTitle": "Code",
+      "codeDescription": "Prochainement"
+    },
+    "provider": {
+      "backTo": "Retour aux fournisseurs",
+      "createTitle": "Créer un fournisseur LLM",
+      "editTitle": "Modifier le fournisseur LLM",
+      "subtitle": "Configurez le point de terminaison du modèle utilisé par les évaluateurs LLM.",
+      "sectionTitle": "Prestataire",
+      "nameLabel": "Nom",
+      "namePlaceholder": "Production : OpenAI",
+      "typeLabel": "Type de fournisseur",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Point final",
+      "endpointPlaceholder": "Point de terminaison personnalisé en option",
+      "defaultModelLabel": "Modèle par défaut",
+      "defaultModelPlaceholder": "GPT-4O-Mini",
+      "availableModelsLabel": "Modèles disponibles",
+      "availableModelsPlaceholder": "GPT-4O-Mini, GPT-4.1",
+      "useAsDefault": "Utiliser comme fournisseur par défaut",
+      "authConfigLabel": "Configuration d'authentification JSON",
+      "saveError": "Impossible d'enregistrer le fournisseur"
+    },
+    "scoreConfig": {
+      "createTitle": "Nouvelle configuration de score",
+      "editTitle": "Modifier la configuration du score",
+      "subtitle": "Les configurations de score définissent le type de score, les seuils de santé et les catégories.",
+      "nameLabel": "Nom",
+      "dataTypeLabel": "Type de données",
+      "descriptionLabel": "Descriptif",
+      "numericRangeLabel": "Plage numérique JSON",
+      "categoriesLabel": "Catégories JSON",
+      "healthyThresholdLabel": "Seuil sain JSON",
+      "dataTypes": {
+        "numeric": "Numérique",
+        "categorical": "Catégorique",
+        "boolean": "Booléen"
+      },
+      "saveError": "Impossible d'enregistrer la configuration du score"
+    },
+    "scorer": {
+      "backTo": "Retour à Scorers",
+      "badgeRemote": "télécommande",
+      "badgeLlm": "Juge LLM",
+      "createTitleRemote": "Créer un scoreur à distance",
+      "createTitleLlm": "Créez un LLM Judge Scorer",
+      "editTitleRemote": "Modifier Remote Scorer",
+      "editTitleLlm": "Modifier LLM Judge Scorer",
+      "subtitleRemote": "Appelez un point de terminaison HTTP que vous hébergez. Nous effectuons la demande ; vous renvoyez un score.",
+      "subtitleLlm": "Un modèle linguistique évalue chaque trace à l'aide de l'invite que vous fournissez.",
+      "identitySection": "Identité",
+      "judgeSection": "Configuration du juge",
+      "endpointSection": "Point final",
+      "nameLabel": "Nom",
+      "namePlaceholder": "juge_fidélité",
+      "producesScoreConfigLabel": "Produit une configuration de score",
+      "producesScoreConfigNone": "Aucune",
+      "scoreConfigVersionLabel": "Version de configuration du score",
+      "latestSuffix": " (le plus récent)",
+      "pinVersion": "Épingler la version sélectionnée",
+      "descriptionLabel": "Descriptif",
+      "providerLabel": "Prestataire",
+      "providerPlaceholder": "Sélectionnez un fournisseur",
+      "modelLabel": "modèle",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Juge vite",
+      "outputSchemaLabel": "Schéma de sortie JSON",
+      "remoteEndpointLabel": "Point de terminaison distant",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Modèle de corps de demande",
+      "saveError": "N'a pas réussi à sauver le buteur",
+      "versionsLoadError": "Impossible de charger les versions de configuration des scores",
+      "testPanel": {
+        "title": "Testez ce score",
+        "hint": "Essayez votre marqueur avec des exemples de données avant de sauvegarder. Les essais ne sont pas poursuivis.",
+        "emptyPrefix": "Ajoutez des variables telles que ",
+        "emptySuffix": " au modèle de score pour tester avec des champs d'échantillonnage.",
+        "runButton": "Exécuter un test",
+        "scenarioSuccess": "Réponse fictive",
+        "scenarioAuth": "Erreur d'authentification",
+        "scenarioSchema": "Incompatibilité de schéma",
+        "stateIdle": "Effectuez un test pour voir le résultat ici.",
+        "stateRunning": "Test de buteur en course à pied...",
+        "successHeader": "Succès",
+        "successScore": "note : 0,92",
+        "successReasoning": "raisonnement : La réponse est étayée par le contexte fourni.",
+        "authHeader": "L'authentification a échoué",
+        "authHint": "Vérifiez les informations d'identification du fournisseur avant d'enregistrer.",
+        "schemaHeader": "Incompatibilité de schéma",
+        "schemaHint": "La réponse ne correspondait pas au schéma de sortie configuré.",
+        "valuePlaceholder": "Valeur pour {{{variable}}}"
+      }
+    },
+    "job": {
+      "backTo": "Retour à Eval Jobs",
+      "createTitle": "Créer un job d'évaluation en ligne",
+      "editTitle": "Modifier une tâche d'évaluation en ligne",
+      "subtitle": "Choisissez le flux, les scores, la cartographie et le comportement d'échantillonnage pour cette tâche d'évaluation.",
+      "stepper": {
+        "target": "Cible",
+        "scorers": "Buteurs",
+        "mapping": "Cartographie",
+        "sampling": "L'échantillonnage"
+      },
+      "targetSection": "Cible",
+      "scorersSection": "Buteurs et cartographie",
+      "nameLabel": "Nom",
+      "namePlaceholder": "Moniteur de fidélité de la production",
+      "streamLabel": "Flux d'entrée",
+      "streamPlaceholder": "défaut",
+      "streamTypeLabel": "Type de flux",
+      "streamTypePlaceholder": "traces",
+      "descriptionLabel": "Descriptif",
+      "samplingModeLabel": "Mode d'échantillonnage",
+      "samplingValueLabel": "Valeur d'échantillonnage JSON",
+      "samplingModes": {
+        "rate": "Tarif",
+        "all": "Tous",
+        "count": "Compter"
+      },
+      "scorerPicker": {
+        "title": "Buteurs",
+        "hint": "Sélectionnez un ou plusieurs buteurs à courir pour chaque période correspondante.",
+        "meta": "{type} · v {version}"
+      },
+      "filter": {
+        "title": "État du filtre",
+        "hint": "Seules les périodes correspondant à cette condition entrent dans l'échantillonnage et la notation."
+      },
+      "inputMapping": {
+        "title": "Mappage des entrées",
+        "hint": "Mappez les champs de span dans chaque variable du modèle de scorer.",
+        "selectScorers": "Sélectionnez les marqueurs pour configurer leurs mappages.",
+        "noVariables": "Ce scoreur n'a aucune variable de modèle à mapper.",
+        "variableCount": "{count} variables"
+      },
+      "preview": {
+        "title": "Aperçu",
+        "hint": "Utilisez les champs de gauche pour définir l'objectif d'évaluation de la production.",
+        "summaryTitle": "Résumé",
+        "summaryName": "Nom",
+        "summaryType": "Tapez",
+        "summaryStatus": "État",
+        "statusEditing": "Édition",
+        "statusDraft": "Brouillon",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Sélectionnez au moins un buteur",
+      "saveError": "Impossible d'enregistrer la tâche d'évaluation"
+    }
   }
 }

@@ -3949,5 +3949,217 @@
       "two": "Schrijf VRL om JSON te parseren uit nginx-logboeken...",
       "three": "Bouw een dashboard voor de gezondheid van K8s nodes..."
     }
+  },
+  "onlineEvals": {
+    "title": "Beoordelingen",
+    "description": "Configureer LLM-providers, scoredefinities, scorers en live evaluatietaken.",
+    "loading": "Configuratie voor online evaluatie wordt geladen...",
+    "loadError": "Het laden van online evaluaties is mislukt",
+    "deletePrompt": "{name} verwijderen?",
+    "deleted": "{label} verwijderd",
+    "deleteError": "Het verwijderen van {label} is mislukt",
+    "saved": "{label} opgeslagen",
+    "newButton": "Nieuw {label}",
+    "search": "Zoek {label}",
+    "refresh": "Vernieuwen",
+    "allStatuses": "Alle statussen",
+    "noRowsFound": "Geen {label} gevonden",
+    "getStartedHint": "Maak er een om te beginnen met de online evaluatie van de bedrading.",
+    "columns": {
+      "name": "Naam",
+      "status": "Status",
+      "updated": "Bijgewerkt"
+    },
+    "actions": {
+      "edit": "Bewerken",
+      "delete": "Verwijderen"
+    },
+    "tabs": {
+      "jobs": "Vacatures bij Eval",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score-configuraties",
+      "providers": "Aanbieders"
+    },
+    "singular": {
+      "jobs": "Job Eval",
+      "scorers": "Scorer",
+      "scoreConfigs": "Scoreconfiguratie",
+      "providers": "Aanbieder"
+    },
+    "secondaryColumn": {
+      "jobs": "Streamen",
+      "scorers": "Typ",
+      "scoreConfigs": "Gegevenstype",
+      "providers": "Aanbieder"
+    },
+    "jobStatus": {
+      "draft": "Ontwerp",
+      "active": "Actief",
+      "paused": "Gepauzeerd",
+      "degraded": "Gedegradeerd",
+      "archived": "Gearchiveerd"
+    },
+    "buttons": {
+      "cancel": "Annuleer",
+      "create": "Creëren",
+      "save": "Opslaan"
+    },
+    "scorerTypeDialog": {
+      "title": "Maak een nieuwe scorer",
+      "intro": "Kies het type scorer. Kies wat past bij de manier waarop je wilt schrijven en voer het uit.",
+      "llmJudgeTitle": "LLM-jurylid",
+      "llmJudgeDescription": "Gebruik een geconfigureerde provider om semantisch te evalueren.",
+      "remoteTitle": "Op afstand",
+      "remoteDescription": "Bel je eigen HTTP-eindpunt om te scoren.",
+      "codeTitle": "Code",
+      "codeDescription": "Binnenkort beschikbaar."
+    },
+    "provider": {
+      "backTo": "Terug naar Providers",
+      "createTitle": "LLM-provider aanmaken",
+      "editTitle": "LLM-provider bewerken",
+      "subtitle": "Configureer het modeleindpunt dat wordt gebruikt door LLM-juryscorers.",
+      "sectionTitle": "Aanbieder",
+      "nameLabel": "Naam",
+      "namePlaceholder": "Productie OpenAI",
+      "typeLabel": "Soort provider",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Eindpunt",
+      "endpointPlaceholder": "Optioneel aangepast eindpunt",
+      "defaultModelLabel": "Standaardmodel",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Beschikbare modellen",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Als standaardprovider gebruiken",
+      "authConfigLabel": "Auth-configuratie JSON",
+      "saveError": "Het opslaan van de provider is mislukt"
+    },
+    "scoreConfig": {
+      "createTitle": "Nieuwe scoreconfiguratie",
+      "editTitle": "Scoreconfiguratie bewerken",
+      "subtitle": "Scoreconfiguraties definiëren het scoretype, gezondheidsdrempels en categorieën.",
+      "nameLabel": "Naam",
+      "dataTypeLabel": "Gegevenstype",
+      "descriptionLabel": "Omschrijving",
+      "numericRangeLabel": "Numeriek bereik JSON",
+      "categoriesLabel": "Categorieën JSON",
+      "healthyThresholdLabel": "JSON met gezonde drempelwaarde",
+      "dataTypes": {
+        "numeric": "Numeriek",
+        "categorical": "Categorisch",
+        "boolean": "Booleaans"
+      },
+      "saveError": "Het opslaan van de scoreconfiguratie is mislukt"
+    },
+    "scorer": {
+      "backTo": "Terug naar Scorers",
+      "badgeRemote": "Op afstand",
+      "badgeLlm": "LLM-jurylid",
+      "createTitleRemote": "Remote Scorer aanmaken",
+      "createTitleLlm": "Creëer een LLM Judge Scorer",
+      "editTitleRemote": "Remote Scorer bewerken",
+      "editTitleLlm": "LLM Judge Scorer bewerken",
+      "subtitleRemote": "Roep een HTTP-eindpunt aan dat u host. Wij maken het verzoek; u geeft een score terug.",
+      "subtitleLlm": "Een taalmodel beoordeelt elk spoor aan de hand van de prompt die u geeft.",
+      "identitySection": "Identiteit",
+      "judgeSection": "Configuratie van de rechter",
+      "endpointSection": "Eindpunt",
+      "nameLabel": "Naam",
+      "namePlaceholder": "getrouwheid_rechter",
+      "producesScoreConfigLabel": "Produceert de scoreconfiguratie",
+      "producesScoreConfigNone": "Geen",
+      "scoreConfigVersionLabel": "Versie van de scoreconfiguratie",
+      "latestSuffix": " (laatste)",
+      "pinVersion": "Geselecteerde versie vastzetten",
+      "descriptionLabel": "Omschrijving",
+      "providerLabel": "Aanbieder",
+      "providerPlaceholder": "Selecteer een provider",
+      "modelLabel": "Model",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Prompt van de rechter",
+      "outputSchemaLabel": "Uitvoerschema JSON",
+      "remoteEndpointLabel": "Eindpunt op afstand",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Bodysjabloon aanvragen",
+      "saveError": "Het opslaan van de scorer is mislukt",
+      "versionsLoadError": "Kon de versies van de scoreconfiguratie niet laden",
+      "testPanel": {
+        "title": "Test deze scorer",
+        "hint": "Probeer je scorer uit met voorbeeldgegevens voordat je ze opslaat. De testruns worden niet voortgezet.",
+        "emptyPrefix": "Variabelen toevoegen zoals ",
+        "emptySuffix": " naar het scorersjabloon om te testen met voorbeeldvelden.",
+        "runButton": "Test uitvoeren",
+        "scenarioSuccess": "Schijnbare reactie",
+        "scenarioAuth": "Auth-fout",
+        "scenarioSchema": "Schema komt niet overeen",
+        "stateIdle": "Voer een test uit om het resultaat hier te zien.",
+        "stateRunning": "Scorertest voor hardlopen...",
+        "successHeader": "Succes",
+        "successScore": "score: 0.92",
+        "successReasoning": "redenering: Het antwoord wordt ondersteund door de aangeleverde context.",
+        "authHeader": "Authenticatie mislukt",
+        "authHint": "Controleer de inloggegevens van de provider voordat u deze opslaat.",
+        "schemaHeader": "Schema komt niet overeen",
+        "schemaHint": "Het antwoord kwam niet overeen met het geconfigureerde uitvoerschema.",
+        "valuePlaceholder": "Waarde voor {{{variable}}}"
+      }
+    },
+    "job": {
+      "backTo": "Terug naar Eval Jobs",
+      "createTitle": "Maak een online evaluatieopdracht",
+      "editTitle": "Online Eval-opdracht bewerken",
+      "subtitle": "Kies de stream, scorers, mapping en samplinggedrag voor deze evaluatietaak.",
+      "stepper": {
+        "target": "Doelwit",
+        "scorers": "Scorers",
+        "mapping": "In kaart brengen",
+        "sampling": "Bemonstering"
+      },
+      "targetSection": "Doelwit",
+      "scorersSection": "Scorers en kaarten",
+      "nameLabel": "Naam",
+      "namePlaceholder": "Monitor voor de getrouwheid van de productie",
+      "streamLabel": "Invoerstroom",
+      "streamPlaceholder": "standaard",
+      "streamTypeLabel": "Soort stream",
+      "streamTypePlaceholder": "sporen",
+      "descriptionLabel": "Omschrijving",
+      "samplingModeLabel": "Bemonsteringsmodus",
+      "samplingValueLabel": "Bemonsteringswaarde JSON",
+      "samplingModes": {
+        "rate": "Tarief",
+        "all": "Alles",
+        "count": "Tellen"
+      },
+      "scorerPicker": {
+        "title": "Scorers",
+        "hint": "Selecteer een of meer scorers om mee te doen voor elke gematchte reeks.",
+        "meta": "{type} · v {versie}"
+      },
+      "filter": {
+        "title": "Staat van het filter",
+        "hint": "Alleen overspanningen die aan deze voorwaarde voldoen, worden meegenomen in de steekproef en de score."
+      },
+      "inputMapping": {
+        "title": "Invoertoewijzing",
+        "hint": "Wijs spanvelden toe aan elke sjabloonvariabele voor de scorer.",
+        "selectScorers": "Selecteer scorers om hun mappings te configureren.",
+        "noVariables": "Deze scorer heeft geen sjabloonvariabelen om in kaart te brengen.",
+        "variableCount": "{count} variabelen"
+      },
+      "preview": {
+        "title": "voorsmaak",
+        "hint": "Gebruik de velden aan de linkerkant om het doel van de productie-evaluatie te definiëren.",
+        "summaryTitle": "Samenvatting",
+        "summaryName": "Naam",
+        "summaryType": "Typ",
+        "summaryStatus": "Status",
+        "statusEditing": "Bewerken",
+        "statusDraft": "Ontwerp",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Selecteer minstens één scorer",
+      "saveError": "Kon de evaluatietaak niet opslaan"
+    }
   }
 }
