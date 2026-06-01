@@ -479,7 +479,11 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::physical_optimizer::PhysicalOptimizerRule;
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        physical_optimizer::PhysicalOptimizerRule,
+        physical_plan::{empty::EmptyExec, expressions::col},
+    };
 
     use super::*;
 
@@ -512,5 +516,101 @@ mod tests {
     fn test_new_empty_exec_count_visitor_default_starts_at_zero() {
         let v = NewEmptyExecCountVisitor::default();
         assert_eq!(v.get_count(), 0);
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_disabled_returns_input_unchanged() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(Arc::clone(&schema)));
+        let result = wrap_partial_reduce(false, input).unwrap();
+        assert_eq!(result.name(), "EmptyExec");
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_non_agg_input_returns_input_unchanged() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(Arc::clone(&schema)));
+        let result = wrap_partial_reduce(true, input).unwrap();
+        assert_eq!(result.name(), "EmptyExec");
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_single_mode_returns_input_unchanged()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Single,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::Single);
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_partial_no_group_by_produces_partial_reduce()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(vec![], vec![], vec![vec![]], false);
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        assert!(result_agg.group_expr().expr().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_partial_with_group_by_produces_partial_reduce_with_column_refs()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        assert_eq!(result_agg.group_expr().expr().len(), 1);
+        let (expr, name) = &result_agg.group_expr().expr()[0];
+        assert_eq!(name, "a");
+        let col_expr = expr
+            .as_any()
+            .downcast_ref::<PhysicalColumn>()
+            .expect("group expr should be a Column reference into partial output schema");
+        assert_eq!(col_expr.name(), "a");
+        assert_eq!(col_expr.index(), 0);
+        Ok(())
     }
 }
