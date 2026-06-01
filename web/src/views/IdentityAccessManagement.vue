@@ -106,6 +106,18 @@ const allTabs = [
     icon: "manage-accounts",
   },
   {
+    dataTest: "iam-ingestion-tokens-tab",
+    name: "ingestionTokens",
+    to: {
+      name: "ingestionTokens",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.ingestionTokens"),
+    class: "tab_content",
+  },
+  {
     dataTest: "iam-groups-tab",
     name: "groups",
     to: {
@@ -213,11 +225,11 @@ watch(
 );
 
 function setTabs() {
-  const cloud = ["users", "organizations"];
+  const cloud = ["users", "ingestionTokens", "organizations"];
 
   const rbac = ["groups", "roles"];
 
-  const os = ["users", "serviceAccounts", "organizations"];
+  const os = ["users", "serviceAccounts", "ingestionTokens", "organizations"];
 
   const isEnterprise =
     config.isEnterprise == "true" || config.isCloud == "true";

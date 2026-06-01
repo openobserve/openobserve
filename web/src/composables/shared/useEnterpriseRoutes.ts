@@ -64,6 +64,18 @@ const useEnterpriseRoutes = () => {
           },
         },
         {
+          path: "ingestionTokens",
+          name: "ingestionTokens",
+          meta: {
+            title: "Ingestion Tokens",
+          },
+          component: () =>
+            import("@/components/iam/IngestionTokens.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "serviceAccounts",
           name: "serviceAccounts",
           meta: {
