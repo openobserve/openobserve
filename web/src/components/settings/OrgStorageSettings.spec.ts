@@ -114,7 +114,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
     await nextTick();
 
-    expect(wrapper.text()).toContain("No storage configured");
+    expect(wrapper.text()).toContain("No bucket configured");
     expect(
       wrapper.find('[data-test="storage-settings-configure-btn"]').exists()
     ).toBe(true);
