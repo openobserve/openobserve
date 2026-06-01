@@ -2238,10 +2238,15 @@ export default defineComponent({
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
 
-      // Turn off SQL mode when the query no longer looks like SQL.
-      // Set sqlModeEditTransition so the watcher in Index.vue preserves the
-      // remaining query text instead of clearing the editor.
-      if (!isSqlQuery(value) && searchObj.meta.sqlMode === true) {
+      // Auto-switch off SQL mode only when the user has typed something
+      // non-empty that clearly isn't a SQL statement (e.g. a filter expression
+      // after removing the SELECT … FROM prefix). An empty editor is ambiguous
+      // — keep the current mode so a blank SQL query still runs as SQL.
+      if (
+        value.trim() !== "" &&
+        !isSqlQuery(value) &&
+        searchObj.meta.sqlMode === true
+      ) {
         searchObj.meta.sqlModeEditTransition = true;
         searchObj.meta.sqlMode = false;
       }
