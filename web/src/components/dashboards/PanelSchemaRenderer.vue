@@ -886,6 +886,21 @@ export default defineComponent({
       tableRendererRef.value = null;
     });
     const convertPanelDataCommon = async (applyOverlay = false) => {
+      // Preserve the previously rendered chart during a reload. While loading,
+      // if the new data buffer has no rows yet but a chart is already rendered,
+      // skip conversion so non-streaming callers (the panelSchema deep watcher,
+      // resize observer, etc.) can't replace it with an empty 0-series result
+      // before the first streaming chunk arrives. The streaming overlay path
+      // (applyOverlay=true) and loading=false final renders are unaffected.
+      const hasRows =
+        data.value?.length > 0 &&
+        (data.value[0]?.result?.length > 0 ||
+          (Array.isArray(data.value[0]) && data.value[0].length > 0));
+      const hasOldChart = panelData.value?.options?.series?.length > 0;
+      if (!applyOverlay && loading.value && !hasRows && hasOldChart) {
+        return;
+      }
+
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
@@ -1355,8 +1370,15 @@ export default defineComponent({
       }
 
       if (panelSchema.value?.queryType === "promql") {
-        return filteredData.value?.length &&
-          filteredData.value.some((item: any) => item?.result?.length)
+        const hasResults =
+          filteredData.value?.length &&
+          filteredData.value.some((item: any) => item?.result?.length);
+        if (hasResults) return "";
+        // During a reload the executor clears state.data before the new results
+        // stream in. Keep showing the previously rendered chart while loading
+        // (matching the SQL branch below); only show "No Data" once the load
+        // completes with no results.
+        return loading.value && panelData.value?.options?.series?.length > 0
           ? ""
           : "No Data";
       }
