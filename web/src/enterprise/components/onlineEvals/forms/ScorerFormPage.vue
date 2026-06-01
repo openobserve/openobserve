@@ -277,12 +277,11 @@
       </div>
 
       <ScorerTestPanel
+        v-if="mode === 'edit'"
         :variables="scorerTestVariables"
         :inputs="scorerTestInputs"
-        :scenario="scorerTestScenario"
         :state="scorerTestState"
         @run="runScorerTest"
-        @update:scenario="scorerTestScenario = $event"
         @update:inputs="scorerTestInputs = $event"
       />
     </div>

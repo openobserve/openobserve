@@ -33,14 +33,6 @@
         >
           {{ t("onlineEvals.scorer.testPanel.runButton") }}
         </OButton>
-        <select
-          :value="scenario"
-          @change="$emit('update:scenario', ($event.target as HTMLSelectElement).value as TestScenario)"
-        >
-          <option value="success">{{ t("onlineEvals.scorer.testPanel.scenarioSuccess") }}</option>
-          <option value="auth">{{ t("onlineEvals.scorer.testPanel.scenarioAuth") }}</option>
-          <option value="schema">{{ t("onlineEvals.scorer.testPanel.scenarioSchema") }}</option>
-        </select>
       </div>
 
       <div class="eval-test-panel__result" :class="`is-${state}`">
@@ -52,16 +44,8 @@
           <small>{{ t("onlineEvals.scorer.testPanel.successReasoning") }}</small>
         </template>
         <template v-else>
-          <strong>{{
-            scenario === "auth"
-              ? t("onlineEvals.scorer.testPanel.authHeader")
-              : t("onlineEvals.scorer.testPanel.schemaHeader")
-          }}</strong>
-          <small>{{
-            scenario === "auth"
-              ? t("onlineEvals.scorer.testPanel.authHint")
-              : t("onlineEvals.scorer.testPanel.schemaHint")
-          }}</small>
+          <strong>{{ t("onlineEvals.scorer.testPanel.schemaHeader") }}</strong>
+          <small>{{ t("onlineEvals.scorer.testPanel.schemaHint") }}</small>
         </template>
       </div>
     </section>
@@ -74,19 +58,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { formatTemplateVariable } from "../../utils/evalFormat";
 
-type TestScenario = "success" | "auth" | "schema";
 type TestState = "idle" | "running" | "success" | "error";
 
 const props = defineProps<{
   variables: string[];
   inputs: Record<string, string>;
-  scenario: TestScenario;
   state: TestState;
 }>();
 
 const emit = defineEmits<{
   (e: "run"): void;
-  (e: "update:scenario", value: TestScenario): void;
   (e: "update:inputs", value: Record<string, string>): void;
 }>();
 
