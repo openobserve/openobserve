@@ -15,14 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import i18n from "@/locales";
-
-installQuasar({
-  plugins: [quasar.Notify],
-});
 
 describe("WildcardValuePopover", () => {
   let wrapper: VueWrapper<any>;
@@ -47,6 +41,18 @@ describe("WildcardValuePopover", () => {
     return el;
   };
 
+  const OButtonStub = {
+    name: "OButton",
+    props: ["variant", "size"],
+    emits: ["click"],
+    template: '<button :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\')"><slot /></button>',
+  };
+  const OIconStub = {
+    name: "OIcon",
+    props: ["name", "size"],
+    template: '<span data-test-stub="o-icon" />',
+  };
+
   const mountComponent = (overrides: Record<string, unknown> = {}) => {
     return mount(WildcardValuePopover, {
       props: {
@@ -58,6 +64,10 @@ describe("WildcardValuePopover", () => {
       },
       global: {
         plugins: [i18n],
+        stubs: {
+          OButton: OButtonStub,
+          OIcon: OIconStub,
+        },
       },
       attachTo: document.body,
     });

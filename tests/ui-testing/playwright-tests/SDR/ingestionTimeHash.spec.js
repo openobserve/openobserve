@@ -2,201 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-async function closeStreamDetailSidebar(page) {
-  // Close stream detail sidebar if open
-  const cancelButton = page.getByRole('button', { name: 'Cancel' });
-  const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
-  if (cancelVisible) {
-    await cancelButton.click();
-    testLogger.info('Closed stream detail sidebar');
-    await page.waitForTimeout(500);
-  }
-}
-
-async function navigateToLogsQuick(page) {
-  // Quick navigation to logs without VRL editor wait
-  await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-  testLogger.info('Navigated to Logs (fast - no VRL wait)');
-}
-
-// Verify multiple fields for hash status
-async function verifyMultipleFieldsHash(page, pm, streamName, fieldsToVerify) {
-  testLogger.info(`Verifying ${fieldsToVerify.length} fields for hash status`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(1000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(2000);
-
-  // Try multiple selectors to find all log entries
-  let logTableCell = page.locator('[data-test="log-table-column-0-source"]');
-  let logCount = await logTableCell.count();
-  testLogger.info(`Selector [data-test="log-table-column-0-source"] found ${logCount} entries`);
-
-  // If that doesn't work, try table rows
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('.logs-result-table tbody tr[role="row"]');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector .logs-result-table tbody tr[role="row"] found ${logCount} entries`);
-  }
-
-  // Try another common selector
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('tbody tr');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector tbody tr found ${logCount} entries`);
-  }
-
-  testLogger.info(`Final: Found ${logCount} log entries in the UI`);
-
-  if (logCount === 0) {
-    throw new Error('No logs found in the stream');
-  }
-
-  // Get all log texts
-  const allLogTexts = [];
-  for (let i = 0; i < logCount; i++) {
-    const text = await logTableCell.nth(i).textContent();
-    allLogTexts.push(text);
-  }
-
-  // For each field we want to verify, search through all logs to find the one containing that field
-  for (const { fieldName, shouldBeHashed } of fieldsToVerify) {
-    testLogger.info(`Searching for log containing field: ${fieldName}`);
-
-    let foundLog = null;
-    let foundIndex = -1;
-
-    // Search through all logs to find one containing this field
-    for (let i = 0; i < allLogTexts.length; i++) {
-      const logText = allLogTexts[i];
-      const fieldAsJsonKey = `"${fieldName}":`;
-      const fieldAsKey = `${fieldName}:`;
-
-      if (logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey)) {
-        foundLog = logText;
-        foundIndex = i;
-        break;
-      }
-    }
-
-    if (!foundLog) {
-      testLogger.error(`Could not find log containing field: ${fieldName}`);
-      testLogger.error(`Available logs: ${allLogTexts.map((t, i) => `\n  Log ${i}: ${t.substring(0, 150)}...`).join('')}`);
-      throw new Error(`Could not find log entry containing field: ${fieldName}`);
-    }
-
-    testLogger.info(`Found ${fieldName} in log ${foundIndex}`);
-
-    // For HASH, the field should be present with [REDACTED:hash] format
-    if (shouldBeHashed) {
-      const redactedHashPattern = /\[REDACTED:[0-9a-f]{32}\]/i;
-      if (!redactedHashPattern.test(foundLog)) {
-        testLogger.error(`Field ${fieldName} found but value is NOT in [REDACTED:hash] format!`);
-        testLogger.error(`Expected format: [REDACTED:hash] where hash is 32 hex characters`);
-        testLogger.error(`Actual log text: ${foundLog.substring(0, 300)}`);
-        throw new Error(`Field ${fieldName} is not properly hashed - missing [REDACTED:hash] format`);
-      }
-
-      const hashMatch = foundLog.match(/\[REDACTED:([0-9a-f]{32})\]/i);
-      if (hashMatch) {
-        testLogger.info(`✓ Field ${fieldName} is present and HASHED: [REDACTED:${hashMatch[1]}]`);
-      }
-    } else {
-      const redactedHashPattern = /\[REDACTED:[0-9a-f]{32}\]/i;
-      if (redactedHashPattern.test(foundLog)) {
-        testLogger.error(`Field ${fieldName} should be visible but appears to be hashed!`);
-        throw new Error(`Field ${fieldName} is unexpectedly hashed`);
-      }
-      testLogger.info(`✓ Field ${fieldName} is visible with actual value (as expected)`);
-    }
-  }
-}
-
-// Special verification for hashed fields
-async function verifyFieldsAreHashed(page, pm, streamName, fieldNames) {
-  testLogger.info(`Verifying ${fieldNames.length} fields are HASHED - checking ONLY most recent logs`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(2000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(4000);
-
-  // Get data from all 4 columns
-  const columnLocators = [
-    page.locator('[data-test="log-table-column-0-source"]'),
-    page.locator('[data-test="log-table-column-1-source"]'),
-    page.locator('[data-test="log-table-column-2-source"]'),
-    page.locator('[data-test="log-table-column-3-source"]')
-  ];
-
-  await columnLocators[0].first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
-    testLogger.warn('Timeout waiting for logs to appear');
-  });
-
-  const allLogTexts = [];
-  for (let colIndex = 0; colIndex < 4; colIndex++) {
-    const locator = columnLocators[colIndex];
-    const count = await locator.count();
-
-    if (count > 0) {
-      const text = await locator.first().textContent();
-      allLogTexts.push(text);
-      testLogger.info(`Column ${colIndex}: ${text.substring(0, 200)}...`);
-    } else {
-      testLogger.warn(`Column ${colIndex}: No data found`);
-    }
-  }
-
-  testLogger.info(`Total columns with data: ${allLogTexts.length}. Expected ${fieldNames.length} fields.`);
-
-  if (allLogTexts.length === 0) {
-    throw new Error('No logs found in the stream - ingestion may have failed');
-  }
-
-  for (const fieldName of fieldNames) {
-    testLogger.info(`Verifying field ${fieldName} is HASHED (present with [REDACTED:hash] value)`);
-
-    let foundInRecentLogs = false;
-    let foundLogText = '';
-
-    for (let i = 0; i < allLogTexts.length; i++) {
-      const logText = allLogTexts[i];
-      const fieldAsJsonKey = `"${fieldName}":`;
-      const fieldAsKey = `${fieldName}:`;
-
-      if (logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey)) {
-        foundInRecentLogs = true;
-        foundLogText = logText;
-        testLogger.info(`Field ${fieldName} found in recent log ${i}: ${logText.substring(0, 300)}`);
-        break;
-      }
-    }
-
-    if (!foundInRecentLogs) {
-      testLogger.error(`Could not find field ${fieldName} in the 4 most recent logs`);
-      throw new Error(`Field ${fieldName} should be present with HASHED value but was not found!`);
-    }
-
-    const redactedHashPattern = /\[REDACTED:[0-9a-f]{32}\]/i;
-    if (!redactedHashPattern.test(foundLogText)) {
-      testLogger.error(`Field ${fieldName} found but value is NOT in [REDACTED:hash] format!`);
-      throw new Error(`Field ${fieldName} is not properly hashed - missing [REDACTED:hash] format`);
-    }
-
-    const hashMatch = foundLogText.match(/\[REDACTED:([0-9a-f]{32})\]/i);
-    if (hashMatch) {
-      testLogger.info(`✓ Field ${fieldName} is correctly HASHED with value: [REDACTED:${hashMatch[1]}]`);
-    }
-  }
-}
-
-
 test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -243,14 +48,6 @@ test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () 
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-
-    const originalNavigateToLogs = pm.logsPage.navigateToLogs.bind(pm.logsPage);
-    pm.logsPage.navigateToLogs = async function() {
-      await this.logsMenuItem.click();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      testLogger.info('Navigated to Logs (skipped VRL editor wait)');
-    };
-
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Combined ingestion time hash test setup completed');
   });
@@ -305,7 +102,7 @@ test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () 
     await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep1 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeHashed: false }));
-    await verifyMultipleFieldsHash(page, pm, testStreamName, fieldsToVerifyStep1);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsToVerifyStep1);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -343,8 +140,8 @@ test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () 
     testLogger.info('STEP 4: Ingest 4 lines of data WITH SDR patterns linked');
     await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
-    const fieldsToCheck = patternsToTest.map(p => p.field);
-    await verifyFieldsAreHashed(page, pm, testStreamName, fieldsToCheck);
+    const fieldsToVerifyStep4 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeHashed: true }));
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsToVerifyStep4);
     testLogger.info('✓ STEP 4 PASSED: All fields are HASHED (present with hashed values)');
 
     testLogger.info('=== ✓ COMBINED HASH TEST COMPLETED SUCCESSFULLY ===');

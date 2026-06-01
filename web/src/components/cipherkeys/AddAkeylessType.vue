@@ -15,88 +15,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="cipher-keys-add-akeyless-type">
-    <!-- Add input filed for base URL, access id with URL validation from q-input-->
-    <q-input
+    <!-- Add input filed for base URL, access id with URL validation from OInput-->
+    <OInput
       data-test="add-cipher-key-akeyless-baseurl-input"
       v-model="formData.key.store.akeyless.base_url"
       :label="t('cipherKey.baseURL') + ' *'"
-      class="showLabelOnTop q-w-lg"
-      stack-label
-      borderless
-      hide-bottom-space
-      dense
-      :rules="[
-        (val: any) => !!val || 'Base URL is required',
-        (val: any) => validateUrl(val) || 'Please provide correct URL.',
-        (val: any) => !/<[^>]*>/.test(val) || 'HTML tags are not allowed',
-      ]"
+      class="showLabelOnTop tw:w-full"
+      :error="!!baseUrlError"
+      :error-message="baseUrlError"
+      @update:model-value="baseUrlError = ''"
     />
-    <!-- Add input filed for access id with URL validation from q-input -->
+    <!-- Add input field for access id with URL validation from OInput -->
     <div v-if="!formData.isUpdate || isUpdateAccessID || formData.key.store.akeyless.access_id == ''">
-      <q-input
+      <OInput
         data-test="add-cipher-key-akeyless-access-id-input"
         v-model="formData.key.store.akeyless.access_id"
         :label="t('cipherKey.accessId') + ' *'"
-        class="showLabelOnTop q-w-lg"
-        stack-label
-        borderless
-        hide-bottom-space
-        dense
-        :rules="[
-          (val: any) => !!val || 'Access ID is required',
-          (val: string) =>
-            /^[a-zA-Z0-9-]*$/.test(val) || 'Access ID should be alphanumeric',
-        ]"
+        class="showLabelOnTop tw:w-full"
+        :error="!!accessIdError"
+        :error-message="accessIdError"
+        @update:model-value="accessIdError = ''"
       />
-      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
+      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
-      <label class="row q-field q-mb-md">
+      <label class="tw:flex q-field tw:mb-3">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
       <pre class="pre-text">{{ formData.key.store.akeyless.access_id }}</pre>
       <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
     </div>
-    <q-select
+    <OSelect
       data-test="add-cipher-key-auth-method-input"
       v-model="formData.key.store.akeyless.auth.type"
       :label="t('cipherKey.authenticationType') + ' *'"
-      class="showLabelOnTop q-w-lg"
-      stack-label
-      borderless
-      dense
+      class="showLabelOnTop tw:w-full"
       :options="authenticationTypeOptions"
-      option-value="value"
-      option-label="label"
-      map-options
-      emit-value
-      :rules="[(val: any) => !!val || 'Authentication type is required']"
-      tabindex="0"
+      labelKey="label"
+      valueKey="value"
+      :error="!!authTypeError"
+      :error-message="authTypeError"
+      @update:model-value="authTypeError = ''"
     />
     <fieldset
-      class="q-fieldset q-pa-md q-w-lg"
+      class="q-fieldset tw:p-3 tw:w-full"
       v-if="formData.key.store.akeyless.auth.type != ''"
     >
-      <legend class="q-caption q-px-sm">
+      <legend class="q-caption tw:px-2">
         {{ getAuthenticationTypeLabel(formData.key.store.akeyless.auth.type) }}
         Configuration
       </legend>
       <div v-if="formData.key.store.akeyless.auth.type === 'access_key'">
         <div v-if="!formData.isUpdate || isUpdateAccessKey || formData.key.store.akeyless.auth.access_key == ''">
-          <q-input
+          <OInput
             data-test="add-cipher-key-akeyless-access-key-input"
             v-model="formData.key.store.akeyless.auth.access_key"
             :label="t('cipherKey.accessKey') + ' *'"
-            class="showLabelOnTop q-w-lg"
-            stack-label
-            borderless
-            dense
-            :rules="[(val: any) => !!val || 'Access Key is required']"
+            class="showLabelOnTop tw:w-full"
+            :error="!!accessKeyError"
+            :error-message="accessKeyError"
+            @update:model-value="accessKeyError = ''"
           />
-          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="row q-field q-mb-md">
+          <label class="tw:flex q-field tw:mb-3">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.access_key }}</pre>
@@ -105,45 +88,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-if="formData.key.store.akeyless.auth.type === 'ldap'">
         <div v-if="!formData.isUpdate || isUpdateLDAPUsername || formData.key.store.akeyless.auth.ldap.username == ''">
-          <q-input
+          <OInput
             data-test="add-cipher-key-akeyless-ldap-username-input"
             v-model="formData.key.store.akeyless.auth.ldap.username"
             :label="t('cipherKey.ldapUsername') + ' *'"
-            class="showLabelOnTop q-w-lg"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) => !!val || 'LDAP Username is required',
-              (val: any) => /^[a-zA-Z0-9._-]+$/.test(val) || 'Username can only contain alphanumeric characters, dots, underscores, and hyphens',
-            ]"
+            class="showLabelOnTop tw:w-full"
+            :error="!!ldapUsernameError"
+            :error-message="ldapUsernameError"
+            @update:model-value="ldapUsernameError = ''"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="row q-field q-mb-md">
+          <label class="tw:flex q-field tw:mb-3">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.username }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
         </div>
         <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
-          <q-input
+          <OInput
             data-test="add-cipher-key-akeyless-ldap-password-input"
             v-model="formData.key.store.akeyless.auth.ldap.password"
             :label="t('cipherKey.ldapPassword') + ' *'"
-            class="showLabelOnTop q-w-lg"
-            stack-label
-            borderless
-            dense
+            class="showLabelOnTop tw:w-full"
             type="password"
             autocomplete="new-password"
-            :rules="[(val: any) => !!val || 'LDAP Password is required']"
+            :error="!!ldapPasswordError"
+            :error-message="ldapPasswordError"
+            @update:model-value="ldapPasswordError = ''"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="row q-field q-mb-md">
+          <label class="tw:flex q-field tw:mb-3">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.password }}</pre>
@@ -151,72 +129,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </fieldset>
-    <q-select
+    <OSelect
       data-test="add-cipher-key-secret-type-input"
       v-model="formData.key.store.akeyless.store.type"
       :label="t('cipherKey.secretType') + ' *'"
-      class="showLabelOnTop q-w-lg"
-      stack-label
-      borderless
-      dense
+      class="showLabelOnTop tw:w-full"
       :options="secretTypeOptions"
-      option-value="value"
-      option-label="label"
-      map-options
-      emit-value
-      :rules="[(val: any) => !!val || 'Secret type is required']"
-      tabindex="0"
+      labelKey="label"
+      valueKey="value"
+      :error="!!secretTypeError"
+      :error-message="secretTypeError"
+      @update:model-value="secretTypeError = ''"
     />
     <fieldset
-      class="q-fieldset q-pa-md q-w-lg"
+      class="q-fieldset tw:p-3 tw:w-full"
       v-if="formData.key.store.akeyless.store.type != ''"
     >
-      <legend class="q-caption q-px-sm">
+      <legend class="q-caption tw:px-2">
         {{ getSecretOptionLabel(formData.key.store.akeyless.store.type) }}
         Configuration
       </legend>
       <div v-if="formData.key.store.akeyless.store.type === 'static_secret'">
-        <q-input
+        <OInput
           data-test="add-cipher-key-akeyless-static-secret-name-input"
           v-model="formData.key.store.akeyless.store.static_secret"
           :label="t('cipherKey.staticSecretName') + ' *'"
-          class="showLabelOnTop q-w-lg"
-          stack-label
-          borderless
-          dense
-          :rules="[(val: any) => !!val || 'Static Secret Name is required']"
+          class="showLabelOnTop tw:w-full"
+          :error="!!staticSecretError"
+          :error-message="staticSecretError"
+          @update:model-value="staticSecretError = ''"
         />
       </div>
       <div v-if="formData.key.store.akeyless.store.type === 'dfc'">
-        <q-input
+        <OInput
           data-test="add-cipher-key-akeyless-dfc-name-input"
           v-model="formData.key.store.akeyless.store.dfc.name"
           :label="t('cipherKey.dfcName') + ' *'"
-          class="showLabelOnTop q-w-lg"
-          stack-label
-          borderless
-          dense
-          :rules="[(val: any) => !!val || 'DFC Name is required']"
+          class="showLabelOnTop tw:w-full"
+          :error="!!dfcNameError"
+          :error-message="dfcNameError"
+          @update:model-value="dfcNameError = ''"
         />
-        <q-input
+        <OInput
           data-test="add-cipher-key-akeyless-dfc-iv-input"
           v-model="formData.key.store.akeyless.store.dfc.iv"
           :label="t('cipherKey.dfcIV')"
-          class="showLabelOnTop q-w-lg"
-          stack-label
-          borderless
-          dense
+          class="showLabelOnTop tw:w-full"
         />
-        <q-input
+        <OTextarea
           data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"
           v-model="formData.key.store.akeyless.store.dfc.encrypted_data"
           :label="t('cipherKey.dfcEncryptedData') + ' *'"
-          class="showLabelOnTop q-w-lg"
-          stack-label
-          type="textarea"
-          borderless
-          dense
-          :rules="[(val: any) => !!val || 'DFC Encrypted Data is required']"
+          class="showLabelOnTop tw:w-full"
+          :error="!!dfcEncryptedDataError"
+          :error-message="dfcEncryptedDataError"
+          @update:model-value="dfcEncryptedDataError = ''"
         />
       </div>
     </fieldset>
@@ -228,6 +195,9 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { validateUrl } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OTextarea from '@/lib/forms/Input/OTextarea.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
 
 export interface AkeylessStore {
   store: {
@@ -262,7 +232,7 @@ export interface FormData {
 }
 export default defineComponent({
   name: "PageAddAkeylessType",
-  components: { OButton },
+  components: { OButton, OInput, OTextarea, OSelect },
   props: {
     formData: {
       type: Object,
@@ -302,12 +272,61 @@ export default defineComponent({
       }),
     },
   },
-  setup(props: any, { emit }) {
+  setup(props: any, { emit, expose }) {
     const { t } = useI18n();
     const isUpdateLDAPPass = ref(false);
     const isUpdateLDAPUsername = ref(false);
     const isUpdateAccessID = ref(false);
     const isUpdateAccessKey = ref(false);
+
+    // Validation error refs
+    const baseUrlError = ref('');
+    const accessIdError = ref('');
+    const authTypeError = ref('');
+    const accessKeyError = ref('');
+    const ldapUsernameError = ref('');
+    const ldapPasswordError = ref('');
+    const secretTypeError = ref('');
+    const staticSecretError = ref('');
+    const dfcNameError = ref('');
+    const dfcEncryptedDataError = ref('');
+
+    const validateAkeylessFields = (): boolean => {
+      const akeyless = props.formData.key.store.akeyless;
+      baseUrlError.value = !akeyless.base_url ? 'Base URL is required'
+        : !validateUrl(akeyless.base_url) ? 'Please provide correct URL.'
+        : /<[^>]*>/.test(akeyless.base_url) ? 'HTML tags are not allowed'
+        : '';
+      accessIdError.value = !akeyless.access_id ? 'Access ID is required'
+        : !/^[a-zA-Z0-9-]*$/.test(akeyless.access_id) ? 'Access ID should be alphanumeric'
+        : '';
+      authTypeError.value = !akeyless.auth.type ? 'Authentication type is required' : '';
+      secretTypeError.value = !akeyless.store.type ? 'Secret type is required' : '';
+      if (akeyless.auth.type === 'access_key') {
+        accessKeyError.value = !akeyless.auth.access_key ? 'Access Key is required' : '';
+      }
+      if (akeyless.auth.type === 'ldap') {
+        ldapUsernameError.value = !akeyless.auth.ldap.username ? 'LDAP Username is required'
+          : !/^[a-zA-Z0-9._-]+$/.test(akeyless.auth.ldap.username) ? 'Username can only contain alphanumeric characters, dots, underscores, and hyphens'
+          : '';
+        ldapPasswordError.value = !akeyless.auth.ldap.password ? 'LDAP Password is required' : '';
+      }
+      if (akeyless.store.type === 'static_secret') {
+        staticSecretError.value = !akeyless.store.static_secret ? 'Static Secret Name is required' : '';
+      }
+      if (akeyless.store.type === 'dfc') {
+        dfcNameError.value = !akeyless.store.dfc.name ? 'DFC Name is required' : '';
+        dfcEncryptedDataError.value = !akeyless.store.dfc.encrypted_data ? 'DFC Encrypted Data is required' : '';
+      }
+      return !baseUrlError.value && !accessIdError.value && !authTypeError.value
+        && !accessKeyError.value && !ldapUsernameError.value && !ldapPasswordError.value
+        && !secretTypeError.value && !staticSecretError.value && !dfcNameError.value
+        && !dfcEncryptedDataError.value;
+    };
+
+    // Parent (AddCipherKey) calls validate() from its Continue handler so
+    // every required Akeyless field surfaces its inline error at once.
+    expose({ validate: validateAkeylessFields });
 
     const authenticationTypeOptions = ref([
       { label: "Access Key", value: "access_key" },
@@ -343,6 +362,17 @@ export default defineComponent({
       isUpdateLDAPUsername,
       isUpdateAccessID,
       isUpdateAccessKey,
+      baseUrlError,
+      accessIdError,
+      authTypeError,
+      accessKeyError,
+      ldapUsernameError,
+      ldapPasswordError,
+      secretTypeError,
+      staticSecretError,
+      dfcNameError,
+      dfcEncryptedDataError,
+      validateAkeylessFields,
     };
   },
 });
@@ -350,6 +380,12 @@ export default defineComponent({
 
 <style lang="scss">
 .cipher-keys-add-akeyless-type {
+  // Small consistent gap between every top-level field (inputs, selects,
+  // fieldsets) so they don't render flush against each other.
+  > * + * {
+    margin-top: 0.5rem;
+  }
+
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0px;
   }

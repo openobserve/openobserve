@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { defineComponent } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
-import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Dialog, Notify } from 'quasar';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 import router from '@/test/unit/helpers/router';
 
+// Mock toast so we can assert notification calls without needing $q
+const mockToast = vi.fn();
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: (...args) => mockToast(...args),
+}));
+
 // Ensure Quasar plugin
-installQuasar({ plugins: [Dialog, Notify] });
 
 // Avoid waiting for router readiness / guards to hang
 // @ts-ignore
@@ -154,6 +157,7 @@ function stubEditorRefs(wrapper) {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
+  mockToast.mockClear();
 });
 
 // 1. Basic rendering
@@ -275,8 +279,9 @@ describe('EditRole - filtering & visibility', () => {
 
   it('countVisibleResources counts nested visible rows', async () => {
     const wrapper = await mountEditRole();
+    // Nested entities are only counted when the parent has expand: true
     const permissions = [
-      { show: true, entities: [{ show: true, entities: [] }] },
+      { show: true, expand: true, entities: [{ show: true, entities: [] }] },
       { show: false, entities: [] },
     ];
     const count = wrapper.vm.countVisibleResources(permissions);
@@ -324,18 +329,26 @@ describe('EditRole - save and cancel', () => {
   });
 
   it('saveRole notifies info when no changes', async () => {
+    // The component uses toast() from @/lib/feedback/Toast/useToast instead of $q.notify.
     const wrapper = await mountEditRole();
-    const notifySpy = vi.spyOn(wrapper.vm.q, 'notify');
+    mockToast.mockClear();
+
     await wrapper.vm.saveRole();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }));
+
+    // toast is called with variant: "info" when there are no changes
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'info' }));
   });
 
   it('saveRole calls updateRole and resets added/removed permissions', async () => {
     const wrapper = await mountEditRole();
     wrapper.vm.updatePermissionMappings('logs:app:AllowGet');
-    const notifySpy = vi.spyOn(wrapper.vm.q, 'notify');
+    mockToast.mockClear();
+
     await wrapper.vm.saveRole();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'positive' }));
+    await flushPromises();
+
+    // toast is called with variant: "success" after a successful update
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }));
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
   });
 });

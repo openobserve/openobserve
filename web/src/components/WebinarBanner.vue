@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Header variant: full-width top bar above the toolbar -->
+  <!-- Header variant: tw:w-full top bar above the toolbar -->
   <div
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
     class="webinar-top-bar"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner q-mb-md"
+    class="webinar-home-banner tw:mb-3"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="webinar-home-title">{{ webinarData.title }}</div>
 
         <div v-if="webinarData.date" class="webinar-home-meta">
-          <q-icon name="schedule" size="0.875rem" />
+          <OIcon name="schedule" size="xs" />
           <span>{{ formattedDate }}</span>
         </div>
       </div>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="webinar-home-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <q-icon name="arrow_forward" class="q-ml-sm" size="1rem" />
+        <OIcon name="arrow-forward" size="sm" class="tw:ml-2" />
       </OButton>
     </div>
   </div>
@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 
@@ -342,14 +343,7 @@ onMounted(async () => {
   font-size: 0.8125rem;
   line-height: 1;
   color: var(--o2-text-secondary);
-
-  .q-icon {
-    flex-shrink: 0;
-    position: relative;
-    top: 0;
-  }
-
-  span {
+span {
     line-height: 1;
   }
 }

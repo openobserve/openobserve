@@ -1,16 +1,70 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { Dialog, Notify } from 'quasar'
-import { installQuasar } from '@/test/unit/helpers'
+
 import FolderList from './FolderList.vue'
 import { useRouter } from 'vue-router'
 import { nextTick } from 'vue'
 import store from '@/test/unit/helpers/store'
 import i18n from '@/locales'
 
-installQuasar({
-  plugins: [Dialog, Notify],
-})
+// the overlay surface itself via v-model:open. This stub mirrors the public
+// prop/emit shape FolderList relies on so the parent dialog open/close logic
+// can be tested without rendering the real drawer internals.
+const AddFolderStub = {
+  name: 'AddFolder',
+  props: {
+    open: { type: Boolean, default: false },
+    editMode: { type: Boolean, default: false },
+    folderId: { type: String, default: 'default' },
+    type: { type: String, default: 'alerts' },
+  },
+  emits: ['update:open', 'update:modelValue'],
+  template: `
+    <div
+      data-test="add-folder-stub"
+      :data-open="String(open)"
+      :data-edit-mode="String(editMode)"
+      :data-folder-id="folderId"
+      :data-type="type"
+    >
+      <button
+        data-test="add-folder-stub-close"
+        @click="$emit('update:open', false)"
+      >close</button>
+      <button
+        data-test="add-folder-stub-submit"
+        @click="$emit('update:modelValue', [{ folderId: 'stub-folder', name: 'Stub Folder' }])"
+      >submit</button>
+    </div>
+  `,
+}
+
+// ConfirmDialog stub — keeps the data-test surface that the original spec
+// asserted against, while exposing update:ok / update:cancel emits.
+const ConfirmDialogStub = {
+  name: 'ConfirmDialog',
+  props: {
+    modelValue: { type: Boolean, default: false },
+    title: { type: String, default: '' },
+    message: { type: String, default: '' },
+  },
+  emits: ['update:ok', 'update:cancel', 'update:modelValue'],
+  template: `
+    <div
+      data-test="dashboard-confirm-delete-folder-dialog"
+      :data-open="String(modelValue)"
+    >
+      <button
+        data-test="confirm-dialog-stub-ok"
+        @click="$emit('update:ok')"
+      >ok</button>
+      <button
+        data-test="confirm-dialog-stub-cancel"
+        @click="$emit('update:cancel')"
+      >cancel</button>
+    </div>
+  `,
+}
 
 // Mock the external dependencies
 vi.mock('vue-router')
@@ -84,13 +138,9 @@ describe('FolderList.vue', () => {
     wrapper = mount(FolderList, {
       global: {
         plugins: [i18n],
-        components: {
-          AddFolder: { template: '<div data-test="add-folder-mock"></div>' },
-          ConfirmDialog: { template: '<div data-test="confirm-dialog-mock"></div>' }
-        },
         stubs: {
-          'AddFolder': true,
-          'ConfirmDialog': true
+          AddFolder: AddFolderStub,
+          ConfirmDialog: ConfirmDialogStub,
         },
         mocks: {
           $store: mockStore,
@@ -121,6 +171,10 @@ describe('FolderList.vue', () => {
       const wrapperWithDefaults = mount(FolderList, {
         global: {
           plugins: [i18n],
+          stubs: {
+            AddFolder: AddFolderStub,
+            ConfirmDialog: ConfirmDialogStub,
+          },
           mocks: {
             $store: mockStore,
           },
@@ -130,6 +184,7 @@ describe('FolderList.vue', () => {
         }
       })
       expect(wrapperWithDefaults.props('type')).toBe('alerts')
+      wrapperWithDefaults.unmount()
     })
 
     it('should initialize reactive variables correctly', () => {
@@ -606,6 +661,10 @@ describe('FolderList.vue', () => {
         const newWrapper = mount(FolderList, {
           global: {
             plugins: [i18n],
+            stubs: {
+              AddFolder: AddFolderStub,
+              ConfirmDialog: ConfirmDialogStub,
+            },
             mocks: {
               $store: mockStore,
               $router: {
@@ -643,6 +702,10 @@ describe('FolderList.vue', () => {
         const newWrapper = mount(FolderList, {
           global: {
             plugins: [i18n],
+            stubs: {
+              AddFolder: AddFolderStub,
+              ConfirmDialog: ConfirmDialogStub,
+            },
             mocks: {
               $store: mockStore,
             },
@@ -652,7 +715,7 @@ describe('FolderList.vue', () => {
           },
           props: { type: 'alerts' }
         })
-        
+
         await nextTick()
         expect(newWrapper.vm.activeFolderId).toBe('default')
         
@@ -665,7 +728,11 @@ describe('FolderList.vue', () => {
     it('should render folder search input', () => {
       const searchInput = wrapper.find('[data-test="folder-search"]')
       expect(searchInput.exists()).toBe(true)
-      expect(searchInput.attributes('placeholder')).toBe('Search Folder')
+      // OInput places the placeholder on the inner <input>, not on the root
+      // element that carries data-test. Query the underlying native input.
+      const nativeInput = searchInput.find('input')
+      expect(nativeInput.exists()).toBe(true)
+      expect(nativeInput.attributes('placeholder')).toBe('Search Folder')
     })
 
     it('should render folder tabs', () => {
@@ -676,18 +743,95 @@ describe('FolderList.vue', () => {
     it('should render new folder button', () => {
       const newFolderBtn = wrapper.find('[data-test="dashboard-new-folder-btn"]')
       expect(newFolderBtn.exists()).toBe(true)
-      expect(newFolderBtn.text()).toBe('add')
+      // After OButton migration, the icon is rendered via <OIcon name="add">
+      // inside the button rather than as bare text. Verify the icon child.
+      const addIcon = newFolderBtn.findComponent({ name: 'OIcon' })
+      expect(addIcon.exists()).toBe(true)
+      expect(addIcon.props('name')).toBe('add')
     })
 
-    it('should render folder dialog', () => {
-      const dialog = wrapper.find('[data-test="dashboard-folder-dialog"]')
-      // Dialog might not be visible until showAddFolderDialog is true
-      expect(dialog.exists()).toBe(false) 
+    it('should render AddFolder with v-model:open bound to showAddFolderDialog', async () => {
+      // After migration, AddFolder owns the overlay surface itself via
+      // v-model:open — there is no q-dialog wrapper anymore.
+      const addFolder = wrapper.find('[data-test="add-folder-stub"]')
+      expect(addFolder.exists()).toBe(true)
+      expect(addFolder.attributes('data-open')).toBe('false')
+
+      wrapper.vm.showAddFolderDialog = true
+      await nextTick()
+      expect(wrapper.find('[data-test="add-folder-stub"]').attributes('data-open')).toBe('true')
+    })
+
+    it('should pass edit-mode, folder-id and type to AddFolder', async () => {
+      wrapper.vm.editFolder('folder1')
+      await nextTick()
+
+      const addFolder = wrapper.find('[data-test="add-folder-stub"]')
+      expect(addFolder.attributes('data-edit-mode')).toBe('true')
+      expect(addFolder.attributes('data-folder-id')).toBe('folder1')
+      expect(addFolder.attributes('data-type')).toBe('alerts')
+    })
+
+    it('should fall back to "default" folder-id when selectedFolderToEdit is null', () => {
+      const addFolder = wrapper.find('[data-test="add-folder-stub"]')
+      expect(addFolder.attributes('data-folder-id')).toBe('default')
+    })
+
+    it('should close AddFolder when it emits update:open=false', async () => {
+      wrapper.vm.showAddFolderDialog = true
+      await nextTick()
+
+      await wrapper.find('[data-test="add-folder-stub-close"]').trigger('click')
+      await nextTick()
+
+      expect(wrapper.vm.showAddFolderDialog).toBe(false)
+    })
+
+    it('should propagate AddFolder update:modelValue via updateFolderList', async () => {
+      wrapper.vm.showAddFolderDialog = true
+      await nextTick()
+
+      await wrapper.find('[data-test="add-folder-stub-submit"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.emitted('update:folders')).toBeTruthy()
+      expect(wrapper.emitted('update:folders')![0]).toEqual([
+        [{ folderId: 'stub-folder', name: 'Stub Folder' }],
+      ])
+      // updateFolderList should reset the dialog/edit state.
+      expect(wrapper.vm.showAddFolderDialog).toBe(false)
+      expect(wrapper.vm.isFolderEditMode).toBe(false)
     })
 
     it('should render confirm delete dialog', () => {
       const confirmDialog = wrapper.find('[data-test="dashboard-confirm-delete-folder-dialog"]')
       expect(confirmDialog.exists()).toBe(true)
+    })
+
+    it('should trigger deleteFolder when ConfirmDialog emits update:ok', async () => {
+      const { deleteFolderByIdByType } = await import('@/utils/commons')
+      const deleteMock = vi.mocked(deleteFolderByIdByType)
+      deleteMock.mockResolvedValue({} as any)
+
+      wrapper.vm.selectedFolderDelete = 'folder1'
+      wrapper.vm.confirmDeleteFolderDialog = true
+      await nextTick()
+
+      await wrapper.find('[data-test="confirm-dialog-stub-ok"]').trigger('click')
+      await flushPromises()
+
+      expect(deleteMock).toHaveBeenCalledWith(wrapper.vm.store, 'folder1', 'alerts')
+      expect(wrapper.vm.confirmDeleteFolderDialog).toBe(false)
+    })
+
+    it('should close ConfirmDialog when it emits update:cancel', async () => {
+      wrapper.vm.confirmDeleteFolderDialog = true
+      await nextTick()
+
+      await wrapper.find('[data-test="confirm-dialog-stub-cancel"]').trigger('click')
+      await nextTick()
+
+      expect(wrapper.vm.confirmDeleteFolderDialog).toBe(false)
     })
 
     it('should show/hide more actions based on index and search', async () => {
@@ -737,6 +881,10 @@ describe('FolderList.vue', () => {
       const emptyWrapper = mount(FolderList, {
         global: {
           plugins: [i18n],
+          stubs: {
+            AddFolder: AddFolderStub,
+            ConfirmDialog: ConfirmDialogStub,
+          },
           mocks: {
             $store: emptyStore,
           },
@@ -766,6 +914,10 @@ describe('FolderList.vue', () => {
       const missingWrapper = mount(FolderList, {
         global: {
           plugins: [i18n],
+          stubs: {
+            AddFolder: AddFolderStub,
+            ConfirmDialog: ConfirmDialogStub,
+          },
           mocks: {
             $store: missingStore,
           },
@@ -802,6 +954,10 @@ describe('FolderList.vue', () => {
       const specialWrapper = mount(FolderList, {
         global: {
           plugins: [i18n],
+          stubs: {
+            AddFolder: AddFolderStub,
+            ConfirmDialog: ConfirmDialogStub,
+          },
           mocks: {
             $store: specialStore,
           },
@@ -840,6 +996,10 @@ describe('FolderList.vue', () => {
       const longWrapper = mount(FolderList, {
         global: {
           plugins: [i18n],
+          stubs: {
+            AddFolder: AddFolderStub,
+            ConfirmDialog: ConfirmDialogStub,
+          },
           mocks: {
             $store: longStore,
           },

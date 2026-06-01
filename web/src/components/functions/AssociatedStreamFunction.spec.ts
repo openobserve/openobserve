@@ -16,13 +16,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AssociatedStreamFunction from "./AssociatedStreamFunction.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-installQuasar({ plugins: [Notify] });
 
 // Hoist mocks so they are available when vi.mock factories are hoisted
 const {
@@ -105,10 +102,20 @@ describe("AssociatedStreamFunction", () => {
     },
   };
 
+  const ODrawerStub = {
+    name: "ODrawer",
+    inheritAttrs: false,
+    props: ["open", "size", "persistent", "title", "subTitle", "showClose", "width"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    template:
+      '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /></div>',
+  };
+
   const globalStubs = {
     QTablePagination: true,
     SchemaIndex: true,
     NoData: true,
+    ODrawer: ODrawerStub,
   };
 
   beforeEach(() => {
@@ -177,6 +184,69 @@ describe("AssociatedStreamFunction", () => {
 
       await flushPromises();
       expect(wrapper.find('[data-test="log-stream-refresh-stats-btn"]').exists()).toBe(true);
+    });
+  });
+
+  describe("Schema ODrawer", () => {
+    it("should render the ODrawer with size 'lg'", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.attributes("data-size")).toBe("lg");
+    });
+
+    it("should bind ODrawer open state to showIndexSchemaDialog (closed by default)", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      expect(vm.showIndexSchemaDialog).toBe(false);
+
+      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
+      expect(drawer.attributes("data-open")).toBe("false");
+    });
+
+    it("should reflect open=true on ODrawer when showIndexSchemaDialog is true", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.showIndexSchemaDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
+      expect(drawer.attributes("data-open")).toBe("true");
+    });
+
+    it("should sync showIndexSchemaDialog when ODrawer emits update:open", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.showIndexSchemaDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawerComponent = wrapper.findComponent(ODrawerStub);
+      expect(drawerComponent.exists()).toBe(true);
+
+      drawerComponent.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(vm.showIndexSchemaDialog).toBe(false);
     });
   });
 
@@ -308,7 +378,7 @@ describe("AssociatedStreamFunction", () => {
   });
 
   describe("Row Expansion (toggleStreamRow)", () => {
-    it("should expand a row when clicked", async () => {
+    it("should expand a row when onExpandRow is called", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -318,7 +388,7 @@ describe("AssociatedStreamFunction", () => {
       const vm = wrapper.vm as any;
       expect(vm.expandedRow.name).toBe("");
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("stream1");
       expect(vm.expandedRow.stream_type).toBe("logs");
     });
@@ -331,10 +401,10 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("stream1");
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.expandedRow.name).toBe("");
     });
 
@@ -348,7 +418,7 @@ describe("AssociatedStreamFunction", () => {
       mockStreamFunction.mockResolvedValue(mockStreamFunctionResult);
 
       const vm = wrapper.vm as any;
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
 
       await flushPromises();
       expect(mockStreamFunction).toHaveBeenCalledWith("test-org", "stream1", "logs");
@@ -364,7 +434,7 @@ describe("AssociatedStreamFunction", () => {
       const vm = wrapper.vm as any;
       vm.addFunctionInProgress = true;
 
-      vm.toggleStreamRow({ row: { name: "stream1", stream_type: "logs" } });
+      vm.onExpandRow({ name: "stream1", stream_type: "logs" });
       expect(vm.addFunctionInProgress).toBe(false);
     });
   });
@@ -539,7 +609,7 @@ describe("AssociatedStreamFunction", () => {
       vm.expandedRow = { name: "stream1", stream_type: "metrics" };
 
       const columns = vm.functionsColumns;
-      const hasCol = columns.some((col: any) => col.name === "applyBeforeFlattening");
+      const hasCol = columns.some((col: any) => col.id === "applyBeforeFlattening");
       expect(hasCol).toBe(false);
     });
 
@@ -554,7 +624,7 @@ describe("AssociatedStreamFunction", () => {
       vm.expandedRow = { name: "stream1", stream_type: "logs" };
 
       const columns = vm.functionsColumns;
-      const hasCol = columns.some((col: any) => col.name === "applyBeforeFlattening");
+      const hasCol = columns.some((col: any) => col.id === "applyBeforeFlattening");
       expect(hasCol).toBe(true);
     });
   });
@@ -571,18 +641,18 @@ describe("AssociatedStreamFunction", () => {
       vm.allFunctionsList = [{ name: "func1" }, { name: "func2" }, { name: "func3" }];
       vm.functionsList = [{ name: "func1" }];
 
-      const mockUpdate = vi.fn((cb: any) => cb());
-      vm.filterFn("func", mockUpdate);
+      vm.filterFn("func");
 
-      expect(mockUpdate).toHaveBeenCalled();
       // func1 is already applied; it should be filtered out
       const hasFunc1 = vm.filterFunctions.some((f: any) => f.name === "func1");
       expect(hasFunc1).toBe(false);
+      // func2 and func3 match "func" and are not applied
+      expect(vm.filterFunctions).toHaveLength(2);
     });
   });
 
-  describe("Filter Data (filterData)", () => {
-    it("should filter rows by name (case-insensitive)", async () => {
+  describe("Filter Data (filteredStreamData)", () => {
+    it("should filter rows by name (case-insensitive) via filterQuery", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -590,17 +660,19 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [
+      vm.logStream = [
         { name: "STREAM_ONE", stream_type: "logs" },
         { name: "stream_two", stream_type: "metrics" },
       ];
+      vm.filterQuery = "stream_one";
 
-      const result = vm.filterData(rows, "stream_one");
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("STREAM_ONE");
+      await wrapper.vm.$nextTick();
+
+      expect(vm.filteredStreamData).toHaveLength(1);
+      expect(vm.filteredStreamData[0].name).toBe("STREAM_ONE");
     });
 
-    it("should filter rows by stream_type", async () => {
+    it("should filter rows by stream_type via filterQuery", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -608,17 +680,19 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [
+      vm.logStream = [
         { name: "stream1", stream_type: "logs" },
         { name: "stream2", stream_type: "metrics" },
       ];
+      vm.filterQuery = "metrics";
 
-      const result = vm.filterData(rows, "metrics");
-      expect(result).toHaveLength(1);
-      expect(result[0].stream_type).toBe("metrics");
+      await wrapper.vm.$nextTick();
+
+      expect(vm.filteredStreamData).toHaveLength(1);
+      expect(vm.filteredStreamData[0].stream_type).toBe("metrics");
     });
 
-    it("should return empty array when no match", async () => {
+    it("should return empty array when no match via filterQuery", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -626,14 +700,17 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      const rows = [{ name: "stream1", stream_type: "logs" }];
+      vm.logStream = [{ name: "stream1", stream_type: "logs" }];
+      vm.filterQuery = "xyz_not_found";
 
-      expect(vm.filterData(rows, "xyz_not_found")).toHaveLength(0);
+      await wrapper.vm.$nextTick();
+
+      expect(vm.filteredStreamData).toHaveLength(0);
     });
   });
 
   describe("Pagination", () => {
-    it("should change pagination correctly", async () => {
+    it("should have default page size of 20", async () => {
       const wrapper = mount(AssociatedStreamFunction, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -641,12 +718,22 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.qTable = { setPagination: vi.fn() };
+      expect(vm.pageSize).toBe(20);
+    });
 
-      vm.changePagination({ label: "50", value: 50 });
-      expect(vm.selectedPerPage).toBe(50);
-      expect(vm.pagination.rowsPerPage).toBe(50);
-      expect(vm.qTable.setPagination).toHaveBeenCalledWith({ rowsPerPage: 50 });
+    it("should have page size options configured", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      expect(vm.pageSizeOptions).toContain(5);
+      expect(vm.pageSizeOptions).toContain(10);
+      expect(vm.pageSizeOptions).toContain(20);
+      expect(vm.pageSizeOptions).toContain(50);
+      expect(vm.pageSizeOptions).toContain(100);
     });
   });
 

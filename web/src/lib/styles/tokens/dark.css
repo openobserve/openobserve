@@ -6,6 +6,16 @@
 :root.dark,
 .dark :root,
 .dark {
+    /*
+     * Tell the browser to render native UI (date/time/color picker icons,
+     * scrollbars, autofill backgrounds, etc.) in dark theme. Without this,
+     * Chromium's default ::-webkit-calendar-picker-indicator stays dark
+     * gray and disappears against the dark input background. This is
+     * inherited by every descendant, so a single declaration on the dark
+     * root flips every native widget at once.
+     */
+    color-scheme: dark;
+
     /* --- Text --- */
     --color-text-primary: var(--color-grey-50);
     --color-text-secondary: var(--color-grey-400);
@@ -74,6 +84,12 @@
     --color-dropdown-item-destructive-text: var(--color-error-400);
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
+    /* Tooltip */
+    --color-tooltip-bg: var(--color-grey-800);
+    --color-tooltip-text: var(--color-grey-50);
+    --color-tooltip-border: var(--color-grey-600);
+    --color-tooltip-arrow: var(--color-grey-800);
+
     /* ToggleGroup */
     --color-toggle-item-hover-bg: var(--color-primary-950);
     --color-toggle-item-active-bg: var(--color-primary-900);
@@ -85,6 +101,55 @@
     --color-tabs-hover-bg: var(--color-primary-900);
     --color-tabs-bar-border: var(--color-grey-700);
 
+    /* Collapsible */
+    --color-collapsible-trigger-hover-bg: var(--color-primary-900);
+    --color-collapsible-trigger-active-bg: var(--color-primary-800);
+
+    /* OFieldList / OFieldRow / OFieldLabel */
+    --color-field-list-row-hover-bg:   var(--color-primary-900);
+    --color-field-list-actions-bg:     var(--color-surface-subtle);
+    --color-field-list-expansion-bg:   var(--color-surface-subtle);
+
+    /* Badge — tokens that change on dark backgrounds */
+    /* default: brighten bg for contrast against dark panel backgrounds (grey-700 blends into grey-900) */
+    --color-badge-default-solid-bg: var(--color-grey-500);
+    --color-badge-default-solid-text: var(--color-grey-100);
+    --color-badge-default-ol-border: var(--color-grey-500);
+    --color-badge-default-ol-text: var(--color-grey-300);
+    --color-badge-default-soft-bg: var(--color-grey-800);
+    --color-badge-default-soft-text: var(--color-grey-300);
+
+    /* primary: brighten solid bg in dark mode — primary-600 on primary-800 (active tab) has near-zero contrast */
+    --color-badge-primary-solid-bg: var(--color-primary-400);
+    --color-badge-primary-ol-text: var(--color-primary-300);
+    --color-badge-primary-soft-bg: var(--color-primary-900);
+    --color-badge-primary-soft-text: var(--color-primary-300);
+
+    /* success: solid unchanged; outline text brightened (700 too dark on dark bg) */
+    --color-badge-success-ol-text: var(--color-success-500);
+    --color-badge-success-soft-bg: color-mix(in srgb, var(--color-success-500) 15%, transparent);
+    --color-badge-success-soft-text: var(--color-success-500);
+
+    /* warning: solid unchanged (yellow + dark text works on any bg); outline brightened */
+    --color-badge-warning-ol-border: var(--color-warning-400);
+    --color-badge-warning-ol-text: var(--color-warning-400);
+    --color-badge-warning-soft-bg: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
+    --color-badge-warning-soft-text: var(--color-warning-400);
+
+    /* error: solid unchanged; outline brightened */
+    --color-badge-error-ol-border: var(--color-error-400);
+    --color-badge-error-ol-text: var(--color-error-400);
+    --color-badge-error-soft-bg: color-mix(in srgb, var(--color-error-400) 15%, transparent);
+    --color-badge-error-soft-text: var(--color-error-400);
+
+    /* info (blue): brighten for dark bg */
+    --color-badge-info-ol-border: var(--color-info-200);
+    --color-badge-info-ol-text:   var(--color-info-200);
+
+    /* purple: brighten for dark bg */
+    --color-badge-purple-ol-border: var(--color-purple-400);
+    --color-badge-purple-ol-text:   var(--color-purple-400);
+
     /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
     --color-button-ghost-warning-text: var(--color-warning-400);
     --color-button-outline-warning-text: var(--color-warning-400);
@@ -93,6 +158,183 @@
     /* RefreshButton — staleness dot (slightly muted in dark mode) */
     --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
+
+    /* Input (OInput, OTextarea) — disabled-bg uses grey-700 (#404040) which
+       sits noticeably brighter than the enabled `surface-panel` grey-900
+       (#171717) so disabled fields are visually obvious in dark mode. */
+    --color-input-bg: var(--color-surface-panel);
+    --color-input-border: var(--color-border-strong);
+    --color-input-disabled-bg: var(--color-grey-700);
+    --color-input-disabled-text: var(--color-text-secondary);
+    --color-input-placeholder: var(--color-text-disabled);
+    --color-input-error-text: var(--color-error-400);
+    --color-input-border-error: var(--color-error-400);
+
+    /* Select (OSelect) — same disabled-bg strategy as input. */
+    --color-select-bg: var(--color-surface-panel);
+    --color-select-border: var(--color-border-strong);
+    --color-select-disabled-bg: var(--color-grey-700);
+    --color-select-disabled-text: var(--color-text-secondary);
+    --color-select-placeholder: var(--color-text-disabled);
+    --color-select-error-text: var(--color-error-400);
+    --color-select-border-error: var(--color-error-400);
+    --color-select-content-bg: var(--color-surface-overlay);
+    --color-select-content-border: var(--color-border-default);
+    --color-select-item-hover-bg: var(--color-primary-900);
+    --color-select-item-selected-bg: var(--color-primary-800);
+    --color-select-item-selected-text: var(--color-primary-200);
+    --color-select-item-disabled: var(--color-text-disabled);
+
+    /* Switch (OSwitch) — same off-vs-on-vs-disabled differentiation as light
+       mode. OFF uses primary outline + primary thumb (interactive signal).
+       ON gets a primary-filled track + white thumb (handled in the Vue
+       template). DISABLED stays grey + dashed so it's clearly distinct
+       from both OFF and ON. */
+    --color-switch-border: var(--color-primary-500);
+    --color-switch-border-off: var(--color-primary-500);
+    --color-switch-thumb-off: var(--color-primary-500);
+    --color-switch-thumb-on: var(--color-primary-500);
+    --color-switch-disabled-border: var(--color-grey-600);
+    --color-switch-disabled-thumb: var(--color-grey-600);
+
+    /* Checkbox (OCheckbox) */
+    --color-checkbox-bg: var(--color-surface-panel);
+    --color-checkbox-border: var(--color-border-strong);
+    --color-checkbox-checked-bg: var(--color-primary-500);
+    --color-checkbox-checked-border: var(--color-primary-500);
+    --color-checkbox-disabled-bg: var(--color-surface-subtle);
+    --color-checkbox-disabled-border: var(--color-border-default);
+
+    /* Radio (ORadio) — same rationale as switch: primary outline by default
+       (signals interactivity), grey only when disabled. */
+    --color-radio-bg: var(--color-surface-panel);
+    --color-radio-border: var(--color-primary-500);
+    --color-radio-checked-border: var(--color-primary-500);
+    --color-radio-checked-dot: var(--color-primary-500);
+    --color-radio-disabled-bg: var(--color-surface-subtle);
+    --color-radio-disabled-border: var(--color-grey-600);
+
+    /* Slider (OSlider) */
+    --color-slider-track: var(--color-grey-700);
+    --color-slider-track-fill: var(--color-primary-500);
+    --color-slider-thumb: var(--color-primary-500);
+    --color-slider-thumb-border: var(--color-surface-panel);
+    --color-slider-disabled-track: var(--color-grey-800);
+    --color-slider-disabled-track-fill: var(--color-grey-700);
+    --color-slider-disabled-thumb: var(--color-grey-600);
+
+    /* File (OFile) */
+    --color-file-bg: var(--color-surface-panel);
+    --color-file-border: var(--color-border-strong);
+    --color-file-disabled-bg: var(--color-surface-subtle);
+    --color-file-disabled-border: var(--color-border-default);
+    --color-file-error-border: var(--color-error-400);
+    --color-file-chip-bg: var(--color-primary-900);
+    --color-file-chip-text: var(--color-primary-200);
+    --color-file-chip-remove: var(--color-primary-200);
+    --color-file-drag-bg: var(--color-primary-950);
+    --color-file-drag-border: var(--color-primary-400);
+
+    /* Date / Time / Color (ODate, OTime, OColor) */
+    --color-datepicker-bg: var(--color-surface-panel);
+    --color-datepicker-border: var(--color-border-default);
+    --color-datepicker-inner-border: var(--color-grey-600);
+    --color-datepicker-disabled-bg: var(--color-surface-subtle);
+    --color-datepicker-disabled-border: var(--color-border-default);
+    --color-datepicker-error-border: var(--color-error-400);
+    --color-datepicker-segment-focus-bg: var(--color-primary-500);
+    --color-datepicker-segment-focus-text: var(--color-white);
+    /* DatePicker calendar popup */
+    --color-datepicker-popup-bg: var(--color-surface-overlay);
+    --color-datepicker-popup-border: var(--color-border-default);
+    --color-datepicker-day-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-selected-bg: var(--color-primary-500);
+    --color-datepicker-day-today-border: var(--color-primary-400);
+    --color-datepicker-day-outside-text: var(--color-text-disabled);
+    --color-datepicker-nav-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-range-bg: var(--color-primary-900);
+    --color-datepicker-day-range-text: var(--color-primary-200);
+    --color-datepicker-clock-face-bg: var(--color-surface-panel);
+    --color-datepicker-clock-header-bg: var(--color-primary-800);
+    --color-datepicker-clock-selected-bg: var(--color-primary-500);
+    --color-datepicker-clock-hover-bg: var(--color-primary-900);
+    --color-datepicker-relative-btn-bg: var(--color-surface-panel);
+    --color-datepicker-relative-btn-selected-bg: var(--color-primary-500);
+    --color-datepicker-relative-btn-hover-bg: var(--color-primary-900);
+
+    /* Color picker */
+    --color-colorpicker-popup-bg: var(--color-surface-overlay);
+    --color-colorpicker-popup-border: var(--color-border-default);
+
+    /* Dialog */
+    --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
+    --color-dialog-bg: var(--color-grey-900);
+    --color-dialog-border: var(--color-grey-700);
+    --color-dialog-header-bg: var(--color-grey-800);
+    --color-dialog-header-text: var(--color-grey-50);
+    --color-dialog-header-border: var(--color-grey-700);
+    --color-dialog-content-text: var(--color-grey-50);
+    --color-dialog-footer-bg: var(--color-grey-800);
+    --color-dialog-footer-border: var(--color-grey-700);
+    --color-dialog-close-text: var(--color-grey-400);
+    --color-dialog-close-hover-bg: var(--color-grey-700);
+    --color-dialog-close-active-bg: var(--color-grey-600);
+
+    /* Pagination */
+    --color-pagination-item-active-bg: var(--color-primary-500);
+
+    /* Timeline */
+    --color-timeline-dot-primary: var(--color-primary-500);
+    --color-timeline-dot-destructive: var(--color-error-500);
+    --color-timeline-dot-info: var(--color-primary-400);
+    --color-timeline-dot-muted: var(--color-grey-500);
+
+    /* Stepper */
+    --color-stepper-indicator-active: var(--color-primary-500);
+    --color-stepper-indicator-done: var(--color-primary-500);
+    --color-stepper-connector-done: var(--color-primary-700);
+    --color-stepper-trigger-hover: var(--color-surface-subtle-hover);
+
+    /* Spinner */
+    --color-spinner: var(--color-primary-400);
+    --color-spinner-track: var(--color-primary-800);
+
+    /* InnerLoading */
+    --color-inner-loading-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
+    --color-inner-loading-label: var(--color-text-secondary);
+
+    /* Skeleton — dark surface base; shimmer is a subtle white gloss. */
+    --color-skeleton-base: var(--color-grey-800);
+    --color-skeleton-shimmer: rgba(255, 255, 255, 0.07);
+
+    /* ProgressBar */
+    --color-progress-bar-default: var(--color-primary-500);
+    --color-progress-bar-warning: var(--color-warning-400);
+    --color-progress-bar-danger: var(--color-error-500);
+    --color-progress-bar-track: var(--color-grey-700);
+
+    /* Banner (OBanner) */
+    --color-banner-default-bg:     var(--color-grey-800);
+    --color-banner-default-text:   var(--color-grey-200);
+    --color-banner-info-bg:        color-mix(in srgb, var(--color-info-800) 20%, transparent);
+    --color-banner-info-border:    var(--color-info-700);
+    --color-banner-info-text:      var(--color-info-100);
+    --color-banner-success-bg:     color-mix(in srgb, var(--color-success-900) 20%, transparent);
+    --color-banner-success-border: var(--color-success-700);
+    --color-banner-success-text:   var(--color-success-100);
+    --color-banner-warning-bg:     color-mix(in srgb, var(--color-warning-900) 20%, transparent);
+    --color-banner-warning-border: var(--color-warning-600);
+    --color-banner-warning-text:   var(--color-warning-100);
+    --color-banner-error-bg:       var(--color-error-700);
+    --color-banner-error-text:     var(--color-grey-0);
+
+    /* Note Container */
+    --color-note-bg:               color-mix(in srgb, var(--color-warning-900) 15%, transparent);
+    --color-note-border:           var(--color-note-dark-border);
+    --color-note-text:             var(--color-note-dark-text);
+    --color-note-highlight:        var(--color-note-highlight-dark);
+    --color-note-emphasis:         var(--color-grey-300);
+    --color-note-code:             var(--color-note-code-dark);
 }
 
 /* ToggleGroup — primary variant dark overrides */
@@ -102,4 +344,47 @@
     --color-toggle-item-hover-bg: var(--color-primary-950);
     --color-toggle-item-active-bg: var(--color-primary-800);
     --color-toggle-item-active-text: var(--color-primary-200);
+}
+
+/* ── Toast (dark) ───────────────────────────────────────── */
+.dark {
+    --color-toast-success-bg:     color-mix(in srgb, var(--color-success-700) 25%, var(--color-grey-900));
+    --color-toast-success-border: var(--color-success-700);
+    --color-toast-success-icon:   var(--color-success-500);
+
+    --color-toast-error-bg:       color-mix(in srgb, var(--color-error-700) 25%, var(--color-grey-900));
+    --color-toast-error-border:   var(--color-error-600);
+    --color-toast-error-icon:     var(--color-error-400);
+
+    --color-toast-warning-bg:     color-mix(in srgb, var(--color-warning-700) 20%, var(--color-grey-900));
+    --color-toast-warning-border: var(--color-warning-500);
+    --color-toast-warning-icon:   var(--color-warning-400);
+
+    --color-toast-info-bg:        color-mix(in srgb, var(--color-primary-600) 30%, var(--color-grey-900));
+    --color-toast-info-border:    var(--color-primary-500);
+    --color-toast-info-icon:      var(--color-primary-300);
+
+    --color-toast-loading-bg:     var(--color-surface-overlay);
+    --color-toast-loading-border: var(--color-border-default);
+    --color-toast-action-text:    var(--color-primary-400);
+    --color-toast-action-hover:   var(--color-primary-300);
+
+    /* ── OTable (dark) ─────────────────────────────────── */
+    --color-table-header-bg: var(--color-grey-800);
+    --color-table-row-hover-bg: var(--color-primary-900);
+    --color-table-row-selected-bg: color-mix(in srgb, var(--color-primary-800) 50%, var(--color-grey-900));
+    --color-table-row-striped-bg: var(--color-grey-800);
+    --color-table-row-divider: var(--color-grey-700);
+    --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-700) 40%, transparent);
+    --color-table-sort-icon-active: var(--color-primary-400);
+    --color-table-streaming-bar: var(--color-primary-400);
+    --color-table-row-expanded-bg: var(--color-grey-850);
+
+    /* ── Sidebar nav (dark) ────────────────────────────────── */
+    --color-nav-icon: var(--color-grey-400);
+    --color-nav-icon-active: var(--color-primary-400);
+    --color-nav-label-hover: var(--color-primary-300);
+    --color-nav-item-hover-bg: rgba(89, 155, 174, 0.15);
+    --color-nav-item-active-bg: rgba(89, 155, 174, 0.30);
+    --color-nav-item-active-border: rgba(89, 155, 174, 0.45);
 }

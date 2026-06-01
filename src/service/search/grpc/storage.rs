@@ -54,6 +54,7 @@ use tracing::Instrument;
 use crate::service::{
     file_list,
     search::{
+        bloom_pruner,
         grpc::{
             tantivy::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
@@ -80,6 +81,7 @@ pub async fn search(
     file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
+    bloom_indexed_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
     let super::QueryParams {
@@ -106,6 +108,38 @@ pub async fn search(
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
     if *use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
+        // check bloom filter first
+        let (bloom_took, ok) = check_bloom_filter(
+            query.clone(),
+            &mut files,
+            index_condition.clone(),
+            bloom_indexed_fields,
+        )
+        .await?;
+        if ok {
+            log::info!(
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] search->bloom: stream {org_id}/{stream_type}/{stream_name}, bloom filter reduced file_list num to {} in {bloom_took} ms",
+                    files.len(),
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("storage bloom filter reduced file_list num".to_string())
+                    .search_role("follower".to_string())
+                    .duration(idx_took)
+                    .desc(format!(
+                        "bloom filter reduced file_list from {original_files_len} to {} in {bloom_took} ms",
+                        files.len(),
+                    ))
+                    .build()
+                )
+            );
+        }
+
+        // check tantivy index
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
@@ -118,7 +152,7 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, inverted index reduced file_list num to {} in {idx_took} ms",
+                    "[trace_id {trace_id}] search->tantivy: stream {org_id}/{stream_type}/{stream_name}, inverted index reduced file_list num to {} in {idx_took} ms",
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
@@ -239,14 +273,12 @@ pub async fn search(
             .observe(cached_ratio);
     }
 
-    // set target partitions based on cache type
-    let target_partitions = if cache_type == file_data::CacheType::None {
-        cfg.limit.query_thread_num
-    } else {
-        cfg.limit.cpu_num
-    };
+    let target_partitions =
+        calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
 
-    log::debug!("search->storage: session target_partitions: {target_partitions}");
+    log::info!(
+        "[trace_id {trace_id}] search->storage: session target_partitions: {target_partitions}"
+    );
 
     let session = config::meta::search::Session {
         id: format!("{trace_id}-storage"),
@@ -416,6 +448,53 @@ pub async fn cache_files(
     }
 }
 
+/// Check bloom filter for the file list
+#[tracing::instrument(name = "service:search:grpc:storage:check_bloom_filter", skip_all)]
+pub async fn check_bloom_filter(
+    query: Arc<super::QueryParams>,
+    file_list: &mut Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    bloom_indexed_fields: Vec<String>,
+) -> Result<(usize, bool), Error> {
+    let cfg = get_config();
+    if !cfg.common.bloom_filter_enabled
+        || file_list.is_empty()
+        || bloom_indexed_fields.is_empty()
+        || index_condition.is_none()
+    {
+        return Ok((0, false));
+    }
+
+    let start = std::time::Instant::now();
+    let before_num = file_list.len();
+    // The pruner pulls the bloom-decidable predicates out of the
+    // IndexCondition itself; if none are decidable it returns the
+    // input untouched (no `.bf` is touched).
+    *file_list = bloom_pruner::prune(
+        &query.trace_id,
+        &query.org_id,
+        query.stream_type,
+        &query.stream_name,
+        file_list.to_vec(),
+        index_condition.as_ref().unwrap(),
+        bloom_indexed_fields,
+    )
+    .await;
+
+    // metrics
+    let elapsed = start.elapsed();
+    let after_num = file_list.len();
+    config::metrics::BLOOM_PRUNE_KEEP_RATIO
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str()])
+        .observe(after_num as f64 / before_num as f64);
+
+    config::metrics::BLOOM_PRUNE_DURATION
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str()])
+        .observe(elapsed.as_secs_f64());
+
+    Ok((elapsed.as_millis() as usize, true))
+}
+
 /// Filter file list using tantivy index
 #[tracing::instrument(name = "service:search:grpc:storage:tantivy_search", skip_all)]
 pub async fn tantivy_search(
@@ -426,6 +505,7 @@ pub async fn tantivy_search(
 ) -> Result<(usize, bool, TantivyMultiResult), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+    let trace_id = &query.trace_id;
 
     // Cache the corresponding Index files
     let mut scan_stats = ScanStats::new();
@@ -478,8 +558,7 @@ pub async fn tantivy_search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, index size: {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, index size: {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.org_id,
                 query.stream_type,
                 query.stream_name,
@@ -512,12 +591,12 @@ pub async fn tantivy_search(
             .observe(cached_ratio);
     }
 
-    // set target partitions based on cache type
-    let target_partitions = if cache_type == file_data::CacheType::None {
-        cfg.limit.query_thread_num
-    } else {
-        cfg.limit.query_index_thread_num
-    };
+    let target_partitions =
+        calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
+
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: session target_partitions: {target_partitions}",
+    );
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
@@ -532,8 +611,7 @@ pub async fn tantivy_search(
     let max_group_len = index_parquet_files.len();
 
     log::info!(
-        "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
-        query.trace_id,
+        "[trace_id {trace_id}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
     );
 
     for file_group in index_parquet_files {
@@ -587,8 +665,7 @@ pub async fn tantivy_search(
             Err(e) => {
                 let took = start.elapsed().as_millis() as usize;
                 log::error!(
-                    "[trace_id {}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
-                    query.trace_id,
+                    "[trace_id {trace_id}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
                 );
                 // search error, need add filter back
                 return Ok((took, true, TantivyMultiResult::RowNums(0)));
@@ -610,8 +687,7 @@ pub async fn tantivy_search(
                         total_row_ids_percent += result.percent();
                         if threshold_num == 0 {
                             log::warn!(
-                                "[trace_id {}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
-                                query.trace_id,
+                                "[trace_id {trace_id}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
                                 total_row_ids_percent as f64 / cfg.limit.cpu_num as f64,
                             );
                             file_list.extend(file_list_map.into_values());
@@ -640,6 +716,10 @@ pub async fn tantivy_search(
                             tantivy_result_builder.add_histogram(histogram);
                             file_list_map.remove(&file_name);
                         }
+                        TantivyResult::MultiHistogram(multi_histogram) => {
+                            tantivy_result_builder.add_multi_histogram(multi_histogram);
+                            file_list_map.remove(&file_name);
+                        }
                         TantivyResult::TopN(top_n) => {
                             tantivy_result_builder.add_top_n(top_n);
                             file_list_map.remove(&file_name);
@@ -655,8 +735,7 @@ pub async fn tantivy_search(
                 }
                 Err(e) => {
                     log::error!(
-                        "[trace_id {}] search->tantivy: error filtering via index. Keep file to search, error: {e}",
-                        query.trace_id,
+                        "[trace_id {trace_id}] search->tantivy: error filtering via index. Keep file to search, error: {e}"
                     );
                     is_add_filter_back = true;
                     continue;
@@ -676,8 +755,7 @@ pub async fn tantivy_search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {index_condition:?} found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}, took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->tantivy: total hits for index_condition: {index_condition:?} found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}, took: {} ms",
                 file_list_map.len(),
                 search_start.elapsed().as_millis()
             ),
@@ -840,6 +918,10 @@ async fn search_tantivy_index(
             IndexOptimizeMode::SimpleHistogram(..) => {
                 need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
             }
+            IndexOptimizeMode::SimpleMultiHistogram(.., name) => {
+                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
+                need_fast_field.insert(name.clone());
+            }
             IndexOptimizeMode::SimpleTopN(field, ..) => {
                 need_fast_field.insert(field.clone());
             }
@@ -882,6 +964,29 @@ async fn search_tantivy_index(
                 num_buckets,
             )
         }
+        Some(IndexOptimizeMode::SimpleMultiHistogram(
+            min_value,
+            max_value,
+            bucket_width,
+            breakdown_field,
+        )) => {
+            if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
+                return Ok(TantivyResult::MultiHistogram(vec![]));
+            }
+            if tantivy_schema.get_field(&breakdown_field).is_err() {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {breakdown_field} not index in tantivy file: {ttv_file_name}");
+                return Ok(TantivyResult::MultiHistogram(vec![]));
+            }
+            TantivyResult::handle_simple_multi_histogram(
+                &searcher,
+                query,
+                min_value,
+                max_value,
+                bucket_width,
+                &breakdown_field,
+            )
+        }
         Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend)) => {
             TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
         }
@@ -901,6 +1006,9 @@ async fn search_tantivy_index(
     let result = match res {
         TantivyResult::Count(count) => TantivyResult::Count(count),
         TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
+        TantivyResult::MultiHistogram(multi_histogram) => {
+            TantivyResult::MultiHistogram(multi_histogram)
+        }
         TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
@@ -963,6 +1071,17 @@ async fn search_tantivy_index(
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
+}
+
+/// Linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu_num.
+pub(crate) fn calc_target_partitions(
+    cpu_num: usize,
+    query_thread_num: usize,
+    cached_ratio: f64,
+) -> usize {
+    (cpu_num as i64
+        + ((query_thread_num as i64 - cpu_num as i64) as f64 * (1.0 - cached_ratio)) as i64)
+        as usize
 }
 
 /// if simple distinct without filter, we need to warm up the field
@@ -1109,6 +1228,9 @@ fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: us
         }
         TantivyResult::Count(count) => CacheEntry::Count(count),
         TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
+        TantivyResult::MultiHistogram(multi_histogram) => {
+            CacheEntry::MultiHistogram(multi_histogram)
+        }
         TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
         TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
         TantivyResult::RowIds(_) => {

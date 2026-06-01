@@ -396,7 +396,10 @@
     "traces": "痕迹",
     "switchToLogs": "点击切换回日志",
     "patternNoValuesAvailable": "没有可用值",
-    "selectLogStream": "选择日志流"
+    "selectLogStream": "选择日志流",
+    "noData": "无可用数据",
+    "functionEditorLabel": "函数编辑器",
+    "loadingStream": "正在加载直播..."
   },
   "menu": {
     "home": "主页",
@@ -1417,7 +1420,7 @@
     "markLineYAxis": "Y 轴",
     "colorPalette": "调色板",
     "colorSeriesBy": "颜色系列来自：",
-    "colorBySeries": "<b>按系列分类</b>",
+    "colorBySeries": "按系列分类",
     "colorDefaultPaletteBySeries": "默认调色板（按系列）",
     "colorDefaultPaletteBySeriesSubLabel": "同名的系列将使用相同的颜色",
     "colorPaletteClassic": "调色板-经典",
@@ -1426,7 +1429,7 @@
     "colorSingleColorSubLabel": "为所有系列设置特定颜色",
     "colorShadesOfSpecificColor": "特定颜色的色调",
     "colorShadesOfSpecificColorSubLabel": "特定颜色的不同色调",
-    "colorByValue": "<b>按值</b>",
+    "colorByValue": "按值",
     "colorGreenYellowRed": "绿色-黄色-红色（按值）",
     "colorRedYellowGreen": "红-黄-绿（按值）",
     "colorTemperature": "温度（按值）",
@@ -1596,7 +1599,9 @@
     "axisLabelRotateTooltipText": "按选定角度（以度为单位）旋转 x 轴标签文本，以提高标签较长或拥挤时的可读性。",
     "axisLabelTruncateTooltipText": "将 x 轴标签截断为指定宽度（以像素为单位）。",
     "axisLabelTooltipNotePrefix": "注意：",
-    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。"
+    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。",
+    "allFolders": "所有文件夹",
+    "selectFile": "选择文件"
   },
   "panel": {
     "header": "面板",
@@ -2629,6 +2634,7 @@
     "serviceAccounts": "服务账号",
     "serviceAccountsName": "服务账户名称",
     "basicUsers": "用户",
+    "organizationMembers": "组织成员",
     "quota": "配额",
     "externalUserWarningTitle": "外部用户警告",
     "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
@@ -3097,7 +3103,10 @@
     "algorithm": "算法",
     "storeType": "商店类型",
     "mechanismType": "机制类型",
-    "actions": "操作"
+    "actions": "操作",
+    "providerTypeRequired": "提供商类型为必填项",
+    "algorithmRequired": "算法是必需的",
+    "secretRequired": "密钥为必填项"
   },
   "quota": {
     "header": "配额",
@@ -3417,7 +3426,8 @@
     "serviceGroupProtected": "无法删除服务组。您只能修改映射的字段。",
     "noDataFound": "未找到任何数据",
     "isWorkloadType": "服务标识符",
-    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。"
+    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。",
+    "loadingCorrelation": "正在加载关联数据..."
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",
@@ -3754,7 +3764,8 @@
     "errSave": "保存失败",
     "errLoadModel": "加载模型失败",
     "tierDefaultName": "默认",
-    "tierConditionalName": "有条件的等级"
+    "tierConditionalName": "有条件的等级",
+    "shadowedWarningBanner": "以下规则被 “{name}” 遮盖——由更高优先级的规则覆盖，不会用于成本计算。"
   },
   "overview": {
     "title": "系统概述",
@@ -3827,5 +3838,56 @@
     "awsStsSelfHostedInfo": "这使用 AWS sts 来代入角色并执行操作。确保您在安装环境中配置了有权访问此角色的 aws 证书。",
     "externalIdRequired": "外部 ID 为必填项",
     "storageAccountRequired": "存储账户名称为必填项"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "早上好",
+      "afternoon": "下午好",
+      "evening": "晚上好",
+      "night": "工作到很晚"
+    },
+    "welcome": {
+      "taglineLead": "我是",
+      "taglineHighlight": "O2 助手",
+      "taglineTail": "。我可以写你的",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "PromQL",
+      "taglineAnd": "并引导您浏览日志、跟踪、指标和事件。",
+      "signedInAs": "登录身份",
+      "role": "角色",
+      "tryOneOfThese": "或者试试其中一个"
+    },
+    "capabilities": {
+      "query": {
+        "title": "写一个查询",
+        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。"
+      },
+      "incident": {
+        "title": "调查事件",
+        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”"
+      },
+      "dashboard": {
+        "title": "构建仪表板",
+        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。"
+      },
+      "alert": {
+        "title": "创建警报",
+        "description": "阈值或预设警报，以及采集时间 VRL 管道。"
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "编写 VRL 来解析我的 nginx 日志中的 JSON",
+      "regexRedact": "生成用于编辑电子邮件的正则表达式模式",
+      "mapStreamSchema": "映射我的 “默认” 直播架构",
+      "promqlCpu": "使用 > 80% 的 CPU 为 pod 编写 PromQL",
+      "datadogToO2": "将此 Datadog 查询转换为 OpenObserve SQL",
+      "lastAlertFired": "为什么我最后一次警报被触发？"
+    },
+    "placeholderRotation": {
+      "one": "让我看看过去一小时的错误...",
+      "two": "编写 VRL 来解析 nginx 日志中的 JSON...",
+      "three": "为 K8s 节点运行状况构建仪表板..."
+    }
   }
 }

@@ -14,14 +14,53 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { flushPromises, shallowMount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { flushPromises, shallowMount, mount } from "@vue/test-utils";
+import { defineComponent, ref, h } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import MainLayout from "@/layouts/MainLayout.vue";
 import router from "@/test/unit/helpers/router";
 import * as cookies from "@/utils/cookies";
+
+// ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
+// update:open / click:* emits). Mirrors stubs used in other migrated specs.
+const ODialogStub = defineComponent({
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryVariant",
+    "secondaryVariant",
+    "neutralVariant",
+    "primaryDisabled",
+    "secondaryDisabled",
+    "neutralDisabled",
+    "primaryLoading",
+    "secondaryLoading",
+    "neutralLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  setup(_, { slots }) {
+    return () =>
+      h(
+        "div",
+        { class: "o-dialog-stub" },
+        [
+          slots.header?.(),
+          slots.default?.(),
+          slots.footer?.(),
+        ],
+      );
+  },
+});
 
 // Mock cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -40,9 +79,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 describe.skip("Main Layout Component", async () => {
   // Component integration tests skipped due to complex dependency injection
@@ -193,8 +229,7 @@ describe("MainLayout Methods and Functions", () => {
 
       const langWithAllData = {
         code: "de",
-        label: "Deutsch",
-        icon: "flag-icon flag-icon-de"
+        label: "Deutsch"
       };
 
       changeLanguage(langWithAllData);
@@ -631,19 +666,21 @@ describe("MainLayout Methods and Functions", () => {
   describe("Language Configuration", () => {
     it("should have correct language list", () => {
       const langList = [
-        { code: "en-gb", label: "English", icon: "flag-icon flag-icon-gb" },
-        { code: "zh-cn", label: "中文 (简体)", icon: "flag-icon flag-icon-cn" },
-        { code: "zh-tw", label: "中文 (繁體)", icon: "flag-icon flag-icon-tw" },
-        { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" },
-        { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" },
-        { code: "es", label: "Español", icon: "flag-icon flag-icon-es" },
-        { code: "pt", label: "Português", icon: "flag-icon flag-icon-pt" },
-        { code: "it", label: "Italiano", icon: "flag-icon flag-icon-it" },
-        { code: "tr", label: "Türkçe", icon: "flag-icon flag-icon-tr" },
-        { code: "ko", label: "한국어", icon: "flag-icon flag-icon-kr" }
+        { code: "en-gb", label: "English" },
+        { code: "tr-turk", label: "Türkçe" },
+        { code: "zh-cn", label: "简体中文" },
+        { code: "zh-tw", label: "繁體中文" },
+        { code: "fr", label: "Français" },
+        { code: "es", label: "Español" },
+        { code: "de", label: "Deutsch" },
+        { code: "it", label: "Italiano" },
+        { code: "ja", label: "日本語" },
+        { code: "ko", label: "한국어" },
+        { code: "nl", label: "Nederlands" },
+        { code: "pt", label: "Português" },
       ];
 
-      expect(langList).toHaveLength(10);
+      expect(langList).toHaveLength(12);
       expect(langList[0].code).toBe("en-gb");
       expect(langList[0].label).toBe("English");
     });
@@ -1169,6 +1206,101 @@ describe("MainLayout Methods and Functions", () => {
         { name: "logs", title: "Logs" },
         { name: "", title: "Invalid" }
       ])).toHaveLength(2);
+    });
+  });
+
+  // The MainLayout template now uses <ODialog v-model:open="showGetStarted" size="full"
+  // :show-close="false"> to host <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />.
+  // The full layout requires complex DI (skipped above), so we exercise just the migrated
+  // fragment via a small host component plus an ODialogStub. This guards the migration
+  // contract: prop bindings, v-model:open round-trip, and the removeFirstTimeLogin handler.
+  describe("ODialog Migration - GetStarted Dialog", () => {
+    const GetStartedStub = defineComponent({
+      name: "GetStarted",
+      emits: ["removeFirstTimeLogin"],
+      setup(_, { emit }) {
+        return () =>
+          h(
+            "button",
+            {
+              class: "get-started-stub",
+              onClick: () => emit("removeFirstTimeLogin", false),
+            },
+            "submit",
+          );
+      },
+    });
+
+    const Host = defineComponent({
+      name: "MainLayoutDialogHost",
+      components: { ODialog: ODialogStub, GetStarted: GetStartedStub },
+      setup() {
+        const showGetStarted = ref(true);
+        const removeFirstTimeLogin = (val: boolean) => {
+          showGetStarted.value = val;
+          localStorage.removeItem("isFirstTimeLogin");
+        };
+        return { showGetStarted, removeFirstTimeLogin };
+      },
+      template: `
+        <ODialog v-model:open="showGetStarted" size="full" :show-close="false">
+          <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
+        </ODialog>
+      `,
+    });
+
+    beforeEach(() => {
+      localStorage.setItem("isFirstTimeLogin", "true");
+    });
+
+    afterEach(() => {
+      localStorage.removeItem("isFirstTimeLogin");
+    });
+
+    it("renders ODialog with size='full' and showClose=false", () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("size")).toBe("full");
+      expect(dialog.props("showClose")).toBe(false);
+    });
+
+    it("binds open prop from showGetStarted (initially true)", () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("closes via v-model:open when ODialog emits update:open=false", async () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      await dialog.vm.$emit("update:open", false);
+
+      expect(dialog.props("open")).toBe(false);
+      expect((wrapper.vm as any).showGetStarted).toBe(false);
+    });
+
+    it("closes and clears isFirstTimeLogin when GetStarted emits removeFirstTimeLogin", async () => {
+      const wrapper = mount(Host);
+      const getStarted = wrapper.findComponent(GetStartedStub);
+
+      await getStarted.vm.$emit("removeFirstTimeLogin", false);
+
+      expect((wrapper.vm as any).showGetStarted).toBe(false);
+      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    });
+
+    it("does NOT forward any q-dialog-specific props (migration removed maximized/full-height)", () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      // ODialog has no `maximized` / `fullHeight` props — verify only the new contract is in use.
+      expect(dialog.props()).not.toHaveProperty("maximized");
+      expect(dialog.props()).not.toHaveProperty("fullHeight");
+      expect(dialog.props("size")).toBe("full");
     });
   });
 

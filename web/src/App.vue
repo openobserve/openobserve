@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <router-view
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   ></router-view>
+  <OToastProvider />
+  <ConfirmDialogProvider />
 </template>
 
 <script lang="ts">
@@ -26,8 +28,11 @@ import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 import config from "@/aws-exports";
 import { applyThemeColors } from "@/utils/theme";
+import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 
 export default {
+  components: { OToastProvider, ConfirmDialogProvider },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -45,15 +50,16 @@ export default {
 
     // Watch for theme mode changes (light ↔ dark toggle)
     // When user toggles between light and dark mode, reapply the correct colors
+    // NOTE: Always call initializeThemeColors() here regardless of temp colors.
+    // initializeThemeColors() uses per-mode priority logic:
+    //   tempThemeColors[currentMode] > localStorage > org settings > defaults
+    // So if the user previewed dark mode colors but switches to light mode,
+    // initializeThemeColors() will correctly apply the light mode colors (not the dark preview).
+    // Skipping it would leave stale CSS variables and body classes from the preview.
     watch(
       () => store.state.theme,
       () => {
-        // Check if user is actively previewing colors in General Settings
-        // Skip reinitialization if temp colors exist to preserve the preview
-        const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
-        if (!hasTempColors) {
-          initializeThemeColors();
-        }
+        initializeThemeColors();
       }
     );
 

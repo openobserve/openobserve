@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import LeftJoinLineSvg from '@/components/icons/LeftJoinLineSvg.vue';
-import { Quasar } from 'quasar';
+
 
 describe('LeftJoinLineSvg.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +10,7 @@ describe('LeftJoinLineSvg.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(LeftJoinLineSvg, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(LeftJoinLineSvg, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

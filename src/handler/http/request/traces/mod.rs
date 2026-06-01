@@ -52,11 +52,14 @@ use crate::{
             CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
         },
     },
-    service::{search as SearchService, traces},
+    service::{
+        search::{self as SearchService, streaming::sorting::TopKHeap},
+        traces,
+    },
 };
 
 pub mod dag;
-mod schema_compat;
+pub(crate) mod schema_compat;
 pub mod session;
 pub mod user;
 
@@ -252,6 +255,9 @@ pub async fn get_latest_traces(
                     org_id: org_id.clone(),
                     bypass_check: false,
                     parent_id: "".to_string(),
+                    use_all_org: false,
+                    use_self_context: false,
+                    use_self_parent: true,
                 },
                 user.role,
                 user.is_external,
@@ -328,13 +334,26 @@ pub async fn get_latest_traces(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
-    let has_gen_ai_fields = is_llm_stream
-        && schema_compat::stream_has_gen_ai_fields(
-            org_id.as_str(),
-            stream_name.as_str(),
-            StreamType::Traces,
-        )
-        .await;
+    // Fetch and validate the LLM schema so SQL never references missing columns.
+    let schema = infra::schema::get_stream_schema_from_cache(
+        org_id.as_str(),
+        stream_name.as_str(),
+        StreamType::Traces,
+    )
+    .await;
+    let validated_schema = if is_llm_stream {
+        match schema.as_ref() {
+            Some(s) => match schema_compat::validate_llm_schema(s, &stream_name) {
+                Ok(v) => Some(v),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            },
+            // Schema not yet cached: fall back with all required fields assumed
+            // present and optional fields marked absent.
+            None => Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+        }
+    } else {
+        None
+    };
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -359,38 +378,11 @@ pub async fn get_latest_traces(
     let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
 
     // search
-    let query_sql = if is_llm_stream && has_gen_ai_fields {
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
-            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
-            FROM \"{stream_name}\""
-        )
-    } else if is_llm_stream {
-        // Legacy `_o2_llm` schema (pre-PR #11626): columns live under `llm_*`
-        // names and the messages column is `llm_input`. Per-direction cost is
-        // not stored separately, so we emit only the total.
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
-            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
-            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
-            array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
-            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '') as gen_ai_input_messages \
-            FROM \"{stream_name}\""
-        )
+    let query_sql = if let Some(ref validated) = validated_schema {
+        build_llm_trace_query(&stream_name, validated)
     } else {
         format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp,
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration \
             FROM \"{stream_name}\""
@@ -549,6 +541,29 @@ pub async fn get_latest_traces(
     //
     // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
     // Trace IDs originate from ingested data and could contain injected SQL if not validated.
+    // Check whether reference_parent_span_id exists in the stream schema.
+    // If missing (rare — it is a mandatory traces field), omit root-span
+    // logic rather than failing the entire query.
+    let has_ref_parent_id = infra::schema::get_stream_schema_from_cache(
+        org_id.as_str(),
+        stream_name.as_str(),
+        StreamType::Traces,
+    )
+    .await
+    .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
+    .unwrap_or(true);
+
+    let root_service_name_expr = if has_ref_parent_id {
+        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)"
+    } else {
+        "null"
+    };
+    let root_operation_name_expr = if has_ref_parent_id {
+        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END)"
+    } else {
+        "null"
+    };
+
     let sanitized_ids: Vec<String> = traces_data
         .values()
         .map(|v| {
@@ -568,8 +583,8 @@ pub async fn get_latest_traces(
             max(end_time) AS max_end_time, \
             max(duration) AS max_duration, \
             count(DISTINCT service_name) AS service_count, \
-            max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END) AS root_service_name, \
-            max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END) AS root_operation_name, \
+            {root_service_name_expr} AS root_service_name, \
+            {root_operation_name_expr} AS root_operation_name, \
             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
             first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name \
          FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids}') GROUP BY trace_id"
@@ -859,6 +874,74 @@ pub async fn get_latest_traces(
     })
 }
 
+/// Build the shared LLM trace aggregation SQL (Query 1) for table and streaming
+/// handlers.
+///
+/// Produces a `SELECT trace_id … GROUP BY trace_id` query that computes per-trace
+/// start/end times, duration, token/cost sums, distinct response models, and
+/// (when the optional input-messages column exists) the first input message.
+///
+/// For legacy `_o2_llm` streams the column names are mapped to the legacy
+/// `llm_*` equivalents. The function is pure — callers add WHERE and ORDER BY.
+fn build_llm_trace_query(
+    stream_name: &str,
+    validated: &schema_compat::ValidatedLlmSchema,
+) -> String {
+    let first_msg_clause = if validated.has_gen_ai {
+        if validated.has_input_messages {
+            format!(
+                "FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')"
+            )
+        } else {
+            "''".to_string()
+        }
+    } else if validated.has_input_messages {
+        format!(
+            "FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')"
+        )
+    } else {
+        "''".to_string()
+    };
+
+    if validated.has_gen_ai {
+        let total_tokens_expr = if validated.has_total_tokens {
+            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
+        } else {
+            "0 as gen_ai_usage_details_total"
+        };
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+            {total_tokens_expr}, \
+            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
+            {first_msg_clause} as gen_ai_input_messages \
+            FROM \"{stream_name}\""
+        )
+    } else {
+        let total_tokens_expr = if validated.has_total_tokens {
+            "sum(llm_usage_tokens_total) as gen_ai_usage_details_total"
+        } else {
+            "0 as gen_ai_usage_details_total"
+        };
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
+            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
+            {total_tokens_expr}, \
+            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
+            array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
+            {first_msg_clause} as gen_ai_input_messages \
+            FROM \"{stream_name}\""
+        )
+    }
+}
+
 /// GetLatestTracesStream — HTTP/2 streaming variant of GetLatestTraces
 ///
 /// Returns results progressively as each time partition is processed.
@@ -953,6 +1036,9 @@ pub async fn get_latest_traces_stream(
                     org_id: org_id.clone(),
                     bypass_check: false,
                     parent_id: "".to_string(),
+                    use_all_org: false,
+                    use_self_context: false,
+                    use_self_parent: true,
                 },
                 user.role,
                 user.is_external,
@@ -1024,13 +1110,23 @@ pub async fn get_latest_traces_stream(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
-    let has_gen_ai_fields = is_llm_stream
-        && schema_compat::stream_has_gen_ai_fields(
+    let validated_schema = if is_llm_stream {
+        let schema = infra::schema::get_stream_schema_from_cache(
             org_id.as_str(),
             stream_name.as_str(),
             StreamType::Traces,
         )
         .await;
+        match schema.as_ref() {
+            Some(s) => match schema_compat::validate_llm_schema(s, &stream_name) {
+                Ok(v) => Some(v),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            },
+            None => Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+        }
+    } else {
+        None
+    };
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -1079,11 +1175,9 @@ pub async fn get_latest_traces_stream(
             from,
             size,
             timeout,
-            sort_by,
             sort_order.to_string(),
             sql_order_expr,
-            is_llm_stream,
-            has_gen_ai_fields,
+            validated_schema,
             use_cache,
             range_error,
             tx,
@@ -1143,11 +1237,9 @@ async fn process_latest_traces_stream(
     from: i64,
     size: i64,
     timeout: i64,
-    sort_by: String,
     sort_order: String,
     sql_order_expr: String,
-    is_llm_stream: bool,
-    has_gen_ai_fields: bool,
+    validated_schema: Option<schema_compat::ValidatedLlmSchema>,
     use_cache: bool,
     range_error: String,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
@@ -1171,35 +1263,11 @@ async fn process_latest_traces_stream(
         f.trim().to_string()
     };
 
-    // Build the aggregation SQL (Query 1) — identical to get_latest_traces
-    let query_sql_base = if is_llm_stream && has_gen_ai_fields {
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
-            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
-            FROM \"{stream_name}\""
-        )
-    } else if is_llm_stream {
-        // Legacy `_o2_llm` schema (pre-PR #11626): see comment in
-        // `get_latest_traces` for column mapping rationale.
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
-            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
-            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
-            array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
-            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '') as gen_ai_input_messages \
-            FROM \"{stream_name}\""
-        )
+    // Build the aggregation SQL (Query 1) — shared with get_latest_traces through
+    // build_llm_trace_query. The validated schema (or fallback when not cached)
+    // guarantees required columns exist and optional columns are checked.
+    let query_sql_base = if let Some(ref validated) = validated_schema {
+        build_llm_trace_query(&stream_name, validated)
     } else {
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
@@ -1268,7 +1336,6 @@ async fn process_latest_traces_stream(
         &partition_req,
         false,
         false,
-        false,
         use_cache,
     )
     .await
@@ -1287,29 +1354,41 @@ async fn process_latest_traces_stream(
     }
 
     let total_partitions = partitions.len();
-    // Partitions from search_partition are already in DESC order (newest-first) by default,
-    // since the partition SQL has no ORDER BY and the default is OrderBy::Desc.
-    let partitions_desc = if sql_order_expr == "zo_sql_timestamp DESC" {
-        log::info!(
-            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=DESC",
-            partitions.len()
-        );
-        partitions
-    } else if sql_order_expr == "zo_sql_timestamp ASC" {
+    // Non-ts ORDER BY uses TopKHeap across all partitions — no single-partition collapse.
+    // ts ASC reverses partition order; everything else (ts DESC and all non-ts) is newest-first.
+    let is_non_ts_order_by = !sql_order_expr.starts_with("zo_sql_timestamp");
+    let partitions_desc: Vec<[i64; 2]> = if sql_order_expr == "zo_sql_timestamp ASC" {
         log::info!(
             "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
             partitions.len()
         );
-        partitions.into_iter().rev().collect::<Vec<_>>()
+        partitions.into_iter().rev().collect()
     } else {
-        // order by other fields can't be multiple partitions
         log::info!(
-            "[TRACES_STREAM trace_id {trace_id}] sort_by non-timestamp ({sql_order_expr}), \
-            forcing single partition [{}, {}]",
-            partition_req.start_time,
-            partition_req.end_time,
+            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order={}",
+            partitions.len(),
+            if is_non_ts_order_by {
+                format!("non-ts ({sql_order_expr}), TopKHeap")
+            } else {
+                "DESC".to_string()
+            }
         );
-        vec![[partition_req.start_time, partition_req.end_time]]
+        partitions
+    };
+
+    // For non-ts ORDER BY: TopKHeap merges Q1 results across all partitions.
+    // k = from + size so the heap is bounded and O(k) memory at all times.
+    // Q2 runs once after all partitions are drained — no per-partition streaming.
+    let heap_k = if from + size > 0 {
+        (from + size) as usize
+    } else {
+        get_config().limit.query_default_limit as usize
+    };
+    let (non_ts_col, non_ts_is_desc) = parse_order_expr(&sql_order_expr);
+    let mut topk_heap: Option<TopKHeap> = if is_non_ts_order_by {
+        Some(TopKHeap::new(heap_k, &[(non_ts_col, non_ts_is_desc)]))
+    } else {
+        None
     };
 
     // `from` is a global offset: skip the first `from` hits across all partitions,
@@ -1340,12 +1419,16 @@ async fn process_latest_traces_stream(
         let p_start = partition[0];
         let p_end = partition[1];
 
-        // Ask for enough rows to cover remaining offset + remaining needed,
-        // capped at query_default_limit (default 1000) to prevent oversized Q1 scans.
         let remaining_to_skip = (hits_to_skip - hits_seen).max(0);
         let remaining_needed = hits_to_deliver - hits_delivered;
-        let fetch_size =
-            (remaining_to_skip + remaining_needed).min(get_config().limit.query_default_limit);
+        // Non-ts ORDER BY: each partition fetches its local top-k = heap_k rows so the heap can
+        // select the global top-k after all partitions complete. No query_default_limit cap here.
+        // ts ORDER BY: cap per partition to avoid oversized Q1 scans.
+        let fetch_size = if is_non_ts_order_by {
+            heap_k as i64
+        } else {
+            (remaining_to_skip + remaining_needed).min(get_config().limit.query_default_limit)
+        };
 
         // ---------- Query 1: aggregate over this partition ----------
         let mut req1 = base_req.clone();
@@ -1405,8 +1488,29 @@ async fn process_latest_traces_stream(
             continue;
         }
 
-        // Sort Q1 hits by trace_start_time descending (same order as the final result).
-        // Q1 returns traces ordered by zo_sql_timestamp DESC, but we need start_time order.
+        // Non-ts ORDER BY: push this partition's Q1 hits into the global heap and move on.
+        // Seen trace IDs are registered here so later partitions skip duplicates.
+        // Q2 and final streaming happen after all partitions complete.
+        if is_non_ts_order_by {
+            for item in &deduped_hits {
+                if let Some(tid) = item.get("trace_id").and_then(|v| v.as_str())
+                    && !tid.is_empty()
+                {
+                    seen_trace_ids.insert(tid.to_string());
+                }
+            }
+            if let Some(ref mut heap) = topk_heap {
+                heap.push_hits(deduped_hits);
+            }
+            let progress = ((idx + 1) * 100) / total_partitions;
+            let _ = sender
+                .send(Ok(StreamResponses::Progress { percent: progress }))
+                .await;
+            continue;
+        }
+
+        // ts ORDER BY: sort Q1 hits by trace_start_time (Q1 orders by zo_sql_timestamp; UI expects
+        // trace_start_time order). Register seen IDs before slicing so dedup covers skipped traces.
         let mut sorted_hits = deduped_hits;
         sorted_hits.sort_by(|a, b| {
             let a_t = json::get_int_value(a.get("trace_start_time").unwrap_or_default());
@@ -1448,321 +1552,29 @@ async fn process_latest_traces_stream(
         }
 
         // ---------- Query 2: fetch span details only for the traces we will deliver ----------
-        let mut traces_data: HashMap<String, TraceResponseItem> =
-            HashMap::with_capacity(deliverable_q1.len());
-        let mut p_start_actual = p_start;
-        let mut p_end_actual = p_end;
-
-        for item in &deliverable_q1 {
-            let tid = item
-                .get("trace_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let trace_start_time = json::get_int_value(
-                item.get("trace_start_time")
-                    .unwrap_or(&serde_json::Value::Null),
-            );
-            let trace_end_time = json::get_int_value(
-                item.get("trace_end_time")
-                    .unwrap_or(&serde_json::Value::Null),
-            );
-            // Expand window to cover actual span times (nanoseconds → microseconds)
-            if trace_start_time > 0 && trace_start_time / 1000 < p_start_actual {
-                p_start_actual = trace_start_time / 1000;
-            }
-            if trace_end_time > 0 && trace_end_time / 1000 > p_end_actual {
-                // becuase we search with < end_time, so we need to add 1 to the end_time
-                p_end_actual = trace_end_time / 1000 + 1;
-            }
-            traces_data.insert(
-                tid.clone(),
-                TraceResponseItem {
-                    trace_id: tid,
-                    start_time: trace_start_time,
-                    end_time: trace_end_time,
-                    duration: 0,
-                    spans: [0, 0],
-                    service_name: Vec::new(),
-                    first_event: serde_json::Value::Null,
-                    gen_ai_usage_input_tokens: json::get_int_value(
-                        item.get("gen_ai_usage_details_input").unwrap_or_default(),
-                    ),
-                    gen_ai_usage_output_tokens: json::get_int_value(
-                        item.get("gen_ai_usage_details_output").unwrap_or_default(),
-                    ),
-                    gen_ai_usage_total_tokens: json::get_int_value(
-                        item.get("gen_ai_usage_details_total").unwrap_or_default(),
-                    ),
-                    gen_ai_usage_cost: json::get_float_value(
-                        item.get("gen_ai_usage_cost_details").unwrap_or_default(),
-                    ),
-                    gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
-                    models: item
-                        .get("gen_ai_response_models")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(String::from))
-                                .collect()
-                        })
-                        .unwrap_or_default(),
-                },
-            );
-        }
-
-        // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
-        // Trace IDs originate from ingested data and could contain injected SQL if not validated.
-        let sanitized_ids: Vec<String> = traces_data
-            .keys()
-            .map(|tid| {
-                tid.chars()
-                    .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-                    .collect::<String>()
-            })
-            .filter(|tid| !tid.is_empty())
-            .collect();
-        let trace_ids_str = sanitized_ids.join("','");
-
-        // Q2a: per-trace aggregates. One row per trace_id (bounded by N traces) so this
-        // never trips the search-service row cap, which the previous SELECT * approach
-        // could hit when traces had tens of thousands of spans.
-        let detail_sql = format!(
-            "SELECT trace_id, \
-                count(*) AS span_count, \
-                sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count, \
-                min(start_time) AS min_start_time, \
-                max(end_time) AS max_end_time, \
-                max(duration) AS max_duration, \
-                count(DISTINCT service_name) AS service_count, \
-                max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END) AS root_service_name, \
-                max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END) AS root_operation_name, \
-                first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
-                first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids_str}') GROUP BY trace_id"
-        );
-
-        let mut req2 = base_req.clone();
-        req2.query.sql = detail_sql;
-        req2.query.from = 0;
-        // Q2a returns one row per trace_id, so size = number of traces.
-        req2.query.size = traces_data.len() as i64;
-        req2.query.start_time = p_start_actual;
-        req2.query.end_time = p_end_actual;
-
-        // Trace IDs that have more than one service — these need a follow-up Q2b.
-        // Single-service traces are fully populated from Q2a alone.
-        // Track the total expected (trace_id, service_name) row count so Q2b can
-        // size its request exactly and skip pagination.
-        let mut multi_service_tids: Vec<String> = Vec::new();
-        let mut multi_service_total: i64 = 0;
-
-        if sender.is_closed() {
-            return;
-        }
-        let detail_res = match SearchService::cache::search(
+        let Some(traces_data) = run_q2_for_traces(
+            &deliverable_q1,
+            p_start,
+            p_end,
+            &base_req,
             &trace_id,
             &org_id,
             stream_type,
-            Some(user_id.clone()),
-            &req2,
-            "".to_string(),
-            false,
-            None,
-            false,
+            &user_id,
+            &stream_name,
+            &sender,
+            &format!("partition [{p_start},{p_end}]"),
         )
         .await
-        {
-            Ok(res) => res,
-            Err(e) => {
-                log::error!(
-                    "[TRACES_STREAM trace_id {trace_id}] Query2 error on partition [{p_start},{p_end}]: {e}"
-                );
-                let _ = sender.send(Err(e)).await;
-                return;
-            }
+        else {
+            return;
         };
 
-        for item in detail_res.hits {
-            let tid = item
-                .get("trace_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            if tid.is_empty() {
-                continue;
-            }
-            let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
-            let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
-            let min_start = json::get_int_value(item.get("min_start_time").unwrap_or_default());
-            let max_end = json::get_int_value(item.get("max_end_time").unwrap_or_default());
-            let max_duration = json::get_int_value(item.get("max_duration").unwrap_or_default());
-            let service_count = json::get_int_value(item.get("service_count").unwrap_or_default());
-            let root_service_name = item
-                .get("root_service_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let root_operation_name = item
-                .get("root_operation_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let first_service_name = item
-                .get("first_service_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let first_operation_name = item
-                .get("first_operation_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-
-            // Prefer the true root span's labels; fall back to earliest span.
-            let event_service_name = if !root_service_name.is_empty() {
-                root_service_name
-            } else {
-                first_service_name
-            };
-            let event_operation_name = if !root_operation_name.is_empty() {
-                root_operation_name
-            } else {
-                first_operation_name
-            };
-
-            if let Some(trace) = traces_data.get_mut(&tid) {
-                trace.spans[0] = span_count.try_into().unwrap_or_default();
-                trace.spans[1] = error_count.try_into().unwrap_or_default();
-                if trace.start_time == 0 || trace.start_time > min_start {
-                    trace.start_time = min_start;
-                }
-                if trace.end_time < max_end {
-                    trace.end_time = max_end;
-                }
-                trace.duration = max_duration;
-                // update the duration if the duration is not correct
-                if trace.end_time - trace.start_time > trace.duration * 1000 {
-                    trace.duration = (trace.end_time - trace.start_time) / 1000;
-                }
-                trace.first_event = serde_json::json!({
-                    "service_name": event_service_name,
-                    "operation_name": event_operation_name,
-                });
-
-                if service_count <= 1 {
-                    // Single service: populate the services list directly from Q2a;
-                    // skip Q2b for this trace.
-                    if !event_service_name.is_empty() {
-                        trace.service_name.push(TraceServiceNameItem {
-                            service_name: event_service_name,
-                            count: span_count.try_into().unwrap_or_default(),
-                            duration: max_duration,
-                        });
-                    }
-                } else {
-                    multi_service_tids.push(tid);
-                    multi_service_total += service_count;
-                }
-            }
-        }
-
-        // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
-        if !multi_service_tids.is_empty() {
-            // Same sanitization as Q2a above — trace IDs come from DB rows and must be
-            // validated before interpolating into SQL.
-            let multi_ids_str = multi_service_tids
-                .iter()
-                .map(|tid| {
-                    tid.chars()
-                        .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-                        .collect::<String>()
-                })
-                .filter(|tid| !tid.is_empty())
-                .collect::<Vec<String>>()
-                .join("','");
-            let svc_sql = format!(
-                "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
-                 FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-                 GROUP BY trace_id, service_name"
-            );
-
-            let mut req3 = base_req.clone();
-            req3.query.sql = svc_sql;
-            req3.query.from = 0;
-            // Output is bounded to the total service count summed from Q2a, so a
-            // single request fetches everything.
-            req3.query.size = multi_service_total;
-            req3.query.start_time = p_start_actual;
-            req3.query.end_time = p_end_actual;
-
-            if sender.is_closed() {
-                return;
-            }
-            let svc_res = match SearchService::cache::search(
-                &trace_id,
-                &org_id,
-                stream_type,
-                Some(user_id.clone()),
-                &req3,
-                "".to_string(),
-                false,
-                None,
-                false,
-            )
-            .await
-            {
-                Ok(res) => res,
-                Err(e) => {
-                    log::error!(
-                        "[TRACES_STREAM trace_id {trace_id}] Query2b error on partition [{p_start},{p_end}]: {e}"
-                    );
-                    let _ = sender.send(Err(e)).await;
-                    return;
-                }
-            };
-
-            for item in svc_res.hits {
-                let tid = item
-                    .get("trace_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let svc_name = item
-                    .get("service_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
-                let svc_duration =
-                    json::get_int_value(item.get("svc_duration").unwrap_or_default());
-                if let Some(trace) = traces_data.get_mut(&tid) {
-                    trace.service_name.push(TraceServiceNameItem {
-                        service_name: svc_name,
-                        count: svc_count.try_into().unwrap_or_default(),
-                        duration: svc_duration,
-                    });
-                }
-            }
-        }
-
-        // Sort by start_time descending (Q2 may have refined start_time from actual span data).
         let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
-        match sort_by.as_str() {
-            "duration" => {
-                if sort_order == "ASC" {
-                    partition_hits.sort_by(|a, b| a.duration.cmp(&b.duration));
-                } else {
-                    partition_hits.sort_by(|a, b| b.duration.cmp(&a.duration));
-                }
-            }
-            _ => {
-                if sort_order == "ASC" {
-                    partition_hits.sort_by(|a, b| a.start_time.cmp(&b.start_time));
-                } else {
-                    partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
-                }
-            }
+        if sort_order == "ASC" {
+            partition_hits.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+        } else {
+            partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
         }
 
         let deliverable: Vec<serde_json::Value> = partition_hits
@@ -1810,7 +1622,396 @@ async fn process_latest_traces_stream(
         }
     }
 
+    // ── Non-ts ORDER BY: drain heap → Q2 once → stream final result ─────────────────────────
+    if is_non_ts_order_by {
+        let deliverable_q1 = topk_heap
+            .take()
+            .map(|h| h.into_sorted_vec(from as usize))
+            .unwrap_or_default();
+
+        if deliverable_q1.is_empty() {
+            let _ = sender.send(Ok(StreamResponses::Done)).await;
+            return;
+        }
+
+        let Some(traces_data) = run_q2_for_traces(
+            &deliverable_q1,
+            start_time,
+            end_time,
+            &base_req,
+            &trace_id,
+            &org_id,
+            stream_type,
+            &user_id,
+            &stream_name,
+            &sender,
+            "non-ts",
+        )
+        .await
+        else {
+            return;
+        };
+
+        // Preserve heap ordering: walk deliverable_q1 in heap-drain order (already globally
+        // sorted by the non-ts column). Q2 may have refined start_time/duration but the
+        // relative ORDER BY column rank from Q1 is authoritative.
+        let partition_hits: Vec<&TraceResponseItem> = deliverable_q1
+            .iter()
+            .filter_map(|item| {
+                let tid = item.get("trace_id").and_then(|v| v.as_str())?;
+                traces_data.get(tid)
+            })
+            .collect();
+
+        let deliverable: Vec<serde_json::Value> = partition_hits
+            .iter()
+            .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
+            .collect();
+
+        let mut results = config::meta::search::Response::default();
+        for h in deliverable {
+            results.add_hit(&h);
+        }
+        results.set_total(total_across_partitions);
+        if !range_error.is_empty() {
+            results.function_error.push(range_error.clone());
+        }
+
+        let _ = sender
+            .send(Ok(StreamResponses::SearchResponse {
+                results,
+                streaming_aggs: false,
+                streaming_id: None,
+                time_offset: TimeOffset {
+                    start_time,
+                    end_time,
+                },
+            }))
+            .await;
+        let _ = sender.send(Ok(StreamResponses::Done)).await;
+        return;
+    }
+
     let _ = sender.send(Ok(StreamResponses::Done)).await;
+}
+
+/// Extract ORDER BY column name and direction from a `"<col> DESC|ASC"` expression.
+fn parse_order_expr(sql_order_expr: &str) -> (String, bool) {
+    let mut parts = sql_order_expr.split_whitespace();
+    let col = parts.next().unwrap_or("zo_sql_duration").to_string();
+    let is_desc = parts
+        .next()
+        .map(|d| d.to_uppercase() != "ASC")
+        .unwrap_or(true);
+    (col, is_desc)
+}
+
+/// Runs Q2a (per-trace aggregates) and Q2b (per-service breakdown) for a slice of Q1 hits,
+/// building the `TraceResponseItem` map.
+///
+/// `window_start` / `window_end` (microseconds) are the initial search window; they expand
+/// to cover actual span times reported by Q1.
+///
+/// Returns `Some(traces_data)` on success. On error the error is sent on `sender` and
+/// `None` is returned — callers should `return` immediately.
+#[allow(clippy::too_many_arguments)]
+async fn run_q2_for_traces(
+    q1_hits: &[serde_json::Value],
+    window_start: i64,
+    window_end: i64,
+    base_req: &config::meta::search::Request,
+    req_trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: &str,
+    stream_name: &str,
+    sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    log_ctx: &str,
+) -> Option<HashMap<String, TraceResponseItem>> {
+    let mut q2_start = window_start;
+    let mut q2_end = window_end;
+    let mut traces_data: HashMap<String, TraceResponseItem> = HashMap::with_capacity(q1_hits.len());
+
+    for item in q1_hits {
+        let tid = item
+            .get("trace_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let trace_start_time =
+            json::get_int_value(item.get("trace_start_time").unwrap_or_default());
+        let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap_or_default());
+        if trace_start_time > 0 && trace_start_time / 1000 < q2_start {
+            q2_start = trace_start_time / 1000;
+        }
+        if trace_end_time > 0 && trace_end_time / 1000 + 1 > q2_end {
+            q2_end = trace_end_time / 1000 + 1;
+        }
+        if tid.is_empty() {
+            continue;
+        }
+        traces_data.insert(
+            tid.clone(),
+            TraceResponseItem {
+                trace_id: tid,
+                start_time: trace_start_time,
+                end_time: trace_end_time,
+                duration: 0,
+                spans: [0, 0],
+                service_name: Vec::new(),
+                first_event: serde_json::Value::Null,
+                gen_ai_usage_input_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_input").unwrap_or_default(),
+                ),
+                gen_ai_usage_output_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_output").unwrap_or_default(),
+                ),
+                gen_ai_usage_total_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_total").unwrap_or_default(),
+                ),
+                gen_ai_usage_cost: json::get_float_value(
+                    item.get("gen_ai_usage_cost_details").unwrap_or_default(),
+                ),
+                gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
+                models: item
+                    .get("gen_ai_response_models")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            },
+        );
+    }
+
+    let sanitized_ids: Vec<String> = traces_data
+        .keys()
+        .map(|tid| {
+            tid.chars()
+                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                .collect::<String>()
+        })
+        .filter(|tid| !tid.is_empty())
+        .collect();
+
+    let has_ref_parent_id =
+        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces)
+            .await
+            .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
+            .unwrap_or(true);
+
+    let root_svc_expr = if has_ref_parent_id {
+        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)"
+    } else {
+        "null"
+    };
+    let root_op_expr = if has_ref_parent_id {
+        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END)"
+    } else {
+        "null"
+    };
+
+    let trace_ids_str = sanitized_ids.join("','");
+    let detail_sql = format!(
+        "SELECT trace_id, \
+            count(*) AS span_count, \
+            sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count, \
+            min(start_time) AS min_start_time, \
+            max(end_time) AS max_end_time, \
+            max(duration) AS max_duration, \
+            count(DISTINCT service_name) AS service_count, \
+            {root_svc_expr} AS root_service_name, \
+            {root_op_expr} AS root_operation_name, \
+            first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
+            first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name \
+         FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids_str}') GROUP BY trace_id"
+    );
+
+    let mut req2 = base_req.clone();
+    req2.query.sql = detail_sql;
+    req2.query.from = 0;
+    req2.query.size = traces_data.len() as i64;
+    req2.query.start_time = q2_start;
+    req2.query.end_time = q2_end;
+
+    let mut multi_service_tids: Vec<String> = Vec::new();
+    let mut multi_service_total: i64 = 0;
+
+    if sender.is_closed() {
+        return None;
+    }
+    let detail_res = match SearchService::cache::search(
+        req_trace_id,
+        org_id,
+        stream_type,
+        Some(user_id.to_string()),
+        &req2,
+        "".to_string(),
+        false,
+        None,
+        false,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(e) => {
+            log::error!("[TRACES_STREAM trace_id {req_trace_id}] Q2a error ({log_ctx}): {e}");
+            let _ = sender.send(Err(e)).await;
+            return None;
+        }
+    };
+
+    for item in detail_res.hits {
+        let tid = item
+            .get("trace_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        if tid.is_empty() {
+            continue;
+        }
+        let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
+        let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
+        let min_start = json::get_int_value(item.get("min_start_time").unwrap_or_default());
+        let max_end = json::get_int_value(item.get("max_end_time").unwrap_or_default());
+        let max_duration = json::get_int_value(item.get("max_duration").unwrap_or_default());
+        let service_count = json::get_int_value(item.get("service_count").unwrap_or_default());
+        let root_service_name = item
+            .get("root_service_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let root_operation_name = item
+            .get("root_operation_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let first_service_name = item
+            .get("first_service_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let first_operation_name = item
+            .get("first_operation_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        let event_service_name = if !root_service_name.is_empty() {
+            root_service_name
+        } else {
+            first_service_name
+        };
+        let event_operation_name = if !root_operation_name.is_empty() {
+            root_operation_name
+        } else {
+            first_operation_name
+        };
+
+        if let Some(trace) = traces_data.get_mut(&tid) {
+            trace.spans[0] = span_count.try_into().unwrap_or_default();
+            trace.spans[1] = error_count.try_into().unwrap_or_default();
+            if trace.start_time == 0 || trace.start_time > min_start {
+                trace.start_time = min_start;
+            }
+            if trace.end_time < max_end {
+                trace.end_time = max_end;
+            }
+            trace.duration = max_duration;
+            if trace.end_time - trace.start_time > trace.duration * 1000 {
+                trace.duration = (trace.end_time - trace.start_time) / 1000;
+            }
+            trace.first_event = serde_json::json!({
+                "service_name": event_service_name,
+                "operation_name": event_operation_name,
+            });
+            if service_count <= 1 {
+                if !event_service_name.is_empty() {
+                    trace.service_name.push(TraceServiceNameItem {
+                        service_name: event_service_name,
+                        count: span_count.try_into().unwrap_or_default(),
+                        duration: max_duration,
+                    });
+                }
+            } else {
+                multi_service_tids.push(tid);
+                multi_service_total += service_count;
+            }
+        }
+    }
+
+    if !multi_service_tids.is_empty() {
+        let multi_ids_str = multi_service_tids
+            .iter()
+            .map(|tid| {
+                tid.chars()
+                    .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                    .collect::<String>()
+            })
+            .filter(|tid| !tid.is_empty())
+            .collect::<Vec<String>>()
+            .join("','");
+        let svc_sql = format!(
+            "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
+             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
+             GROUP BY trace_id, service_name"
+        );
+        let mut req3 = base_req.clone();
+        req3.query.sql = svc_sql;
+        req3.query.from = 0;
+        req3.query.size = multi_service_total;
+        req3.query.start_time = q2_start;
+        req3.query.end_time = q2_end;
+
+        if sender.is_closed() {
+            return None;
+        }
+        let svc_res = match SearchService::cache::search(
+            req_trace_id,
+            org_id,
+            stream_type,
+            Some(user_id.to_string()),
+            &req3,
+            "".to_string(),
+            false,
+            None,
+            false,
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                log::error!("[TRACES_STREAM trace_id {req_trace_id}] Q2b error ({log_ctx}): {e}");
+                let _ = sender.send(Err(e)).await;
+                return None;
+            }
+        };
+        for item in svc_res.hits {
+            let tid = item
+                .get("trace_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let svc_name = item
+                .get("service_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
+            let svc_duration = json::get_int_value(item.get("svc_duration").unwrap_or_default());
+            if let Some(trace) = traces_data.get_mut(&tid) {
+                trace.service_name.push(TraceServiceNameItem {
+                    service_name: svc_name,
+                    count: svc_count.try_into().unwrap_or_default(),
+                    duration: svc_duration,
+                });
+            }
+        }
+    }
+
+    Some(traces_data)
 }
 
 #[derive(Debug, Serialize)]

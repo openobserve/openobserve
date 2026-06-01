@@ -27,22 +27,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- x axis container -->
     <div
       style="display: flex; flex-direction: row; width: 100%"
-      class="q-pl-md"
+      class="tw:pl-3"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
           <div class="layout-name">
             {{ currentXLabel }}
-            <q-icon name="info_outline" class="q-ml-xs">
-              <q-tooltip>
-                {{ xAxisHint }}
-              </q-tooltip>
-            </q-icon>
+            <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+              <OTooltip :content="xAxisHint" />
           </div>
           <span class="layout-separator">:</span>
           <div
-            class="axis-container droppable scroll row"
+            class="axis-container droppable scroll tw:flex"
             :class="{
               'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
               'drop-entered':
@@ -64,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="row q-mr-sm q-my-xs"
+              class="tw:flex tw:mr-2 tw:my-1"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -77,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'
                 "
                 class="dragItem"
+                data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
@@ -95,69 +93,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="xs" />
                   </template>
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip-12"
-                  :data-test="`dashboard-x-item-${itemX?.alias}`"
-                >
-                  {{ xLabel[index] }}
-                  <template #icon-right
-                    ><q-icon name="arrow_drop_down"
-                  /></template>
-                  <q-menu
-                    :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup"
-                  >
-                    <div
-                      style="padding: 3px 16px 16px 16px"
-                      :style="{
-                        width:
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery ||
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.x[index].isDerived
-                            ? 'auto'
-                            : FIELD_FUNCTION_MENU_WIDTH,
-                      }"
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip-12"
+                      :data-test="`dashboard-x-item-${itemX?.alias}`"
                     >
-                      <div>
-                        <div class="q-mr-xs q-mb-sm">
-                          <DynamicFunctionPopUp
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index]
-                            "
-                            :allowAggregation="false"
-                            :customQuery="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery
-                            "
-                            :chartType="dashboardPanelData.data.type"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </q-menu>
-                </OButton>
+                      {{ xLabel[index] }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
+                    :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.x[index].isDerived
+                          ? 'auto'
+                          : FIELD_FUNCTION_MENU_WIDTH,
+                    }"
+                  >
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.x[index]
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(index)"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="text-caption text-weight-bold text-center q-py-xs"
+              class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
               v-if="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -170,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 align-items: center;
               "
             >
-              <div class="q-mt-xs">{{ xAxisHint }}</div>
+              <div class="tw:mt-1">{{ xAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -190,38 +184,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div style="display: flex; flex-direction: row" class="q-pl-md">
+        <div style="display: flex; flex-direction: row" class="tw:pl-3">
           <!-- Separator between X and Breakdown/Pivot -->
-          <q-separator vertical class="q-mr-md" />
+          <OSeparator vertical class="tw:mr-4" />
           <div class="layout-name" style="min-width: 0 !important">
             {{
               dashboardPanelData.data.type == "table"
                 ? t("panel.pivotField")
                 : t("panel.breakdown")
             }}
-            <q-icon name="info_outline" class="q-ml-xs">
-              <q-tooltip>
-                <span v-if="dashboardPanelData.data.type == 'table'">
-                  {{ t("panel.pivotFieldTooltip") }}
-                </span>
-                <span
-                  v-else-if="
-                    dashboardPanelData.data.type == 'h-bar' ||
-                    dashboardPanelData.data.type == 'h-stacked'
-                  "
-                >
-                  {{ t("panel.breakdownTooltipHBar") }}
-                </span>
-
-                <span v-else>
-                  {{ t("panel.breakdownTooltipDefault") }}
-                </span>
-              </q-tooltip>
-            </q-icon>
+            <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+              <OTooltip side="top" align="center">
+                <template #content>
+                  <span v-if="dashboardPanelData.data.type == 'table'">{{
+                    t("panel.pivotFieldTooltip")
+                  }}</span>
+                  <span
+                    v-else-if="
+                      dashboardPanelData.data.type == 'h-bar' ||
+                      dashboardPanelData.data.type == 'h-stacked'
+                    "
+                    >{{ t("panel.breakdownTooltipHBar") }}</span
+                  >
+                  <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
+                </template>
+              </OTooltip>
           </div>
           <span class="layout-separator">:</span>
           <div
-            class="axis-container droppable scroll row"
+            class="axis-container droppable scroll tw:flex"
             :class="{
               'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
               'drop-entered':
@@ -244,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="row q-mr-sm q-my-xs"
+              class="tw:flex tw:mr-2 tw:my-1"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -258,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'breakdown'
                 "
                 class="dragItem"
+                data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
@@ -276,69 +268,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="xs" />
                   </template>
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip-12"
-                  :data-test="`dashboard-b-item-${itemB?.alias}`"
-                >
-                  {{ bLabel[index] }}
-                  <template #icon-right
-                    ><q-icon name="arrow_drop_down"
-                  /></template>
-                  <q-menu
-                    :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup"
-                  >
-                    <div
-                      style="padding: 3px 16px 16px 16px"
-                      :style="{
-                        width:
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery ||
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.breakdown[index].isDerived
-                            ? 'auto'
-                            : FIELD_FUNCTION_MENU_WIDTH,
-                      }"
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip-12"
+                      :data-test="`dashboard-b-item-${itemB?.alias}`"
                     >
-                      <div>
-                        <div class="q-mr-xs q-mb-sm">
-                          <DynamicFunctionPopUp
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.breakdown[index]
-                            "
-                            :allowAggregation="false"
-                            :customQuery="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery
-                            "
-                            :chartType="dashboardPanelData.data.type"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </q-menu>
-                </OButton>
+                      {{ bLabel[index] }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
+                    :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.breakdown[index].isDerived
+                          ? 'auto'
+                          : FIELD_FUNCTION_MENU_WIDTH,
+                    }"
+                  >
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.breakdown[index]
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(index)"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="text-caption text-weight-bold text-center q-py-xs"
+              class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
               v-if="
                 !dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -351,26 +339,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 align-items: center;
               "
             >
-              <div class="q-mt-xs">{{ bAxisHint }}</div>
+              <div class="tw:mt-1">{{ bAxisHint }}</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- y axis container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ currentYLabel }}
-        <q-icon name="info_outline" class="q-ml-xs">
-          <q-tooltip>
-            {{ yAxisHint }}
-          </q-tooltip>
-        </q-icon>
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+          <OTooltip :content="yAxisHint" />
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll row"
+        class="axis-container droppable scroll tw:flex"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -392,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="row q-mr-sm q-my-xs"
+          class="tw:flex tw:mr-2 tw:my-1"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -404,6 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'
             "
             class="dragItem"
+            data-test="dashboard-query-builder-drag-item"
           >
             &nbsp;
           </div>
@@ -422,71 +408,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
               <template #icon-left>
-                <q-icon name="drag_indicator" size="13px" />
+                <OIcon name="drag-indicator" size="xs" />
               </template>
             </OButton>
-            <OButton
-              variant="primary"
-              size="chip-12"
-              :data-test="`dashboard-y-item-${itemY?.alias}`"
-            >
-              {{ yLabel[index] }}
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
-              <q-menu
-                :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup"
-              >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.y[index].isDerived
-                        ? 'auto'
-                        : FIELD_FUNCTION_MENU_WIDTH,
-                  }"
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  size="chip-12"
+                  :data-test="`dashboard-y-item-${itemY?.alias}`"
                 >
-                  <div>
-                    <div class="q-mr-xs q-mb-sm">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index]
-                        "
-                        :allowAggregation="
-                          dashboardPanelData.data.type == 'heatmap'
-                            ? false
-                            : true
-                        "
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </q-menu>
-            </OButton>
+                  {{ yLabel[index] }}
+                  <template #icon-right
+                    ><OIcon name="arrow-drop-down" size="sm"
+                  /></template>
+                </OButton>
+              </template>
+              <div
+                :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
+                class="field-function-menu-popup dashboard-query-builder-dropdown"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index].isDerived
+                      ? 'auto'
+                      : FIELD_FUNCTION_MENU_WIDTH,
+                }"
+              >
+                <DynamicFunctionPopUp
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index]
+                  "
+                  :allowAggregation="
+                    dashboardPanelData.data.type == 'heatmap'
+                      ? false
+                      : true
+                  "
+                  :customQuery="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                  "
+                  :chartType="dashboardPanelData.data.type"
+                />
+              </div>
+            </ODropdown>
             <OButton
               variant="outline"
               size="icon-chip"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(index)"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </OButtonGroup>
         </div>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -499,28 +483,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             align-items: center;
           "
         >
-          <div class="q-mt-xs">{{ yAxisHint }}</div>
+          <div class="tw:mt-1">{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
 
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
-      <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div style="display: flex; flex-direction: row" class="tw:pl-3">
         <div class="layout-name">
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
           }}
-          <q-icon name="info_outline" class="q-ml-xs">
-            <q-tooltip>
-              {{ zAxisHint }}
-            </q-tooltip>
-          </q-icon>
+          <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+            <OTooltip :content="zAxisHint" />
         </div>
         <span class="layout-separator">:</span>
         <div
-          class="axis-container droppable scroll row"
+          class="axis-container droppable scroll tw:flex"
           :class="{
             'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
             'drop-entered':
@@ -542,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="row q-mr-sm q-my-xs"
+            class="tw:flex tw:mr-2 tw:my-1"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
@@ -554,6 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'
               "
               class="dragItem"
+              data-test="dashboard-query-builder-drag-item"
             >
               &nbsp;
             </div>
@@ -572,69 +554,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
                 <template #icon-left>
-                  <q-icon name="drag_indicator" size="13px" />
+                  <OIcon name="drag-indicator" size="xs" />
                 </template>
               </OButton>
-              <OButton
-                variant="primary"
-                size="chip-12"
-                :data-test="`dashboard-z-item-${itemZ?.alias}`"
-              >
-                {{ zLabel[index] }}
-                <template #icon-right
-                  ><q-icon name="arrow_drop_down"
-                /></template>
-                <q-menu
-                  :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup"
-                >
-                  <div
-                    style="padding: 3px 16px 16px 16px"
-                    :style="{
-                      width:
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.z[index].isDerived
-                          ? 'auto'
-                          : FIELD_FUNCTION_MENU_WIDTH,
-                    }"
+              <ODropdown>
+                <template #trigger>
+                  <OButton
+                    variant="primary"
+                    size="chip-12"
+                    :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   >
-                    <div>
-                      <div class="q-mr-xs q-mb-sm">
-                        <DynamicFunctionPopUp
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.z[index]
-                          "
-                          :allowAggregation="true"
-                          :customQuery="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery
-                          "
-                          :chartType="dashboardPanelData.data.type"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </q-menu>
-              </OButton>
+                    {{ zLabel[index] }}
+                    <template #icon-right
+                      ><OIcon name="arrow-drop-down" size="sm"
+                    /></template>
+                  </OButton>
+                </template>
+                <div
+                  :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown"
+                  :style="{
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.z[index].isDerived
+                        ? 'auto'
+                        : FIELD_FUNCTION_MENU_WIDTH,
+                  }"
+                >
+                  <DynamicFunctionPopUp
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.z[index]
+                    "
+                    :allowAggregation="true"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
+                    :chartType="dashboardPanelData.data.type"
+                  />
+                </div>
+              </ODropdown>
               <OButton
                 variant="outline"
                 size="icon-chip"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(index)"
+                icon-left="close"
               >
-                <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </OButtonGroup>
           </div>
           <div
-            class="text-caption text-weight-bold text-center q-py-xs"
+            class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -647,14 +625,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align-items: center;
             "
           >
-            <div class="q-mt-xs">{{ zAxisHint }}</div>
+            <div class="tw:mt-1">{{ zAxisHint }}</div>
           </div>
         </div>
       </div>
     </span>
-    <q-separator />
+    <OSeparator />
     <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <q-separator />
+    <OSeparator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -669,7 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardData="dashboardData"
       :dashboardPanelData="dashboardPanelData"
     />
-    <q-separator />
+    <OSeparator />
     <OperationsList
       v-model:operations="promqlBuilderQuery.operations"
       :dashboardData="dashboardPanelData"
@@ -700,7 +678,6 @@ import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
@@ -720,16 +697,20 @@ import type { PromVisualQuery } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
   components: {
     OButtonGroup,
     OButton,
+    ODropdown,
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
-    CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DashboardJoinsOption,
@@ -737,6 +718,9 @@ export default defineComponent({
     LabelFilterEditor,
     OperationsList,
     PromQLBuilderOptions,
+    OIcon,
+    OTooltip,
+    OSeparator,
   },
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],
@@ -1461,7 +1445,7 @@ export default defineComponent({
   width: 100%;
   text-align: center;
   // white-space: nowrap;
-  overflow-x: auto;
+  flex-wrap: wrap;
 }
 
 .layout-separator {
@@ -1519,12 +1503,12 @@ export default defineComponent({
   padding: 0;
 }
 
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
+.dashboard-query-builder-dropdown {
+  // box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+  // transform: translateY(0.5rem);
+  // border-radius: 0px;
 
-  .q-virtual-scroll__content {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
 }
@@ -1626,11 +1610,7 @@ export default defineComponent({
         z-index: 3;
         opacity: 0;
         right: 0;
-
-        .q-icon {
-          cursor: pointer;
-        }
-      }
+}
 
       .field_label {
         pointer-events: none;
@@ -1677,32 +1657,6 @@ export default defineComponent({
   }
 }
 
-.q-item {
-  // color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
-  }
-}
-
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
@@ -1725,7 +1679,6 @@ export default defineComponent({
 }
 
 .field-function-menu-popup {
-  padding: 3px 16px 16px 16px;
-  width: 771px;
+  padding: 8px;
 }
 </style>

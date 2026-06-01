@@ -437,8 +437,9 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     // === SAVE + VERIFY: Full alert creation flow ===
 
-    // Capture the alert name that setupToQueryConfig filled
-    const alertNameInput = page.locator(pm.alertsPage.alertNameInput);
+    // Capture the alert name that setupToQueryConfig filled.
+    // O2: OInput wraps the native <input>; use alertNameInputField to hit the real <input>.
+    const alertNameInput = page.locator(pm.alertsPage.alertNameInputField);
     const alertName = await alertNameInput.inputValue();
     testLogger.info(`Saving alert: ${alertName}`);
 
@@ -448,20 +449,21 @@ test.describe("Alerts Stream Switching Regression", () => {
     await destDropdown.click();
     await page.waitForTimeout(1000);
 
-    const destMenu = page.locator('.q-menu:visible');
-    await expect(destMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-    const firstDest = destMenu.locator('.q-item').first();
+    const destMenu = page.locator('[data-test="alert-destinations-select-popover"]');
+    await expect(destMenu).toBeVisible({ timeout: 5000 });
+    const firstDest = page.locator('[data-test="alert-destinations-select-option"]').first();
+    await expect(firstDest).toBeVisible({ timeout: 5000 });
     await firstDest.click();
     testLogger.info(`Selected destination`);
     await page.waitForTimeout(500);
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
-    // Remove interfering q-portal elements
+    // Remove interfering portal elements
     await page.evaluate(() => {
       document.querySelectorAll('div[id^="q-portal"]').forEach(el => {
         if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none';
       });
-    }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
+    }).catch(e => testLogger.warn('Failed to remove portal elements', { error: e.message }));
     await page.waitForTimeout(300);
 
     // Submit — button is clipped in scroll container, use evaluate() same as createScheduledAlertWithSQL
@@ -471,7 +473,7 @@ test.describe("Alerts Stream Switching Regression", () => {
       if (btn) btn.click();
     });
     testLogger.info('Clicked Save button via evaluate()');
-    await expect(page.getByText('Alert saved successfully.')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert saved successfully.' })).toBeVisible({ timeout: 30000 });
     testLogger.info('Alert saved successfully');
 
     // Verify the alert appears in the list

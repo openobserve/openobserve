@@ -16,12 +16,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { searchState } from "./searchState";
 
-installQuasar();
 
 // searchObj is module-level reactive state shared across all composable calls.
 // We use a wrapper component so that useStore/useRouter composables have the

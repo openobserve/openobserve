@@ -15,26 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton
-    id="date-time-button"
-    ref="datetimeBtn"
-    data-cy="date-time-button"
-    variant="outline"
-    class="date-time-button"
-  >
-    <template #icon-left><q-icon name="schedule" /></template>
-    <span class="date-time-label">{{ displayValue }}</span>
-    <template #icon-right
-      ><q-icon name="arrow_drop_down" class="date-time-arrow"
-    /></template>
-    <q-menu
-      no-route-dismiss
-      id="date-time-menu"
-      class="date-time-dialog"
-      anchor="bottom left"
-      self="top left"
-    >
-      <div class="flex justify-evenly q-py-sm">
+  <ODropdown v-model:open="menuOpen" side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        id="date-time-button"
+        ref="datetimeBtn"
+        data-cy="date-time-button"
+        variant="outline"
+        class="date-time-button"
+        icon-left="schedule"
+      >
+        <span class="date-time-label">{{ displayValue }}</span>
+        <template #icon-right
+          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
+        /></template>
+      </OButton>
+    </template>
+    <div id="date-time-menu" class="date-time-dialog">
+      <div class="tw:flex tw:justify-evenly tw:py-2">
         <OButton
           class="tab-button"
           :variant="
@@ -45,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.datetimeRelative") }}
         </OButton>
-        <q-separator vertical inset />
+        <OSeparator vertical class="tw:my-2" />
         <OButton
           class="tab-button"
           :variant="
@@ -57,12 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("common.datetimeAbsolute") }}
         </OButton>
       </div>
-      <q-separator />
+      <OSeparator />
       <OTabPanels v-model="data.selectedDate.tab" animated>
         <OTabPanel name="relative">
-          <div class="date-time-table relative column">
+          <div class="date-time-table tw:relative tw:flex tw:flex-col">
             <div
-              class="relative-row q-px-md q-py-sm"
+              class="relative-row tw:px-3 tw:py-2"
               v-for="(period, index) in relativePeriods"
               :key="'date_' + index"
             >
@@ -92,28 +90,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="relative-row q-px-md q-py-sm">
+            <div class="relative-row tw:px-3 tw:py-2">
               <div class="relative-period-name">Custom</div>
 
-              <div class="row q-gutter-sm">
-                <div class="col">
-                  <q-input
+              <div class="tw:flex tw:gap-2 tw:flex-1 tw:min-w-0">
+                <div class="tw:flex tw:flex-col tw:w-20">
+                  <OInput
                     v-model="data.selectedDate.relative.value"
                     type="number"
-                    dense
-                    filled
-                    min="1"
+                    :min="1"
                     @change="calculateMaxValue"
-                  ></q-input>
+                  />
                 </div>
-                <div class="col">
-                  <q-select
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <OSelect
                     v-model="data.selectedDate.relative.period"
                     :options="relativePeriods"
-                    dense
-                    filled
-                    @update:modelValue="onCustomPeriodSelect"
-                  ></q-select>
+                    @update:model-value="onCustomPeriodSelect"
+                  />
                 </div>
               </div>
             </div>
@@ -121,98 +115,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
         <OTabPanel name="absolute">
           <div class="date-time-table">
-            <div class="flex justify-center q-pa-none">
-              <q-date
-                v-model="data.selectedDate.absolute.date"
-                class="absolute-calendar"
-                range
-                :locale="{
-                  daysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-                }"
-              />
-            </div>
+            <ODateRangeCalendar
+              :start-date="data.selectedDate.absolute.date.from"
+              :end-date="data.selectedDate.absolute.date.to"
+              :max-date="calendarMaxDate"
+              @update:start-date="data.selectedDate.absolute.date.from = $event"
+              @update:end-date="data.selectedDate.absolute.date.to = $event"
+            />
             <div class="notePara">{{ t("common.datetimeMessage") }}</div>
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
 
-            <table class="q-px-md startEndTime">
+            <table class="tw:px-3 startEndTime">
               <tr>
                 <td class="label">{{ t("common.startTime") }}</td>
                 <td class="label">{{ t("common.endTime") }}</td>
               </tr>
               <tr>
                 <td>
-                  <q-input
+                  <OTime
+                    class="tw:w-full"
                     v-model="data.selectedDate.absolute.startTime"
-                    dense
-                    filled
-                    mask="time"
-                    :rules="['time']"
-                  >
-                    <template #append>
-                      <q-icon name="access_time" class="cursor-pointer">
-                        <q-popup-proxy
-                          transition-show="scale"
-                          transition-hide="scale"
-                        >
-                          <q-time
-                            v-model="data.selectedDate.absolute.startTime"
-                          >
-                            <div class="row items-center justify-end">
-                              <OButton
-                                v-close-popup="true"
-                                variant="ghost-primary"
-                                size="xs"
-                                >{{ t("common.close") }}</OButton
-                              >
-                            </div>
-                          </q-time>
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
+                  />
                 </td>
                 <td>
-                  <q-input
+                  <OTime
+                    class="tw:w-full"
                     v-model="data.selectedDate.absolute.endTime"
-                    dense
-                    filled
-                    mask="time"
-                    :rules="['time']"
-                  >
-                    <template #append>
-                      <q-icon name="access_time" class="cursor-pointer">
-                        <q-popup-proxy
-                          transition-show="scale"
-                          transition-hide="scale"
-                        >
-                          <q-time v-model="data.selectedDate.absolute.endTime">
-                            <div class="row items-center justify-end">
-                              <OButton
-                                v-close-popup="true"
-                                variant="ghost-primary"
-                                size="xs"
-                                >{{ t("common.close") }}</OButton
-                              >
-                            </div>
-                          </q-time>
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
+                  />
                 </td>
               </tr>
             </table>
           </div>
         </OTabPanel>
       </OTabPanels>
-    </q-menu>
-  </OButton>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
+// @ts-nocheck
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
+import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";
@@ -220,7 +171,18 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "DateTimePicker",
-  components: { OTabPanels, OTabPanel, OButton },
+  components: {
+    OSeparator,
+    OTabPanels,
+    OTabPanel,
+    OButton,
+    OIcon,
+    OInput,
+    OSelect,
+    OTime,
+    ODateRangeCalendar,
+    ODropdown,
+  },
   props: {
     modelValue: {
       type: Object,
@@ -245,6 +207,7 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const datetimeBtn = ref();
+    const menuOpen = ref(false);
     const { t } = useI18n();
 
     // v-model computed value which is used for the getvalue and setvalue for the props
@@ -292,7 +255,7 @@ export default defineComponent({
       data.selectedDate.tab = "relative";
       data.selectedDate.relative.period = period;
       data.selectedDate.relative.value = value;
-      datetimeBtn.value.click();
+      menuOpen.value = false;
     };
 
     const onCustomPeriodSelect = () => {
@@ -395,9 +358,17 @@ export default defineComponent({
       setRelativeDate,
       onCustomPeriodSelect,
       datetimeBtn,
+      menuOpen,
       displayValue,
       calculateMaxValue,
       getImageURL,
+      calendarMaxDate: computed(() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, "0");
+        const d = String(today.getDate()).padStart(2, "0");
+        return `${y}/${m}/${d}`;
+      }),
     };
   },
 });
@@ -433,7 +404,7 @@ export default defineComponent({
 }
 
 .date-time-dialog {
-  width: 341px;
+  width: 325px;
 
   .tab-button {
     &.q-btn {
@@ -450,12 +421,12 @@ export default defineComponent({
   }
 }
 
-.date-time-table.relative {
+.date-time-table {
   display: flex;
+  flex-direction: column;
 
   .relative-row {
     display: flex;
-    flex: 1;
     align-items: center;
     border-bottom: 1px solid $border-color;
 
@@ -583,6 +554,11 @@ export default defineComponent({
 }
 
 .startEndTime {
+  width: calc(100% - 0.8rem);
+  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
+  td {
+    width: 50%;
+  }
   .q-field {
     padding-bottom: 0.125rem;
   }

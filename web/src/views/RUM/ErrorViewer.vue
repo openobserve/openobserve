@@ -16,19 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="error-viewer-container tw:mx-[0.625rem] tw:mb-[0.375rem] card-container"
+    class="error-viewer-container card-container"
   >
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-12.5rem)]"
+        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:h-[calc(100vh-12.5rem)]"
       >
         <div>
-          <q-spinner-hourglass
-            color="primary"
-            size="2.5rem"
+          <OSpinner
+            size="md"
             class="tw:mx-auto tw:block"
+            data-test="error-viewer-loading-indicator"
           />
-          <div class="text-center full-width">
+          <div class="tw:text-center tw:w-full">
             {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:p-[0.625rem]">
         <ErrorHeader :error="errorDetails" />
       </div>
-      <q-separator class="full-width" />
+      <OSeparator class="tw:w-full" />
       <div class="tw:p-[0.625rem]">
         <ErrorTags :error="errorDetails" />
         <ErrorStackTrace
@@ -65,6 +65,8 @@ import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { t } = useI18n();
 
@@ -179,7 +181,7 @@ const getError = () => {
 
 <style scoped>
 .error-viewer-container {
-  height: calc(100vh - var(--navbar-height) - 1rem);
+  height: 100%;
   overflow-y: auto;
 }
 </style>

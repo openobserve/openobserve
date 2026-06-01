@@ -17,12 +17,9 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -49,33 +46,98 @@ function setStoreFolders(type: string, folders: any[]) {
   };
 }
 
+// ─── Stubs ────────────────────────────────────────────────────────────────────
+
+// ODrawer stub: mirrors the migrated ODrawer surface — v-model:open, button labels,
+// and click:primary/click:secondary emits. Renders default slot only when open.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "showClose",
+    "title",
+    "subTitle",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+    "persistent",
+    "size",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div v-if="open" class="o-drawer-stub" :data-test="$attrs['data-test']">
+      <button
+        class="o-drawer-primary"
+        :data-test="'o-drawer-primary'"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        class="o-drawer-secondary"
+        :data-test="'o-drawer-secondary'"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+      <slot />
+    </div>
+  `,
+};
+
+// OButton stub: emits click on native button so [data-test] selectors keep working
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled"],
+  emits: ["click"],
+  template: `
+    <button
+      :data-test="$attrs['data-test']"
+      :disabled="disabled"
+      @click="$emit('click', $event)"
+    ><slot /></button>
+  `,
+};
+
+// AddFolder stub: mirrors the self-contained AddFolder that owns its own
+// ODrawer. Receives `open` via v-model:open and emits `update:open` to close.
+const submitSpy = vi.fn();
+const AddFolderStub = {
+  name: "AddFolder",
+  props: ["type", "editMode", "open"],
+  emits: ["update:modelValue", "update:open"],
+  template: '<div class="add-folder-stub" />',
+  setup(_: any, { expose }: any) {
+    expose({ submit: submitSpy });
+    return {};
+  },
+};
+
 // ─── Global mount config ──────────────────────────────────────────────────────
 
 const globalConfig = {
   plugins: [i18n],
   stubs: {
-    AddFolder: { template: '<div class="add-folder-stub" />' },
-    "q-dialog": {
-      template:
-        '<div v-if="modelValue" class="q-dialog-stub"><slot /></div>',
-      props: ["modelValue"],
-    },
-    "q-select": {
+    AddFolder: AddFolderStub,
+    ODrawer: ODrawerStub,
+    OButton: OButtonStub,
+    "OSelect": {
       template: `
-        <div class="q-select-stub" :data-test="$attrs['data-test']">
+        <div class="o-select-stub" :data-test="$attrs['data-test']" :data-disable="String(disabled)">
           <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
             <option v-for="opt in options" :key="opt.value" :value="JSON.stringify(opt)">{{ opt.label }}</option>
           </select>
         </div>`,
-      props: ["modelValue", "options", "label", "disable"],
+      props: ["modelValue", "options", "label", "disabled"],
       emits: ["update:modelValue"],
     },
-    "q-btn": {
-      template:
-        '<button :data-test="$attrs[\'data-test\']" :disabled="disable" @click="$emit(\'click\')"><slot /><q-icon v-if="$attrs.name" /></button>',
-      props: ["disable"],
-    },
-    "q-icon": { template: '<i :class="name" />', props: ["name", "size"] },
+    "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
     "q-item": { template: "<div class='q-item-stub'><slot /></div>" },
     "q-item-section": { template: "<div><slot /></div>" },
   },
@@ -88,6 +150,7 @@ describe("SelectFolderDropDown.vue", () => {
 
   beforeEach(() => {
     setStoreFolders("alerts", MOCK_FOLDERS);
+    submitSpy.mockClear();
     vi.clearAllMocks();
   });
 
@@ -130,10 +193,11 @@ describe("SelectFolderDropDown.vue", () => {
       expect(wrapper.props("disableDropdown")).toBe(false);
     });
 
-    it("passes disableDropdown to q-select stub as disable prop", () => {
+    it("passes disableDropdown to OSelect stub as disable prop", () => {
       wrapper = createWrapper({ disableDropdown: true });
-      const select = wrapper.find(".q-select-stub");
+      const select = wrapper.find(".o-select-stub");
       expect(select.exists()).toBe(true);
+      expect(select.attributes("data-disable")).toBe("true");
     });
 
     it("accepts activeFolderId prop", () => {
@@ -154,20 +218,21 @@ describe("SelectFolderDropDown.vue", () => {
     it("defaults to 'default' folder when activeFolderId is not provided", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.selectedFolder.value).toBe("default");
+      // selectedFolder is a ref<string>, auto-unwrapped to the string value
+      expect(vm.selectedFolder).toBe("default");
     });
 
     it("selects the folder matching activeFolderId when provided", () => {
       wrapper = createWrapper({ activeFolderId: "folder-1" });
       const vm = wrapper.vm as any;
-      expect(vm.selectedFolder.value).toBe("folder-1");
-      expect(vm.selectedFolder.label).toBe("My Alerts");
+      // selectedFolder is a ref<string> — the folder ID string
+      expect(vm.selectedFolder).toBe("folder-1");
     });
 
     it("falls back to 'default' when activeFolderId does not match any folder", () => {
       wrapper = createWrapper({ activeFolderId: "nonexistent-id" });
       const vm = wrapper.vm as any;
-      expect(vm.selectedFolder.value).toBe("default");
+      expect(vm.selectedFolder).toBe("default");
     });
   });
 
@@ -180,8 +245,8 @@ describe("SelectFolderDropDown.vue", () => {
       const newFolder = { data: { name: "New Folder", folderId: "new-id" } };
       await vm.updateFolderList(newFolder);
       await nextTick();
-      expect(vm.selectedFolder.label).toBe("New Folder");
-      expect(vm.selectedFolder.value).toBe("new-id");
+      // selectedFolder is ref<string> — holds just the folder ID
+      expect(vm.selectedFolder).toBe("new-id");
     });
 
     it("closes the add folder dialog after update", async () => {
@@ -195,7 +260,7 @@ describe("SelectFolderDropDown.vue", () => {
     });
   });
 
-  // ─── showAddFolderDialog ─────────────────────────────────────────────────────
+  // ─── showAddFolderDialog (ODrawer) ───────────────────────────────────────────
 
   describe("showAddFolderDialog", () => {
     it("initializes showAddFolderDialog to false", () => {
@@ -203,21 +268,43 @@ describe("SelectFolderDropDown.vue", () => {
       expect((wrapper.vm as any).showAddFolderDialog).toBe(false);
     });
 
-    it("opens dialog when add button is clicked", async () => {
+    it("AddFolder open is false initially", () => {
+      wrapper = createWrapper();
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.props("open")).toBe(false);
+    });
+
+    it("opens AddFolder when add button is clicked", async () => {
       wrapper = createWrapper();
       const addBtn = wrapper.find(`[data-test="alerts-folder-move-new-add"]`);
       await addBtn.trigger("click");
+      await nextTick();
       expect((wrapper.vm as any).showAddFolderDialog).toBe(true);
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.props("open")).toBe(true);
     });
 
-    it("does NOT open the dialog when dropdown is disabled", async () => {
+    it("does NOT render AddFolder when dropdown is disabled (v-if guard)", async () => {
       wrapper = createWrapper({ disableDropdown: true });
-      const addBtn = wrapper.find(`[data-test="alerts-folder-move-new-add"]`);
-      // In the template the button also has :disable="disableDropdown" — even if
-      // click fires, the dialog guard prevents rendering
-      expect(wrapper.find("q-dialog").exists() || !(wrapper.vm as any).showAddFolderDialog).toBe(
-        true
-      );
+      // AddFolder is rendered with v-if="!disableDropdown" — should never appear
+      expect(wrapper.findComponent(AddFolderStub).exists()).toBe(false);
+    });
+  });
+
+  // ─── AddFolder interactions ───────────────────────────────────────────────────
+
+  describe("AddFolder interactions", () => {
+    it("closes showAddFolderDialog when AddFolder emits update:open=false", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.exists()).toBe(true);
+      await addFolder.vm.$emit("update:open", false);
+      await nextTick();
+      expect(vm.showAddFolderDialog).toBe(false);
     });
   });
 
@@ -227,7 +314,9 @@ describe("SelectFolderDropDown.vue", () => {
     it("emits 'folder-selected' with selectedFolder when it changes", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.selectedFolder = { label: "My Alerts", value: "folder-1" };
+      // selectedFolder is ref<string>; setting it triggers the watcher
+      // which looks up the folder name from the store and emits { label, value }
+      vm.selectedFolder = "folder-1";
       await nextTick();
       const emitted = wrapper.emitted("folder-selected");
       expect(emitted).toBeTruthy();
@@ -241,18 +330,16 @@ describe("SelectFolderDropDown.vue", () => {
   // ─── Computed style ───────────────────────────────────────────────────────────
 
   describe("computedStyle", () => {
-    it("appends margin-top: 23px to the base style", () => {
+    it("returns the provided style as-is", () => {
       wrapper = createWrapper({ style: "height: 40px" });
       const style = (wrapper.vm as any).computedStyle;
       expect(style).toContain("height: 40px");
-      expect(style).toContain("margin-top: 23px");
     });
 
-    it("uses default 'height: 35px' when no style prop is provided", () => {
+    it("returns empty string when no style prop is provided", () => {
       wrapper = createWrapper();
       const style = (wrapper.vm as any).computedStyle;
-      expect(style).toContain("height: 35px");
-      expect(style).toContain("margin-top: 23px");
+      expect(style).toBe("");
     });
   });
 
@@ -269,7 +356,7 @@ describe("SelectFolderDropDown.vue", () => {
       store.commit("setFoldersByType", store.state.organizationData.foldersByType);
       await nextTick();
       // selectedFolder should still resolve to folder-1
-      expect((wrapper.vm as any).selectedFolder.value).toBe("folder-1");
+      expect((wrapper.vm as any).selectedFolder).toBe("folder-1");
     });
   });
 
@@ -284,9 +371,9 @@ describe("SelectFolderDropDown.vue", () => {
       expect(vm.store.state.organizationData.foldersByType["alerts"]).toEqual(MOCK_FOLDERS);
     });
 
-    it("renders the select element", () => {
+    it("renders the OSelect element", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".q-select-stub").exists()).toBe(true);
+      expect(wrapper.find(".o-select-stub").exists()).toBe(true);
     });
   });
 
@@ -297,8 +384,8 @@ describe("SelectFolderDropDown.vue", () => {
       setStoreFolders("alerts", []);
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      // When no folders, defaults to {label: 'default', value: 'default'}
-      expect(vm.selectedFolder.value).toBe("default");
+      // When no folders, defaults to 'default'
+      expect(vm.selectedFolder).toBe("default");
     });
 
     it("handles undefined foldersByType for type gracefully", () => {

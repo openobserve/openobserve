@@ -15,10 +15,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import {
   mockDomainData,
@@ -28,15 +26,17 @@ import {
   apiErrorScenarios,
 } from "./DomainManagement.test-helpers";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Create a unique DOM node for this test file to avoid conflicts
 const uniqueNodeId = "domain-management-test-app";
 const node = document.createElement("div");
 node.setAttribute("id", uniqueNodeId);
 document.body.appendChild(node);
+
+// Mock toast
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 // Mock the domainManagement service with a unique namespace
 vi.mock("@/services/domainManagement", () => ({
@@ -253,23 +253,9 @@ describe("DomainManagement Integration Tests", () => {
       const vm = wrapper.vm;
       const initialCount = vm.domains.length;
 
-      // Mock the q.dialog method directly on the component
-      const mockDialog = vi.fn().mockReturnValue({
-        onOk: vi.fn((callback) => {
-          callback(); // Immediately call the callback to simulate OK click
-          return { onCancel: vi.fn() };
-        }),
-      });
-
-      // Add $q to the component instance if it doesn't exist
-      if (!vm.$q) {
-        vm.$q = { dialog: mockDialog };
-      } else {
-        vm.$q.dialog = mockDialog;
-      }
-
-      // Call the actual removeDomain method
-      await vm.removeDomain(0);
+      // Component now uses ODialog — call doRemoveDomain directly (bypassing dialog)
+      vm.pendingRemoveDomainIndex = 0;
+      await vm.doRemoveDomain();
 
       expect(vm.domains.length).toBe(initialCount - 1);
     });
@@ -390,17 +376,15 @@ describe("DomainManagement Integration Tests", () => {
 
       const vm = wrapper.vm;
 
-      // Check domain count display
-      const countText = wrapper.find(".text-caption");
-      expect(countText.text()).toContain(vm.domains.length.toString());
+      // Check domain count is rendered in the DOM
+      expect(wrapper.text()).toContain(vm.domains.length.toString());
 
       // Add a domain and check count update
       vm.newDomain = "test.com";
       await vm.addDomain();
       await nextTick();
 
-      const updatedCountText = wrapper.find(".text-caption");
-      expect(updatedCountText.text()).toContain(vm.domains.length.toString());
+      expect(wrapper.text()).toContain(vm.domains.length.toString());
     });
 
     it("should enable/disable buttons based on validation", async () => {

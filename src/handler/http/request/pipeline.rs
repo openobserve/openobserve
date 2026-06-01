@@ -429,7 +429,19 @@ pub async fn delete_pipeline_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(id, &org_id, &_user_id, "pipelines", "DELETE", None).await {
+        if !check_permissions(
+            id,
+            &org_id,
+            &_user_id,
+            "pipelines",
+            "DELETE",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
@@ -533,6 +545,13 @@ pub async fn enable_pipeline(
     Path((org_id, pipeline_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline not found: {pipeline_id}"));
+    }
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
@@ -602,7 +621,19 @@ pub async fn enable_pipeline_bulk(
         let user_id = _user_email.user_id;
 
         for id in &req.ids {
-            if !check_permissions(id, &org_id, &user_id, "pipelines", "PUT", None).await {
+            if !check_permissions(
+                id,
+                &org_id,
+                &user_id,
+                "pipelines",
+                "PUT",
+                None,
+                false,
+                false,
+                true,
+            )
+            .await
+            {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }

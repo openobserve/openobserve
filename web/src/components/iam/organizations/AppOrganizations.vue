@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <component v-if="loadComponent" :is="componentName" />
-  </div>
+  <component v-if="loadComponent" :is="componentName" />
 </template>
 
 <script lang="ts">

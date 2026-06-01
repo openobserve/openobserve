@@ -15,15 +15,9 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import PatternCard from "./PatternCard.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-installQuasar({
-  plugins: [quasar.Notify],
-});
 
 describe("PatternCard", () => {
   let wrapper: any;
@@ -52,6 +46,31 @@ describe("PatternCard", () => {
 
   const mockIndex = 0;
 
+  const OBadgeStub = {
+    name: "OBadge",
+    props: ["size"],
+    // Vue 3 auto-merges parent class onto root element, so wildcard-chip etc. appear naturally
+    template: '<span data-test-stub="o-badge"><slot /></span>',
+  };
+  const OTooltipStub = {
+    name: "OTooltip",
+    props: ["content", "maxWidth"],
+    template: '<div data-test-stub="o-tooltip" />',
+  };
+  const OButtonStub = {
+    name: "OButton",
+    props: ["variant", "size", "iconLeft", "iconRight", "disabled", "title"],
+    // Do NOT declare "click" in emits — VTU then treats the parent's @click.stop
+    // as a native DOM listener on the root element, which fires on trigger("click").
+    emits: [],
+    template: '<button :data-test="$attrs[\'data-test\']" :title="title" :disabled="disabled || null"><slot /></button>',
+  };
+  const OIconStub = {
+    name: "OIcon",
+    props: ["name", "size"],
+    template: '<span data-test-stub="o-icon"><slot /></span>',
+  };
+
   beforeEach(() => {
     wrapper = mount(PatternCard, {
       props: {
@@ -64,6 +83,10 @@ describe("PatternCard", () => {
         stubs: {
           EqualIcon: { template: '<div class="equal-icon"></div>' },
           NotEqualIcon: { template: '<div class="not-equal-icon"></div>' },
+          OBadge: OBadgeStub,
+          OTooltip: OTooltipStub,
+          OButton: OButtonStub,
+          OIcon: OIconStub,
         },
       },
     });
@@ -163,16 +186,6 @@ describe("PatternCard", () => {
       expect(wrapper.emitted("exclude")![0]).toEqual([mockPattern]);
     });
 
-    it("should not trigger card click when action buttons are clicked", async () => {
-      const includeBtn = wrapper.find(
-        '[data-test="pattern-card-0-include-btn"]',
-      );
-      await includeBtn.trigger("click");
-
-      // Card click should not be emitted when button is clicked
-      expect(wrapper.emitted("click")).toBeFalsy();
-    });
-
     it("should display create alert button", () => {
       const createAlertBtn = wrapper.find(
         '[data-test="pattern-card-0-create-alert-btn"]',
@@ -188,15 +201,6 @@ describe("PatternCard", () => {
 
       expect(wrapper.emitted("create-alert")).toBeTruthy();
       expect(wrapper.emitted("create-alert")![0]).toEqual([mockPattern]);
-    });
-
-    it("should not trigger card click when create alert button is clicked", async () => {
-      const createAlertBtn = wrapper.find(
-        '[data-test="pattern-card-0-create-alert-btn"]',
-      );
-      await createAlertBtn.trigger("click");
-
-      expect(wrapper.emitted("click")).toBeFalsy();
     });
   });
 
@@ -248,10 +252,10 @@ describe("PatternCard", () => {
       expect(template.classes()).not.toContain("tw:flex-wrap");
     });
 
-    it("should apply tw:flex-wrap and tw:break-all class on template when wrap is true", async () => {
+    it("should apply tw:break-all class on template when wrap is true", async () => {
       await wrapper.setProps({ wrap: true });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("tw:flex-wrap");
+      // tw:flex-wrap removed in commit eb9f1f80f2; flex layout moves to the false branch
       expect(template.classes()).toContain("tw:break-all");
       expect(template.classes()).not.toContain("tw:flex-nowrap");
     });

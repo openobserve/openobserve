@@ -45,7 +45,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     // Navigate directly to alert destinations page
     await page.goto(`${process.env["ZO_BASE_URL"]}/web/settings/alert_destinations?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    // Anchor on the list title rendering — deterministic signal that the destinations page is ready.
+    await pm.alertDestinationsPage.expectDestinationsListTitleVisible();
 
     testLogger.info('Navigated to Alert Destinations page');
   });
@@ -110,6 +111,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('slack');
     await pm.alertDestinationsPage.fillWebhookUrl('https://invalid-url.com');
+    // Trigger validation via Save click; PrebuiltDestinationForm only sets fieldErrors on validate()
+    await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectValidationError();
     testLogger.info('✓ Invalid webhook URL shows validation error');
     await pm.alertDestinationsPage.clickCancel();
@@ -250,7 +253,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
     testLogger.info('✓ ServiceNow destination created', { servicenowName });
 
-    await pm.alertDestinationsPage.editServiceNowDestination(servicenowName, instanceUrlUpdated);
+    await pm.alertDestinationsPage.editServiceNowDestination(servicenowName, instanceUrlUpdated, null, password);
     await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
     testLogger.info('✓ ServiceNow destination instance URL updated');
 
@@ -277,7 +280,6 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     testLogger.info('Part 1: Verifying Custom destination option');
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('custom');
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.alertDestinationsPage.expectUrlInputVisible();
     testLogger.info('✓ Custom destination form displays correctly');
     await pm.alertDestinationsPage.clickCancel();
@@ -292,7 +294,6 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.selectHttpMethod('POST');
     await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectSuccessNotification();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     testLogger.info('✓ Custom destination created', { destinationName });
 
     // ----- PART 3: Edit Custom Destination URL -----
@@ -302,7 +303,6 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.updateCustomUrl(updatedUrl);
     await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectSuccessNotification();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.alertDestinationsPage.expectDestinationInList(destinationName);
     testLogger.info('✓ Custom destination URL updated successfully');
 

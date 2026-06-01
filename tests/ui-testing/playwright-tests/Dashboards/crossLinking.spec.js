@@ -150,8 +150,8 @@ test.describe("Cross-Linking testcases", () => {
         await expect(page.locator('[data-test="cross-link-name-input"]')).toBeVisible();
         await expect(page.locator('[data-test="cross-link-url-input"]')).toBeVisible();
         await expect(page.locator('[data-test="cross-link-field-input"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-save-btn"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-cancel-btn"]')).toBeVisible();
+        await expect(page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-primary-btn"]')).toBeVisible();
+        await expect(page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]')).toBeVisible();
 
         testLogger.info('Test completed');
     });
@@ -290,9 +290,8 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickEditCrossLink(0);
         await pm.crossLinkPage.expectDialogVisible();
 
-        // Verify form is populated (name input should have a value)
-        const nameInput = page.locator('[data-test="cross-link-name-input"]');
-        const nameValue = await nameInput.inputValue();
+        // Verify form is populated (name input should have a value).
+        const nameValue = await pm.crossLinkPage.getCrossLinkNameValue();
         expect(nameValue.length).toBeGreaterThan(0);
 
         // Modify the URL
@@ -334,15 +333,17 @@ test.describe("Cross-Linking testcases", () => {
             });
         }
 
-        // Count links before delete
-        const itemsBefore = await page.locator('[data-test^="cross-link-item-"]').count();
+        // Count links before delete. Use the per-item-name data-test so the
+        // count includes only the top-level rows (each item exposes a single
+        // `cross-link-item-name-<idx>` which is a 1:1 with the row).
+        const itemsBefore = await page.locator('[data-test^="cross-link-item-name-"]').count();
         expect(itemsBefore).toBeGreaterThan(0);
 
         // Delete first link
         await pm.crossLinkPage.clickDeleteCrossLink(0);
 
         // Verify count decreased
-        const itemsAfter = await page.locator('[data-test^="cross-link-item-"]').count();
+        const itemsAfter = await page.locator('[data-test^="cross-link-item-name-"]').count();
         expect(itemsAfter).toBe(itemsBefore - 1);
 
         testLogger.info('Test completed');
@@ -365,8 +366,11 @@ test.describe("Cross-Linking testcases", () => {
 
         await pm.crossLinkPage.clickCrossLinkingTab();
 
-        // Count links before
-        const itemsBefore = await page.locator('[data-test^="cross-link-item-"]').count();
+        // Count links before. `cross-link-item-name-<idx>` is emitted once
+        // per row, so it gives an accurate per-row count (unlike the broader
+        // `cross-link-item-` prefix which also matches the per-cell url/name
+        // attributes inside each row).
+        const itemsBefore = await page.locator('[data-test^="cross-link-item-name-"]').count();
 
         // Open dialog, fill form, cancel
         await pm.crossLinkPage.clickAddCrossLink();
@@ -379,7 +383,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.expectDialogNotVisible();
 
         // Verify no new link was added
-        const itemsAfter = await page.locator('[data-test^="cross-link-item-"]').count();
+        const itemsAfter = await page.locator('[data-test^="cross-link-item-name-"]').count();
         expect(itemsAfter).toBe(itemsBefore);
 
         testLogger.info('Test completed');
@@ -419,7 +423,7 @@ test.describe("Cross-Linking testcases", () => {
 
         testLogger.info('Cross-link created and saved');
 
-        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query
+        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query.
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
@@ -449,24 +453,19 @@ test.describe("Cross-Linking testcases", () => {
         });
 
         try {
-            // Step 4: Find the kubernetes_container_name field row in the expanded JSON preview
-            // and click its action dropdown button
-            const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
-            await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
-            const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-            await fieldActionBtn.click();
-            await page.waitForTimeout(1000);
+            // Step 4: Open the kubernetes_container_name field action dropdown
+            // (data-test resolved via PO method on the JsonPreview log-detail row)
+            await pm.crossLinkPage.openFieldActionDropdown('kubernetes_container_name');
 
             // Look for the cross-link item in the dropdown menu
-            const crossLinkItem = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
-            const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
+            const crossLinkVisible = await pm.crossLinkPage.isLogCrossLinkVisible(crossLinkName);
 
             // Assert cross-link menu item is visible
             expect(crossLinkVisible, `Cross-link "${crossLinkName}" should be visible in dropdown menu`).toBe(true);
             testLogger.info('Cross-link menu item is visible in dropdown');
 
             // Click the cross-link
-            await crossLinkItem.click();
+            await pm.crossLinkPage.clickLogCrossLinkMenuItem(crossLinkName);
             await page.waitForTimeout(1000);
 
             // Step 5: Retrieve the captured URL
@@ -589,37 +588,24 @@ test.describe("Cross-Linking testcases", () => {
 
         try {
             // Step 4: Click on a data row in the table panel to trigger the cross-link drilldown menu
-            // Quasar's q-table may use virtual scrolling where tbody tr elements report as hidden.
-            // Use page.evaluate to find and click the first visible cell with content.
+            // Uses PO helper that resolves cells via data-test on the rendered table.
             await page.waitForTimeout(2000);
-            await page.evaluate(() => {
-                const table = document.querySelector('[data-test="dashboard-panel-table"]');
-                if (!table) return;
-                const cells = table.querySelectorAll('td');
-                for (const cell of cells) {
-                    if (cell.offsetParent !== null && cell.textContent.trim()) {
-                        cell.click();
-                        return;
-                    }
-                }
-            });
+            await pm.crossLinkPage.clickFirstDashboardTableCell();
             await page.waitForTimeout(1500);
 
-            // Step 5: Look for the crosslink-drilldown-menu popup
-            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
-            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+            // Step 5: Look for the drilldown menu popup (resolved via data-test)
+            const menuVisible = await pm.crossLinkPage.isDrilldownMenuVisible();
 
             expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
             testLogger.info('Drilldown menu is visible');
 
-            // Find and click the cross-link menu item
-            const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
-            const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
+            // Find and click the cross-link menu item (per-name data-test on each menu item)
+            const crossLinkMenuVisible = await pm.crossLinkPage.isDrilldownMenuItemVisible(crossLinkName);
 
             expect(crossLinkMenuVisible, `Cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
             testLogger.info('Cross-link menu item is visible in drilldown');
 
-            await crossLinkMenuItem.click();
+            await pm.crossLinkPage.clickDrilldownMenuItem(crossLinkName);
             await page.waitForTimeout(1000);
 
             // Step 6: Retrieve and verify the captured URL
@@ -757,30 +743,29 @@ test.describe("Cross-Linking testcases", () => {
         // Verify the list item renders all components
         await pm.crossLinkPage.expectCrossLinkItemVisible(0);
 
-        const listItem = page.locator('[data-test="cross-link-item-0"]');
-
-        // Verify name is displayed
-        const nameText = await listItem.locator('.text-subtitle2').textContent();
+        // Verify name is displayed (resolved via dedicated per-item-name data-test)
+        const nameText = await pm.crossLinkPage.getCrossLinkItemNameText(0);
         expect(nameText).toContain(linkName);
 
-        // Verify URL is displayed
-        const urlText = await listItem.locator('.text-caption').first().textContent();
+        // Verify URL is displayed (resolved via dedicated per-item-url data-test)
+        const urlText = await pm.crossLinkPage.getCrossLinkItemUrlText(0);
         expect(urlText).toContain('display.example.com');
 
-        // Verify field chips are rendered (CrossLinkManager shows q-chip for each field)
-        const fieldChips = listItem.locator('.q-chip');
-        const chipCount = await fieldChips.count();
+        // Verify field chips are rendered (CrossLinkManager shows OBadge for each field after q-chip → OBadge migration)
+        const chipCount = await pm.crossLinkPage.getFieldChipsCount(0);
         expect(chipCount).toBe(2);
 
         // Verify chip text content
-        const chip0Text = await fieldChips.nth(0).textContent();
-        const chip1Text = await fieldChips.nth(1).textContent();
+        const chip0Text = await pm.crossLinkPage.getFieldChipText(0, 0);
+        const chip1Text = await pm.crossLinkPage.getFieldChipText(0, 1);
         expect(chip0Text).toContain('kubernetes_container_name');
         expect(chip1Text).toContain('kubernetes_pod_name');
 
-        // Verify edit and delete action buttons exist
-        await expect(page.locator('[data-test="cross-link-edit-0"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-delete-0"]')).toBeVisible();
+        // Verify edit and delete action buttons exist on the stream-level
+        // (editable) manager; the org-level read-only manager doesn't emit
+        // these so we only need to assert presence at all.
+        await expect(page.locator('[data-test="cross-link-edit-0"]').first()).toBeVisible();
+        await expect(page.locator('[data-test="cross-link-delete-0"]').first()).toBeVisible();
 
         testLogger.info('List item display verified');
     });
@@ -801,12 +786,16 @@ test.describe("Cross-Linking testcases", () => {
 
         await pm.crossLinkPage.clickCrossLinkingTab();
 
-        // Ensure a link exists with known values
-        let existingCount = await page.locator('[data-test^="cross-link-item-"]').count();
+        // Ensure a link exists with known values. Count via the delete-btn
+        // data-test so we only loop over deletable stream-level items
+        // (org-level read-only items render with `cross-link-item-name-<idx>`
+        // but no matching `cross-link-delete-<idx>` — clicking idx=0 then
+        // would time out).
+        let existingCount = await page.locator('[data-test^="cross-link-delete-"]').count();
         while (existingCount > 0) {
             await pm.crossLinkPage.clickDeleteCrossLink(0);
             await page.waitForTimeout(500);
-            existingCount = await page.locator('[data-test^="cross-link-item-"]').count();
+            existingCount = await page.locator('[data-test^="cross-link-delete-"]').count();
         }
 
         const editLinkName = `Edit Prefill ${Date.now()}`;
@@ -821,19 +810,15 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickEditCrossLink(0);
         await pm.crossLinkPage.expectDialogVisible();
 
-        // Verify name is pre-populated
-        const nameInput = page.locator('[data-test="cross-link-name-input"]');
-        const nameValue = await nameInput.inputValue();
+        // Verify name + URL are pre-populated via PO getters (no inline locators).
+        const nameValue = await pm.crossLinkPage.getCrossLinkNameValue();
         expect(nameValue).toBe(editLinkName);
-
-        // Verify URL is pre-populated
-        const urlInput = page.locator('[data-test="cross-link-url-input"]');
-        const urlValue = await urlInput.inputValue();
+        const urlValue = await pm.crossLinkPage.getCrossLinkUrlValue();
         expect(urlValue).toBe(editLinkUrl);
 
         // Verify field chip is pre-populated
         await pm.crossLinkPage.expectFieldChipVisible(0);
-        const chipText = await page.locator('[data-test="cross-link-field-chip-0"]').textContent();
+        const chipText = await pm.crossLinkPage.getDialogFieldChipText(0);
         expect(chipText).toContain('kubernetes_container_name');
 
         // Verify save button is enabled (all required fields are filled)
@@ -875,34 +860,33 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickUpdateSettings();
         await page.waitForTimeout(2000);
 
-        // Navigate to logs
+        // Navigate to logs and select the stream via the shared logsPage helper.
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
+
+        // Disable Quick Mode so all fields (including _timestamp /
+        // non-interesting fields) show inside the expanded JSON detail.
+        await pm.logsPage.ensureQuickModeState(false);
+        await page.waitForTimeout(1000);
+
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
-        // Open log detail
-        const firstLogRow = page.locator('[data-test="log-table-column-0-source"]');
-        await firstLogRow.waitFor({ state: 'visible', timeout: 15000 });
-        await firstLogRow.click();
-        await page.waitForTimeout(2000);
-        await page.locator('[data-test="dialog-box"]').waitFor({ state: 'visible', timeout: 10000 });
-
-        const jsonContent = page.locator('[data-test="log-detail-json-content"]');
-        await jsonContent.waitFor({ state: 'visible', timeout: 5000 });
+        // Expand the first log row inline (the new logs UI replaced the
+        // side-panel `dashboard-confirm-dialog` with an inline JsonPreview
+        // toggled by `table-row-expand-menu`, the same path test 10 uses).
+        await pm.crossLinkPage.expandFirstLogRow();
 
         // Check the configured field — cross-link SHOULD appear
-        const configuredFieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
+        // Resolve the configured field row via PO/data-test (no class/text selectors)
+        const configuredFieldRow = page.locator(pm.crossLinkPage.logDetailRow('kubernetes_container_name'));
         const configuredVisible = await configuredFieldRow.isVisible().catch(() => false);
 
         if (configuredVisible) {
-            const configuredBtn = configuredFieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-            await configuredBtn.click();
-            await page.waitForTimeout(1000);
+            await pm.crossLinkPage.openFieldActionDropdown('kubernetes_container_name');
 
-            const crossLinkInMenu = page.locator('.q-menu .q-item').filter({ hasText: crossLinkName });
-            const hasCrossLink = await crossLinkInMenu.isVisible().catch(() => false);
+            const hasCrossLink = await pm.crossLinkPage.isLogCrossLinkVisible(crossLinkName);
 
             if (hasCrossLink) {
                 testLogger.info('Cross-link correctly appears for configured field');
@@ -915,16 +899,13 @@ test.describe("Cross-Linking testcases", () => {
         }
 
         // Check a different field — cross-link should NOT appear
-        const otherFieldRow = page.locator('.log_json_content').filter({ hasText: '_timestamp' }).first();
+        const otherFieldRow = page.locator(pm.crossLinkPage.logDetailRow('_timestamp'));
         const otherVisible = await otherFieldRow.isVisible().catch(() => false);
 
         if (otherVisible) {
-            const otherBtn = otherFieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-            await otherBtn.click();
-            await page.waitForTimeout(1000);
+            await pm.crossLinkPage.openFieldActionDropdown('_timestamp');
 
-            const crossLinkInOtherMenu = page.locator('.q-menu .q-item').filter({ hasText: crossLinkName });
-            const hasCrossLinkInOther = await crossLinkInOtherMenu.isVisible().catch(() => false);
+            const hasCrossLinkInOther = await pm.crossLinkPage.isLogCrossLinkVisible(crossLinkName);
 
             // Cross-link should NOT appear for _timestamp since it's not in the configured fields
             expect(hasCrossLinkInOther).toBe(false);
@@ -1007,8 +988,8 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickEditCrossLink(0);
         await pm.crossLinkPage.expectDialogVisible();
 
-        // Verify name is pre-populated
-        const nameValue = await page.locator('[data-test="cross-link-name-input"]').inputValue();
+        // Verify name is pre-populated via PO getter.
+        const nameValue = await pm.crossLinkPage.getCrossLinkNameValue();
         expect(nameValue).toBe(linkName);
 
         // Modify the URL
@@ -1056,8 +1037,9 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickDeleteCrossLink(0);
         await page.waitForTimeout(500);
 
-        // Verify it's gone (empty state or no items)
-        const remainingCount = await page.locator('[data-test^="cross-link-item-"]').count();
+        // Verify it's gone (empty state or no items). Count via the per-row
+        // name attribute so we don't double-count internal cells.
+        const remainingCount = await page.locator('[data-test^="cross-link-item-name-"]').count();
         expect(remainingCount).toBe(0);
 
         // Save org settings to persist deletion
@@ -1156,15 +1138,19 @@ test.describe("Cross-Linking testcases", () => {
         }
 
         // Verify the org cross-link item is visible (rendered by the readonly CrossLinkManager)
-        const orgItem = page.locator('[data-test^="cross-link-item-"]').filter({ hasText: orgLinkName });
+        // Resolve the per-item index by looking up the dedicated cross-link-item-name-* data-test.
+        const orgIdx = await pm.crossLinkPage.findCrossLinkItemIndexByName(orgLinkName);
+        expect(orgIdx, `Org cross-link "${orgLinkName}" should be rendered`).toBeGreaterThanOrEqual(0);
+
+        const orgItem = page.locator(pm.crossLinkPage.crossLinkItem(orgIdx));
         await expect(orgItem).toBeVisible({ timeout: 10000 });
         const itemText = await orgItem.textContent();
         expect(itemText).toContain(orgLinkName);
         expect(itemText).toContain('org-readonly.example.com');
 
         // Verify org-level items do NOT have edit/delete buttons (readonly prop hides them)
-        await expect(orgItem.locator('[data-test^="cross-link-edit-"]')).not.toBeVisible({ timeout: 3000 });
-        await expect(orgItem.locator('[data-test^="cross-link-delete-"]')).not.toBeVisible({ timeout: 3000 });
+        await expect(page.locator(pm.crossLinkPage.crossLinkEditBtn(orgIdx))).toHaveCount(0);
+        await expect(page.locator(pm.crossLinkPage.crossLinkDeleteBtn(orgIdx))).toHaveCount(0);
 
         // Verify the stream-level manager still has its add button (editable)
         const streamAddBtn = page.locator('[data-test="add-cross-link-btn"]');
@@ -1232,7 +1218,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickOrgSettingsSave();
         await page.waitForTimeout(2000);
 
-        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query
+        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query.
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
@@ -1262,24 +1248,19 @@ test.describe("Cross-Linking testcases", () => {
         });
 
         try {
-            // Step 4: Find the kubernetes_container_name field row in the expanded JSON preview
-            // and click its action dropdown button
-            const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
-            await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
-            const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-            await fieldActionBtn.click();
-            await page.waitForTimeout(1000);
+            // Step 4: Open the kubernetes_container_name field action dropdown
+            // (data-test resolved via PO method on the JsonPreview log-detail row)
+            await pm.crossLinkPage.openFieldActionDropdown('kubernetes_container_name');
 
             // Look for the org-level cross-link item in the dropdown menu
-            const crossLinkItem = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
-            const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
+            const crossLinkVisible = await pm.crossLinkPage.isLogCrossLinkVisible(crossLinkName);
             testLogger.info('Org-level cross-link menu item visibility', { crossLinkVisible, crossLinkName });
 
             // Assert cross-link menu item is visible
             expect(crossLinkVisible, `Org-level cross-link "${crossLinkName}" should be visible in dropdown menu`).toBe(true);
 
             // Click the cross-link
-            await crossLinkItem.click();
+            await pm.crossLinkPage.clickLogCrossLinkMenuItem(crossLinkName);
             testLogger.info('Clicked org-level cross-link menu item');
             await page.waitForTimeout(1000);
 
@@ -1442,37 +1423,25 @@ test.describe("Cross-Linking testcases", () => {
         try {
             // Step 4: Click on a data row in the table panel to trigger the cross-link drilldown menu
             await page.waitForTimeout(2000);
-            await page.evaluate(() => {
-                const table = document.querySelector('[data-test="dashboard-panel-table"]');
-                if (!table) return;
-                const cells = table.querySelectorAll('td');
-                for (const cell of cells) {
-                    if (cell.offsetParent !== null && cell.textContent.trim()) {
-                        cell.click();
-                        return;
-                    }
-                }
-            });
+            await pm.crossLinkPage.clickFirstDashboardTableCell();
             await page.waitForTimeout(1500);
             testLogger.info('Clicked on dashboard table cell');
 
-            // Step 5: Look for the crosslink-drilldown-menu popup
-            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
-            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+            // Step 5: Look for the drilldown menu popup (resolved via data-test)
+            const menuVisible = await pm.crossLinkPage.isDrilldownMenuVisible();
             testLogger.info('Drilldown menu visibility', { menuVisible });
 
             // Assert drilldown menu appeared
             expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
 
-            // Find and click the cross-link menu item
-            const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
-            const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
+            // Find and click the cross-link menu item (per-name data-test on each menu item)
+            const crossLinkMenuVisible = await pm.crossLinkPage.isDrilldownMenuItemVisible(crossLinkName);
             testLogger.info('Org cross-link menu item visibility', { crossLinkMenuVisible, crossLinkName });
 
             // Assert cross-link menu item is visible
             expect(crossLinkMenuVisible, `Org cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
 
-            await crossLinkMenuItem.click();
+            await pm.crossLinkPage.clickDrilldownMenuItem(crossLinkName);
             testLogger.info('Clicked org cross-link menu item');
             await page.waitForTimeout(1000);
 

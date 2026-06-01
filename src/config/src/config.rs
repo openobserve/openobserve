@@ -213,24 +213,20 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = chain(
-        _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
-        get_config()
-            .common
-            .bloom_filter_default_fields
-            .split(',')
-            .filter_map(|s| {
-                let s = s.trim();
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            }),
-    )
-    .collect::<Vec<_>>();
+    let mut fields = get_config()
+        .common
+        .bloom_filter_default_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -1091,16 +1087,20 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_DISABLED_ON_SEARCH", default = false)]
-    pub bloom_filter_disabled_on_search: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
-        name = "ZO_BLOOM_FILTER_NDV_RATIO",
-        default = 100,
-        help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
+        name = "ZO_BLOOM_FILTER_FPP",
+        default = 0.01,
+        help = "Target false-positive probability for the bloom filter layer. Smaller = fewer false survivors but larger `.bf` files (sizes the SBBF block count). Must be in (0, 1); out-of-range falls back to 0.01."
     )]
-    pub bloom_filter_ndv_ratio: u64,
+    pub bloom_filter_fpp: f64,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_MAX_FILES_PER_BF",
+        default = 256,
+        help = "Max number of files packed into one `.bf` (transposed bloom layout). A bigger value means fewer `.bf` reads per query but more compactor memory at build time (≈ files × per-file-SBBF). One hour bucket is split into ceil(files / this) `.bf` files."
+    )]
+    pub bloom_filter_max_files_per_bf: usize,
     #[env_config(
         name = "ZO_SEARCH_AROUND_DEFAULT_FIELDS",
         default = "",
@@ -1555,8 +1555,6 @@ pub struct Limit {
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
-    #[env_config(name = "ZO_QUERY_INDEX_THREAD_NUM", default = 0)]
-    pub query_index_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
@@ -1808,7 +1806,13 @@ pub struct Limit {
         default = 0, // MB, default is 5% of total memory
         help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
-    pub footer_cache_max_size: usize,
+    pub inverted_index_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
+        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
+    )]
+    pub bloom_footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -1896,6 +1900,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
     // file_size, file_time, time_range
     pub strategy: String,
+    #[env_config(name = "ZO_COMPACT_FAST_MODE", default = false)]
+    pub fast_mode: bool,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
@@ -1960,6 +1966,12 @@ pub struct Compact {
         help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"
     )]
     pub retention_allowed_hours: String,
+    #[env_config(
+        name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
+        default = 2,
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"
+    )]
+    pub tantivy_builder_thread_num: usize,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2602,13 +2614,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.limit.query_thread_num = cpu_num * 4;
         }
     }
-    if cfg.limit.query_index_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.query_index_thread_num = cpu_num;
-        } else {
-            cfg.limit.query_index_thread_num = cpu_num * 4;
-        }
-    }
 
     if cfg.limit.file_download_thread_num == 0 {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
@@ -2875,9 +2880,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    // check bloom filter ndv ratio
-    if cfg.common.bloom_filter_ndv_ratio == 0 {
-        cfg.common.bloom_filter_ndv_ratio = 100;
+    // check bloom filter fpp: must be a probability in (0, 1)
+    if cfg.common.bloom_filter_fpp <= 0.0 || cfg.common.bloom_filter_fpp >= 1.0 {
+        log::warn!(
+            "ZO_BLOOM_FILTER_FPP={} is out of range (0, 1); falling back to default 0.01",
+            cfg.common.bloom_filter_fpp
+        );
+        cfg.common.bloom_filter_fpp = 0.01;
     }
 
     // check for join match one
@@ -3109,12 +3118,23 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.footer_cache_max_size == 0 {
-        cfg.limit.footer_cache_max_size =
+    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
+        cfg.limit.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+    }
+    if cfg.limit.bloom_footer_cache_max_size == 0 {
+        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // order of magnitude smaller than tantivy footers (footer payload
+        // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
+        // `.bf`), so the cache holds 4-32 K entries at this size.
+        cfg.limit.bloom_footer_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
@@ -3217,7 +3237,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.disk_cache.bucket_num == 0 {
         // because we validate cpu_num before this
-        // we can be sure here that that value is sane.
+        // we can be sure here that value is sane.
 
         // following numbers are imperically decided, users can set the value
         // directly if they know better, otherwise this was the best numbers

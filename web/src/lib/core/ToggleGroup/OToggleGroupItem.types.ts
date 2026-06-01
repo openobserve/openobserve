@@ -12,8 +12,14 @@ export interface ToggleGroupItemProps {
   value: AcceptableValue;
   /** Disables only this item */
   disabled?: boolean;
+  /** Tooltip shown on hover — especially useful when disabled is true to explain why */
+  tooltip?: string;
   /** Size controls padding and font-size. md (default) = full toolbar; sm = small toolbar; xs = compact inline toggle */
   size?: ToggleGroupItemSize;
+  /** Icon name (from OIcon registry) placed before the label. For custom icon components, use the `icon-left` slot. */
+  iconLeft?: string;
+  /** Icon name (from OIcon registry) placed after the label. For custom icon components, use the `icon-right` slot. */
+  iconRight?: string;
 }
 
 export interface ToggleGroupItemSlots {

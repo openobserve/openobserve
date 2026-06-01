@@ -15,26 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row items-center" data-test="dashboard-table-pagination-controls">
+  <div
+    class="tw:flex tw:items-center"
+    data-test="dashboard-table-pagination-controls"
+  >
     <!-- Records per page dropdown: only when pagination is enabled -->
-    <div v-if="showPagination" class="row items-center q-gutter-sm">
-      <span class="text-caption" data-test="dashboard-table-rows-per-page-label"
+    <div
+      v-if="showPagination"
+      class="tw:flex tw:flex-row tw:items-center tw:gap-2"
+    >
+      <span class="tw:text-xs" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
-      <q-select
+      <OSelect
         :model-value="pagination.rowsPerPage"
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
-        :options="paginationOptions"
-        :option-label="(opt: any) => (opt === 0 ? 'All' : opt)"
-        borderless
-        dense
-        options-dense
-        class="q-table__select"
+        :options="formattedPaginationOptions"
+        size="sm"
+        data-test="dashboard-table-rows-per-page-select"
       />
     </div>
 
     <!-- Count display -->
-    <span class="text-caption q-px-sm" data-test="dashboard-table-row-count">
+    <span class="tw:text-xs tw:px-2" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 
@@ -46,8 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isFirstPage"
         @click="$emit('firstPage')"
+        icon-left="first-page"
+        data-test="dashboard-table-pagination-first-page"
       >
-        <template #icon-left><q-icon name="first_page" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -55,8 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isFirstPage"
         @click="$emit('prevPage')"
+        icon-left="chevron-left"
+        data-test="dashboard-table-pagination-prev-page"
       >
-        <template #icon-left><q-icon name="chevron_left" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -64,8 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isLastPage"
         @click="$emit('nextPage')"
+        icon-left="chevron-right"
+        data-test="dashboard-table-pagination-next-page"
       >
-        <template #icon-left><q-icon name="chevron_right" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -73,8 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isLastPage"
         @click="$emit('lastPage')"
+        icon-left="last-page"
+        data-test="dashboard-table-pagination-last-page"
       >
-        <template #icon-left><q-icon name="last_page" /></template>
       </OButton>
     </template>
   </div>
@@ -84,9 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 export default defineComponent({
   name: "TablePaginationControls",
-  components: { OButton },
+  components: { OButton, OSelect },
   props: {
     showPagination: {
       type: Boolean,
@@ -140,8 +148,16 @@ export default defineComponent({
       return `${start}-${end} of ${totalRows}`;
     });
 
+    const formattedPaginationOptions = computed(() =>
+      props.paginationOptions.map((opt) => ({
+        label: opt === 0 ? "All" : String(opt),
+        value: opt,
+      })),
+    );
+
     return {
       countDisplay,
+      formattedPaginationOptions,
       t,
     };
   },
@@ -149,6 +165,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Auto-size to content so "10" is narrow and "1000" is wider.
+:deep([data-test="dashboard-table-rows-per-page-select"]) {
+  width: fit-content !important;
+}
+
 // Ensure all pagination elements sit on the same baseline.
 [data-test="dashboard-table-pagination-controls"] {
   display: flex !important;

@@ -15,25 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll">
+  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5" data-test="metrics-page">
     <!-- Header Section -->
     <div
-      class="row tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs"
+      class="tw:flex tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1"
       style="height: 48px; overflow-y: auto"
     >
       <div class="card-container tw:w-full tw:h-full tw:flex">
-        <div class="flex items-center col">
+        <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:grow">
           <div
-            class="flex items-center q-table__title q-mx-md tw:font-semibold tw:text-xl"
+            class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold"
           >
             <span>
               {{ t("search.metrics") }}
             </span>
           </div>
-          <syntax-guide-metrics class="q-mr-sm" />
-          <MetricLegends class="q-mr-sm" />
+          <syntax-guide-metrics />
+          <MetricLegends />
         </div>
-        <div class="text-right col flex justify-end items-center">
+        <div
+          class="tw:text-right tw:flex tw:flex-row tw:justify-end tw:items-center tw:gap-2"
+        >
           <DateTimePickerDashboard
             v-if="
               !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
@@ -57,12 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state?.zoConfig?.min_auto_refresh_interval || 5
             "
             @trigger="runQuery"
-            class="q-px-none dashboards-icon dashboards-auto-refresh-interval"
+            class="dashboard-icons"
             data-test="metrics-auto-refresh"
           />
           <div
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-            class="dashboard-icons tw:mx-2"
+            class="dashboard-icons tw:mr-2"
           >
             <OButton
               v-if="
@@ -110,18 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <q-dialog
-      v-model="showAddToDashboardDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-to-dashboard
-        @save="addPanelToDashboard"
-        @cancel="showAddToDashboardDialog = false"
-        :dashboardPanelData="dashboardPanelData"
-      />
-    </q-dialog>
+    <add-to-dashboard
+      v-model:open="showAddToDashboardDialog"
+      :dashboardPanelData="dashboardPanelData"
+      @save="addPanelToDashboard"
+    />
   </div>
 </template>
 
@@ -222,9 +217,14 @@ export default defineComponent({
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
 
-    onUnmounted(async () => {
-      // clear a few things
-      resetDashboardPanelData();
+    onUnmounted(() => {
+      // NOTE: Do NOT call resetDashboardPanelData() here.
+      // When org changes, Vue mounts the new component (onBeforeMount) BEFORE
+      // unmounting the old one (onUnmounted). Resetting the shared singleton
+      // dashboardPanelDataObj["metrics"] here would overwrite the "promql" state
+      // that the new instance just set, causing the PromQL query type to
+      // disappear after every org switch. The new instance's onBeforeMount
+      // already resets and re-initialises the state correctly.
     });
 
     /** Apply default SQL builder fields for metrics.
@@ -401,10 +401,7 @@ export default defineComponent({
             if (stream) {
               await makeAutoSQLQuery();
             }
-          } else if (
-            dashboardPanelData.data.queryType === "promql" &&
-            stream
-          ) {
+          } else if (dashboardPanelData.data.queryType === "promql" && stream) {
             query.query = `${stream}{}`;
           }
         }
@@ -638,22 +635,3 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
-.dashboards-auto-refresh-interval {
-  .q-btn {
-    min-height: 2rem; // 30px
-    max-height: 2rem; // 30px
-    padding: 0 0.25rem; // 4px
-    border-radius: 0.375rem; // 6px
-    transition: all 0.2s ease;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-
-    .q-icon {
-      font-size: 1.125rem; // 18px
-    }
-  }
-}
-</style>

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    data-test="dashboard-tab-list-container"
     style="display: flex; align-items: center"
     @mouseover="isHovered = true"
     @mouseleave="isHovered = false"
@@ -36,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
-        <div class="full-width row justify-between no-wrap">
+        <div class="tw:w-full tw:flex tw:justify-between tw:flex-nowrap">
           <span
             style="
               white-space: nowrap;
@@ -46,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :title="tab?.name"
             :data-test="`dashboard-tab-${tab.tabId}-name`"
+            :data-test-tab-name="tab?.name"
             >{{ tab?.name }}</span
           >
         </div>
@@ -63,16 +65,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       data-test="dashboard-tab-add-btn"
+      icon-left="add"
     >
-      <template #icon-left><q-icon name="add" /></template>
-      <q-tooltip>Add Tab</q-tooltip>
+      <OTooltip content="Add Tab" />
     </OButton>
-    <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
-      <AddTab
-        :dashboard-id="dashboardData?.dashboardId"
-        @refresh="refreshDashboard"
-      />
-    </q-dialog>
+    <AddTab
+      v-model:open="showAddTabDialog"
+      :dashboard-id="dashboardData?.dashboardId"
+      @refresh="refreshDashboard"
+    />
   </div>
 </template>
 
@@ -80,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
@@ -94,6 +96,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    OTooltip,
   },
   props: {
     dashboardData: {

@@ -7,7 +7,7 @@
       @click="handleDialogClick"
     >
       <div class="confirmation-header">
-        <q-icon name="help_outline" size="20px" class="confirmation-icon" />
+        <OIcon name="help-outline" size="md" class="confirmation-icon" />
         <span class="confirmation-title">{{ formattedMessage }}</span>
       </div>
 
@@ -83,6 +83,7 @@
 import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface ConfirmationData {
   tool?: string;

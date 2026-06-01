@@ -16,8 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref, computed, reactive } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
@@ -254,7 +252,6 @@ import SearchBar from "@/plugins/traces/SearchBar.vue";
 // ---------------------------------------------------------------------------
 // Quasar setup
 // ---------------------------------------------------------------------------
-installQuasar({ plugins: [quasar.Dialog, quasar.Notify] });
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
@@ -1168,7 +1165,7 @@ describe("SearchBar", () => {
       );
       expect(resetBtn.exists()).toBe(true);
       // QTooltip uses <Teleport> and renders outside the button — check via component tree
-      expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
     it("should have a tooltip inside the Traces mode toggle button", async () => {
@@ -1179,7 +1176,7 @@ describe("SearchBar", () => {
         '[data-test="traces-search-mode-traces-btn"]',
       );
       expect(searchBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
     it("should have a tooltip inside the service-graph tab toggle button", async () => {
@@ -1188,7 +1185,7 @@ describe("SearchBar", () => {
 
       const sgBtn = wrapper.find('[data-test="traces-service-graph-toggle"]');
       expect(sgBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
     it("should have a tooltip inside the Traces search mode button", async () => {
@@ -1199,7 +1196,7 @@ describe("SearchBar", () => {
         '[data-test="traces-search-mode-traces-btn"]',
       );
       expect(tracesBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
     it("should have a tooltip inside the Spans search mode button", async () => {
@@ -1210,7 +1207,7 @@ describe("SearchBar", () => {
         '[data-test="traces-search-mode-spans-btn"]',
       );
       expect(spansBtn.exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
   });
 

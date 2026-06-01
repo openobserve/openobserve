@@ -109,7 +109,7 @@ test.describe(
         const popup = page.locator('[data-test="dashboard-drilldown-popup"]');
         await popup.waitFor({ state: "visible", timeout: 10000 });
 
-        await page.locator('[data-test="dashboard-config-panel-drilldown-name"]').fill("Same Dash Custom Var");
+        await page.locator('[data-test="dashboard-config-panel-drilldown-name-field"]').fill("Same Dash Custom Var");
 
         await page.locator('[data-test="dashboard-drilldown-folder-select"]').waitFor({ state: "visible", timeout: 10000 });
         await page.locator('[data-test="dashboard-drilldown-folder-select"]').click();
@@ -130,16 +130,16 @@ test.describe(
         await addVarBtn.click();
         await page.waitForTimeout(300);
 
-        // In Quasar v2, data-test on <q-input> propagates to the native <input> via $attrs
-        const autoCompleteInputs = popup.locator('[data-test="common-auto-complete"]');
-        await autoCompleteInputs.first().waitFor({ state: "visible", timeout: 5000 });
-        await autoCompleteInputs.first().scrollIntoViewIfNeeded();
-        await autoCompleteInputs.first().fill(variableName);
-        await autoCompleteInputs.last().fill(drilldownVarValue);
+        // OCombobox in DrilldownPopUp has no data-test; use placeholder attributes
+        const nameInput = popup.getByPlaceholder('Name').first();
+        const valueInput = popup.getByPlaceholder('Value').first();
+        await nameInput.waitFor({ state: "visible", timeout: 5000 });
+        await nameInput.fill(variableName);
+        await valueInput.fill(drilldownVarValue);
         testLogger.info(`Variable mapping: ${variableName} → ${drilldownVarValue}`);
 
-        await page.locator('[data-test="confirm-button"]').waitFor({ state: "visible", timeout: 5000 });
-        await page.locator('[data-test="confirm-button"]').click();
+        await page.locator('[data-test="o-dialog-primary-btn"]').waitFor({ state: "visible", timeout: 5000 });
+        await page.locator('[data-test="o-dialog-primary-btn"]').click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         // ── 5. Save panel ────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ test.describe(
         const popup = page.locator('[data-test="dashboard-drilldown-popup"]');
         await popup.waitFor({ state: "visible", timeout: 10000 });
 
-        await page.locator('[data-test="dashboard-config-panel-drilldown-name"]').fill("PassAll Same Dash");
+        await page.locator('[data-test="dashboard-config-panel-drilldown-name-field"]').fill("PassAll Same Dash");
 
         await page.locator('[data-test="dashboard-drilldown-folder-select"]').waitFor({ state: "visible", timeout: 10000 });
         await page.locator('[data-test="dashboard-drilldown-folder-select"]').click();
@@ -257,7 +257,7 @@ test.describe(
         await passAllToggle.click();
         testLogger.info("passAllVariables enabled");
 
-        await page.locator('[data-test="confirm-button"]').click();
+        await page.locator('[data-test="o-dialog-primary-btn"]').click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -371,7 +371,7 @@ test.describe(
         const popup = page.locator('[data-test="dashboard-drilldown-popup"]');
         await popup.waitFor({ state: "visible", timeout: 10000 });
 
-        await page.locator('[data-test="dashboard-config-panel-drilldown-name"]').fill("Same Dash Tab Drilldown");
+        await page.locator('[data-test="dashboard-config-panel-drilldown-name-field"]').fill("Same Dash Tab Drilldown");
 
         await page.locator('[data-test="dashboard-drilldown-folder-select"]').waitFor({ state: "visible", timeout: 10000 });
         await page.locator('[data-test="dashboard-drilldown-folder-select"]').click();
@@ -390,7 +390,7 @@ test.describe(
         await passAllToggle.waitFor({ state: "visible", timeout: 5000 });
         await passAllToggle.click();
 
-        await page.locator('[data-test="confirm-button"]').click();
+        await page.locator('[data-test="o-dialog-primary-btn"]').click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         await pm.dashboardPanelActions.applyDashboardBtn();

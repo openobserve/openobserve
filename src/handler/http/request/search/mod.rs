@@ -55,10 +55,10 @@ use crate::{
             functions,
             http::{
                 get_clear_cache_from_request, get_dashboard_info_from_request,
-                get_enable_align_histogram_from_request, get_is_multi_stream_search_from_request,
-                get_is_ui_histogram_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
+                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -468,6 +468,9 @@ pub async fn search(
                             org_id: org_id.clone(),
                             bypass_check: false,
                             parent_id: "".to_string(),
+                            use_all_org: false,
+                            use_self_context: false,
+                            use_self_parent: true,
                         },
                         user.role,
                         user.is_external,
@@ -1454,7 +1457,6 @@ async fn values_v1(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
-        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(content = inline(config::meta::search::SearchPartitionRequest), description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",
@@ -1499,8 +1501,6 @@ pub async fn search_partition(
 
     let user_id = &user_email.user_id;
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
-    let enable_align_histogram = get_enable_align_histogram_from_request(&url_query);
-
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
@@ -1566,7 +1566,6 @@ pub async fn search_partition(
         &req,
         false,
         true,
-        enable_align_histogram,
         true, // allow streamings aggs cache for http search partition handler
     )
     .instrument(http_span)
@@ -1973,6 +1972,9 @@ pub async fn result_schema(
                             org_id: org_id.clone(),
                             bypass_check: false,
                             parent_id: "".to_string(),
+                            use_all_org: false,
+                            use_self_context: false,
+                            use_self_parent: true,
                         },
                         user.role,
                         user.is_external,

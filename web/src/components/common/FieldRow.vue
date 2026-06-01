@@ -16,92 +16,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Simple field without expansion (FTS keys or fields without values) -->
-  <div
-    v-if="field.ftsKey || !field.isSchemaField || !field.showValues"
-    class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
-    :title="field.name"
+  <OFieldRow
+    v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
+    :data-test="`logs-field-list-item-${field.name}`"
+    class="tw:pl-[1.5rem]"
+    :highlight="isFieldSelected && field.name !== timestampColumn"
   >
-    <div
-      class="field_label full-width tw:flex! tw:items-center! tw:justify-between!"
-      :data-test="`logs-field-list-item-${field.name}`"
+    <OFieldLabel :field="field" :show-type-icon="false" />
+    <OButton
+      :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+      v-if="showQuickMode && field.name !== timestampColumn"
+      :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
+      variant="ghost-neutral"
+      class="tw:gap-0! tw:mr-1"
+      size="icon"
+      :title="
+        field.isInterestingField
+          ? 'Remove from interesting fields'
+          : 'Add to interesting fields'
+      "
+      @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
     >
-      <div
-        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[1.5rem] tw:text-[0.875rem]"
-        style="display: inline-block"
+      <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
+    </OButton>
+
+    <template v-if="field.name !== timestampColumn" #actions>
+      <OButton
+        v-if="field.isSchemaField && field.name != timestampColumn"
+        variant="ghost-neutral"
+        size="icon"
+        :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
+        @click.stop="$emit('add-to-filter', `${field.name}=''`)"
       >
-        {{ field.label || field.name }}
-      </div>
-      <span class="float-right">
-        <q-icon
-          :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-          v-if="showQuickMode && field.name !== timestampColumn"
-          :name="field.isInterestingField ? 'info' : 'info_outline'"
-          :class="theme === 'dark' ? '' : 'light-dimmed'"
-          style="margin-right: 0.375rem"
-          size="1.1rem"
-          :title="
-            field.isInterestingField
-              ? 'Remove from interesting fields'
-              : 'Add to interesting fields'
-          "
-        />
-      </span>
-    </div>
-    <div
-      class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem] tw:overflow-hidden"
-      v-if="field.name !== timestampColumn"
-    >
-      <span style="margin-right: 0.375rem">
-        <OButton
-          v-if="field.isSchemaField && field.name != timestampColumn"
-          variant="ghost-primary"
-          size="icon-xs-circle"
-          :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
-          @click.stop="$emit('add-to-filter', `${field.name}=''`)"
-        >
-          <q-icon :name="outlinedAdd" size="0.8rem" />
-        </OButton>
-      </span>
-      <q-icon
+        <OIcon name="add" size="sm" />
+      </OButton>
+      <OButton
         :data-test="`log-search-index-list-add-${field.name}-field-btn`"
-        v-if="
-          showVisibilityToggle &&
-          !isFieldSelected &&
-          field.name !== timestampColumn
-        "
-        :name="outlinedVisibility"
-        style="margin-right: 0.375rem"
-        size="1.1rem"
+        v-if="showVisibilityToggle && !isFieldSelected && field.name !== timestampColumn"
+        variant="ghost-neutral"
+        size="icon"
+        class="tw:gap-0!"
         title="Add field to table"
-        class="tw:cursor-pointer!"
         @click.stop="$emit('toggle-field', field)"
-      />
-      <q-icon
+      >
+        <OIcon name="visibility" size="sm" />
+      </OButton>
+      <OButton
         :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
         v-if="showVisibilityToggle && isFieldSelected"
-        :name="outlinedVisibilityOff"
-        style="margin-right: 0.375rem"
-        size="1.1rem"
+        variant="ghost-neutral"
+        class="tw:gap-0!"
+        size="icon"
         title="Remove field from table"
-        class="tw:cursor-pointer!"
         @click.stop="$emit('toggle-field', field)"
-      />
-      <q-icon
+      >
+        <OIcon name="visibility-off" size="sm" />
+      </OButton>
+      <OButton
         :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
         v-if="showQuickMode && field.name !== timestampColumn"
-        :name="field.isInterestingField ? 'info' : 'info_outline'"
-        size="1.1rem"
+        variant="ghost-neutral"
+        class="tw:gap-0!"
+        size="icon"
         :title="
           field.isInterestingField
             ? 'Remove from interesting fields'
             : 'Add to interesting fields'
         "
-        @click.stop="
-          $emit('toggle-interesting', field, field.isInterestingField)
-        "
-      />
-    </div>
-  </div>
+        @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+      >
+        <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
+      </OButton>
+    </template>
+  </OFieldRow>
 
   <!-- Field with expansion for values -->
   <slot v-else name="expansion" :field="field"></slot>
@@ -109,12 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import {
-  outlinedAdd,
-  outlinedVisibility,
-  outlinedVisibilityOff,
-} from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
+import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 
 interface Props {
   field: any;
@@ -123,10 +108,12 @@ interface Props {
   theme: string;
   showQuickMode: boolean;
   showVisibilityToggle?: boolean;
+  showFtsFieldValues?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showVisibilityToggle: true,
+  showFtsFieldValues: false,
 });
 
 defineEmits<{
@@ -140,26 +127,3 @@ const isFieldSelected = computed(() =>
 );
 </script>
 
-<style scoped lang="scss">
-.field-container {
-  position: relative;
-
-  .field_overlay {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    display: none;
-    align-items: center;
-    padding: 0 0.25rem;
-  }
-
-  &:hover .field_overlay {
-    display: flex;
-  }
-}
-
-.field_label {
-  padding: 0.25rem 0;
-}
-</style>

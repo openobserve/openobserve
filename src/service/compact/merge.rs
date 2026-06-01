@@ -18,7 +18,7 @@ use std::sync::Arc;
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use arrow::array::RecordBatch;
 use bytes::Bytes;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     FileFormat, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -29,7 +29,7 @@ use config::{
     },
     metrics,
     utils::{
-        parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
+        parquet::read_schema_from_bytes,
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
@@ -42,8 +42,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     runtime::DATAFUSION_RUNTIME,
     schema::{
-        SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
-        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
+        SchemaCache, get_partition_time_level, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_created_at,
     },
     storage,
 };
@@ -115,34 +115,7 @@ pub async fn generate_job_by_stream(
 
     // format to hour with zero minutes, seconds
     let offset = offset - offset % hour_micros(1);
-
-    let cfg = get_config();
-    // check offset
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    // must wait for at least 3 * max_file_retention_time
-    // -- first period: the last hour local file upload to storage, write file list
-    // -- second period, the last hour file list upload to storage
-    // -- third period, we can do the merge, so, at least 3 times of
-    // max_file_retention_time
-    if offset >= time_now_hour
-        || time_now.timestamp_micros() - offset
-            <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-                * 3
-    {
+    if !super::is_past_hour(offset) {
         return Ok(()); // the time is future, just wait
     }
 
@@ -417,6 +390,13 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
+    // A job whose offset hour has not yet fully passed is an incremental round on the
+    // still-open current hour (enqueued by the ingester, see service::compact::incremental):
+    // only seal full-size groups and carry the remainder, so each file is merged into a
+    // sealed output exactly once. The scheduled hour-end pass seals whatever is left.
+    let offset = offset - offset % hour_micros(1);
+    let is_incremental = !super::is_past_hour(offset);
+
     // check offset
     let partition_time_level = get_partition_time_level(stream_type);
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
@@ -466,7 +446,7 @@ pub async fn merge_by_stream(
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
+        let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
@@ -494,7 +474,7 @@ pub async fn merge_by_stream(
             let skip_group_files = false;
 
             if files_with_size.len() <= 1 && !skip_group_files {
-                return Ok(());
+                return Ok(vec![]);
             }
 
             // group files need to merge
@@ -520,9 +500,10 @@ pub async fn merge_by_stream(
                             if job_strategy == MergeStrategy::FileSize {
                                 break;
                             }
-                            new_file_size = 0;
                             new_file_list.clear();
-                            continue; // this batch don't need to merge, skip
+                            new_file_size = file.meta.original_size;
+                            new_file_list.push(file.clone());
+                            continue; // replace previous file with current file
                         }
                         batch_groups.push(MergeBatch {
                             batch_id: batch_groups.len(),
@@ -538,7 +519,12 @@ pub async fn merge_by_stream(
                     new_file_size += file.meta.original_size;
                     new_file_list.push(file.clone());
                 }
-                if new_file_list.len() > 1 {
+                // The trailing batch is always below max_file_size (the loop flushes a group
+                // only when adding the next file would exceed it). In incremental mode we do
+                // NOT seal this remainder: more files will arrive in the still-open hour, and
+                // sealing now would force re-merging it later (write amplification). Carry it
+                // to the next round; the scheduled hour-end pass seals whatever is left.
+                if new_file_list.len() > 1 && !is_incremental {
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
                         org_id: org_id.clone(),
@@ -550,7 +536,7 @@ pub async fn merge_by_stream(
                 }
 
                 if batch_groups.is_empty() {
-                    return Ok(()); // no files need to merge
+                    return Ok(vec![]); // no files need to merge
                 }
             }
 
@@ -571,6 +557,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
+            let mut orphan_blooms = Vec::new();
             for ret in worker_results {
                 let (batch_id, new_files) = match ret {
                     Ok(v) => v,
@@ -614,18 +601,53 @@ pub async fn merge_by_stream(
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
+
+                // collect orphan blooms after writing file list successfully
+                for file in delete_file_list {
+                    if file.meta.bloom_ver > 0 {
+                        orphan_blooms.push(file.meta.bloom_ver);
+                    }
+                }
             }
             drop(permit);
             if let Some(e) = last_error {
                 return Err(e);
             }
-            Ok(())
+            Ok(orphan_blooms)
         });
         tasks.push(task);
     }
 
+    // collect bloom files which need to be clean
+    let mut orphan_blooms = Vec::new();
     for task in tasks {
-        task.await??;
+        orphan_blooms.extend(task.await??);
+    }
+
+    // Build bloom for the current hour
+    let build_start = std::time::Instant::now();
+    match crate::service::compact::bloom_build::build_for_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        is_incremental,
+        orphan_blooms,
+    )
+    .await
+    {
+        Ok(false) => {}
+        Ok(true) => {
+            let build_time = build_start.elapsed().as_millis();
+            log::info!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
+            );
+        }
+        Err(e) => {
+            log::warn!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
+            );
+        }
     }
 
     // update job status
@@ -742,6 +764,7 @@ pub async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        bloom_ver: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -750,7 +773,6 @@ pub async fn merge_files(
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values, storage_type) =
@@ -846,7 +868,6 @@ pub async fn merge_files(
                     &stream_name,
                     schema,
                     tables,
-                    &bloom_filter_fields,
                     new_file_meta,
                     false,
                 )
@@ -919,7 +940,6 @@ pub async fn merge_files(
             }
 
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                // generate inverted index
                 generate_inverted_index(
                     org_id,
                     &new_file_key,
@@ -967,7 +987,6 @@ pub async fn merge_files(
                 }
 
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                    // generate inverted index
                     generate_inverted_index(
                         org_id,
                         &new_file_key,
@@ -1011,8 +1030,6 @@ async fn generate_inverted_index(
     latest_schema: Arc<Schema>,
     buf: Bytes,
 ) -> Result<(), anyhow::Error> {
-    let file_format = get_config().common.file_format;
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
         org_id,
@@ -1020,7 +1037,7 @@ async fn generate_inverted_index(
         full_text_search_fields,
         index_fields,
         latest_schema, // Use stream schema to include all configured fields
-        reader,
+        buf,
     )
     .await
     .map_err(|e| {
@@ -1329,6 +1346,7 @@ mod tests {
                 compressed_size: original_size / 2, // assume 50% compression
                 index_size: 0,
                 flattened: false,
+                bloom_ver: 0,
             },
             deleted: false,
             segment_ids: None,

@@ -1,6 +1,6 @@
 <template>
-  <div style="max-width: 400px; margin-top: 100px" class="q-mx-auto q-pa-md">
-    <div class="flex justify-center" style="height: 150px">
+  <div style="max-width: 400px; margin-top: 100px" class="tw:mx-auto tw:p-3">
+    <div class="tw:flex tw:justify-center" style="height: 150px">
       <img
         class="appLogo"
         style="width: 250px; height: auto"
@@ -12,7 +12,7 @@
       />
     </div>
 
-    <div class="flex justify-center q-mt-lg">
+    <div class="tw:flex tw:justify-center tw:mt-4">
       <OButton
         data-test="sso-login-btn"
         variant="primary"
@@ -21,55 +21,47 @@
       >
         <div
           data-test="sso-login-btn"
-          class="flex items-center justify-center full-width text-center relative"
+          class="tw:flex tw:items-center tw:justify-center tw:w-full tw:text-center tw:relative"
         >
           <img
-            class="absolute"
+            class="tw:absolute"
             style="width: 30px; left: 16px"
             :src="getImageURL('images/common/sso.svg')"
           />
-          <span class="text-center"> Login with SSO</span>
+          <span class="tw:text-center"> Login with SSO</span>
         </div>
       </OButton>
     </div>
 
-    <div class="q-mb-md q-mt-lg text-center">
+    <div class="tw:mb-3 tw:mt-4 tw:text-center">
       <a
-        class="cursor-pointer login-internal-link"
+        class="tw:cursor-pointer login-internal-link"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
         >Sign in with an internal user</a
       >
 
-      <div v-show="showLoginInput" class="o2-input login-inputs q-pt-lg">
-        <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
-          <q-input
+      <div v-show="showLoginInput" class="o2-input login-inputs tw:pt-4">
+        <div class="tw:gap-3">
+          <OInput
             v-model="name"
             data-cy="login-user-id"
             data-test="login-user-id"
-            outlined
             :label="`${t('login.userEmail')} *`"
             placeholder="Email"
-            class="showLabelOnTop no-case"
-            dense
-            stack-label
-            filled
+            type="email"
           />
 
-          <q-input
+          <OInput
             v-model="password"
             data-cy="login-password"
             data-test="login-password"
-            outlined
             :label="`${t('login.password')} *`"
             placeholder="Password"
-            class="showLabelOnTop no-case"
-            dense
-            stack-label
-            filled
+            type="password"
           />
 
-          <div class="q-mt-lg q-mb-xl">
+          <div class="tw:mt-4 tw:mb-6">
             <OButton
               data-cy="login-sign-in"
               variant="primary"
@@ -82,7 +74,7 @@
               {{ t('login.signIn') }}
             </OButton>
           </div>
-        </q-form>
+        </div>
       </div>
     </div>
   </div>
@@ -94,6 +86,7 @@ import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 
 const store = useStore();
 

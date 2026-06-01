@@ -15,25 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-[calc(100vh-var(--navbar-height)-10px)] tw:overflow-hidden tw:pt-[0.325rem]">
+  <div class="tw:h-full tw:overflow-hidden tw:pt-1 tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
+        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
       >
         <div>
-          <q-spinner-hourglass
-            color="primary"
-            size="2.5rem"
+          <OSpinner
+            size="md"
             class="tw:mx-auto tw:block"
+            data-test="rum-loading-indicator"
           />
-          <div class="text-center full-width">
+          <div class="tw:text-center tw:w-full">
             {{ t("rum.loadingMsg") }}
           </div>
         </div>
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+      <div v-if="showTabs" class="tw:pb-[0.625rem]">
         <div class="card-container tw:px-4 tw:pt-2">
           <OTabs v-model="activeTab" align="left" dense @change="changeTab">
             <OTab
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive
-            :class="showTabs ? 'tw:h-[calc(100%-var(--navbar-height)+20px)]' : 'tw:h-full'"
+            class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col"
           >
             <component
               :is="Component"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div :class="showTabs ? 'tw:h-[calc(100%-var(--navbar-height)+20px)]' : 'tw:h-full'">
+          <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -71,13 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="">
         <div
-          class="card-container q-pa-lg tw:mx-[0.625rem] tw:max-w-full tw:h-[calc(100vh - 3.125rem)]"
+          class="card-container tw:p-4 tw:max-w-full tw:flex-1 tw:min-h-0"
         >
-          <div class="q-pb-lg">
-            <div class="text-left text-h6 text-bold q-pb-md">
+          <div class="tw:pb-4">
+            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
               {{ t("rum.aboutRUMTitle") }}
             </div>
-            <div class="text-subtitle1">
+            <div class="tw:text-base tw:font-medium">
               {{ t("rum.aboutRUMMessage") }}
             </div>
             <div>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
-            <q-icon name="arrow_forward" size="1.25rem" class="q-ml-xs" />
+            <template #icon-right><OIcon name="arrow-forward" size="sm" class="tw:ml-1" /></template>
           </OButton>
         </div>
       </div>
@@ -122,6 +122,8 @@ import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const route = useRoute();
 const router = useRouter();

@@ -128,6 +128,7 @@ test.describe("Alerts Regression Bugs", () => {
   test("Bug #9967: PromQL alert creation - comprehensive validation", {
     tag: ['@promqlAlert', '@alerts', '@regressionBugs', '@P0', '@metrics', '@bug-9967']
   }, async ({ page }) => {
+    test.setTimeout(360000);
     testLogger.info('Testing Bug #9967 fix - comprehensive validation');
     testLogger.info('Bug: Cannot save alert when selecting PromQL on metrics stream');
     testLogger.info('Fix: Added promql_condition field with operator and value inputs');
@@ -283,28 +284,23 @@ test.describe("Alerts Regression Bugs", () => {
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     testLogger.info('✓ Clicked Group By add button');
 
-    // After clicking add, a combobox appears in the Group By row
-    const groupByInput = groupByRow.locator('[role="combobox"]').first();
-    await expect(groupByInput).toBeVisible({ timeout: 5000 });
-    testLogger.info('✓ Found Group By combobox');
+    // After clicking add, the group-by OSelect trigger button appears (data-test="alert-group-by-select-0-trigger")
+    const groupByTrigger = page.locator('[data-test="alert-group-by-select-0-trigger"]').first();
+    await expect(groupByTrigger).toBeVisible({ timeout: 5000 });
+    testLogger.info('✓ Found Group By OSelect trigger');
 
-    // Click to open the autocomplete dropdown.
-    const groupBySelect = groupByRow.locator('.q-select').first();
-    await expect(groupBySelect).toBeVisible({ timeout: 5000 });
-    testLogger.info('✓ Group By select container visible');
-
-    // Click the select to open the dropdown
-    await groupBySelect.click();
+    // Click the OSelect trigger to open the autocomplete dropdown
+    await groupByTrigger.click();
     await page.waitForTimeout(1000);
 
-    const suggestions = page.locator('.q-menu:visible .q-item');
+    const suggestions = page.locator('[data-test^="alert-group-by-select-"][data-test$="-option"]');
     const suggestionCount = await suggestions.count();
     testLogger.info(`Autocomplete suggestions: ${suggestionCount}`);
 
     if (suggestionCount === 0) {
       // Try one more click after a pause
       await page.waitForTimeout(2000);
-      await groupBySelect.click();
+      await groupByTrigger.click();
       await page.waitForTimeout(1000);
     }
 

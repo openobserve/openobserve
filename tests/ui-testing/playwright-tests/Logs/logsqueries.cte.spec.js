@@ -15,35 +15,34 @@ test.describe("CTE Logs Queries testcases", () => {
   let pageManager;
 
   async function applyQueryButton(pm) {
-    const search = pm.page.waitForResponse(logData.applyQuery);
-    // Strategic 1000ms wait for query preparation - this is functionally necessary
-    await pm.page.waitForTimeout(1000);
-    await pm.logsPage.clickRefreshButton();
-    await expect.poll(async () => (await search).status()).toBe(200);
+    // Deterministic Run-query helper — waits for the refresh button to exit any
+    // in-flight Cancel state from a prior auto-search, fires the click, then waits
+    // for the button to settle. Replaces the legacy 1s buffer + waitForResponse
+    // pattern that races the auto-search response listener.
+    await pm.logsPage.waitForSearchBarRefreshButton();
+    await pm.logsPage.runQueryAndWaitForResults();
   }
 
   test.beforeEach(async ({ page }, testInfo) => {
     // Initialize test setup
     testLogger.testStart(testInfo.title, testInfo.file);
-    
+
     // Navigate to base URL with authentication
     await navigateToBase(page);
     pageManager = new PageManager(page);
-    
-    // Strategic 500ms wait for post-authentication stabilization - this is functionally necessary
-    await page.waitForTimeout(500);
+
     await ingestion(page);
-    // Strategic 500ms wait for ingestion completion - this is functionally necessary
-    await page.waitForTimeout(500);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    // Strategic 1000ms wait for logs page stabilization - this is functionally necessary
-    await page.waitForTimeout(1000);
-    await pageManager.logsPage.selectStream("e2e_cte"); 
+    // Deterministic post-navigation settle — replaces legacy 1s buffer.
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pageManager.logsPage.selectStream("e2e_cte");
+    // CTE queries use SQL syntax — enable SQL mode before the initial query run.
+    await pageManager.logsPage.enableSqlModeIfDisabled();
     await applyQueryButton(pageManager);
-    
+
     testLogger.info('CTE test setup completed');
   });
 
@@ -54,13 +53,13 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.typeInQueryEditor('WITH TotalCols AS ( SELECT * FROM "e2e_cte" ) SELECT message FROM TotalCols');
-    // Strategic 500ms wait for CTE query processing - this is functionally necessary
-    await pageManager.logsPage.waitForTimeout(500);
-    await pageManager.logsPage.clickSearchBarRefreshButton();
+    // setQueryEditorValue replaces any existing query via Monaco API (avoids appending to default query).
+    await pageManager.logsPage.setQueryEditorValue('WITH TotalCols AS ( SELECT * FROM "e2e_cte" ) SELECT message FROM TotalCols');
+    // Deterministic wait — confirms Monaco model reflects the new query before Run.
+    await pageManager.logsPage.waitForQueryEditorValue('TotalCols');
+    await applyQueryButton(pageManager);
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('TotalCols CTE query completed successfully');
   });
 
@@ -71,13 +70,12 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.typeInQueryEditor('WITH Cleaned AS (SELECT message, kubernetes_container_name AS container, kubernetes_pod_name FROM "e2e_cte" WHERE kubernetes_container_name IS NOT NULL) SELECT container, kubernetes_pod_name, message FROM Cleaned');
-    // Strategic 500ms wait for CTE query processing - this is functionally necessary
-    await pageManager.logsPage.waitForTimeout(500);
-    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.setQueryEditorValue('WITH Cleaned AS (SELECT message, kubernetes_container_name AS container, kubernetes_pod_name FROM "e2e_cte" WHERE kubernetes_container_name IS NOT NULL) SELECT container, kubernetes_pod_name, message FROM Cleaned');
+    // Deterministic wait — confirms Monaco model reflects the new query before Run.
+    await pageManager.logsPage.waitForQueryEditorValue('Cleaned');
+    await applyQueryButton(pageManager);
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('Cleaned CTE query completed successfully');
   });
 
@@ -88,13 +86,12 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.typeInQueryEditor('WITH FilteredLogs AS (SELECT * FROM "e2e_cte" WHERE str_match_ignore_case(message, \'org\')) SELECT message, kubernetes_pod_name FROM FilteredLogs');
-    // Strategic 500ms wait for CTE query processing - this is functionally necessary
-    await pageManager.logsPage.waitForTimeout(500);
-    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.setQueryEditorValue('WITH FilteredLogs AS (SELECT * FROM "e2e_cte" WHERE str_match_ignore_case(message, \'org\')) SELECT message, kubernetes_pod_name FROM FilteredLogs');
+    // Deterministic wait — confirms Monaco model reflects the new query before Run.
+    await pageManager.logsPage.waitForQueryEditorValue('FilteredLogs');
+    await applyQueryButton(pageManager);
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('FilteredLogs CTE query completed successfully');
   });
 
@@ -105,13 +102,16 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.typeInQueryEditor('WITH Counts AS (SELECT kubernetes_pod_name, COUNT(*) AS log_count FROM "e2e_cte" GROUP BY kubernetes_pod_name) SELECT * FROM Counts WHERE log_count > 1');
-    // Strategic 500ms wait for CTE query processing - this is functionally necessary
-    await pageManager.logsPage.waitForTimeout(500);
-    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.setQueryEditorValue('WITH Counts AS (SELECT kubernetes_pod_name, COUNT(*) AS log_count FROM "e2e_cte" GROUP BY kubernetes_pod_name) SELECT * FROM Counts WHERE log_count > 1');
+    // Deterministic wait — confirms Monaco model reflects the new query before Run.
+    await pageManager.logsPage.waitForQueryEditorValue('Counts');
+    await applyQueryButton(pageManager);
+    // Aggregate results have no user-pinned fields, so the table shows a single
+    // "source" column containing the full row as JSON. Verify the source cell is
+    // present and that it includes the expected field key.
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    
+    await pageManager.logsPage.expectInterestingFieldInTable('kubernetes_pod_name');
+
     testLogger.info('Counts CTE query completed successfully');
   });
 
@@ -122,13 +122,16 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.typeInQueryEditor('WITH Levels AS (SELECT level, COUNT(*) as level_count FROM "e2e_cte" GROUP BY level) SELECT * FROM Levels ORDER BY level_count DESC');
-    // Strategic 500ms wait for CTE query processing - this is functionally necessary
-    await pageManager.logsPage.waitForTimeout(500);
-    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.setQueryEditorValue('WITH Levels AS (SELECT level, COUNT(*) as level_count FROM "e2e_cte" GROUP BY level) SELECT * FROM Levels ORDER BY level_count DESC');
+    // Deterministic wait — confirms Monaco model reflects the new query before Run.
+    await pageManager.logsPage.waitForQueryEditorValue('Levels');
+    await applyQueryButton(pageManager);
+    // Aggregate results have no user-pinned fields, so the table shows a single
+    // "source" column containing the full row as JSON. Verify the source cell is
+    // present and that it includes the expected field key.
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    
+    await pageManager.logsPage.expectInterestingFieldInTable('level');
+
     testLogger.info('Levels CTE query completed successfully');
   });
 
@@ -139,13 +142,12 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.typeInQueryEditor('WITH Normalized AS (SELECT COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte") SELECT * FROM Normalized WHERE normalized_message LIKE \'%timeout%\'');
-    // Strategic 500ms wait for CTE query processing - this is functionally necessary
-    await pageManager.logsPage.waitForTimeout(500);
-    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.setQueryEditorValue('WITH Normalized AS (SELECT _timestamp, COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte") SELECT * FROM Normalized WHERE normalized_message LIKE \'%timeout%\'');
+    // Deterministic wait — confirms Monaco model reflects the new query before Run.
+    await pageManager.logsPage.waitForQueryEditorValue('Normalized');
+    await applyQueryButton(pageManager);
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    
+
     testLogger.info('Normalized CTE query completed successfully');
   });
 

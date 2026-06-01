@@ -22,21 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex tw:items-start tw:justify-between tw:mb-1">
       <div class="tw:flex tw:items-center tw:gap-2">
-        <q-icon
+        <OIcon
           v-if="icon"
           :name="icon"
-          size="1rem"
-          :color="statusColor"
+          size="sm"
+          :class="statusColorClass"
         />
         <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
           {{ label }}
         </span>
       </div>
-      <q-icon
+      <OIcon
         v-if="status"
         :name="statusIcon"
-        size="0.875rem"
-        :color="statusColor"
+        size="sm"
+        :class="statusColorClass"
       />
     </div>
 
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="tw:text-[var(--o2-text-secondary)]">Threshold</span>
         <span class="tw:font-medium">{{ threshold }}</span>
       </div>
-      <q-linear-progress
+      <OProgressBar
         :value="progressValue"
-        :color="statusColor"
-        size="4px"
+        :variant="progressVariant"
+        size="xs"
       />
     </div>
   </div>
@@ -70,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
   label: string;
   value: number | null | undefined;
@@ -141,7 +143,7 @@ const statusIcon = computed(() => {
   if (!props.status) return "";
 
   const icons = {
-    good: "check_circle",
+    good: "check-circle",
     "needs-improvement": "warning",
     poor: "error",
   };
@@ -149,20 +151,29 @@ const statusIcon = computed(() => {
   return icons[props.status] || "";
 });
 
-const statusColor = computed(() => {
-  if (!props.status) return "grey";
+const statusColorClass = computed(() => {
+  if (!props.status) return "tw:text-gray-500";
 
-  const colors = {
-    good: "positive",
-    "needs-improvement": "warning",
-    poor: "negative",
+  const classes = {
+    good: "tw:text-[var(--o2-positive)]",
+    "needs-improvement": "tw:text-[var(--o2-warning)]",
+    poor: "tw:text-[var(--o2-negative)]",
   };
 
-  return colors[props.status] || "grey";
+  return classes[props.status] || "tw:text-gray-500";
 });
 
 const progressValue = computed(() => {
   if (props.value == null || !props.maxValue) return 0;
   return Math.min((props.value / props.maxValue) * 1, 1);
+});
+const progressVariant = computed(() => {
+  if (!props.status) return "default";
+  const map: Record<string, string> = {
+    good: "default",
+    "needs-improvement": "warning",
+    poor: "danger",
+  };
+  return map[props.status] || "default";
 });
 </script>

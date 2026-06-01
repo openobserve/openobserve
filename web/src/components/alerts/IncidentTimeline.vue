@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:items-center tw:py-12">
-      <q-spinner-dots size="40px" color="primary" />
+      <OSpinner variant="dots" size="md" />
     </div>
 
     <!-- Empty state -->
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="events.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-16 tw:text-gray-500"
     >
-      <q-icon name="forum" size="56px" class="tw:mb-3 tw:opacity-40" />
+      <OIcon name="forum" class="tw:mb-3 tw:opacity-40" style="width: 56px; height: 56px;" />
       <div class="tw:text-base tw:font-medium tw:mb-1">No activity yet</div>
       <div class="tw:text-sm tw:text-gray-400">Events and comments will appear here</div>
     </div>
@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-circle-sm"
           @click="scrollToTop"
           data-test="incident-timeline-scroll-top"
-        ><q-icon name="keyboard_arrow_up" size="18px" /><q-tooltip>Scroll to top</q-tooltip></OButton>
+        ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip content="Scroll to top" /></OButton>
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
           data-test="incident-timeline-scroll-bottom"
-        ><q-icon name="keyboard_arrow_down" size="18px" /><q-tooltip>Scroll to bottom</q-tooltip></OButton>
+        ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip content="Scroll to bottom" /></OButton>
       </div>
 
       <div ref="timelineContainer" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
@@ -83,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
-                    <q-icon
+                    <OIcon
                       name="person"
-                      size="12px"
+                      size="xs"
                       :style="{ color: getAvatarColor(getUserId(event)) }"
                     />
                   </div>
@@ -98,9 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
-                    <q-icon
+                    <OIcon
                       :name="getEventIcon(event)"
-                      size="14px"
+                      size="sm"
                       :style="{ color: getEventBadgeColor(event) }"
                     />
                   </div>
@@ -146,9 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }"
                         >
                           AI SRE
-                          <q-tooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" class="tw:max-w-sm" anchor="bottom left" self="top left">
-                            {{ getFailureTooltip(event) }}
-                          </q-tooltip>
+                          <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
                         </span>
                         <span class="tw:text-sm"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
@@ -213,9 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
-                    <q-icon
+                    <OIcon
                       name="person"
-                      size="12px"
+                      size="xs"
                       :style="{ color: getAvatarColor(getUserId(event)) }"
                     />
                   </div>
@@ -279,9 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
             }"
           >
-            <q-icon
+            <OIcon
               name="person"
-              size="12px"
+              size="xs"
               :style="{ color: getAvatarColor(getCurrentUserId()) }"
             />
           </div>
@@ -289,10 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Input Area -->
         <div class="tw:flex-1 tw:relative">
-          <q-input
+          <OInput
             v-model="commentText"
             type="textarea"
-            outlined
             placeholder="Write a comment..."
             :rows="3"
             class="comment-input"
@@ -310,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="submitting"
               @click="submitComment"
               data-test="incident-timeline-comment-send"
-            ><q-icon name="send" size="16px" /><q-tooltip>Send comment</q-tooltip></OButton>
+            ><OIcon name="send" size="sm" /><OTooltip content="Send comment" /></OButton>
           </div>
         </div>
       </div>
@@ -321,11 +318,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import { date } from "quasar";
+import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   orgId: string;
@@ -337,7 +338,6 @@ interface Props {
 const props = defineProps<Props>();
 
 const store = useStore();
-const q = useQuasar();
 
 const events = ref<any[]>([]);
 const loading = ref(false);
@@ -377,16 +377,14 @@ const submitComment = async () => {
     await incidentsService.postComment(props.orgId, props.incidentId, text);
     commentText.value = "";
     await fetchEvents();
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Comment posted successfully",
-      timeout: 2000,
     });
   } catch (e: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to post comment",
-      timeout: 2000,
     });
   } finally {
     submitting.value = false;
@@ -455,19 +453,19 @@ const getAvatarColor = (username: string): string => {
 // Get event icon
 const getEventIcon = (event: any): string => {
   switch (event.type) {
-    case "Created": return "add_circle";
+    case "Created": return "add-circle";
     case "Alert": return "notifications";
     case "SeverityUpgrade":
     case "SeverityOverride": return "warning";
-    case "Acknowledged": return "check_circle";
+    case "Acknowledged": return "check-circle";
     case "Resolved": return "check";
     case "Reopened": return "replay";
-    case "DimensionsUpgraded": return "upgrade";
+    case "DimensionsUpgraded": return "arrow-upward";
     case "TitleChanged": return "edit";
-    case "AssignmentChanged": return "person_add";
+    case "AssignmentChanged": return "person";
     case "ai_analysis_begin": return "psychology";
     case "ai_analysis_complete": return "check";
-    case "ai_analysis_failed": return "error_outline";
+    case "ai_analysis_failed": return "error-outline";
     default: return "circle";
   }
 };
@@ -615,7 +613,7 @@ const formatRelativeTime = (timestamp: number): string => {
   const days = Math.floor(diff / 86400000);
   if (diff < 604800000) return `${days} day${days === 1 ? '' : 's'} ago`;
 
-  return date.formatDate(timestamp / 1000, "MMM D, YYYY");
+  return formatToDateOnly(timestamp);
 };
 
 watch(() => props.visible, async (visible) => {
@@ -655,10 +653,6 @@ defineExpose({
 }
 
 .comment-input {
-  :deep(.q-field__control) {
-    border-radius: 6px;
-  }
-
   :deep(textarea) {
     font-size: 14px;
     line-height: 1.5;

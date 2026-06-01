@@ -5,6 +5,7 @@ import type {
   DropdownItemSlots,
 } from "./ODropdown.types";
 import { DropdownMenuItem } from "reka-ui";
+import OIcon from "../../core/Icon/OIcon.vue";
 
 const props = withDefaults(defineProps<DropdownItemProps>(), {
   disabled: false,
@@ -35,11 +36,13 @@ const variantClasses: Record<
       'tw:w-full tw:px-3 tw:py-1.5 tw:rounded-md',
       'tw:cursor-pointer tw:select-none tw:outline-none',
       variantClasses[variant],
-      'tw:data-[disabled]:text-dropdown-item-disabled tw:data-[disabled]:cursor-not-allowed tw:data-[disabled]:pointer-events-none',
+      'tw:data-[disabled]:text-dropdown-item-disabled tw:data-[disabled]:cursor-not-allowed',
     ]"
     @select="(e) => emit('select', e)"
   >
-    <slot name="icon-left" />
+    <slot name="icon-left">
+      <OIcon v-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+    </slot>
     <slot />
     <slot name="icon-right" />
   </DropdownMenuItem>

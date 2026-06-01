@@ -25,7 +25,7 @@ use axum_extra::extract::cookie::{Cookie, SameSite};
 use config::{
     Config, get_config,
     meta::user::UserRole,
-    utils::{base64, json},
+    utils::{base64, json, password::validate_password_strength},
 };
 use serde::Serialize;
 #[cfg(feature = "enterprise")]
@@ -107,12 +107,15 @@ pub async fn list(
     // Check if user has access to get users
     if get_openfga_config().enabled
         && check_permissions(
-            &format!("_all_{org_id}"),
+            &org_id,
             &org_id,
             &user_email.user_id,
             "users",
             "GET",
             None,
+            true,
+            false,
+            false,
         )
         .await
     {
@@ -169,8 +172,8 @@ pub async fn save(
     let mut user = UserRequest::from(&user);
     user.email = user.email.trim().to_lowercase();
 
-    let bad_req_msg = if user.password.len() < 8 {
-        Some("Password must be at least 8 characters long")
+    let bad_req_msg = if let Err(msg) = validate_password_strength(&user.password) {
+        Some(msg)
     } else if user.role.base_role == UserRole::Root {
         Some("Not allowed")
     } else if user.role.base_role == UserRole::SreAgent {
@@ -254,10 +257,8 @@ pub async fn update(
             .unwrap();
     }
     if user.change_password
-        && user
-            .new_password
-            .as_deref()
-            .is_some_and(|pass| pass.len() < 8)
+        && let Some(new_pw) = user.new_password.as_deref()
+        && let Err(msg) = validate_password_strength(new_pw)
     {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
@@ -265,7 +266,7 @@ pub async fn update(
             .body(Body::from(
                 serde_json::to_string(&meta::http::HttpResponse::error(
                     axum::http::StatusCode::BAD_REQUEST,
-                    "Password must be at least 8 characters long".to_string(),
+                    msg.to_string(),
                 ))
                 .unwrap(),
             ))
@@ -460,7 +461,19 @@ pub async fn delete_bulk(
 
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
-        if !check_permissions(email, &org_id, &initiator_id, "users", "DELETE", None).await {
+        if !check_permissions(
+            email,
+            &org_id,
+            &initiator_id,
+            "users",
+            "DELETE",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }

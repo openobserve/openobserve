@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-    <div class="card-container tw:mb-[0.8rem]">
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
+    <div class="card-container tw:mb-[0.8rem] tw:shrink-0">
       <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
           <FunctionsToolbar
             v-model:name="formData.name"
@@ -35,25 +35,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:flex">
-
-
+    <div class="tw:flex tw:flex-1 tw:min-h-0">
       <div
-        class="tw:flex tw:overflow-auto "
-        :style="{
-          width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
-        }"
+        class="tw:flex tw:overflow-hidden tw:min-h-0"
+        :class="[
+          store.state.isAiChatEnabled && !isAddFunctionComponent
+            ? 'tw:w-3/4'
+            : 'tw:w-full',
+        ]"
       >
-        <q-splitter
+        <OSplitter
           v-model="splitterModel"
-          :limits="[30, Infinity]"
+          :limits="[30, 100]"
           class="tw:overflow-hidden tw:w-full"
-          reverse
+          :horizontal="false"
         >
           <template v-slot:before>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
-              <q-form id="addFunctionForm" ref="addJSTransformForm">
-                <div class="add-function-name-input q-pb-sm o2-input">
+            <div class="tw:px-3 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
+              <div class="add-function-name-input tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -62,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:flex-1 tw:min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -72,12 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :languages="['vrl', 'javascript']"
                       :default-language="formData.transType === '1' ? 'javascript' : 'vrl'"
                       :query="formData.function"
-                      :hide-nl-toggle="false"
-                      :disable-ai="false"
+                      :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
+                      :disable-ai="!store.state.zoConfig.ai_enabled"
                       :disable-ai-reason="''"
                       :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('function.enterFunctionPrompt')"
-                      editor-height="calc(100vh - 194px)"
+                      editor-height="100%"
                       @update:query="handleFunctionUpdate"
                       @language-change="handleLanguageChange"
                       @toggle-nlp-mode="handleToggleNlpMode"
@@ -86,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-success="handleGenerationSuccess"
                     />
                   </div>
-                  <div class="text-subtitle2">
+                  <div class="tw:text-sm tw:font-medium">
                     <div v-if="vrlFunctionError">
                       <FullViewContainer
                         name="function"
@@ -96,25 +95,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="expandState.functionError"
-                        class="q-px-sm q-pb-sm tw:border-l-4 tw:border-red-500"
+                        class="tw:px-2 tw:pb-2 tw:border-l-4 tw:border-red-500"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'bg-grey-10'
-                            : 'bg-grey-2'
+                            ? 'tw:bg-gray-800'
+                            : 'tw:bg-gray-100'
                         "
                       >
-                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                        <pre class="tw:my-0 tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>
                     </div>
                   </div>
-                </div>
-              </q-form>
+              </div>
             </div>
           </template>
           <template v-slot:after>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max q-ml-sm card-container">
+            <div class="tw:px-3 tw:pt-2 tw:pb-3 tw:h-max tw:ml-2 card-container">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="formData"
@@ -124,12 +122,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
-      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-        <O2AIChat :style="{
-          height: `calc(100vh - (112px + ${heightOffset}px))`
-        }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+      <div
+        v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
+        :class="[
+          'tw:w-1/4 tw:max-w-full tw:min-w-[75px]',
+          heightOffset ? 'ai-chat-with-offset' : '',
+          store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container',
+        ]"
+      >
+        <O2AIChat
+          class="tw:h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
+          :is-open="store.state.isAiChatEnabled"
+          @close="store.state.isAiChatEnabled = false"
+          :aiChatInputContext="aiChatInputContext"
+        />
       </div>
     </div>
   </div>  
@@ -157,7 +165,6 @@ import {
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
@@ -167,6 +174,8 @@ import { onBeforeRouteLeave } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -195,6 +204,7 @@ export default defineComponent({
     },
   },
   components: {
+    OSplitter,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -214,8 +224,7 @@ export default defineComponent({
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);
-    const disableColor: any = ref("");
+    const addJSTransformForm: any = ref(null);    const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
       function: "",
@@ -224,7 +233,6 @@ export default defineComponent({
     });
     const indexOptions = ref([]);
     const { t } = useI18n();
-    const $q = useQuasar();
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const streams: any = ref({});
@@ -370,8 +378,8 @@ export default defineComponent({
             return false;
           }
 
-          const loadingNotification = $q.notify({
-            spinner: true,
+          const loadingNotification = toast({
+            variant: "loading",
             message: "Please wait...",
             timeout: 0,
           });
@@ -406,18 +414,17 @@ export default defineComponent({
                 formData.value = { ...defaultValue() };
 
                 emit("update:list", _formData);
-                addJSTransformForm?.value?.resetValidation();
 
                 loadingNotification();
-                $q.notify({
-                  type: "positive",
+                toast({
+                  variant: "success",
                   message: res.data.message || "Function saved successfully",
                 });
               })
               .catch((err) => {
                 compilationErr.value = err?.response?.data["message"];
-                $q.notify({
-                  type: "negative",
+                toast({
+                  variant: "error",
                   message:
                     err.response?.data?.message ?? "Function creation failed",
                 });
@@ -569,12 +576,10 @@ export default defineComponent({
 
     return {
       t,
-      $q,
       emit,
       disableColor,
       beingUpdated,
       formData,
-      addJSTransformForm,
       store,
       compilationErr,
       indexOptions,
@@ -691,6 +696,10 @@ export default defineComponent({
   :deep(.date-time-button) {
     width: 100%;
   }
+}
+
+.ai-chat-with-offset {
+  --ai-chat-offset: 75px;
 }
 </style>
 <style>

@@ -2,9 +2,7 @@
 
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar();
 
 vi.mock("@/composables/useIngestion", () => ({
   default: () => ({ aiContent: "mock-ai-content" }),

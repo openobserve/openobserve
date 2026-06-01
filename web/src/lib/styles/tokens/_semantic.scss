@@ -1,0 +1,113 @@
+/* ============================================================
+   SEMANTIC TOKENS — maps base palette to intent/meaning
+   Used directly in components for shared design decisions.
+   ============================================================
+   ARCHITECTURE (required for dark-mode + Tailwind prefix):
+   1. Plain `:root` block defines light-mode default values.
+   2. `@theme inline` with self-references registers tokens for
+      Tailwind utility generation. `inline` keeps `var()` refs
+      unprefixed, so dark.css overrides apply correctly.
+   ============================================================ */
+
+/* ── Light-mode defaults ─────────────────────────────────── */
+:root {
+  /* Text — grey-based semantic hierarchy (Datadog/Grafana pattern) */
+  --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles */
+  --color-text-primary:     var(--color-grey-900);  /* alias for heading — backward compat */
+  --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
+  --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions */
+  --color-text-caption:     var(--color-grey-500);  /* captions, footnotes, timestamps */
+  --color-text-label:       var(--color-grey-400);  /* form labels, metadata, badges */
+  --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
+  --color-text-disabled:    var(--color-grey-400);
+  --color-text-placeholder: var(--color-grey-400);
+  --color-text-link:        var(--color-primary-600);  /* clickable links */
+  --color-text-link-hover:  var(--color-primary-700);  /* link hover state */
+  --color-text-code:        var(--color-grey-700);     /* inline code, monospace */
+  --color-text-inverse:     var(--color-white);        /* text on dark/colored bg */
+
+  /* Surfaces */
+  --color-surface-base:    var(--color-white);
+  --color-surface-panel:   var(--color-grey-50);
+  --color-surface-overlay: var(--color-white);
+  --color-surface-subtle:       var(--color-grey-100);
+  --color-surface-subtle-hover: var(--color-grey-200);
+
+  /* Borders */
+  --color-border-default: var(--color-grey-200);
+  --color-border-strong:  var(--color-grey-400);
+
+  /* Overlay scrim — semi-transparent backdrop */
+  --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
+}
+
+/* ── Register ALL semantic tokens for Tailwind utilities ── */
+@theme inline {
+  /* Text */
+  --color-text-heading:     var(--color-text-heading);
+  --color-text-primary:     var(--color-text-primary);
+  --color-text-body:        var(--color-text-body);
+  --color-text-secondary:   var(--color-text-secondary);
+  --color-text-caption:     var(--color-text-caption);
+  --color-text-label:       var(--color-text-label);
+  --color-text-muted:       var(--color-text-muted);
+  --color-text-disabled:    var(--color-text-disabled);
+  --color-text-placeholder: var(--color-text-placeholder);
+  --color-text-link:        var(--color-text-link);
+  --color-text-link-hover:  var(--color-text-link-hover);
+  --color-text-code:        var(--color-text-code);
+  --color-text-inverse:     var(--color-text-inverse);
+
+  /* Surfaces */
+  --color-surface-base:    var(--color-surface-base);
+  --color-surface-panel:   var(--color-surface-panel);
+  --color-surface-overlay: var(--color-surface-overlay);
+  --color-surface-subtle:       var(--color-surface-subtle);
+  --color-surface-subtle-hover: var(--color-surface-subtle-hover);
+
+  /* Borders */
+  --color-border-default: var(--color-border-default);
+  --color-border-strong:  var(--color-border-strong);
+
+  /* Overlay scrim */
+  --color-overlay-scrim: var(--color-overlay-scrim);
+
+  /* Brand / Primary (re-exports from base.css) */
+  --color-primary-50:  var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+
+  /* Error / Danger (re-exports from base.css) */
+  --color-error-50:  var(--color-error-50);
+  --color-error-100: var(--color-error-100);
+  --color-error-400: var(--color-error-400);
+  --color-error-500: var(--color-error-500);
+  --color-error-600: var(--color-error-600);
+  --color-error-700: var(--color-error-700);
+
+  /* Warning (re-exports from base.css) */
+  --color-warning-50:  var(--color-warning-50);
+  --color-warning-100: var(--color-warning-100);
+  --color-warning-400: var(--color-warning-400);
+  --color-warning-500: var(--color-warning-500);
+  --color-warning-600: var(--color-warning-600);
+  --color-warning-700: var(--color-warning-700);
+
+  /* Radius / Shadow (re-exports from base.css) */
+  --radius-sm:   var(--radius-sm);
+  --radius-md:   var(--radius-md);
+  --radius-lg:   var(--radius-lg);
+  --radius-xl:   var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}

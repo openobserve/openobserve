@@ -21,6 +21,12 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+// Mock toast so tests don't need $q
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
+
 // Mock incidents service
 vi.mock("@/services/incidents", () => ({
   default: {
@@ -42,8 +48,6 @@ vi.mock("@/services/service_streams", () => ({
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
 import serviceStreamsApi from "@/services/service_streams";
@@ -53,7 +57,6 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Install Quasar globally
-installQuasar({ plugins: [Dialog, Notify] });
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -114,7 +117,6 @@ describe("IncidentDetailDrawer.vue", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          QPage: true,
           IncidentServiceGraph: true,
           SREChat: true,
           // Use custom stubs that accept props so we can test them
@@ -379,13 +381,13 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should show success notification on status update", async () => {
-      const mockNotify = vi.fn();
-      wrapper.vm.$q.notify = mockNotify;
+      mockToast.mockClear();
 
       await wrapper.vm.acknowledgeIncident();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("positive");
+      expect(mockToast).toHaveBeenCalled();
+      const call = mockToast.mock.calls[0][0];
+      expect(call.variant).toBe("success");
     });
 
     it("should not emit status-updated event (removed)", async () => {
@@ -398,15 +400,14 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should handle status update error", async () => {
-      const mockNotify = vi.fn();
+      mockToast.mockClear();
       (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));
-
-      wrapper.vm.$q.notify = mockNotify;
 
       await wrapper.vm.acknowledgeIncident();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("negative");
+      expect(mockToast).toHaveBeenCalled();
+      const call = mockToast.mock.calls[0][0];
+      expect(call.variant).toBe("error");
     });
 
     it("should update local incident state on success", async () => {
@@ -481,13 +482,13 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should show success notification after RCA", async () => {
-      const mockNotify = vi.fn();
-      wrapper.vm.$q.notify = mockNotify;
+      mockToast.mockClear();
 
       await wrapper.vm.triggerRca();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("positive");
+      expect(mockToast).toHaveBeenCalled();
+      const successCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "success");
+      expect(successCall).toBeTruthy();
     });
 
     it("should reload incident details after RCA", async () => {
@@ -500,15 +501,14 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should handle RCA error", async () => {
-      const mockNotify = vi.fn();
+      mockToast.mockClear();
       (incidentsService.triggerRca as any).mockRejectedValue(new Error("RCA failed"));
-
-      wrapper.vm.$q.notify = mockNotify;
 
       await wrapper.vm.triggerRca();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("negative");
+      expect(mockToast).toHaveBeenCalled();
+      const errCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "error");
+      expect(errCall).toBeTruthy();
     });
 
     it("should clear RCA content on error", async () => {
@@ -594,25 +594,25 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Utility Functions - Status Colors", () => {
+  describe("Utility Functions - Status Variants", () => {
     beforeEach(async () => {
       wrapper = await createWrapper();
     });
 
-    it("should return correct color for open status", () => {
-      expect(wrapper.vm.getStatusColor("open")).toBe("negative");
+    it("should return correct variant for open status", () => {
+      expect(wrapper.vm.getStatusVariant("open")).toBe("error-soft");
     });
 
-    it("should return correct color for acknowledged status", () => {
-      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("orange");
+    it("should return correct variant for acknowledged status", () => {
+      expect(wrapper.vm.getStatusVariant("acknowledged")).toBe("warning-soft");
     });
 
-    it("should return correct color for resolved status", () => {
-      expect(wrapper.vm.getStatusColor("resolved")).toBe("positive");
+    it("should return correct variant for resolved status", () => {
+      expect(wrapper.vm.getStatusVariant("resolved")).toBe("success-soft");
     });
 
-    it("should return grey for unknown status", () => {
-      expect(wrapper.vm.getStatusColor("unknown")).toBe("grey");
+    it("should return default-soft for unknown status", () => {
+      expect(wrapper.vm.getStatusVariant("unknown")).toBe("default-soft");
     });
   });
 
@@ -1336,14 +1336,13 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("shows info notification when analysis_in_flight=true in response", async () => {
-      const mockNotify = vi.fn();
-      wrapper.vm.$q.notify = mockNotify;
+      mockToast.mockClear();
       (incidentsService.updateIncident as any).mockResolvedValue({
         data: { severity: "P2", analysis_in_flight: true },
       });
       await wrapper.vm.updateSeverity("P2");
       await flushPromises();
-      const infoCall = mockNotify.mock.calls.find((c: any[]) => c[0].type === "info");
+      const infoCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "info");
       expect(infoCall).toBeTruthy();
       expect(infoCall[0].message).toContain("already running");
     });
@@ -1370,8 +1369,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("handles API error and sets updating=false", async () => {
-      const mockNotify = vi.fn();
-      wrapper.vm.$q.notify = mockNotify;
+      mockToast.mockClear();
       (incidentsService.updateIncident as any).mockRejectedValue(new Error("API error"));
       await wrapper.vm.updateSeverity("P3");
       await flushPromises();

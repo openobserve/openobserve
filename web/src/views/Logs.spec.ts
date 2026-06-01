@@ -15,9 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
-
 import Logs from "@/views/Logs.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -30,9 +27,6 @@ document.body.appendChild(node);
 
 SearchPlugin({});
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 describe.skip("Alert List", async () => {
   let wrapper: any;

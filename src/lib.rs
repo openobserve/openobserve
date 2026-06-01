@@ -15,6 +15,7 @@
 
 #![feature(lazy_get)]
 #![feature(variant_count)]
+#![recursion_limit = "256"]
 
 #[cfg(feature = "enterprise")]
 pub mod cipher;

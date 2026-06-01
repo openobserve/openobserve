@@ -149,6 +149,7 @@
     "timestamp": "timestamp",
     "source": "_source",
     "noResult": "No results found.",
+    "noData": "No data available",
     "syntaxGuide": "Syntax guide",
     "recordsPerPage": "Records per page",
     "showing": "Showing",
@@ -394,6 +395,7 @@
     "selectStreamBeforeScheduling": "Please select a stream before scheduling a job",
     "functionSelectionNotSupportedVisualization": "Function selection is not supported for timechart",
     "toggleFunctionEditor": "Toggle Function Editor",
+    "functionEditorLabel": "Function Editor",
     "functionLabel": "Function",
     "actionLabel": "Action",
     "transformLabel": "Transform",
@@ -403,7 +405,8 @@
     "addToDashboard": "Add To Dashboard",
     "selectStream": "Select Stream",
     "pattern_summary": "Showing 1 to 50 out of {totalEvents} events & {patternsFound} patterns found in {logsAnalyzed} events in {totalTime} ms.",
-    "selectLogStream": "Select logs stream"
+    "selectLogStream": "Select logs stream",
+    "loadingStream": "Loading Stream..."
   },
   "menu": {
     "home": "Home",
@@ -517,9 +520,9 @@
     "today_usage": "Today's Usage",
     "feature_comparison_lbl": "Feature Comparison",
     "feature_comparision_ent_msg": "You're using OpenObserve Enterprise Edition with access to all advanced features listed below.",
-    "feature_comparision_plan_detail": "Your plan: Enterprise Edition is free for up to 200 GB/day (~6 TB/month) of data ingestion.",
+    "feature_comparision_plan_detail": "Your plan: Enterprise Edition is free for up to 50 GB/day (~1.5 TB/month) of data ingestion.",
     "feature_comparision_os_msg": "You're currently using OpenObserve Open Source Edition. Upgrade to Enterprise Edition to unlock advanced features listed in the comparison table below.",
-    "feature_comparision_good_news": "Good news: OpenObserve Enterprise Edition is completely free for up to 200 GB/day (~6 TB/month) of data ingestion.",
+    "feature_comparision_good_news": "Good news: OpenObserve Enterprise Edition is completely free for up to 50 GB/day (~1.5 TB/month) of data ingestion.",
     "feature_comparision_subtitle": "Compare features across Open Source, Enterprise, and Cloud offerings",
     "feature_column_name": "Feature",
     "edition_opensource": "Open Source (Self hosted)",
@@ -546,6 +549,7 @@
     "feature_query_management": "Query management",
     "feature_workload_management": "Workload management (QoS)",
     "feature_audit_trail": "Audit trail",
+    "feature_action_scripts": "Action Scripts",
     "feature_sensitive_data_redaction": "Sensitive data redaction",
     "feature_influence_roadmap": "Ability to influence roadmap",
     "feature_license": "License",
@@ -564,7 +568,7 @@
     "value_support_enterprise": "Enterprise",
     "value_support_cloud": "Cloud",
     "value_cost_free": "Free",
-    "value_cost_enterprise": "If self hosted, free for up to 200 GB/Day data ingested. Paid thereafter",
+    "value_cost_enterprise": "If self hosted, free for up to 50 GB/day data ingested. Paid thereafter",
     "value_cost_cloud": "14 day free trial. Paid thereafter",
     "commit_lbl": "Commit",
     "build_lbl": "Built",
@@ -624,7 +628,7 @@
       "cloud": {
         "hero_title": "Enterprise Features",
         "offer_text": "Get all enterprise features completely free when you self-host OpenObserve",
-        "badge_text": "Free up to 200GB / day",
+        "badge_text": "Free up to 50GB / day",
         "features_title": "OpenObserve Cloud Features",
         "features_subtitle": "All features included in your cloud subscription",
         "primary_button_text": "Download Now"
@@ -650,7 +654,7 @@
       "open_source": {
         "hero_title": "Get Enterprise Edition",
         "offer_text": "Download and unlock all enterprise features completely free",
-        "badge_text": "Free up to 200GB / day",
+        "badge_text": "Free up to 50GB / day",
         "features_title": "Unlock All Enterprise Features",
         "features_subtitle": "Everything you need for production-ready observability",
         "primary_button_text": "Download Now"
@@ -927,6 +931,7 @@
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
+    "organizationMembers": "Organization Members",
     "invitations": "Invitations",
     "quota": "Quotas",
     "externalUserWarningTitle": "External user warning",
@@ -1578,7 +1583,8 @@
     "panelTitle": "Panel Title",
     "selectDashboard": "Select Dashboard",
     "importDashboard": "Import Dashboard",
-    "dropFileMsg": "Drop your file here",
+    "dropFileMsg": "Drop your file here ",
+    "selectFile": "Select File",
     "importURL": "Import Dashboard from URL",
     "addURL": "Add your url",
     "importJson": "Import Dashboard from JSON",
@@ -1649,6 +1655,7 @@
     "singleColor": "Single Color",
     "colorMode": "Background Color",
     "searchAcross": "Search Across Folders",
+    "allFolders": "All Folders",
     "searchSelf": "Switch to Search across the current Folder",
     "searchAll": "Switch to Search Across all Folders",
     "folder": "Folder",
@@ -1762,7 +1769,7 @@
     "markLineYAxis": "Y-Axis",
     "colorPalette": "Color palette",
     "colorSeriesBy": "Color series by:",
-    "colorBySeries": "<b>By Series</b>",
+    "colorBySeries": "By Series",
     "colorDefaultPaletteBySeries": "Default Palette (By Series)",
     "colorDefaultPaletteBySeriesSubLabel": "Series with the same name will use the same color",
     "colorPaletteClassic": "Palette-Classic",
@@ -1771,7 +1778,7 @@
     "colorSingleColorSubLabel": "Set a specific color to all series",
     "colorShadesOfSpecificColor": "Shades Of Specific Color",
     "colorShadesOfSpecificColorSubLabel": "Different shades of specific color",
-    "colorByValue": "<b>By Value</b>",
+    "colorByValue": "By Value",
     "colorGreenYellowRed": "Green-Yellow-Red (By Value)",
     "colorRedYellowGreen": "Red-Yellow-Green (By Value)",
     "colorTemperature": "Temperature (By Value)",
@@ -2004,6 +2011,57 @@
     "clearAll": "Clear all",
     "clearAllTitle": "Clear all chats",
     "clearAllMessage": "This will permanently delete all chat history. This action cannot be undone."
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Good Morning",
+      "afternoon": "Good Afternoon",
+      "evening": "Good Evening",
+      "night": "Working Late"
+    },
+    "welcome": {
+      "taglineLead": "I'm",
+      "taglineHighlight": "O2 Assistant",
+      "taglineTail": ". I can write your",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "PromQL",
+      "taglineAnd": "and walk you through your logs, traces, metrics and incidents.",
+      "signedInAs": "Signed in as",
+      "role": "Role",
+      "tryOneOfThese": "Or try one of these"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Write a Query",
+        "description": "SQL for logs, traces, RUM, or PromQL for metrics."
+      },
+      "incident": {
+        "title": "Investigate Incidents",
+        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\""
+      },
+      "dashboard": {
+        "title": "Build a Dashboard",
+        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels."
+      },
+      "alert": {
+        "title": "Create an Alert",
+        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Write VRL to parse JSON from my nginx logs",
+      "regexRedact": "Generate a regex pattern to redact emails",
+      "mapStreamSchema": "Map my \"default\" stream schema",
+      "promqlCpu": "Write PromQL for pods using > 80% CPU",
+      "datadogToO2": "Convert this Datadog query to OpenObserve SQL",
+      "lastAlertFired": "Why was my last alert fired?"
+    },
+    "placeholderRotation": {
+      "one": "Show me errors from the last hour…",
+      "two": "Write VRL to parse JSON from nginx logs…",
+      "three": "Build a dashboard for K8s node health…"
+    }
   },
   "billing": {
     "header": "Usage & Billing",
@@ -2617,7 +2675,8 @@
       "rowTemplateTooltip": "Row Template is used to format the alert message.",
       "templateType": "Template Type:",
       "noTemplatesAvailable": "No templates available",
-      "refreshTemplates": "Refresh latest Templates"
+      "refreshTemplates": "Refresh latest Templates",
+      "selectTemplate": "Select Template"
     },
     "editJson": "Edit Alert JSON",
     "additional_settings":"Additional Settings",
@@ -3470,6 +3529,9 @@
     "dfcEncryptedData": "DFC Encrypted Data",
     "providerType": "Type",
     "algorithm": "Algorithm",
+    "providerTypeRequired": "Provider type is required",
+    "algorithmRequired": "Algorithm is required",
+    "secretRequired": "Secret is required",
     "storeType": "Store Type",
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
@@ -3577,6 +3639,7 @@
     "correlatedLogs": "Logs",
     "correlatedMetrics": "Metrics",
     "correlatedTraces": "Traces",
+    "loadingCorrelation": "Loading correlation data...",
     "clickToLoadLogs": "Click to load correlated logs",
     "clickToLoadMetrics": "Click to load correlated metrics",
     "clickToLoadTraces": "Click to load correlated traces",
@@ -3900,6 +3963,7 @@
     "shadowBannerPrefix": "The rules below are shadowed by",
     "shadowBannerSuffix": "— overridden by a higher-priority rule and won't be used for cost calculations.",
     "shadowedTooltip": "Shadowed by \"{name}\" — overridden by a higher-priority rule and won't be used for cost calculations",
+    "shadowedWarningBanner": "The rules below are shadowed by \"{name}\" — overridden by a higher-priority rule and won't be used for cost calculations.",
     "overflowMore": "more",
     "errLoadModels": "Failed to load models",
     "errUpdate": "Failed to update",

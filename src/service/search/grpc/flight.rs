@@ -43,8 +43,9 @@ use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
-        get_stream_setting_fts_fields, get_stream_setting_index_fields,
-        get_stream_setting_index_updated_at, unwrap_stream_created_at, unwrap_stream_settings,
+        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, get_stream_setting_index_updated_at,
+        unwrap_stream_created_at, unwrap_stream_settings,
     },
 };
 use itertools::Itertools;
@@ -157,6 +158,10 @@ pub async fn search(
         .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
     let index_fields = get_stream_setting_index_fields(&stream_settings)
+        .into_iter()
+        .filter(|v| latest_schema_map.contains_key(v))
+        .collect_vec();
+    let bloom_indexed_fields = get_stream_setting_bloom_filter_fields(&stream_settings)
         .into_iter()
         .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
@@ -295,6 +300,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            bloom_indexed_fields.clone(),
             storage_idx_optimize_rule,
         )
         .await
@@ -592,8 +598,11 @@ fn optimizer_physical_plan(
         && index_optimizer_rule_ref.lock().is_none()
         && index_rule.can_optimize()
     {
-        let index_optimizer_rule =
-            FollowerIndexOptimizerRule::new(time_range, index_optimizer_rule_ref.clone());
+        let index_optimizer_rule = FollowerIndexOptimizerRule::new(
+            time_range,
+            index_fields.clone(),
+            index_optimizer_rule_ref.clone(),
+        );
         let _ = index_optimizer_rule.optimize(original_plan, ctx.state().config_options())?;
     }
 
@@ -681,6 +690,7 @@ async fn handle_tantivy_optimize(
         idx_optimize_rule,
         Some(IndexOptimizeMode::SimpleCount)
             | Some(IndexOptimizeMode::SimpleHistogram(..))
+            | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
             | Some(IndexOptimizeMode::SimpleTopN(..))
             | Some(IndexOptimizeMode::SimpleDistinct(..))
     ) {
@@ -715,7 +725,10 @@ async fn update_index_updated_at(
     let ttv_timestamp_updated_at = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
     let index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
 
-    if matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleTopN(..))) {
+    if matches!(
+        idx_optimize_rule,
+        Some(IndexOptimizeMode::SimpleTopN(..)) | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
+    ) {
         let ttv_secondary_index_updated_at =
             db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
         return index_updated_at.max(ttv_secondary_index_updated_at);

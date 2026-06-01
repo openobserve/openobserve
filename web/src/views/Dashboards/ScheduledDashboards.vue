@@ -15,122 +15,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="scheduled-dashboards"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  <ODrawer data-test="scheduled-dashboards-drawer"
+    :open="open"
+    :width="60"
+    :title="t('dashboard.scheduledDashboards')"
+    @update:open="emit('update:open', $event)"
   >
-    <q-table
-      data-test="scheduled-dashboard-table"
-      ref="scheduledDashboardTableRef"
-      :rows="formattedReports"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
-      style="width: 100%"
-      class="q-px-md"
-      @row-click="openReport"
-    >
-      <template #no-data>
-        <template v-if="loading">
-          <div
-            class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
-          >
-            <q-spinner-hourglass color="primary" size="lg" />
-          </div>
-        </template>
-        <template v-else>
-          <NoData />
-        </template>
-      </template>
-      <template #top="scope">
-        <div class="tw:flex tw:justify-between tw:w-full">
-          <div
-            class="q-table__title tw:flex tw:items-center"
-            data-test="alerts-list-title"
-          >
-            {{ t("dashboard.scheduledDashboards") }}
-          </div>
-
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="app-tabs-container tw:h-[36px]">
-              <app-tabs
-                class="tabs-selection-container"
-                :tabs="reportTypeTabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="filterReports"
-              />
-            </div>
-
-            <q-input
-              data-test="alert-list-search-input"
-              v-model="filterQuery"
-              borderless
-              dense
-              class="no-border tw:border tw:border-[var(--q-color-button-border,#d1d5db)] tw:rounded-md tw:px-2 tw:h-9"
-              :placeholder="t('reports.search')"
-              hide-bottom-space
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
-
-            <OButton
-              variant="primary"
-              size="sm-action"
-              data-test="alert-list-add-alert-btn"
-              @click="createNewReport"
-              >{{ t("dashboard.newReport") }}</OButton
-            >
-
-            <div class="q-ml-sm">
-              <OButton variant="ghost" size="icon-sm" v-close-popup="true">
-                <template #icon-left><q-icon name="close" /></template>
-              </OButton>
-            </div>
-          </div>
+    <template #header-right>
+      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+        <div class="app-tabs-container tw:h-[36px]">
+          <AppTabs
+            class="tabs-selection-container"
+            :tabs="scheduledReportTypeTabs"
+            v-model:active-tab="scheduledActiveTab"
+          />
         </div>
 
-        <QTablePagination
-          :scope="scope"
-          :position="'top'"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <OInput
+          data-test="alert-list-search-input"
+          v-model="scheduledFilterQuery"
+          :placeholder="t('reports.search')"
+        >
+          <template #icon-left>
+            <OIcon name="search" size="sm" class="tw:cursor-pointer" />
+          </template>
+        </OInput>
+
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="alert-list-add-alert-btn"
+          @click="createScheduledReport"
+          >{{ t("dashboard.newReport") }}</OButton
+        >
+      </div>
+    </template>
+
+    <div
+      data-test="scheduled-dashboards-container"
+      class="scheduled-dashboards"
+      :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'"
+    >
+    <OTable
+      data-test="scheduled-dashboard-table"
+      :data="displayReports"
+      :columns="columns"
+      row-key="id"
+      pagination="client"
+      :page-size="selectedPerPage"
+      :page-size-options="perPageOptionsList"
+      :show-global-filter="false"
+      :loading="loading"
+      style="width: 100%"
+      class="tw:px-3"
+    >
+      <template #cell-name="{ row }">
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
       </template>
 
-      <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'bottom'"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
+      <template #cell-tab="{ row }">
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
       </template>
-    </q-table>
-  </div>
+
+      <template #cell-time_range="{ row }">
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
+      </template>
+
+      <template #cell-frequency="{ row }">
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
+      </template>
+
+      <template #cell-last_triggered_at="{ row }">
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.last_triggered_at }}</span>
+      </template>
+
+      <template #cell-created_at="{ row }">
+        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.created_at }}</span>
+      </template>
+
+      <template #empty>
+        <NoData />
+      </template>
+    </OTable>
+    </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
-import { QTable } from "quasar";
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
-import { Database, CalendarClock } from "lucide-vue-next";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   reports: {
     type: Array,
     required: true,
@@ -157,7 +150,32 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits<{
+  "update:open": [value: boolean];
+}>();
+
 const { t } = useI18n();
+
+const router = useRouter();
+
+const scheduledFilterQuery = ref("");
+const scheduledActiveTab = ref("cached");
+const scheduledReportTypeTabs = reactive([
+  { label: t("reports.cached"), value: "cached", icon: "database" },
+  { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
+]);
+
+const createScheduledReport = () => {
+  router.push({
+    name: "createReport",
+    query: {
+      folderId: props.folderId,
+      dashboardId: props.dashboardId,
+      tabId: props.tabId,
+      type: "cached",
+    },
+  });
+};
 
 const scheduledReports = ref<ScheduledDashboardReport[]>(
   props.reports as ScheduledDashboardReport[],
@@ -165,26 +183,7 @@ const scheduledReports = ref<ScheduledDashboardReport[]>(
 
 const formattedReports = ref<ScheduledDashboardReport[]>([]);
 
-const scheduledDashboardTableRef = ref<InstanceType<typeof QTable> | null>();
-
-const router = useRouter();
-
-const activeTab = ref("cached");
-
 const store = useStore();
-
-const reportTypeTabs = reactive([
-  {
-    label: t("reports.cached"),
-    value: "cached",
-    icon: Database,
-  },
-  {
-    label: t("reports.scheduled"),
-    value: "shared",
-    icon: CalendarClock,
-  },
-]);
 
 watch(
   () => props.reports,
@@ -195,6 +194,13 @@ watch(
     deep: true,
   },
 );
+
+watch(
+  scheduledActiveTab,
+  () => {
+    filterReports();
+  },
+);
 //this makes sure that reports are formatted when the component is mounted
 //because sometimes watcher might not be triggered if the props are already set
 onMounted(() => {
@@ -202,8 +208,6 @@ onMounted(() => {
 });
 
 const formatReports = () => {
-  resultTotal.value = props.reports.length;
-
   props.reports.length > 0 &&
     props.reports.forEach((report: any, index) => {
       scheduledReports.value.push({
@@ -232,7 +236,7 @@ const getTabName = (tabId: string) => {
 const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
-  if (activeTab.value === "cached") {
+  if (scheduledActiveTab.value === "cached") {
     formattedReports.value = (
       scheduledReports.value as ScheduledDashboardReport[]
     ).filter((report) => report.isCached);
@@ -250,104 +254,81 @@ const filterReports = () => {
       };
     },
   );
-
-  resultTotal.value = formattedReports.value.length;
 };
 
-const columns: any = [
+const columns: OTableColumnDef[] = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    meta: { align: "left" },
+    size: 50,
   },
   {
-    name: "name",
-    field: "name",
-    label: t("reports.name"),
-    align: "left",
+    id: "name",
+    header: t("reports.name"),
+    accessorKey: "name",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "tab",
-    field: "tab",
-    label: t("reports.tab"),
-    align: "left",
+    id: "tab",
+    header: t("reports.tab"),
+    accessorKey: "tab",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "time_range",
-    field: "time_range",
-    label: t("reports.timeRange"),
-    align: "left",
+    id: "time_range",
+    header: t("reports.timeRange"),
+    accessorKey: "time_range",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "frequency",
-    field: "frequency",
-    label: t("reports.frequency"),
-    align: "left",
+    id: "frequency",
+    header: t("reports.frequency"),
+    accessorKey: "frequency",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "last_triggered_at",
-    field: "last_triggered_at",
-    label: t("reports.lastTriggeredAt"),
-    align: "left",
+    id: "last_triggered_at",
+    header: t("reports.lastTriggeredAt"),
+    accessorKey: "last_triggered_at",
     sortable: false,
+    meta: { align: "left" },
   },
   {
-    name: "created_at",
-    field: "created_at",
-    label: t("reports.createdAt"),
-    align: "left",
+    id: "created_at",
+    header: t("reports.createdAt"),
+    accessorKey: "created_at",
     sortable: false,
+    meta: { align: "left" },
   },
 ];
 
-const pagination: any = ref({
-  rowsPerPage: 20,
-});
+const selectedPerPage = ref(20);
+
+const perPageOptionsList = [5, 10, 20, 50, 100];
 
 const resultTotal = ref(0);
 
-const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "All", value: 0 },
-];
+const displayReports = computed(() => {
+  let reports = formattedReports.value;
+  if (scheduledFilterQuery.value) {
+    const query = scheduledFilterQuery.value.toLowerCase();
+    reports = reports.filter((row: any) =>
+      Object.values(row).some((v) =>
+        String(v).toLowerCase().includes(query),
+      ),
+    );
+  }
+  resultTotal.value = reports.length;
+  return reports;
+});
 
-const changePagination = (val: { label: string; value: any }) => {
-  pagination.value.rowsPerPage = val.value;
-  scheduledDashboardTableRef.value?.setPagination(pagination.value);
-};
-
-const filterQuery = ref("");
-
-const filterData = (rows: any, terms: string) => {
-  return rows.filter((row: any) => {
-    return Object.values(row).some((value) => {
-      return String(value).toLowerCase().includes(terms.toLowerCase());
-    });
-  });
-};
-
-const createNewReport = () => {
-  router.push({
-    name: "createReport",
-    query: {
-      folderId: props.folderId,
-      dashboardId: props.dashboardId,
-      tabId: props.tabId,
-      type: "cached",
-    },
-  });
-};
-
-const openReport = (event: any, row: any) => {
+const openReport = (row: any) => {
   router.push({
     name: "createReport",
     query: {

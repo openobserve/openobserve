@@ -396,7 +396,10 @@
     "traces": "Huellas",
     "switchToLogs": "haga clic para volver a Registros",
     "patternNoValuesAvailable": "No hay valores disponibles",
-    "selectLogStream": "Seleccione la secuencia de registros"
+    "selectLogStream": "Seleccione la secuencia de registros",
+    "noData": "No hay datos disponibles",
+    "functionEditorLabel": "Editor de funciones",
+    "loadingStream": "Cargando Stream..."
   },
   "menu": {
     "home": "Inicio",
@@ -1417,7 +1420,7 @@
     "markLineYAxis": "Eje Y",
     "colorPalette": "Paleta de colores",
     "colorSeriesBy": "Serie de colores de:",
-    "colorBySeries": "<b>Por serie</b>",
+    "colorBySeries": "Por serie",
     "colorDefaultPaletteBySeries": "Paleta predeterminada (por serie)",
     "colorDefaultPaletteBySeriesSubLabel": "Las series con el mismo nombre usarán el mismo color",
     "colorPaletteClassic": "Palette-Classic",
@@ -1426,7 +1429,7 @@
     "colorSingleColorSubLabel": "Establece un color específico para todas las series",
     "colorShadesOfSpecificColor": "Tonos de color específico",
     "colorShadesOfSpecificColorSubLabel": "Diferentes tonalidades de color específico",
-    "colorByValue": "<b>Por valor</b>",
+    "colorByValue": "Por valor",
     "colorGreenYellowRed": "Verde-amarillo-rojo (por valor)",
     "colorRedYellowGreen": "Rojo-Amarillo-Verde (por valor)",
     "colorTemperature": "Temperatura (por valor)",
@@ -1596,7 +1599,9 @@
     "axisLabelRotateTooltipText": "Gire el texto de la etiqueta del eje x en un ángulo elegido (en grados) para mejorar la legibilidad cuando las etiquetas son largas o están abarrotadas.",
     "axisLabelTruncateTooltipText": "Trunque las etiquetas del eje x al ancho especificado (en píxeles).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales."
+    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales.",
+    "allFolders": "Todas las carpetas",
+    "selectFile": "Seleccione un archivo"
   },
   "panel": {
     "header": "Panel",
@@ -2623,6 +2628,7 @@
     "serviceAccounts": "Cuentas de servicio",
     "serviceAccountsName": "Nombre de las cuentas de servicio",
     "basicUsers": "Usuarios",
+    "organizationMembers": "Miembros de la Organización",
     "quota": "Cuotas",
     "externalUserWarningTitle": "Advertencia de usuario externo",
     "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios.",
@@ -3091,7 +3097,10 @@
     "algorithm": "Algoritmo",
     "storeType": "Tipo de tienda",
     "mechanismType": "Tipo de mecanismo",
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "providerTypeRequired": "El tipo de proveedor es obligatorio",
+    "algorithmRequired": "Se requiere un algoritmo",
+    "secretRequired": "El secreto es obligatorio"
   },
   "quota": {
     "header": "Cuotas",
@@ -3411,7 +3420,8 @@
     "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados.",
     "noDataFound": "No se han encontrado datos",
     "isWorkloadType": "Identificador de servicio",
-    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos."
+    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos.",
+    "loadingCorrelation": "Cargando datos de correlación..."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
@@ -3748,7 +3758,8 @@
     "errSave": "No se pudo guardar",
     "errLoadModel": "No se pudo cargar el modelo",
     "tierDefaultName": "Predeterminado",
-    "tierConditionalName": "Nivel condicional"
+    "tierConditionalName": "Nivel condicional",
+    "shadowedWarningBanner": "Las reglas siguientes aparecen sombreadas por «{name}», lo que las anula una regla de mayor prioridad y no se utilizará para los cálculos de costos."
   },
   "overview": {
     "title": "Descripción general del sistema",
@@ -3821,5 +3832,56 @@
     "awsStsSelfHostedInfo": "Esto utiliza AWS sts para asumir funciones y realizar operaciones. Asegúrese de haber configurado las credenciales de AWS en el entorno de instalación que tienen acceso a esta función.",
     "externalIdRequired": "Se requiere un identificador externo",
     "storageAccountRequired": "El nombre de la cuenta de almacenamiento es obligatorio"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Buenos días",
+      "afternoon": "Buenas tardes",
+      "evening": "Buenas noches",
+      "night": "Trabajando hasta tarde"
+    },
+    "welcome": {
+      "taglineLead": "soy",
+      "taglineHighlight": "Asistente O2",
+      "taglineTail": ". Puedo escribir tu",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "Pro MQL",
+      "taglineAnd": "y le guiará a través de sus registros, rastreos, métricas e incidentes.",
+      "signedInAs": "Iniciado sesión como",
+      "role": "Rol",
+      "tryOneOfThese": "O prueba uno de estos"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Escribe una consulta",
+        "description": "SQL para registros, seguimientos, RUM o PromQL para métricas."
+      },
+      "incident": {
+        "title": "Investigue los incidentes",
+        "description": "Causa raíz en registros, rastreos y alertas, por ejemplo, «¿Por qué se activó Gateway-5xx?»"
+      },
+      "dashboard": {
+        "title": "Cree un tablero",
+        "description": "De un tema, por ejemplo, «Estado del nodo K8: CPU, memoria, reinicios». También crea paneles."
+      },
+      "alert": {
+        "title": "Crear una alerta",
+        "description": "Alertas de umbral o programadas y canalizaciones de VRL de tiempo de ingesta."
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Escriba VRL para analizar JSON desde mis registros de nginx",
+      "regexRedact": "Genere un patrón de expresiones regulares para redactar correos electrónicos",
+      "mapStreamSchema": "Mapear mi esquema de transmisión «predeterminado»",
+      "promqlCpu": "Escriba ProMQL para pods con más del 80% de CPU",
+      "datadogToO2": "Convierta esta consulta de Datadog en OpenObserve SQL",
+      "lastAlertFired": "¿Por qué se activó mi última alerta?"
+    },
+    "placeholderRotation": {
+      "one": "Muéstrame los errores de la última hora...",
+      "two": "Escriba VRL para analizar JSON desde los registros de nginx...",
+      "three": "Cree un panel de control para el estado de los nodos de K8..."
+    }
   }
 }

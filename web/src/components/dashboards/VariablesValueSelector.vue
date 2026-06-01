@@ -16,17 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="variablesData.values?.length > 0"
-    :key="variablesData.isVariablesLoading"
-    class="flex q-mt-xs q-ml-xs"
+    class="tw:flex tw:flex-wrap tw:mt-1 tw:ml-1"
   >
     <div
       v-for="(item, index) in variablesData.values"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div v-if="item.type == 'query_values'">
+      <div v-if="item.type == 'query_values'" class="tw:max-w-[40rem] tw:min-w-37.5">
         <VariableQueryValueSelector
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
@@ -36,49 +35,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'constant'">
-        <q-input
+      <div v-else-if="item.type == 'constant'" class="tw:max-w-[40rem] tw:min-w-37.5">
+        <OInput
           v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           style="max-width: 150px !important"
           v-model="item.value"
           :label="item.label || item.name"
-          dense
+          label-position="inside"
           readonly
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
+        />
       </div>
-      <div v-else-if="item.type == 'textbox'">
-        <q-input
+      <div v-else-if="item.type == 'textbox'" class="tw:max-w-[40rem] tw:min-w-37.5">
+        <OInput
           v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           style="max-width: 150px !important"
-          debounce="1000"
+          :debounce="1000"
           v-model="item.value"
           :label="item.label || item.name"
-          dense
+          label-position="inside"
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
+        />
       </div>
-      <div v-else-if="item.type == 'custom'">
+      <div v-else-if="item.type == 'custom'" class="tw:max-w-[40rem] tw:min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'dynamic_filters'">
+      <div v-else-if="item.type == 'dynamic_filters'" class="tw:max-w-max">
         <VariableAdHocValueSelector
-          class="q-mr-lg q-mt-xs"
+          class="tw:mr-4 tw:mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
@@ -87,14 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- Add Variable Button -->
-    <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
+    <div v-if="showAddVariableButton" class="tw:ml-1 tw:mt-2">
       <OButton
         variant="outline"
         size="sm"
         @click="openAddVariable"
         data-test="dashboard-add-variable-btn"
+        icon-left="add"
       >
-        <template #icon-left><q-icon name="add" /></template>
         Add Variable
       </OButton>
     </div>
@@ -119,6 +114,7 @@ import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vu
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import {
@@ -188,6 +184,7 @@ export default defineComponent({
     VariableAdHocValueSelector,
     VariableCustomValueSelector,
     OButton,
+    OInput,
   },
   setup(props: any, { emit }) {
     const store = useStore();
@@ -2501,56 +2498,21 @@ export default defineComponent({
 
       const variableName = variableItem.name;
 
-      // If variables are still loading (either manager-level or local), defer search until loading finishes
-      const managerLoading =
-        useManager &&
-        manager &&
-        (manager as any).isLoading &&
-        (manager as any).isLoading.value;
-      const localLoading = variablesData.values.some(
-        (v: any) => v.isLoading === true || v.isVariablePartialLoaded === false,
-      );
-
-      if (managerLoading || localLoading) {
-        const stop = watch(
-          () =>
-            useManager && manager && (manager as any).isLoading
-              ? (manager as any).isLoading.value
-              : variablesData.values.some(
-                  (v: any) =>
-                    v.isLoading === true || v.isVariablePartialLoaded === false,
-                ),
-          (val) => {
-            if (!val) {
-              stop();
-              // Re-run the search once loading has completed
-              cancelAllVariableOperations(variableName);
-              loadSingleVariableDataByName(
-                variableItem,
-                false,
-                filterText,
-              ).catch(() => {});
-            }
-          },
-        );
-        return;
-      }
-
-      // If there's no filter text (user did not type), treat this as an open event.
-      // In that case, only load options if they are not already present/loaded.
-      if (
-        !filterText ||
-        (typeof filterText === "string" && filterText.trim() === "")
-      ) {
-        // Delegate to loadVariableOptions which contains the logic to avoid unnecessary fetches
-        cancelAllVariableOperations(variableName);
-        await loadVariableOptions(variableItem);
-        return;
-      }
-
-      // Cancel any previous API calls for this variable immediately
+      // For both search (non-empty filterText) and clear (empty filterText) events,
+      // cancel any ongoing operations and fire the values API immediately.
+      // - non-empty: fires a filtered query (str_match) for typeahead
+      // - empty: fires an unfiltered query to reload all options
+      // We never defer here — the user is actively interacting with an open dropdown
+      // and expects immediate feedback. Deferring causes the API to either never fire
+      // or fire with stale text when a previous streaming request is still running.
       cancelAllVariableOperations(variableName);
-      await loadSingleVariableDataByName(variableItem, false, filterText);
+      await loadSingleVariableDataByName(
+        variableItem,
+        false,
+        filterText && typeof filterText === "string" && filterText.trim() !== ""
+          ? filterText
+          : undefined,
+      );
     };
 
     return {

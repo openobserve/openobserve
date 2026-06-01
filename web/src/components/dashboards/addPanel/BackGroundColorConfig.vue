@@ -1,30 +1,24 @@
 <template>
   <div style="display: flex; align-items: center; width: 100%">
-    <q-select
-      borderless
-      hide-bottom-space
+    <OSelect
       v-model="backgroundType"
       :options="colorModeOptions"
-      dense
       :label="t('dashboard.colorMode')"
-      class="showLabelOnTop selectedLabel tw:w-full"
-      stack-label
-      emit-value
-      :display-value="
-        backgroundType
-          ? colorModeOptions.find((it: any) => it.value === backgroundType)
-              ?.label
-          : 'None'
-      "
+      class="tw:flex-1"
       data-test="dashboard-config-color-mode"
-    ></q-select>
+    />
 
     <div v-if="backgroundType === 'single'">
       <div
+        data-test="dashboard-config-color-input-wrapper"
         class="color-input-wrapper"
         style="margin-top: 36px; margin-left: 5px"
       >
-        <input type="color" v-model="backgroundColor" />
+        <input
+          data-test="dashboard-config-color-input"
+          type="color"
+          v-model="backgroundColor"
+        />
       </div>
     </div>
   </div>
@@ -34,9 +28,11 @@
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "BackgroundColorConfig",
+  components: { OSelect },
   setup() {
     // Destructure props and emit if needed
     const dashboardPanelDataPageKey = inject(

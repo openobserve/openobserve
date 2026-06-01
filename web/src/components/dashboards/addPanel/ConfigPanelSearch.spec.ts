@@ -14,12 +14,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Notify] });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -55,11 +52,11 @@ describe("ConfigPanelSearch", () => {
 
   describe("rendering", () => {
     it("renders a q-input element", () => {
-      expect(wrapper.find("input").exists()).toBe(true);
+      expect(wrapper.find("#dashboard-config-panel-search-input").exists()).toBe(true);
     });
 
     it("renders a search icon", () => {
-      // Quasar renders the prepend slot — q-icon with name 'search'
+      // Quasar renders the prepend slot — OIcon with name 'search'
       expect(wrapper.html()).toContain("search");
     });
   });
@@ -72,7 +69,7 @@ describe("ConfigPanelSearch", () => {
     it("reflects modelValue in the input element", async () => {
       const w = mountComponent({ modelValue: "hello" });
       await flushPromises();
-      const input = w.find("input");
+      const input = w.find("#dashboard-config-panel-search-input");
       expect((input.element as HTMLInputElement).value).toBe("hello");
       w.unmount();
     });
@@ -85,7 +82,7 @@ describe("ConfigPanelSearch", () => {
 
   describe("emits", () => {
     it("emits update:modelValue when input value changes", async () => {
-      const input = wrapper.find("input");
+      const input = wrapper.find("#dashboard-config-panel-search-input");
       await input.setValue("axis");
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeTruthy();

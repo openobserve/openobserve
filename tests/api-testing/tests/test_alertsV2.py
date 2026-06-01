@@ -536,6 +536,7 @@ def test_put_alertnew_disable(create_session, base_url):
     for alert in alerts:
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
+        folder_id = alert.get("folder_id", "default")
 
         print(f"Extracted alert_id: {alert_id}")
 
@@ -543,9 +544,9 @@ def test_put_alertnew_disable(create_session, base_url):
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
         print(f"Alert {alert_id} exists and is retrievable.")
-    
+
     # Proceed to disable the alert
-        resp_alertnew_disable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs")
+        resp_alertnew_disable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs&folder={folder_id}")
         print(f"Disable Alert Response: {resp_alertnew_disable.text}")
         assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
         print(f"Successfully disabled alert {alert_id}")
@@ -593,6 +594,7 @@ def test_put_alertnew_enable(create_session, base_url):
     for alert in alerts:
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
+        folder_id = alert.get("folder_id", "default")
 
         print(f"Extracted alert_id: {alert_id}")
 
@@ -603,7 +605,7 @@ def test_put_alertnew_enable(create_session, base_url):
 
 
     # Proceed to enable the alert
-        resp_alertnew_enable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs")
+        resp_alertnew_enable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs&folder={folder_id}")
         print(f"Enable Alert Response: {resp_alertnew_enable.text}")
         assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
         print(f"Successfully enabled alert {alert_id}")

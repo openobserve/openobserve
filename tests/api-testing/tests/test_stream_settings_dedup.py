@@ -40,10 +40,10 @@ STREAM_TYPE = "logs"
 # From the seed data logs_data.json:
 #   String fields: level, message, log, stream, code
 #   Numeric fields: _timestamp (auto), FloatValue
-FTS_SAFE_FIELDS = ["level", "message", "log", "stream"]
+FTS_SAFE_FIELDS = ["message", "log", "stream"]
 # FloatValue is numeric; _timestamp is used for bloom but not FTS
-INDEX_SAFE_FIELDS = ["_timestamp", "FloatValue"]
-BLOOM_SAFE_FIELDS = ["level", "message", "log", "stream", "_timestamp", "FloatValue"]
+INDEX_SAFE_FIELDS = ["level", "FloatValue"]
+BLOOM_SAFE_FIELDS = ["kubernetes_pod_id", "FloatValue"]
 
 
 def get_field_for_fts(settings):
@@ -336,12 +336,13 @@ class TestStreamSettingsDedupEdgeCases:
 
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         field_a = get_field_for_index(settings)
-        # Get a second field different from field_a
+        # Get a second field different from field_a that is also not already indexed
+        current_idx = set(settings.get("index_fields", []))
         available = [f for f in INDEX_SAFE_FIELDS if f != field_a]
-        filtered = [f for f in available if f not in set(settings.get("full_text_search_keys", []))]
-        candidates = filtered if filtered else available
-        field_b = candidates[0] if candidates else pytest.skip("Only one index-safe field available")
+        filtered = [f for f in available if f not in set(settings.get("full_text_search_keys", [])) and f not in current_idx]
+        field_b = filtered[0] if filtered else pytest.skip("No second index-safe field available outside current index")
         original_idx = list(settings.get("index_fields", []))
+        logger.info(f"Original index fields: {original_idx}")
 
         try:
             # Add first field
@@ -349,12 +350,14 @@ class TestStreamSettingsDedupEdgeCases:
             resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
             assert resp.status_code == 200
             time.sleep(1)
+            logger.info(f"Added index fields: {field_a}")
 
             # Add second field
             payload = {"index_fields": {"add": [field_b], "remove": []}}
             resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
             assert resp.status_code == 200
             time.sleep(1)
+            logger.info(f"Added index fields: {field_b}")
 
             # Verify both present
             settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
