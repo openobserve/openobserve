@@ -3,26 +3,23 @@
     <div class="eval-form-page__top">
       <button class="eval-form-page__back" type="button" @click="$emit('cancel')">
         <OIcon name="chevron-left" size="xs" />
-        Back to Scorers
+        {{ t("onlineEvals.scorer.backTo") }}
       </button>
       <div class="eval-form-page__top-actions">
         <span class="eval-form-page__badge">
-          {{ form.scorerType === "remote" ? "Remote" : "LLM Judge" }}
+          {{ form.scorerType === "remote" ? t("onlineEvals.scorer.badgeRemote") : t("onlineEvals.scorer.badgeLlm") }}
         </span>
         <OButton type="button" icon-left="close" variant="ghost" size="icon-sm" @click="$emit('cancel')" />
       </div>
     </div>
 
     <div class="eval-form-page__head">
-      <h1>
-        {{ mode === "create" ? "Create" : "Edit" }}
-        {{ form.scorerType === "remote" ? "Remote" : "LLM Judge" }} Scorer
-      </h1>
+      <h1>{{ titleText }}</h1>
       <p>
         {{
           form.scorerType === "remote"
-            ? "Call an HTTP endpoint you host. We render the request; you return a score."
-            : "A language model judges each trace using the prompt you provide."
+            ? t("onlineEvals.scorer.subtitleRemote")
+            : t("onlineEvals.scorer.subtitleLlm")
         }}
       </p>
     </div>
@@ -30,17 +27,22 @@
     <div class="eval-form-page__body eval-form-page__body--split">
       <div class="eval-form-page__main">
         <section class="eval-form-section">
-          <div class="eval-form-section__title"><span>01</span> Identity</div>
-          <label>Name <input v-model.trim="form.name" required placeholder="faithfulness_judge" /></label>
-          <label>Produces score config
+          <div class="eval-form-section__title"><span>01</span> {{ t("onlineEvals.scorer.identitySection") }}</div>
+          <label>
+            {{ t("onlineEvals.scorer.nameLabel") }}
+            <input v-model.trim="form.name" required :placeholder="t('onlineEvals.scorer.namePlaceholder')" />
+          </label>
+          <label>
+            {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
             <select v-model="form.producesScoreConfigId" @change="handleScoreConfigSelection">
-              <option value="">None</option>
+              <option value="">{{ t("onlineEvals.scorer.producesScoreConfigNone") }}</option>
               <option v-for="config in scoreConfigs" :key="entityId(config)" :value="entityId(config)">
                 {{ config.name }}
               </option>
             </select>
           </label>
-          <label>Score config version
+          <label>
+            {{ t("onlineEvals.scorer.scoreConfigVersionLabel") }}
             <select
               v-model="form.producesScoreConfigVersion"
               :disabled="!form.producesScoreConfigId"
@@ -51,7 +53,7 @@
                 :key="`${entityId(configVersion)}-${configVersion.version}`"
                 :value="String(configVersion.version)"
               >
-                v{{ configVersion.version }}{{ index === 0 ? " (latest)" : "" }}
+                v{{ configVersion.version }}{{ index === 0 ? t("onlineEvals.scorer.latestSuffix") : "" }}
               </option>
             </select>
           </label>
@@ -61,32 +63,51 @@
               type="checkbox"
               :disabled="!form.producesScoreConfigId || !form.producesScoreConfigVersion"
             />
-            <span>Pin selected version</span>
+            <span>{{ t("onlineEvals.scorer.pinVersion") }}</span>
           </label>
-          <label class="eval-form-section__wide">Description <textarea v-model.trim="form.description" rows="3" /></label>
+          <label class="eval-form-section__wide">
+            {{ t("onlineEvals.scorer.descriptionLabel") }}
+            <textarea v-model.trim="form.description" rows="3" />
+          </label>
         </section>
 
         <section class="eval-form-section">
           <div class="eval-form-section__title">
             <span>02</span>
-            {{ form.scorerType === "remote" ? "Endpoint" : "Judge configuration" }}
+            {{ form.scorerType === "remote" ? t("onlineEvals.scorer.endpointSection") : t("onlineEvals.scorer.judgeSection") }}
           </div>
           <template v-if="form.scorerType === 'llm_judge'">
-            <label>Provider
+            <label>
+              {{ t("onlineEvals.scorer.providerLabel") }}
               <select v-model="form.providerId" required>
-                <option value="">Select provider</option>
+                <option value="">{{ t("onlineEvals.scorer.providerPlaceholder") }}</option>
                 <option v-for="provider in providers" :key="provider.id" :value="provider.id">
                   {{ provider.name }}
                 </option>
               </select>
             </label>
-            <label>Model <input v-model.trim="form.model" placeholder="gpt-4o" /></label>
-            <label class="eval-form-section__wide">Judge prompt <textarea v-model="form.template" rows="10" required /></label>
-            <label class="eval-form-section__wide">Output schema JSON <textarea v-model="form.outputSchema" rows="7" /></label>
+            <label>
+              {{ t("onlineEvals.scorer.modelLabel") }}
+              <input v-model.trim="form.model" :placeholder="t('onlineEvals.scorer.modelPlaceholder')" />
+            </label>
+            <label class="eval-form-section__wide">
+              {{ t("onlineEvals.scorer.promptLabel") }}
+              <textarea v-model="form.template" rows="10" required />
+            </label>
+            <label class="eval-form-section__wide">
+              {{ t("onlineEvals.scorer.outputSchemaLabel") }}
+              <textarea v-model="form.outputSchema" rows="7" />
+            </label>
           </template>
           <template v-else>
-            <label class="eval-form-section__wide">Remote endpoint <input v-model.trim="form.remoteEndpoint" required placeholder="https://eval.internal.corp/check" /></label>
-            <label class="eval-form-section__wide">Request body template <textarea v-model="form.template" rows="10" required /></label>
+            <label class="eval-form-section__wide">
+              {{ t("onlineEvals.scorer.remoteEndpointLabel") }}
+              <input v-model.trim="form.remoteEndpoint" required :placeholder="t('onlineEvals.scorer.remoteEndpointPlaceholder')" />
+            </label>
+            <label class="eval-form-section__wide">
+              {{ t("onlineEvals.scorer.requestBodyLabel") }}
+              <textarea v-model="form.template" rows="10" required />
+            </label>
           </template>
         </section>
       </div>
@@ -103,14 +124,17 @@
     </div>
 
     <div class="eval-form-page__foot">
-      <OButton type="button" variant="outline" @click="$emit('cancel')">Cancel</OButton>
-      <OButton type="submit" :loading="isSaving">{{ mode === "create" ? "Create" : "Save" }}</OButton>
+      <OButton type="button" variant="outline" @click="$emit('cancel')">{{ t("onlineEvals.buttons.cancel") }}</OButton>
+      <OButton type="submit" :loading="isSaving">
+        {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+      </OButton>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -146,6 +170,7 @@ const emit = defineEmits<{
   (e: "request-versions", scoreConfigId: string): void;
 }>();
 
+const { t } = useI18n();
 const form = ref(initForm(props.row, props.scorerType));
 const isSaving = ref(false);
 
@@ -165,6 +190,18 @@ const selectedScoreConfigVersions = computed(() => {
   return [...(cachedVersions || fallback)].sort(
     (a, b) => Number(b.version || 0) - Number(a.version || 0),
   );
+});
+
+const titleText = computed(() => {
+  const isRemote = form.value.scorerType === "remote";
+  if (props.mode === "create") {
+    return isRemote
+      ? t("onlineEvals.scorer.createTitleRemote")
+      : t("onlineEvals.scorer.createTitleLlm");
+  }
+  return isRemote
+    ? t("onlineEvals.scorer.editTitleRemote")
+    : t("onlineEvals.scorer.editTitleLlm");
 });
 
 onMounted(() => {
@@ -220,7 +257,6 @@ async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
   if (!selectedId) return;
 
   emit("request-versions", selectedId);
-  // give parent a tick to update cache
   await Promise.resolve();
 
   const latestVersion = selectedScoreConfigVersions.value[0]?.version;
@@ -254,7 +290,8 @@ async function save() {
           ...scoreConfigRef,
           template: form.value.template,
           outputSchema:
-            parseOptionalJson(form.value.outputSchema, "Output schema") || defaultOutputSchema(),
+            parseOptionalJson(form.value.outputSchema, t("onlineEvals.scorer.outputSchemaLabel")) ||
+            defaultOutputSchema(),
           params: {
             provider_id: form.value.providerId,
             ...(form.value.model ? { model: form.value.model } : {}),
@@ -285,10 +322,13 @@ async function save() {
         scorer: scorerPayload,
       });
     }
-    toast({ variant: "success", message: "Scorer saved" });
+    toast({
+      variant: "success",
+      message: t("onlineEvals.saved", { label: t("onlineEvals.singular.scorers") }),
+    });
     emit("saved");
   } catch (err: any) {
-    showError(err, "Failed to save scorer");
+    showError(err, t("onlineEvals.scorer.saveError"));
   } finally {
     isSaving.value = false;
   }

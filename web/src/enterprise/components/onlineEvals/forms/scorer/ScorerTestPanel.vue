@@ -3,9 +3,9 @@
     <section class="eval-test-panel">
       <h3>
         <OIcon name="play-arrow" size="xs" />
-        Test this scorer
+        {{ t("onlineEvals.scorer.testPanel.title") }}
       </h3>
-      <p>Try your scorer with sample data before saving. Test runs are not persisted.</p>
+      <p>{{ t("onlineEvals.scorer.testPanel.hint") }}</p>
 
       <div v-if="variables.length" class="eval-test-panel__fields">
         <label v-for="variable in variables" :key="variable">
@@ -13,14 +13,14 @@
           <textarea
             :value="inputs[variable]"
             :rows="variable === 'metadata' ? 2 : 3"
-            :placeholder="`Value for {{ ${variable} }}`"
+            :placeholder="t('onlineEvals.scorer.testPanel.valuePlaceholder', { variable })"
             @input="updateInput(variable, ($event.target as HTMLTextAreaElement).value)"
           />
         </label>
       </div>
 
       <div v-else class="eval-test-panel__empty">
-        Add variables like <code v-text="'{{ input }}'" /> to the scorer template to test with sample fields.
+        {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{ t("onlineEvals.scorer.testPanel.emptySuffix") }}
       </div>
 
       <div class="eval-test-panel__actions">
@@ -31,32 +31,36 @@
           :disabled="variables.length === 0"
           @click="$emit('run')"
         >
-          Run test
+          {{ t("onlineEvals.scorer.testPanel.runButton") }}
         </OButton>
         <select
           :value="scenario"
           @change="$emit('update:scenario', ($event.target as HTMLSelectElement).value as TestScenario)"
         >
-          <option value="success">Mock response</option>
-          <option value="auth">Auth error</option>
-          <option value="schema">Schema mismatch</option>
+          <option value="success">{{ t("onlineEvals.scorer.testPanel.scenarioSuccess") }}</option>
+          <option value="auth">{{ t("onlineEvals.scorer.testPanel.scenarioAuth") }}</option>
+          <option value="schema">{{ t("onlineEvals.scorer.testPanel.scenarioSchema") }}</option>
         </select>
       </div>
 
       <div class="eval-test-panel__result" :class="`is-${state}`">
-        <template v-if="state === 'idle'">Run a test to see the result here.</template>
-        <template v-else-if="state === 'running'">Running scorer test...</template>
+        <template v-if="state === 'idle'">{{ t("onlineEvals.scorer.testPanel.stateIdle") }}</template>
+        <template v-else-if="state === 'running'">{{ t("onlineEvals.scorer.testPanel.stateRunning") }}</template>
         <template v-else-if="state === 'success'">
-          <strong>Success</strong>
-          <span>score: 0.92</span>
-          <small>reasoning: The answer is supported by the supplied context.</small>
+          <strong>{{ t("onlineEvals.scorer.testPanel.successHeader") }}</strong>
+          <span>{{ t("onlineEvals.scorer.testPanel.successScore") }}</span>
+          <small>{{ t("onlineEvals.scorer.testPanel.successReasoning") }}</small>
         </template>
         <template v-else>
-          <strong>{{ scenario === "auth" ? "Authentication failed" : "Schema mismatch" }}</strong>
+          <strong>{{
+            scenario === "auth"
+              ? t("onlineEvals.scorer.testPanel.authHeader")
+              : t("onlineEvals.scorer.testPanel.schemaHeader")
+          }}</strong>
           <small>{{
             scenario === "auth"
-              ? "Check provider credentials before saving."
-              : "The response did not match the configured output schema."
+              ? t("onlineEvals.scorer.testPanel.authHint")
+              : t("onlineEvals.scorer.testPanel.schemaHint")
           }}</small>
         </template>
       </div>
@@ -65,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { formatTemplateVariable } from "../../utils/evalFormat";
@@ -84,6 +89,8 @@ const emit = defineEmits<{
   (e: "update:scenario", value: TestScenario): void;
   (e: "update:inputs", value: Record<string, string>): void;
 }>();
+
+const { t } = useI18n();
 
 function updateInput(variable: string, value: string) {
   emit("update:inputs", { ...props.inputs, [variable]: value });

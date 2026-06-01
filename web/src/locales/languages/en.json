@@ -4060,5 +4060,217 @@
     "errLoadModel": "Failed to load model",
     "tierDefaultName": "Default",
     "tierConditionalName": "Conditional Tier"
+  },
+  "onlineEvals": {
+    "title": "Evaluations",
+    "description": "Configure LLM providers, score definitions, scorers, and live evaluation jobs.",
+    "loading": "Loading online eval configuration...",
+    "loadError": "Failed to load online evals",
+    "deletePrompt": "Delete {name}?",
+    "deleted": "{label} deleted",
+    "deleteError": "Failed to delete {label}",
+    "saved": "{label} saved",
+    "newButton": "New {label}",
+    "search": "Search {label}",
+    "refresh": "Refresh",
+    "allStatuses": "All statuses",
+    "noRowsFound": "No {label} found",
+    "getStartedHint": "Create one to start wiring online evaluation.",
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "updated": "Updated"
+    },
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "tabs": {
+      "jobs": "Eval Jobs",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score Configs",
+      "providers": "Providers"
+    },
+    "singular": {
+      "jobs": "Eval Job",
+      "scorers": "Scorer",
+      "scoreConfigs": "Score Config",
+      "providers": "Provider"
+    },
+    "secondaryColumn": {
+      "jobs": "Stream",
+      "scorers": "Type",
+      "scoreConfigs": "Data type",
+      "providers": "Provider"
+    },
+    "jobStatus": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "degraded": "Degraded",
+      "archived": "Archived"
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "create": "Create",
+      "save": "Save"
+    },
+    "scorerTypeDialog": {
+      "title": "Create a new Scorer",
+      "intro": "Choose the scorer type. Pick whichever fits how you want to author and run it.",
+      "llmJudgeTitle": "LLM Judge",
+      "llmJudgeDescription": "Use a configured provider to evaluate semantically.",
+      "remoteTitle": "Remote",
+      "remoteDescription": "Call your own HTTP endpoint for scoring.",
+      "codeTitle": "Code",
+      "codeDescription": "Coming soon."
+    },
+    "provider": {
+      "backTo": "Back to Providers",
+      "createTitle": "Create LLM Provider",
+      "editTitle": "Edit LLM Provider",
+      "subtitle": "Configure the model endpoint used by LLM judge scorers.",
+      "sectionTitle": "Provider",
+      "nameLabel": "Name",
+      "namePlaceholder": "Production OpenAI",
+      "typeLabel": "Provider type",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Endpoint",
+      "endpointPlaceholder": "Optional custom endpoint",
+      "defaultModelLabel": "Default model",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Available models",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Use as default provider",
+      "authConfigLabel": "Auth config JSON",
+      "saveError": "Failed to save provider"
+    },
+    "scoreConfig": {
+      "createTitle": "New Score Config",
+      "editTitle": "Edit Score Config",
+      "subtitle": "Score configs define score type, health thresholds, and categories.",
+      "nameLabel": "Name",
+      "dataTypeLabel": "Data type",
+      "descriptionLabel": "Description",
+      "numericRangeLabel": "Numeric range JSON",
+      "categoriesLabel": "Categories JSON",
+      "healthyThresholdLabel": "Healthy threshold JSON",
+      "dataTypes": {
+        "numeric": "Numeric",
+        "categorical": "Categorical",
+        "boolean": "Boolean"
+      },
+      "saveError": "Failed to save score config"
+    },
+    "scorer": {
+      "backTo": "Back to Scorers",
+      "badgeRemote": "Remote",
+      "badgeLlm": "LLM Judge",
+      "createTitleRemote": "Create Remote Scorer",
+      "createTitleLlm": "Create LLM Judge Scorer",
+      "editTitleRemote": "Edit Remote Scorer",
+      "editTitleLlm": "Edit LLM Judge Scorer",
+      "subtitleRemote": "Call an HTTP endpoint you host. We render the request; you return a score.",
+      "subtitleLlm": "A language model judges each trace using the prompt you provide.",
+      "identitySection": "Identity",
+      "judgeSection": "Judge configuration",
+      "endpointSection": "Endpoint",
+      "nameLabel": "Name",
+      "namePlaceholder": "faithfulness_judge",
+      "producesScoreConfigLabel": "Produces score config",
+      "producesScoreConfigNone": "None",
+      "scoreConfigVersionLabel": "Score config version",
+      "latestSuffix": " (latest)",
+      "pinVersion": "Pin selected version",
+      "descriptionLabel": "Description",
+      "providerLabel": "Provider",
+      "providerPlaceholder": "Select provider",
+      "modelLabel": "Model",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Judge prompt",
+      "outputSchemaLabel": "Output schema JSON",
+      "remoteEndpointLabel": "Remote endpoint",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Request body template",
+      "saveError": "Failed to save scorer",
+      "versionsLoadError": "Failed to load score config versions",
+      "testPanel": {
+        "title": "Test this scorer",
+        "hint": "Try your scorer with sample data before saving. Test runs are not persisted.",
+        "emptyPrefix": "Add variables like ",
+        "emptySuffix": " to the scorer template to test with sample fields.",
+        "runButton": "Run test",
+        "scenarioSuccess": "Mock response",
+        "scenarioAuth": "Auth error",
+        "scenarioSchema": "Schema mismatch",
+        "stateIdle": "Run a test to see the result here.",
+        "stateRunning": "Running scorer test...",
+        "successHeader": "Success",
+        "successScore": "score: 0.92",
+        "successReasoning": "reasoning: The answer is supported by the supplied context.",
+        "authHeader": "Authentication failed",
+        "authHint": "Check provider credentials before saving.",
+        "schemaHeader": "Schema mismatch",
+        "schemaHint": "The response did not match the configured output schema.",
+        "valuePlaceholder": "Value for {{ {variable} }}"
+      }
+    },
+    "job": {
+      "backTo": "Back to Eval Jobs",
+      "createTitle": "Create Online Eval Job",
+      "editTitle": "Edit Online Eval Job",
+      "subtitle": "Pick the stream, scorers, mapping, and sampling behavior for this evaluation job.",
+      "stepper": {
+        "target": "Target",
+        "scorers": "Scorers",
+        "mapping": "Mapping",
+        "sampling": "Sampling"
+      },
+      "targetSection": "Target",
+      "scorersSection": "Scorers and mapping",
+      "nameLabel": "Name",
+      "namePlaceholder": "Production Faithfulness Monitor",
+      "streamLabel": "Input stream",
+      "streamPlaceholder": "default",
+      "streamTypeLabel": "Stream type",
+      "streamTypePlaceholder": "traces",
+      "descriptionLabel": "Description",
+      "samplingModeLabel": "Sampling mode",
+      "samplingValueLabel": "Sampling value JSON",
+      "samplingModes": {
+        "rate": "Rate",
+        "all": "All",
+        "count": "Count"
+      },
+      "scorerPicker": {
+        "title": "Scorers",
+        "hint": "Select one or more scorers to run for every matched span.",
+        "meta": "{type} · v{version}"
+      },
+      "filter": {
+        "title": "Filter condition",
+        "hint": "Only spans matching this condition enter sampling and scoring."
+      },
+      "inputMapping": {
+        "title": "Input mapping",
+        "hint": "Map span fields into each scorer template variable.",
+        "selectScorers": "Select scorers to configure their mappings.",
+        "noVariables": "This scorer has no template variables to map.",
+        "variableCount": "{count} variables"
+      },
+      "preview": {
+        "title": "Preview",
+        "hint": "Use the fields on the left to define the production evaluation target.",
+        "summaryTitle": "Summary",
+        "summaryName": "Name",
+        "summaryType": "Type",
+        "summaryStatus": "Status",
+        "statusEditing": "Editing",
+        "statusDraft": "Draft",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Select at least one scorer",
+      "saveError": "Failed to save eval job"
+    }
   }
 }

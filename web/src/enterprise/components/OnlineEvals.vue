@@ -42,8 +42,8 @@ the Free Software Foundation, either version 3 of the License, or
     <template v-else>
       <div class="online-evals__header card-container">
         <div>
-          <h1>Evaluations</h1>
-          <p>Configure LLM providers, score definitions, scorers, and live evaluation jobs.</p>
+          <h1>{{ t("onlineEvals.title") }}</h1>
+          <p>{{ t("onlineEvals.description") }}</p>
         </div>
       </div>
 
@@ -65,7 +65,7 @@ the Free Software Foundation, either version 3 of the License, or
 
         <div v-if="isLoading" class="online-evals__loading">
           <OSpinner size="lg" />
-          <span>Loading online eval configuration...</span>
+          <span>{{ t("onlineEvals.loading") }}</span>
         </div>
 
         <div v-else class="online-evals__body">
@@ -109,6 +109,7 @@ the Free Software Foundation, either version 3 of the License, or
 <script setup lang="ts">
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -138,6 +139,7 @@ type FullPageEntity = Exclude<ActiveTab, "scoreConfigs">;
 type AnyRow = EvalJob | Scorer | ScoreConfig | Provider;
 
 const store = useStore();
+const { t } = useI18n();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const activeTab = ref<ActiveTab>("jobs");
@@ -184,34 +186,20 @@ const filteredRows = computed(() => {
 });
 
 const tabs = computed(() => [
-  { value: "jobs" as ActiveTab, label: "Eval Jobs", icon: "rule", count: jobs.value.length },
-  { value: "scorers" as ActiveTab, label: "Scorers", icon: "grading", count: scorers.value.length },
-  { value: "scoreConfigs" as ActiveTab, label: "Score Configs", icon: "fact-check", count: scoreConfigs.value.length },
-  { value: "providers" as ActiveTab, label: "Providers", icon: "hub", count: providers.value.length },
+  { value: "jobs" as ActiveTab, label: t("onlineEvals.tabs.jobs"), icon: "rule", count: jobs.value.length },
+  { value: "scorers" as ActiveTab, label: t("onlineEvals.tabs.scorers"), icon: "grading", count: scorers.value.length },
+  { value: "scoreConfigs" as ActiveTab, label: t("onlineEvals.tabs.scoreConfigs"), icon: "fact-check", count: scoreConfigs.value.length },
+  { value: "providers" as ActiveTab, label: t("onlineEvals.tabs.providers"), icon: "hub", count: providers.value.length },
 ]);
 
 const currentTabLabel = computed(
-  () => tabs.value.find((tab) => tab.value === activeTab.value)?.label || "Rows",
+  () => tabs.value.find((tab) => tab.value === activeTab.value)?.label || "",
 );
-const currentSingularLabel = computed(
-  () =>
-    ({
-      jobs: "Eval Job",
-      scorers: "Scorer",
-      scoreConfigs: "Score Config",
-      providers: "Provider",
-    })[activeTab.value],
+const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
+const createButtonLabel = computed(() =>
+  t("onlineEvals.newButton", { label: currentSingularLabel.value }),
 );
-const createButtonLabel = computed(() => `New ${currentSingularLabel.value}`);
-const secondaryColumnLabel = computed(
-  () =>
-    ({
-      jobs: "Stream",
-      scorers: "Type",
-      scoreConfigs: "Data type",
-      providers: "Provider",
-    })[activeTab.value],
-);
+const secondaryColumnLabel = computed(() => t(`onlineEvals.secondaryColumn.${activeTab.value}`));
 
 watch(activeTab, () => {
   filterQuery.value = "";
@@ -263,7 +251,7 @@ async function handleSaved() {
 }
 
 async function deleteRow(row: AnyRow) {
-  if (!window.confirm(`Delete ${row.name}?`)) return;
+  if (!window.confirm(t("onlineEvals.deletePrompt", { name: row.name }))) return;
   try {
     if (activeTab.value === "providers")
       await onlineEvalsService.providers.delete(orgId.value, (row as Provider).id);
@@ -273,10 +261,13 @@ async function deleteRow(row: AnyRow) {
       await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
     else await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
 
-    toast({ variant: "success", message: `${currentSingularLabel.value} deleted` });
+    toast({
+      variant: "success",
+      message: t("onlineEvals.deleted", { label: currentSingularLabel.value }),
+    });
     await loadAll(orgId.value);
   } catch (err: any) {
-    showError(err, `Failed to delete ${currentSingularLabel.value.toLowerCase()}`);
+    showError(err, t("onlineEvals.deleteError", { label: currentSingularLabel.value.toLowerCase() }));
   }
 }
 </script>

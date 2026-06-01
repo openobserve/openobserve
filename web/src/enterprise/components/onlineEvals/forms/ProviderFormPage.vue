@@ -3,7 +3,7 @@
     <div class="eval-form-page__top">
       <button class="eval-form-page__back" type="button" @click="$emit('cancel')">
         <OIcon name="chevron-left" size="xs" />
-        Back to Providers
+        {{ t("onlineEvals.provider.backTo") }}
       </button>
       <div class="eval-form-page__top-actions">
         <OButton type="button" icon-left="close" variant="ghost" size="icon-sm" @click="$emit('cancel')" />
@@ -11,24 +11,40 @@
     </div>
 
     <div class="eval-form-page__head">
-      <h1>{{ mode === "create" ? "Create" : "Edit" }} LLM Provider</h1>
-      <p>Configure the model endpoint used by LLM judge scorers.</p>
+      <h1>{{ mode === "create" ? t("onlineEvals.provider.createTitle") : t("onlineEvals.provider.editTitle") }}</h1>
+      <p>{{ t("onlineEvals.provider.subtitle") }}</p>
     </div>
 
     <div class="eval-form-page__body">
       <div class="eval-form-page__main">
         <section class="eval-form-section">
-          <div class="eval-form-section__title"><span>01</span> Provider</div>
-          <label>Name <input v-model.trim="form.name" required placeholder="Production OpenAI" /></label>
-          <label>Provider type <input v-model.trim="form.providerType" required placeholder="openai" /></label>
-          <label class="eval-form-section__wide">Endpoint <input v-model.trim="form.endpoint" placeholder="Optional custom endpoint" /></label>
-          <label>Default model <input v-model.trim="form.defaultModel" required placeholder="gpt-4o-mini" /></label>
-          <label>Available models <input v-model.trim="form.availableModels" placeholder="gpt-4o-mini, gpt-4.1" /></label>
+          <div class="eval-form-section__title"><span>01</span> {{ t("onlineEvals.provider.sectionTitle") }}</div>
+          <label>
+            {{ t("onlineEvals.provider.nameLabel") }}
+            <input v-model.trim="form.name" required :placeholder="t('onlineEvals.provider.namePlaceholder')" />
+          </label>
+          <label>
+            {{ t("onlineEvals.provider.typeLabel") }}
+            <input v-model.trim="form.providerType" required :placeholder="t('onlineEvals.provider.typePlaceholder')" />
+          </label>
+          <label class="eval-form-section__wide">
+            {{ t("onlineEvals.provider.endpointLabel") }}
+            <input v-model.trim="form.endpoint" :placeholder="t('onlineEvals.provider.endpointPlaceholder')" />
+          </label>
+          <label>
+            {{ t("onlineEvals.provider.defaultModelLabel") }}
+            <input v-model.trim="form.defaultModel" required :placeholder="t('onlineEvals.provider.defaultModelPlaceholder')" />
+          </label>
+          <label>
+            {{ t("onlineEvals.provider.availableModelsLabel") }}
+            <input v-model.trim="form.availableModels" :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')" />
+          </label>
           <label class="eval-form-check">
             <input v-model="form.isDefault" type="checkbox" />
-            <span>Use as default provider</span>
+            <span>{{ t("onlineEvals.provider.useAsDefault") }}</span>
           </label>
-          <label class="eval-form-section__wide">Auth config JSON
+          <label class="eval-form-section__wide">
+            {{ t("onlineEvals.provider.authConfigLabel") }}
             <textarea v-model="form.authConfig" rows="7" required />
           </label>
         </section>
@@ -36,14 +52,17 @@
     </div>
 
     <div class="eval-form-page__foot">
-      <OButton type="button" variant="outline" @click="$emit('cancel')">Cancel</OButton>
-      <OButton type="submit" :loading="isSaving">{{ mode === "create" ? "Create" : "Save" }}</OButton>
+      <OButton type="button" variant="outline" @click="$emit('cancel')">{{ t("onlineEvals.buttons.cancel") }}</OButton>
+      <OButton type="submit" :loading="isSaving">
+        {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+      </OButton>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -62,6 +81,7 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
+const { t } = useI18n();
 const form = ref(initForm(props.row));
 const isSaving = ref(false);
 
@@ -98,7 +118,7 @@ async function save() {
       endpoint: form.value.endpoint || null,
       defaultModel: form.value.defaultModel,
       availableModels: splitCsv(form.value.availableModels),
-      authConfig: parseJson(form.value.authConfig, "Auth config"),
+      authConfig: parseJson(form.value.authConfig, t("onlineEvals.provider.authConfigLabel")),
       isDefault: form.value.isDefault,
     };
 
@@ -107,10 +127,13 @@ async function save() {
     } else {
       await onlineEvalsService.providers.create(props.orgId, payload);
     }
-    toast({ variant: "success", message: "Provider saved" });
+    toast({
+      variant: "success",
+      message: t("onlineEvals.saved", { label: t("onlineEvals.singular.providers") }),
+    });
     emit("saved");
   } catch (err: any) {
-    showError(err, "Failed to save provider");
+    showError(err, t("onlineEvals.provider.saveError"));
   } finally {
     isSaving.value = false;
   }

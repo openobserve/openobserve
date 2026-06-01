@@ -3,7 +3,7 @@
     <div class="eval-form-page__top">
       <button class="eval-form-page__back" type="button" @click="$emit('cancel')">
         <OIcon name="chevron-left" size="xs" />
-        Back to Eval Jobs
+        {{ t("onlineEvals.job.backTo") }}
       </button>
       <div class="eval-form-page__top-actions">
         <OButton type="button" icon-left="close" variant="ghost" size="icon-sm" @click="$emit('cancel')" />
@@ -11,37 +11,53 @@
     </div>
 
     <div class="eval-form-page__head">
-      <h1>{{ mode === "create" ? "Create" : "Edit" }} Online Eval Job</h1>
-      <p>Pick the stream, scorers, mapping, and sampling behavior for this evaluation job.</p>
+      <h1>{{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}</h1>
+      <p>{{ t("onlineEvals.job.subtitle") }}</p>
     </div>
 
     <div class="eval-form-page__body eval-form-page__body--split">
       <div class="eval-form-page__main">
         <div class="eval-stepper">
-          <span class="is-active"><i>1</i> Target</span>
-          <span><i>2</i> Scorers</span>
-          <span><i>3</i> Mapping</span>
-          <span><i>4</i> Sampling</span>
+          <span class="is-active"><i>1</i> {{ t("onlineEvals.job.stepper.target") }}</span>
+          <span><i>2</i> {{ t("onlineEvals.job.stepper.scorers") }}</span>
+          <span><i>3</i> {{ t("onlineEvals.job.stepper.mapping") }}</span>
+          <span><i>4</i> {{ t("onlineEvals.job.stepper.sampling") }}</span>
         </div>
 
         <section class="eval-form-section">
-          <div class="eval-form-section__title"><span>01</span> Target</div>
-          <label>Name <input v-model.trim="form.name" required placeholder="Production Faithfulness Monitor" /></label>
-          <label>Input stream <input v-model.trim="form.stream" required placeholder="default" /></label>
-          <label>Stream type <input v-model.trim="form.streamType" required placeholder="traces" /></label>
-          <label class="eval-form-section__wide">Description <textarea v-model.trim="form.description" rows="3" /></label>
-          <label>Sampling mode
+          <div class="eval-form-section__title"><span>01</span> {{ t("onlineEvals.job.targetSection") }}</div>
+          <label>
+            {{ t("onlineEvals.job.nameLabel") }}
+            <input v-model.trim="form.name" required :placeholder="t('onlineEvals.job.namePlaceholder')" />
+          </label>
+          <label>
+            {{ t("onlineEvals.job.streamLabel") }}
+            <input v-model.trim="form.stream" required :placeholder="t('onlineEvals.job.streamPlaceholder')" />
+          </label>
+          <label>
+            {{ t("onlineEvals.job.streamTypeLabel") }}
+            <input v-model.trim="form.streamType" required :placeholder="t('onlineEvals.job.streamTypePlaceholder')" />
+          </label>
+          <label class="eval-form-section__wide">
+            {{ t("onlineEvals.job.descriptionLabel") }}
+            <textarea v-model.trim="form.description" rows="3" />
+          </label>
+          <label>
+            {{ t("onlineEvals.job.samplingModeLabel") }}
             <select v-model="form.samplingMode">
-              <option value="rate">Rate</option>
-              <option value="all">All</option>
-              <option value="count">Count</option>
+              <option value="rate">{{ t("onlineEvals.job.samplingModes.rate") }}</option>
+              <option value="all">{{ t("onlineEvals.job.samplingModes.all") }}</option>
+              <option value="count">{{ t("onlineEvals.job.samplingModes.count") }}</option>
             </select>
           </label>
-          <label>Sampling value JSON <textarea v-model="form.samplingValue" rows="4" required /></label>
+          <label>
+            {{ t("onlineEvals.job.samplingValueLabel") }}
+            <textarea v-model="form.samplingValue" rows="4" required />
+          </label>
         </section>
 
         <section class="eval-form-section">
-          <div class="eval-form-section__title"><span>02</span> Scorers and mapping</div>
+          <div class="eval-form-section__title"><span>02</span> {{ t("onlineEvals.job.scorersSection") }}</div>
 
           <JobScorerPicker
             :scorers="scorers"
@@ -66,14 +82,17 @@
     </div>
 
     <div class="eval-form-page__foot">
-      <OButton type="button" variant="outline" @click="$emit('cancel')">Cancel</OButton>
-      <OButton type="submit" :loading="isSaving">{{ mode === "create" ? "Create" : "Save" }}</OButton>
+      <OButton type="button" variant="outline" @click="$emit('cancel')">{{ t("onlineEvals.buttons.cancel") }}</OButton>
+      <OButton type="submit" :loading="isSaving">
+        {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+      </OButton>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -117,6 +136,7 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
+const { t } = useI18n();
 const form = ref(initForm(props.row));
 const filterGroup = ref(initFilterGroup(props.row));
 const inputMappings = ref(initInputMappings(props.row));
@@ -200,7 +220,7 @@ function syncMappings() {
 async function save() {
   if (!props.orgId) return;
   if (!form.value.scorerIds.length) {
-    showError(new Error("Select at least one scorer"), "Failed to save eval job");
+    showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
     return;
   }
 
@@ -215,7 +235,7 @@ async function save() {
       scorers: form.value.scorerIds.map((id) => ({ id, version: scorerVersions.value[id] ?? null })),
       inputMapping: buildJobInputMappingPayload(form.value.scorerIds, inputMappings.value),
       samplingMode: form.value.samplingMode as any,
-      samplingValue: parseJson(form.value.samplingValue, "Sampling value"),
+      samplingValue: parseJson(form.value.samplingValue, t("onlineEvals.job.samplingValueLabel")),
     };
 
     if (props.mode === "edit" && props.row) {
@@ -223,10 +243,13 @@ async function save() {
     } else {
       await onlineEvalsService.jobs.create(props.orgId, payload);
     }
-    toast({ variant: "success", message: "Eval Job saved" });
+    toast({
+      variant: "success",
+      message: t("onlineEvals.saved", { label: t("onlineEvals.singular.jobs") }),
+    });
     emit("saved");
   } catch (err: any) {
-    showError(err, "Failed to save eval job");
+    showError(err, t("onlineEvals.job.saveError"));
   } finally {
     isSaving.value = false;
   }

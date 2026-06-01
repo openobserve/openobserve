@@ -3,30 +3,48 @@
     <form class="eval-dialog__panel" @submit.prevent="save">
       <div class="eval-dialog__head">
         <div>
-          <h2>{{ mode === "create" ? "New Score Config" : "Edit Score Config" }}</h2>
-          <p>Score configs define score type, health thresholds, and categories.</p>
+          <h2>{{ mode === "create" ? t("onlineEvals.scoreConfig.createTitle") : t("onlineEvals.scoreConfig.editTitle") }}</h2>
+          <p>{{ t("onlineEvals.scoreConfig.subtitle") }}</p>
         </div>
         <OButton type="button" icon-left="close" variant="ghost" size="icon-sm" @click="$emit('cancel')" />
       </div>
 
       <div class="eval-dialog__content">
-        <label>Name <input v-model.trim="form.name" required /></label>
-        <label>Data type
+        <label>
+          {{ t("onlineEvals.scoreConfig.nameLabel") }}
+          <input v-model.trim="form.name" required />
+        </label>
+        <label>
+          {{ t("onlineEvals.scoreConfig.dataTypeLabel") }}
           <select v-model="form.dataType" :disabled="mode === 'edit'">
-            <option value="numeric">Numeric</option>
-            <option value="categorical">Categorical</option>
-            <option value="boolean">Boolean</option>
+            <option value="numeric">{{ t("onlineEvals.scoreConfig.dataTypes.numeric") }}</option>
+            <option value="categorical">{{ t("onlineEvals.scoreConfig.dataTypes.categorical") }}</option>
+            <option value="boolean">{{ t("onlineEvals.scoreConfig.dataTypes.boolean") }}</option>
           </select>
         </label>
-        <label class="eval-dialog__wide">Description <input v-model.trim="form.description" /></label>
-        <label>Numeric range JSON <textarea v-model="form.numericRange" rows="4" /></label>
-        <label>Categories JSON <textarea v-model="form.categories" rows="4" /></label>
-        <label class="eval-dialog__wide">Healthy threshold JSON <textarea v-model="form.healthyThreshold" rows="4" /></label>
+        <label class="eval-dialog__wide">
+          {{ t("onlineEvals.scoreConfig.descriptionLabel") }}
+          <input v-model.trim="form.description" />
+        </label>
+        <label>
+          {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
+          <textarea v-model="form.numericRange" rows="4" />
+        </label>
+        <label>
+          {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
+          <textarea v-model="form.categories" rows="4" />
+        </label>
+        <label class="eval-dialog__wide">
+          {{ t("onlineEvals.scoreConfig.healthyThresholdLabel") }}
+          <textarea v-model="form.healthyThreshold" rows="4" />
+        </label>
       </div>
 
       <div class="eval-dialog__foot">
-        <OButton type="button" variant="outline" @click="$emit('cancel')">Cancel</OButton>
-        <OButton type="submit" :loading="isSaving">{{ mode === "create" ? "Create" : "Save" }}</OButton>
+        <OButton type="button" variant="outline" @click="$emit('cancel')">{{ t("onlineEvals.buttons.cancel") }}</OButton>
+        <OButton type="submit" :loading="isSaving">
+          {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+        </OButton>
       </div>
     </form>
   </div>
@@ -34,6 +52,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
@@ -51,6 +70,7 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
+const { t } = useI18n();
 const form = ref(initForm(props.row));
 const isSaving = ref(false);
 
@@ -82,9 +102,9 @@ async function save() {
     const basePayload: Record<string, any> = {
       name: form.value.name,
       description: form.value.description || null,
-      numericRange: parseOptionalJson(form.value.numericRange, "Numeric range"),
-      categories: parseOptionalJson(form.value.categories, "Categories"),
-      healthyThreshold: parseOptionalJson(form.value.healthyThreshold, "Healthy threshold"),
+      numericRange: parseOptionalJson(form.value.numericRange, t("onlineEvals.scoreConfig.numericRangeLabel")),
+      categories: parseOptionalJson(form.value.categories, t("onlineEvals.scoreConfig.categoriesLabel")),
+      healthyThreshold: parseOptionalJson(form.value.healthyThreshold, t("onlineEvals.scoreConfig.healthyThresholdLabel")),
     };
 
     if (props.mode === "edit" && props.row) {
@@ -95,10 +115,13 @@ async function save() {
         dataType: form.value.dataType,
       });
     }
-    toast({ variant: "success", message: "Score Config saved" });
+    toast({
+      variant: "success",
+      message: t("onlineEvals.saved", { label: t("onlineEvals.singular.scoreConfigs") }),
+    });
     emit("saved");
   } catch (err: any) {
-    showError(err, "Failed to save score config");
+    showError(err, t("onlineEvals.scoreConfig.saveError"));
   } finally {
     isSaving.value = false;
   }

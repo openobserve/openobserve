@@ -1,8 +1,8 @@
 <template>
   <div class="eval-form-section__wide eval-condition-builder">
     <div class="eval-form-field-head">
-      <span>Filter condition</span>
-      <small>Only spans matching this condition enter sampling and scoring.</small>
+      <span>{{ t("onlineEvals.job.filter.title") }}</span>
+      <small>{{ t("onlineEvals.job.filter.hint") }}</small>
     </div>
     <FilterGroup
       :group="group"
@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import {
   removeConditionGroup as removeAlertConditionGroup,
@@ -38,6 +39,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:group", value: V2Group): void;
 }>();
+
+const { t } = useI18n();
 
 const streamFields = computed(() => DEFAULT_JOB_STREAM_FIELDS);
 const streamFieldsMap = computed(() =>

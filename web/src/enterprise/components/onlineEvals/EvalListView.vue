@@ -5,7 +5,7 @@
         <OIcon name="search" size="xs" />
         <input
           :value="search"
-          :placeholder="`Search ${tabLabel.toLowerCase()}`"
+          :placeholder="t('onlineEvals.search', { label: tabLabel.toLowerCase() })"
           @input="$emit('update:search', ($event.target as HTMLInputElement).value)"
         />
       </div>
@@ -17,12 +17,12 @@
           class="online-evals__select"
           @change="$emit('update:jobStatusFilter', ($event.target as HTMLSelectElement).value as EvalJobStatus | '')"
         >
-          <option value="">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="degraded">Degraded</option>
-          <option value="archived">Archived</option>
+          <option value="">{{ t("onlineEvals.allStatuses") }}</option>
+          <option value="draft">{{ t("onlineEvals.jobStatus.draft") }}</option>
+          <option value="active">{{ t("onlineEvals.jobStatus.active") }}</option>
+          <option value="paused">{{ t("onlineEvals.jobStatus.paused") }}</option>
+          <option value="degraded">{{ t("onlineEvals.jobStatus.degraded") }}</option>
+          <option value="archived">{{ t("onlineEvals.jobStatus.archived") }}</option>
         </select>
 
         <OButton
@@ -32,7 +32,7 @@
           :loading="isLoading"
           @click="$emit('refresh')"
         >
-          Refresh
+          {{ t("onlineEvals.refresh") }}
         </OButton>
         <OButton icon-left="add" size="sm" @click="$emit('create')">
           {{ createButtonLabel }}
@@ -42,16 +42,16 @@
 
     <div v-if="rows.length === 0" class="online-evals__empty">
       <OIcon name="rule" size="md" />
-      <strong>No {{ tabLabel.toLowerCase() }} found</strong>
-      <span>Create one to start wiring online evaluation.</span>
+      <strong>{{ t("onlineEvals.noRowsFound", { label: tabLabel.toLowerCase() }) }}</strong>
+      <span>{{ t("onlineEvals.getStartedHint") }}</span>
     </div>
 
     <div v-else class="online-evals__table">
       <div class="online-evals__thead" :class="tableClass">
-        <span>Name</span>
+        <span>{{ t("onlineEvals.columns.name") }}</span>
         <span>{{ secondaryColumnLabel }}</span>
-        <span>Status</span>
-        <span>Updated</span>
+        <span>{{ t("onlineEvals.columns.status") }}</span>
+        <span>{{ t("onlineEvals.columns.updated") }}</span>
         <span></span>
       </div>
 
@@ -75,14 +75,14 @@
             icon-left="edit"
             variant="ghost"
             size="icon-sm"
-            title="Edit"
+            :title="t('onlineEvals.actions.edit')"
             @click="$emit('edit', row)"
           />
           <OButton
             icon-left="delete"
             variant="ghost-destructive"
             size="icon-sm"
-            title="Delete"
+            :title="t('onlineEvals.actions.delete')"
             @click="$emit('delete', row)"
           />
         </span>
@@ -93,6 +93,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type {
@@ -137,6 +138,8 @@ defineEmits<{
   (e: "edit", row: AnyRow): void;
   (e: "delete", row: AnyRow): void;
 }>();
+
+const { t } = useI18n();
 
 const tableClass = computed(() => `online-evals__row--${props.activeTab}`);
 
