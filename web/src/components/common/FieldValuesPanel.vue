@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showMultiSelect"
               :model-value="selectedValues"
               :value="value.key"
+              :color="filterMode === 'exclude' ? 'negative' : 'primary'"
               size="xs"
               class="tw:shrink-0"
               @update:model-value="handleUserCheckboxChange"
