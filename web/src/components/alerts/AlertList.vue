@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="dynamicQueryModel"
               :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
               data-test="alert-list-search-input"
-              :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
               class="tw:ml-2 tw:w-[200px]"
             />
