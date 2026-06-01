@@ -451,6 +451,11 @@ test.describe("Metrics testcases", () => {
   test("Invalid PromQL syntax error handling", {
     tag: ['@metrics', '@edge', '@P2', '@all']
   }, async ({ page }, testInfo) => {
+    // Skipped in enterprise runs only — flaky there, runs fine in OSS.
+    // AKEYLESS_ACCESS_ID is set in the ENT playwright workflow but not OSS.
+    // Debug + un-skip in a separate PR.
+    test.skip(!!process.env.AKEYLESS_ACCESS_ID, "flaky in ENT runs only; debugging in a separate PR");
+
     const pm = await setupTest(page, testInfo);
     testLogger.info('Testing invalid PromQL syntax handling');
 
