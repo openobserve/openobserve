@@ -22,10 +22,11 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     config::ConfigOptions,
-    physical_expr::LexOrdering,
+    physical_expr::{LexOrdering, PhysicalExpr, expressions::Column as PhysicalColumn},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
@@ -116,11 +117,10 @@ impl RemoteScanRule {
             sampling_config,
         );
         let remote_scan_nodes = Arc::new(remote_scan_nodes);
+        let cfg = config::get_config();
         Self {
             remote_scan_nodes,
-            single_node_optimizer_enable: config::get_config()
-                .common
-                .feature_single_node_optimize_enabled,
+            single_node_optimizer_enable: cfg.common.feature_single_node_optimize_enabled,
         }
     }
 
@@ -202,13 +202,16 @@ impl PhysicalOptimizerRule for RemoteScanRule {
 pub struct RemoteScanRewriter {
     pub remote_scan_nodes: Arc<RemoteScanNodes>,
     pub is_changed: bool,
+    pub partial_reduce_enabled: bool,
 }
 
 impl RemoteScanRewriter {
     pub fn new(remote_scan_nodes: Arc<RemoteScanNodes>) -> Self {
+        let cfg = config::get_config();
         Self {
             remote_scan_nodes,
             is_changed: false,
+            partial_reduce_enabled: cfg.common.feature_partial_reduce_enabled,
         }
     }
 }
@@ -223,14 +226,21 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
-                let remote_scan = Arc::new(RemoteScanExec::new(
-                    input.clone(),
-                    self.remote_scan_nodes.get_remote_node(&table_name),
-                )?);
+                // when the leader sends a partial aggregate plan to followers,
+                // insert a PartialReduce to reduce data transfer.
+                let remote_scan_input =
+                    wrap_partial_reduce(self.partial_reduce_enabled, input.clone())?;
+                let remote_scan_or_partial_reduce: Arc<dyn ExecutionPlan> =
+                    Arc::new(RemoteScanExec::new(
+                        remote_scan_input,
+                        self.remote_scan_nodes.get_remote_node(&table_name),
+                    )?);
                 let output_partitioning =
                     Partitioning::RoundRobinBatch(input.output_partitioning().partition_count());
-                let repartition =
-                    Arc::new(RepartitionExec::try_new(remote_scan, output_partitioning)?);
+                let repartition = Arc::new(RepartitionExec::try_new(
+                    remote_scan_or_partial_reduce,
+                    output_partitioning,
+                )?);
                 let new_node = node.with_new_children(vec![repartition])?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
@@ -320,6 +330,62 @@ impl TreeNodeRewriter for RemoteScanRewriter {
     }
 }
 
+fn wrap_partial_reduce(
+    partial_reduce_enabled: bool,
+    input: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    if !partial_reduce_enabled || input.name() != "AggregateExec" {
+        return Ok(input);
+    }
+    let Some(agg) = input.as_any().downcast_ref::<AggregateExec>() else {
+        return Ok(input);
+    };
+    if *agg.mode() != AggregateMode::Partial {
+        return Ok(input.clone());
+    }
+    // PartialReduce receives Partial's output, so group expressions must be
+    // simple Column refs into that schema rather than the original scan-level exprs.
+    let partial_schema = input.schema();
+    let group_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg
+        .group_expr()
+        .expr()
+        .iter()
+        .map(|(_, name)| {
+            let idx = partial_schema.index_of(name)?;
+            Ok((
+                Arc::new(PhysicalColumn::new(name, idx)) as Arc<dyn PhysicalExpr>,
+                name.clone(),
+            ))
+        })
+        .collect::<Result<_>>()?;
+    let null_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg
+        .group_expr()
+        .null_expr()
+        .iter()
+        .map(|(_, name)| {
+            let idx = partial_schema.index_of(name)?;
+            Ok((
+                Arc::new(PhysicalColumn::new(name, idx)) as Arc<dyn PhysicalExpr>,
+                name.clone(),
+            ))
+        })
+        .collect::<Result<_>>()?;
+    let new_group_by = PhysicalGroupBy::new(
+        group_exprs,
+        null_exprs,
+        agg.group_expr().groups().to_vec(),
+        !agg.group_expr().is_single(),
+    );
+    Ok(Arc::new(AggregateExec::try_new(
+        AggregateMode::PartialReduce,
+        new_group_by,
+        agg.aggr_expr().to_vec(),
+        vec![None; agg.aggr_expr().len()],
+        input.clone(),
+        partial_schema,
+    )?) as Arc<dyn ExecutionPlan>)
+}
+
 fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
     let mut visitor = NewEmptyExecCountVisitor::default();
     plan.visit(&mut visitor)
@@ -400,6 +466,17 @@ impl Default for NewEmptyExecCountVisitor {
     }
 }
 
+impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "NewEmptyExec" {
+            self.count += 1;
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use datafusion::physical_optimizer::PhysicalOptimizerRule;
@@ -435,16 +512,5 @@ mod tests {
     fn test_new_empty_exec_count_visitor_default_starts_at_zero() {
         let v = NewEmptyExecCountVisitor::default();
         assert_eq!(v.get_count(), 0);
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if node.name() == "NewEmptyExec" {
-            self.count += 1;
-        }
-        Ok(TreeNodeRecursion::Continue)
     }
 }
