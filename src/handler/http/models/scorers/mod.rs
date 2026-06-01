@@ -83,6 +83,8 @@ pub enum ScorerCreateConfig {
 pub struct LlmJudgeScorerRequest {
     #[serde(default)]
     pub produces_score_config_id: Option<String>,
+    #[serde(default)]
+    pub produces_score_config_version: Option<i32>,
     pub template: String,
     pub output_schema: Value,
     pub params: LlmJudgeScorerParams,
@@ -93,6 +95,8 @@ pub struct LlmJudgeScorerRequest {
 pub struct RemoteScorerRequest {
     #[serde(default)]
     pub produces_score_config_id: Option<String>,
+    #[serde(default)]
+    pub produces_score_config_version: Option<i32>,
     pub template: String,
     pub params: RemoteScorerParams,
 }
@@ -114,6 +118,10 @@ pub enum ScorerUpdateConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LlmJudgeScorerUpdateRequest {
+    #[serde(default)]
+    pub produces_score_config_id: Option<String>,
+    #[serde(default)]
+    pub produces_score_config_version: Option<i32>,
     pub template: String,
     #[serde(default)]
     pub output_schema: Option<Value>,
@@ -123,6 +131,10 @@ pub struct LlmJudgeScorerUpdateRequest {
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RemoteScorerUpdateRequest {
+    #[serde(default)]
+    pub produces_score_config_id: Option<String>,
+    #[serde(default)]
+    pub produces_score_config_version: Option<i32>,
     pub template: String,
     pub params: RemoteScorerParams,
 }
@@ -279,23 +291,31 @@ pub struct ScorerTestResponseBody {
 
 impl From<ScorerRequestBody> for infra::table::scorers::Scorer {
     fn from(value: ScorerRequestBody) -> Self {
-        let (scorer_type, produces_score_config_id, template, output_schema, params) =
-            match value.scorer {
-                ScorerCreateConfig::LlmJudge(scorer) => (
-                    ScorerType::LlmJudge,
-                    scorer.produces_score_config_id,
-                    scorer.template,
-                    Some(scorer.output_schema),
-                    params_to_value(scorer.params),
-                ),
-                ScorerCreateConfig::Remote(scorer) => (
-                    ScorerType::Remote,
-                    scorer.produces_score_config_id,
-                    scorer.template,
-                    None,
-                    params_to_value(scorer.params),
-                ),
-            };
+        let (
+            scorer_type,
+            produces_score_config_id,
+            produces_score_config_version,
+            template,
+            output_schema,
+            params,
+        ) = match value.scorer {
+            ScorerCreateConfig::LlmJudge(scorer) => (
+                ScorerType::LlmJudge,
+                scorer.produces_score_config_id,
+                scorer.produces_score_config_version,
+                scorer.template,
+                Some(scorer.output_schema),
+                params_to_value(scorer.params),
+            ),
+            ScorerCreateConfig::Remote(scorer) => (
+                ScorerType::Remote,
+                scorer.produces_score_config_id,
+                scorer.produces_score_config_version,
+                scorer.template,
+                None,
+                params_to_value(scorer.params),
+            ),
+        };
 
         Self {
             id: String::new(),
@@ -306,7 +326,7 @@ impl From<ScorerRequestBody> for infra::table::scorers::Scorer {
             scorer_type,
             description: value.description,
             produces_score_config_id,
-            produces_score_config_version: None,
+            produces_score_config_version,
             template,
             output_schema,
             params,
@@ -319,15 +339,26 @@ impl From<ScorerRequestBody> for infra::table::scorers::Scorer {
 
 impl From<ScorerUpdateRequestBody> for infra::table::scorers::Scorer {
     fn from(value: ScorerUpdateRequestBody) -> Self {
-        let (scorer_type, template, output_schema, params) = match value.scorer {
+        let (
+            scorer_type,
+            produces_score_config_id,
+            produces_score_config_version,
+            template,
+            output_schema,
+            params,
+        ) = match value.scorer {
             ScorerUpdateConfig::LlmJudge(scorer) => (
                 ScorerType::LlmJudge,
+                scorer.produces_score_config_id,
+                scorer.produces_score_config_version,
                 scorer.template,
                 scorer.output_schema,
                 params_to_value(scorer.params),
             ),
             ScorerUpdateConfig::Remote(scorer) => (
                 ScorerType::Remote,
+                scorer.produces_score_config_id,
+                scorer.produces_score_config_version,
                 scorer.template,
                 None,
                 params_to_value(scorer.params),
@@ -342,8 +373,8 @@ impl From<ScorerUpdateRequestBody> for infra::table::scorers::Scorer {
             version: 0,
             scorer_type,
             description: value.description,
-            produces_score_config_id: None,
-            produces_score_config_version: None,
+            produces_score_config_id,
+            produces_score_config_version,
             template,
             output_schema,
             params,
@@ -440,6 +471,7 @@ mod tests {
             description: None,
             scorer: ScorerCreateConfig::LlmJudge(LlmJudgeScorerRequest {
                 produces_score_config_id: Some("scfg-entity-1".to_string()),
+                produces_score_config_version: Some(1),
                 template: "Judge {{input}}".to_string(),
                 output_schema: serde_json::json!({"type": "object"}),
                 params: LlmJudgeScorerParams {
@@ -458,6 +490,7 @@ mod tests {
         assert!(scorer.id.is_empty());
         assert_eq!(scorer.name, "acc_judge");
         assert_eq!(scorer.scorer_type, "llm_judge");
+        assert_eq!(scorer.produces_score_config_version, Some(1));
         assert_eq!(scorer.template, "Judge {{input}}");
         assert_eq!(scorer.params["provider_id"], "p1");
     }
@@ -519,6 +552,8 @@ mod tests {
             description: Some("Updated".to_string()),
             name: None,
             scorer: ScorerUpdateConfig::LlmJudge(LlmJudgeScorerUpdateRequest {
+                produces_score_config_id: Some("scfg-entity-1".to_string()),
+                produces_score_config_version: Some(2),
                 template: "Judge {{input}}".to_string(),
                 output_schema: None,
                 params: LlmJudgeScorerParams {
@@ -535,7 +570,11 @@ mod tests {
         };
         let scorer = infra::table::scorers::Scorer::from(body);
         assert!(scorer.name.is_empty());
-        assert!(scorer.produces_score_config_id.is_none());
+        assert_eq!(
+            scorer.produces_score_config_id,
+            Some("scfg-entity-1".to_string())
+        );
+        assert_eq!(scorer.produces_score_config_version, Some(2));
     }
 
     #[test]

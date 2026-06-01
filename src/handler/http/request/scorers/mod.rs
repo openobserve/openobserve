@@ -39,6 +39,7 @@ impl From<ScorerError> for Response {
             ScorerError::InvalidScorerType(_)
             | ScorerError::ScorerTypeImmutable
             | ScorerError::ProducesScoreConfigIdImmutable
+            | ScorerError::ScoreConfigVersionNotFound
             | ScorerError::DuplicateName => MetaHttpResponse::bad_request(value),
         }
     }

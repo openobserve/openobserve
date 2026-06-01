@@ -30,6 +30,7 @@ use serde_json::Value;
 #[derive(Debug, Clone, Serialize)]
 pub struct EvaluatorTraceInput {
     pub org_id: String,
+    pub evaluator_trace_id: String,
     pub target_span_id: String,
     pub target_trace_id: String,
     pub target_stream: String,
@@ -64,8 +65,8 @@ pub struct EvaluatorTrace {
 }
 
 pub fn create_evaluator_trace(input: EvaluatorTraceInput) -> EvaluatorTrace {
-    let span_id = ider::generate();
-    let trace_id = ider::generate();
+    let span_id = ider::generate_span_id();
+    let trace_id = input.evaluator_trace_id.clone();
     let now = Utc::now().timestamp_micros();
     let latency_ms = input.latency_ms.max(0);
     let latency_micros = latency_ms.saturating_mul(1000);
@@ -287,6 +288,7 @@ mod tests {
     fn test_create_success_trace() {
         let input = EvaluatorTraceInput {
             org_id: "org1".to_string(),
+            evaluator_trace_id: "11111111111111111111111111111111".to_string(),
             target_span_id: "span-1".to_string(),
             target_trace_id: "trace-1".to_string(),
             target_stream: "traces".to_string(),
@@ -352,6 +354,7 @@ mod tests {
     fn test_create_error_trace() {
         let input = EvaluatorTraceInput {
             org_id: "org1".to_string(),
+            evaluator_trace_id: "22222222222222222222222222222222".to_string(),
             target_span_id: "span-2".to_string(),
             target_trace_id: "trace-2".to_string(),
             target_stream: "traces".to_string(),
@@ -393,6 +396,7 @@ mod tests {
     fn test_create_remote_scorer_trace() {
         let input = EvaluatorTraceInput {
             org_id: "org1".to_string(),
+            evaluator_trace_id: "33333333333333333333333333333333".to_string(),
             target_span_id: "span-3".to_string(),
             target_trace_id: "trace-3".to_string(),
             target_stream: "traces".to_string(),
@@ -439,6 +443,7 @@ mod tests {
     fn test_create_unknown_scorer_trace() {
         let input = EvaluatorTraceInput {
             org_id: "org1".to_string(),
+            evaluator_trace_id: "44444444444444444444444444444444".to_string(),
             target_span_id: "span-4".to_string(),
             target_trace_id: "trace-4".to_string(),
             target_stream: "traces".to_string(),
@@ -480,6 +485,7 @@ mod tests {
     fn test_create_skipped_trace() {
         let input = EvaluatorTraceInput {
             org_id: "org1".to_string(),
+            evaluator_trace_id: "55555555555555555555555555555555".to_string(),
             target_span_id: "span-5".to_string(),
             target_trace_id: "trace-5".to_string(),
             target_stream: "traces".to_string(),
@@ -524,6 +530,49 @@ mod tests {
         assert_eq!(attrs[evaluator::ATTR_SAMPLING_RATE], 0.1);
         assert_eq!(attrs[evaluator::ATTR_SAMPLED], false);
         assert!(attrs.get(evaluator::ATTR_SCORER_ID).is_none());
+    }
+
+    #[test]
+    fn test_multiple_scorer_spans_share_evaluator_trace_id() {
+        let evaluator_trace_id = "11111111111111111111111111111111".to_string();
+
+        let make_input = |scorer_id: &str| EvaluatorTraceInput {
+            org_id: "org1".to_string(),
+            evaluator_trace_id: evaluator_trace_id.clone(),
+            target_span_id: "span-1".to_string(),
+            target_trace_id: "trace-1".to_string(),
+            target_stream: "traces".to_string(),
+            scorer_id: Some(scorer_id.to_string()),
+            scorer_version: Some("1".to_string()),
+            scorer_type: Some(ScorerType::LlmJudge),
+            job_id: Some("job-1".to_string()),
+            score_config_id: None,
+            score_config_version: None,
+            eval_run_id: Some("run-1".to_string()),
+            provider_id: None,
+            provider_name: None,
+            provider_type: None,
+            model: None,
+            latency_ms: 10,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
+            sampling_rate: Some(1.0),
+            sampled: Some(true),
+            status: evaluator::status::SUCCESS.to_string(),
+            error_kind: None,
+            error_message: None,
+            skip_reason: None,
+            prompt: None,
+            response: None,
+        };
+
+        let first = create_evaluator_trace(make_input("sc-1"));
+        let second = create_evaluator_trace(make_input("sc-2"));
+
+        assert_eq!(first.span_json["trace_id"], evaluator_trace_id);
+        assert_eq!(first.span_json["trace_id"], second.span_json["trace_id"]);
+        assert_ne!(first.span_json["span_id"], second.span_json["span_id"]);
     }
 
     #[test]

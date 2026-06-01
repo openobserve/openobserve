@@ -1407,6 +1407,7 @@ async fn process_node(
                             crate::service::llm_evaluations::evaluator_trace::create_evaluator_trace(
                                 crate::service::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
                                     org_id: ctx.org_id.clone(),
+                                    evaluator_trace_id: ctx.evaluator_trace_id.clone(),
                                     target_span_id: ctx.span_id.clone(),
                                     target_trace_id: ctx.trace_id.clone(),
                                     target_stream: ctx.source_stream.clone(),

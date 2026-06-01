@@ -43,6 +43,9 @@ pub enum ScorerError {
     #[error("produces_score is immutable and cannot be changed on update")]
     ProducesScoreConfigIdImmutable,
 
+    #[error("Score config version not found")]
+    ScoreConfigVersionNotFound,
+
     #[error("Scorer name already exists")]
     DuplicateName,
 }
@@ -90,15 +93,14 @@ pub async fn update_scorer(
         .await?
         .ok_or(ScorerError::NotFound)?;
 
-    // scorer_type and produces_score_config_id are immutable.
+    // scorer_type is immutable; produced score config can change with a new scorer version.
     if scorer.scorer_type != existing.scorer_type {
         return Err(ScorerError::ScorerTypeImmutable);
     }
-    if scorer.produces_score_config_id.is_some()
-        && scorer.produces_score_config_id != existing.produces_score_config_id
-    {
-        return Err(ScorerError::ProducesScoreConfigIdImmutable);
-    }
+    let produces_score_config_id = scorer
+        .produces_score_config_id
+        .clone()
+        .or_else(|| existing.produces_score_config_id.clone());
 
     let new_name = scorer.name.trim().to_string();
     let new_name = if new_name.is_empty() {
@@ -122,7 +124,7 @@ pub async fn update_scorer(
     scorer.org_id = org_id.to_string();
     scorer.name = new_name;
     scorer.scorer_type = existing.scorer_type;
-    scorer.produces_score_config_id = existing.produces_score_config_id;
+    scorer.produces_score_config_id = produces_score_config_id;
     scorer.produces_score_config_version = resolve_score_config_version(org_id, &scorer).await?;
     scorer.version = latest_version + 1;
     let now = Utc::now().timestamp_millis();
@@ -142,9 +144,16 @@ async fn resolve_score_config_version(
 ) -> Result<Option<i32>, ScorerError> {
     match scorer.produces_score_config_id.as_deref() {
         Some(entity_id) if !entity_id.is_empty() => {
-            Ok(table::score_configs::get_by_entity_id(org_id, entity_id)
-                .await?
-                .map(|score_config| score_config.version))
+            if let Some(version) = scorer.produces_score_config_version {
+                let score_config =
+                    table::score_configs::get_by_entity_id_and_version(org_id, entity_id, version)
+                        .await?;
+                return match score_config {
+                    Some(_) => Ok(Some(version)),
+                    None => Err(ScorerError::ScoreConfigVersionNotFound),
+                };
+            }
+            Ok(None)
         }
         _ => Ok(None),
     }

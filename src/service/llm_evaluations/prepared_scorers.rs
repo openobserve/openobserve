@@ -226,6 +226,7 @@ impl PreparedLlmJudgeScorer {
 
                 let trace = create_evaluator_trace(EvaluatorTraceInput {
                     org_id: span_ctx.org_id.clone(),
+                    evaluator_trace_id: span_ctx.evaluator_trace_id.clone(),
                     target_span_id: span_ctx.span_id.clone(),
                     target_trace_id: span_ctx.trace_id.clone(),
                     target_stream: span_ctx.source_stream.clone(),
@@ -377,6 +378,7 @@ impl PreparedRemoteScorer {
 
                 let trace = create_evaluator_trace(EvaluatorTraceInput {
                     org_id: span_ctx.org_id.clone(),
+                    evaluator_trace_id: span_ctx.evaluator_trace_id.clone(),
                     target_span_id: span_ctx.span_id.clone(),
                     target_trace_id: span_ctx.trace_id.clone(),
                     target_stream: span_ctx.source_stream.clone(),

@@ -42,6 +42,7 @@ pub struct SpanEvalContext {
     pub org_id: String,
     pub span_id: String,
     pub trace_id: String,
+    pub evaluator_trace_id: String,
     pub session_id: Option<String>,
     pub source_stream: String,
     pub job_id: Option<String>,
@@ -143,6 +144,7 @@ pub fn extract_context_from_span(
         org_id: org_id.to_string(),
         span_id,
         trace_id,
+        evaluator_trace_id: config::ider::generate_trace_id(),
         session_id,
         source_stream,
         job_id: job_id.map(|s| s.to_string()),
@@ -300,6 +302,7 @@ pub async fn execute_scorers(
                 let execution_error = e.downcast_ref::<ScorerExecutionError>();
                 let err_trace = create_evaluator_trace(EvaluatorTraceInput {
                     org_id: ctx.org_id.clone(),
+                    evaluator_trace_id: ctx.evaluator_trace_id.clone(),
                     target_span_id: ctx.span_id.clone(),
                     target_trace_id: ctx.trace_id.clone(),
                     target_stream: ctx.source_stream.clone(),
@@ -362,6 +365,8 @@ mod tests {
         assert_eq!(ctx.org_id, "org1");
         assert_eq!(ctx.span_id, "span-1");
         assert_eq!(ctx.trace_id, "trace-1");
+        assert_eq!(ctx.evaluator_trace_id.len(), 32);
+        assert_ne!(ctx.evaluator_trace_id, ctx.trace_id);
         assert_eq!(ctx.job_id, Some("job-1".to_string()));
         assert_eq!(ctx.attributes.get("span_name").unwrap(), "chat completion");
         assert_eq!(ctx.attributes.get("gen_ai.system").unwrap(), "openai");
@@ -417,6 +422,7 @@ mod tests {
             org_id: "org1".to_string(),
             span_id: "span-1".to_string(),
             trace_id: "trace-1".to_string(),
+            evaluator_trace_id: "11111111111111111111111111111111".to_string(),
             session_id: Some("session-1".to_string()),
             source_stream: "traces".to_string(),
             job_id: Some("job-1".to_string()),
@@ -460,6 +466,7 @@ mod tests {
             org_id: "org1".to_string(),
             span_id: "span-1".to_string(),
             trace_id: "trace-1".to_string(),
+            evaluator_trace_id: "11111111111111111111111111111111".to_string(),
             session_id: Some("session-1".to_string()),
             source_stream: "traces".to_string(),
             job_id: Some("job-1".to_string()),
