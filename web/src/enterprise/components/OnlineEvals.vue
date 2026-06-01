@@ -69,7 +69,18 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
 
         <div v-else class="online-evals__body">
+          <ScoreConfigList
+            v-if="activeTab === 'scoreConfigs'"
+            :rows="(filteredRows as ScoreConfig[])"
+            :scorers="scorers"
+            :search="filterQuery"
+            @update:search="filterQuery = $event"
+            @create="openCreateDialog"
+            @edit="(row) => openEditDialog(row)"
+            @delete="(row) => deleteRow(row)"
+          />
           <EvalListView
+            v-else
             :active-tab="activeTab"
             :tab-label="currentTabLabel"
             :rows="filteredRows"
@@ -128,6 +139,7 @@ import {
 } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
 import EvalListView from "./onlineEvals/EvalListView.vue";
+import ScoreConfigList from "./onlineEvals/ScoreConfigList.vue";
 import ScorerTypeDialog from "./onlineEvals/forms/ScorerTypeDialog.vue";
 import ScoreConfigDialog from "./onlineEvals/forms/ScoreConfigDialog.vue";
 import ProviderFormPage from "./onlineEvals/forms/ProviderFormPage.vue";
