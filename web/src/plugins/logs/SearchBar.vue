@@ -113,6 +113,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.showHistogramLabel") }}
           </ODropdownItem>
 
+          <!-- SQL Mode Toggle -->
+          <ODropdownItem
+            data-test="logs-search-bar-menu-sql-mode-btn"
+            @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+          >
+            <template #icon-left>
+              <OSwitch
+                v-model="searchObj.meta.sqlMode"
+                :disabled="isSqlModeDisabled"
+                size="md"
+                data-test="logs-search-bar-sql-mode-toggle"
+                @click.stop
+              />
+            </template>
+            {{ t("search.sqlModeLabel") }}
+          </ODropdownItem>
+
           <!-- Quick Mode Toggle -->
           <ODropdownItem
             data-test="logs-search-bar-quick-mode-toggle-btn"
