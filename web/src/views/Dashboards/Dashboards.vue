@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('dashboard.searchAcross')
                   : t('dashboard.search')
               "
-              :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
               data-test="dashboard-search"
             />

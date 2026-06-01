@@ -6,6 +6,7 @@ export interface SearchInputProps {
   modelValue?: string;
   placeholder?: string;
   size?: SearchInputSize;
+  /** Shows a × button to clear the field. Defaults to true — all search inputs are clearable by default. */
   clearable?: boolean;
   debounce?: number;
   disabled?: boolean;
