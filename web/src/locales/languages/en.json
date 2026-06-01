@@ -4421,5 +4421,25 @@
       "selectAtLeastOne": "Select at least one scorer",
       "saveError": "Failed to save eval job"
     }
+  },
+  "llmProviders": {
+    "tabLabel": "LLM Providers",
+    "title": "LLM Providers",
+    "subtitle": "Manage the LLM provider connections used by LLM Judge scorers.",
+    "newButton": "New Provider",
+    "searchPlaceholder": "Search providers",
+    "defaultBadge": "Default",
+    "loadError": "Failed to load LLM providers",
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "endpoint": "Endpoint",
+      "defaultModel": "Default Model",
+      "default": "Default"
+    },
+    "empty": {
+      "title": "No LLM Providers Yet",
+      "description": "LLM Providers store the connection details (endpoint + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
+    }
   }
 }

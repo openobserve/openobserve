@@ -7,17 +7,9 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div class="online-evals" data-test="online-evals-page">
-    <!-- Full-page forms (jobs / scorers / providers) -->
-    <ProviderFormPage
-      v-if="formPage?.entity === 'providers'"
-      :org-id="orgId"
-      :mode="formPage.mode"
-      :row="(dialog.row as Provider | null)"
-      @saved="handleSaved"
-      @cancel="closeFormPage"
-    />
+    <!-- Full-page forms (jobs / scorers) -->
     <ScorerFormPage
-      v-else-if="formPage?.entity === 'scorers'"
+      v-if="formPage?.entity === 'scorers'"
       :org-id="orgId"
       :mode="formPage.mode"
       :row="(dialog.row as Scorer | null)"
@@ -101,23 +93,6 @@ the Free Software Foundation, either version 3 of the License, or
             @edit="(row: EvalJob) => openEditDialog(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
           />
-          <EvalListView
-            v-else
-            :active-tab="activeTab"
-            :tab-label="currentTabLabel"
-            :rows="filteredRows"
-            :is-loading="isLoading"
-            :search="filterQuery"
-            :job-status-filter="jobStatusFilter"
-            :create-button-label="createButtonLabel"
-            :secondary-column-label="secondaryColumnLabel"
-            @update:search="filterQuery = $event"
-            @update:job-status-filter="jobStatusFilter = $event"
-            @refresh="loadAll(orgId)"
-            @create="openCreateDialog"
-            @edit="openEditDialog"
-            @delete="deleteRow"
-          />
         </div>
       </section>
 
@@ -149,7 +124,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type EvalJob,
   type EvalJobStatus,
-  type Provider,
   type ScoreConfig,
   type Scorer,
   type ScorerType,
@@ -160,19 +134,17 @@ import {
   statusOf,
 } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
-import EvalListView from "./onlineEvals/EvalListView.vue";
 import ScoreConfigList from "./onlineEvals/ScoreConfigList.vue";
 import ScorerList from "./onlineEvals/ScorerList.vue";
 import EvalJobList from "./onlineEvals/EvalJobList.vue";
 import ScorerTypeDialog from "./onlineEvals/forms/ScorerTypeDialog.vue";
 import ScoreConfigDialog from "./onlineEvals/forms/ScoreConfigDialog.vue";
-import ProviderFormPage from "./onlineEvals/forms/ProviderFormPage.vue";
 import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 
-type ActiveTab = "jobs" | "scorers" | "scoreConfigs" | "providers";
+type ActiveTab = "jobs" | "scorers" | "scoreConfigs";
 type FullPageEntity = Exclude<ActiveTab, "scoreConfigs">;
-type AnyRow = EvalJob | Scorer | ScoreConfig | Provider;
+type AnyRow = EvalJob | Scorer | ScoreConfig;
 
 const store = useStore();
 const { t } = useI18n();
@@ -206,7 +178,6 @@ const rowsByTab = computed<Record<ActiveTab, AnyRow[]>>(() => ({
   jobs: jobs.value.filter((job) => !jobStatusFilter.value || statusOf(job) === jobStatusFilter.value),
   scorers: scorers.value,
   scoreConfigs: scoreConfigs.value,
-  providers: providers.value,
 }));
 
 const filteredRows = computed(() => {
@@ -225,17 +196,9 @@ const tabs = computed(() => [
   { value: "jobs" as ActiveTab, label: t("onlineEvals.tabs.jobs"), icon: "rule", count: jobs.value.length },
   { value: "scorers" as ActiveTab, label: t("onlineEvals.tabs.scorers"), icon: "grading", count: scorers.value.length },
   { value: "scoreConfigs" as ActiveTab, label: t("onlineEvals.tabs.scoreConfigs"), icon: "fact-check", count: scoreConfigs.value.length },
-  { value: "providers" as ActiveTab, label: t("onlineEvals.tabs.providers"), icon: "hub", count: providers.value.length },
 ]);
 
-const currentTabLabel = computed(
-  () => tabs.value.find((tab) => tab.value === activeTab.value)?.label || "",
-);
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
-const createButtonLabel = computed(() =>
-  t("onlineEvals.newButton", { label: currentSingularLabel.value }),
-);
-const secondaryColumnLabel = computed(() => t(`onlineEvals.secondaryColumn.${activeTab.value}`));
 
 watch(activeTab, () => {
   filterQuery.value = "";
@@ -289,9 +252,7 @@ async function handleSaved() {
 async function deleteRow(row: AnyRow) {
   if (!window.confirm(t("onlineEvals.deletePrompt", { name: row.name }))) return;
   try {
-    if (activeTab.value === "providers")
-      await onlineEvalsService.providers.delete(orgId.value, (row as Provider).id);
-    else if (activeTab.value === "scoreConfigs")
+    if (activeTab.value === "scoreConfigs")
       await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
     else if (activeTab.value === "scorers")
       await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
