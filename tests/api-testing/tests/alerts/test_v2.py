@@ -83,7 +83,11 @@ def _alert_payload(
     folder_id: str,
     template: str,
     destination: str,
-    stream_name: str = "default",
+    # Default to the conftest-managed `stream_pytest_data` — it's the only
+    # stream guaranteed to exist on every server (created by the autouse
+    # ingest_data fixture). Using a literal "default" here would 404 on
+    # fresh CI runners that haven't accumulated state.
+    stream_name: str = "stream_pytest_data",
     enabled: bool = True,
     vrl_function: str | None = None,
     sql: str | None = None,

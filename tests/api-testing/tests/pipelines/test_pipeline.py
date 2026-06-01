@@ -107,7 +107,10 @@ def _scheduled_pipeline_payload(name: str, stream_name: str, schedule_enabled: b
                     "query_condition": {
                         "type": "sql",
                         "conditions": None,
-                        "sql": "select * from default",
+                        # Use stream_pytest_data (conftest-managed) instead of
+                        # literal "default" — that stream doesn't exist on a
+                        # fresh CI runner. OO validates the SQL at create time.
+                        "sql": "select * from stream_pytest_data",
                         "promql": None,
                         "promql_condition": None,
                         "aggregation": None,
