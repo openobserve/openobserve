@@ -50,7 +50,6 @@ the Free Software Foundation, either version 3 of the License, or
             @click="activeTab = tab.value"
           >
             <span>{{ tab.label }}</span>
-            <strong>{{ tab.count }}</strong>
           </button>
         </div>
 
@@ -196,9 +195,9 @@ const filteredRows = computed(() => {
 });
 
 const tabs = computed(() => [
-  { value: "jobs" as ActiveTab, label: t("onlineEvals.tabs.jobs"), count: jobs.value.length },
-  { value: "scorers" as ActiveTab, label: t("onlineEvals.tabs.scorers"), count: scorers.value.length },
-  { value: "scoreConfigs" as ActiveTab, label: t("onlineEvals.tabs.scoreConfigs"), count: scoreConfigs.value.length },
+  { value: "jobs" as ActiveTab, label: t("onlineEvals.tabs.jobs") },
+  { value: "scorers" as ActiveTab, label: t("onlineEvals.tabs.scorers") },
+  { value: "scoreConfigs" as ActiveTab, label: t("onlineEvals.tabs.scoreConfigs") },
 ]);
 
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
@@ -372,14 +371,6 @@ async function deleteRow(row: AnyRow) {
   color: var(--o2-text);
   border-bottom-color: var(--o2-brand);
   margin-bottom: -1px;
-}
-
-.online-evals__tab strong {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--o2-bg-muted);
-  color: var(--o2-text-secondary);
-  font: 700 10px var(--o2-font-mono);
 }
 
 .online-evals__loading {
