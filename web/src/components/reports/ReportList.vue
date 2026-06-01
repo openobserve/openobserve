@@ -50,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('dashboard.searchAcross')
                   : t('reports.search')
               "
-              :clearable="searchAcrossFolders"
               @clear="clearSearch"
             />
 
