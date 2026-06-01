@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="tw:flex tw:min-h-[28px] tw:pt-[0.375rem] tw:shrink-0">
+      <div class="tw:flex tw:min-h-[28px] tw:py-[0.125rem] tw:shrink-0 result-bar">
         <div
           class="tw:w-2/3 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
           v-if="searchObj.data.countErrorMsg != ''"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="queryTook != null && searchObj.meta.logsVisualizeToggle !== 'patterns'"
             class="result-badge result-badge--time"
           >
-            <OIcon name="timer" size="xs" class="tw:mr-0.5 tw:opacity-70" />
+            <OIcon name="timer" size="xs" class="tw:mr-0.5" />
             {{ queryTook }} ms
           </span>
 
@@ -100,27 +100,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isPartialResult && queryScanSize && searchObj.meta.logsVisualizeToggle !== 'patterns'"
             class="result-badge result-badge--scan"
           >
-            Δ {{ scanSizeLabel }} {{ queryScanSize }}
+            {{ isFromCache ? "△ " : "" }}scan {{ queryScanSize }}
           </span>
 
-          <!-- Inspect Button (visible on md+ screens) -->
+          <!-- Inspect Button (hidden when overflow menu is active) -->
           <OButton
-            v-if="showInspectBtn"
-            variant="ghost-primary"
+            v-if="showInspectBtn && !shouldMoveActionsToMenu"
+            variant="outline"
             size="icon"
-            class="analyze-button inspect-button tw:hidden md:tw:inline-flex"
+            class="action-icon-btn"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
             <OIcon name="troubleshoot" size="sm" />
             <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
           </OButton>
-          <!-- Volume Analysis Button (visible on md+ screens) -->
+          <!-- Volume Analysis Button (hidden when overflow menu is active) -->
           <OButton
-            v-if="showAnalyzeBtn"
-            variant="ghost-primary"
+            v-if="showAnalyzeBtn && !shouldMoveActionsToMenu"
+            variant="outline"
             size="icon"
-            class="analyze-button tw:hidden md:tw:inline-flex"
+            class="action-icon-btn"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
@@ -138,16 +138,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw:w-1/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
-          <!-- Overflow menu: Wrap + Inspect + Analyze (visible on small screens, hidden on md+) -->
+          <!-- Overflow menu: Wrap + Inspect + Analyze (shown when screen is too narrow) -->
+          <div
+            v-if="(showWrapBtn || showInspectBtn || showAnalyzeBtn) && shouldMoveActionsToMenu"
+          >
           <ODropdown
-            v-if="showWrapBtn || showInspectBtn || showAnalyzeBtn"
-            class="md:tw:hidden"
             side="bottom"
             align="end"
           >
             <template #trigger>
               <OButton
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 class="wrap-content-btn"
                 data-test="logs-search-actions-overflow-btn"
@@ -190,14 +191,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('volumeInsights.analyzeTooltipLogs') }}
             </ODropdownItem>
           </ODropdown>
+          </div>
 
-          <!-- Wrap Content Button (visible on md+ screens) -->
+          <!-- Wrap Content Button (hidden when overflow menu is active) -->
           <OButton
-            v-if="showWrapBtn"
+            v-if="showWrapBtn && !shouldMoveActionsToMenu"
             data-test="logs-search-result-wrap-table-content-btn"
-            variant="ghost"
+            variant="outline"
             size="icon"
-            class="wrap-content-btn tw:hidden md:tw:flex"
+            class="wrap-content-btn"
             :class="{
               'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
             }"
@@ -1739,6 +1741,11 @@ export default defineComponent({
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
 
+    const resultBarWidth = ref(window.innerWidth);
+    const updateResultBarWidth = () => { resultBarWidth.value = window.innerWidth; };
+    onMounted(() => { window.addEventListener("resize", updateResultBarWidth); });
+    onBeforeUnmount(() => { window.removeEventListener("resize", updateResultBarWidth); });
+
     return {
       t,
       store,
@@ -1823,11 +1830,15 @@ export default defineComponent({
       openCorrelationPanel,
       openCorrelationFromLog,
       openLogDetailsWithCorrelation,
+      resultBarWidth,
     };
   },
   computed: {
     toggleWrapFlag() {
       return this.searchObj.meta.toggleSourceWrap;
+    },
+    shouldMoveActionsToMenu() {
+      return this.resultBarWidth < 900;
     },
     showInspectBtn() {
       return (
@@ -1859,9 +1870,9 @@ export default defineComponent({
       if (size == null || size <= 0) return null;
       return formatSizeFromMB(size);
     },
-    scanSizeLabel() {
+    isFromCache() {
       const ratio = this.searchObj.data.queryResults?.result_cache_ratio;
-      return ratio != null && ratio > 0 ? "ΔScan" : "Scan";
+      return ratio != null && ratio > 0;
     },
     isPartialResult() {
       return !!this.searchObj.loadingCounter;
@@ -1869,44 +1880,45 @@ export default defineComponent({
     displayCountRange() {
       try {
         const results = this.searchObj.data.queryResults;
-        if (!results || (!results.total && !results.hits?.length)) {
-          return this.noOfRecordsTitle || "";
-        }
-        const currentPage =
-          (this.searchObj.data.resultGrid.currentPage - 1) || 0;
-        const startCount =
-          currentPage * this.searchObj.meta.resultGrid.rowsPerPage + 1;
+        // Only compute after a search has run (took is set by the backend response)
+        if (!results || results.took == null) return "";
+
         let totalCount = Math.max(
           results.hits?.length || 0,
           results.total || 0,
         );
-        let endCount: number;
 
         if (!this.searchObj.meta.resultGrid.showPagination) {
-          endCount = results.hits?.length || 0;
-          totalCount = endCount;
-        } else {
-          endCount =
-            this.searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
-          const paginLen =
-            this.searchObj.communicationMethod === "streaming" ||
-            this.searchObj.meta.jobId != ""
-              ? results.pagination?.length || 0
-              : results.partitionDetail?.paginations?.length || 0;
-          if (currentPage >= paginLen - 1) {
-            endCount = Math.min(
-              startCount + this.searchObj.meta.resultGrid.rowsPerPage - 1,
-              totalCount,
-            );
-          }
+          const count = results.hits?.length || 0;
+          return `${count.toLocaleString()} events`;
+        }
+
+        const currentPage =
+          (this.searchObj.data.resultGrid.currentPage - 1) || 0;
+        const startCount =
+          currentPage * this.searchObj.meta.resultGrid.rowsPerPage + 1;
+
+        let endCount: number =
+          this.searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+        const paginLen =
+          this.searchObj.communicationMethod === "streaming" ||
+          this.searchObj.meta.jobId != ""
+            ? results.pagination?.length || 0
+            : results.partitionDetail?.paginations?.length || 0;
+        if (currentPage >= paginLen - 1) {
+          endCount = Math.min(
+            startCount + this.searchObj.meta.resultGrid.rowsPerPage - 1,
+            totalCount,
+          );
         }
 
         if (isNaN(totalCount)) totalCount = 0;
         if (isNaN(endCount)) endCount = 0;
 
+        if (totalCount === 0) return "0 events";
         return `${startCount}–${endCount} of ${totalCount.toLocaleString()} events`;
       } catch {
-        return this.noOfRecordsTitle || "";
+        return "";
       }
     },
     findFTSFields() {

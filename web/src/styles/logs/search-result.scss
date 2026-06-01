@@ -2,11 +2,28 @@
   width: 170px;
 }
 
+// Result info bar — same background as query editor footer
+.result-bar {
+  background: var(--o2-section-header-bg);
+  border-bottom: 1px solid var(--o2-border-color);
+}
+
+// Shared style for inline action icon buttons (Inspect, Analyze)
+.action-icon-btn {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  width: 1.45rem !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 // Result info bar — count text and metric badges
 .result-count-text {
   font-size: var(--text-sm);
-  color: var(--o2-text-body);
-  font-weight: 500;
+  color: var(--o2-text-heading);
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -14,8 +31,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.1875rem;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
   font-size: var(--text-xs);
   font-weight: 500;
   white-space: nowrap;
@@ -91,34 +108,15 @@
   .wrap-content-btn {
     height: 1.5rem !important;
     min-height: 1.5rem !important;
-    width: 1.45rem !important; // Square button
+    width: 1.45rem !important;
     padding: 0 !important;
-    border: 0.0626rem solid var(--o2-border-color) !important;
-    border-radius: 0.25rem !important; // 4px - match select-pagination
-    transition: all 0.2s ease;
-    margin: 0; // flex parent handles alignment
-    background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
-    backdrop-filter: blur(10px) !important;
+    margin: 0;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
 
-    &:hover {
-      background: rgba(255, 255, 255, 0.15) !important;
-    }
-
-    &--active {
-      background: var(--q-primary) !important;
-      color: white;
-
-      &:hover {
-        background: var(--q-primary) !important;
-        opacity: 0.85;
-      }
-    }
-
     :deep(.q-icon) {
-      font-size: 0.75rem !important; // Match select-pagination icon size
+      font-size: 0.75rem !important;
     }
 
     :deep(.q-btn__content) {
