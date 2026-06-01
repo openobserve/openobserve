@@ -74,22 +74,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedOrganization && activeType == 'table'"
               class="tw:flex tw:items-center"
             >
-              <OInput
+              <OSearchInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
                 style="width: 200px"
-                :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                 :placeholder="
                   {
                     'api-limits': t('quota.api-search'),
                     'role-limits': t('quota.role-search'),
                   }[activeTab]
                 "
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
-                </template>
-              </OInput>
+              />
               <OSelect
                 v-if="activeTab == 'role-limits'"
                 :loading="isApiCategoryLoading"
@@ -370,7 +365,7 @@ import {
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -393,7 +388,7 @@ export default defineComponent({
     NoOrganizationSelected,
     OButton,
     OSelect,
-    OInput,
+    OSearchInput,
     AppTabs,
     ConfirmDialog,
     QueryEditor: defineAsyncComponent(

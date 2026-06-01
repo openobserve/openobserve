@@ -27,16 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alert_destinations.header") }}
           </div>
           <div class="tw:flex tw:justify-end tw:gap-2">
-            <OInput
+            <OSearchInput
               v-model="filterQuery"
               data-test="destination-list-search-input"
-              class="tw:h-[36px] tw:w-[200px] no-border o2-search-input"
+              class="tw:h-[36px] tw:w-[200px]"
               :placeholder="t('alert_destinations.search')"
-            >
-              <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-            </OInput>
+            />
             <OButton
               variant="outline"
               size="sm"
@@ -240,7 +236,7 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OBadge from '@/lib/core/Badge/OBadge.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -260,7 +256,7 @@ export default defineComponent({
     ConfirmDialog,
     ImportDestination,
     OButton,
-    OInput,
+    OSearchInput,
     OCheckbox,
     OBadge,
     OTable,

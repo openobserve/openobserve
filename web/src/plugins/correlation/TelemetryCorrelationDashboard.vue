@@ -168,15 +168,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                   >
-                    <OInput
+                    <OSearchInput
                       v-model="metricSearchText"
                       :placeholder="t('search.searchField')"
                       clearable
-                    >
-                      <template #icon-left>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                    </OInput>
+                    />
                   </div>
 
                 <!-- Grouped metric list -->
@@ -635,15 +631,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
             >
-              <OInput
+              <OSearchInput
                 v-model="metricSearchText"
                 :placeholder="t('search.searchField')"
                 clearable
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
+              />
             </div>
 
               <!-- Grouped metric list -->
@@ -1011,16 +1003,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Metric Stream Selector Dialog -->
   <ODialog data-test="telemetry-correlation-dashboard-metric-selector-dialog" v-model:open="showMetricSelector" size="md" :title="t('correlation.selectMetrics')">
     <!-- Search Input -->
-    <OInput
+    <OSearchInput
       v-model="metricSearchText"
       :placeholder="t('search.searchField')"
       clearable
       class="tw:w-full tw:mb-3"
-    >
-      <template #icon-left>
-        <OIcon name="search" size="sm" />
-      </template>
-    </OInput>
+    />
 
     <div class="metric-list-container">
       <template
@@ -1146,7 +1134,7 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";

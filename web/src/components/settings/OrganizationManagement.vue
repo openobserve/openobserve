@@ -21,16 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xl tw:tracking-[0.005em]" data-test="org-management-list-title">
           {{ t("settings.organizationManagement") }}
         </div>
-        <OInput
+        <OSearchInput
           data-test="org-management-search-input"
           v-model="filterQuery"
           class="tw:ml-auto no-border o2-search-input"
           :placeholder="t('settings.searchOrgs')"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="sm" />
-          </template>
-        </OInput>
+        />
       </div>
       <OTable
         data-test="org-management-list-table"
@@ -193,8 +189,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -211,7 +207,7 @@ export default defineComponent({
     ODialog,
     OTooltip,
     OInput,
-    OIcon,
+    OSearchInput,
     OTable,
   },
   setup() {

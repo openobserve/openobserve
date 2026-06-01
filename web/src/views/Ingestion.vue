@@ -35,17 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("ingestion.redirectionIngestionMsg") }}
           </span>
           <div class="tw:w-50 tw:flex-none">
-            <OInput
+            <OSearchInput
               v-model="globalSearchQuery"
               :placeholder="t('common.search')"
               clearable
               class="tw:w-full indexlist-search-input"
               data-test="recommended-list-search-input"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" class="tw:cursor-pointer" />
-              </template>
-            </OInput>
+            />
           </div>
           <!-- Token selector dropdown -->
           <OSelect
@@ -229,8 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -257,8 +252,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, OTabs, ORouteTab, OButton, OInput,
-    OIcon, OSelect,
+  components: { ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
+    OSelect,
 },
   setup() {
     const { t } = useI18n();

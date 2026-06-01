@@ -83,18 +83,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-wrap"
       >
-        <OInput
+        <OSearchInput
           v-model="searchText"
           :placeholder="t('traces.sessionDetail.searchPlaceholder')"
           clearable
           :debounce="200"
-          size="sm"
+          size="xs"
           class="no-border tw:w-[18rem]! tw:h-[36px]"
-        >
-          <template #icon-left>
-            <OIcon class="o2-search-input-icon" size="xs" name="search" />
-          </template>
-        </OInput>
+        />
         <OSelect
           v-model="statusFilter"
           :options="statusOptions"
@@ -602,7 +598,7 @@ import {
 } from "./composables/useSessions";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

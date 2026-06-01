@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Search input -->
-            <OInput
+            <OSearchInput
               data-test="report-list-search-input"
               v-model="dynamicQueryModel"
               class="tw:ml-auto no-border o2-search-input tw:w-[150px]"
@@ -52,11 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :clearable="searchAcrossFolders"
               @clear="clearSearch"
-            >
-              <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-            </OInput>
+            />
 
             <!-- All Folders toggle -->
             <div class="tw:ml-2 tw:whitespace-nowrap">
@@ -296,11 +292,10 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";

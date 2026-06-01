@@ -1312,18 +1312,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #top>
                   <div class="tw:px-2 tw:py-2 tw:w-full tw:min-w-0 tw:box-border">
-                    <OInput
+                    <OSearchInput
                       data-test="log-search-saved-view-field-search-input"
                       v-model="searchObj.data.savedViewFilterFields"
                       clearable
                       :debounce="300"
                       class="tw:w-full"
                       :placeholder="t('search.searchSavedView')"
-                    >
-                      <template #icon-left>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                    </OInput>
+                    />
                   </div>
                   <div
                     v-if="searchObj.loadingSavedView == true"
@@ -1587,6 +1583,7 @@ import {
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1676,6 +1673,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OInput,
+    OSearchInput,
     OSelect,
     OSwitch,
     OTree,

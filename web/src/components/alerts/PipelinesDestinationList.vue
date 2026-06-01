@@ -27,15 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("pipeline_destinations.header") }}
         </div>
         <div class="tw:flex tw:justify-end tw:gap-2">
-          <OInput
+          <OSearchInput
             v-model="filterQuery"
-            class="tw:ml-auto no-border o2-search-input"
+            class="tw:ml-auto"
             :placeholder="t('pipeline_destinations.search')"
-          >
-            <template #icon-left>
-              <OIcon class="o2-search-input-icon" name="search" size="sm" />
-            </template>
-          </OInput>
+          />
           <OButton
             data-test="pipeline-destination-list-add-btn"
             variant="primary"
@@ -168,7 +164,7 @@ import type { Template } from "@/ts/interfaces/index";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -193,7 +189,7 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     OIcon,
-    OInput,
+    OSearchInput,
     OTable,
   },
   setup() {
