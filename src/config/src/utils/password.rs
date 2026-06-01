@@ -34,7 +34,7 @@ pub const PASSWORD_POLICY_HINT: &str = "Password must be 8-128 characters and co
 /// Returns the policy hint on failure so callers can surface a uniform message.
 pub fn validate_password_strength(password: &str) -> Result<(), &'static str> {
     let len = password.chars().count();
-    if len < MIN_PASSWORD_LEN || len > MAX_PASSWORD_LEN {
+    if !(MIN_PASSWORD_LEN..=MAX_PASSWORD_LEN).contains(&len) {
         return Err(PASSWORD_POLICY_HINT);
     }
 
