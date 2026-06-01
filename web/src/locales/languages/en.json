@@ -486,6 +486,7 @@
     "loadingMsg": "Hold on tight, we're loading RUM data.",
     "breadcrumbs": "Breadcrumbs",
     "tags": "Tags",
+    "traces": "Traces",
     "searchEvents": "Search Events",
     "loadingSessions": "Hold on tight, we're fetching sessions.",
     "errorStack": "Error Stack",
@@ -497,7 +498,14 @@
     "getStartedRUM": "Get started with Real User Monitoring",
     "loadingErrorDetails": "Hold on tight, we're fetching error details.",
     "eventID": "Event ID",
-    "loadingApplicationErrors": "Hold on tight, we're fetching application errors."
+    "loadingApplicationErrors": "Hold on tight, we're fetching application errors.",
+    "noCorrelatedTraces": "No correlated traces found for this session.",
+    "viewTraceDetails": "View Trace Details",
+    "routeChange": "Route",
+    "initialView": "Initial",
+    "failedToFetchTraces": "Failed to fetch trace data. Please try again.",
+    "traceNotFound": "Trace details not found.",
+    "failedToFetchTraceDetails": "Failed to load trace details. Please try again."
   },
   "about": {
     "name": "OpenObserve",

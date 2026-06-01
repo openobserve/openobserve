@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="events-container relative-position">
+  <div class="events-container relative-position tw:h-full tw:flex tw:flex-col">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b tw:px-2 tw:py-2" />
     <template v-if="activeTab === 'tags'">
       <div
@@ -45,6 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+    </template>
+    <template v-else-if="activeTab === 'traces'">
+      <PlayerTracesTab
+        :session-id="sessionId"
+        :current-time="currentTime"
+      />
     </template>
     <template v-else>
       <div
@@ -130,6 +136,7 @@ import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import PlayerTracesTab from "./PlayerTracesTab.vue";
 
 const { t } = useI18n();
 
@@ -141,6 +148,14 @@ const props = defineProps({
   sessionDetails: {
     type: Object,
     required: true,
+  },
+  sessionId: {
+    type: String,
+    default: "",
+  },
+  currentTime: {
+    type: Number,
+    default: 0,
   },
 });
 
@@ -160,6 +175,12 @@ const tabs = [
     label: t("rum.tags"),
     value: "tags",
     icon: "tag",
+    style: { width: "fit-content", padding: "0.5rem 0.625rem" },
+  },
+  {
+    label: t("rum.traces"),
+    value: "traces",
+    icon: "timeline",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];
@@ -239,7 +260,6 @@ const handleEventClick = (event: any) => {
 
 .events-container {
   width: calc(100% - 1px);
-  height: calc(100vh - 3.5625rem);
   overflow: hidden;
 }
 
