@@ -33,10 +33,10 @@
               </OInput>
 
               <OSelect
-                v-model="statusFilterModel"
+                v-model="statusFilter"
                 :options="statusOptions"
                 :placeholder="t('onlineEvals.job.allStatuses')"
-                size="sm"
+                size="md"
                 class="tw:ml-2 tw:w-[150px]"
                 data-test="eval-job-list-status-filter"
               />
@@ -46,8 +46,7 @@
                 class="tw:ml-2"
                 variant="primary"
                 size="sm"
-                icon-left="add"
-                @click="$emit('create')"
+                  @click="$emit('create')"
               >
                 {{ t("onlineEvals.job.newButton") }}
               </OButton>
@@ -63,6 +62,8 @@
             :data="filteredRows"
             :columns="columns"
             row-key="id"
+            :loading="loading"
+            :footer-title="t('onlineEvals.job.listTitle')"
             :global-filter="searchModel"
             :show-global-filter="false"
             :page-size="20"
@@ -126,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -140,36 +141,29 @@ import type {
 import { statusOf, valueOf } from "./utils/evalEntity";
 import EvalJobEmptyState from "./EvalJobEmptyState.vue";
 
-type StatusFilter = "" | EvalJobStatus;
-
 const props = defineProps<{
   rows: EvalJob[];
   search: string;
-  statusFilter?: StatusFilter;
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "update:search", value: string): void;
-  (e: "update:statusFilter", value: StatusFilter): void;
   (e: "create"): void;
   (e: "edit", row: EvalJob): void;
   (e: "delete", row: EvalJob): void;
 }>();
 
 const { t } = useI18n();
+const statusFilter = ref<EvalJobStatus | null>(null);
 
 const searchModel = computed({
   get: () => props.search,
   set: (v: string) => emit("update:search", v),
 });
 
-const statusFilterModel = computed({
-  get: () => (props.statusFilter ?? "") as StatusFilter,
-  set: (v: any) => emit("update:statusFilter", (v ?? "") as StatusFilter),
-});
-
 const statusOptions = computed(() => [
-  { label: t("onlineEvals.job.allStatuses"), value: "" },
+  { label: t("onlineEvals.job.allStatuses"), value: null },
   { label: t("onlineEvals.jobStatus.draft"), value: "draft" },
   { label: t("onlineEvals.jobStatus.active"), value: "active" },
   { label: t("onlineEvals.jobStatus.paused"), value: "paused" },
@@ -178,6 +172,14 @@ const statusOptions = computed(() => [
 ]);
 
 const columns = computed(() => [
+  {
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    sortable: false,
+    size: 56,
+    meta: { align: "left" },
+  },
   {
     id: "name",
     header: t("onlineEvals.job.columns.name"),
@@ -243,12 +245,21 @@ const columns = computed(() => [
 ]);
 
 const filteredRows = computed(() => {
-  if (!statusFilterModel.value) return props.rows;
-  return props.rows.filter((row) => statusOf(row) === statusFilterModel.value);
+  const rows = statusFilter.value
+    ? props.rows.filter((row) => statusOf(row) === statusFilter.value)
+    : props.rows;
+  return rows.map((row, index) => ({
+    ...row,
+    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
+  }));
 });
 
 const showEmptyState = computed(
-  () => props.rows.length === 0 && !searchModel.value && !statusFilterModel.value,
+  () =>
+    !props.loading &&
+    props.rows.length === 0 &&
+    !searchModel.value &&
+    !statusFilter.value,
 );
 
 function statusLabel(status: EvalJobStatus) {

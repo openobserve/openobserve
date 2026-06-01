@@ -38,7 +38,6 @@
       data-test="llm-providers-empty-create-btn"
       variant="primary"
       size="md"
-      icon-left="add"
       class="lp-empty__btn"
       @click="$emit('create')"
     >

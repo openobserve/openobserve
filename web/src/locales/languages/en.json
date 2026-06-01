@@ -4147,6 +4147,11 @@
       "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
       "useAsDefault": "Use as default provider",
       "authConfigLabel": "Auth config JSON",
+      "authConfigHelp": "Credentials are encrypted at rest and cannot be read back after saving.",
+      "authSection": "Authentication",
+      "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
+      "cannotRename": "Cannot be renamed after creation.",
+      "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
       "saveError": "Failed to save provider"
     },
     "scoreConfig": {

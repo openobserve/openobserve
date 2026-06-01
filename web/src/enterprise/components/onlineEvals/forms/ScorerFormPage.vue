@@ -62,11 +62,13 @@
             <label class="scorer-field__label">
               {{ t("onlineEvals.scorer.nameLabel") }}
               <span class="scorer-field__req">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="scorer-field__lock" />
             </label>
             <OInput
               v-model.trim="form.name"
               :placeholder="t('onlineEvals.scorer.namePlaceholder')"
               size="sm"
+              :disabled="mode === 'edit'"
               data-test="scorer-form-name-input"
             />
             <div class="scorer-field__help">{{ t("onlineEvals.scorer.nameHelp") }}</div>
@@ -90,12 +92,14 @@
             <label class="scorer-field__label">
               {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
               <span class="scorer-field__req">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="scorer-field__lock" />
             </label>
             <OSelect
               v-model="form.producesScoreConfigId"
               :options="scoreConfigOptions"
               :placeholder="t('onlineEvals.scorer.producesScoreConfigNone')"
-              size="sm"
+              size="md"
+              :disabled="mode === 'edit'"
               data-test="scorer-form-score-config-select"
               @update:modelValue="handleScoreConfigSelection"
             />
@@ -152,7 +156,7 @@
               v-model="form.providerId"
               :options="providerOptions"
               :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-              size="sm"
+              size="md"
               data-test="scorer-form-provider-select"
             />
 
@@ -764,6 +768,11 @@ async function save() {
 .scorer-field__req {
   color: var(--o2-status-error-text);
   margin-left: 2px;
+}
+
+.scorer-field__lock {
+  margin-left: 6px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .scorer-field__help {

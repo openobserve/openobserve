@@ -33,10 +33,10 @@
               </OInput>
 
               <OSelect
-                v-model="typeFilterModel"
+                v-model="typeFilter"
                 :options="typeOptions"
                 :placeholder="t('onlineEvals.scorer.allTypes')"
-                size="sm"
+                size="md"
                 class="tw:ml-2 tw:w-[150px]"
                 data-test="scorer-list-type-filter"
               />
@@ -46,8 +46,7 @@
                 class="tw:ml-2"
                 variant="primary"
                 size="sm"
-                icon-left="add"
-                @click="$emit('create')"
+                  @click="$emit('create')"
               >
                 {{ t("onlineEvals.scorer.newButton") }}
               </OButton>
@@ -63,6 +62,8 @@
             :data="filteredRows"
             :columns="columns"
             row-key="id"
+            :loading="loading"
+            :footer-title="t('onlineEvals.scorer.listTitle')"
             :global-filter="searchModel"
             :show-global-filter="false"
             :page-size="20"
@@ -125,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -141,43 +142,44 @@ import type {
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import ScorerEmptyState from "./ScorerEmptyState.vue";
 
-type TypeFilter = "" | ScorerType;
-
 const props = defineProps<{
   rows: Scorer[];
   jobs: EvalJob[];
   scoreConfigs: ScoreConfig[];
   search: string;
-  typeFilter?: TypeFilter;
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "update:search", value: string): void;
-  (e: "update:typeFilter", value: TypeFilter): void;
   (e: "create"): void;
   (e: "edit", row: Scorer): void;
   (e: "delete", row: Scorer): void;
 }>();
 
 const { t } = useI18n();
+const typeFilter = ref<ScorerType | null>(null);
 
 const searchModel = computed({
   get: () => props.search,
   set: (v: string) => emit("update:search", v),
 });
 
-const typeFilterModel = computed({
-  get: () => (props.typeFilter ?? "") as TypeFilter,
-  set: (v: any) => emit("update:typeFilter", (v ?? "") as TypeFilter),
-});
-
 const typeOptions = computed(() => [
-  { label: t("onlineEvals.scorer.allTypes"), value: "" },
+  { label: t("onlineEvals.scorer.allTypes"), value: null },
   { label: t("onlineEvals.scorer.badgeLlm"), value: "llm_judge" },
   { label: t("onlineEvals.scorer.badgeRemote"), value: "remote" },
 ]);
 
 const columns = computed(() => [
+  {
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    sortable: false,
+    size: 56,
+    meta: { align: "left" },
+  },
   {
     id: "name",
     header: t("onlineEvals.scorer.columns.name"),
@@ -243,12 +245,21 @@ const columns = computed(() => [
 ]);
 
 const filteredRows = computed(() => {
-  if (!typeFilterModel.value) return props.rows;
-  return props.rows.filter((row) => scorerTypeOf(row) === typeFilterModel.value);
+  const rows = typeFilter.value
+    ? props.rows.filter((row) => scorerTypeOf(row) === typeFilter.value)
+    : props.rows;
+  return rows.map((row, index) => ({
+    ...row,
+    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
+  }));
 });
 
 const showEmptyState = computed(
-  () => props.rows.length === 0 && !searchModel.value && !typeFilterModel.value,
+  () =>
+    !props.loading &&
+    props.rows.length === 0 &&
+    !searchModel.value &&
+    !typeFilter.value,
 );
 
 function scorerTypeLabel(type: ScorerType) {

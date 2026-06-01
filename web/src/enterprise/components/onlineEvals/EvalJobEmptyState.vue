@@ -47,7 +47,6 @@
       data-test="eval-job-empty-create-btn"
       variant="primary"
       size="md"
-      icon-left="add"
       class="ej-empty__btn"
       @click="$emit('create')"
     >

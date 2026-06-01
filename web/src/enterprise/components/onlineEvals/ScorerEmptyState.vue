@@ -40,7 +40,6 @@
       data-test="scorer-empty-create-btn"
       variant="primary"
       size="md"
-      icon-left="add"
       class="sr-empty__btn"
       @click="$emit('create')"
     >

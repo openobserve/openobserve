@@ -55,17 +55,13 @@ the Free Software Foundation, either version 3 of the License, or
           </button>
         </div>
 
-        <div v-if="isLoading" class="online-evals__loading">
-          <OSpinner size="lg" />
-          <span>{{ t("onlineEvals.loading") }}</span>
-        </div>
-
-        <div v-else class="online-evals__body">
+        <div class="online-evals__body">
           <ScoreConfigList
             v-if="activeTab === 'scoreConfigs'"
             :rows="(filteredRows as ScoreConfig[])"
             :scorers="scorers"
             :search="filterQuery"
+            :loading="isLoading"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @edit="(row) => openEditDialog(row)"
@@ -77,6 +73,7 @@ the Free Software Foundation, either version 3 of the License, or
             :jobs="jobs"
             :score-configs="scoreConfigs"
             :search="filterQuery"
+            :loading="isLoading"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @edit="(row: Scorer) => openEditDialog(row)"
@@ -86,9 +83,8 @@ the Free Software Foundation, either version 3 of the License, or
             v-else-if="activeTab === 'jobs'"
             :rows="(filteredRows as EvalJob[])"
             :search="filterQuery"
-            :status-filter="jobStatusFilter"
+            :loading="isLoading"
             @update:search="filterQuery = $event"
-            @update:statusFilter="jobStatusFilter = $event"
             @create="openCreateDialog"
             @edit="(row: EvalJob) => openEditDialog(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
@@ -116,14 +112,13 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type EvalJob,
-  type EvalJobStatus,
   type ScoreConfig,
   type Scorer,
   type ScorerType,
@@ -147,12 +142,22 @@ type FullPageEntity = Exclude<ActiveTab, "scoreConfigs">;
 type AnyRow = EvalJob | Scorer | ScoreConfig;
 
 const store = useStore();
+const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const activeTab = ref<ActiveTab>("jobs");
+const VALID_TABS: ActiveTab[] = ["jobs", "scorers", "scoreConfigs"];
+
+function parseTabFromRoute(value: unknown): ActiveTab {
+  if (typeof value === "string" && (VALID_TABS as string[]).includes(value)) {
+    return value as ActiveTab;
+  }
+  return "jobs";
+}
+
+const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
 const filterQuery = ref("");
-const jobStatusFilter = ref<EvalJobStatus | "">("");
 const scorerTypeDialog = ref(false);
 const pendingScorerType = ref<ScorerType>("llm_judge");
 const formPage = ref<{ entity: FullPageEntity; mode: "create" | "edit" } | null>(null);
@@ -175,7 +180,7 @@ const {
 } = useOnlineEvalsData();
 
 const rowsByTab = computed<Record<ActiveTab, AnyRow[]>>(() => ({
-  jobs: jobs.value.filter((job) => !jobStatusFilter.value || statusOf(job) === jobStatusFilter.value),
+  jobs: jobs.value,
   scorers: scorers.value,
   scoreConfigs: scoreConfigs.value,
 }));
@@ -200,9 +205,21 @@ const tabs = computed(() => [
 
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
 
-watch(activeTab, () => {
+watch(activeTab, (next) => {
   filterQuery.value = "";
+  if (route.query.tab !== next) {
+    router.replace({ query: { ...route.query, tab: next } }).catch(() => {});
+  }
 });
+
+// React to back/forward navigation that changes ?tab=…
+watch(
+  () => route.query.tab,
+  (next) => {
+    const parsed = parseTabFromRoute(next);
+    if (parsed !== activeTab.value) activeTab.value = parsed;
+  },
+);
 
 onBeforeMount(() => loadAll(orgId.value));
 

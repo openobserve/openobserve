@@ -51,11 +51,13 @@
             <label class="job-field__label">
               {{ t("onlineEvals.job.nameLabel") }}
               <span class="job-field__req">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
             </label>
             <OInput
               v-model.trim="form.name"
               :placeholder="t('onlineEvals.job.namePlaceholder')"
               size="sm"
+              :disabled="mode === 'edit'"
               data-test="job-form-name-input"
             />
             <div class="job-field__help">{{ t("onlineEvals.job.nameHelp") }}</div>
@@ -71,7 +73,7 @@
               v-model="form.stream"
               :options="streamOptions"
               :placeholder="t('onlineEvals.job.streamPlaceholder')"
-              size="sm"
+              size="md"
               :disabled="mode === 'edit'"
               data-test="job-form-stream-select"
             />
@@ -157,7 +159,7 @@
               <OSelect
                 v-model="form.samplingMode"
                 :options="samplingModeOptions"
-                size="sm"
+                size="md"
                 data-test="job-form-sampling-mode-select"
               />
               <div class="job-field__help">{{ t("onlineEvals.job.samplingHelp") }}</div>

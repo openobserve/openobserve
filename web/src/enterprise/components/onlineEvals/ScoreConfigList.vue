@@ -33,10 +33,10 @@
               </OInput>
 
               <OSelect
-                v-model="typeFilterModel"
+                v-model="typeFilter"
                 :options="typeOptions"
                 :placeholder="t('onlineEvals.scoreConfig.allTypes')"
-                size="sm"
+                size="md"
                 class="tw:ml-2 tw:w-[140px]"
                 data-test="score-config-list-type-filter"
               />
@@ -46,8 +46,7 @@
                 class="tw:ml-2"
                 variant="primary"
                 size="sm"
-                icon-left="add"
-                @click="$emit('create')"
+                  @click="$emit('create')"
               >
                 {{ t("onlineEvals.scoreConfig.newButton") }}
               </OButton>
@@ -63,6 +62,8 @@
           :data="filteredRows"
           :columns="columns"
           row-key="id"
+          :loading="loading"
+          :footer-title="t('onlineEvals.scoreConfig.listTitle')"
           :global-filter="searchModel"
           :show-global-filter="false"
           :page-size="20"
@@ -128,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -139,43 +140,46 @@ import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import ScoreConfigEmptyState from "./ScoreConfigEmptyState.vue";
 
-type TypeFilter = "" | "numeric" | "categorical" | "boolean";
+type DataType = "numeric" | "categorical" | "boolean";
 
 const props = defineProps<{
   rows: ScoreConfig[];
   scorers: Scorer[];
   search: string;
-  typeFilter?: TypeFilter;
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "update:search", value: string): void;
-  (e: "update:typeFilter", value: TypeFilter): void;
   (e: "create"): void;
   (e: "edit", row: ScoreConfig): void;
   (e: "delete", row: ScoreConfig): void;
 }>();
 
 const { t } = useI18n();
+const typeFilter = ref<DataType | null>(null);
 
 const searchModel = computed({
   get: () => props.search,
   set: (v: string) => emit("update:search", v),
 });
 
-const typeFilterModel = computed({
-  get: () => (props.typeFilter ?? "") as TypeFilter,
-  set: (v: any) => emit("update:typeFilter", (v ?? "") as TypeFilter),
-});
-
 const typeOptions = computed(() => [
-  { label: t("onlineEvals.scoreConfig.allTypes"), value: "" },
+  { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
   { label: t("onlineEvals.scoreConfig.dataTypes.numeric"), value: "numeric" },
   { label: t("onlineEvals.scoreConfig.dataTypes.categorical"), value: "categorical" },
   { label: t("onlineEvals.scoreConfig.dataTypes.boolean"), value: "boolean" },
 ]);
 
 const columns = computed(() => [
+  {
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    sortable: false,
+    size: 56,
+    meta: { align: "left" },
+  },
   {
     id: "name",
     header: t("onlineEvals.scoreConfig.columns.name"),
@@ -242,12 +246,21 @@ const columns = computed(() => [
 ]);
 
 const filteredRows = computed(() => {
-  if (!typeFilterModel.value) return props.rows;
-  return props.rows.filter((row) => dataTypeOf(row) === typeFilterModel.value);
+  const rows = typeFilter.value
+    ? props.rows.filter((row) => dataTypeOf(row) === typeFilter.value)
+    : props.rows;
+  return rows.map((row, index) => ({
+    ...row,
+    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
+  }));
 });
 
 const showEmptyState = computed(
-  () => props.rows.length === 0 && !searchModel.value && !typeFilterModel.value,
+  () =>
+    !props.loading &&
+    props.rows.length === 0 &&
+    !searchModel.value &&
+    !typeFilter.value,
 );
 
 function rowCreated(row: ScoreConfig) {

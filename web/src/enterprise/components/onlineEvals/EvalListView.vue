@@ -34,7 +34,7 @@
         >
           {{ t("onlineEvals.refresh") }}
         </OButton>
-        <OButton icon-left="add" size="sm" @click="$emit('create')">
+        <OButton size="sm" @click="$emit('create')">
           {{ createButtonLabel }}
         </OButton>
       </div>

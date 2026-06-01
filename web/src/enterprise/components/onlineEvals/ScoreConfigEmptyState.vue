@@ -40,7 +40,6 @@
       data-test="score-config-empty-create-btn"
       variant="primary"
       size="md"
-      icon-left="add"
       class="sc-empty__btn"
       @click="$emit('create')"
     >

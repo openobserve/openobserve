@@ -43,8 +43,7 @@
             data-test="llm-providers-add-btn"
             variant="primary"
             size="sm"
-            icon-left="add"
-            @click="openCreate"
+                  @click="openCreate"
           >
             {{ t("llmProviders.newButton") }}
           </OButton>
@@ -68,6 +67,8 @@
           :data="filteredProviders"
           :columns="columns"
           row-key="id"
+          :loading="isLoading"
+          :footer-title="t('llmProviders.title')"
           :global-filter="searchQuery"
           :show-global-filter="false"
           :page-size="20"
@@ -158,6 +159,14 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
 const columns = computed(() => [
   {
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    sortable: false,
+    size: 56,
+    meta: { align: "left" },
+  },
+  {
     id: "name",
     header: t("llmProviders.columns.name"),
     accessorKey: "name",
@@ -209,12 +218,17 @@ const columns = computed(() => [
 
 const filteredProviders = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  if (!query) return providers.value;
-  return providers.value.filter((p) =>
-    [p.name, providerTypeOf(p), p.endpoint]
-      .filter(Boolean)
-      .some((v) => String(v).toLowerCase().includes(query)),
-  );
+  const filtered = !query
+    ? providers.value
+    : providers.value.filter((p) =>
+        [p.name, providerTypeOf(p), p.endpoint]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(query)),
+      );
+  return filtered.map((row, index) => ({
+    ...row,
+    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
+  }));
 });
 
 onBeforeMount(() => {
