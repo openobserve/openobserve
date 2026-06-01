@@ -1174,7 +1174,7 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_PRINT_KEY_EVENT", default = false)]
     pub print_key_event: bool,
-    #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
+    #[env_config(name = "ZO_PRINT_KEY_SQL", default = true)]
     pub print_key_sql: bool,
     // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]

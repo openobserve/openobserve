@@ -157,8 +157,6 @@ pub async fn validate_token(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_validate_name_rejects_empty() {
         let name = "";
