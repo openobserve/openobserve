@@ -9,7 +9,7 @@
         "end": 1780316205000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "sorter_model",
           "throughput_rate",
@@ -28,7 +28,7 @@
         "end": 1780316265000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "throughput_rate",
@@ -47,7 +47,7 @@
         "end": 1780316325000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "facility_zone",
           "load_factor",
@@ -66,7 +66,7 @@
         "end": 1780316385000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "throughput_rate",
@@ -104,7 +104,7 @@
         "end": 1780316505000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "operation_mode",
@@ -124,7 +124,7 @@
         "end": 1780316565000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "load_factor",
@@ -143,7 +143,7 @@
         "end": 1780316625000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -167,7 +167,7 @@
         "end": 1780316685000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "control_center",
@@ -188,7 +188,7 @@
         "end": 1780316745000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "sorter_model",
@@ -210,7 +210,7 @@
         "end": 1780316805000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 8,
         "columns": [
           "facility_zone",
           "operation_mode",
@@ -231,7 +231,7 @@
         "end": 1780316865000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "conveyor_lane",
@@ -252,7 +252,7 @@
         "end": 1780316925000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -274,7 +274,7 @@
         "end": 1780316985000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "facility_zone",
@@ -296,7 +296,7 @@
         "end": 1780317045000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "control_center",
@@ -318,7 +318,7 @@
         "end": 1780317105000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -339,7 +339,7 @@
         "end": 1780317165000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -360,7 +360,7 @@
         "end": 1780317225000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "facility_zone",
@@ -383,7 +383,7 @@
         "end": 1780317285000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "conveyor_lane",
@@ -403,7 +403,7 @@
         "end": 1780317345000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 25,
         "columns": [
           "facility_zone",
           "sorter_model",
@@ -425,7 +425,7 @@
         "end": 1780317405000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 19,
         "columns": [
           "_timestamp",
           "pallet_id",

@@ -9,7 +9,7 @@
         "end": 1780309365000000
       },
       "expected": {
-        "row_count": 4,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -29,7 +29,7 @@
         "end": 1780309425000000
       },
       "expected": {
-        "row_count": 2,
+        "row_count": 4,
         "columns": [
           "_timestamp",
           "log",
@@ -64,7 +64,7 @@
         "end": 1780309485000000
       },
       "expected": {
-        "row_count": 6,
+        "row_count": 15,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -87,7 +87,7 @@
         "end": 1780309545000000
       },
       "expected": {
-        "row_count": 8,
+        "row_count": 5,
         "columns": [
           "sorter_model",
           "operation_mode",
@@ -106,7 +106,7 @@
         "end": 1780309605000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -128,7 +128,7 @@
         "end": 1780309665000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 20,
         "columns": [
           "_timestamp",
           "log",
@@ -149,7 +149,7 @@
         "end": 1780309725000000
       },
       "expected": {
-        "row_count": 5,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "sorter_model",
@@ -171,7 +171,7 @@
         "end": 1780309785000000
       },
       "expected": {
-        "row_count": 4,
+        "row_count": 11,
         "columns": [
           "pallet_id",
           "sorter_model",
@@ -193,7 +193,7 @@
         "end": 1780309845000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 15,
         "columns": [
           "_timestamp",
           "control_center",
@@ -214,7 +214,7 @@
         "end": 1780309905000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 15,
         "columns": [
           "_timestamp",
           "build_signature",
@@ -236,7 +236,7 @@
         "end": 1780309965000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -257,7 +257,7 @@
         "end": 1780310025000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "conveyor_lane",
@@ -277,7 +277,7 @@
         "end": 1780310085000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 15,
         "columns": [
           "_timestamp",
           "operation_mode",
@@ -299,7 +299,7 @@
         "end": 1780310145000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "_timestamp",
@@ -319,7 +319,7 @@
         "end": 1780310205000000
       },
       "expected": {
-        "row_count": 8,
+        "row_count": 15,
         "columns": [
           "_timestamp",
           "log",

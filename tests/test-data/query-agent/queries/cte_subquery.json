@@ -9,7 +9,7 @@
         "end": 1780310865000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 3,
         "columns": [
           "load_tier",
           "cnt",
@@ -27,7 +27,7 @@
         "end": 1780310925000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "total_events",
@@ -46,7 +46,7 @@
         "end": 1780310985000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 14,
         "columns": [
           "pallet_id",
           "throughput_rate",
@@ -64,7 +64,7 @@
         "end": 1780311045000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "avg_tput",
@@ -82,7 +82,7 @@
         "end": 1780311105000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "facility_zone",
@@ -101,7 +101,7 @@
         "end": 1780311165000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "sorter_model",
@@ -120,7 +120,7 @@
         "end": 1780311225000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "cnt",
@@ -141,7 +141,7 @@
         "end": 1780311285000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "facility_zone",
@@ -163,7 +163,7 @@
         "end": 1780311345000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 24,
         "columns": [
           "segment",
           "facility_zone",
@@ -183,7 +183,7 @@
         "end": 1780311405000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 2,
         "columns": [
           "conveyor_lane",
           "facility_zone",
@@ -203,7 +203,7 @@
         "end": 1780311465000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -224,7 +224,7 @@
         "end": 1780311525000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 8,
         "columns": [
           "facility_zone",
           "operation_mode",
@@ -243,7 +243,7 @@
         "end": 1780311585000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_a",
@@ -263,7 +263,7 @@
         "end": 1780311645000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "high_cnt",
@@ -283,7 +283,7 @@
         "end": 1780311705000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 2,
         "columns": [
           "facility_zone",
           "sorter_model",
@@ -302,7 +302,7 @@
         "end": 1780311765000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -325,7 +325,7 @@
         "end": 1780311825000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "chain_count",

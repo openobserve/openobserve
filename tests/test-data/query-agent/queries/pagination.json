@@ -9,7 +9,7 @@
         "end": 1780314285000000
       },
       "expected": {
-        "row_count": 6,
+        "row_count": 8,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -28,7 +28,7 @@
         "end": 1780314345000000
       },
       "expected": {
-        "row_count": 4,
+        "row_count": 6,
         "columns": [
           "sorter_model",
           "operation_mode",
@@ -46,7 +46,7 @@
         "end": 1780314405000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 6,
         "columns": [
           "_timestamp",
           "sorter_model",
@@ -65,7 +65,7 @@
         "end": 1780314465000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 8,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -85,7 +85,7 @@
         "end": 1780314525000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 8,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -106,7 +106,7 @@
         "end": 1780314585000000
       },
       "expected": {
-        "row_count": 3,
+        "row_count": 5,
         "columns": [
           "facility_zone",
           "operation_mode",
@@ -125,7 +125,7 @@
         "end": 1780314645000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -145,7 +145,7 @@
         "end": 1780314705000000
       },
       "expected": {
-        "row_count": 3,
+        "row_count": 7,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -165,7 +165,7 @@
         "end": 1780314765000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 16,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -185,7 +185,7 @@
         "end": 1780314825000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 5,
         "columns": [
           "_timestamp",
           "throughput_rate",

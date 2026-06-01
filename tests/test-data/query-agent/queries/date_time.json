@@ -9,7 +9,7 @@
         "end": 1780311885000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 2,
         "columns": [
           "_time",
           "cnt"
@@ -26,7 +26,7 @@
         "end": 1780311945000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 9,
         "columns": [
           "ts_minute",
           "operation_mode",
@@ -63,7 +63,7 @@
         "end": 1780312065000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 1,
         "columns": [
           "_time",
           "total_tput",
@@ -82,7 +82,7 @@
         "end": 1780312125000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 3,
         "columns": [
           "minute_bucket",
           "auto_cnt",
@@ -101,7 +101,7 @@
         "end": 1780312185000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 17,
         "columns": [
           "half_min",
           "facility_zone",
@@ -121,7 +121,7 @@
         "end": 1780312245000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 2,
         "columns": [
           "block",
           "cnt",
@@ -141,7 +141,7 @@
         "end": 1780312305000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 7,
         "columns": [
           "window_5m",
           "sorter_model",
@@ -162,7 +162,7 @@
         "end": 1780312365000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 19,
         "columns": [
           "default_bucket",
           "control_center",
@@ -183,7 +183,7 @@
         "end": 1780312425000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 2,
         "columns": [
           "early_window",
           "early_cnt",
@@ -204,7 +204,7 @@
         "end": 1780312485000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 3,
         "columns": [
           "minute_slot",
           "total_events",

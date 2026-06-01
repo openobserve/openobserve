@@ -44,7 +44,7 @@
         "end": 1780308285000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 5,
         "columns": [
           "sorter_model",
           "cnt"
@@ -61,7 +61,7 @@
         "end": 1780308345000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 1,
         "columns": [
           "total_throughput"
         ],
@@ -283,7 +283,7 @@
         "end": 1780309065000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "mode_count",

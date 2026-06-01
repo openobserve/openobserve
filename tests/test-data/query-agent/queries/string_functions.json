@@ -9,7 +9,7 @@
         "end": 1780314885000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "safe_zone",
@@ -27,7 +27,7 @@
         "end": 1780314945000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "matched",
@@ -45,7 +45,7 @@
         "end": 1780315005000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_upper",
@@ -66,7 +66,7 @@
         "end": 1780315065000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -86,7 +86,7 @@
         "end": 1780315125000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "control_center",
           "sorter_models",
@@ -105,7 +105,7 @@
         "end": 1780315185000000
       },
       "expected": {
-        "row_count": 8,
+        "row_count": 23,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -126,7 +126,7 @@
         "end": 1780315245000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -147,7 +147,7 @@
         "end": 1780315305000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -168,7 +168,7 @@
         "end": 1780315365000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "log",
@@ -190,7 +190,7 @@
         "end": 1780315425000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 0,
         "columns": [
           "facility_zone",
           "mode_tput_list",

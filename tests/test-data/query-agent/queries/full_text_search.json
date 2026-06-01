@@ -9,7 +9,7 @@
         "end": 1780312545000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "log",
@@ -27,7 +27,7 @@
         "end": 1780312605000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "log",
@@ -45,7 +45,7 @@
         "end": 1780312665000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "cnt"
@@ -62,7 +62,7 @@
         "end": 1780312725000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 17,
         "columns": [
           "_time",
           "match_count"
@@ -79,7 +79,7 @@
         "end": 1780312785000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 9,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -100,7 +100,7 @@
         "end": 1780312845000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "match_cnt",
@@ -119,7 +119,7 @@
         "end": 1780312905000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 0,
         "columns": [
           "time_block",
           "warehouse_hits",
@@ -138,7 +138,7 @@
         "end": 1780312965000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "log",
@@ -159,7 +159,7 @@
         "end": 1780313025000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 15,
         "columns": [
           "source",
           "_timestamp",

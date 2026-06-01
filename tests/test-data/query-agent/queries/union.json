@@ -43,7 +43,7 @@
         "end": 1780315605000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 3,
         "columns": [
           "speed_tier",
           "cnt",
@@ -79,7 +79,7 @@
         "end": 1780315725000000
       },
       "expected": {
-        "row_count": 6,
+        "row_count": 10,
         "columns": [
           "_timestamp",
           "log"
@@ -96,7 +96,7 @@
         "end": 1780315785000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 8,
         "columns": [
           "location",
           "granularity",
@@ -134,7 +134,7 @@
         "end": 1780315905000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "facility_zone",
           "sorter_model",
@@ -154,7 +154,7 @@
         "end": 1780315965000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 20,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -174,7 +174,7 @@
         "end": 1780316025000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 20,
         "columns": [
           "facility_zone",
           "pallet_id",
@@ -216,7 +216,7 @@
         "end": 1780316145000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 3,
         "columns": [
           "category",
           "cnt",

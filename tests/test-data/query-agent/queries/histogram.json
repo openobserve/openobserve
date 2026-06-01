@@ -9,7 +9,7 @@
         "end": 1780313085000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 17,
         "columns": [
           "_time",
           "cnt"
@@ -26,7 +26,7 @@
         "end": 1780313145000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 17,
         "columns": [
           "_time",
           "high_load_cnt",
@@ -44,7 +44,7 @@
         "end": 1780313205000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "bucket_time",
           "facility_zone",
@@ -63,7 +63,7 @@
         "end": 1780313265000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 6,
         "columns": [
           "bucket",
           "cnt",
@@ -83,7 +83,7 @@
         "end": 1780313325000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 6,
         "columns": [
           "time_window",
           "operation_mode",
@@ -103,7 +103,7 @@
         "end": 1780313385000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 5,
         "columns": [
           "block",
           "sorter_model",
@@ -123,7 +123,7 @@
         "end": 1780313445000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 22,
         "columns": [
           "time_slot",
           "control_center",
@@ -142,7 +142,7 @@
         "end": 1780313505000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 3,
         "columns": [
           "minute_slot",
           "total_events",
@@ -161,7 +161,7 @@
         "end": 1780313565000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 8,
         "columns": [
           "interval_bucket",
           "conveyor_lane",
@@ -181,7 +181,7 @@
         "end": 1780313625000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 2,
         "columns": [
           "window_block",
           "charged_ops",
@@ -200,7 +200,7 @@
         "end": 1780313685000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 11,
         "columns": [
           "fine_bucket",
           "total",

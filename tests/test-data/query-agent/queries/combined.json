@@ -9,7 +9,7 @@
         "end": 1780310265000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "events",
@@ -29,7 +29,7 @@
         "end": 1780310325000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "log",
@@ -48,7 +48,7 @@
         "end": 1780310385000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "cnt",
@@ -87,7 +87,7 @@
         "end": 1780310505000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -110,7 +110,7 @@
         "end": 1780310565000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -135,7 +135,7 @@
         "end": 1780310625000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -163,7 +163,7 @@
         "end": 1780310685000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 5,
         "columns": [
           "facility_zone",
           "sorter_model",
@@ -183,7 +183,7 @@
         "end": 1780310745000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 0,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -207,7 +207,7 @@
         "end": 1780310805000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 4,
         "columns": [
           "facility_zone",
           "best_mode",

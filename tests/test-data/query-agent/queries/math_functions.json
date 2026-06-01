@@ -9,7 +9,7 @@
         "end": 1780313745000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 1,
         "columns": [
           "high_load_pct"
         ],
@@ -25,7 +25,7 @@
         "end": 1780313805000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -47,7 +47,7 @@
         "end": 1780313865000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "item_count",
@@ -68,7 +68,7 @@
         "end": 1780313925000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "cell_temp",
@@ -111,7 +111,7 @@
         "end": 1780314045000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "load_factor",
@@ -132,7 +132,7 @@
         "end": 1780314105000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "throughput_rate",
@@ -155,7 +155,7 @@
         "end": 1780314165000000
       },
       "expected": {
-        "row_count": null,
+        "row_count": 28,
         "columns": [
           "_timestamp",
           "pallet_id",
@@ -177,7 +177,7 @@
         "end": 1780314225000000
       },
       "expected": {
-        "row_count": 10,
+        "row_count": 12,
         "columns": [
           "_timestamp",
           "defect",
