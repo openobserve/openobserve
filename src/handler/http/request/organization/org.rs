@@ -520,10 +520,10 @@ pub async fn create_org(
         service_account: req.service_account,
     };
 
-    if let Some(oid) = req.make_billed_member_of.as_ref() {
-        if !check_permissions(
-            &oid,
-            &oid,
+    if let Some(oid) = req.make_billed_member_of.as_ref()
+        && !check_permissions(
+            oid,
+            oid,
             &user_email.user_id,
             "billing_group",
             "POST",
@@ -533,10 +533,9 @@ pub async fn create_org(
             false,
         )
         .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
-    }
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    };
 
     let result =
         organization::create_org(&mut org, &user_email.user_id, req.make_billed_member_of).await;
