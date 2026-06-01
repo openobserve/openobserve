@@ -161,6 +161,8 @@ test.describe("Unflattened testcases", () => {
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
       if (attempt < 5) {
         await ingestion(page);
+        // Wait for indexer to process newly ingested data before re-querying
+        await page.waitForTimeout(5000);
         await applyQueryButton(page);
       }
     }
@@ -293,7 +295,7 @@ test.describe("Unflattened testcases", () => {
     // With ORDER BY _timestamp DESC the newest rows come first; we scan more
     // than strictly necessary (10) so a slight indexing lag still resolves
     let o2idFound = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 5; attempt++) {
       const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
@@ -302,7 +304,7 @@ test.describe("Unflattened testcases", () => {
         break;
       }
       testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
-      if (attempt === 3) {
+      if (attempt === 5) {
         try {
           const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
           testLogger.error('Available fields in log detail', { fields: allKeys });
@@ -313,11 +315,12 @@ test.describe("Unflattened testcases", () => {
       }
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
       await ingestion(page);
-      await page.waitForTimeout(3000);
+      // Wait for indexer to process newly ingested data before re-querying
+      await page.waitForTimeout(5000);
       await applyQueryButton(page);
     }
     if (!o2idFound) {
-      throw new Error('Failed to find _o2_id field in log details after 3 attempts');
+      throw new Error('Failed to find _o2_id field in log details after 5 attempts');
     }
 
     await page.waitForTimeout(500);

@@ -262,7 +262,6 @@ test.describe("Alerts UI Operations", () => {
   });
 });
 
-/* ENT-only: Alerts & Incidents Page Navigation — needs rework before re-enabling
 // ============================================================================
 // Alerts & Incidents Page Navigation Tests
 // ============================================================================
@@ -287,22 +286,14 @@ test.describe("Alerts & Incidents Page Navigation", { tag: '@enterprise' }, () =
         // Wait for alert list page to be ready
         await pm.alertsPage.waitForAlertListPageReady();
 
-        // Check config API for enterprise feature flag (service_graph_enabled)
-        let isEnterprise = false;
-        try {
-            const configResp = await page.waitForResponse(
-                response => response.url().includes('/config') && response.status() === 200,
-                { timeout: 10000 }
-            );
-            const configBody = await configResp.json();
-            isEnterprise = configBody?.service_graph_enabled === true;
-        } catch {
-            const incidentsMenu = page.locator(pm.alertsPage.locators.incidentsMenuItem);
-            isEnterprise = await incidentsMenu.isVisible({ timeout: 5000 }).catch(() => false);
-        }
+        // Check if incidents feature is enabled (controlled by incidents_enabled in the
+        // config API on ENT builds). We detect it by checking whether the incidents
+        // sidebar menu item is visible — it is added dynamically after the config loads.
+        // waitForAlertListPageReady() above ensures config has already been processed.
+        const isEnterprise = await pm.alertsPage.isIncidentsFeatureEnabled(5000);
 
         if (!isEnterprise) {
-            test.skip(true, 'service_graph_enabled is false — enterprise feature, skipping on OSS');
+            test.skip(true, 'incidents_enabled is false — enterprise feature, skipping on OSS');
         }
         testLogger.info('Alert page loaded successfully (enterprise features enabled)');
     });
@@ -415,4 +406,3 @@ test.describe("Alerts & Incidents Page Navigation", { tag: '@enterprise' }, () =
         testLogger.info('=== Edge cases COMPLETE ===');
     });
 });
-*/

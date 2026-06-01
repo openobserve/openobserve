@@ -63,18 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
             <!-- Search for Alerts -->
-            <OInput
+            <OSearchInput
               v-model="dynamicQueryModel"
               :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
               data-test="alert-list-search-input"
-              :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
               class="tw:ml-2 tw:w-[200px]"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
             <!-- All Folders toggle -->
             <OSwitch
               data-test="alert-list-search-across-folders-toggle"
@@ -672,6 +667,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
@@ -709,6 +705,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OInput,
+    OSearchInput,
     OSwitch,
     OTooltip,
     SelectFolderDropDown,

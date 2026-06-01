@@ -61,15 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:active-tab="onTabChange"
             />
           </div>
-          <OInput
+          <OSearchInput
             v-model="filterQuery"
             class="no-border o2-search-input"
             :placeholder="t('modelPricing.searchPlaceholder')"
-          >
-            <template #icon-left>
-              <OIcon class="o2-search-input-icon" name="search" size="sm" />
-            </template>
-          </OInput>
+          />
           <OButton
             variant="outline"
             size="sm"
@@ -498,7 +494,7 @@ import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';

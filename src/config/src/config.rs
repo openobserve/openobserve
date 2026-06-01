@@ -50,7 +50,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 42;
+pub const DB_SCHEMA_VERSION: u64 = 43;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1174,7 +1174,7 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_PRINT_KEY_EVENT", default = false)]
     pub print_key_event: bool,
-    #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
+    #[env_config(name = "ZO_PRINT_KEY_SQL", default = true)]
     pub print_key_sql: bool,
     // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
@@ -3237,7 +3237,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.disk_cache.bucket_num == 0 {
         // because we validate cpu_num before this
-        // we can be sure here that that value is sane.
+        // we can be sure here that value is sane.
 
         // following numbers are imperically decided, users can set the value
         // directly if they know better, otherwise this was the best numbers

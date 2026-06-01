@@ -63,17 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
             </div>
             <div>
-              <OInput
+              <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
                 class="tw:ml-auto no-border o2-search-input"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
-              >
-                <template #icon-left>
-                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
-                </template>
-              </OInput>
+              />
             </div>
             <OButton
               data-test="log-stream-refresh-stats-btn"
@@ -292,7 +288,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
@@ -307,7 +303,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OSpinner,
-    OInput,
+    OSearchInput,
     OCheckbox,
     OTable,
   },

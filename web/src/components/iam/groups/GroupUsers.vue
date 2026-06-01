@@ -49,16 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="iam-users-selection-search-input"
         class="tw:mr-3"
       >
-        <OInput
+        <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
+          class="tw:h-[36px] tw:w-[200px]"
           placeholder="Search User"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon"/>
-          </template>
-        </OInput>
+        />
       </div>
 
       <div
@@ -140,7 +136,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";

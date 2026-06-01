@@ -19,17 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Value search input — only when fetched count hits the limit -->
     <div v-if="showValueSearch" class="value-search-container tw:mb-1">
       <div class="value-search-input-wrap">
-        <OInput
+        <OSearchInput
           v-model="valueSearchTerm"
           clearable
           size="sm"
           :placeholder="`Search ${fieldName} values…`"
           @clear="valueSearchTerm = ''"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="sm" />
-          </template>
-        </OInput>
+        />
       </div>
     </div>
 
@@ -144,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showMultiSelect"
               :model-value="selectedValues"
               :value="value.key"
+              :color="filterMode === 'exclude' ? 'negative' : 'primary'"
               size="xs"
               class="tw:shrink-0"
               @update:model-value="handleUserCheckboxChange"
@@ -206,7 +203,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface FieldValues {

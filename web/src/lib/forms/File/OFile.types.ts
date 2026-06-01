@@ -44,6 +44,8 @@ export interface FileEmits {
   (_e: "change", _value: FileValue): void;
   (_e: "clear"): void;
   (_e: "size-error", _files: File[]): void;
+  /** Emitted when one or more files are rejected because their type does not match `accept` */
+  (_e: "type-error", _files: File[]): void;
 }
 
 export interface FileSlots {

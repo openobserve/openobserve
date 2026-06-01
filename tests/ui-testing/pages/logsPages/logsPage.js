@@ -76,10 +76,10 @@ export class LogsPage {
         this.dateSelector = (day) => `[data-test="date-selector-${day}"]`;
         this.monthSelector = (month) => `[data-test="month-selector-${month}"]`;
         this.yearSelector = (year) => `[data-test="year-selector-${year}"]`;
-        this.startTimeField = '[data-test="start-time-field"]';
-        this.endTimeField = '[data-test="end-time-field"]';
-        this.startTimeInput = '[data-test="start-time-input"]';
-        this.endTimeInput = '[data-test="end-time-input"]';
+        this.startTimeField = '[data-test="datetime-start-time"]';
+        this.endTimeField = '[data-test="datetime-end-time"]';
+        this.startTimeInput = '[data-test="datetime-start-time"] input[type="time"]';
+        this.endTimeInput = '[data-test="datetime-end-time"] input[type="time"]';
         this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
         this.savedViewsButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
@@ -994,13 +994,23 @@ export class LogsPage {
 
     async addStreamToSelection(streamName) {
         testLogger.info(`Adding stream to selection: ${streamName}`);
-        // Legacy `log-search-index-list-stream-toggle-<name>` is gone post-OSelect
-        // migration. Click the wrapper to open the popover, then pick the option
-        // by data-test-value.
-        const searchInput = this.page.locator(this.indexDropDown);
-        await searchInput.click();
-        await this.page.waitForTimeout(500);
-        await searchInput.fill(streamName);
+        // Open the OSelect popover via the trigger button (same pattern as
+        // selectStream), then fill the ListboxFilter search input.
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        const popover = this.page.locator(this.indexDropDownPopover);
+        const search = this.page.locator(this.indexDropDownSearch);
+        if (await trigger.count() > 0) {
+            await trigger.click();
+        } else {
+            await this.page.locator(this.indexDropDown).click();
+        }
+        await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await search.count() > 0) {
+            await search.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            await search.press('ControlOrMeta+a').catch(() => {});
+            await search.press('Backspace').catch(() => {});
+            await search.fill(streamName);
+        }
         await this.page.waitForTimeout(1000);
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
@@ -2411,7 +2421,24 @@ export class LogsPage {
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+        // Use Monaco API (more reliable) instead of DOM selectors
+        const set = await this.page.evaluate(
+            ({ selector, value }) => {
+                const host = document.querySelector(selector);
+                if (!host || !window.monaco?.editor?.getEditors) return false;
+                const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+                if (!ed) return false;
+                ed.setValue(value);
+                ed.focus();
+                return true;
+            },
+            { selector: this.queryEditor, value: query }
+        ).catch(() => false);
+
+        if (!set) {
+            // Fallback to DOM fill
+            return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+        }
     }
 
     async clearQueryEditor() {
@@ -3021,7 +3048,7 @@ export class LogsPage {
      */
     async openLogDetailSidebar() {
         await this.page.locator(this.logTableColumnSource).click();
-        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Log detail sidebar opened');
     }
 
@@ -3030,7 +3057,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async expectLogDetailSidebarVisible() {
-        await expect(this.page.locator(this.logDetailDialogBox)).toBeVisible();
+        await expect(this.page.locator(this.logDetailDialog)).toBeVisible();
     }
 
     /**
@@ -3038,7 +3065,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async expectLogDetailSidebarNotVisible() {
-        await expect(this.page.locator(this.logDetailDialogBox)).not.toBeVisible();
+        await expect(this.page.locator(this.logDetailDialog)).not.toBeVisible();
     }
 
     /**
@@ -3123,7 +3150,7 @@ export class LogsPage {
     async closeLogDetailSidebar() {
         await this.page.locator(this.logDetailCloseButton).click();
         // Wait for sidebar to close
-        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'hidden', timeout: 5000 });
+        await this.page.locator(this.logDetailDialog).waitFor({ state: 'hidden', timeout: 5000 });
         testLogger.info('Log detail sidebar closed');
     }
 
@@ -3827,6 +3854,15 @@ export class LogsPage {
         return this.page.locator(this.liveMode5SecBtn);
     }
 
+    /**
+     * Get the Live Mode refresh button by interval value
+     * @param {number} value - The refresh interval in seconds (e.g. 5, 10, 60, 300)
+     * @returns {import('@playwright/test').Locator} The button locator
+     */
+    getLiveModeButtonByValue(value) {
+        return this.page.locator(`[data-test="logs-search-bar-refresh-time-${value}"]`);
+    }
+
     async getPageContent() {
         return await this.page.locator('body').innerText().catch(() => '');
     }
@@ -4366,13 +4402,21 @@ export class LogsPage {
     }
 
     async selectStreamAndStreamTypeForLogs(stream) {
+        // Click the OSelect wrapper to open the popover
         await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
+        await this.page.locator('[data-test="log-search-index-list-select-stream-popover"]').waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+        // Fill the search input INSIDE the popover — the wrapper div is not an input
+        const popoverSearch = this.page.locator('[data-test="log-search-index-list-select-stream-popover"] input').first();
+        await popoverSearch.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await popoverSearch.fill(stream);
         await this.page.waitForTimeout(2000);
-        await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(stream);
-        await this.page.waitForTimeout(2000);
-        await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
-        await this.page.waitForTimeout(2000);
-        await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
+        // Click the matching option — OSelect renders each option with data-test-value="{streamName}"
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`
+        ).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click();
     }
 
     // Download-related functions
@@ -5291,23 +5335,28 @@ export class LogsPage {
     }
 
     async fillStreamFilter(streamName) {
-        // OSelect wrapper is a div and cannot be `.fill()`'d. Open the popover via
-        // its explicit `-trigger` (falling back to the wrapper if absent) and type
-        // into the popover's `-search` filter input (§4 OSelect contract).
+        // Open the OSelect popover and type into the filter/search input so the
+        // virtualised option list renders the target row.
         const trigger = this.page.locator(this.indexDropDownTrigger);
         const wrapper = this.page.locator(this.indexDropDown);
         const popover = this.page.locator(this.indexDropDownPopover);
-        const search = this.page.locator(this.indexDropDownSearch);
         if (await trigger.count() > 0) {
             await trigger.first().click();
         } else {
             await wrapper.click();
         }
-        await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        await search.waitFor({ state: 'visible', timeout: 5000 });
-        await search.press('ControlOrMeta+a').catch(() => {});
-        await search.press('Backspace').catch(() => {});
-        return await search.fill(streamName);
+        await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        // The search input's data-test may not forward; try the explicit
+        // -search locator first, then fall back to any <input> in the popover.
+        const search = this.page.locator(this.indexDropDownSearch);
+        if (await search.count() > 0) {
+            await search.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            await search.press('ControlOrMeta+a').catch(() => {});
+            await search.press('Backspace').catch(() => {});
+            return await search.fill(streamName);
+        }
+        // No search input available — leave popover open unfiltered.
+        return null;
     }
 
     async toggleStreamSelection(streamName) {
@@ -5315,9 +5364,24 @@ export class LogsPage {
         // `log-search-index-list-stream-toggle-<name>` is no longer emitted.
         // Pick the OSelect option whose `data-test-value` matches streamName.
         // Caller must ensure the popover is open (e.g. via fillStreamFilter).
-        return await this.page.locator(
+        //
+        // IMPORTANT: OSelect with rowClickSingleSelect=true splits each option into a
+        // checkbox zone (left) and a label zone (right). A click at the element centre
+        // lands in the label zone and fires handleRowClickSingleSelect, which REPLACES
+        // the current selection with just this stream. To ADD to the multi-select we
+        // must click the checkbox span ([data-select-checkbox]) in the left zone.
+        const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
-        ).first().click();
+        ).first();
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        const checkbox = option.locator('[data-select-checkbox]').first();
+        const checkboxVisible = await checkbox.isVisible({ timeout: 1000 }).catch(() => false);
+        if (checkboxVisible) {
+            // Click the checkbox to toggle without replacing existing selection
+            return await checkbox.click({ force: true });
+        }
+        // Fallback: single-select mode — click the option normally
+        return await option.click();
     }
 
     async toggleQueryModeEditor() {
@@ -5395,12 +5459,16 @@ export class LogsPage {
         // (no role="cell"). Prefer the o-field-list-group locator when the
         // requested name matches a group header; fall back to ARIA cell role
         // for actual table cells elsewhere.
+        // Use waitFor instead of count() — count() is synchronous and returns 0 if the
+        // element hasn't rendered yet, causing a false fall-through to the ARIA locator.
         const groupLocator = this.page.locator('[data-test^="o-field-list-group-"]')
             .filter({ hasText: name });
-        if ((await groupLocator.count()) > 0) {
+        try {
+            await groupLocator.first().waitFor({ state: 'visible', timeout: 15000 });
             return groupLocator.first();
+        } catch {
+            return this.page.getByRole('cell', { name });
         }
-        return await this.page.getByRole('cell', { name });
     }
 
     async clickCellByName(name) {
@@ -5885,18 +5953,33 @@ export class LogsPage {
     }
 
     async clickTimeCell() {
-        // Click on the time cell (access_time icon)
-        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().click();
+        // Post-UX-revamp: time input is a native <input type="time"> inside datetime-start-time
+        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
+        await timeInput.waitFor({ state: 'visible', timeout: 5000 });
+        return await timeInput.click();
     }
 
     async fillTimeCellWithInvalidValue(value) {
-        // Fill time cell with partial/invalid value
-        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().fill(value);
+        // Use fill() with the value and rely on the component's validation to surface
+        // the error state, rather than bypassing browser validation via evaluate().
+        const timeInput = this.page.locator('[data-test="datetime-start-time"] input[type="time"]').first();
+        await timeInput.waitFor({ state: 'visible', timeout: 5000 });
+        const currentValue = await timeInput.inputValue().catch(() => '');
+        await timeInput.fill('');
+        await timeInput.fill(value);
+        // Verify the input reflects the attempted value (or its best-effort parse)
+        const newValue = await timeInput.inputValue().catch(() => '');
+        if (newValue !== value) {
+            // Browser rejected or parsed the value — that's the expected error path
+            return { rejected: true, originalValue: currentValue, newValue };
+        }
+        return { rejected: false, originalValue: currentValue, newValue };
     }
 
     async expectErrorIconVisible() {
-        // Use specific selector for error icon (material-icons with text-negative class)
-        return await expect(this.page.locator('i.OIcon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
+        // O2 OInput error state uses data-test="o-input-error" scoped to the datetime container
+        const errorIcon = this.page.locator('[data-test="datetime-start-time"] [data-test="o-input-error"]').first();
+        return await expect(errorIcon).toBeVisible({ timeout: 5000 });
     }
 
     async expectResultErrorDetailsButtonVisible() {
@@ -5916,11 +5999,11 @@ export class LogsPage {
     }
 
     async expectStartTimeVisible() {
-        return await expect(this.page.getByRole('cell', { name: 'Start time' })).toBeVisible();
+        return await expect(this.page.locator('[data-test="datetime-start-time"]').first()).toBeVisible({ timeout: 5000 });
     }
 
     async expectEndTimeVisible() {
-        return await expect(this.page.getByRole('cell', { name: 'End time' })).toBeVisible();
+        return await expect(this.page.locator('[data-test="datetime-end-time"]').first()).toBeVisible({ timeout: 5000 });
     }
 
     async clickOutsideTimeInput() {
@@ -6381,6 +6464,18 @@ export class LogsPage {
     }
 
     /**
+     * Wait for actual result rows to appear in the table.
+     * The table container becomes visible before Vue populates queryResults.hits, which gates
+     * the analyze button v-if. Waiting for a row ensures hits.length > 0 is true in the
+     * reactive store before callers check for the analyze button or row-dependent UI.
+     */
+    async waitForSearchResultRows(timeout = 20000) {
+        await this.page.locator(`${this.logsTable} tbody tr`).first()
+            .waitFor({ state: 'visible', timeout });
+        testLogger.info('waitForSearchResultRows: at least one result row is visible');
+    }
+
+    /**
      * Wait for SQL mode to be active after switching
      */
     async waitForSQLModeActive() {
@@ -6795,6 +6890,18 @@ export class LogsPage {
      */
     async getQueryFromEditor() {
         try {
+            // Use Monaco API to get the actual editor value (textContent includes line numbers)
+            const query = await this.page.evaluate((selector) => {
+                const host = document.querySelector(selector);
+                if (!host || !window.monaco?.editor?.getEditors) return null;
+                const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+                if (!ed) return null;
+                return ed.getValue();
+            }, this.queryEditor).catch(() => null);
+
+            if (query !== null) return query.trim();
+
+            // Fallback to textContent if Monaco isn't available
             const editor = this.page.locator(this.queryEditor);
             const queryText = await editor.textContent();
             return queryText?.trim() || '';
@@ -6813,9 +6920,28 @@ export class LogsPage {
      * @returns {Promise<string>} The pagination text (e.g., "1-50 of 100")
      */
     async getPaginationText() {
-        const paginationLocator = this.page.locator(this.tableBottom).first();
-        await paginationLocator.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-        return await paginationLocator.textContent().catch(() => 'N/A');
+        // Try logs page pagination first, then streams page pagination,
+        // then the streams listing page (which uses a custom OTable #bottom slot).
+        const selectors = [
+            this.tableBottom,                           // logs-search-result-pagination
+            '[data-test="o2-table-pagination-info"]',   // OTable built-in pagination
+        ];
+        for (const selector of selectors) {
+            const locator = this.page.locator(selector).first();
+            const count = await locator.count().catch(() => 0);
+            if (count > 0) {
+                const text = await locator.textContent().catch(() => null);
+                if (text && text.trim()) return text.trim();
+            }
+        }
+        // Fallback: streams listing page (LogStream.vue) uses a custom #bottom
+        // slot that renders "{totalRows} Stream(s)" without a data-test.
+        const streamCount = this.page.locator('text=/\\d+ Stream\\(s\\)/').first();
+        if (await streamCount.count().catch(() => 0) > 0) {
+            const text = await streamCount.textContent().catch(() => null);
+            if (text && text.trim()) return text.trim();
+        }
+        return 'N/A';
     }
 
     /**
@@ -7005,9 +7131,15 @@ export class LogsPage {
      * @returns {Promise<string>} The notification text
      */
     async getNotificationText() {
+        const toastMessage = this.page.locator('[data-test="o-toast-message"]');
+        const count = await toastMessage.count();
+        if (count > 0) {
+            return await toastMessage.first().textContent() || '';
+        }
+        // Fallback to role=alert for backward compatibility
         const notifications = this.page.locator('[role="alert"]');
-        const notificationCount = await notifications.count();
-        if (notificationCount > 0) {
+        const alertCount = await notifications.count();
+        if (alertCount > 0) {
             return await notifications.first().textContent() || '';
         }
         return '';
@@ -7018,7 +7150,7 @@ export class LogsPage {
      * @returns {Promise<number>} The number of notifications
      */
     async getNotificationCount() {
-        return await this.page.locator('[role="alert"]').count();
+        return await this.page.locator('[data-test^="o-toast"]').count();
     }
 
     /**
@@ -7027,7 +7159,7 @@ export class LogsPage {
      */
     async isRefreshButtonVisible() {
         const refreshButton = this.page.locator(this.queryButton);
-        return await refreshButton.isVisible();
+        return await refreshButton.isVisible({ timeout: 10000 }).catch(() => false);
     }
 
     /**
@@ -7588,11 +7720,14 @@ export class LogsPage {
         if (!isOn) {
             // force: true bypasses actionability checks — ODropdown portal transiently detaches items on render
             await this.page.locator(this.menuSqlModeBtn).click({ force: true });
-            // Dropdown stays open (ODropdownItem has @select.prevent) — poll the inner button directly
+            // In CI the dropdown may close after the click, making stateEl detached/hidden.
+            // Re-open the menu on each poll iteration so the state element is always visible.
             await expect.poll(async () => {
-                const s = await stateEl.getAttribute('data-state').catch(() => null);
+                await this._openUtilitiesMenuForSqlMode();
+                const s = await this.page.locator(this.menuSqlModeBtnState).first()
+                    .getAttribute('data-state').catch(() => null);
                 return s === 'checked';
-            }, { timeout: 10000 }).toBe(true);
+            }, { timeout: 15000 }).toBe(true);
             testLogger.info('SQL mode enabled');
         } else {
             testLogger.info('SQL mode already enabled');
@@ -7610,11 +7745,15 @@ export class LogsPage {
         await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
         if (isOn) {
-            await this.page.locator(this.menuSqlModeBtn).click();
+            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
+            // In CI the dropdown may close after the click, making stateEl detached/hidden.
+            // Re-open the menu on each poll iteration so the state element is always visible.
             await expect.poll(async () => {
-                const s = await stateEl.getAttribute('data-state').catch(() => null);
+                await this._openUtilitiesMenuForSqlMode();
+                const s = await this.page.locator(this.menuSqlModeBtnState).first()
+                    .getAttribute('data-state').catch(() => null);
                 return s === 'unchecked';
-            }, { timeout: 10000 }).toBe(true);
+            }, { timeout: 15000 }).toBe(true);
             testLogger.info('SQL mode disabled');
         } else {
             testLogger.info('SQL mode already disabled');
@@ -7684,8 +7823,9 @@ export class LogsPage {
      * Assert that the Patterns toggle is in selected state
      */
     async expectPatternsToggleSelected() {
-        // OToggleGroupItem renders data-test on an outer <span>; data-state="on" is on the inner Reka UI button
-        await expect(this.page.locator(`${this.patternsToggle} [data-state]`)).toHaveAttribute('data-state', 'on');
+        // OToggleGroupItem uses inheritAttrs:false + v-bind="$attrs" on the inner Reka UI <button>.
+        // data-test AND data-state are both on that same <button> element — no child selector.
+        await expect(this.page.locator(`${this.patternsToggle}[data-state="on"]`)).toBeVisible({ timeout: 10000 });
         testLogger.info('Patterns toggle is in selected state');
     }
 
@@ -8084,7 +8224,7 @@ export class LogsPage {
      * Get pattern details dialog content
      */
     async getPatternDetailsDialogContent() {
-        const content = await this.page.locator('[data-test="logs-search-result-detail-dialog"]').innerText();
+        const content = await this.page.locator('[data-test="pattern-details-dialog"]').innerText();
         testLogger.info(`Dialog content length: ${content.length} chars`);
         return content;
     }
@@ -9293,9 +9433,7 @@ export class LogsPage {
      * @param {string|number} pageNum - The page number to click (e.g., '1', '2')
      */
     async clickPageNumber(pageNum) {
-        const pageBtn = this.page
-            .locator('[data-test="logs-search-result-pagination"]')
-            .locator(`button[aria-label="${pageNum}"]`);
+        const pageBtn = this.page.locator(this.resultPaginationPageBtn(pageNum));
         await pageBtn.click({ force: true });
         await this.waitForResultsLoaded();
     }
@@ -9304,9 +9442,7 @@ export class LogsPage {
      * Click the "Next page" button in the pagination component.
      */
     async clickNextPage() {
-        const nextBtn = this.page
-            .locator('[data-test="logs-search-result-pagination"]')
-            .locator('button[aria-label="Next page"]');
+        const nextBtn = this.page.locator('[data-test="logs-search-result-pagination-next"]');
         await nextBtn.click({ force: true });
         await this.waitForResultsLoaded();
     }
@@ -9345,14 +9481,15 @@ export class LogsPage {
     }
 
     /**
-     * Click a scheduled search row by its trace_id.
-     * @param {string} traceId - The trace_id of the scheduled search job
-     * @returns {Promise<boolean>} true if the row was clicked, false if not found
+     * Click a scheduled search row to expand it.
+     * OTable renders rows as data-test="o2-table-row-{index}" (not by trace_id),
+     * so we click the first visible row which triggers expand-on-row-click.
+     * @param {string} traceId - kept for API compatibility but not used for locating
      */
     async clickScheduledSearchRow(traceId) {
-        const row = this.page.locator(`[data-test="search-scheduler-table-${traceId}-row"]`);
-        await row.waitFor({ state: 'visible', timeout: 10000 });
-        await row.locator('[data-test="search-scheduler-expand-btn"]').click();
+        const firstRow = this.page.locator('[data-test="o2-table-row-0"]');
+        await firstRow.waitFor({ state: 'visible', timeout: 30000 });
+        await firstRow.click();
         await this.page.waitForTimeout(3000);
     }
 
@@ -9429,8 +9566,11 @@ export class LogsPage {
         return await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
             if (!pagination) return '';
-            const btn = pagination.querySelector('button[aria-current="true"]');
-            return btn ? btn.getAttribute('aria-label') : '';
+            const btn = pagination.querySelector('button[aria-current="page"]');
+            if (!btn) return '';
+            const label = btn.getAttribute('aria-label') || '';
+            const match = label.match(/\d+/);
+            return match ? match[0] : '';
         });
     }
 

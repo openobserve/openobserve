@@ -42,17 +42,13 @@
       <div class="tw:w-[25%]">
         <div class="tw:flex tw:flex-col tw:px-2 tw:py-2">
           <div>
-            <OInput
+            <OSearchInput
               data-test="associated-regex-patterns-search-input"
               v-model="filterPattern"
               data-cy="schema-index-field-search-input"
               placeholder="Search"
               clearable
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
           </div>
           <div style="height: calc(100vh - 130px); overflow-y: auto">
             <div class="pattern-list-wrapper">
@@ -469,6 +465,7 @@ import ConfirmDialog from '../ConfirmDialog.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -493,6 +490,7 @@ export default defineComponent({
     OButton,
     OSpinner,
     OInput,
+    OSearchInput,
     ORadioGroup,
     ORadio,
     OCheckbox,

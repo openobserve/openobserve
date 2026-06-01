@@ -70,6 +70,7 @@ const hubRoute = computed(() => ({ name: "iam", query: orgQuery.value }));
 const routeToIamTab: Record<string, string> = {
   users: "users",
   serviceAccounts: "serviceAccounts",
+  ingestionTokens: "ingestionTokens",
   groups: "groups",
   editGroup: "groups",
   roles: "roles",
@@ -145,6 +146,14 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           to: { name: "serviceAccounts", query: orgQuery.value },
           visible: svc,
           dataTest: "iam-service-accounts-tab",
+        },
+        {
+          key: "ingestionTokens",
+          label: t("iam.ingestionTokens"),
+          description: "Tokens for ingesting data into this organization",
+          icon: "key",
+          to: { name: "ingestionTokens", query: orgQuery.value },
+          dataTest: "iam-ingestion-tokens-tab",
         },
         {
           key: "invitations",

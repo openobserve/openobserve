@@ -39,17 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:flex-1 tw:min-h-0 el-border-radius">
         <div class="tw:flex tw:flex-col tw:h-full">
           <div class="tw:pt-[0.625rem] tw:pl-1 tw:pr-4">
-          <OInput
+          <OSearchInput
             data-test="ai-integrations-search-input"
             v-model="integrationFilter"
             clearable
             class="tw:w-full indexlist-search-input"
             :placeholder="t('common.search')"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="tw:cursor-pointer" />
-            </template>
-          </OInput>
+          />
           </div>
           <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
             <OTabs
@@ -90,13 +86,11 @@ import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
 import OTab from '@/lib/navigation/Tabs/OTab.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 
 export default defineComponent({
   name: "AIIntegrationsPage",
-  components: { OTabs, OTab, OInput,
-    OIcon,
+  components: { OTabs, OTab, OSearchInput,
 },
   setup() {
     const { t } = useI18n();

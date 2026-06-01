@@ -45,15 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("logStream.header") }}
           </div>
           <div class="tw:ml-auto" data-test="stream-association-search-input">
-            <OInput
+            <OSearchInput
               v-model="filterQuery"
-              class="tw:mb-1 no-border"
+              class="tw:mb-1"
               :placeholder="t('logStream.search')"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
           </div>
           <OButton
             data-test="log-stream-refresh-stats-btn"
@@ -212,14 +208,14 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { SchemaIndex, NoData, OButton, ODrawer, OInnerLoading, OSwitch, OSelect, OInput,
+  components: { SchemaIndex, NoData, OButton, ODrawer, OInnerLoading, OSwitch, OSelect, OSearchInput,
     OIcon, OTable,
 },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],

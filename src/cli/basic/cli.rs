@@ -211,9 +211,17 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "reset" => {
             infra::init().await?;
             db::org_users::cache().await?;
+            db::org_ingestion_tokens::cache().await?;
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
+                    if let Err(msg) = config::utils::password::validate_password_strength(
+                        &cfg.auth.root_user_password,
+                    ) {
+                        return Err(anyhow::anyhow!(
+                            "ZO_ROOT_USER_PASSWORD does not meet policy: {msg}"
+                        ));
+                    }
                     let ret = users::update_user(
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
@@ -346,6 +354,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 "user" => {
                     db::user::cache().await?;
                     db::org_users::cache().await?;
+                    db::org_ingestion_tokens::cache().await?;
                     let mut id = 0;
                     for user in USERS.iter() {
                         id += 1;

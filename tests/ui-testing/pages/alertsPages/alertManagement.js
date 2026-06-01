@@ -211,7 +211,8 @@ export class AlertManagement {
             testLogger.debug('Already on alerts page, skipping navigation');
         }
 
-        await this.page.locator(this.locators.searchAcrossFoldersToggle).locator('div').nth(1).click({ force: true });
+        const toggleBtn = this.page.locator('[data-test="alert-list-search-across-folders-toggle-btn"]');
+        await toggleBtn.click({ force: true });
         await this.page.waitForTimeout(500);
 
         const inputField = this.page.locator(this.locators.alertSearchInputField);
@@ -477,7 +478,8 @@ export class AlertManagement {
             testLogger.info('Alert not found in current folder, retrying across all folders', { alertName });
             const toggle = this.page.locator(this.locators.searchAcrossFoldersToggle);
             if (await toggle.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await toggle.locator('div').nth(1).click({ force: true });
+                const toggleBtnAlt = this.page.locator('[data-test="alert-list-search-across-folders-toggle-btn"]');
+                await toggleBtnAlt.click({ force: true });
                 await this.page.waitForTimeout(500);
             }
             await this.searchAlert(alertName);

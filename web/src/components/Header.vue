@@ -261,18 +261,14 @@ size="xs" class="warning" />{{
               <!-- Search input for filtering organizations -->
               <template #top>
                 <div class="tw:w-full">
-                  <OInput
+                  <OSearchInput
                     data-test="organization-search-input"
                     v-model="searchQuery"
                     clearable
                     :debounce="1"
                     autofocus
                     placeholder="Search Organization"
-                  >
-                    <template #icon-left>
-                      <OIcon name="search" size="sm" />
-                    </template>
-                  </OInput>
+                  />
                 </div>
               </template>
 
@@ -539,7 +535,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ChromeBreadcrumb from "@/components/common/ChromeBreadcrumb.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -557,7 +553,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-    OInput,
+    OSearchInput,
     ODropdown,
     OTable,
     ODropdownItem,

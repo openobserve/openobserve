@@ -693,9 +693,13 @@ test.describe("Cross-Linking testcases", () => {
             fields: ['kubernetes_container_name']
         });
 
-        // Click Update Settings to persist to backend
+        // Click Update Settings to persist to backend and wait for the API response
+        const settingsResponsePromise = page.waitForResponse(
+            (resp) => resp.url().includes('/streams/') && resp.url().includes('/settings') && resp.request().method() === 'PUT',
+            { timeout: 15000 }
+        );
         await pm.crossLinkPage.clickUpdateSettings();
-        await page.waitForTimeout(2000);
+        await settingsResponsePromise;
 
         // Reload the page completely and navigate back
         await pm.crossLinkPage.navigateToStreams();
@@ -703,9 +707,16 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.openStreamDetail();
         await pm.crossLinkPage.clickCrossLinkingTab();
 
-        // Verify the cross-link survived the reload
+        // Verify the cross-link survived the reload.
+        // Poll for the item — the cross-link list container renders before
+        // the individual items finish loading from the settings API.
         await pm.crossLinkPage.expectCrossLinkListVisible();
-        const itemText = await pm.crossLinkPage.getCrossLinkItemText(0);
+        await expect.poll(
+            () => pm.crossLinkPage.findCrossLinkItemIndexByName(linkName),
+            { timeout: 10000, message: `Cross-link "${linkName}" should exist after reload` }
+        ).toBeGreaterThanOrEqual(0);
+        const idx = await pm.crossLinkPage.findCrossLinkItemIndexByName(linkName);
+        const itemText = await pm.crossLinkPage.getCrossLinkItemText(idx);
         expect(itemText).toContain(linkName);
         expect(itemText).toContain('persist.example.com');
 

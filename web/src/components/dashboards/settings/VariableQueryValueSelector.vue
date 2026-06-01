@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <OSelect
       ref="selectRef"
-      style="min-width: 9.375rem"
+      style="min-width: 9.375rem; max-width: 40rem"
       :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"

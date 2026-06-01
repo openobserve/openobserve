@@ -135,6 +135,7 @@ export class AlertsPage {
 
             // QueryConfig "Alert if" row + group-by selectors (data-test added on rows)
             alertIfRowLogs: '[data-test="alert-if-row-logs"]',
+            alertAggregationFunctionSelect: '[data-test="alert-aggregation-function-select"]',
             alertGroupByRow: '[data-test="alert-group-by-row"]',
             alertHavingGroupsRow: '[data-test="alert-having-groups-row"]',
             alertGroupByAddButton: '[data-test="alert-group-by-add-btn"]',
@@ -1220,6 +1221,21 @@ export class AlertsPage {
      * Note: Incidents menu item depends on service_graph_enabled config from the server.
      * The menu item may take time to render while the config API response is processed.
      */
+
+    /**
+     * Returns true if the incidents sidebar menu item becomes visible within the given timeout.
+     * Use this in beforeEach to skip enterprise tests on OSS environments.
+     * @param {number} timeout - ms to wait (default 5000)
+     */
+    async isIncidentsFeatureEnabled(timeout = 5000) {
+        try {
+            await this.page.locator(this.locators.incidentsMenuItem).waitFor({ state: 'visible', timeout });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     async navigateToIncidentsPage() {
         testLogger.info('Navigating to Incidents page');
         // Wait for the incidents menu item to be available (may take time for config to load)
@@ -3486,9 +3502,9 @@ export class AlertsPage {
      * @returns {Locator} The function dropdown q-select element
      */
     getAggregationToggle() {
-        // In v3, the function dropdown is the first .alert-v3-select in the "Alert if" row
-        const alertIfSection = this.page.locator(this.locators.alertIfRowLogs);
-        return alertIfSection.locator('.alert-v3-select').first();
+        // The aggregation function OSelect has no data-test. Its trigger is the first
+        // <button type="button"> inside the "Alert if" row.
+        return this.page.locator('[data-test="alert-if-row-logs"] button[type="button"]').first();
     }
 
     /**
@@ -3497,11 +3513,18 @@ export class AlertsPage {
      * @param {string} functionValue - Internal value, e.g. 'count', 'total_events', 'avg'
      */
     async _selectAggregationOption(functionValue) {
-        // OSelect popovers expose option items via [data-test$="-option"] with data-test-value
-        const option = this.page.locator(`[data-test$="-popover"] [data-test$="-option"][data-test-value="${functionValue}"]`).first();
+        // OSelect with data-test emits <parent>-option attributes on options and
+        // <parent>-popover on the popover. When data-test is absent (function
+        // dropdown has none), fall back to data-test-value + role="option".
+        let option = this.page.locator(`[data-test$="-popover"] [data-test$="-option"][data-test-value="${functionValue}"]`).first();
+        const found = await option.isVisible({ timeout: 2000 }).catch(() => false);
+        if (!found) {
+            option = this.page.locator(`[role="option"][data-test-value="${functionValue}"]`).first();
+        }
         await option.waitFor({ state: 'visible', timeout: 5000 });
         await option.click();
         // Wait for popover dismissal so subsequent assertions don't race
+        await this.page.locator('[role="listbox"]').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
     }
 
@@ -3511,7 +3534,7 @@ export class AlertsPage {
      */
     async enableAggregation() {
         const toggle = this.getAggregationToggle();
-        await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await toggle.waitFor({ state: 'visible', timeout: 30000 });
         await toggle.click();
         await this._selectAggregationOption('count');
         testLogger.info('Aggregation enabled via count function');
@@ -3546,13 +3569,16 @@ export class AlertsPage {
 
     /**
      * Get the locator for the aggregation field dropdown (the field selector next to
-     * the aggregation function dropdown in the "Alert if" row). This is the second
-     * .alert-v3-select in the alert-condition-row that contains "Alert if".
+     * the aggregation function dropdown in the "Alert if" row). After the O2 migration
+     * the OSelect has no data-test so we locate it as the second <button> trigger in
+     * the alert-if-row-logs container.
      * @returns {Locator}
      */
     getAggregationFieldSelect() {
-        const alertIfSection = this.page.locator('.alert-condition-row').filter({ hasText: 'Alert if' }).first();
-        return alertIfSection.locator('.alert-v3-select').nth(1);
+        // O2: the field OSelect has no data-test. Its trigger is the second
+        // <button type="button"> inside the "Alert if" row (the first is the
+        // aggregation function selector).
+        return this.page.locator('[data-test="alert-if-row-logs"] button[type="button"]').nth(1);
     }
 
     /**
@@ -3567,7 +3593,13 @@ export class AlertsPage {
         await fieldSelect.click();
         await this.page.waitForTimeout(500);
 
-        const menuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        // O2: when parent OSelect has no data-test, the popover lacks the -popover
+        // suffix and options lack the -option suffix. Fall back to role-based locators.
+        let menuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        const hasSuffixedOptions = await menuItems.first().isVisible({ timeout: 2000 }).catch(() => false);
+        if (!hasSuffixedOptions) {
+            menuItems = this.page.locator('[role="option"]');
+        }
         const count = await menuItems.count();
         const fields = [];
         for (let i = 0; i < count; i++) {

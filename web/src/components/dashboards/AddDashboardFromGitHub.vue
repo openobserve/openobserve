@@ -54,17 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dashboard List -->
         <div v-else class="tw:flex tw:flex-col tw:mx-2 tw:my-2">
-          <OInput
+          <OSearchInput
             v-model="searchQuery"
             placeholder="Search dashboards..."
             clearable
             class="tw:mb-4"
             data-test="add-dashboard-github-search"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
+          />
 
           <div class="tw:text-xs tw:text-gray-500 tw:mb-2 tw:px-1">
             {{ filteredDashboards.length }} dashboard(s) available
@@ -173,7 +169,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -189,7 +185,7 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
-  components: { AddFolder, OButton, ODialog, ODrawer, OInput, OSelect, OCheckbox, OSpinner,
+  components: { AddFolder, OButton, ODialog, ODrawer, OSearchInput, OSelect, OCheckbox, OSpinner,
     OIcon,
 },
   props: {
@@ -583,7 +579,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .dashboard-list {
-  max-height: calc(100dvh - 230px);
+  max-height: calc(100dvh - 200px);
   overflow-y: auto;
   list-style: none;
   padding: 0;

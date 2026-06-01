@@ -124,6 +124,11 @@
     "create": "创建",
     "resources": "资源",
     "updated_at": "更新于",
+    "enable": "启用",
+    "disable": "禁用",
+    "download": "下载",
+    "enabled": "已启用",
+    "disabled": "已禁用",
     "error": "错误",
     "db": "数据库",
     "discardChanges": "放弃更改",
@@ -1141,7 +1146,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Sub Logs",
-    "aiLabel": "人工智能集成"
+    "aiLabel": "人工智能集成",
+    "manageTokensBtnLabel": "管理代币",
+    "orgLevelExplanation": "这些是组织级别的摄取令牌。它们与个人用户无关，即使创建它们的用户离开组织，它们也将继续工作。令牌只能在摄取端点上使用。",
+    "resetDefaultTokenLabel": "重置代币",
+    "tokenManagementTitle": "管理摄取令牌",
+    "defaultTokenBadge": "默认",
+    "createTokenBtn": "创建新代币",
+    "createTokenTitle": "创建代币",
+    "tokenNameLabel": "姓名",
+    "tokenDescriptionLabel": "描述",
+    "rotateTokenBtn": "旋转",
+    "deleteTokenBtn": "删除",
+    "copyTokenBtn": "复制",
+    "copyTokenWarning": "立即复制此令牌。它不会再次显示。",
+    "newTokenRevealed": "新代币生成",
+    "deleteTokenConfirm": "删除令牌 “{name}”？使用此代币的管道将停止运行。",
+    "rotateTokenConfirm": "轮换代币 “{name}”？所有使用此令牌的管道都必须使用新值进行更新。",
+    "tokenCreatedSuccess": "已成功创建代币。",
+    "tokenRotatedSuccess": "代币成功轮换。",
+    "tokenDeletedSuccess": "令牌已成功删除。",
+    "resetDefaultConfirm": "重置默认摄取令牌？所有使用此令牌的管道都必须更新。",
+    "tokenFetchError": "加载令牌失败。",
+    "tokenCreateError": "创建令牌失败。",
+    "tokenRotateError": "轮换令牌失败。",
+    "tokenDeleteError": "删除令牌失败。",
+    "noTokensFound": "未找到摄取令牌。",
+    "createdBy": "由... 创建"
   },
   "dashboard": {
     "selectField": "字段",
@@ -2606,7 +2637,8 @@
     "systemDefault": "系统默认",
     "usageStreamEnabledLabel": "启用使用流",
     "aiToolsets": "AI 工具集",
-    "llmModelPricing": "LLM 模型定价"
+    "llmModelPricing": "LLM 模型定价",
+    "ingestionTokens": "摄取代币"
   },
   "iam": {
     "users": "用户",
@@ -2638,7 +2670,8 @@
     "quota": "配额",
     "externalUserWarningTitle": "外部用户警告",
     "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
-    "invitations": "邀请"
+    "invitations": "邀请",
+    "ingestionTokens": "摄取代币"
   },
   "pipeline": {
     "header": "流水线",
@@ -3838,5 +3871,56 @@
     "awsStsSelfHostedInfo": "这使用 AWS sts 来代入角色并执行操作。确保您在安装环境中配置了有权访问此角色的 aws 证书。",
     "externalIdRequired": "外部 ID 为必填项",
     "storageAccountRequired": "存储账户名称为必填项"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "早上好",
+      "afternoon": "下午好",
+      "evening": "晚上好",
+      "night": "工作到很晚"
+    },
+    "welcome": {
+      "taglineLead": "我是",
+      "taglineHighlight": "O2 助手",
+      "taglineTail": "。我可以写你的",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "PromQL",
+      "taglineAnd": "并引导您浏览日志、跟踪、指标和事件。",
+      "signedInAs": "登录身份",
+      "role": "角色",
+      "tryOneOfThese": "或者试试其中一个"
+    },
+    "capabilities": {
+      "query": {
+        "title": "写一个查询",
+        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。"
+      },
+      "incident": {
+        "title": "调查事件",
+        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”"
+      },
+      "dashboard": {
+        "title": "构建仪表板",
+        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。"
+      },
+      "alert": {
+        "title": "创建警报",
+        "description": "阈值或预设警报，以及采集时间 VRL 管道。"
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "编写 VRL 来解析我的 nginx 日志中的 JSON",
+      "regexRedact": "生成用于编辑电子邮件的正则表达式模式",
+      "mapStreamSchema": "映射我的 “默认” 直播架构",
+      "promqlCpu": "使用 > 80% 的 CPU 为 pod 编写 PromQL",
+      "datadogToO2": "将此 Datadog 查询转换为 OpenObserve SQL",
+      "lastAlertFired": "为什么我最后一次警报被触发？"
+    },
+    "placeholderRotation": {
+      "one": "让我看看过去一小时的错误...",
+      "two": "编写 VRL 来解析 nginx 日志中的 JSON...",
+      "three": "为 K8s 节点运行状况构建仪表板..."
+    }
   }
 }

@@ -35,16 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:full-width tw:flex tw:items-center tw:justify-end tw:gap-3"
           >
-            <OInput
+            <OSearchInput
               v-model="filterQuery"
               class="tw:ml-auto no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
-            >
-              <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-            </OInput>
+            />
             <OButton
               data-test="action-list-add-btn"
               variant="primary"
@@ -245,6 +241,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -278,6 +275,7 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OInput,
+    OSearchInput,
     OCheckbox,
     OTooltip,
     OSelect,

@@ -34,16 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
             <!-- Search input -->
-            <OInput
+            <OSearchInput
               data-test="eval-template-list-search-input"
               v-model="filterQuery"
               class="tw:ml-2 tw:w-[200px]"
               :placeholder="t('evalTemplate.search')"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
 
             <!-- Refresh button -->
             <OButton
@@ -178,8 +174,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Template {

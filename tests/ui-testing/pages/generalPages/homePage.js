@@ -705,7 +705,7 @@ export class HomePage {
      */
     async validateIngestionPageElements() {
         await expect(this.ingestionPageIndicator).toBeVisible({ timeout: 10000 });
-        await expect(this.page.locator('[data-test="ingestion-reset-token-btn"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByRole('button', { name: /Manage Tokens/i })).toBeVisible({ timeout: 5000 });
     }
 
     /**
