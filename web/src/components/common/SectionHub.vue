@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the same shape used by the rail/switcher, with an added `description`.
 -->
 <template>
-  <ConstrainedPage size="lg" class="o2-section-hub" data-test="section-hub">
-    <div>
+  <div class="o2-section-hub tw:h-full tw:overflow-y-auto" data-test="section-hub">
+    <div class="tw:mx-auto tw:max-w-5xl tw:px-6 tw:py-6">
       <header v-if="title || description" class="tw:mb-6">
         <h1
           v-if="title"
@@ -65,12 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in group.items"
             :key="item.key"
             type="button"
-            class="o2-hub-card tw:group tw:flex tw:items-start tw:gap-3 tw:text-left tw:p-4 tw:rounded-lg tw:border tw:border-border-default tw:bg-surface-panel tw:transition-colors tw:hover:border-primary-500 tw:hover:bg-surface-subtle tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
+            class="o2-hub-card tw:group tw:flex tw:items-start tw:gap-3 tw:text-left tw:p-4 tw:rounded-lg tw:border tw:border-border-default tw:transition tw:hover:border-primary-500 tw:hover:bg-surface-subtle tw:hover:shadow-sm tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
             :data-test="item.dataTest || `section-hub-card-${item.key}`"
             @click="router.push(item.to)"
           >
             <span
-              class="tw:shrink-0 tw:mt-0.5 tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-md tw:bg-surface-subtle tw:text-text-secondary tw:transition-colors tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600"
+              class="tw:shrink-0 tw:mt-0.5 tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-md tw:bg-surface-subtle tw:text-text-secondary tw:transition-colors tw:group-hover:text-primary-600"
             >
               <img
                 v-if="item.icon && isImg(item.icon)"
@@ -96,14 +96,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </section>
     </div>
-  </ConstrainedPage>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 
 const router = useRouter();
 

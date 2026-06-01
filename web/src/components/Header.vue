@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
-      class="tw:flex relative-position tw:mr-2"
+      class="tw:flex relative-position"
       v-if="
         (config.isEnterprise == 'true' &&
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10 tw:min-w-[150px]"
+        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10"
       >
         <img
           data-test="header-openobserve-logo"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="tw:flex relative-position tw:mr-2 logo-container">
+    <div v-else class="tw:flex relative-position logo-container">
       <img
         data-test="header-openobserve-logo"
         class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
@@ -129,8 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div><!-- end left side -->
 
+    <!-- CENTER: global breadcrumb — the page's "you are here", published by each
+         page (falls back to the route title). Takes the elastic middle so the
+         right-side controls shrink to content. -->
+    <ChromeBreadcrumb class="tw:flex-1 tw:min-w-0 tw:px-3" />
+
     <!-- RIGHT SIDE: Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:flex-1 tw:min-w-0 tw:pr-3 tw:gap-1">
+    <div class="tw:flex tw:items-center tw:justify-end tw:shrink-0 tw:pr-3 tw:gap-1">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
       class="headerMenu tw:flex tw:items-center tw:gap-1"
@@ -528,6 +533,7 @@ import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ChromeBreadcrumb from "@/components/common/ChromeBreadcrumb.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -543,6 +549,7 @@ export default defineComponent({
   components: {
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
+    ChromeBreadcrumb,
     OButton,
     OIcon,
     OTooltip,
@@ -897,7 +904,9 @@ export default defineComponent({
   display: inline-flex;
   align-items: center;
   min-height: 2.5rem;
-  min-width: 9.375rem;
+  /* No min-width: the wordmark is ~120px, so reserving 150px left an empty gap
+     before the breadcrumb. The enterprise custom-logo branch keeps its own
+     Tailwind min-w-[150px] where it's still wanted. */
 }
 
 .openobserve-logo {

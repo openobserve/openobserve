@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               v-if="group.label"
-              class="tw:px-3 tw:pt-2 tw:pb-1 tw:text-[11px] tw:font-semibold tw:text-text-disabled tw:select-none"
+              class="tw:px-3 tw:pt-2 tw:pb-1 tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide tw:text-text-disabled tw:select-none"
             >
               {{ group.label }}
             </div>

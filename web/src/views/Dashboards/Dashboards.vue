@@ -20,13 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <PageLayout
     :key="store.state.selectedOrganization.identifier"
     :sidebar-width="200"
+    :header-class="'tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default'"
   >
-    <!-- ── Page header ──────────────────────────────────────────── -->
+    <!-- ── Page header (row 1) ──────────────────────────────────────
+         The breadcrumb path now lives in the top chrome bar (published
+         below); this row carries the page title + description + actions. -->
     <template #header>
       <AppPageHeader
-        icon="dashboard"
         :title="t('dashboard.header')"
-        subtitle="Create, organize, and explore your observability dashboards."
+        icon="dashboard"
+        subtitle="Create, organize, and share dashboards across folders"
       >
       <template #actions>
         <!-- import dashboard button with dropdown -->
@@ -76,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`dashboard.add`) }}
         </OButton>
       </template>
-        </AppPageHeader>
+      </AppPageHeader>
     </template>
 
     <!-- ── Folder rail ──────────────────────────────────────────── -->
@@ -533,7 +536,9 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  onActivated,
   onBeforeUnmount,
+  onDeactivated,
   onMounted,
   onUnmounted,
   ref,
@@ -546,6 +551,10 @@ import { useI18n } from "vue-i18n";
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  useAppBreadcrumb,
+  type Crumb,
+} from "@/composables/useAppBreadcrumb";
 import NoDashboards from "@/components/common/empty-states/NoDashboards.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -633,6 +642,22 @@ export default defineComponent({
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
+
+    // Publish the breadcrumb path to the top chrome bar (single root crumb;
+    // the page title + description live in the row-1 AppPageHeader).
+    const crumbs = computed<Crumb[]>(() => [
+      {
+        label: t("dashboard.header"),
+        icon: "dashboard",
+        current: true,
+        dataTest: "breadcrumb-dashboards-root",
+      },
+    ]);
+    const { publish, clear } = useAppBreadcrumb();
+    watch(crumbs, (c) => publish(c), { immediate: true });
+    onActivated(() => publish(crumbs.value));
+    onDeactivated(clear);
+    onUnmounted(clear);
 
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
