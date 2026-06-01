@@ -267,6 +267,8 @@ import * as echarts from "echarts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import serviceGraphService from "@/services/service_graph";
+import searchService from "@/services/search";
+import streamService from "@/services/stream";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import {
@@ -1106,6 +1108,149 @@ export default defineComponent({
       }
     });
 
+    // Query the raw trace stream directly for CLIENT spans that call databases
+    // (db_system / db_name attrs) or uninstrumented external services (peer_service attr).
+    // These never emit SERVER spans, so the pre-computed topology stream misses them entirely.
+    //
+    // Field names use underscore form because OpenObserve's flatten util converts dots to
+    // underscores on ingest: db.system → db_system, db.name → db_name, peer.service → peer_service.
+    //
+    // DataFusion rejects SQL at planning time if any referenced column is absent from the
+    // stream schema. We therefore fetch the schema first and build the query with only the
+    // columns that actually exist, skipping the whole augmentation when none are present.
+    const fetchDatabaseEdges = async (
+      orgId: string,
+      stream: string,
+      startTime: number,
+      endTime: number,
+    ): Promise<{ nodes: any[]; edges: any[] }> => {
+      if (!stream || stream === "all") return { nodes: [], edges: [] };
+
+      // Step 1 — resolve which db-indicator fields exist in this stream's schema
+      let schemaFieldSet = new Set<string>();
+      try {
+        const schemaResponse = await streamService.schema(orgId, stream, "traces");
+        const schemaFields: { name: string }[] =
+          schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+        schemaFieldSet = new Set(schemaFields.map((f: any) => f.name));
+      } catch {
+        // Schema fetch failed — skip augmentation rather than letting the search fail
+        return { nodes: [], edges: [] };
+      }
+
+      // Priority: peer_service (most specific) > db_name (logical name) > db_system (type)
+      const coalesceFields = (["peer_service", "db_name", "db_system"] as const).filter((f) =>
+        schemaFieldSet.has(f),
+      );
+      if (coalesceFields.length === 0) return { nodes: [], edges: [] };
+
+      // Step 2 — build SQL referencing only fields that are present in the schema
+      const coalesceExpr =
+        coalesceFields.length > 1
+          ? `COALESCE(${coalesceFields.map((f) => `c.${f}`).join(", ")})`
+          : `c.${coalesceFields[0]}`;
+
+      const filterClauses = coalesceFields
+        .filter((f) => f === "peer_service" || f === "db_system")
+        .map((f) => `c.${f} IS NOT NULL`)
+        .join(" OR ");
+
+      const sql = `SELECT
+        c.service_name AS client,
+        ${coalesceExpr} AS server,
+        COUNT(*) AS total_requests,
+        COUNT(*) FILTER (WHERE c.span_status = 'ERROR') AS errors,
+        CAST(COUNT(*) FILTER (WHERE c.span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+        CAST(approx_median(c.end_time - c.start_time) AS BIGINT) AS p50_latency_ns,
+        CAST(approx_percentile_cont(c.end_time - c.start_time, 0.95) AS BIGINT) AS p95_latency_ns,
+        CAST(approx_percentile_cont(c.end_time - c.start_time, 0.99) AS BIGINT) AS p99_latency_ns
+      FROM "${stream}" AS c
+      WHERE
+        c._timestamp >= ${startTime} AND c._timestamp < ${endTime}
+        AND CAST(c.span_kind AS VARCHAR) = '3'
+        AND c.service_name IS NOT NULL
+        AND (${filterClauses})
+        AND ${coalesceExpr} IS NOT NULL
+      GROUP BY
+        c.service_name,
+        ${coalesceExpr}`;
+
+      // Step 3 — run the query and convert hits to nodes + edges
+      try {
+        const response = await searchService.search({
+          org_identifier: orgId,
+          query: {
+            query: {
+              sql,
+              start_time: startTime,
+              end_time: endTime,
+              from: 0,
+              size: 10000,
+            },
+          },
+          page_type: "traces",
+        });
+
+        const hits: any[] = response.data?.hits || [];
+        if (hits.length === 0) return { nodes: [], edges: [] };
+
+        // Accumulate per-service request counts for node construction
+        const serviceStats = new Map<string, { requests: number; errors: number }>();
+        const edgeList: any[] = [];
+
+        for (const hit of hits) {
+          const clientName: string | null = hit.client ?? null;
+          const serverName: string = hit.server;
+          if (!serverName) continue;
+
+          const totalReq = Number(hit.total_requests) || 0;
+          const failedReq = Number(hit.errors) || 0;
+          const errorRate =
+            Number(hit.error_rate) || (totalReq > 0 ? (failedReq / totalReq) * 100 : 0);
+
+          if (clientName) {
+            const s = serviceStats.get(clientName) ?? { requests: 0, errors: 0 };
+            s.requests += totalReq;
+            s.errors += failedReq;
+            serviceStats.set(clientName, s);
+          }
+          const s = serviceStats.get(serverName) ?? { requests: 0, errors: 0 };
+          s.requests += totalReq;
+          s.errors += failedReq;
+          serviceStats.set(serverName, s);
+
+          edgeList.push({
+            id: `${clientName}->${serverName}`,
+            from: clientName,
+            to: serverName,
+            total_requests: totalReq,
+            failed_requests: failedReq,
+            error_rate: errorRate,
+            p50_latency_ns: Number(hit.p50_latency_ns) || 0,
+            p95_latency_ns: Number(hit.p95_latency_ns) || 0,
+            p99_latency_ns: Number(hit.p99_latency_ns) || 0,
+            baseline_p50_latency_ns: null,
+            baseline_p95_latency_ns: null,
+            baseline_p99_latency_ns: null,
+          });
+        }
+
+        const nodeList = Array.from(serviceStats.entries()).map(([id, s]) => ({
+          id,
+          label: id,
+          requests: s.requests,
+          errors: s.errors,
+          error_rate: s.requests > 0 ? (s.errors / s.requests) * 100 : 0,
+          is_virtual: false,
+        }));
+
+        return { nodes: nodeList, edges: edgeList };
+      } catch (err) {
+        console.warn("[ServiceGraph] Database edge query failed (non-fatal):", err);
+        return { nodes: [], edges: [] };
+      }
+    };
+
     const loadServiceGraph = async () => {
       // Prevent concurrent loads — if already loading, skip
       if (loading.value) return;
@@ -1177,6 +1322,42 @@ export default defineComponent({
             baseline_p95_latency_ns: edge.baseline_p95_latency_ns ?? null,
             baseline_p99_latency_ns: edge.baseline_p99_latency_ns ?? null,
           }));
+
+        // Augment topology with database / external-service edges fetched directly
+        // from the raw trace stream. These edges are invisible to the pre-computed
+        // topology stream because databases (and uninstrumented external services)
+        // never emit SERVER spans — only the calling service emits a CLIENT span.
+        const dbData = await fetchDatabaseEdges(
+          orgId,
+          streamFilter.value && streamFilter.value !== "all" ? streamFilter.value : "",
+          searchObj.data.datetime.startTime,
+          searchObj.data.datetime.endTime,
+        );
+
+        if (dbData.nodes.length > 0 || dbData.edges.length > 0) {
+          // Track which IDs are already present so we don't duplicate
+          const existingNodeIds = new Set(nodes.map((n: any) => n.id));
+
+          // Add database / external-service nodes not already in topology.
+          // Client service nodes are already present with correct stats from topology.
+          for (const dbNode of dbData.nodes) {
+            if (!existingNodeIds.has(dbNode.id)) {
+              nodes.push(dbNode);
+              existingNodeIds.add(dbNode.id);
+            }
+          }
+
+          // Add database edges. Both endpoints must exist after the node merge above.
+          const existingEdgeIds = new Set(edges.map((e: any) => e.id));
+          for (const dbEdge of dbData.edges) {
+            if (existingEdgeIds.has(dbEdge.id)) continue;
+            const fromOk = dbEdge.from === null || existingNodeIds.has(dbEdge.from);
+            const toOk = existingNodeIds.has(dbEdge.to);
+            if (fromOk && toOk) {
+              edges.push(dbEdge);
+            }
+          }
+        }
 
         graphData.value = {
           nodes,
