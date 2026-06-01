@@ -15,7 +15,7 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, it, expect } from "vitest";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
+import FieldTypeBadge from "@/components/common/badges/FieldTypeBadge.vue";
 
 describe("FieldTypeBadge.vue", () => {
   const createWrapper = (props: Record<string, any> = {}) =>

@@ -87,14 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
           <template #cell-auth="{ row }">
-            <OBadge
-              v-if="row.auth_type"
-              :variant="row.auth_type === 'SSO' ? 'primary-outline' : 'default-outline'"
-              size="sm"
-              class="o2-role-chip"
-            >
-              {{ row.auth_type }}
-            </OBadge>
+            <AuthTypeBadge v-if="row.auth_type" :auth-type="row.auth_type" />
           </template>
 
           <!-- Roles badges — yellow outline for built-in, red outline for custom.
@@ -102,15 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                custom role names keep their original casing (nmcdev/admin/etc.). -->
           <template #cell-roles="{ row }">
             <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-1">
-              <OBadge
+              <RoleBadge
                 v-for="(roleName, idx) in (row.roles || [])"
                 :key="`${roleName}-${idx}`"
-                :variant="isBuiltinRole(roleName) ? 'warning-outline' : 'error-outline'"
-                size="md"
-                class="o2-role-chip"
-              >
-                {{ isBuiltinRole(roleName) ? toCamelCase(roleName) : roleName }}
-              </OBadge>
+                :role-name="roleName"
+              />
             </div>
           </template>
 
@@ -223,7 +212,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AuthTypeBadge from "@/components/iam/users/badges/AuthTypeBadge.vue";
+import RoleBadge from "@/components/iam/users/badges/RoleBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -260,7 +250,8 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
-    OBadge,
+    AuthTypeBadge,
+    RoleBadge,
     OIcon,
     ODialog,
     OInput,
@@ -427,19 +418,6 @@ export default defineComponent({
       return cols;
     });
 
-    // Built-in role names get the muted (yellow) outline badge; anything else
-    // is treated as a custom role and gets the destructive (red) outline badge.
-    const BUILTIN_ROLES = new Set([
-      "admin",
-      "viewer",
-      "user",
-      "root",
-      "member",
-      "editor",
-      "serviceaccount",
-    ]);
-    const isBuiltinRole = (r: string) =>
-      BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
     const options = ref([]);
     const customRoles = ref([]);
@@ -1188,7 +1166,6 @@ export default defineComponent({
       store,
       config,
       isEnterpriseOrCloud,
-      isBuiltinRole,
       toCamelCase,
       usersState,
       columns,

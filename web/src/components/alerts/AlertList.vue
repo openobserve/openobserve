@@ -221,27 +221,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-status="{ row }">
                   <template v-if="row.status && row.status !== '--'">
-                    <OBadge
-                      :variant="
-                        row.status === 'failed'
-                          ? 'error'
-                          : row.status === 'active'
-                            ? 'success'
-                            : row.status === 'training'
-                              ? 'warning'
-                              : row.status === 'disabled'
-                                ? 'default'
-                                : 'success'
-                      "
-                      class="tw:capitalize tw:cursor-default"
-                    >
-                      {{ row.status }}
+                    <AlertStatusBadge :status="row.status">
                       <OTooltip
                         v-if="row.status === 'failed' && row.last_error"
                         :max-width="'400px'"
                         :content="row.last_error"
                       />
-                    </OBadge>
+                    </AlertStatusBadge>
                   </template>
                   <span v-else class="tw:block">--</span>
                 </template>
@@ -684,7 +670,7 @@ import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AlertStatusBadge from "@/components/alerts/badges/AlertStatusBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -721,7 +707,7 @@ export default defineComponent({
     ODropdownItem,
     ODropdownSeparator,
     OSpinner,
-    OBadge,
+    AlertStatusBadge,
     OSelect,
     OTable,
   },

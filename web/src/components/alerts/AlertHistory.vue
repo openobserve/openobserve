@@ -152,12 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-status="{ value }">
-            <OBadge
-              :variant="getStatusVariant(value)"
-              size="sm"
-            >
-              {{ value }}
-            </OBadge>
+            <PipelineRunStatusBadge :status="value" />
           </template>
 
           <template #cell-is_realtime="{ value }">
@@ -271,12 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="tw:w-1/2">
                   <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
-                  <OBadge
-                    :variant="getStatusVariant(selectedRow.status)"
-                    size="sm"
-                  >
-                    {{ selectedRow.status }}
-                  </OBadge>
+                  <PipelineRunStatusBadge :status="selectedRow.status" />
                 </div>
               </div>
             </div>
@@ -488,7 +478,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import PipelineRunStatusBadge from "@/components/pipelines/badges/PipelineRunStatusBadge.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -837,25 +827,6 @@ const formatDuration = (microseconds: number) => {
     return `${minutes}m ${seconds % 60}s`;
   }
   return `${seconds}s`;
-};
-
-const getStatusVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "success":
-    case "ok":
-    case "completed":
-      return "success-outline";
-    case "error":
-    case "failed":
-      return "error-outline";
-    case "warning":
-      return "warning-outline";
-    case "pending":
-    case "running":
-      return "primary-outline";
-    default:
-      return "default-outline";
-  }
 };
 
 const showDetailsDialog = (row: any) => {

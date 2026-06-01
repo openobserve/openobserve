@@ -91,9 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="ov-row-body">
             <div class="ov-row-title">
-              <span class="ov-severity-badge" :class="`ov-sev-${(inc.severity || 'p4').toLowerCase()}`">
-                {{ (inc.severity || 'P4').toUpperCase() }}
-              </span>
+              <IncidentSeverityBadge :severity="inc.severity || 'P4'" />
               {{ inc.title || t('overview.untitledIncident') }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
                 <span
@@ -248,6 +246,7 @@ import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
+import IncidentSeverityBadge from "@/components/alerts/badges/IncidentSeverityBadge.vue";
 
 const { t } = useI18n();
 const store = useStore();
@@ -984,61 +983,6 @@ body.body--dark {
     color: #f9cbcb;
     background: #401a1a;
     border-color: rgba(239, 68, 68, 0.35);
-  }
-}
-
-/* ── Severity badge ── */
-.ov-severity-badge {
-  display: inline-block;
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.2rem;
-  letter-spacing: 0.04em;
-
-  &.ov-sev-p1 {
-    background: #fef2f2;
-    color: #b91c1c;
-    border: 0.0625em solid #fca5a5;
-  }
-  &.ov-sev-p2 {
-    background: #fff7ed;
-    color: #c2410c;
-    border: 0.0625em solid #fdba74;
-  }
-  &.ov-sev-p3 {
-    background: #fefce8;
-    color: #a16207;
-    border: 0.0625em solid #fde047;
-  }
-  &.ov-sev-p4 {
-    background: #f0f9ff;
-    color: #0369a1;
-    border: 0.0625em solid #7dd3fc;
-  }
-}
-
-/* Dark mode severity badges */
-:root.body--dark {
-  .ov-sev-p1 {
-    background: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.3);
-  }
-  .ov-sev-p2 {
-    background: rgba(249, 115, 22, 0.15);
-    color: #fdba74;
-    border-color: rgba(249, 115, 22, 0.3);
-  }
-  .ov-sev-p3 {
-    background: rgba(234, 179, 8, 0.15);
-    color: #fde047;
-    border-color: rgba(234, 179, 8, 0.3);
-  }
-  .ov-sev-p4 {
-    background: rgba(59, 130, 246, 0.15);
-    color: #7dd3fc;
-    border-color: rgba(59, 130, 246, 0.3);
   }
 }
 

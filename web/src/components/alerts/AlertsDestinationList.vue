@@ -116,11 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-type="{ row }">
             <div class="tw:flex tw:items-center tw:gap-2">
               <template v-if="getPrebuiltTypeName(row)">
-                <OBadge
+                <DestinationTypeBadge
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
-                  variant="primary"
-                  class="tw:text-xs"
-                >{{ getPrebuiltTypeName(row) }}</OBadge>
+                  :is-prebuilt="true"
+                  :label="getPrebuiltTypeName(row)"
+                />
                 <OIcon
                   name="auto-awesome"
                   size="sm"
@@ -128,11 +128,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else>
-                <OBadge
+                <DestinationTypeBadge
                   data-test="destination-type-badge-custom"
-                  variant="default"
-                  class="tw:text-xs"
-                >{{ getCustomDestinationLabel(row) }}</OBadge>
+                  :is-prebuilt="false"
+                  :label="getCustomDestinationLabel(row)"
+                />
                 <OIcon
                   name="settings"
                   size="sm"
@@ -242,7 +242,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
-import OBadge from '@/lib/core/Badge/OBadge.vue';
+import DestinationTypeBadge from '@/components/alerts/badges/DestinationTypeBadge.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -262,7 +262,7 @@ export default defineComponent({
     OButton,
     OInput,
     OCheckbox,
-    OBadge,
+    DestinationTypeBadge,
     OTable,
   },
   setup() {

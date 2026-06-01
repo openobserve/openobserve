@@ -68,8 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Compact Status, Severity, Alerts badges at extreme right -->
       <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
         <!-- Status Badge -->
-        <OBadge
-          :variant="getStatusVariant(incidentDetails.status)"
+        <IncidentStatusBadge
+          :status="incidentDetails.status"
           class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -77,11 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ getStatusLabel(incidentDetails.status) }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
-        </OBadge>
+        </IncidentStatusBadge>
 
         <!-- Severity Badge -->
-        <OBadge
-          :variant="getSeverityVariant(incidentDetails.severity)"
+        <IncidentSeverityBadge
+          :severity="incidentDetails.severity"
           class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ incidentDetails.severity }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
-        </OBadge>
+        </IncidentSeverityBadge>
 
         <!-- Alert Count Badge -->
         <OBadge
@@ -911,9 +911,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
-                          <OBadge :variant="getStreamTypeVariant(alerts[selectedAlertIndex]?.stream_type)" class="tw:w-fit">
-                            <span class="tw:text-[10px]">{{ alerts[selectedAlertIndex]?.stream_type || 'N/A' }}</span>
-                          </OBadge>
+                          <StreamTypeBadge :stream-type="alerts[selectedAlertIndex]?.stream_type || ''" class="tw:w-fit" />
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
@@ -1197,6 +1195,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import IncidentStatusBadge from "@/components/alerts/badges/IncidentStatusBadge.vue";
+import IncidentSeverityBadge from "@/components/alerts/IncidentSeverityBadge.vue";
+import StreamTypeBadge from "@/components/common/badges/StreamTypeBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -1219,6 +1220,9 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OBadge,
+    IncidentStatusBadge,
+    IncidentSeverityBadge,
+    StreamTypeBadge,
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
@@ -2172,19 +2176,6 @@ export default defineComponent({
       }
     };
 
-    const getStatusVariant = (status: string): BadgeVariant => {
-      switch (status) {
-        case "open":
-          return "error-soft";
-        case "acknowledged":
-          return "warning-soft";
-        case "resolved":
-          return "success-soft";
-        default:
-          return "default-soft";
-      }
-    };
-
     const getStatusLabel = (status: string) => {
       switch (status) {
         case "open":
@@ -2913,11 +2904,8 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
-      getStatusVariant,
       getStatusLabel,
       getSeverityColorHex,
-      getSeverityVariant,
-      getStreamTypeVariant,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

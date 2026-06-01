@@ -178,7 +178,7 @@ import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
-import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
+import FrustrationBadge from "@/components/rum/badges/FrustrationBadge.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";

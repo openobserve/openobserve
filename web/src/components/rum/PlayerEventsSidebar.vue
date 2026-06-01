@@ -126,7 +126,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
 
 import { useI18n } from "vue-i18n";
-import FrustrationEventBadge from "./FrustrationEventBadge.vue";
+import FrustrationEventBadge from "./badges/FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OBadge from "@/lib/core/Badge/OBadge.vue";

@@ -44,14 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Status column -->
       <template #cell-status="{ row }">
         <div class="tw:flex tw:items-center tw:gap-2">
-          <OBadge :variant="statusColor(row)" data-test="anomaly-detection-status-badge">
-            {{ statusLabel(row) }}
+          <AnomalyStatusBadge :status="row.status" :enabled="row.enabled" data-test="anomaly-detection-status-badge">
             <OSpinner
-              v-if="row.status === 'training'"
+              v-if="row.status === 'training' && row.enabled"
               size="xs"
               class="tw:ml-1"
             />
-          </OBadge>
+          </AnomalyStatusBadge>
           <OTooltip v-if="row.status === 'failed'" :content="row.last_error || t('alerts.anomalyStatus.failed')" />
         </div>
       </template>
@@ -239,15 +238,14 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AnomalyStatusBadge from "@/components/anomaly_detection/badges/AnomalyStatusBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTable, OTooltip },
+  components: { AnomalyStatusBadge, OButton, ODialog, OIcon, OSpinner, OTable, OTooltip },
 
   props: {
     org_identifier: {
@@ -291,22 +289,6 @@ export default defineComponent({
     const displayConfigs = computed(() =>
       configs.value.map((c, i) => ({ ...c, "#": i + 1 }))
     );
-
-    const statusColor = (row: any): BadgeVariant => {
-      if (!row.enabled) return "default";
-      switch (row.status) {
-        case "ready":     return "success";
-        case "training":  return "primary";
-        case "failed":    return "error";
-        case "waiting":   return "default";
-        default:          return "default";
-      }
-    };
-
-    const statusLabel = (row: any) => {
-      if (!row.enabled) return t("alerts.anomalyStatus.disabled");
-      return t(`alerts.anomalyStatus.${row.status}`) || row.status;
-    };
 
     const formatTimestamp = (ts: number) => {
       // timestamps come back in microseconds
@@ -457,8 +439,6 @@ export default defineComponent({
       cancellingId,
       confirmCancelTraining,
       cancelTraining,
-      statusColor,
-      statusLabel,
       formatTimestamp,
       formatSeconds,
       loadConfigs,
