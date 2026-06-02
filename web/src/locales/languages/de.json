@@ -4257,7 +4257,9 @@
           "updated": "aktualisiert"
         }
       }
-    }
+    },
+    "deleteTitle": "{label} löschen",
+    "deleteConfirmMessage": "Bist du sicher, dass du „{name}“ löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden."
   },
   "llmProviders": {
     "tabLabel": "LLM-Anbieter",

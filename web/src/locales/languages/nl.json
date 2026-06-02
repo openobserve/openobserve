@@ -4268,7 +4268,9 @@
           "updated": "Bijgewerkt"
         }
       }
-    }
+    },
+    "deleteTitle": "{label} verwijderen",
+    "deleteConfirmMessage": "Weet je zeker dat je „{name}” wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."
   },
   "llmProviders": {
     "tabLabel": "LLM-aanbieders",

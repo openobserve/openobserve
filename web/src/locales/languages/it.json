@@ -4266,7 +4266,9 @@
           "updated": "Aggiornato"
         }
       }
-    }
+    },
+    "deleteTitle": "Elimina {label}",
+    "deleteConfirmMessage": "Sei sicuro di voler eliminare «{name}»? Questa azione non può essere annullata."
   },
   "llmProviders": {
     "tabLabel": "Fornitori di LLM",

@@ -4257,7 +4257,9 @@
           "updated": "更新済み"
         }
       }
-    }
+    },
+    "deleteTitle": "{ラベル} を削除",
+    "deleteConfirmMessage": "「{name}」を削除してよろしいですか？このアクションは元に戻せません。"
   },
   "llmProviders": {
     "tabLabel": "LLM プロバイダー",

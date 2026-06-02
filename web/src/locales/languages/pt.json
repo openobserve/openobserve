@@ -4257,7 +4257,9 @@
           "updated": "Atualizado"
         }
       }
-    }
+    },
+    "deleteTitle": "Excluir {label}",
+    "deleteConfirmMessage": "Tem certeza de que deseja excluir “{name}”? Essa ação não pode ser desfeita."
   },
   "llmProviders": {
     "tabLabel": "Provedores de LLM",

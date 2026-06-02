@@ -4261,7 +4261,9 @@
           "updated": "已更新"
         }
       }
-    }
+    },
+    "deleteTitle": "删除 {标签}",
+    "deleteConfirmMessage": "您确定要删除 “{name}” 吗？此操作无法撤消。"
   },
   "llmProviders": {
     "tabLabel": "LLM 提供商",

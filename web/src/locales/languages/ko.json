@@ -4268,7 +4268,9 @@
           "updated": "업데이트됨"
         }
       }
-    }
+    },
+    "deleteTitle": "{라벨} 삭제",
+    "deleteConfirmMessage": "정말로 “{name}”을 삭제하시겠습니까?이 작업은 취소할 수 없습니다."
   },
   "llmProviders": {
     "tabLabel": "LLM 제공업체",
