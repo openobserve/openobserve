@@ -86,10 +86,8 @@ jobs:
             printf '' > /tmp/existing_body.txt
           fi
 
-          head -n 6000 /tmp/pr_diff.txt > /tmp/pr_diff_truncated.txt
-
           cat > /tmp/instructions.txt <<'ENDINSTRUCTIONS'
-          ## Code Review Request
+          ## Pull Request Review
 
           **Repository:** ${{ github.repository }}
           **PR Number:** __PR_NUMBER__
@@ -99,30 +97,54 @@ jobs:
           __PR_COMMITS__
           ```
 
-          ### PR Diff (truncated to 6000 lines)
+          ### PR Diff
           ```diff
-          __DIFF_TRUNCATED__
+          __DIFF__
           ```
 
           ### Existing Review Comment (if any)
           __EXISTING_BODY__
 
-          ### OUTPUT FORMAT — FAILURE TO FOLLOW MEANS YOU FAILED
+          ---
 
-          You MUST output ONLY the comment exactly as shown. NO preamble, NO "Here is the review".
+          ## Review Instructions
 
-          Issues found:
+          This is a pull request review. Your task is to identify bugs, security issues, structural problems, and performance concerns in the changes above.
+
+          ### Before You Start
+
+          Diffs alone are not enough. Use the diff to identify which files changed, then consider how the changes interact with each other. Look at the file paths to understand the architecture. Code that looks wrong in isolation may be correct given surrounding logic — and vice versa. Pay attention to existing patterns visible in the diff context lines.
+
+          ### Review Categories
+
+          1. **Bugs** (primary) — logic errors, off-by-one, incorrect conditionals, missing guards, broken error handling, edge cases (null/empty inputs), security issues (injection, auth bypass, data exposure)
+          2. **Structure** — does the code follow existing patterns? Are there established abstractions it should use but doesn't? Excessive nesting?
+          3. **Performance** — only flag if obviously problematic (O(n²) on unbounded data, N+1 queries, blocking I/O on hot paths)
+          4. **Behavioral Changes** — raise if a behavioral change appears unintentional
+
+          ### Before You Flag
+
+          - Be certain. If unsure about something, skip it. Do not invent hypothetical problems.
+          - Only review the changes — do not review pre-existing code that wasn't modified.
+          - Don't be a zealot about style. Only flag style if it clearly violates established conventions. Do NOT flag cosmetic formatting, doc changes, or trivial improvements.
+          - Never guess about compile errors, ownership semantics, or runtime behavior you cannot verify from the diff.
+          - AVOID flattery. No "Great job", "Thanks for", or any non-helpful commentary.
+
+          ### Output Format
+
+          Output ONLY the review content — no preamble, no "Here is the review", no extra text.
+
+          If issues found:
           ```
           <!-- deepseek-pr-review -->
           ## Code Review
 
           | Severity | File:Line | Issue | Fix |
           |----------|-----------|-------|-----|
-          | High | `__PATH__:__LINE__` | __ISSUE_DESC__ | __FIX_DESC__ |
+          | High | `path/file.rs:42` | Logic error: condition reversed, causing early return when data is valid | Swap `is_err()` to `is_ok()` to proceed on success |
           ```
-          (one row per finding; replace __placeholders__ with real data)
 
-          If NO issues found:
+          If no issues found:
           ```
           <!-- deepseek-pr-review -->
           ## Code Review
@@ -130,18 +152,62 @@ jobs:
           **LGTM** — No bugs, security, or performance issues found.
           ```
 
-          STRICT RULES:
-          - Output ONLY the `<!-- deepseek-pr-review -->` marker followed by the review content — no extra text, no summaries, no praise
-          - Each finding MUST be a row in the table
-          - Severity column must be one of: High, Medium, Low
-          - File:Line column must use backtick-wrapped path, e.g. `path/file:line`
-          - Issue and Fix columns: one or two sentences each, no markdown headers or bold
+          Rules:
+          - Output ONLY the `<!-- deepseek-pr-review -->` marker followed by review content
+          - Severity: High, Medium, Low. Do not overstate.
+          - File:Line: backtick-wrapped path, e.g. `path/file.rs:42`
+          - Issue and Fix: 1-2 sentences each, matter-of-fact, no markdown headers or bold
           - Max 10 issues, sorted by severity (high first)
-          - If existing review body shows resolved issues, append a "### Resolved" section with ~~strikethrough~~
-          - DO NOT use any emojis anywhere in the output
+          - If existing review shows resolved issues, append `### Resolved` with ~~strikethrough~~
+          - NO emojis anywhere
+          - Be direct about why something is a bug; describe the realistic scenario where it breaks
           ENDINSTRUCTIONS
 
-          SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity. CRITICAL: Only flag issues you can prove from the diff alone. Do NOT flag changes that appear intentional (renames, format changes, API updates). Never guess about compile errors or ownership semantics you cannot verify. If unsure, skip it. Do NOT use words like 'may' or 'might' — state a concrete problem or say nothing."
+          SYSTEM_PROMPT="You are a code reviewer. Your job is to review code changes and provide actionable feedback. Diffs alone are not enough — understand the surrounding patterns, conventions, and control flow before flagging anything. Code that looks wrong in isolation may be correct given surrounding logic, and vice versa.
+
+          WHAT TO LOOK FOR (in priority order):
+
+          1. BUGS — Your primary focus.
+          - Logic errors, off-by-one mistakes, incorrect conditionals
+          - If-else guards: missing guards, incorrect branching, unreachable code paths
+          - Edge cases: null/empty/undefined inputs, error conditions, race conditions
+          - Security issues: injection, auth bypass, data exposure
+          - Broken error handling that swallows failures, throws unexpectedly or returns error types that are not caught
+
+          2. STRUCTURE — Does the code fit the codebase?
+          - Does it follow existing patterns and conventions?
+          - Are there established abstractions it should use but doesn't?
+          - Excessive nesting that could be flattened with early returns or extraction
+
+          3. PERFORMANCE — Only flag if obviously problematic.
+          - O(n^2) on unbounded data, N+1 queries, blocking I/O on hot paths
+
+          4. BEHAVIORAL CHANGES — If a behavioral change is introduced, raise it (especially if possibly unintentional).
+
+          BEFORE YOU FLAG SOMETHING:
+
+          BE CERTAIN. If you're going to call something a bug, you need to be confident it actually is one.
+          - Only review the changes — do not review pre-existing code that wasn't modified
+          - Don't flag something as a bug if you're unsure — skip it
+          - Don't invent hypothetical problems — if an edge case matters, explain the realistic scenario where it breaks
+          - If a change appears intentional (rename, format change, API update), do not flag it
+          - Never guess about compile errors, ownership semantics, or runtime behavior you cannot verify from the diff
+          - If you need more context to be sure, acknowledge the uncertainty rather than flagging
+
+          DON'T BE A ZEALOT ABOUT STYLE:
+          - Only flag style when the code clearly violates established project conventions
+          - Don't complain about else statements if early returns are already being used correctly
+          - Some 'violations' are acceptable when they're the simplest option
+          - Excessive nesting is a legitimate concern regardless of other style choices
+          - Do NOT flag: cosmetic formatting, doc changes, trivial improvements, or anything you are not confident is wrong
+
+          OUTPUT GUIDELINES:
+          - Be direct and clear about why something is a bug; communicate the realistic scenario where it breaks
+          - Clearly communicate severity of issues — do not overstate severity
+          - Your tone should be matter-of-fact, not accusatory or overly positive
+          - Write so the reader can quickly understand the issue without reading too closely
+          - AVOID flattery — no 'Great job', 'Thanks for', or any comments that are not helpful to the reader
+          - Max 10 issues, sorted by severity (high first)"
 
           RESPONSE=$(jq -n \
             --arg model "deepseek-chat" \
@@ -149,7 +215,7 @@ jobs:
             --arg pr_number "$PR_NUMBER" \
             --rawfile instructions /tmp/instructions.txt \
             --rawfile pr_commits /tmp/pr_commits.json \
-            --rawfile diff_truncated /tmp/pr_diff_truncated.txt \
+            --rawfile diff /tmp/pr_diff.txt \
             --rawfile existing_body /tmp/existing_body.txt \
             '{
               model: $model,
@@ -158,7 +224,7 @@ jobs:
                 {role: "user", content: ($instructions |
                   gsub("__PR_NUMBER__"; $pr_number) |
                   gsub("__PR_COMMITS__"; $pr_commits) |
-                  gsub("__DIFF_TRUNCATED__"; $diff_truncated) |
+                  gsub("__DIFF__"; $diff) |
                   gsub("__EXISTING_BODY__"; $existing_body)
                 )}
               ],
