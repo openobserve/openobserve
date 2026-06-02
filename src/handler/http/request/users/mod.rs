@@ -901,10 +901,8 @@ pub async fn get_auth(
             });
             let cookie_name = "auth_tokens";
             let auth_cookie = if req_ts == 0 {
-                let access_token = format!(
-                    "Basic {}",
-                    base64::encode(&format!("{}:{}", &name, &password))
-                );
+                let access_token =
+                    format!("Basic {}", base64::encode(&format!("{name}:{password}")));
                 let tokens = AuthTokens {
                     access_token,
                     refresh_token: "".to_string(),
@@ -918,7 +916,7 @@ pub async fn get_auth(
                 let auth_ext = format!(
                     "{} {}",
                     cookie_name,
-                    base64::encode(&format!("{}:{}", &name, &password))
+                    base64::encode(&format!("{name}:{password}"))
                 );
 
                 let tokens = AuthTokensExt {

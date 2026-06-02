@@ -116,7 +116,7 @@ pub async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Statu
 pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
     let cfg = config::get_config();
     let mut channel = Channel::from_shared(grpc_addr.to_string()).map_err(|err| {
-        log::error!("gRPC node: {}, parse err: {:?}", &grpc_addr, err);
+        log::error!("gRPC node: {}, parse err: {:?}", grpc_addr, err);
         Status::internal("parse gRPC node error".to_string())
     })?;
     if cfg.grpc.tls_enabled {
@@ -135,7 +135,7 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
             }
         }
         channel = channel.tls_config(tls).map_err(|err| {
-            log::error!("gRPC node: {}, tls err: {:?}", &grpc_addr, err);
+            log::error!("gRPC node: {}, tls err: {:?}", grpc_addr, err);
             Status::internal("tls gRPC node error".to_string())
         })?;
     }
@@ -146,7 +146,7 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
         .connect()
         .await
         .map_err(|err| {
-            log::error!("gRPC node: {}, connect err: {:?}", &grpc_addr, err);
+            log::error!("gRPC node: {}, connect err: {:?}", grpc_addr, err);
             Status::internal("connect to gRPC node error".to_string())
         })?;
     Ok(channel)
@@ -188,7 +188,7 @@ pub async fn make_grpc_search_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] search->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())
@@ -254,7 +254,7 @@ pub async fn make_grpc_metrics_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())
@@ -308,7 +308,7 @@ pub async fn make_grpc_node_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] node->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())
@@ -359,7 +359,7 @@ pub async fn make_grpc_cluster_info_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] cluster_info->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())

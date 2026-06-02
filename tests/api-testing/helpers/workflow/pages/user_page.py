@@ -1,5 +1,9 @@
+import logging
+import os
 import random
 from requests.auth import HTTPBasicAuth
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -19,13 +23,19 @@ class UserPage:
         payload = {
             "organization": org_id,
             "email": email_address,
-            "password": "Complexpass#123",
-            "first_name": "Shyam",
-            "last_name": "P",
+            # Read from env to match the pattern in support/factories.py,
+            # db-testing/conftest.py, and the rum fixtures — falls back to
+            # the standard CI test password when no env var is set.
+            "password": os.getenv("ZO_ROOT_USER_PASSWORD", "Complexpass#123"),
+            # Standard convention: all automated-test users use the
+            # same display name so they're identifiable as test-created
+            # in the IAM users page (and safe to clean up).
+            "first_name": "Automation",
+            "last_name": "TestUser",
             "role": "admin",
         }
 
-        print("Payload for user creation:", payload)  # Log the payload
+        logger.debug("Payload for user creation: %s", payload)
         response = session.post(f"{base_url}api/{org_id}/users", json=payload, headers=headers)
         assert response.status_code == 200, f"Failed to create user as admin: {response.content.decode()}"
         return response

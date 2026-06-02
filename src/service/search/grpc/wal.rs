@@ -139,7 +139,7 @@ pub async fn search_parquet(
         if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
             log::debug!(
                 "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{})",
-                &file.key,
+                file.key,
                 file.meta.min_ts,
                 file.meta.max_ts
             );

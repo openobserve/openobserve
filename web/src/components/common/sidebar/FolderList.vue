@@ -37,17 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Search Input -->
         <div class="tw:px-2 tw:py-1">
-          <OInput
+          <OSearchInput
             v-model="searchQuery"
             data-test="folder-search"
             :placeholder="t('dashboard.searchFolder')"
             clearable
             class="tw:w-full"
-          >
-            <template #icon-left>
-              <OIcon class="o2-search-input-icon" name="search" size="sm" />
-            </template>
-          </OInput>
+          />
         </div>
       </div>
       <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
@@ -128,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
   <script lang="ts">
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -196,7 +192,7 @@ export default defineComponent({
       OTabs,
       OTab,
       OButton,
-      OInput,
+      OSearchInput,
       ODropdown,
       ODropdownItem,
     },

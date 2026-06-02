@@ -284,7 +284,7 @@ pub async fn list(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("report:{}", &report.report_name))
+                    .contains(&format!("report:{}", report.report_name))
                 || permitted
                     .as_ref()
                     .unwrap()
@@ -581,7 +581,7 @@ impl SendReport for Report {
 
             let url = url::Url::parse(&format!(
                 "{}/api/{}/reports/{}/send",
-                &cfg.common.report_server_url, &self.org_id, &self.name
+                cfg.common.report_server_url, self.org_id, self.name
             ))
             .unwrap();
             match Client::builder()
@@ -602,7 +602,7 @@ impl SendReport for Report {
                             resp.bytes().await,
                         ));
                     }
-                    log::info!("report sent successfully for the report {}", &self.name);
+                    log::info!("report sent successfully for the report {}", self.name);
                 }
                 Err(e) => {
                     return Err(SendReportError::ReportServerClientError(e));
@@ -682,7 +682,7 @@ async fn send_email(
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
         Ok(_) => {
-            log::info!("email sent successfully for the report {}", &report.name);
+            log::info!("email sent successfully for the report {}", report.name);
             Ok(())
         }
         Err(e) => Err(SendReportError::SendEmailError(e)),
@@ -768,7 +768,7 @@ async fn generate_report(
     });
 
     let web_url = format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri);
-    log::debug!("Navigating to web url: {}", &web_url);
+    log::debug!("Navigating to web url: {}", web_url);
     let page = browser
         .new_page(&format!("{web_url}/login?login_as_internal_user=true"))
         .await?;
@@ -863,7 +863,7 @@ async fn generate_report(
         ReportTimerangeType::Absolute => {
             let url = format!(
                 "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
-                &timerange.from, &timerange.to
+                timerange.from, timerange.to
             );
             (url.clone(), url)
         }

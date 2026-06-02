@@ -100,7 +100,7 @@ impl Default for GeoipConfig {
         GeoipConfig {
             path: format!(
                 "{}{}",
-                &get_config().common.mmdb_data_dir,
+                get_config().common.mmdb_data_dir,
                 MMDB_CITY_FILE_NAME
             ),
             locale: default_locale(),
@@ -111,7 +111,7 @@ impl Default for GeoipConfig {
 impl GeoipConfig {
     pub fn new(name: &str) -> self::GeoipConfig {
         GeoipConfig {
-            path: format!("{}{}", &get_config().common.mmdb_data_dir, name),
+            path: format!("{}{}", get_config().common.mmdb_data_dir, name),
             locale: default_locale(),
         }
     }

@@ -421,29 +421,21 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify no data or error is shown (incomplete Sankey config).
-      // Both elements may be visible simultaneously on CI, so check each
-      // independently rather than using .or() which throws strict mode
-      // violation when both match.
+      // Use expect.poll to handle the async gap between the apply button
+      // re-enabling and Vue committing the no-data text to the DOM.
+      // Checking textContent (not just isVisible) avoids false-positives
+      // from the empty zero-height no-data div that exists when noData === "".
       const noDataLocator = pm.dashboardPanelActions.getNoDataLocator();
       const dashErrorLocator = pm.dashboardPanelActions.getDashboardErrorLocator();
 
-      const noDataVisible = await noDataLocator.isVisible().catch(() => false);
-      const dashErrorVisible = await dashErrorLocator.isVisible().catch(() => false);
-
-      if (!noDataVisible && !dashErrorVisible) {
-        // Neither visible yet — wait for either one to appear
-        await page.waitForFunction(() => {
-          const noData = document.querySelector('[data-test="no-data"]');
-          const dashErr = document.querySelector('[data-test="dashboard-error"]');
-          return (noData && noData.offsetParent !== null) ||
-                 (dashErr && dashErr.offsetParent !== null);
-        }, { timeout: 10000 });
-      }
-
-      expect(noDataVisible || dashErrorVisible ||
-        await noDataLocator.isVisible().catch(() => false) ||
-        await dashErrorLocator.isVisible().catch(() => false)
-      ).toBe(true);
+      await expect.poll(async () => {
+        const noDataText = (await noDataLocator.textContent().catch(() => '')).trim();
+        const dashErrorVisible = await dashErrorLocator.isVisible().catch(() => false);
+        return noDataText.length > 0 || dashErrorVisible;
+      }, {
+        timeout: 12000,
+        message: 'Expected "No Data" or dashboard error when only Source field is configured',
+      }).toBeTruthy();
 
       testLogger.info("Sankey no data state verified");
 

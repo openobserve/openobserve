@@ -898,7 +898,7 @@ async fn search_tantivy_index(
     let need_all_term_fields = condition
         .need_all_term_fields()
         .into_iter()
-        .chain(get_simple_distinct_field(&idx_optimize_rule).into_iter())
+        .chain(get_simple_distinct_field(&idx_optimize_rule))
         .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
         .collect::<HashSet<_>>();
 

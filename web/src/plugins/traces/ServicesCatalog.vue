@@ -40,18 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Search input -->
       <div>
-        <OInput
+        <OSearchInput
           v-model="filterText"
           :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
           clearable
           :debounce="300"
           class="tw:w-[14rem]!"
           data-test="services-catalog-filter-input"
-        >
-          <template #icon-left>
-            <OIcon class="o2-search-input-icon" size="sm" name="search" />
-          </template>
-        </OInput>
+        />
       </div>
 
       <template v-if="!isLoading && services.length > 0">
@@ -419,7 +415,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();

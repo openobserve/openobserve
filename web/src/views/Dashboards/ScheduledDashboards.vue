@@ -31,15 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <OInput
+        <OSearchInput
           data-test="alert-list-search-input"
           v-model="scheduledFilterQuery"
           :placeholder="t('reports.search')"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="sm" class="tw:cursor-pointer" />
-          </template>
-        </OInput>
+        />
 
         <OButton
           variant="primary"
@@ -112,8 +108,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

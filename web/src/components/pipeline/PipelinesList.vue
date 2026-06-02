@@ -54,16 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
 
-            <OInput
+            <OSearchInput
               data-test="pipeline-list-search-input"
               v-model="filterQuery"
               class="tw:ml-2 tw:w-[200px]"
               :placeholder="t('pipeline.search')"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
             <!-- Full buttons visible at wide widths -->
             <template v-if="!shouldCollapseToolbar">
               <OButton
@@ -494,7 +490,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";

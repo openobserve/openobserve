@@ -217,55 +217,50 @@ async fn apply_deduplication_impl(
 
         // Check if this fingerprint exists and is within time window
         let should_send = match get_dedup_state(db, &fingerprint).await? {
-            Some(existing_state) => {
-                if is_within_window(&existing_state, time_window_minutes) {
-                    // Within window - update occurrence count but don't send
-                    if let Err(e) = save_dedup_state(
-                        db,
-                        DedupStateParams {
-                            org_id: org_id.as_str(),
-                            fingerprint: &fingerprint,
-                            alert_id: &alert_id,
-                            first_seen_at: existing_state.first_seen_at,
-                            last_seen_at: now,
-                            occurrence_count: existing_state.occurrence_count + 1,
-                        },
-                    )
-                    .await
-                    {
-                        log::warn!(
-                            "Failed to update dedup state for fingerprint {}: {}",
-                            fingerprint,
-                            e
-                        );
-                    }
-
-                    // Record suppression metric
-                    let dedup_type = if existing_state.alert_id == alert_id {
-                        "same_alert"
-                    } else {
-                        "cross_alert"
-                    };
-                    config::metrics::ALERT_DEDUP_SUPPRESSED_TOTAL
-                        .with_label_values(&[org_id.as_str(), &alert.name, dedup_type])
-                        .inc();
-
-                    log::debug!(
-                        "[dedup] Suppressed alert '{}' for org: {}, fingerprint: {}, occurrence: {}, type: {}",
-                        alert.name,
-                        org_id,
+            Some(existing_state) if is_within_window(&existing_state, time_window_minutes) => {
+                // Within window - update occurrence count but don't send
+                if let Err(e) = save_dedup_state(
+                    db,
+                    DedupStateParams {
+                        org_id: org_id.as_str(),
+                        fingerprint: &fingerprint,
+                        alert_id: &alert_id,
+                        first_seen_at: existing_state.first_seen_at,
+                        last_seen_at: now,
+                        occurrence_count: existing_state.occurrence_count + 1,
+                    },
+                )
+                .await
+                {
+                    log::warn!(
+                        "Failed to update dedup state for fingerprint {}: {}",
                         fingerprint,
-                        existing_state.occurrence_count + 1,
-                        dedup_type
+                        e
                     );
-
-                    false
-                } else {
-                    // Outside window - treat as new alert
-                    true
                 }
+
+                // Record suppression metric
+                let dedup_type = if existing_state.alert_id == alert_id {
+                    "same_alert"
+                } else {
+                    "cross_alert"
+                };
+                config::metrics::ALERT_DEDUP_SUPPRESSED_TOTAL
+                    .with_label_values(&[org_id.as_str(), &alert.name, dedup_type])
+                    .inc();
+
+                log::debug!(
+                    "[dedup] Suppressed alert '{}' for org: {}, fingerprint: {}, occurrence: {}, type: {}",
+                    alert.name,
+                    org_id,
+                    fingerprint,
+                    existing_state.occurrence_count + 1,
+                    dedup_type
+                );
+
+                false
             }
-            None => {
+            _ => {
                 // New fingerprint - should send
                 true
             }

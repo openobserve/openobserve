@@ -82,7 +82,7 @@ fn rule_extractor(
         } else {
             crate::service::users::get_user_roles(user_email.as_str(), Some(&org_id)).await
         };
-        log::debug!("found user_roles: {:?}", &user_roles);
+        log::debug!("found user_roles: {:?}", user_roles);
         let openapi_path = openapi_path.unwrap_or(path);
         // find the group of the openapi_path
         match find_group_by_openapi(&openapi_path).await {
@@ -106,15 +106,14 @@ fn rule_extractor(
                 )
                 .await;
                 log::debug!(
-                    "org_id{}, user_roles:{:?}, api_group_name:{}, api_group_operation:{}, user_email:{}, default_resource:{}, found default_rule: {:?}, custom_rules: {:?}",
-                    &org_id,
+                    "org_id{org_id}, user_roles:{:?}, api_group_name:{}, api_group_operation:{}, user_email:{}, default_resource:{}, found default_rule: {:?}, custom_rules: {:?}",
                     user_roles,
                     api_group_name,
                     api_group_operation.as_str(),
                     user_email,
                     default_resource,
-                    &default_rule,
-                    &custom_rules
+                    default_rule,
+                    custom_rules
                 );
                 // Select the final rule based on priority
                 select_final_rule_resource(default_rule, custom_rules, user_email.as_str())

@@ -41,7 +41,7 @@ impl LogsService for LogsServer {
         if !metadata.contains_key(&cfg.grpc.org_header_key) {
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
-                &cfg.grpc.org_header_key
+                cfg.grpc.org_header_key
             )));
         }
 

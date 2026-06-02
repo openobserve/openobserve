@@ -21,17 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
         <div class="tw:flex tw:gap-3">
-          <OInput
+          <OSearchInput
             v-model="searchQuery"
             :placeholder="t('modelPricing.searchByModelName')"
             clearable
             class="no-border tw:w-[220px]"
             data-test="built-in-model-pricing-search"
-          >
-            <template v-slot:icon-left>
-              <OIcon class="o2-search-input-icon" name="search" size="sm" />
-            </template>
-          </OInput>
+          />
         </div>
 
         <!-- Refresh -->
@@ -174,7 +170,7 @@ import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -196,7 +192,7 @@ interface BuiltInModel {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  components: { OButton, OSpinner, OInput, OTable,
+  components: { OButton, OSpinner, OSearchInput, OTable,
     OIcon,
 },
   emits: ["import-models"],

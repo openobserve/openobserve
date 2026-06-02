@@ -20,18 +20,14 @@
       </div>
       <!-- Search input -->
       <div data-test="service-graph-search-input">
-        <OInput
+        <OSearchInput
           v-model="searchFilter"
           class="tw:w-[14rem]!"
           placeholder="Search Services"
           :debounce="300"
           @update:model-value="applyFilters"
           clearable
-        >
-          <template #icon-left>
-            <OIcon class="o2-search-input-icon" size="sm" name="search" />
-          </template>
-        </OInput>
+        />
       </div>
       <!-- Spacer -->
       <div class="tw:flex-1" />
@@ -294,7 +290,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -310,7 +306,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OSelect,
-    OInput,
+    OSearchInput,
     OIcon,
     OCard,
     OCardSection,

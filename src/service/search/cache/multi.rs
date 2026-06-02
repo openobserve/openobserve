@@ -46,12 +46,10 @@ pub async fn get_cached_results(
             .result_cache_selection_strategy
             .as_str(),
     );
-    loop {
-        let Some(idx) = cache_metas.iter().position_max_by_key(|result| {
-            select_cache_meta(result, &cache_req, &selection_strategy)
-        }) else {
-            break;
-        };
+    while let Some(idx) = cache_metas
+        .iter()
+        .position_max_by_key(|result| select_cache_meta(result, &cache_req, &selection_strategy))
+    {
         let best_cache_meta = cache_metas.remove(idx);
         if let Some(result) = super::cacher::get_cached_results(
             trace_id,

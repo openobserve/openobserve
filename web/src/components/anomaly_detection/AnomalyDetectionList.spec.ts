@@ -583,16 +583,27 @@ describe("AnomalyDetectionList - editConfig", () => {
   });
 });
 
-describe("AnomalyDetectionList - auto-poll", () => {
-  it("sets up polling timer on mount and clears on unmount", async () => {
+describe("AnomalyDetectionList - manual refresh", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("does not auto-poll — advancing 30s timer does not call service again", async () => {
     vi.useFakeTimers();
     const w = await mountComp();
     await flushPromises();
     vi.clearAllMocks();
     vi.advanceTimersByTime(30_000);
     await flushPromises();
-    expect(anomalyDetectionService.list).toHaveBeenCalled();
+    expect(anomalyDetectionService.list).not.toHaveBeenCalled();
     w.unmount();
     vi.useRealTimers();
+  });
+
+  it("refresh button calls loadConfigs when clicked", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    vi.clearAllMocks();
+    await w.find('[data-test="anomaly-detection-list-refresh-btn"]').trigger("click");
+    await flushPromises();
+    expect(anomalyDetectionService.list).toHaveBeenCalledWith("default");
   });
 });

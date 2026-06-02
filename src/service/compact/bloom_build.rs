@@ -139,7 +139,7 @@ pub(crate) async fn build_for_stream(
     // chunk's max cardinality).
     let fpp = cfg.common.bloom_filter_fpp;
     let max_files_per_bf = cfg.common.bloom_filter_max_files_per_bf.max(1);
-    files.sort_by(|a, b| b.meta.records.cmp(&a.meta.records));
+    files.sort_by_key(|k| std::cmp::Reverse(k.meta.records));
 
     let base_ver = now_micros();
     let chunk_total = files.len().div_ceil(max_files_per_bf);

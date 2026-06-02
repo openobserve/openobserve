@@ -63,18 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
             <!-- Search for Alerts -->
-            <OInput
+            <OSearchInput
               v-model="dynamicQueryModel"
               :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
               data-test="alert-list-search-input"
-              :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
               class="tw:ml-2 tw:w-[200px]"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
             <!-- All Folders toggle -->
             <OSwitch
               data-test="alert-list-search-across-folders-toggle"
@@ -87,6 +82,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
               </template>
             </OSwitch>
+            <!-- Refresh button -->
+            <OButton
+              class="tw:ml-2"
+              variant="outline"
+              size="sm"
+              :loading="loading"
+              @click="refreshAlerts"
+              data-test="alert-list-refresh-btn"
+            >
+              <template #icon-left><OIcon name="refresh" size="sm" /></template>
+              {{ t('common.refresh') }}
+            </OButton>
           </div>
           <!-- Import button -->
           <OButton
@@ -672,6 +679,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
@@ -709,6 +717,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OInput,
+    OSearchInput,
     OSwitch,
     OTooltip,
     SelectFolderDropDown,
@@ -917,53 +926,9 @@ export default defineComponent({
 
     const filteredResults: Ref<any[]> = ref([]);
 
-    // ── Anomaly polling ──────────────────────────────────────────────────────
-    // Statuses that mean the anomaly job is done — no need to keep polling
-    const ANOMALY_TERMINAL_STATUSES = ["failed", "active", "completed"];
-
-    const hasNonTerminalAnomalyRows = computed(
-      () =>
-        activeTab.value === "anomalyDetection" &&
-        filteredResults.value.some(
-          (row: any) =>
-            row.type === "anomaly" &&
-            !ANOMALY_TERMINAL_STATUSES.includes(row.status),
-        ),
-    );
-
-    let anomalyPollingTimer: ReturnType<typeof setInterval> | null = null;
-
-    const stopAnomalyPolling = () => {
-      if (anomalyPollingTimer !== null) {
-        clearInterval(anomalyPollingTimer);
-        anomalyPollingTimer = null;
-      }
-    };
-
-    const startAnomalyPolling = () => {
-      if (anomalyPollingTimer !== null) return; // already running
-      anomalyPollingTimer = setInterval(async () => {
-        if (!hasNonTerminalAnomalyRows.value) {
-          stopAnomalyPolling();
-          return;
-        }
-        await getAlertsFn(store, activeFolderId.value);
-      }, 10000);
-    };
-
-    watch(hasNonTerminalAnomalyRows, (hasNonTerminal) => {
-      if (hasNonTerminal) {
-        startAnomalyPolling();
-      } else {
-        stopAnomalyPolling();
-      }
-    });
-    // ── End anomaly polling ──────────────────────────────────────────────────
-
     onBeforeUnmount(() => {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("click", handleClickOutside, true);
-      stopAnomalyPolling();
     });
 
     const activeFolderToMove = ref("default");
@@ -1444,6 +1409,15 @@ export default defineComponent({
         // "all" — show everything
         filteredResults.value = allAlerts.value;
       }
+    };
+
+    const refreshAlerts = async () => {
+      if (searchAcrossFolders.value && searchQuery.value) {
+        await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+      } else {
+        await getAlertsFn(store, activeFolderId.value);
+      }
+      filterAlertsByTab();
     };
 
     // onMounted(async () => {
@@ -2722,6 +2696,7 @@ export default defineComponent({
       config,
       isCompactToolbar,
       isAnomalyDetectionEnabled,
+      refreshAlerts,
     };
   },
 });

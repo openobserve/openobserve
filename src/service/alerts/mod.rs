@@ -390,6 +390,18 @@ impl QueryConditionExt for QueryCondition {
             .await
             // SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
+            let encode_query_fn = if let Some(v) = &self.vrl_function {
+                match base64::decode_url(v) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        return Err(anyhow::anyhow!(
+                            "Error decoding alert vrl query function: {e}"
+                        ));
+                    }
+                }
+            } else {
+                None
+            };
             // fire the query
             let req = config::meta::search::Request {
                 query: config::meta::search::Query {
@@ -403,19 +415,7 @@ impl QueryConditionExt for QueryCondition {
                     track_total_hits: false,
                     action_id: None,
                     uses_zo_fn: false,
-                    query_fn: if self.vrl_function.is_some() {
-                        match base64::decode_url(self.vrl_function.as_ref().unwrap()) {
-                            Ok(query_fn) => Some(query_fn),
-                            Err(e) => {
-                                return Err(anyhow::anyhow!(
-                                    "Error decoding alert vrl query function: {e}" /* TODO: update
-                                                                                    * error msg */
-                                ));
-                            }
-                        }
-                    } else {
-                        None
-                    },
+                    query_fn: encode_query_fn,
                     skip_wal: false,
                     sampling_config: None,
                     sampling_ratio: None,
@@ -570,7 +570,7 @@ impl ConditionListExt for ConditionList {
                     let data_type = match schema.field_with_name(&cond.column) {
                         Ok(field) => field.data_type(),
                         Err(_) => {
-                            return Err(anyhow::anyhow!("Column {} not found", &cond.column));
+                            return Err(anyhow::anyhow!("Column {} not found", cond.column));
                         }
                     };
                     cond_sql_list.push(build_expr(cond, "", data_type)?);
@@ -591,7 +591,7 @@ impl ConditionListExt for ConditionList {
                 let data_type = match schema.field_with_name(&node.column) {
                     Ok(field) => field.data_type(),
                     Err(_) => {
-                        return Err(anyhow::anyhow!("Column {} not found", &node.column));
+                        return Err(anyhow::anyhow!("Column {} not found", node.column));
                     }
                 };
                 build_expr(node, "", data_type)
@@ -1007,7 +1007,7 @@ async fn condition_item_to_sql(
             let data_type = match schema.field_with_name(&condition.column) {
                 Ok(field) => field.data_type(),
                 Err(_) => {
-                    return Err(anyhow::anyhow!("Column {} not found", &condition.column));
+                    return Err(anyhow::anyhow!("Column {} not found", condition.column));
                 }
             };
 
@@ -1062,7 +1062,7 @@ pub async fn build_sql(
             Err(_) => {
                 return Err(anyhow::anyhow!(
                     "Aggregation column {} not found on stream {stream_name}",
-                    &agg.having.column,
+                    agg.having.column,
                 ));
             }
         };
