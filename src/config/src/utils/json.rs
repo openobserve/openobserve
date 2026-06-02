@@ -23,13 +23,7 @@ pub fn get_float_value(val: &Value) -> f64 {
         Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
         // f64, i64, u64 both can be converted to f64
         Value::Number(v) => v.as_f64().unwrap_or(0.0),
-        Value::Bool(v) => {
-            if *v {
-                1.0
-            } else {
-                0.0
-            }
-        }
+        Value::Bool(v) if *v => 1.0,
         _ => 0.0,
     }
 }
@@ -42,13 +36,7 @@ pub fn get_int_value(val: &Value) -> i64 {
             Some(v) => v,
             None => v.as_f64().unwrap_or(0.0) as i64,
         },
-        Value::Bool(v) => {
-            if *v {
-                1
-            } else {
-                0
-            }
-        }
+        Value::Bool(v) if *v => 1,
         _ => 0,
     }
 }
@@ -61,13 +49,7 @@ pub fn get_uint_value(val: &Value) -> u64 {
             Some(v) => v,
             None => v.as_f64().unwrap_or(0.0) as u64,
         },
-        Value::Bool(v) => {
-            if *v {
-                1
-            } else {
-                0
-            }
-        }
+        Value::Bool(v) if *v => 1,
         _ => 0,
     }
 }

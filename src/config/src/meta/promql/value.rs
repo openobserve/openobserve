@@ -484,26 +484,29 @@ impl Serialize for RangeValue {
     where
         S: Serializer,
     {
-        if self.exemplars.is_none() {
-            let mut seq = serializer.serialize_struct("range_value", 2)?;
-            let labels_map = self
-                .labels
-                .iter()
-                .map(|l| (l.name.as_str(), l.value.as_str()))
-                .collect::<FxIndexMap<_, _>>();
-            seq.serialize_field("metric", &labels_map)?;
-            seq.serialize_field("values", &self.samples)?;
-            seq.end()
-        } else {
-            let mut seq = serializer.serialize_struct("range_value", 2)?;
-            let labels_map = self
-                .labels
-                .iter()
-                .map(|l| (l.name.as_str(), l.value.as_str()))
-                .collect::<FxIndexMap<_, _>>();
-            seq.serialize_field("seriesLabels", &labels_map)?;
-            seq.serialize_field("exemplars", &self.exemplars.as_ref().unwrap())?;
-            seq.end()
+        match &self.exemplars {
+            Some(exemplars) => {
+                let mut seq = serializer.serialize_struct("range_value", 2)?;
+                let labels_map = self
+                    .labels
+                    .iter()
+                    .map(|l| (l.name.as_str(), l.value.as_str()))
+                    .collect::<FxIndexMap<_, _>>();
+                seq.serialize_field("seriesLabels", &labels_map)?;
+                seq.serialize_field("exemplars", &exemplars)?;
+                seq.end()
+            }
+            None => {
+                let mut seq = serializer.serialize_struct("range_value", 2)?;
+                let labels_map = self
+                    .labels
+                    .iter()
+                    .map(|l| (l.name.as_str(), l.value.as_str()))
+                    .collect::<FxIndexMap<_, _>>();
+                seq.serialize_field("metric", &labels_map)?;
+                seq.serialize_field("values", &self.samples)?;
+                seq.end()
+            }
         }
     }
 }

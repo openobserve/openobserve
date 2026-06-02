@@ -1574,7 +1574,7 @@ async fn process_latest_traces_stream(
         if sort_order == "ASC" {
             partition_hits.sort_by_key(|k| k.start_time);
         } else {
-            partition_hits.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+            partition_hits.sort_by_key(|k| k.start_time);
         }
 
         let deliverable: Vec<serde_json::Value> = partition_hits
