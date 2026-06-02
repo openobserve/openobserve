@@ -144,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <TenstackTable
           :rows="correlatedViews"
           :columns="traceColumns"
-          :use-virtual-scroll="false"
           :row-height="32"
           :enable-row-expand="false"
           :enable-text-highlight="false"
