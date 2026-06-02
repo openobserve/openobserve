@@ -36,7 +36,7 @@
     "attributes": "属性",
     "events": "事件",
     "goHome": "回到主页",
-    "name": "名称",
+    "name": "姓名",
     "add": "添加",
     "selectAll": "全选",
     "deselectAll": "取消全选",
@@ -404,24 +404,7 @@
     "selectLogStream": "选择日志流",
     "noData": "无可用数据",
     "functionEditorLabel": "函数编辑器",
-    "loadingStream": "正在加载直播...",
-    "askAIPlaceholderRotation": {
-      "one": "让我看看过去一小时的错误...",
-      "two": "查找耗时超过 5 秒的慢速查询...",
-      "three": "计算按服务分组的 5xx 个响应...",
-      "four": "筛选等级 = “错误” 的日志..."
-    },
-    "hideHistogram": "隐藏直方图",
-    "disableQuickMode": "禁用快速模式",
-    "menuGroupSetOnce": "设置一次",
-    "menuGroupSavedViews": "保存的视图",
-    "menuGroupTools": "工具",
-    "menuGroupHistory": "历史",
-    "menuGroupDownloads": "下载",
-    "menuGroupSchedule": "日程安排",
-    "menuGroupInspect": "检查",
-    "validSql": "有效的 SQL",
-    "invalidSql": "查询无效"
+    "loadingStream": "正在加载直播..."
   },
   "menu": {
     "home": "主页",
@@ -454,8 +437,7 @@
     "pipeline": "流水线",
     "language": "语言",
     "actions": "操作",
-    "incidents": "事件",
-    "evals": "Evals"
+    "incidents": "事件"
   },
   "rum": {
     "title": "用户体验监控",
@@ -500,30 +482,15 @@
     "searchEvents": "搜索活动",
     "loadingSessions": "等一下，我们正在获取会话。",
     "errorStack": "错误堆栈",
-    "sessionReplay": "会话重放",
-    "viewSessionReplay": "查看会话重放",
-    "playSessionReplay": "播放会话重放",
+    "sessionReplay": "会话重播",
+    "viewSessionReplay": "查看会话重播",
+    "playSessionReplay": "播放会话重播",
     "discoverSessionTitle": "探索会话回放以详细了解用户互动",
-    "discoverSessionMessage": "Session Replay 捕获并重放您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
+    "discoverSessionMessage": "Session Replay 捕获并重播您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
     "getStartedRUM": "开始使用真实用户监控",
     "loadingErrorDetails": "等一下，我们正在获取错误细节。",
     "eventID": "事件 ID",
-    "loadingApplicationErrors": "等一下，我们正在提取应用程序错误。",
-    "traces": "痕迹",
-    "noCorrelatedTraces": "未找到此会话的相关跟踪。",
-    "viewTraceDetails": "查看追踪详情",
-    "routeChange": "路线",
-    "initialView": "初始",
-    "failedToFetchTraces": "无法获取跟踪数据。请重试。",
-    "traceNotFound": "未找到追踪详情。",
-    "failedToFetchTraceDetails": "加载追踪详情失败。请重试。",
-    "span": "跨度",
-    "spans": "跨度",
-    "errorTraces": "错误痕迹",
-    "seekToMoment": "在会议中寻求这一刻",
-    "timeInSession": "会话时间",
-    "route": "路线",
-    "duration": "持续时间"
+    "loadingApplicationErrors": "等一下，我们正在提取应用程序错误。"
   },
   "about": {
     "name": "OpenObserve",
@@ -546,15 +513,15 @@
     "create_at_lbl": "创建于",
     "expires_at_lbl": "到期时间",
     "usage_limits": "使用限制",
-    "ingestion_type": "写入类型",
-    "ingestion_limit": "写入限制",
+    "ingestion_type": "摄取类型",
+    "ingestion_limit": "摄取限制",
     "today_usage": "今天的用法",
     "feature_comparision_ent_msg": "你正在使用 OpenObserve 企业版，可以访问下面列出的所有高级功能。",
-    "feature_comparision_plan_detail": "您的套餐：企业版可免费写入高达 50 GB /天（约 1.5 TB/月）的数据。",
+    "feature_comparision_plan_detail": "您的套餐：企业版可免费摄取高达 200 GB /天（约 6 TB/月）的数据。",
     "feature_comparision_os_msg": "你目前正在使用 OpenObserve 开源版。升级到企业版可解锁下表中列出的高级功能。",
-    "feature_comparision_good_news": "好消息：OpenObserve 企业版完全免费，每天写入高达 50 GB（约 1.5 TB/月）的数据。",
+    "feature_comparision_good_news": "好消息：OpenObserve 企业版完全免费，每天摄取高达 200 GB（约 6 TB/月）的数据。",
     "commit_lbl": "提交",
-    "build_lbl": "构建",
+    "build_lbl": "已建成",
     "no_license_installed_lbl": "未安装许可证",
     "no_license_installed_msg": "当前未安装任何企业许可证。联系您的管理员或申请新许可证。",
     "active_lbl": "活跃",
@@ -577,7 +544,7 @@
     "feature_dashboards": "仪表板",
     "feature_reports": "报告",
     "feature_vrl_functions": "VRL 函数",
-    "feature_pipelines": "流水线",
+    "feature_pipelines": "管道",
     "feature_high_availability": "高可用性",
     "feature_multitenancy": "多租户（组织）",
     "feature_dynamic_schema": "动态架构和架构演变",
@@ -594,7 +561,7 @@
     "feature_license": "许可证",
     "feature_support": "支持",
     "feature_cost": "价格",
-    "feature_pipelines_external": "流水线-远程数据写入",
+    "feature_pipelines_external": "管道-远程数据写入",
     "feature_extreme_performance": "极致性能（许多查询提高了 100 倍）",
     "feature_query_optimizer": "查询优化器",
     "value_sso_requires_ha": "✅ 需要 HA 模式",
@@ -607,14 +574,14 @@
     "value_support_enterprise": "企业",
     "value_support_cloud": "云",
     "value_cost_free": "免费",
-    "value_cost_enterprise": "如果是自托管，则每天最多可免费写入 50 GB 的数据。之后付款",
+    "value_cost_enterprise": "如果是自托管，则每天最多可免费写入 200 GB 的数据。之后付款",
     "value_cost_cloud": "14 天免费试用。之后付款",
     "feature_comparison_lbl": "功能对比",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "企业功能",
         "offer_text": "自托管 OpenObserve 即可完全免费获得所有企业功能",
-        "badge_text": "免费高达 50GB /天",
+        "badge_text": "免费高达 200GB /天",
         "features_title": "OpenObserve",
         "features_subtitle": "您的云订阅中包含的所有功能",
         "primary_button_text": "立即下载"
@@ -622,17 +589,17 @@
       "enterprise_without_license": {
         "hero_title": "企业功能",
         "offer_text": "申请免费许可证以最大限度地部署 OpenObserve",
-        "badge_text": "免费高达 {quota} GB /天",
+        "badge_text": "免费高达 {配额} GB /天",
         "features_title": "可用的企业功能",
         "features_subtitle": "获取免费许可证以解锁无限功能",
         "primary_button_text": "获取免费许可证",
-        "license_note": "没有许可证 50GB/天 • 有许可证则为每天 50GB"
+        "license_note": "没有许可证 100GB/天 • 有许可证则为每天 200GB"
       },
       "enterprise_with_license": {
         "hero_title": "您的企业版",
         "offer_text": "你正在运行启用所有功能的 OpenObserve 企业版",
-        "badge_text_unlimited": "写入限制：无限制",
-        "badge_text_limited": "写入限制：{限制} GB/天",
+        "badge_text_unlimited": "摄取限制：无限制",
+        "badge_text_limited": "摄取限制：{限制} GB/天",
         "features_title": "活跃的企业功能",
         "features_subtitle": "所有功能均已解锁，可供使用",
         "primary_button_text": "管理许可证"
@@ -640,7 +607,7 @@
       "open_source": {
         "hero_title": "获取企业版",
         "offer_text": "完全免费下载和解锁所有企业功能",
-        "badge_text": "免费高达 50GB /天",
+        "badge_text": "免费高达 200GB /天",
         "features_title": "解锁所有企业版功能",
         "features_subtitle": "生产就绪可观测性所需的一切",
         "primary_button_text": "立即下载"
@@ -648,7 +615,7 @@
       "core_features": {
         "logs_metrics_traces": {
           "name": "日志、指标、跟踪",
-          "note": "全面的可观测性数据写入和分析"
+          "note": "全面的可观测性数据摄取和分析"
         },
         "rum": {
           "name": "RUM",
@@ -671,8 +638,8 @@
           "note": "用于数据转换的矢量重映射语言"
         },
         "pipelines": {
-          "name": "流水线",
-          "note": "数据处理和转换流水线"
+          "name": "管道",
+          "note": "数据处理和转换管道"
         },
         "high_availability": {
           "name": "高可用性",
@@ -725,8 +692,8 @@
           "note": "保护 PII 和敏感信息"
         },
         "pipeline_remote_destinations": {
-          "name": "流水线远程目标",
-          "note": "将数据发送到远程目标"
+          "name": "管道远程目的地",
+          "note": "将数据发送到远程目的地"
         },
         "query_optimizer": {
           "name": "查询优化器/聚合缓存",
@@ -762,7 +729,7 @@
         },
         "rate_limiting": {
           "name": "速率限制",
-          "note": "控制查询和写入率"
+          "note": "控制查询和摄取率"
         },
         "broadcast_join": {
           "name": "广播加入",
@@ -815,7 +782,7 @@
     "your_complete_license_key": "您的完整许可证密钥：",
     "copy_key": "复制密钥",
     "usage_information": "使用信息",
-    "license_allows_ingestion": "您的许可证允许每天写入 <strong>{限制} GB</strong> 的数据。",
+    "license_allows_ingestion": "您的许可证允许每天摄取 <strong>{限制} GB</strong> 的数据。",
     "limit_exceeded_days": "本月 {days<strong class=\"{colorClass}\">} 天 {plural}</strong> 已超过上限",
     "limit_exceeded_warning": " （最多允许 {max} 天）。应用程序功能将受到限制",
     "limit_exceeded_info": " （最多 {max} 个 {剩余} 余额 {复数}）",
@@ -832,7 +799,7 @@
     "feature_correlation_management": "关联管理",
     "feature_log_patterns": "日志模式",
     "environment_type": "环境类型",
-    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地写入数据。"
+    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地摄取数据。"
   },
   "login": {
     "userid": "账号",
@@ -963,8 +930,7 @@
     "nameRequired": "名称为必填项",
     "subscription_type": "订阅类型",
     "proceed_subscription": "继续订阅",
-    "subscription_plan": "订阅计划",
-    "makeBilledMember": "将此组织设为 {org} 的计费会员"
+    "subscription_plan": "订阅计划"
   },
   "template": {
     "header": "模板",
@@ -1181,31 +1147,31 @@
     "iis": "IIS",
     "pubsub": "Pub/Sub Logs",
     "aiLabel": "人工智能集成",
-    "manageTokensBtnLabel": "管理令牌",
-    "orgLevelExplanation": "这些是组织级别的写入令牌。它们与个人用户无关，即使创建它们的用户离开组织，它们也将继续工作。令牌只能在写入API上使用。",
-    "resetDefaultTokenLabel": "重置令牌",
-    "tokenManagementTitle": "管理写入令牌",
+    "manageTokensBtnLabel": "管理代币",
+    "orgLevelExplanation": "这些是组织级别的摄取令牌。它们与个人用户无关，即使创建它们的用户离开组织，它们也将继续工作。令牌只能在摄取端点上使用。",
+    "resetDefaultTokenLabel": "重置代币",
+    "tokenManagementTitle": "管理摄取令牌",
     "defaultTokenBadge": "默认",
-    "createTokenBtn": "创建新令牌",
-    "createTokenTitle": "创建令牌",
-    "tokenNameLabel": "名称",
+    "createTokenBtn": "创建新代币",
+    "createTokenTitle": "创建代币",
+    "tokenNameLabel": "姓名",
     "tokenDescriptionLabel": "描述",
     "rotateTokenBtn": "旋转",
     "deleteTokenBtn": "删除",
     "copyTokenBtn": "复制",
     "copyTokenWarning": "立即复制此令牌。它不会再次显示。",
-    "newTokenRevealed": "新令牌生成",
-    "deleteTokenConfirm": "删除令牌 “{name}”？使用此令牌的流水线将停止运行。",
-    "rotateTokenConfirm": "轮换令牌 “{name}”？所有使用此令牌的流水线都必须使用新值进行更新。",
-    "tokenCreatedSuccess": "已成功创建令牌。",
-    "tokenRotatedSuccess": "令牌成功轮换。",
+    "newTokenRevealed": "新代币生成",
+    "deleteTokenConfirm": "删除令牌 “{name}”？使用此代币的管道将停止运行。",
+    "rotateTokenConfirm": "轮换代币 “{name}”？所有使用此令牌的管道都必须使用新值进行更新。",
+    "tokenCreatedSuccess": "已成功创建代币。",
+    "tokenRotatedSuccess": "代币成功轮换。",
     "tokenDeletedSuccess": "令牌已成功删除。",
-    "resetDefaultConfirm": "重置默认写入令牌？所有使用此令牌的流水线都必须更新。",
+    "resetDefaultConfirm": "重置默认摄取令牌？所有使用此令牌的管道都必须更新。",
     "tokenFetchError": "加载令牌失败。",
     "tokenCreateError": "创建令牌失败。",
     "tokenRotateError": "轮换令牌失败。",
     "tokenDeleteError": "删除令牌失败。",
-    "noTokensFound": "未找到写入令牌。",
+    "noTokensFound": "未找到摄取令牌。",
     "createdBy": "由... 创建"
   },
   "dashboard": {
@@ -1666,12 +1632,7 @@
     "axisLabelTooltipNotePrefix": "注意：",
     "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。",
     "allFolders": "所有文件夹",
-    "selectFile": "选择文件",
-    "multiSqlQueryLabel": "查询标签",
-    "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
-    "multiQueryWarning": "仅为 {chartType} 呈现查询 1",
-    "trellisNotSupportedWithMultiQuery": "多次查询禁用网格布局。移除额外的查询以使用网格。",
-    "xAliasInconsistencyWarning": "X 轴别名在不同查询之间不一致：有些使用直方图，有些不使用。在所有查询中使用相同的别名类型以获得可预测的结果。"
+    "selectFile": "选择文件"
   },
   "panel": {
     "header": "面板",
@@ -1726,7 +1687,7 @@
     "deletePanelTitle": "删除面板",
     "deletePanelMessage": "您确定要删除此面板吗？",
     "movePanelTitle": "将面板移至另一个选项卡",
-    "movePanelMessage": "选择目标选项卡",
+    "movePanelMessage": "选择目的地选项卡",
     "noQueriesToCreateAlert": "此面板没有可从中创建告警的查询",
     "panelQueryMustHaveStream": "面板查询必须配置数据流",
     "unsupportedPanelTypeAlert": "从 {type} 面板创建告警可能无法按预期运行",
@@ -1775,9 +1736,9 @@
     "indexSizeLbl": "索引大小",
     "docsCountLbl": "活动",
     "functionTitle": "函数",
-    "schedulePipelineTitle": "定时",
+    "schedulePipelineTitle": "已排定",
     "rtPipelineTitle": "实时",
-    "pipelineTitle": "流水线",
+    "pipelineTitle": "管道",
     "alertTitle": "告警",
     "dashboardTitle": "仪表板",
     "streamTotal": "数据流",
@@ -1786,8 +1747,7 @@
     "noDataAvailable": "无可用数据",
     "tabAiAssistant": "O2 AI 助手",
     "tabOverview": "概述",
-    "tabUsage": "用法",
-    "subtitle": "您的可观测性工作空间一览"
+    "tabUsage": "用法"
   },
   "billing": {
     "header": "用量和账单",
@@ -1847,105 +1807,7 @@
     "aiModePayAsYouGo": "即用即付",
     "aiModeExhausted": "精疲力",
     "aiExhaustedMessage": "订阅即可继续使用 AI 功能",
-    "aiPaygMessage": "免费积分已用尽 — 使用量计入订阅账单",
-    "organizationGroup": {
-      "tabLabel": "组织小组",
-      "inviteOrgButton": "邀请组织",
-      "viewUsage": "查看使用情况",
-      "statTotal": "儿童组织总数",
-      "statActive": "活跃",
-      "statPending": "待处理的邀请",
-      "statRejected": "已拒绝",
-      "statusActive": "活跃",
-      "statusPending": "待处理",
-      "statusRejected": "已拒绝",
-      "filterAll": "全部",
-      "childOrgColumn": "儿童组织",
-      "dateColumn": "日期",
-      "cancel": "取消",
-      "invitedBy": "受邀者",
-      "acceptedBy": "接受者",
-      "addedOnCreation": "创建时添加",
-      "memberSince": "成员起始于",
-      "noMembers": "尚无成员组织",
-      "inviteTitle": "邀请组织",
-      "inviteOrgIdLabel": "组织标识符",
-      "inviteOrgIdPlaceholder": "输入组织标识符",
-      "sendInvite": "发送邀请",
-      "inviteSent": "邀请已成功发送",
-      "inviteSameOrg": "组织无法邀请自己",
-      "childHeadline": "账单由管理",
-      "childHeroSub": "您的使用量将向该组织收费。计划变更和发票由上级组织处理——这里没有什么可管理的。",
-      "receivedInvitesTab": "待处理的邀请",
-      "noPendingInvites": "没有待处理的邀请",
-      "noPendingInvitesHint": "当其他组织邀请您加入他们的账单组时，您将在此处看到邀请。",
-      "invitedByOn": "由 {邀请者} 邀请",
-      "inviteTabPrompt": "邀请其他组织加入您的账单组。它们的使用量将向该组织收费。",
-      "emptyTitle": "启动账单组",
-      "chipConsolidatedBill": "一份合并账单",
-      "chipLinkOrgs": "链接多个组织",
-      "accept": "接受",
-      "reject": "拒绝",
-      "inviteAccepted": "邀请已成功接受",
-      "inviteRejected": "邀请成功拒绝",
-      "plansManagedTitle": "账单由上级组织管理",
-      "plansManagedDescription": "该组织的账单由 {payer} 管理。计划变更由上级组织处理。",
-      "chipPlanManaged": "由家长管理的计划",
-      "chipNoInvoices": "没有单独的发票",
-      "viewOrgGroup": "查看组织群组",
-      "usageMemberLabel": "成员组织",
-      "usageAllMembers": "当前组织",
-      "currentOrgTitle": "当前组织"
-    },
-    "billingGroup": {
-      "tabLabel": "账单组",
-      "inviteOrgButton": "邀请组织",
-      "viewUsage": "查看使用情况",
-      "statTotal": "儿童组织总数",
-      "statActive": "活跃",
-      "statPending": "待处理的邀请",
-      "statRejected": "已拒绝",
-      "statusActive": "活跃",
-      "statusPending": "待处理",
-      "statusRejected": "已拒绝",
-      "filterAll": "全部",
-      "childOrgColumn": "儿童组织",
-      "orgColumn": "组织",
-      "orgIdColumn": "组织标识符",
-      "actionsColumn": "行动",
-      "dateColumn": "日期",
-      "cancel": "取消",
-      "invitedBy": "受邀者",
-      "acceptedBy": "接受者",
-      "addedOnCreation": "创建时添加",
-      "memberSince": "成员起始于",
-      "noMembers": "尚无成员组织",
-      "inviteTitle": "邀请组织",
-      "inviteOrgIdLabel": "组织标识符",
-      "inviteOrgIdPlaceholder": "输入组织标识符",
-      "sendInvite": "发送邀请",
-      "inviteSent": "邀请已成功发送",
-      "inviteSameOrg": "组织无法邀请自己",
-      "childHeadline": "账单由管理",
-      "childHeroSub": "您的使用量将向该组织收费。计划变更和发票由上级组织处理——这里没有什么可管理的。",
-      "invitesPanelHint": "这些组织已邀请您加入他们的账单组。如果您接受，则该组织的使用量将向他们收费。",
-      "inviteTabPrompt": "邀请其他组织加入您的账单组。它们的使用量将向该组织收费。",
-      "emptyTitle": "启动账单组",
-      "chipConsolidatedBill": "一份合并账单",
-      "chipLinkOrgs": "链接多个组织",
-      "accept": "接受",
-      "reject": "拒绝",
-      "inviteAccepted": "邀请已成功接受",
-      "inviteRejected": "邀请成功拒绝",
-      "plansManagedTitle": "账单由上级组织管理",
-      "plansManagedDescription": "该组织的账单由 {payer} 管理。计划变更由上级组织处理。",
-      "chipPlanManaged": "由家长管理的计划",
-      "chipNoInvoices": "没有单独的发票",
-      "viewOrgGroup": "查看组织群组",
-      "usageMemberLabel": "成员组织",
-      "usageAllMembers": "当前组织",
-      "currentOrgTitle": "当前组织"
-    }
+    "aiPaygMessage": "免费积分已用尽 — 使用量计入订阅账单"
   },
   "message": {
     "ServerInternalError": "错误：出了点问题。内部服务器错误。",
@@ -1990,7 +1852,7 @@
     "threshold": "阈值",
     "interval": "频率",
     "silenceNotification": "通知后静默",
-    "destination": "告警目标",
+    "destination": "通知地址",
     "additionalVariables": "附加变量",
     "description": "描述",
     "stream_name": "数据流名称",
@@ -2014,7 +1876,7 @@
     "move": "移动告警",
     "importedFromPanel": "从仪表板面板导入的查询：“{panelTitle}”",
     "createFunction": "创建函数",
-    "newFunctionAssociationMsg": "注意：将创建该函数，然后您将被重定向到之前的表单，以将新创建的函数与流水线相关联。",
+    "newFunctionAssociationMsg": "注意：将创建该函数，然后您将被重定向到之前的表单，以将新创建的函数与管道相关联。",
     "createdBy": "创建者",
     "createdAt": "创建于",
     "lastRunAt": "上次运行时间",
@@ -2165,7 +2027,7 @@
       "notEqualTo": "不等于",
       "eventsDetected": "检测到的事件",
       "sendsTo": "发送至",
-      "noDestination": "没有目标",
+      "noDestination": "没有目的地",
       "notSetupYet": "（尚未设置）",
       "cooldown": "冷却时间",
       "betweenAlerts": "告警之间",
@@ -2239,17 +2101,17 @@
       "advanced": "上下文变量、描述和行模板"
     },
     "template": "模板",
-    "searchDestinationType": "搜索目标类型...",
-    "customDestination": "自定义目标",
+    "searchDestinationType": "搜索目的地类型...",
+    "customDestination": "自定义目的地",
     "customDestinationDescription": "配置自定义 HTTP 端点或电子邮件目标",
-    "noDestinationTypesFound": "未找到目标类型",
+    "noDestinationTypesFound": "未找到目的地类型",
     "clearSearch": "清除搜索",
     "popular": "流行",
     "testIdleMessage": "单击 “测试” 以验证您的目标配置",
-    "destinationPreview": "目标预览",
-    "testSuccessMessage": "测试成功！您的目标配置正确。",
+    "destinationPreview": "目的地预览",
+    "testSuccessMessage": "测试成功！您的目的地配置正确。",
     "testFailedMessage": "测试失败。请检查您的配置并重试。",
-    "testInProgress": "测试目标...",
+    "testInProgress": "测试目的地...",
     "sendingNotification": "发送测试通知以验证连通性",
     "testErrorDNS": "DNS 解析失败。请检查 webhook 的网址或主机名。",
     "testErrorConnection": "连接被拒绝。请验证 URL 并确保该服务可访问。",
@@ -2354,15 +2216,15 @@
     },
     "alertSettings": {
       "cronSchedule": "Cron 时间表",
-      "addNewDestination": "添加新目标",
+      "addNewDestination": "添加新目的地",
       "cooldownTooltip": "如果警报触发，则应等待多长时间才能发送另一条通知。例如，如果警报在下午 4:00 触发，静音通知设置为 10 分钟，则即使警报在 1 分钟后仍然存在，它也要等到下午 4:10 才会发送其他通知。这是为了避免向用户发送垃圾通知。",
       "thresholdTooltip": "根据事件数或聚合值定义何时触发警报。示例：如果设置为 “> 100”，则当事件数超过 100 个时会触发警报。",
       "periodTooltip": "查询应运行的时间段。例如 10 分钟意味着无论何时运行查询，都将使用最后 10 分钟的数据。",
       "frequencyTooltipMinutes": "任务应多久执行一次。例如每 5 分钟一次。",
       "frequencyTooltipCron": "标准 UNIX cron 格式，有 5 个由空格分隔的字段：[0-59 分钟] [小时 0-23] [本月第 1-31 天] [第 1-12 个月或 1 月至 12 月] [周日 0-7 或 '1L-7L'，0 和 7 表示星期日]。",
       "timezoneWarning": "警告：显示的时区是近似值。手动验证并选择正确的时区。",
-      "destinationsTooltip": "选择一个或多个目标发送警报通知。",
-      "templateTooltip": "可选：选择一个模板用于此警报中的所有目标。模板允许您自定义警报消息的格式。如果未选中，则每个目标都将使用其自己的配置模板。"
+      "destinationsTooltip": "选择一个或多个目的地发送警报通知。",
+      "templateTooltip": "可选：选择一个模板用于此警报中的所有目的地。模板允许您自定义警报消息的格式。如果未选中，则每个目的地都将使用其自己的配置模板。"
     },
     "advanced": {
       "addVariable": "添加变量",
@@ -2464,12 +2326,12 @@
       "seasonalityWeekly": "一小时 + 一周中的某一天",
       "seasonalityDaily": "一天中的一小时",
       "notifications": "通知",
-      "notificationsTooltip": "启用后，只要检测到异常，就会向所选目标发送通知。",
+      "notificationsTooltip": "启用后，只要检测到异常，就会向所选目的地发送通知。",
       "enabled": "已启用",
       "disabled": "已禁用",
-      "noDestinationsFound": "未找到目标",
-      "addNewDestination": "添加新目标",
-      "destinationRequired": "至少需要一个目标！",
+      "noDestinationsFound": "未找到目的地",
+      "addNewDestination": "添加新目的地",
+      "destinationRequired": "至少需要一个目的地！",
       "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
     },
     "anomalyName": "异常名称"
@@ -2489,29 +2351,20 @@
     "delete": "删除",
     "variable_guide_header": "模板变量指南",
     "variable_usage_examples": "用法示例",
-    "body": "Body",
-    "clone": "克隆",
-    "cloneTitle": "克隆模板",
-    "systemReadOnly": "预建模板 — 删除已禁用。将其克隆以制作可修改的副本。",
-    "prebuiltBadge": "预建的",
-    "prebuiltBadgeHint": "由系统管理。您可以编辑，但删除功能已禁用。",
-    "customBadge": "自定义",
-    "filterAll": "全部",
-    "filterPrebuilt": "预建的",
-    "filterCustom": "自定义"
+    "body": "Body"
   },
   "alert_destinations": {
-    "header": "告警目标",
-    "add": "添加目标",
+    "header": "地址",
+    "add": "添加地址",
     "edit": "编辑",
-    "search": "搜索目标",
+    "search": "搜索地址",
     "name": "名称",
     "template": "模板",
     "save": "保存",
     "actions": "操作",
     "cancel": "取消",
-    "addTitle": "添加目标",
-    "updateTitle": "更新目标",
+    "addTitle": "添加地址",
+    "updateTitle": "更新地址",
     "delete": "删除",
     "method": "Method",
     "url": "URL",
@@ -2521,13 +2374,13 @@
     "skip_tls_verify": "跳过 TLS 验证",
     "action": "操作",
     "output_format": "输出格式",
-    "destination_type": "目标类型",
+    "destination_type": "目的地类型",
     "readonly": "只读",
     "additional_settings": "其他设置",
     "custom_headers": "自定义标题（可选）",
     "preview": "预览",
     "test": "测试",
-    "saved": "目标已成功保存",
+    "saved": "目的地已成功保存",
     "saveError": "保存目标失败",
     "customWebhook": "自定义（Webhook）",
     "customEmail": "自定义（电子邮件）",
@@ -2535,13 +2388,7 @@
     "custom": "自定义",
     "separator": "分隔符",
     "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
-    "separator_hint": "在记录之间使用的分隔字符串（允许空格）",
-    "filterAll": "全部",
-    "filterPrebuilt": "预建的",
-    "filterCustom": "自定义",
-    "templateDefaultBadge": "默认",
-    "templateDefaultOption": "Default ({name})",
-    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
   },
   "metrics": {
     "searchMetric": "搜索指标",
@@ -2587,7 +2434,7 @@
     "traceIdFieldName": "TraceID 字段名称",
     "spanIdFieldName": "SpanID 字段名称",
     "enableWebsocketSearch": "启用 Websocket 搜索",
-    "toggleIngestionLogsLabel": "切换写入日志",
+    "toggleIngestionLogsLabel": "切换摄取日志",
     "claimParserFunction": "SSO 索赔解析器",
     "claimParserFunctionDescription": "选择 VRL 函数来解析 SSO/LDAP 声明并将其转换为组织和角色分配",
     "claimParserFunctionLabel": "选择 VRL 函数",
@@ -2791,7 +2638,7 @@
     "usageStreamEnabledLabel": "启用使用流",
     "aiToolsets": "AI 工具集",
     "llmModelPricing": "LLM 模型定价",
-    "ingestionTokens": "写入令牌"
+    "ingestionTokens": "摄取代币"
   },
   "iam": {
     "users": "用户",
@@ -2824,7 +2671,7 @@
     "externalUserWarningTitle": "外部用户警告",
     "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
     "invitations": "邀请",
-    "ingestionTokens": "写入令牌"
+    "ingestionTokens": "摄取代币"
   },
   "pipeline": {
     "header": "流水线",
@@ -2839,7 +2686,7 @@
     "nodes": "节点",
     "associateFunction": "关联函数",
     "derivedStream": "派生数据流",
-    "pipelineName": "输入流水线名称",
+    "pipelineName": "输入管道名称",
     "flatteningLbl": "扁平化后",
     "streamTitle": "关联数据流",
     "conditionTitle": "关联条件",
@@ -2851,9 +2698,9 @@
     "delete": "删除",
     "view": "查看",
     "delay": "延迟",
-    "history": "流水线历史",
-    "searchHistory": "输入流水线名称",
-    "destination_type": "目标类型",
+    "history": "管道历史",
+    "searchHistory": "输入管道名称",
+    "destination_type": "目的地类型",
     "backfill": "回填",
     "buildQuery": "生成查询",
     "setVariables": "设置变量",
@@ -2867,9 +2714,9 @@
     "output": "输出",
     "validating": "正在验证...",
     "validateAndClose": "验证并关闭",
-    "editPipelineJson": "编辑流水线 Json",
-    "editPipelineJSON": "编辑流水线 JSON",
-    "savePipeline": "保存流水线",
+    "editPipelineJson": "编辑管道 Json",
+    "editPipelineJSON": "编辑管道 JSON",
+    "savePipeline": "保存管道",
     "savePipelineConfirm": "你确定要保存这个流水线吗，因为它没有任何影响？",
     "sourceNode": "来源",
     "streamNode": "直播",
@@ -2877,7 +2724,7 @@
     "transformNode": "转型",
     "functionNode": "函数",
     "conditionNode": "状况",
-    "destinationNode": "目标",
+    "destinationNode": "目的地",
     "remoteNode": "远程",
     "sourceStreamTooltip": "来源：直播节点",
     "sourceQueryTooltip": "来源：查询节点",
@@ -2885,17 +2732,17 @@
     "conditionTooltip": "条件节点",
     "destinationStreamTooltip": "目标：直播节点",
     "destinationExternalTooltip": "目标：外部目标节点",
-    "pipelineNotFound": "未找到流水线",
-    "pipelineNameRequired": "流水线名称为必填项",
+    "pipelineNotFound": "未找到管道",
+    "pipelineNameRequired": "管道名称为必填项",
     "sourceNodeRequired": "源节点为必填项",
     "destinationNodeRequired": "目标节点为必填项",
     "connectAllNodes": "请先连接所有节点，然后再保存",
     "connectAllNodesShort": "请连接所有节点",
-    "enrichmentTablesScheduledOnly": "充实表作为目标流仅适用于预定流水线",
-    "savingPipeline": "正在保存流水线...",
-    "pipelineUpdated": "流水线已成功更新",
-    "pipelineSaved": "流水线已成功保存",
-    "errorSavingPipeline": "保存流水线时出错",
+    "enrichmentTablesScheduledOnly": "充实表作为目标流仅适用于预定管道",
+    "savingPipeline": "正在保存管道...",
+    "pipelineUpdated": "管道已成功更新",
+    "pipelineSaved": "管道已成功保存",
+    "errorSavingPipeline": "保存管道时出错",
     "cancelChangesConfirm": "您确定要取消更改吗？",
     "cancel": "取消",
     "dragDropNodesHere": "将节点拖放到此处",
@@ -2915,7 +2762,7 @@
     "llmEvaluationNodeSaved": "LLM 评估节点已成功保存",
     "llmJudgeConfig": "LLM 法官配置",
     "enableLlmJudge": "启用 LLM-asJudge",
-    "enableLlmJudgeHelp": "启用后，使用 LLM 通过详细的维度分数评估响应质量。更详尽，但需要花费LLM令牌。",
+    "enableLlmJudgeHelp": "启用后，使用 LLM 通过详细的维度分数评估响应质量。更详尽，但需要花费LLM代币。",
     "llmSpanIdentifier": "LLM 跨度标识符",
     "llmSpanIdentifierLabel": "用于识别 LLM 跨度的字段",
     "llmSpanIdentifierHelp": "从源流中选择标识 LLM 跨度的字段。仅评估此字段存在且非空的跨度。",
@@ -2925,20 +2772,20 @@
     "samplingLabel": "采样",
     "samplingAllTraces": "所有追踪 (100%)",
     "samplingOfTraces": "的追踪",
-    "nameLabel": "名称",
+    "nameLabel": "姓名",
     "llmEvaluationDescription": "评估追踪并将结果写入单独的日志流",
     "llmEvaluationEnableToggle": "为该追踪流启用 LLM 评估",
-    "llmEvaluationEnableHelp": "创建实时流水线，用于评估 LLM 追踪并将结果写入单独的日志流。",
+    "llmEvaluationEnableHelp": "创建实时管道，用于评估 LLM 追踪并将结果写入单独的日志流。",
     "llmSpanIdentifierFieldHelp": "标识 LLM 跨度的字段（例如 gen_ai_system）",
     "llmEvaluationSamplingRateLabel": "采样率：{百分比}%",
     "llmEvaluationSamplingHelp": "要评估的追踪百分比",
     "llmEvaluationOutputStreamName": "输出流名称",
     "llmEvaluationOutputStreamHelp": "评估结果将写入此日志流",
-    "llmEvaluationRemoveWarning": "要删除现有的 LLM 评估流水线，请从 “流水线” 页面对其进行管理。",
-    "llmEvaluationPipelineExists": "此跟踪流已存在名为 “{streamName}” 的流水线。从 “流水线” 页面对其进行管理。",
-    "llmEvaluationPipelineDescription": "跟踪流的 LLM 评估流水线 {streamName}",
-    "llmEvaluationCreatedSuccess": "LLM 评估流水线 “{streamName}” 已成功创建。",
-    "llmEvaluationCreationFailed": "无法创建 LLM 评估流水线。",
+    "llmEvaluationRemoveWarning": "要删除现有的 LLM 评估管道，请从 “管道” 页面对其进行管理。",
+    "llmEvaluationPipelineExists": "此跟踪流已存在名为 “{streamName}” 的管道。从 “管道” 页面对其进行管理。",
+    "llmEvaluationPipelineDescription": "跟踪流的 LLM 评估管道 {streamName}",
+    "llmEvaluationCreatedSuccess": "LLM 评估管道 “{streamName}” 已成功创建。",
+    "llmEvaluationCreationFailed": "无法创建 LLM 评估管道。",
     "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
     "invalidCronExpression": "无效的 cron 表达式",
     "thresholdShouldNotBeEmpty": "阈值不应为空",
@@ -2950,10 +2797,7 @@
     "evaluationTemplate": "评估模板",
     "evaluationTemplateHelp": "选择一个评估模板来定义 LLM 评委的标准和维度。",
     "noTemplatesFound": "未找到评估模板。在 “评估模板” 页面中创建一个。",
-    "evalTemplatesRefreshed": "评估模板已成功刷新",
-    "subtitle": "在飞行中转换、丰富和路由数据",
-    "selectStream": "选择一个直播...",
-    "queryEditorPlaceholder": "在此处选择直播或编写 SQL 查询..."
+    "evalTemplatesRefreshed": "评估模板已成功刷新"
   },
   "reports": {
     "header": "报表",
@@ -2977,8 +2821,8 @@
     "tab": "选项卡",
     "cached": "已缓存",
     "cachedReport": "缓存报表",
-    "destination": "目标",
-    "scheduled": "定时",
+    "destination": "接收地址",
+    "scheduled": "已计划",
     "reportFormat": "报告格式",
     "reportType": "报告类型",
     "attachmentType": "附件风格",
@@ -3148,7 +2992,7 @@
       "countPill": "{总计} {单位} 的 {数量}",
       "noStreamsFound": "未找到 LLM 直播",
       "noStreamsDescription1": "会话组跨度为",
-      "noStreamsDescription2": "跨越标记为 LLM 流的跟踪流。要么不存在这样的直播，要么尚未写入任何跨度。",
+      "noStreamsDescription2": "跨越标记为 LLM 流的跟踪流。要么不存在这样的直播，要么尚未摄取任何跨度。",
       "failedToLoad": "加载会话失败",
       "retry": "重试",
       "noSessionsFound": "未找到会话",
@@ -3161,7 +3005,7 @@
         "sessionId": "会话 ID",
         "turns": "回合",
         "duration": "持续时间",
-        "tokens": "令牌",
+        "tokens": "代币",
         "cost": "成本",
         "status": "状态"
       }
@@ -3185,8 +3029,8 @@
       "kpi": {
         "turns": "回合",
         "duration": "持续时间",
-        "inputTokens": "输入令牌",
-        "outputTokens": "输出令牌",
+        "inputTokens": "输入代币",
+        "outputTokens": "输出代币",
         "cost": "成本"
       },
       "conversation": "对话",
@@ -3201,15 +3045,14 @@
       "stats": {
         "status": "状态",
         "model": "模型",
-        "tokens": "令牌",
+        "tokens": "代币",
         "input": "输入",
         "output": "输出",
         "total": "总计",
         "cost": "成本",
         "spans": "跨度"
       }
-    },
-    "openInFullView": "以全视图打开"
+    }
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3247,8 +3090,8 @@
     "token": "令牌"
   },
   "pipeline_destinations": {
-    "header": "流水线目标",
-    "search": "搜索目标"
+    "header": "管道目的地",
+    "search": "搜索目的地"
   },
   "actions": {
     "testAction": "测试操作",
@@ -3273,7 +3116,7 @@
     "add": "新的密码密钥",
     "search": "搜索密钥",
     "update": "更新密码密钥",
-    "name": "名称",
+    "name": "姓名",
     "type": "类型",
     "step1": "密钥商店详情",
     "step2": "加密机制",
@@ -3285,7 +3128,7 @@
     "ldapUsername": "LDAP 用户名",
     "ldapPassword": "LDAP 密码",
     "secretType": "密钥类型",
-    "staticSecretName": "名称",
+    "staticSecretName": "姓名",
     "dfcName": "DFC 名称",
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC 加密数据",
@@ -3437,16 +3280,16 @@
     "error_summary": "错误摘要",
     "node_errors": "节点错误",
     "close": "关闭",
-    "resume_pipeline_title": "恢复流水线写入",
+    "resume_pipeline_title": "恢复管道摄取",
     "tab_all": "全部",
-    "tab_scheduled": "定时",
+    "tab_scheduled": "已排定",
     "tab_realtime": "实时",
     "stream_type": "数据流类型",
     "frequency": "频率",
     "period": "时期",
     "cron": "Cron",
     "type": "类型",
-    "run_pipeline": "运行流水线",
+    "run_pipeline": "运行管道",
     "showLegends": "显示图例"
   },
   "alert_list": {
@@ -3676,8 +3519,8 @@
     "header": "交叉链接",
     "addCrossLink": "添加交叉链接",
     "editCrossLink": "编辑交叉链接",
-    "name": "名称",
-    "nameRequired": "名称为必填项",
+    "name": "姓名",
+    "nameRequired": "姓名为必填项",
     "namePlaceholder": "例如，查看追踪详情",
     "urlTemplate": "网址模板",
     "urlRequired": "网址为必填项",
@@ -3740,7 +3583,7 @@
     "deleteSuccess": "模板已成功删除",
     "deleteFailed": "删除模板失败",
     "statsLoadFailed": "加载模板统计信息失败",
-    "nameRequired": "名称为必填项",
+    "nameRequired": "姓名为必填项",
     "responseTypeRequired": "回复类型为必填项",
     "dimensionRequired": "至少需要一个维度",
     "contentRequired": "内容为必填项",
@@ -3762,8 +3605,8 @@
     "add": "新的 AI 工具集",
     "search": "搜索 AI 工具集",
     "update": "更新 AI 工具集",
-    "name": "名称",
-    "nameRequired": "名称为必填项",
+    "name": "姓名",
+    "nameRequired": "姓名为必填项",
     "nameInvalid": "只允许使用字母、数字、连字符和下划线",
     "nameTooLong": "名称不得超过 256 个字符",
     "kind": "类型",
@@ -3823,7 +3666,7 @@
     "importBtn": "导入",
     "newModel": "新模型",
     "noModels": "没有模型定价定义",
-    "noModelsDesc": "添加自定义定价定义以跟踪 LLM 令牌成本。",
+    "noModelsDesc": "添加自定义定价定义以跟踪 LLM 代币成本。",
     "modelsCount": "{count} 型号",
     "exportSelected": "导出 ({count})",
     "deleteSelected": "删除 ({count})",
@@ -3845,7 +3688,7 @@
     "modelNameField": "型号名称 *",
     "modelNameTooltip": "为该规则命名。您可以通过在多个条目中使用相同的名称和匹配模式来跟踪价格变化。",
     "matchPatternField": "匹配模式（正则表达式）*",
-    "matchPatternTooltip": "正则表达式与写入的型号名称进行匹配以应用此定价规则。",
+    "matchPatternTooltip": "正则表达式与摄取的型号名称进行匹配以应用此定价规则。",
     "patternExamplesBtn": "查看模式示例",
     "patternExamplesTitle": "匹配模式示例",
     "patternExamplesDesc": "用于流行模型的常用正则表达式模式",
@@ -3858,10 +3701,10 @@
     "tierName": "等级名称",
     "applyTierWhen": "在以下情况下应用此等级",
     "quickSetup": "快速设置：",
-    "tokenPrices": "令牌价格",
-    "tokenPricesUnit": "— 每 100 万个令牌美元",
+    "tokenPrices": "代币价格",
+    "tokenPricesUnit": "— 每 100 万个代币美元",
     "usageKeyCol": "使用密钥",
-    "pricePerMillionHeader": "$/ 1M 令牌",
+    "pricePerMillionHeader": "$/ 1M 代币",
     "noPricesDefined": "尚未定义价格",
     "noPricesDesc": "使用上面的快速设置或在下方添加价格",
     "usageType": "使用类型",
@@ -3873,13 +3716,13 @@
     "save": "保存",
     "colModel": "模型",
     "colMatchPattern": "比赛模式",
-    "colPricing": "定价（每 100 万个令牌）",
+    "colPricing": "定价（每 100 万个代币）",
     "colActions": "行动",
     "colPattern": "图案",
     "colPricingSimple": "定价",
     "colModelTooltip": "定价规则的显示名称。",
     "colMatchPatternTooltip": "在传入跨度上与模型名称匹配的正则表达式模式。规则按优先级进行评估（您的组织 → 全局 → 内置），第一场比赛获胜。删除线模式意味着它被更高优先级的规则所掩盖，并且永远不会被使用。",
-    "colPricingTooltip": "默认层级的每令牌价格，显示为每 100 万个令牌的成本。",
+    "colPricingTooltip": "默认层级的每代币价格，显示为每 100 万个代币的成本。",
     "testMatchTitle": "测试模型匹配",
     "testMatchSubtitle": "模拟跨度中的型号名称如何与定价规则相匹配。",
     "modelNameInput": "型号名称",
@@ -3895,7 +3738,7 @@
     "matchFound": "已找到匹配项",
     "matchPriority": "比赛优先级",
     "defaultPricingTier": "默认定价等级",
-    "pricePerMTokens": "价格/1M 令牌",
+    "pricePerMTokens": "价格/1M 代币",
     "noPricingForTier": "没有为该等级定义定价。",
     "close": "关闭",
     "testMatch": "测试赛",
@@ -3948,7 +3791,7 @@
     "usageKeyContainsSpaces": "使用密钥不得包含空格",
     "tierPriceMissingKey": "等级 “{name}” 的价格没有使用密钥。添加使用密钥（例如 “输入”）或使用快速设置模板。",
     "tierUsageKeyPlainNumber": "等级 “{name}”：使用密钥不能是普通数字。使用 “输入” 或 “输出” 之类的标签。",
-    "addDefaultPrice": "在默认等级中添加至少一个令牌价格。",
+    "addDefaultPrice": "在默认等级中添加至少一个代币价格。",
     "saveShadowedWarning": "已保存，但此条目被具有相同模式和更高优先级的 “{winner}” 所掩盖。除非删除或禁用其他条目，否则它永远不会用于成本计算。",
     "modelPricingSaved": "模型定价已保存",
     "errSave": "保存失败",
@@ -4008,7 +3851,7 @@
     "createdAt": "创建于",
     "updatedAt": "更新于",
     "featureOwnDataTitle": "端到端拥有您的数据",
-    "featureOwnDataDesc": "将写入的数据直接存储在您自己的存储桶中，并完全控制谁可以访问这些数据。",
+    "featureOwnDataDesc": "将摄取的数据直接存储在您自己的存储桶中，并完全控制谁可以访问这些数据。",
     "featureSecureTitle": "安全且合规",
     "featureSecureDesc": "精细的访问密钥，您的敏感数据将保留在基础架构中。",
     "goBack": "回去",
@@ -4051,23 +3894,19 @@
     "capabilities": {
       "query": {
         "title": "写一个查询",
-        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。",
-        "prompt": "帮我写一个查询"
+        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。"
       },
       "incident": {
         "title": "调查事件",
-        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”",
-        "prompt": "帮我调查一个事件"
+        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”"
       },
       "dashboard": {
         "title": "构建仪表板",
-        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。",
-        "prompt": "帮我构建一个仪表板或面板"
+        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。"
       },
       "alert": {
         "title": "创建警报",
-        "description": "阈值或预设警报，以及采集时间 VRL 流水线。",
-        "prompt": "帮我创建一个警报或流水线"
+        "description": "阈值或预设警报，以及采集时间 VRL 管道。"
       }
     },
     "suggestions": {
@@ -4203,452 +4042,6 @@
       "queries": "查询",
       "serviceAccounts": "服务账号",
       "invitations": "邀请函"
-    },
-    "noDashboardsInFolder": {
-      "title": "此文件夹中没有仪表板",
-      "description": "这个文件夹是空的。在此处添加仪表板或将仪表板从另一个文件夹中移动。",
-      "action": "新仪表板",
-      "actionDesc": "在此文件夹中创建仪表板",
-      "import": "导入控制面板",
-      "importDesc": "上传仪表板 JSON 文件",
-      "templates": "浏览模板",
-      "templatesDesc": "从社区仪表板开始"
-    },
-    "noGroups": {
-      "title": "还没有群组",
-      "description": "群组允许您同时管理多个用户的权限。创建一个即可开始使用。",
-      "action": "新群组",
-      "actionDesc": "创建用户组"
-    },
-    "noRoles": {
-      "title": "还没有角色",
-      "description": "角色定义用户可以执行的操作。创建自定义角色来控制访问权限。",
-      "action": "新角色",
-      "actionDesc": "定义自定义访问角色"
-    },
-    "noAnomalyConfigs": {
-      "title": "未配置异常检测",
-      "description": "设置异常检测以自动识别数据中的异常模式。",
-      "action": "新配置",
-      "actionDesc": "配置异常检测"
-    },
-    "noApiLimits": {
-      "title": "未配置 API 限制",
-      "description": "API 限制控制每个组织在每个时间窗口可以摄取和查询多少数据。"
-    },
-    "noRoleLimits": {
-      "title": "未配置角色限制",
-      "description": "角色限制定义了适用于组织内单个角色的采集和查询配额。"
-    },
-    "noIngestionTokens": {
-      "title": "还没有摄取令牌",
-      "description": "在发送日志、指标和跟踪时，摄取令牌对数据源进行身份验证。",
-      "action": "新代币",
-      "actionDesc": "生成摄取令牌"
-    },
-    "noOrganizations": {
-      "title": "尚无组织",
-      "description": "组织将您的用户和数据分组在一起。创建一个即可开始使用。"
-    },
-    "noAlertDestinations": {
-      "title": "还没有目的地",
-      "description": "目的地定义警报通知的发送地点——Slack、电子邮件、网络挂钩等。",
-      "action": "新目的地",
-      "actionDesc": "连接通知频道"
-    },
-    "noAlertTemplates": {
-      "title": "还没有模板",
-      "description": "模板定义警报通知消息的格式。",
-      "action": "新模板",
-      "actionDesc": "创建通知模板"
-    },
-    "noEnrichmentTables": {
-      "title": "还没有浓缩表",
-      "description": "丰富表允许您在查询时为日志数据附加额外的上下文。",
-      "action": "新桌子",
-      "actionDesc": "创建浓缩表"
-    },
-    "noCipherKeys": {
-      "title": "还没有密钥",
-      "description": "密码密钥用于加密数据流中的敏感字段。",
-      "action": "新密钥",
-      "actionDesc": "生成密钥"
-    },
-    "noAiToolsets": {
-      "title": "还没有 AI 工具集",
-      "description": "AI 工具集将您的组织与外部 AI 功能连接起来。",
-      "action": "新工具集",
-      "actionDesc": "添加 AI 工具集"
-    },
-    "noLlmProviders": {
-      "title": "未配置 LLM 提供商",
-      "description": "连接语言模型提供商以启用 AI 驱动的功能。",
-      "action": "添加提供商",
-      "actionDesc": "配置 LLM 提供商"
-    },
-    "noDiscoveredServices": {
-      "title": "未发现任何服务",
-      "description": "一旦跟踪开始到达，服务将自动出现在此处。"
-    },
-    "noNodes": {
-      "title": "没有可用的节点",
-      "description": "群集节点注册后将显示在此处。"
-    },
-    "noSourceMaps": {
-      "title": "未上传任何源地图",
-      "description": "上传源映射以在 RUM 错误报告中启用可读的堆栈跟踪。",
-      "action": "上传",
-      "actionDesc": "上传源地图文件"
-    },
-    "noBackfillJobs": {
-      "title": "没有回填作业",
-      "description": "回填任务通过管道重新处理历史数据。运行一个即可开始。"
-    },
-    "noSearchJobs": {
-      "title": "没有预定的搜索任务",
-      "description": "您安排的长时间搜索将显示在此处，您可以在其中跟踪其状态并在搜索完成后浏览结果。"
-    }
-  },
-  "onlineEvals": {
-    "title": "评估",
-    "description": "配置 LLM 提供商、分数定义、评分器和实时评估作业。",
-    "loading": "正在加载在线评估配置...",
-    "loadError": "加载在线评估失败",
-    "deletePrompt": "删除 {姓名}？",
-    "deleted": "{label} 已删除",
-    "deleteError": "删除 {label} 失败",
-    "saved": "{label} 已保存",
-    "newButton": "新的 {标签}",
-    "search": "搜索 {标签}",
-    "refresh": "刷新",
-    "allStatuses": "所有状态",
-    "noRowsFound": "未找到 {标签}",
-    "getStartedHint": "创建一个，开始接线在线评估。",
-    "columns": {
-      "name": "姓名",
-      "status": "状态",
-      "updated": "已更新"
-    },
-    "actions": {
-      "edit": "编辑",
-      "delete": "删除"
-    },
-    "tabs": {
-      "jobs": "评估职位",
-      "scorers": "记分员",
-      "scoreConfigs": "分数配置",
-      "providers": "提供商"
-    },
-    "singular": {
-      "jobs": "评估作业",
-      "scorers": "记分员",
-      "scoreConfigs": "分数配置",
-      "providers": "提供商"
-    },
-    "secondaryColumn": {
-      "jobs": "直播",
-      "scorers": "类型",
-      "scoreConfigs": "数据类型",
-      "providers": "提供商"
-    },
-    "jobStatus": {
-      "draft": "草稿",
-      "active": "活跃",
-      "paused": "已暂停",
-      "degraded": "已降级",
-      "archived": "已存档"
-    },
-    "buttons": {
-      "cancel": "取消",
-      "create": "创建",
-      "save": "保存"
-    },
-    "scorerTypeDialog": {
-      "title": "创建新的记分员",
-      "intro": "选择记分器类型。选择你想要的创作方式并运行它。",
-      "llmJudgeTitle": "法学硕士法官",
-      "llmJudgeDescription": "使用配置的提供商进行语义评估。",
-      "remoteTitle": "远程",
-      "remoteDescription": "调用自己的 HTTP 端点进行评分。",
-      "codeTitle": "代码",
-      "codeDescription": "即将推出。"
-    },
-    "provider": {
-      "backTo": "返回提供商",
-      "createTitle": "创建 LLM 提供商",
-      "editTitle": "编辑 LLM 提供商",
-      "subtitle": "配置 LLM 评分员使用的模型端点。",
-      "sectionTitle": "提供商",
-      "nameLabel": "姓名",
-      "namePlaceholder": "制作 OpenAI",
-      "typeLabel": "提供商类型",
-      "typePlaceholder": "openai",
-      "endpointLabel": "端点",
-      "endpointPlaceholder": "可选的自定义端点",
-      "defaultModelLabel": "默认型号",
-      "defaultModelPlaceholder": "gpt-4o-mini",
-      "availableModelsLabel": "可用型号",
-      "availableModelsPlaceholder": "gpt-4o-mini，gpt-4.1",
-      "useAsDefault": "用作默认提供商",
-      "authConfigLabel": "身份验证配置 JSON",
-      "saveError": "无法保存提供商"
-    },
-    "scoreConfig": {
-      "createTitle": "新的分数配置",
-      "editTitle": "编辑分数配置",
-      "subtitle": "分数配置定义分数类型、生命值阈值和类别。",
-      "nameLabel": "姓名",
-      "dataTypeLabel": "数据类型",
-      "descriptionLabel": "描述",
-      "numericRangeLabel": "数值范围 JSON",
-      "categoriesLabel": "分类 JSON",
-      "healthyThresholdLabel": "健康阈值 JSON",
-      "dataTypes": {
-        "numeric": "数字",
-        "categorical": "分类的",
-        "boolean": "布尔值"
-      },
-      "saveError": "无法保存分数配置"
-    },
-    "scorer": {
-      "backTo": "返回记分员",
-      "badgeRemote": "远程",
-      "badgeLlm": "法学硕士法官",
-      "createTitleRemote": "创建远程记分器",
-      "createTitleLlm": "创建 LLM 评委记分员",
-      "editTitleRemote": "编辑远程记分器",
-      "editTitleLlm": "编辑 LLM 评委记分员",
-      "subtitleRemote": "调用您托管的 HTTP 端点。我们提出请求；你返回一个分数。",
-      "subtitleLlm": "语言模型使用您提供的提示来判断每条轨迹。",
-      "identitySection": "身份",
-      "judgeSection": "法官配置",
-      "endpointSection": "端点",
-      "nameLabel": "姓名",
-      "namePlaceholder": "忠诚_法官",
-      "producesScoreConfigLabel": "生成分数配置",
-      "producesScoreConfigNone": "无",
-      "scoreConfigVersionLabel": "分数配置版本",
-      "latestSuffix": " （最新）",
-      "pinVersion": "固定所选版本",
-      "descriptionLabel": "描述",
-      "providerLabel": "提供商",
-      "providerPlaceholder": "选择提供商",
-      "modelLabel": "模型",
-      "modelPlaceholder": "gpt-4o",
-      "promptLabel": "法官提示音",
-      "outputSchemaLabel": "输出架构 JSON",
-      "remoteEndpointLabel": "远程端点",
-      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
-      "requestBodyLabel": "请求正文模板",
-      "saveError": "无法保存记分员",
-      "versionsLoadError": "加载分数配置版本失败",
-      "testPanel": {
-        "title": "测试这个记分器",
-        "hint": "保存之前，请使用示例数据试用记分器。测试运行不会持续下去。",
-        "emptyPrefix": "添加变量，例如 ",
-        "emptySuffix": " 到评分器模板使用示例字段进行测试。",
-        "runButton": "运行测试",
-        "scenarioSuccess": "模拟回应",
-        "scenarioAuth": "身份验证错误",
-        "scenarioSchema": "架构不匹配",
-        "stateIdle": "在此处运行测试以查看结果。",
-        "stateRunning": "跑步记分手测试...",
-        "successHeader": "成功",
-        "successScore": "分数：0.92",
-        "successReasoning": "推理：提供的上下文支持答案。",
-        "authHeader": "身份验证失败",
-        "authHint": "保存之前，请检查提供商凭据。",
-        "schemaHeader": "架构不匹配",
-        "schemaHint": "响应与配置的输出架构不匹配。",
-        "valuePlaceholder": "{variable} 的值"
-      }
-    },
-    "job": {
-      "backTo": "返回 Eval Jobs",
-      "createTitle": "创建在线评估作业",
-      "editTitle": "编辑在线评估作业",
-      "subtitle": "为该评估任务选择直播、记分器、映射和采样行为。",
-      "stepper": {
-        "target": "目标",
-        "scorers": "记分员",
-        "mapping": "映射",
-        "sampling": "采样"
-      },
-      "targetSection": "目标",
-      "scorersSection": "记分器和制图",
-      "nameLabel": "姓名",
-      "namePlaceholder": "制作忠诚度监测",
-      "streamLabel": "输入流",
-      "streamPlaceholder": "默认",
-      "streamTypeLabel": "直播类型",
-      "streamTypePlaceholder": "痕迹",
-      "descriptionLabel": "描述",
-      "samplingModeLabel": "采样模式",
-      "samplingValueLabel": "采样值 JSON",
-      "samplingModes": {
-        "rate": "费率",
-        "all": "全部",
-        "count": "计数"
-      },
-      "scorerPicker": {
-        "title": "记分员",
-        "hint": "选择一个或多个记分员在每个匹配的时间段内跑步。",
-        "meta": "{类型} · v {版本}"
-      },
-      "filter": {
-        "title": "过滤条件",
-        "hint": "只有符合此条件的跨度才能进入抽样和评分。"
-      },
-      "inputMapping": {
-        "title": "输入映射",
-        "hint": "将跨度字段映射到每个记分器模板变量中。",
-        "selectScorers": "选择记分器来配置他们的映射。",
-        "noVariables": "此记分器没有模板变量可供映射。",
-        "variableCount": "{count} 变量"
-      },
-      "preview": {
-        "title": "预览",
-        "hint": "使用左边的字段定义生产评估目标。",
-        "summaryTitle": "摘要",
-        "summaryName": "姓名",
-        "summaryType": "类型",
-        "summaryStatus": "状态",
-        "statusEditing": "正在编辑",
-        "statusDraft": "草稿",
-        "emptyValue": "—"
-      },
-      "selectAtLeastOne": "至少选择一名记分员",
-      "saveError": "无法保存评估作业"
-    },
-    "quality": {
-      "scopeLabel": "此工作空间中的所有质量维度",
-      "timeRange": {
-        "label": "时间范围",
-        "last1h": "过去 1 小时",
-        "last24h": "过去 24 小时",
-        "last7d": "过去 7 天",
-        "last30d": "过去 30 天"
-      },
-      "sourceStream": {
-        "label": "源码流",
-        "all": "所有直播"
-      },
-      "refresh": "刷新",
-      "kpis": {
-        "evaluated": {
-          "title": "评估过的痕迹",
-          "unit": "",
-          "hint": "窗口中 _llm_scores 中的不同跟踪 ID"
-        },
-        "qualityIssueRate": {
-          "title": "质量问题率",
-          "unit": "%",
-          "hint": "评估任何维度低于阈值的轨迹"
-        },
-        "evaluationCost": {
-          "title": "评估成本",
-          "unit": "$",
-          "hint": "窗口中 LLM Judge 记分员成本的总和"
-        },
-        "jobSuccess": {
-          "title": "工作成功",
-          "unit": "%",
-          "hint": "在线评估任务运行成功率"
-        },
-        "scorerFailures": {
-          "title": "记分手失败",
-          "unit": "",
-          "hint": "窗口中的记分器调用失败"
-        },
-        "latencyP95": {
-          "title": "延迟 p95",
-          "unit": "s",
-          "hint": "Scorer-call p95 延迟"
-        },
-        "vsPrev": "vs 上一页",
-        "noData": "—"
-      },
-      "loading": "正在加载质量数据...",
-      "detail": {
-        "loading": "正在加载每个配置的细分...",
-        "noData": "此窗口中此配置尚无分数。",
-        "drillTitle": "钻到痕迹",
-        "splitByScorer": "按记分手划分",
-        "splitBySourceType": "按源类型拆分",
-        "trendTitle": "趋势",
-        "trendSubtitle": "{configName}，{存储桶}",
-        "distributionTitle": "分数分布",
-        "compositionTitle": "随着时间的推移构成",
-        "categoryDistributionTitle": "类别分布",
-        "passRateTitle": "一段时间内的及格率",
-        "trueFalseTitle": "对与错",
-        "legendAvg": "平均值",
-        "legendP95": "p95",
-        "legendThreshold": "阈值 {方向} {值}",
-        "legendHealthy": "健康",
-        "legendUnhealthy": "不健康",
-        "kpis": {
-          "average": "平均值",
-          "p50": "P50",
-          "p95": "P95",
-          "p50p95": "P50/P95",
-          "unhealthy": "不健康",
-          "healthy": "健康",
-          "coverage": "覆盖范围"
-        }
-      },
-      "sidebar": {
-        "allConfigs": "所有配置",
-        "empty": "没有与该过滤器匹配的配置。"
-      },
-      "overview": {
-        "title": "分数配置概述",
-        "countSuffix": "{n} 个配置",
-        "searchPlaceholder": "筛选配置...",
-        "loading": "正在加载每个配置的聚合...",
-        "emptyNoConfigsTitle": "还没有分数配置",
-        "emptyNoConfigsHint": "定义您的第一个分数配置以开始跟踪质量维度。",
-        "emptyWaitingTitle": "等待第一个比分落下",
-        "emptyWaitingHint": "您的分数配置已声明，但尚未在此窗口中向 _llm_scores 写入任何分数。",
-        "waitingStepJob": "激活在线评估任务，为其中一个配置生成分数",
-        "waitingStepRange": "扩大时间范围——今天早些时候或本周早些时候的分数可能不在此窗口中",
-        "waitingStepRefresh": "单击 “刷新” — 当前工作的分数将在评估后约 1 分钟内显示",
-        "waitingPrimaryCta": "空缺评估任务",
-        "waitingRefreshCta": "刷新",
-        "noThreshold": "没有门槛",
-        "columns": {
-          "scoreConfig": "分数配置",
-          "type": "类型",
-          "totalScores": "总分数",
-          "coverage": "覆盖范围",
-          "unhealthy": "不健康",
-          "trend": "趋势",
-          "threshold": "如果是健康的",
-          "updated": "已更新"
-        }
-      }
-    },
-    "deleteTitle": "删除 {标签}",
-    "deleteConfirmMessage": "您确定要删除 “{name}” 吗？此操作无法撤消。"
-  },
-  "llmProviders": {
-    "tabLabel": "LLM 提供商",
-    "title": "LLM 提供商",
-    "subtitle": "管理 LLM Judge 评分员使用的 LLM 提供商连接。",
-    "newButton": "新提供商",
-    "searchPlaceholder": "搜索提供商",
-    "defaultBadge": "默认",
-    "loadError": "无法加载 LLM 提供商",
-    "columns": {
-      "name": "姓名",
-      "type": "类型",
-      "endpoint": "端点",
-      "defaultModel": "默认型号",
-      "default": "默认"
-    },
-    "empty": {
-      "title": "还没有 LLM 提供商",
-      "description": "LLM 提供商存储您的 LLM Judge 评分员调用的语言模型的连接详细信息（端点 + 凭据）。添加一个即可开始进行基于法官的评估。"
     }
   }
 }

@@ -404,24 +404,7 @@
     "selectLogStream": "Logs-Stream auswählen",
     "noData": "Keine Daten verfügbar",
     "functionEditorLabel": "Funktionseditor",
-    "loadingStream": "Stream wird geladen...",
-    "askAIPlaceholderRotation": {
-      "one": "Zeige mir Fehler der letzten Stunde...",
-      "two": "Finden Sie langsame Abfragen, die länger als 5 Sekunden dauern...",
-      "three": "Zählen Sie 5xx Antworten, gruppiert nach Service...",
-      "four": "Filtert Protokolle, bei denen level = 'error'..."
-    },
-    "hideHistogram": "Histogramm ausblenden",
-    "disableQuickMode": "Schnellmodus deaktivieren",
-    "menuGroupSetOnce": "Einmal einstellen",
-    "menuGroupSavedViews": "Gespeicherte Ansichten",
-    "menuGroupTools": "Werkzeuge",
-    "menuGroupHistory": "Geschichte",
-    "menuGroupDownloads": "herunterladbare",
-    "menuGroupSchedule": "Zeitplan",
-    "menuGroupInspect": "Inspizieren",
-    "validSql": "Gültiges SQL",
-    "invalidSql": "Ungültige Abfrage"
+    "loadingStream": "Stream wird geladen..."
   },
   "menu": {
     "home": "Startseite",
@@ -454,8 +437,7 @@
     "pipeline": "Rohrleitungen",
     "language": "Sprache",
     "actions": "Aktionen",
-    "incidents": "Vorfälle",
-    "evals": "Evalen"
+    "incidents": "Vorfälle"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
@@ -508,22 +490,7 @@
     "getStartedRUM": "Erste Schritte mit Real User Monitoring",
     "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",
     "eventID": "ID des Ereignisses",
-    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab.",
-    "traces": "Spuren",
-    "noCorrelatedTraces": "Für diese Sitzung wurden keine korrelierten Spuren gefunden.",
-    "viewTraceDetails": "Trace-Details anzeigen",
-    "routeChange": "Route",
-    "initialView": "Anfänglich",
-    "failedToFetchTraces": "Ablaufverfolgungsdaten konnten nicht abgerufen werden. Bitte versuchen Sie es erneut.",
-    "traceNotFound": "Die Trace-Details wurden nicht gefunden.",
-    "failedToFetchTraceDetails": "Die Trace-Details konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
-    "span": "spannen",
-    "spans": "überspannt",
-    "errorTraces": "Fehlerspuren",
-    "seekToMoment": "Suchen Sie in der Sitzung nach diesem Moment",
-    "timeInSession": "Uhrzeit der Sitzung",
-    "route": "Route",
-    "duration": "Dauer"
+    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab."
   },
   "about": {
     "name": "Observe öffnen",
@@ -550,9 +517,9 @@
     "ingestion_limit": "Verschluckungslimit",
     "today_usage": "Heutige Nutzung",
     "feature_comparision_ent_msg": "Sie verwenden OpenObserve Enterprise Edition mit Zugriff auf alle unten aufgeführten erweiterten Funktionen.",
-    "feature_comparision_plan_detail": "Ihr Plan: Die Enterprise Edition ist kostenlos für die Datenaufnahme von bis zu 50 GB/Tag (~1.5 TB/Monat).",
+    "feature_comparision_plan_detail": "Ihr Plan: Die Enterprise Edition ist kostenlos für die Datenaufnahme von bis zu 200 GB/Tag (~6 TB/Monat).",
     "feature_comparision_os_msg": "Sie verwenden derzeit OpenObserve Open Source Edition. Führen Sie ein Upgrade auf die Enterprise Edition durch, um die in der folgenden Vergleichstabelle aufgeführten erweiterten Funktionen freizuschalten.",
-    "feature_comparision_good_news": "Gute Nachrichten: OpenObserve Enterprise Edition ist völlig kostenlos für die Datenaufnahme von bis zu 50 GB/Tag (~1.5 TB/Monat).",
+    "feature_comparision_good_news": "Gute Nachrichten: OpenObserve Enterprise Edition ist völlig kostenlos für die Datenaufnahme von bis zu 200 GB/Tag (~6 TB/Monat).",
     "commit_lbl": "Festschreiben",
     "build_lbl": "Gebaut",
     "no_license_installed_lbl": "Keine Lizenz installiert",
@@ -607,14 +574,14 @@
     "value_support_enterprise": "Unternehmen",
     "value_support_cloud": "Wolke",
     "value_cost_free": "Kostenlos",
-    "value_cost_enterprise": "Wenn es selbst gehostet wird, kostenlos für bis zu 50 GB/Tag aufgenommene Daten. Danach bezahlt",
+    "value_cost_enterprise": "Wenn es selbst gehostet wird, kostenlos für bis zu 200 GB/Tag aufgenommene Daten. Danach bezahlt",
     "value_cost_cloud": "14-tägige kostenlose Testversion. Danach bezahlt",
     "feature_comparison_lbl": "Vergleich der Funktionen",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Funktionen für Unternehmen",
         "offer_text": "Holen Sie sich alle Unternehmensfunktionen völlig kostenlos, wenn Sie OpenObserve selbst hosten",
-        "badge_text": "Kostenlos bis zu 50 GB/Tag",
+        "badge_text": "Kostenlos bis zu 200 GB/Tag",
         "features_title": "Funktionen von OpenObserve Cloud",
         "features_subtitle": "Alle Funktionen, die in Ihrem Cloud-Abonnement enthalten sind",
         "primary_button_text": "Jetzt herunterladen"
@@ -626,7 +593,7 @@
         "features_title": "Verfügbare Unternehmensfunktionen",
         "features_subtitle": "Holen Sie sich eine kostenlose Lizenz, um unbegrenzte Funktionen freizuschalten",
         "primary_button_text": "Holen Sie sich eine kostenlose Lizenz",
-        "license_note": "50 GB/Tag ohne Lizenz • 50 GB/Tag mit Lizenz"
+        "license_note": "100 GB/Tag ohne Lizenz • 200 GB/Tag mit Lizenz"
       },
       "enterprise_with_license": {
         "hero_title": "Ihre Enterprise Edition",
@@ -640,7 +607,7 @@
       "open_source": {
         "hero_title": "Holen Sie sich die Enterprise Edition",
         "offer_text": "Laden Sie alle Unternehmensfunktionen völlig kostenlos herunter und schalten Sie sie frei",
-        "badge_text": "Kostenlos bis zu 50 GB/Tag",
+        "badge_text": "Kostenlos bis zu 200 GB/Tag",
         "features_title": "Alle Unternehmensfunktionen freischalten",
         "features_subtitle": "Alles, was Sie für produktionsreife Observability benötigen",
         "primary_button_text": "Jetzt herunterladen"
@@ -963,8 +930,7 @@
     "nameRequired": "Name ist erforderlich",
     "subscription_type": "Art des Abonnements",
     "proceed_subscription": "Weiter zum Abonnement",
-    "subscription_plan": "Abonnementplan",
-    "makeBilledMember": "Diese Organisation zu einem Rechnungsmitglied von {org} machen"
+    "subscription_plan": "Abonnementplan"
   },
   "template": {
     "header": "Vorlagen",
@@ -1666,12 +1632,7 @@
     "axisLabelTooltipNotePrefix": "Hinweis:",
     "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
     "allFolders": "Alle Ordner",
-    "selectFile": "Wählen Sie Datei",
-    "multiSqlQueryLabel": "Bezeichnung abfragen",
-    "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
-    "multiQueryWarning": "Nur Abfrage 1 wird für {chartType} gerendert",
-    "trellisNotSupportedWithMultiQuery": "Das Trellis-Layout ist bei mehreren Abfragen deaktiviert. Entfernen Sie zusätzliche Abfragen, um Trellis zu verwenden.",
-    "xAliasInconsistencyWarning": "X-Achsen-Aliase sind bei allen Abfragen inkonsistent: Einige verwenden ein Histogramm, andere nicht. Verwenden Sie für alle Abfragen denselben Aliastyp, um vorhersehbare Ergebnisse zu erzielen."
+    "selectFile": "Wählen Sie Datei"
   },
   "panel": {
     "header": "Panel",
@@ -1786,8 +1747,7 @@
     "noDataAvailable": "Keine Daten verfügbar",
     "tabAiAssistant": "O2 KI-Assistent",
     "tabOverview": "Überblick",
-    "tabUsage": "Verwendungszweck",
-    "subtitle": "Ihr Observability-Workspace auf einen Blick"
+    "tabUsage": "Verwendungszweck"
   },
   "billing": {
     "header": "Nutzung und Abrechnung",
@@ -1847,105 +1807,7 @@
     "aiModePayAsYouGo": "Bezahlen Sie nach Bedarf",
     "aiModeExhausted": "Erschöpft",
     "aiExhaustedMessage": "Abonnieren Sie, um KI-Funktionen weiterhin zu nutzen",
-    "aiPaygMessage": "Kostenlose Credits sind aufgebraucht — Nutzung wird dem Abonnement in Rechnung gestellt",
-    "organizationGroup": {
-      "tabLabel": "Organisationsgruppe",
-      "inviteOrgButton": "Organisation einladen",
-      "viewUsage": "Nutzung anzeigen",
-      "statTotal": "Gesamtzahl der Kinderorganisationen",
-      "statActive": "Aktiv",
-      "statPending": "Ausstehende Einladungen",
-      "statRejected": "Abgelehnt",
-      "statusActive": "Aktiv",
-      "statusPending": "Ausstehend",
-      "statusRejected": "Abgelehnt",
-      "filterAll": "Alle",
-      "childOrgColumn": "Kinderorganisation",
-      "dateColumn": "Datum",
-      "cancel": "Stornieren",
-      "invitedBy": "Eingeladen von",
-      "acceptedBy": "Akzeptiert von",
-      "addedOnCreation": "Bei der Erstellung hinzugefügt",
-      "memberSince": "Mitglied seit",
-      "noMembers": "Noch keine Mitgliedsorganisationen",
-      "inviteTitle": "Laden Sie eine Organisation ein",
-      "inviteOrgIdLabel": "Organisations-ID",
-      "inviteOrgIdPlaceholder": "Organisationskennung eingeben",
-      "sendInvite": "Einladung senden",
-      "inviteSent": "Einladung erfolgreich gesendet",
-      "inviteSameOrg": "Eine Organisation kann sich nicht selbst einladen",
-      "childHeadline": "Abrechnung verwaltet von",
-      "childHeroSub": "Ihre Nutzung wird dieser Organisation in Rechnung gestellt. Planänderungen und Rechnungen werden von der Mutterorganisation bearbeitet — hier gibt es nichts zu verwalten.",
-      "receivedInvitesTab": "Ausstehende Einladungen",
-      "noPendingInvites": "Keine ausstehenden Einladungen",
-      "noPendingInvitesHint": "Hier siehst du Einladungen, wenn dich eine andere Organisation einlädt, ihrer Abrechnungsgruppe beizutreten.",
-      "invitedByOn": "Eingeladen von {inviter}",
-      "inviteTabPrompt": "Laden Sie eine andere Organisation ein, Ihrer Abrechnungsgruppe beizutreten. Ihre Nutzung wird dieser Organisation in Rechnung gestellt.",
-      "emptyTitle": "Fakturierungsgruppe starten",
-      "chipConsolidatedBill": "Ein konsolidierter Gesetzentwurf",
-      "chipLinkOrgs": "Verknüpfen Sie mehrere Organisationen",
-      "accept": "Akzeptieren",
-      "reject": "Ablehnen",
-      "inviteAccepted": "Einladung erfolgreich angenommen",
-      "inviteRejected": "Einladung erfolgreich abgelehnt",
-      "plansManagedTitle": "Abrechnung wird von der Mutterorganisation verwaltet",
-      "plansManagedDescription": "Die Abrechnung dieser Organisation wird von {payer} verwaltet. Planänderungen werden von der Mutterorganisation bearbeitet.",
-      "chipPlanManaged": "Vom Elternteil verwalteter Plan",
-      "chipNoInvoices": "Keine separaten Rechnungen",
-      "viewOrgGroup": "Organisationsgruppe anzeigen",
-      "usageMemberLabel": "Mitgliedsorganisation",
-      "usageAllMembers": "Aktuelle Org",
-      "currentOrgTitle": "Aktuelle Organisation"
-    },
-    "billingGroup": {
-      "tabLabel": "Abrechnungsgruppe",
-      "inviteOrgButton": "Organisation einladen",
-      "viewUsage": "Nutzung anzeigen",
-      "statTotal": "Gesamtzahl der Kinderorganisationen",
-      "statActive": "Aktiv",
-      "statPending": "Ausstehende Einladungen",
-      "statRejected": "Abgelehnt",
-      "statusActive": "Aktiv",
-      "statusPending": "Ausstehend",
-      "statusRejected": "Abgelehnt",
-      "filterAll": "Alle",
-      "childOrgColumn": "Kinderorganisation",
-      "orgColumn": "Organisation",
-      "orgIdColumn": "Organisations-ID",
-      "actionsColumn": "Aktionen",
-      "dateColumn": "Datum",
-      "cancel": "Stornieren",
-      "invitedBy": "Eingeladen von",
-      "acceptedBy": "Akzeptiert von",
-      "addedOnCreation": "Bei der Erstellung hinzugefügt",
-      "memberSince": "Mitglied seit",
-      "noMembers": "Noch keine Mitgliedsorganisationen",
-      "inviteTitle": "Laden Sie eine Organisation ein",
-      "inviteOrgIdLabel": "Organisations-ID",
-      "inviteOrgIdPlaceholder": "Organisationskennung eingeben",
-      "sendInvite": "Einladung senden",
-      "inviteSent": "Einladung erfolgreich gesendet",
-      "inviteSameOrg": "Eine Organisation kann sich nicht selbst einladen",
-      "childHeadline": "Abrechnung verwaltet von",
-      "childHeroSub": "Ihre Nutzung wird dieser Organisation in Rechnung gestellt. Planänderungen und Rechnungen werden von der Mutterorganisation bearbeitet — hier gibt es nichts zu verwalten.",
-      "invitesPanelHint": "Diese Organisationen haben Sie eingeladen, ihrer Abrechnungsgruppe beizutreten. Wenn du zustimmst, wird ihnen die Nutzung dieser Organisation in Rechnung gestellt.",
-      "inviteTabPrompt": "Laden Sie eine andere Organisation ein, Ihrer Abrechnungsgruppe beizutreten. Ihre Nutzung wird dieser Organisation in Rechnung gestellt.",
-      "emptyTitle": "Fakturierungsgruppe starten",
-      "chipConsolidatedBill": "Ein konsolidierter Gesetzentwurf",
-      "chipLinkOrgs": "Verknüpfen Sie mehrere Organisationen",
-      "accept": "Akzeptieren",
-      "reject": "Ablehnen",
-      "inviteAccepted": "Einladung erfolgreich angenommen",
-      "inviteRejected": "Einladung erfolgreich abgelehnt",
-      "plansManagedTitle": "Abrechnung wird von der Mutterorganisation verwaltet",
-      "plansManagedDescription": "Die Abrechnung dieser Organisation wird von {payer} verwaltet. Planänderungen werden von der Mutterorganisation bearbeitet.",
-      "chipPlanManaged": "Vom Elternteil verwalteter Plan",
-      "chipNoInvoices": "Keine separaten Rechnungen",
-      "viewOrgGroup": "Organisationsgruppe anzeigen",
-      "usageMemberLabel": "Mitgliedsorganisation",
-      "usageAllMembers": "Aktuelle Org",
-      "currentOrgTitle": "Aktuelle Organisation"
-    }
+    "aiPaygMessage": "Kostenlose Credits sind aufgebraucht — Nutzung wird dem Abonnement in Rechnung gestellt"
   },
   "message": {
     "ServerInternalError": "Fehler: Etwas ist schief gelaufen. Interner Serverfehler.",
@@ -2489,16 +2351,7 @@
     "delete": "Löschen",
     "variable_guide_header": "Leitfaden für Vorlagenvariablen",
     "variable_usage_examples": "Beispiele für die Verwendung",
-    "body": "Inhalt",
-    "clone": "Klonen",
-    "cloneTitle": "Vorlage klonen",
-    "systemReadOnly": "Vorgefertigte Vorlage — Löschen ist deaktiviert. Klonen Sie sie, um eine modifizierbare Kopie zu erstellen.",
-    "prebuiltBadge": "Vorgefertigt",
-    "prebuiltBadgeHint": "Wird vom System verwaltet. Sie können bearbeiten, aber das Löschen ist deaktiviert.",
-    "customBadge": "Benutzerdefiniert",
-    "filterAll": "Alle",
-    "filterPrebuilt": "Vorgefertigt",
-    "filterCustom": "Benutzerdefiniert"
+    "body": "Inhalt"
   },
   "alert_destinations": {
     "header": "Ziele",
@@ -2535,13 +2388,7 @@
     "custom": "Benutzerdefiniert",
     "separator": "Trennzeichen",
     "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
-    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)",
-    "filterAll": "Alle",
-    "filterPrebuilt": "Vorgefertigt",
-    "filterCustom": "Benutzerdefiniert",
-    "templateDefaultBadge": "Standard",
-    "templateDefaultOption": "Default ({name})",
-    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",
@@ -2946,10 +2793,7 @@
     "evaluationTemplate": "Vorlage für eine Bewertung",
     "evaluationTemplateHelp": "Wählen Sie eine Bewertungsvorlage aus, die die Kriterien und Dimensionen für den LLM-Richter definiert.",
     "noTemplatesFound": "Es wurden keine Bewertungsvorlagen gefunden. Erstellen Sie eine auf der Seite mit den Bewertungsvorlagen.",
-    "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert",
-    "subtitle": "Daten während des Fluges transformieren, anreichern und routen",
-    "selectStream": "Wählen Sie einen Stream aus...",
-    "queryEditorPlaceholder": "Wählen Sie hier einen Stream aus oder schreiben Sie eine SQL-Abfrage..."
+    "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert"
   },
   "reports": {
     "header": "Berichte",
@@ -3204,8 +3048,7 @@
         "cost": "Kosten",
         "spans": "Spannweiten"
       }
-    },
-    "openInFullView": "In Vollansicht öffnen"
+    }
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -4047,23 +3890,19 @@
     "capabilities": {
       "query": {
         "title": "Schreiben Sie eine Anfrage",
-        "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken.",
-        "prompt": "Hilf mir, eine Anfrage zu schreiben"
+        "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken."
       },
       "incident": {
         "title": "Vorfälle untersuchen",
-        "description": "Ursache für Logs, Traces und Alerts — z. B. „Warum hat Gateway-5xx gezündet?“",
-        "prompt": "Hilf mir, einen Vorfall zu untersuchen"
+        "description": "Ursache für Logs, Traces und Alerts — z. B. „Warum hat Gateway-5xx gezündet?“"
       },
       "dashboard": {
         "title": "Erstellen Sie ein Dashboard",
-        "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels.",
-        "prompt": "Hilf mir, ein Dashboard zu erstellen"
+        "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels."
       },
       "alert": {
         "title": "Eine Warnung erstellen",
-        "description": "Schwellenwerte oder geplante Warnungen und VRL-Pipelines zum Zeitpunkt der Aufnahme.",
-        "prompt": "Hilf mir, eine Warnung zu erstellen"
+        "description": "Schwellenwerte oder geplante Warnungen und VRL-Pipelines zum Zeitpunkt der Aufnahme."
       }
     },
     "suggestions": {
@@ -4199,452 +4038,6 @@
       "queries": "Anfragen",
       "serviceAccounts": "Dienstkonten",
       "invitations": "Einladungen"
-    },
-    "noDashboardsInFolder": {
-      "title": "Keine Dashboards in diesem Ordner",
-      "description": "Dieser Ordner ist leer. Fügen Sie hier ein Dashboard hinzu oder verschieben Sie eines aus einem anderen Ordner.",
-      "action": "Neues Dashboard",
-      "actionDesc": "Erstellen Sie ein Dashboard in diesem Ordner",
-      "import": "Dashboard importieren",
-      "importDesc": "Laden Sie eine Dashboard-JSON-Datei hoch",
-      "templates": "Vorlagen durchsuchen",
-      "templatesDesc": "Starte von einem Community-Dashboard"
-    },
-    "noGroups": {
-      "title": "Noch keine Gruppen",
-      "description": "Mit Gruppen können Sie Berechtigungen für mehrere Benutzer gleichzeitig verwalten. Erstellen Sie eine, um loszulegen.",
-      "action": "Neue Gruppe",
-      "actionDesc": "Erstellen Sie eine Benutzergruppe"
-    },
-    "noRoles": {
-      "title": "Noch keine Rollen",
-      "description": "Rollen definieren, welche Aktionen Benutzer ausführen können. Erstellen Sie eine benutzerdefinierte Rolle, um den Zugriff zu kontrollieren.",
-      "action": "Neue Rolle",
-      "actionDesc": "Definieren Sie eine benutzerdefinierte Zugriffsrolle"
-    },
-    "noAnomalyConfigs": {
-      "title": "Keine Anomalieerkennung konfiguriert",
-      "description": "Richten Sie die Anomalieerkennung ein, um ungewöhnliche Muster in Ihren Daten automatisch zu erkennen.",
-      "action": "Neue Konfiguration",
-      "actionDesc": "Anomalieerkennung konfigurieren"
-    },
-    "noApiLimits": {
-      "title": "Keine API-Limits konfiguriert",
-      "description": "API-Limits steuern, wie viele Daten jede Organisation pro Zeitfenster aufnehmen und abfragen kann."
-    },
-    "noRoleLimits": {
-      "title": "Keine Rollenbeschränkungen konfiguriert",
-      "description": "Rollenlimits definieren die Aufnahme- und Abfragequoten, die auf einzelne Rollen innerhalb einer Organisation angewendet werden."
-    },
-    "noIngestionTokens": {
-      "title": "Noch keine Ingestion-Token",
-      "description": "Ingestion-Token authentifizieren Datenquellen beim Senden von Protokollen, Metriken und Traces.",
-      "action": "Neues Token",
-      "actionDesc": "Generieren Sie ein Aufnahme-Token"
-    },
-    "noOrganizations": {
-      "title": "Noch keine Organisationen",
-      "description": "Organisationen gruppieren Ihre Benutzer und Daten. Erstellen Sie eine, um loszulegen."
-    },
-    "noAlertDestinations": {
-      "title": "Noch keine Ziele",
-      "description": "Ziele definieren, wohin Warnmeldungen gesendet werden — Slack, E-Mail, Webhooks und mehr.",
-      "action": "Neues Reiseziel",
-      "actionDesc": "Einen Benachrichtigungskanal verbinden"
-    },
-    "noAlertTemplates": {
-      "title": "Noch keine Vorlagen",
-      "description": "Vorlagen definieren das Format von Warnmeldungen.",
-      "action": "Neue Vorlage",
-      "actionDesc": "Erstellen Sie eine Benachrichtigungsvorlage"
-    },
-    "noEnrichmentTables": {
-      "title": "Noch keine Anreicherungstabellen",
-      "description": "Mithilfe von Anreicherungstabellen können Sie Ihren Protokolldaten bei der Abfrage zusätzlichen Kontext hinzufügen.",
-      "action": "Neuer Tisch",
-      "actionDesc": "Erstellen Sie eine Anreicherungstabelle"
-    },
-    "noCipherKeys": {
-      "title": "Noch keine Chiffrierschlüssel",
-      "description": "Chiffrenschlüssel werden verwendet, um sensible Felder in Ihren Datenströmen zu verschlüsseln.",
-      "action": "Neuer Schlüssel",
-      "actionDesc": "Generieren Sie einen Chiffrenschlüssel"
-    },
-    "noAiToolsets": {
-      "title": "Noch keine KI-Toolsets",
-      "description": "KI-Toolsets verbinden Ihr Unternehmen mit externen KI-Funktionen.",
-      "action": "Neues Toolset",
-      "actionDesc": "Fügen Sie ein KI-Toolset hinzu"
-    },
-    "noLlmProviders": {
-      "title": "Keine LLM-Anbieter konfiguriert",
-      "description": "Stellen Sie eine Verbindung zu einem Sprachmodellanbieter her, um KI-gestützte Funktionen zu aktivieren.",
-      "action": "Anbieter hinzufügen",
-      "actionDesc": "Konfigurieren Sie einen LLM-Anbieter"
-    },
-    "noDiscoveredServices": {
-      "title": "Keine Dienste gefunden",
-      "description": "Dienste werden hier automatisch angezeigt, sobald Spuren eintreffen."
-    },
-    "noNodes": {
-      "title": "Keine Knoten verfügbar",
-      "description": "Clusterknoten werden hier angezeigt, sobald sie registriert sind."
-    },
-    "noSourceMaps": {
-      "title": "Keine Quellkarten hochgeladen",
-      "description": "Laden Sie Quellzuordnungen hoch, um lesbare Stack-Traces in Ihren RUM-Fehlerberichten zu aktivieren.",
-      "action": "Upload",
-      "actionDesc": "Laden Sie eine Quellkartendatei hoch"
-    },
-    "noBackfillJobs": {
-      "title": "Keine Backfill-Jobs",
-      "description": "Backfill-Jobs verarbeiten historische Daten über eine Pipeline erneut. Führen Sie einen aus, um loszulegen."
-    },
-    "noSearchJobs": {
-      "title": "Keine geplanten Suchaufträge",
-      "description": "Langfristige Suchanfragen, die Sie planen, werden hier angezeigt. Dort können Sie ihren Status verfolgen und die Ergebnisse einsehen, sobald sie abgeschlossen sind."
-    }
-  },
-  "onlineEvals": {
-    "title": "Evaluationen",
-    "description": "Konfigurieren Sie LLM-Anbieter, Score-Definitionen, Scorer und Live-Bewertungsjobs.",
-    "loading": "Online-Evaluierungskonfiguration wird geladen...",
-    "loadError": "Online-Evaluierungen konnten nicht geladen werden",
-    "deletePrompt": "{name} löschen?",
-    "deleted": "{label} gelöscht",
-    "deleteError": "{label} konnte nicht gelöscht werden",
-    "saved": "{label} gespeichert",
-    "newButton": "Neues {label}",
-    "search": "Suche {label}",
-    "refresh": "Auffrischen",
-    "allStatuses": "Alle Status",
-    "noRowsFound": "Kein {label} gefunden",
-    "getStartedHint": "Erstellen Sie eine, um mit der Verkabelung der Online-Bewertung zu beginnen.",
-    "columns": {
-      "name": "Name",
-      "status": "Status",
-      "updated": "aktualisiert"
-    },
-    "actions": {
-      "edit": "Bearbeiten",
-      "delete": "Löschen"
-    },
-    "tabs": {
-      "jobs": "Stellenangebote evaluieren",
-      "scorers": "Torschützen",
-      "scoreConfigs": "Score-Konfigurationen",
-      "providers": "Anbieter"
-    },
-    "singular": {
-      "jobs": "Job evaluieren",
-      "scorers": "Torschütze",
-      "scoreConfigs": "Punktekonfiguration",
-      "providers": "Anbieter"
-    },
-    "secondaryColumn": {
-      "jobs": "Streamen",
-      "scorers": "Typ",
-      "scoreConfigs": "Datentyp",
-      "providers": "Anbieter"
-    },
-    "jobStatus": {
-      "draft": "Entwurf",
-      "active": "Aktiv",
-      "paused": "Pausiert",
-      "degraded": "Degradiert",
-      "archived": "Archiviert"
-    },
-    "buttons": {
-      "cancel": "Stornieren",
-      "create": "Erstellen",
-      "save": "Speichern"
-    },
-    "scorerTypeDialog": {
-      "title": "Einen neuen Scorer erstellen",
-      "intro": "Wählen Sie den Scorer-Typ. Wählen Sie das, was am besten zu Ihrer Erstellung passt, und führen Sie es aus.",
-      "llmJudgeTitle": "LLM-Richter",
-      "llmJudgeDescription": "Verwenden Sie einen konfigurierten Anbieter für die semantische Bewertung.",
-      "remoteTitle": "Fernbedienung",
-      "remoteDescription": "Rufen Sie Ihren eigenen HTTP-Endpunkt für das Scoring auf.",
-      "codeTitle": "Kode",
-      "codeDescription": "Kommt bald."
-    },
-    "provider": {
-      "backTo": "Zurück zu Anbietern",
-      "createTitle": "LLM-Anbieter erstellen",
-      "editTitle": "LLM-Anbieter bearbeiten",
-      "subtitle": "Konfigurieren Sie den Modellendpunkt, der von LLM-Judge Scorern verwendet wird.",
-      "sectionTitle": "Anbieter",
-      "nameLabel": "Name",
-      "namePlaceholder": "Produktion OpenAI",
-      "typeLabel": "Anbietertyp",
-      "typePlaceholder": "Openai",
-      "endpointLabel": "Endpunkt",
-      "endpointPlaceholder": "Optionaler benutzerdefinierter Endpunkt",
-      "defaultModelLabel": "Standardmodell",
-      "defaultModelPlaceholder": "GPT-4O-Mini",
-      "availableModelsLabel": "Verfügbare Modelle",
-      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
-      "useAsDefault": "Als Standardanbieter verwenden",
-      "authConfigLabel": "Authentifizierungskonfiguration JSON",
-      "saveError": "Anbieter konnte nicht gespeichert werden"
-    },
-    "scoreConfig": {
-      "createTitle": "Neue Score-Konfiguration",
-      "editTitle": "Score-Konfiguration bearbeiten",
-      "subtitle": "Score-Konfigurationen definieren den Punktetyp, Gesundheitsgrenzwerte und Kategorien.",
-      "nameLabel": "Name",
-      "dataTypeLabel": "Datentyp",
-      "descriptionLabel": "Beschreibung",
-      "numericRangeLabel": "Numerischer Bereich JSON",
-      "categoriesLabel": "Kategorien JSON",
-      "healthyThresholdLabel": "Fehlerfreier JSON-Schwellenwert",
-      "dataTypes": {
-        "numeric": "Numerisch",
-        "categorical": "Kategorisch",
-        "boolean": "Boolesch"
-      },
-      "saveError": "Die Score-Konfiguration konnte nicht gespeichert werden"
-    },
-    "scorer": {
-      "backTo": "Zurück zu Scorers",
-      "badgeRemote": "Fernbedienung",
-      "badgeLlm": "LLM-Richter",
-      "createTitleRemote": "Remote Scorer erstellen",
-      "createTitleLlm": "LLM Judge Scorer erstellen",
-      "editTitleRemote": "Remote Scorer bearbeiten",
-      "editTitleLlm": "LLM Judge Scorer bearbeiten",
-      "subtitleRemote": "Rufen Sie einen HTTP-Endpunkt auf, den Sie hosten. Wir rendern die Anfrage; Sie geben eine Punktzahl zurück.",
-      "subtitleLlm": "Ein Sprachmodell bewertet jede Spur anhand der von Ihnen bereitgestellten Aufforderung.",
-      "identitySection": "Identität",
-      "judgeSection": "Konfiguration des Richters",
-      "endpointSection": "Endpunkt",
-      "nameLabel": "Name",
-      "namePlaceholder": "Treue_Richter",
-      "producesScoreConfigLabel": "Erzeugt eine Score-Konfiguration",
-      "producesScoreConfigNone": "Keine",
-      "scoreConfigVersionLabel": "Score-Konfigurationsversion",
-      "latestSuffix": " (neueste)",
-      "pinVersion": "Ausgewählte Version anheften",
-      "descriptionLabel": "Beschreibung",
-      "providerLabel": "Anbieter",
-      "providerPlaceholder": "Anbieter wählen",
-      "modelLabel": "Modell",
-      "modelPlaceholder": "gpt-4o",
-      "promptLabel": "Aufforderung des Richters",
-      "outputSchemaLabel": "Ausgabeschema JSON",
-      "remoteEndpointLabel": "Entfernter Endpunkt",
-      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
-      "requestBodyLabel": "Textvorlage anfordern",
-      "saveError": "Der Punktezähler konnte nicht gespeichert werden",
-      "versionsLoadError": "Die Score-Konfigurationsversionen konnten nicht geladen werden",
-      "testPanel": {
-        "title": "Teste diesen Scorer",
-        "hint": "Testen Sie Ihren Scorer vor dem Speichern mit Beispieldaten. Testläufe werden nicht gespeichert.",
-        "emptyPrefix": "Fügen Sie Variablen hinzu wie ",
-        "emptySuffix": " zur Scorer-Vorlage, um mit Beispielfeldern zu testen.",
-        "runButton": "Test ausführen",
-        "scenarioSuccess": "Scheinantwort",
-        "scenarioAuth": "Fehler bei der Authentifizierung",
-        "scenarioSchema": "Schemafinkongruenz",
-        "stateIdle": "Führen Sie einen Test durch, um das Ergebnis hier zu sehen.",
-        "stateRunning": "Scorer-Test wird ausgeführt...",
-        "successHeader": "Erfolg",
-        "successScore": "Ergebnis: 0.92",
-        "successReasoning": "Begründung: Die Antwort wird durch den angegebenen Kontext gestützt.",
-        "authHeader": "Authentifizierung fehlgeschlagen",
-        "authHint": "Überprüfen Sie vor dem Speichern die Anmeldeinformationen des Anbieters.",
-        "schemaHeader": "Schemafinkongruenz",
-        "schemaHint": "Die Antwort entsprach nicht dem konfigurierten Ausgabeschema.",
-        "valuePlaceholder": "Wert für {variable}"
-      }
-    },
-    "job": {
-      "backTo": "Zurück zu Eval Jobs",
-      "createTitle": "Online-Evaluierungsauftrag erstellen",
-      "editTitle": "Online-Evaluierungsauftrag bearbeiten",
-      "subtitle": "Wählen Sie den Stream, die Scorer, das Mapping und das Sampling-Verhalten für diesen Evaluierungsjob aus.",
-      "stepper": {
-        "target": "Ziel",
-        "scorers": "Torschützen",
-        "mapping": "Kartierung",
-        "sampling": "Probenentnahme"
-      },
-      "targetSection": "Ziel",
-      "scorersSection": "Punktezähler und Kartierung",
-      "nameLabel": "Name",
-      "namePlaceholder": "Überwachung der Produktionstreue",
-      "streamLabel": "Eingabestream",
-      "streamPlaceholder": "Standard",
-      "streamTypeLabel": "Stream-Typ",
-      "streamTypePlaceholder": "Spuren",
-      "descriptionLabel": "Beschreibung",
-      "samplingModeLabel": "Sampling-Modus",
-      "samplingValueLabel": "Stichprobenwert JSON",
-      "samplingModes": {
-        "rate": "Bewerte",
-        "all": "Alle",
-        "count": "Zählen"
-      },
-      "scorerPicker": {
-        "title": "Torschützen",
-        "hint": "Wählen Sie einen oder mehrere Scorer aus, die für jeden passenden Zeitraum ausgeführt werden sollen.",
-        "meta": "{Typ} · v {Version}"
-      },
-      "filter": {
-        "title": "Zustand des Filters",
-        "hint": "Nur Spannweiten, die diese Bedingung erfüllen, werden in die Stichprobe und Bewertung eingegeben."
-      },
-      "inputMapping": {
-        "title": "Zuordnung der Eingaben",
-        "hint": "Ordnen Sie Span-Felder jeder Scorer-Vorlagenvariablen zu.",
-        "selectScorers": "Wählen Sie Scorer aus, um ihre Zuordnungen zu konfigurieren.",
-        "noVariables": "Dieser Scorer hat keine zuzuordnenden Vorlagenvariablen.",
-        "variableCount": "{count} Variablen"
-      },
-      "preview": {
-        "title": "Vorschau",
-        "hint": "Verwenden Sie die Felder auf der linken Seite, um das Ziel der Produktionsbewertung zu definieren.",
-        "summaryTitle": "Zusammenfassung",
-        "summaryName": "Name",
-        "summaryType": "Typ",
-        "summaryStatus": "Status",
-        "statusEditing": "Bearbeitung",
-        "statusDraft": "Entwurf",
-        "emptyValue": "—"
-      },
-      "selectAtLeastOne": "Wählen Sie mindestens einen Scorer aus",
-      "saveError": "Fehler beim Speichern des Evaluierungsauftrags"
-    },
-    "quality": {
-      "scopeLabel": "Alle Qualitätsabmessungen in diesem Arbeitsbereich",
-      "timeRange": {
-        "label": "Zeitbereich",
-        "last1h": "Letzte 1 Stunde",
-        "last24h": "Letzte 24 Stunden",
-        "last7d": "Letzte 7 Tage",
-        "last30d": "Letzte 30 Tage"
-      },
-      "sourceStream": {
-        "label": "Quellstream",
-        "all": "Alle Streams"
-      },
-      "refresh": "Auffrischen",
-      "kpis": {
-        "evaluated": {
-          "title": "Bewertete Spuren",
-          "unit": "",
-          "hint": "Eindeutige Trace-IDs in _llm_scores innerhalb des Fensters"
-        },
-        "qualityIssueRate": {
-          "title": "Rate an Qualitätsproblemen",
-          "unit": "%",
-          "hint": "Ausgewertete Spuren mit einer beliebigen Dimension unter dem Schwellenwert"
-        },
-        "evaluationCost": {
-          "title": "Kosten der Bewertung",
-          "unit": "$",
-          "hint": "Summe der LLM Judge Scorer-Kosten im Fenster"
-        },
-        "jobSuccess": {
-          "title": "Erfolg im Beruf",
-          "unit": "%",
-          "hint": "Erfolgsquote bei der Ausführung von Online-Evaluationsaufträgen"
-        },
-        "scorerFailures": {
-          "title": "Torschützenausfälle",
-          "unit": "",
-          "hint": "Fehlgeschlagene Scorer-Aufrufe im Fenster"
-        },
-        "latencyP95": {
-          "title": "Latenz p95",
-          "unit": "s",
-          "hint": "Scorer-Call p95-Latenz"
-        },
-        "vsPrev": "gegen voriges",
-        "noData": "—"
-      },
-      "loading": "Qualitätsdaten werden geladen...",
-      "detail": {
-        "loading": "Aufschlüsselung pro Konfiguration wird geladen...",
-        "noData": "Noch keine Ergebnisse für diese Konfiguration in diesem Fenster.",
-        "drillTitle": "Auf Spuren bohren",
-        "splitByScorer": "Geteilt nach Torschütze",
-        "splitBySourceType": "Aufgeteilt nach Quelltyp",
-        "trendTitle": "Trend",
-        "trendSubtitle": "{ConfigName}, {bucket}",
-        "distributionTitle": "Verteilung der Punktzahlen",
-        "compositionTitle": "Zusammensetzung im Laufe der Zeit",
-        "categoryDistributionTitle": "Kategorie Vertrieb",
-        "passRateTitle": "Erfolgsquote im Laufe der Zeit",
-        "trueFalseTitle": "Wahr gegen Falsch",
-        "legendAvg": "Durchschn.",
-        "legendP95": "p95",
-        "legendThreshold": "Schwellenwert {Richtung} {Wert}",
-        "legendHealthy": "gesund",
-        "legendUnhealthy": "ungesund",
-        "kpis": {
-          "average": "Durchschnittlich",
-          "p50": "P50",
-          "p95": "P95",
-          "p50p95": "P50/P95",
-          "unhealthy": "Ungesund",
-          "healthy": "Gesund",
-          "coverage": "Deckung"
-        }
-      },
-      "sidebar": {
-        "allConfigs": "Alle Konfigurationen",
-        "empty": "Keine Konfigurationen stimmen mit diesem Filter überein."
-      },
-      "overview": {
-        "title": "Score-Konfigurationen im Überblick",
-        "countSuffix": "{n} Konfigurationen",
-        "searchPlaceholder": "Konfigurationen filtern...",
-        "loading": "Aggregate pro Konfiguration werden geladen...",
-        "emptyNoConfigsTitle": "Noch keine Score-Konfigurationen",
-        "emptyNoConfigsHint": "Definieren Sie Ihre erste Score-Konfiguration, um mit der Verfolgung von Qualitätsdimensionen zu beginnen.",
-        "emptyWaitingTitle": "Ich warte darauf, dass die ersten Ergebnisse landen",
-        "emptyWaitingHint": "Ihre Score-Konfigurationen sind deklariert, aber es wurden noch keine Ergebnisse in _llm_scores in diesem Fenster geschrieben.",
-        "waitingStepJob": "Aktiviere einen Online-Evaluierungsjob, der Ergebnisse für eine dieser Konfigurationen generiert",
-        "waitingStepRange": "Den Zeitraum erweitern — Ergebnisse von heute oder Anfang dieser Woche werden möglicherweise nicht in diesem Fenster angezeigt",
-        "waitingStepRefresh": "Klicken Sie auf Aktualisieren — die Ergebnisse eines aktiven Jobs werden innerhalb von ~1 Minute nach der Bewertung angezeigt",
-        "waitingPrimaryCta": "Öffnen Sie Eval Jobs",
-        "waitingRefreshCta": "Auffrischen",
-        "noThreshold": "kein Schwellenwert",
-        "columns": {
-          "scoreConfig": "Punktekonfiguration",
-          "type": "Typ",
-          "totalScores": "Gesamtpunktzahl",
-          "coverage": "Deckung",
-          "unhealthy": "Ungesund",
-          "trend": "Trend",
-          "threshold": "Gesund wenn",
-          "updated": "aktualisiert"
-        }
-      }
-    },
-    "deleteTitle": "{label} löschen",
-    "deleteConfirmMessage": "Bist du sicher, dass du „{name}“ löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden."
-  },
-  "llmProviders": {
-    "tabLabel": "LLM-Anbieter",
-    "title": "LLM-Anbieter",
-    "subtitle": "Verwalten Sie die LLM-Provider-Verbindungen, die von LLM Judge Scorern verwendet werden.",
-    "newButton": "Neuer Anbieter",
-    "searchPlaceholder": "Anbieter suchen",
-    "defaultBadge": "Standard",
-    "loadError": "LLM-Anbieter konnten nicht geladen werden",
-    "columns": {
-      "name": "Name",
-      "type": "Typ",
-      "endpoint": "Endpunkt",
-      "defaultModel": "Standardmodell",
-      "default": "Standard"
-    },
-    "empty": {
-      "title": "Noch keine LLM-Anbieter",
-      "description": "LLM-Anbieter speichern die Verbindungsdetails (Endpunkt und Anmeldeinformationen) für die Sprachmodelle, die Ihre LLM-Judge-Scorer aufrufen. Fügen Sie eines hinzu, um mit der Durchführung von Bewertungen durch Richter zu beginnen."
     }
   }
 }
