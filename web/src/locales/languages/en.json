@@ -509,7 +509,8 @@
     "traceNotFound": "Trace details not found.",
     "failedToFetchTraceDetails": "Failed to load trace details. Please try again.",
     "seekToMoment": "Seek to this moment in the session",
-    "timeInSession": "Time",
+    "timeInSession": "Session Time",
+    "timestamp": "Timestamp",
     "route": "Route",
     "duration": "Duration"
   },
