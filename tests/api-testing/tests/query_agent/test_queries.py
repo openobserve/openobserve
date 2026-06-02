@@ -47,6 +47,9 @@ def _run_query(client, query):
         assert len(hits) < size, \
             f"{query['id']}: Got {len(hits)} rows at size={size} — result may be truncated"
 
+    # Column assertions only run when hits are non-empty.
+    # Queries with row_count=0 must NOT include "columns" in expected
+    # (they can't be validated and would silently pass unchecked).
     if len(hits) > 0:
         for col in expected.get("columns", []):
             assert col in hits[0], f"{query['id']}: Expected column '{col}' not in response"
