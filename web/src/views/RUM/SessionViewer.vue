@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :limits="[25, 75]"
         unit="%"
         class="tw:w-full tw:h-full"
+        separatorClass="tw:bg-[var(--o2-border-color)] tw:w-[1px]!"
       >
         <template #before>
           <VideoPlayer
@@ -96,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
             @event-emitted="handleSidebarEvent"
-            class="tw:h-full tw:border-l tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="tw:h-full"
           />
         </template>
       </OSplitter>

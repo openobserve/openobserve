@@ -124,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-expand-button="true"
           :enable-correlation-links="true"
           :initial-timeline-expanded="false"
+          class="tw:h-full!"
         />
       </div>
     </div>
@@ -131,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- List view -->
     <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full">
       <!-- Filter bar -->
-      <div class="tw:flex tw:items-center tw:px-2 tw:py-1 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:shrink-0 tw:min-h-[2rem]">
+      <div class="tw:flex tw:items-center tw:pr-2 tw:py-1  tw:shrink-0 tw:min-h-[2rem]">
         <OBadge
           variant="default"
           data-test="rum-player-traces-tab-count-badge"
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="error"
           data-test="rum-player-traces-tab-error-count-badge"
           class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
-        >{{ `${formatLargeNumber(totalErrorCount)} ${totalErrorCount === 1 ? t("rum.error") : t("rum.errors")}` }}</OBadge>
+        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OBadge>
       </div>
 
       <!-- Traces table -->
@@ -265,7 +266,7 @@ const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
 
 const totalErrorCount = computed(() =>
-  correlatedViews.value.reduce((sum, v) => sum + (v.metadata?.errorCount || 0), 0),
+  correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
 );
 
 const {fetchQueryDataWithHttpStream} = useHttpStreaming();
@@ -276,8 +277,8 @@ const traceColumns = computed(() => [
     id: "timestamp",
     header: t("rum.timestamp"),
     accessorFn: (row: any) => row.metadata?.start_time ?? 0,
-    size: 80,
-    minSize: 60,
+    size: 100,
+    minSize: 100,
     maxSize: 200,
     meta: { align: "left", slot: true },
   },
