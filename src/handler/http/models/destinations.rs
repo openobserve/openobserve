@@ -184,14 +184,9 @@ impl From<meta_dest::Template> for Template {
             meta_dest::TemplateType::Sns => (String::new(), DestinationType::Sns),
         };
 
-        // Only true for templates the system actually manages — i.e. the
-        // suffix matches a registered prebuilt destination type. Keeps
-        // user-created `prebuilt_*` templates from being mis-flagged as
-        // read-only in the UI.
-        let is_prebuilt = value
-            .name
-            .strip_prefix("prebuilt_")
-            .is_some_and(|t| config::prebuilt_loader::get_prebuilt_template(t).is_some());
+        // Shared rule lives in `config::prebuilt_loader` so the HTTP DTO and
+        // the service-layer guards can't drift apart.
+        let is_prebuilt = config::prebuilt_loader::is_prebuilt_template_name(&value.name);
 
         Self {
             name: value.name,

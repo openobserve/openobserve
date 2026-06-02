@@ -23,23 +23,12 @@ use crate::{
     service::db::{self, alerts::templates::TemplateError},
 };
 
-/// Names with this prefix are reserved for system-managed templates.
-/// `ensure_prebuilt_template` (in `alerts::destinations`) and
-/// `ensure_system_templates` both create templates as `prebuilt_<type>`, and
-/// every existing prebuilt destination type already follows the convention.
-/// Using the name as the marker avoids a schema migration for the new flag.
-const PREBUILT_TEMPLATE_PREFIX: &str = "prebuilt_";
-
-/// True only for templates the system actually manages: the name must be
-/// `prebuilt_<type>` where `<type>` is a registered prebuilt destination type
-/// (slack, opsgenie, servicenow, ...). This lets pre-existing user-created
-/// templates that happen to start with `prebuilt_` (e.g. `prebuilt_internal`)
-/// remain freely editable and deletable, while still protecting the seeded
-/// system defaults that destinations depend on.
-pub fn is_prebuilt_template_name(name: &str) -> bool {
-    name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)
-        .is_some_and(|t| config::prebuilt_loader::get_prebuilt_template(t).is_some())
-}
+// The "is this a system-managed template?" check lives next to
+// `get_prebuilt_template` in `config::prebuilt_loader` so the HTTP model, the
+// service-layer guards below, and any future caller all derive the same
+// answer from one place. Re-exported here as a thin wrapper so existing
+// callers in this module keep working without a long path.
+pub use config::prebuilt_loader::is_prebuilt_template_name;
 
 pub async fn save(
     name: &str,
