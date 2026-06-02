@@ -440,6 +440,8 @@ import {
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 const { t } = useI18n();
 const store = useStore();
@@ -447,6 +449,7 @@ const { searchObj } = useTraces();
 const { getStreams } = useStreams();
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
+const { loadKeyFields } = useServiceCorrelation();
 
 const emit = defineEmits<{
   "view-traces": [serviceName: string];
@@ -482,6 +485,9 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
+
+// Service detection config
+const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
 
 const totalPages = computed(() =>
   filteredServices.value.length && rowsPerPage.value
@@ -770,6 +776,16 @@ const onStreamFilterChange = (stream: string) => {
   loadServicesCatalog();
 };
 
+async function loadServiceDetectionConfig() {
+  try {
+    const keyFields = await loadKeyFields();
+    serviceDetectionConfig.value = keyFields["traces"]?.service_detection ?? null;
+  } catch (error) {
+    console.warn("Failed to load service detection config:", error);
+    serviceDetectionConfig.value = null;
+  }
+}
+
 async function loadServicesCatalog() {
   const streamName = streamFilter.value?.replaceAll('"', "");
   if (!streamName) return;
@@ -870,7 +886,7 @@ ORDER BY total_requests DESC`;
 }
 
 // Expose for parent ref access
-defineExpose({ loadServicesCatalog, streamFilter });
+defineExpose({ loadServicesCatalog, streamFilter, serviceDetectionConfig });
 
 watch(
   () => [
@@ -888,6 +904,7 @@ watch(
 
 onMounted(async () => {
   await loadAvailableStreams();
+  await loadServiceDetectionConfig();
   loadServicesCatalog();
 });
 

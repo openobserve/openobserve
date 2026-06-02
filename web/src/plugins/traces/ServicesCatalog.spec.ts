@@ -162,6 +162,16 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock useServiceCorrelation composable for service detection config loading
+// ---------------------------------------------------------------------------
+const mockLoadKeyFields = vi.fn();
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: () => ({
+    loadKeyFields: mockLoadKeyFields,
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock useStreams composable
 // ---------------------------------------------------------------------------
 const mockGetStreams = vi.fn().mockResolvedValue({ list: [] });
@@ -1889,6 +1899,52 @@ describe("ServicesCatalog", () => {
         );
         expect(decodedSql).toContain('FROM "production-stream"');
       });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Service Detection Config Loading
+  // -----------------------------------------------------------------------
+  describe("Service Detection Config Loading", () => {
+    it("should load service detection config from keyFields", async () => {
+      const mockServiceDetectionConfig = {
+        server_kinds: ["1", "2"],
+        rules: [
+          { attributes: ["db_system"], sub_attributes: ["db_name"] }
+        ]
+      };
+
+      mockLoadKeyFields.mockResolvedValueOnce({
+        traces: { service_detection: mockServiceDetectionConfig }
+      });
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(mockLoadKeyFields).toHaveBeenCalled();
+      expect(wrapper.vm.serviceDetectionConfig).toEqual(mockServiceDetectionConfig);
+    });
+
+    it("should handle missing service detection config gracefully", async () => {
+      mockLoadKeyFields.mockResolvedValueOnce({
+        traces: {}
+      });
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(mockLoadKeyFields).toHaveBeenCalled();
+      expect(wrapper.vm.serviceDetectionConfig).toBeNull();
+    });
+
+    it("should handle loadKeyFields error gracefully", async () => {
+      mockLoadKeyFields.mockRejectedValueOnce(new Error("Failed to load"));
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(mockLoadKeyFields).toHaveBeenCalled();
+      expect(wrapper.vm.serviceDetectionConfig).toBeNull();
     });
   });
 });
