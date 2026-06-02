@@ -1854,6 +1854,26 @@ export default defineComponent({
       },
     ];
     onBeforeMount(() => {
+      // Normalize config fields that default to null but may arrive as undefined
+      // when loaded from older panels (backend omits null fields in JSON response).
+      const nullableConfigKeys = [
+        "legends_position",
+        "legends_type",
+        "chart_align",
+        "unit",
+        "unit_custom",
+      ] as const;
+      nullableConfigKeys.forEach((key) => {
+        if (dashboardPanelData.data.config[key] === undefined) {
+          dashboardPanelData.data.config[key] = null;
+        }
+      });
+      if (dashboardPanelData.data.config.label_option?.position === undefined) {
+        if (dashboardPanelData.data.config.label_option) {
+          dashboardPanelData.data.config.label_option.position = null;
+        }
+      }
+
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
         dashboardPanelData.data.config.legend_width = {
