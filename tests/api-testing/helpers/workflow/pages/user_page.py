@@ -20,8 +20,11 @@ class UserPage:
             "organization": org_id,
             "email": email_address,
             "password": "Complexpass#123",
-            "first_name": "Shyam",
-            "last_name": "P",
+            # Standard convention: all automated-test users use the
+            # same display name so they're identifiable as test-created
+            # in the IAM users page (and safe to clean up).
+            "first_name": "Automation",
+            "last_name": "TestUser",
             "role": "admin",
         }
 

@@ -22,8 +22,11 @@ class ServiceAccountPage:
         payload = {
             "email": email_address,
             "organization": org_id,
-            "first_name": "Shyam",
-            "last_name": "Panjiyar"
+            # Standard convention: all automated-test users / service
+            # accounts use the same display name so they're identifiable
+            # as test-created in the IAM users page (and safe to clean up).
+            "first_name": "Automation",
+            "last_name": "TestUser",
         }
         print("Payload for service account creation:", payload)  # Log the payload
         response = session.post(
