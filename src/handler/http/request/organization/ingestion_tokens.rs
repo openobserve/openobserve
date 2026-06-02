@@ -31,7 +31,7 @@ use crate::{
     service::ingestion_tokens,
 };
 
-/// List all org-level ingestion tokens (masked).
+/// List all org-level ingestion tokens.
 ///
 /// GET /{org_id}/ingestion-tokens
 #[utoipa::path(
@@ -41,7 +41,7 @@ use crate::{
     tag = "Organizations",
     operation_id = "ListOrgIngestionTokens",
     summary = "List org-level ingestion tokens",
-    description = "Returns all org-level ingestion tokens for the organization. Token values are masked. Any authenticated user in the organization can access this.",
+    description = "Returns all org-level ingestion tokens for the organization. Any authenticated user in the organization can access this.",
     security(
         ("Authorization"= [])
     ),
