@@ -232,7 +232,7 @@ mod tests {
     fn test_map_error_to_http_response_other_error() {
         let err = errors::Error::Message("Generic error".to_string());
         let response = map_error_to_http_response(&err, None);
-        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[test]
