@@ -13,6 +13,7 @@ interface ToastRecord {
   open: boolean // Reka controls enter/exit animation via this
   action?: ToastOptions["action"]
   count: number // number of identical toasts collapsed into this one
+  timerKey: number  // increments on each dedup reset; drives progress bar restart
   timer?: ReturnType<typeof setTimeout> // auto-dismiss handle, reset on dedup
   timerStart?: number                   // epoch ms when the current timer was started
   remainingTimeout?: number             // ms left when the timer was last paused
@@ -137,6 +138,7 @@ function toast(options: ToastOptions): DismissFn {
   )
   if (existing) {
     existing.count++
+    existing.timerKey++  // causes progress bar element to remount and restart
     scheduleAutoDismiss(existing) // keep it visible while duplicates arrive
     return makeDismissFn(existing.id, position)
   }
@@ -153,6 +155,7 @@ function toast(options: ToastOptions): DismissFn {
     open: true,
     action: options.action,
     count: 1,
+    timerKey: 0,
   }
 
   // Loading variant is suppressed — callers use the returned dismiss fn to
