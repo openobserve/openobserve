@@ -138,14 +138,12 @@ const isTopPosition = computed(() =>
     :open="open"
     :duration="0"
     :class="[
-      'tw:relative tw:pointer-events-auto tw:flex tw:gap-2 tw:rounded-lg tw:p-3 tw:shadow-toast',
-      title ? 'tw:items-start' : 'tw:items-center',
+      'tw:relative tw:pointer-events-auto',
       'tw:w-fit tw:min-w-[18rem] tw:max-w-[calc(100vw-2rem)]',
       'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
       isTopPosition ? 'tw:data-[state=open]:slide-in-from-top-4' : 'tw:data-[state=open]:slide-in-from-bottom-4',
       'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
       isTopPosition ? 'tw:data-[state=closed]:slide-out-to-top-4' : 'tw:data-[state=closed]:slide-out-to-bottom-4',
-      variantClasses[variant ?? 'default'],
     ]"
     :role="rootRole"
     :data-test="`o-toast-${id}`"
@@ -155,7 +153,7 @@ const isTopPosition = computed(() =>
     @mouseleave="onMouseLeave"
     @update:open="(val) => emit('openChange', val)"
   >
-    <!-- Count badge — shown when identical toasts are collapsed together -->
+    <!-- Count badge — outside the clipped inner shell so it is never cut off -->
     <span
       v-if="count > 1"
       :class="[
@@ -166,92 +164,101 @@ const isTopPosition = computed(() =>
       :data-test="`o-toast-count-${count}`"
       aria-hidden="true"
     >{{ count > 99 ? "99+" : count }}</span>
-    <!-- Icon -->
+
+    <!-- Inner shell: carries all visual styling + overflow-hidden to clip the progress bar -->
     <div
-      v-if="hasIcon"
-      :class="['tw:shrink-0 tw:flex tw:items-center', iconColorClasses[variant ?? 'default']]"
-      aria-hidden="true"
+      :class="[
+        'tw:relative tw:flex tw:gap-2 tw:rounded-lg tw:overflow-hidden tw:p-3 tw:shadow-toast tw:w-full',
+        title ? 'tw:items-start' : 'tw:items-center',
+        variantClasses[variant ?? 'default'],
+      ]"
     >
-      <OIcon name="autorenew" size="sm" v-if="variant === 'loading'"
-        class="tw:size-5 tw:animate-spin" />
-      <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'"
-        class="tw:size-5" />
-      <OIcon name="cancel" size="sm" v-else-if="variant === 'error'"
-        class="tw:size-5" />
-      <OIcon name="warning" size="sm" v-else-if="variant === 'warning'"
-        class="tw:size-5" />
-      <OIcon name="info" size="sm" v-else-if="variant === 'info'"
-        class="tw:size-5" />
-    </div>
-
-    <!-- Content -->
-    <div class="tw:flex-1 tw:min-w-0">
-      <!-- Title — visible when provided, sr-only otherwise (carries message text for screen readers) -->
-      <ToastTitle
-        :class="[
-          'tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug',
-          !title ? 'tw:sr-only' : ''
-        ]"
-      >
-        {{ title ?? screenReaderTitle }}
-      </ToastTitle>
-
-      <!-- Message + inline action — the action sits beside short messages and
-           wraps below long ones (flex-wrap) -->
+      <!-- Icon -->
       <div
-        :class="[
-          'tw:flex tw:flex-wrap tw:items-start tw:gap-x-3 tw:gap-y-1.5',
-          title ? 'tw:mt-1' : '',
-        ]"
+        v-if="hasIcon"
+        :class="['tw:shrink-0 tw:flex tw:items-center', iconColorClasses[variant ?? 'default']]"
+        aria-hidden="true"
       >
-        <ToastDescription
-          :class="[
-            'tw:text-sm tw:leading-snug',
-            title ? 'tw:text-toast-fg-secondary' : 'tw:text-toast-fg',
-          ]"
-          data-test="o-toast-message"
-        >
-          {{ message }}
-        </ToastDescription>
-
-        <!-- Action button -->
-        <ToastAction
-          v-if="action"
-          :alt-text="action.label"
-          as-child
-        >
-          <button
-            type="button"
-            class="tw:inline-flex tw:items-center tw:justify-center tw:rounded tw:bg-toast-action-text tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:text-white tw:shadow-sm tw:transition-colors tw:hover:bg-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1 tw:focus-visible:ring-toast-action-text"
-            @click="action.handler"
-          >
-            {{ action.label }}
-          </button>
-        </ToastAction>
+        <OIcon name="autorenew" size="sm" v-if="variant === 'loading'"
+          class="tw:size-5 tw:animate-spin" />
+        <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'"
+          class="tw:size-5" />
+        <OIcon name="cancel" size="sm" v-else-if="variant === 'error'"
+          class="tw:size-5" />
+        <OIcon name="warning" size="sm" v-else-if="variant === 'warning'"
+          class="tw:size-5" />
+        <OIcon name="info" size="sm" v-else-if="variant === 'info'"
+          class="tw:size-5" />
       </div>
-    </div>
 
-    <!-- Dismiss button -->
-    <ToastClose
-      :class="['tw:shrink-0 tw:flex tw:items-center tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border', title ? 'tw:self-start' : 'tw:self-center']"
-      aria-label="Dismiss notification"
-    >
-      <OIcon name="close" size="sm" class="tw:size-4" aria-hidden="true" />
-    </ToastClose>
+      <!-- Content -->
+      <div class="tw:flex-1 tw:min-w-0">
+        <!-- Title — visible when provided, sr-only otherwise (carries message text for screen readers) -->
+        <ToastTitle
+          :class="[
+            'tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug',
+            !title ? 'tw:sr-only' : ''
+          ]"
+        >
+          {{ title ?? screenReaderTitle }}
+        </ToastTitle>
 
-    <!-- Timeout progress bar — shrinks from full to empty over the toast's lifetime -->
-    <div
-      v-if="timeout > 0"
-      class="tw:absolute tw:bottom-0 tw:left-0 tw:right-0 tw:h-0.5 tw:rounded-b-lg tw:overflow-hidden"
-      aria-hidden="true"
-    >
+        <!-- Message + inline action -->
+        <div
+          :class="[
+            'tw:flex tw:flex-wrap tw:items-start tw:gap-x-3 tw:gap-y-1.5',
+            title ? 'tw:mt-1' : '',
+          ]"
+        >
+          <ToastDescription
+            :class="[
+              'tw:text-sm tw:leading-snug',
+              title ? 'tw:text-toast-fg-secondary' : 'tw:text-toast-fg',
+            ]"
+            data-test="o-toast-message"
+          >
+            {{ message }}
+          </ToastDescription>
+
+          <!-- Action button -->
+          <ToastAction
+            v-if="action"
+            :alt-text="action.label"
+            as-child
+          >
+            <button
+              type="button"
+              class="tw:inline-flex tw:items-center tw:justify-center tw:rounded tw:bg-toast-action-text tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:text-white tw:shadow-sm tw:transition-colors tw:hover:bg-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1 tw:focus-visible:ring-toast-action-text"
+              @click="action.handler"
+            >
+              {{ action.label }}
+            </button>
+          </ToastAction>
+        </div>
+      </div>
+
+      <!-- Dismiss button -->
+      <ToastClose
+        :class="['tw:shrink-0 tw:flex tw:items-center tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border', title ? 'tw:self-start' : 'tw:self-center']"
+        aria-label="Dismiss notification"
+      >
+        <OIcon name="close" size="sm" class="tw:size-4" aria-hidden="true" />
+      </ToastClose>
+
+      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-lg -->
       <div
-        :class="['tw:h-full tw:w-full tw:origin-left toast-progress-fill', progressBarColorClasses[variant ?? 'default']]"
-        :style="{
-          animationDuration: `${timeout}ms`,
-          animationPlayState: isPaused ? 'paused' : 'running',
-        }"
-      />
+        v-if="timeout > 0"
+        class="tw:absolute tw:bottom-0 tw:left-0 tw:right-0 tw:h-0.5"
+        aria-hidden="true"
+      >
+        <div
+          :class="['tw:h-full tw:w-full tw:origin-left toast-progress-fill', progressBarColorClasses[variant ?? 'default']]"
+          :style="{
+            animationDuration: `${timeout}ms`,
+            animationPlayState: isPaused ? 'paused' : 'running',
+          }"
+        />
+      </div>
     </div>
   </ToastRoot>
 </template>
