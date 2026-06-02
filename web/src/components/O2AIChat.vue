@@ -5783,6 +5783,7 @@ export default defineComponent({
 
   .chat-content {
     flex: 1;
+    min-height: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -5792,6 +5793,7 @@ export default defineComponent({
 
   .messages-container {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 8px;
     display: flex;
