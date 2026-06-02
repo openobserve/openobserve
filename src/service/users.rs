@@ -80,7 +80,7 @@ pub async fn post_user(
     }
     let cfg = get_config();
     usr_req.email = usr_req.email.to_lowercase();
-    if usr_req.role.custom_role.is_some() {
+    if let Some(_custom_roles) = &usr_req.role.custom_role {
         #[cfg(not(feature = "enterprise"))]
         return Ok(MetaHttpResponse::bad_request("Custom roles not allowed"));
         #[cfg(feature = "enterprise")]
@@ -89,7 +89,7 @@ pub async fn post_user(
         } else {
             match o2_openfga::authorizer::roles::get_all_roles(org_id, None).await {
                 Ok(res) => {
-                    for custom_role in usr_req.role.custom_role.as_ref().unwrap() {
+                    for custom_role in _custom_roles {
                         if !res.contains(custom_role) {
                             return Ok(MetaHttpResponse::bad_request("Custom role not found"));
                         }
@@ -200,9 +200,8 @@ pub async fn post_user(
                     if usr_req.role.base_role.eq(&UserRole::ServiceAccount) {
                         get_service_account_creation_tuple(&org_id, &usr_req.email, &mut tuples);
                     }
-                    if usr_req.role.custom_role.is_some() {
-                        let custom_role = usr_req.role.custom_role.unwrap();
-                        custom_role.iter().for_each(|crole| {
+                    if let Some(custom_roles) = usr_req.role.custom_role {
+                        custom_roles.iter().for_each(|crole| {
                             tuples.push(get_user_crole_tuple(&org_id, crole, &usr_req.email));
                         });
                     }
@@ -688,9 +687,8 @@ pub async fn add_user_to_org(
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
                     get_add_user_to_org_tuples(org_id, email, &base_role.to_string(), &mut tuples);
-                    if role.custom_role.is_some() {
-                        let custom_role = role.custom_role.unwrap();
-                        custom_role.iter().for_each(|crole| {
+                    if let Some(custom_roles) = role.custom_role {
+                        custom_roles.iter().for_each(|crole| {
                             tuples.push(get_user_crole_tuple(org_id, crole, email));
                         });
                     }
@@ -1012,7 +1010,7 @@ pub async fn remove_user_from_org(
                                 user_role.to_string()
                             };
                             if get_openfga_config().enabled {
-                                log::debug!("delete user single org, role: {}", &user_fga_role);
+                                log::debug!("delete user single org, role: {user_fga_role}");
                                 delete_user_from_org(org_id, email_id, &user_fga_role).await;
                                 if user_role.eq(&UserRole::ServiceAccount) {
                                     delete_service_account_from_org(org_id, email_id).await;

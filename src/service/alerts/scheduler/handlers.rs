@@ -903,10 +903,9 @@ async fn handle_alert_triggers(
                 };
 
                 log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {}, rows: {}",
-                    &new_trigger.org,
-                    &alert.name,
-                    fingerprint,
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {fingerprint}, rows: {}",
+                    new_trigger.org,
+                    alert.name,
                     data.len()
                 );
 
@@ -922,8 +921,7 @@ async fn handle_alert_triggers(
 
                 if batch_ready {
                     log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} reached max size, sending immediately",
-                        fingerprint
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
                     );
                     if let Some(batch) =
                         crate::service::alerts::grouping::get_ready_batch(&fingerprint)
@@ -978,8 +976,8 @@ async fn handle_alert_triggers(
                     if deduplicated_data.is_empty() && deduplicated {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
-                            &new_trigger.org,
-                            &new_trigger.module_key
+                            new_trigger.org,
+                            new_trigger.module_key
                         );
 
                         // Mark as suppressed for history tracking
@@ -1002,10 +1000,9 @@ async fn handle_alert_triggers(
                 }
                 Err(e) => {
                     log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {}",
-                        &new_trigger.org,
-                        &new_trigger.module_key,
-                        e
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {e}",
+                        new_trigger.org,
+                        new_trigger.module_key,
                     );
                     // On error, continue with original data to avoid missing alerts
                     data
@@ -1065,8 +1062,8 @@ async fn handle_alert_triggers(
                 Ok(Some(outcome)) => {
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {} (service: {})",
-                        &new_trigger.org,
-                        &alert.name,
+                        new_trigger.org,
+                        alert.name,
                         outcome.incident_id(),
                         outcome.service_name(),
                     );
@@ -1077,8 +1074,8 @@ async fn handle_alert_triggers(
                 Ok(None) => {
                     log::debug!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] No incident correlation for alert {}/{}",
-                        &new_trigger.org,
-                        &alert.name,
+                        new_trigger.org,
+                        alert.name,
                     );
                     false
                 }

@@ -719,7 +719,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     Err(err) => {
                         log::error!(
                             "[trace_id {trace_id}] search->grpc: node: {}, search err: {err:?}",
-                            &node.get_grpc_addr(),
+                            node.get_grpc_addr(),
                         );
                         let err = ErrorCodes::from_json(err.message())?;
                         return Err(Error::ErrorCode(err));
@@ -851,7 +851,7 @@ pub async fn cancel_query(
                     Err(err) => {
                         log::error!(
                             "[trace_id {trace_id}] grpc_cancel_query: node: {}, search err: {err:?}",
-                            &node.get_grpc_addr(),
+                            node.get_grpc_addr(),
                         );
                         let err = ErrorCodes::from_json(err.message())?;
                         return Err(Error::ErrorCode(err));

@@ -187,11 +187,11 @@ pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             // So we can return here
             log::debug!(
                 "folder tuples already exists for org: {org_id}; folder: {}",
-                &obj.obj_id
+                obj.obj_id
             );
             return;
         } else if obj.parent_type.eq("folders") {
-            log::debug!("checking parent folder tuples for folder: {}", &obj.parent);
+            log::debug!("checking parent folder tuples for folder: {}", obj.parent);
             // In case of dashboard, we need to check if the tuples for its folder exist
             // If not, the below function creates the proper tuples for the folder
             authorizer::authz::check_folder_exists(org_id, &obj.parent).await;

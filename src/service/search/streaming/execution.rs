@@ -433,11 +433,10 @@ pub async fn do_partitioned_search(
     }
 
     // Remove the streaming_aggs cache
-    if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+    if is_streaming_aggs && let Some(_streaming_id) = &partition_resp.streaming_id {
         #[cfg(feature = "enterprise")]
         {
-            let streaming_id = partition_resp.streaming_id.as_ref().unwrap();
-            streaming_aggs_exec::remove_cache(streaming_id)
+            streaming_aggs_exec::remove_cache(_streaming_id)
         }
     }
 
@@ -790,9 +789,9 @@ pub async fn process_delta(
     }
 
     // Remove the streaming_aggs cache
-    if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+    if is_streaming_aggs && let Some(_streaming_id) = partition_resp.streaming_id {
         #[cfg(feature = "enterprise")]
-        streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+        streaming_aggs_exec::remove_cache(&_streaming_id)
     }
 
     Ok(())

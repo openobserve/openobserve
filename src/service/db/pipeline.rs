@@ -320,7 +320,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                 .super_cluster
                 .enabled
             {
-                let key = format!("{PIPELINES_WATCH_PREFIX}{}", &pipeline.id);
+                let key = format!("{PIPELINES_WATCH_PREFIX}{}", pipeline.id);
                 match config::utils::json::to_vec(pipeline) {
                     Err(e) => {
                         log::error!(

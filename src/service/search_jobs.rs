@@ -257,9 +257,8 @@ async fn filter_partition_job(
     let mut needed_partitions_jobs = Vec::new();
     for partition_job in partition_jobs.iter() {
         // if the result_path is not none, means the partition job is done
-        if partition_job.result_path.is_some() {
-            let path = partition_job.result_path.as_ref().unwrap();
-            let buf = storage::get_bytes("", path).await?;
+        if let Some(result_path) = partition_job.result_path.as_ref() {
+            let buf = storage::get_bytes("", result_path).await?;
             let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
             need -= res.total as i64;
         } else {
@@ -450,9 +449,8 @@ pub async fn get_result(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "search->grpc: node: {}, search err: {:?}",
-                        &node.get_grpc_addr(),
-                        err
+                        "search->grpc: node: {}, search err: {err:?}",
+                        node.get_grpc_addr(),
                     );
                     let err = ErrorCodes::from_json(err.message())?;
                     return Err(Error::ErrorCode(err));
@@ -498,9 +496,8 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "search->grpc: node: {}, search err: {:?}",
-                            &node.get_grpc_addr(),
-                            err
+                            "search->grpc: node: {}, search err: {err}",
+                            node.get_grpc_addr(),
                         );
                         let err = ErrorCodes::from_json(err.message())?;
                         return Err(Error::ErrorCode(err));

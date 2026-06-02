@@ -65,7 +65,7 @@ async fn run_download_files() {
 
         let fname = format!(
             "{}{}",
-            &cfg.common.mmdb_data_dir,
+            cfg.common.mmdb_data_dir,
             get_o2_config().common.mmdb_enterprise_file_name
         );
 
@@ -136,7 +136,7 @@ async fn update_maxmind_client() {
     let city_fname = if get_o2_config().common.enable_enterprise_mmdb {
         format!(
             "{}{}",
-            &cfg.common.mmdb_data_dir,
+            cfg.common.mmdb_data_dir,
             get_o2_config().common.mmdb_enterprise_file_name
         )
     } else {

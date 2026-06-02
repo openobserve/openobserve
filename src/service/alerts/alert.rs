@@ -868,9 +868,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         {
             Ok(Some(outcome)) => {
                 log::info!(
-                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
-                    org_id,
-                    &alert.name,
+                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
+                    alert.name,
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
@@ -878,9 +877,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             }
             Ok(None) => {
                 log::debug!(
-                    "No incident correlation for manually triggered alert {}/{}",
-                    org_id,
-                    &alert.name
+                    "No incident correlation for manually triggered alert {org_id}/{}",
+                    alert.name
                 );
                 false
             }
@@ -948,9 +946,8 @@ pub async fn trigger_by_name(
         {
             Ok(Some(outcome)) => {
                 log::info!(
-                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
-                    org_id,
-                    &alert.name,
+                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
+                    alert.name,
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
@@ -958,9 +955,8 @@ pub async fn trigger_by_name(
             }
             Ok(None) => {
                 log::debug!(
-                    "No incident correlation for manually triggered alert {}/{}",
-                    org_id,
-                    &alert.name
+                    "No incident correlation for manually triggered alert {org_id}/{}",
+                    alert.name
                 );
                 false
             }
