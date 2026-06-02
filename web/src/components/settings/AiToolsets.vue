@@ -63,10 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty><NoData /></template>
 
         <template #cell-kind="{ row }">
-          <OBadge
-            :variant="kindBadgeVariant(row.kind)"
-            size="sm"
-          >{{ row.kind.toUpperCase() }}</OBadge>
+          <AiToolsetKindBadge :kind="row.kind" size="sm" />
         </template>
 
         <template #cell-actions="{ row }">
@@ -122,7 +119,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AiToolsetKindBadge from "@/components/ai_toolsets/badges/AiToolsetKindBadge.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 // Distinct variants so each kind reads visually different (mcp=blue, cli=green,
@@ -142,7 +139,7 @@ export default defineComponent({
     AddAiToolset,
     OButton,
     OIcon,
-    OBadge,
+    AiToolsetKindBadge,
     OInput,
     OTable,
 },

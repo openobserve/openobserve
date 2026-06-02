@@ -1323,29 +1323,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Header section with cardinality details -->
           <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
             <span class="tw:font-medium">Cardinality:</span>
-            <OBadge
-              :variant="
-                cardinalityColor(
-                  dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
-                    'Unknown',
-                )
-              "
+            <CardinalityClassBadge
+              :cardinality-class="dimensionAnalytics[primaryDim?.group_id]?.cardinality_class || 'Unknown'"
               class="tw:px-2"
             >
               {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }}
               unique values
-            </OBadge>
-            <OBadge
-              :variant="`${cardinalityColor(
-                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
-                  'Unknown',
-              )}-outline`"
+            </CardinalityClassBadge>
+            <CardinalityClassBadge
+              :cardinality-class="dimensionAnalytics[primaryDim?.group_id]?.cardinality_class || 'Unknown'"
+              outline
             >
               {{
                 dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
                 "Unknown"
               }}
-            </OBadge>
+            </CardinalityClassBadge>
           </div>
 
           <!-- Two-pane Layout for Streams and Values -->
@@ -1534,8 +1527,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import CardinalityClassBadge from "@/components/settings/badges/CardinalityClassBadge.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

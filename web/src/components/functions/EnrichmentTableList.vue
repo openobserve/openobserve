@@ -295,13 +295,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
-                  <OBadge
+                  <EnrichmentJobStatusBadge
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
-                    :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
-                  >
-                    {{ job.status }}
-                  </OBadge>
+                    :status="job.status"
+                  />
                 </span>
                 <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
@@ -352,7 +350,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import EnrichmentJobStatusBadge from "@/components/functions/badges/EnrichmentJobStatusBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
@@ -371,7 +369,7 @@ export default defineComponent({
     OTooltip,
     OCheckbox,
     OIcon,
-    OBadge,
+    EnrichmentJobStatusBadge,
     OTable,
 },
   emits: [

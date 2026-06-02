@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
-        <OBadge
+        <ObservationTypeBadge
           v-if="isLLMSpan"
-          :variant="getObservationTypeVariant(span.gen_ai_operation_name)"
+          :operation-name="span.gen_ai_operation_name"
           class="tw:mr-1 observation-type-badge"
           data-test="trace-details-sidebar-observation-badge"
-        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OBadge>
+        />
 
         <span class="tw:truncate">{{ span.operation_name }}</span>
       </div>
@@ -926,6 +926,7 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ObservationTypeBadge from "@/plugins/traces/badges/ObservationTypeBadge.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";

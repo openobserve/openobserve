@@ -201,6 +201,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 interface Props {
   show: boolean;

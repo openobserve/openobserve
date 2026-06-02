@@ -230,20 +230,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-status="{ row }">
-                  <OBadge
+                  <AlertTriggerStatusBadge
+                    :status="row.status"
+                    :error="row.error"
                     size="sm"
-                    :icon="getStatusChipIcon(row.status)"
-                    :variant="getStatusChipVariant(row.status)"
                     class="tw:cursor-default"
                     data-test="alert-history-status-chip"
-                  >
-                    {{ formatStatus(row.status) }}
-                    <OTooltip
-                      v-if="row.error"
-                      :max-width="'300px'"
-                      :content="row.error"
-                    />
-                  </OBadge>
+                  />
                 </template>
                 <template #cell-timestamp="{ row }">
                   <span class="tw:text-[13px]">{{
@@ -480,7 +473,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AlertTriggerStatusBadge from "@/components/alerts/badges/AlertTriggerStatusBadge.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import alertsService from "@/services/alerts";
