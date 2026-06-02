@@ -493,7 +493,14 @@
     "initialView": "이니셜",
     "failedToFetchTraces": "추적 데이터를 가져오지 못했습니다.다시 시도해 주세요.",
     "traceNotFound": "추적 세부 정보를 찾을 수 없습니다.",
-    "failedToFetchTraceDetails": "추적 세부 정보를 로드하지 못했습니다.다시 시도해 주세요."
+    "failedToFetchTraceDetails": "추적 세부 정보를 로드하지 못했습니다.다시 시도해 주세요.",
+    "span": "한 뼘",
+    "spans": "기간",
+    "errorTraces": "오류 추적",
+    "seekToMoment": "세션에서 이 순간을 찾아라",
+    "timeInSession": "세션 시간",
+    "route": "노선",
+    "duration": "지속"
   },
   "about": {
     "name": "오픈 옵저브",

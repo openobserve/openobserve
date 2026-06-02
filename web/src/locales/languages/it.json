@@ -493,7 +493,14 @@
     "initialView": "Iniziale",
     "failedToFetchTraces": "Recupero dei dati di traccia non riuscito. Per favore riprova.",
     "traceNotFound": "Dettagli della traccia non trovati.",
-    "failedToFetchTraceDetails": "Caricamento dei dettagli della traccia non riuscito. Per favore riprova."
+    "failedToFetchTraceDetails": "Caricamento dei dettagli della traccia non riuscito. Per favore riprova.",
+    "span": "ampiezza",
+    "spans": "ricopre",
+    "errorTraces": "tracce di errore",
+    "seekToMoment": "Cerca questo momento della sessione",
+    "timeInSession": "Durata della sessione",
+    "route": "Percorso",
+    "duration": "Durata"
   },
   "about": {
     "name": "Apri Observe",

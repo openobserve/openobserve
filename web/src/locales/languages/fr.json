@@ -493,7 +493,14 @@
     "initialView": "Initiale",
     "failedToFetchTraces": "Impossible de récupérer les données de trace. Réessayez, s'il vous plaît.",
     "traceNotFound": "Les détails de la trace sont introuvables.",
-    "failedToFetchTraceDetails": "Impossible de charger les détails de la trace. Veuillez réessayer."
+    "failedToFetchTraceDetails": "Impossible de charger les détails de la trace. Veuillez réessayer.",
+    "span": "envergure",
+    "spans": "couvre",
+    "errorTraces": "traces d'erreurs",
+    "seekToMoment": "Recherchez ce moment de la session",
+    "timeInSession": "Durée de la session",
+    "route": "Parcours",
+    "duration": "Durée"
   },
   "about": {
     "name": "Ouvrez Observe",

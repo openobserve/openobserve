@@ -493,7 +493,14 @@
     "initialView": "Initieel",
     "failedToFetchTraces": "Het ophalen van traceergegevens is mislukt. Probeer het opnieuw.",
     "traceNotFound": "Traceergegevens niet gevonden.",
-    "failedToFetchTraceDetails": "Het laden van de traceringsgegevens is mislukt. Probeer het opnieuw."
+    "failedToFetchTraceDetails": "Het laden van de traceringsgegevens is mislukt. Probeer het opnieuw.",
+    "span": "span",
+    "spans": "overspant",
+    "errorTraces": "foutsporen",
+    "seekToMoment": "Streef naar dit moment in de sessie",
+    "timeInSession": "Sessietijd",
+    "route": "Route",
+    "duration": "Duur"
   },
   "about": {
     "name": "OpenObserve",

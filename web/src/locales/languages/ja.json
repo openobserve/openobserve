@@ -493,7 +493,14 @@
     "initialView": "初期",
     "failedToFetchTraces": "トレースデータを取得できませんでした。もう一度試してください。",
     "traceNotFound": "トレースの詳細が見つかりません。",
-    "failedToFetchTraceDetails": "トレースの詳細を読み込めませんでした。もう一度試してください。"
+    "failedToFetchTraceDetails": "トレースの詳細を読み込めませんでした。もう一度試してください。",
+    "span": "スパン",
+    "spans": "スパン",
+    "errorTraces": "エラートレース",
+    "seekToMoment": "セッションの今この瞬間を探して",
+    "timeInSession": "セッション時間",
+    "route": "ルート",
+    "duration": "所要時間"
   },
   "about": {
     "name": "OpenObserve",
