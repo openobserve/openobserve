@@ -2214,6 +2214,9 @@
     "search": "Search Alert",
     "move": "Move alert",
     "name": "Name",
+    "destinations": {
+      "saved": "Destination saved"
+    },
     "addConditions": "Add Conditions",
     "sqlEditor": "SQL Editor",
     "promqlEditor": "PromQL Editor",
@@ -2783,13 +2786,26 @@
     "delete": "Delete",
     "variable_guide_header": "Template Variable Guide",
     "variable_usage_examples": "Usage Examples",
-    "body": "Body"
+    "body": "Body",
+    "clone": "Clone",
+    "cloneTitle": "Clone template",
+    "systemReadOnly": "Prebuilt template — delete is disabled. Clone it to make a modifiable copy.",
+    "prebuiltBadge": "Prebuilt",
+    "prebuiltBadgeHint": "Managed by the system. You can edit, but deletion is disabled.",
+    "customBadge": "Custom",
+    "filterAll": "All",
+    "filterPrebuilt": "Prebuilt",
+    "filterCustom": "Custom"
   },
   "alert_destinations": {
     "header": "Notification Destinations",
     "add": "New destination",
     "edit": "Edit",
     "search": "Search destination",
+    "filterAll": "All",
+    "filterPrebuilt": "Prebuilt",
+    "filterCustom": "Custom",
+    "templateDefaultBadge": "Default",
     "name": "Name",
     "destination_type": "Destination Type",
     "template": "Template",
