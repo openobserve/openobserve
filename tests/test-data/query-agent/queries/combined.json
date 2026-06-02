@@ -2,7 +2,7 @@
   "queries": [
     {
       "id": "Q036",
-      "sql": "WITH throughput_cte AS (SELECT facility_zone, COUNT(*) AS events, SUM(throughput_rate) AS total_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test\" GROUP BY facility_zone), charge_cte AS (SELECT facility_zone, COUNT(*) FILTER (WHERE charge_remaining < 25.0) AS low_charge_events FROM \"query_agent_test\" GROUP BY facility_zone) SELECT t.facility_zone, t.events, t.total_tput, t.avg_load, ROUND(CAST(c.low_charge_events AS FLOAT) / NULLIF(t.events, 0) * 100.0, 2) AS error_rate FROM throughput_cte t JOIN charge_cte c ON t.facility_zone = c.facility_zone ORDER BY error_rate DESC",
+      "sql": "WITH throughput_cte AS (SELECT facility_zone, COUNT(*) AS events, SUM(throughput_rate) AS total_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test_v2\" GROUP BY facility_zone), charge_cte AS (SELECT facility_zone, COUNT(*) FILTER (WHERE charge_remaining < 25.0) AS low_charge_events FROM \"query_agent_test_v2\" GROUP BY facility_zone) SELECT t.facility_zone, t.events, t.total_tput, t.avg_load, ROUND(CAST(c.low_charge_events AS FLOAT) / NULLIF(t.events, 0) * 100.0, 2) AS error_rate FROM throughput_cte t JOIN charge_cte c ON t.facility_zone = c.facility_zone ORDER BY error_rate DESC",
       "category": "combined",
       "time_range": {
         "start": 1780310097000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "Q037",
-      "sql": "SELECT _timestamp, log, CASE WHEN load_factor < 30.0 THEN 'light' WHEN load_factor < 60.0 THEN 'moderate' WHEN load_factor < 85.0 THEN 'heavy' ELSE 'critical' END AS load_category, ROW_NUMBER() OVER (PARTITION BY CASE WHEN load_factor < 30.0 THEN 'light' WHEN load_factor < 60.0 THEN 'moderate' WHEN load_factor < 85.0 THEN 'heavy' ELSE 'critical' END ORDER BY load_factor DESC) AS rank_in_category FROM \"query_agent_test\" WHERE load_factor IS NOT NULL ORDER BY load_category, rank_in_category",
+      "sql": "SELECT _timestamp, log, CASE WHEN load_factor < 30.0 THEN 'light' WHEN load_factor < 60.0 THEN 'moderate' WHEN load_factor < 85.0 THEN 'heavy' ELSE 'critical' END AS load_category, ROW_NUMBER() OVER (PARTITION BY CASE WHEN load_factor < 30.0 THEN 'light' WHEN load_factor < 60.0 THEN 'moderate' WHEN load_factor < 85.0 THEN 'heavy' ELSE 'critical' END ORDER BY load_factor DESC) AS rank_in_category FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL ORDER BY load_category, rank_in_category",
       "category": "combined",
       "time_range": {
         "start": 1780310157000000,
@@ -41,7 +41,7 @@
     },
     {
       "id": "Q038",
-      "sql": "SELECT facility_zone, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, STRING_AGG(DISTINCT sorter_model, ' | ' ORDER BY sorter_model ASC) AS sorter_list FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone HAVING COUNT(*) >= 2 ORDER BY cnt DESC",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, STRING_AGG(DISTINCT sorter_model, ' | ' ORDER BY sorter_model ASC) AS sorter_list FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone HAVING COUNT(*) >= 2 ORDER BY cnt DESC",
       "category": "combined",
       "time_range": {
         "start": 1780310217000000,
@@ -60,7 +60,7 @@
     },
     {
       "id": "Q039",
-      "sql": "SELECT operation_mode, facility_zone, COUNT(*) AS cnt, SUM(load_factor) AS sum_load, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" WHERE load_factor IS NOT NULL GROUP BY operation_mode, facility_zone ORDER BY sum_load DESC LIMIT 8",
+      "sql": "SELECT operation_mode, facility_zone, COUNT(*) AS cnt, SUM(load_factor) AS sum_load, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL GROUP BY operation_mode, facility_zone ORDER BY sum_load DESC LIMIT 8",
       "category": "combined",
       "time_range": {
         "start": 1780310277000000,
@@ -80,7 +80,7 @@
     },
     {
       "id": "Q040",
-      "sql": "SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, ROUND(AVG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS running_avg, ROUND((throughput_rate - AVG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)), 2) AS deviation, CASE WHEN throughput_rate > 2 * AVG(throughput_rate) OVER (PARTITION BY facility_zone) THEN 'OUTLIER_HIGH' WHEN throughput_rate < 0.5 * AVG(throughput_rate) OVER (PARTITION BY facility_zone) THEN 'OUTLIER_LOW' ELSE 'NORMAL' END AS outlier_flag FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL AND facility_zone IS NOT NULL ORDER BY facility_zone ASC, _timestamp ASC",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, ROUND(AVG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS running_avg, ROUND((throughput_rate - AVG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)), 2) AS deviation, CASE WHEN throughput_rate > 2 * AVG(throughput_rate) OVER (PARTITION BY facility_zone) THEN 'OUTLIER_HIGH' WHEN throughput_rate < 0.5 * AVG(throughput_rate) OVER (PARTITION BY facility_zone) THEN 'OUTLIER_LOW' ELSE 'NORMAL' END AS outlier_flag FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL AND facility_zone IS NOT NULL ORDER BY facility_zone ASC, _timestamp ASC",
       "category": "combined",
       "time_range": {
         "start": 1780310337000000,
@@ -103,7 +103,7 @@
     },
     {
       "id": "Q041",
-      "sql": "WITH raw AS (SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining FROM \"query_agent_test\"), scored AS (SELECT *, ROUND((throughput_rate / NULLIF((SELECT AVG(throughput_rate) FROM raw), 0)) * 0.4 + (load_factor / NULLIF((SELECT AVG(load_factor) FROM raw), 0)) * 0.3 + (charge_remaining / NULLIF((SELECT AVG(charge_remaining) FROM raw), 0)) * 0.3, 4) AS composite_score FROM raw), ranked AS (SELECT *, RANK() OVER (ORDER BY composite_score DESC) AS overall_rank, NTILE(5) OVER (ORDER BY composite_score DESC) AS quintile FROM scored) SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining, composite_score, overall_rank, quintile FROM ranked WHERE quintile <= 2 ORDER BY composite_score DESC",
+      "sql": "WITH raw AS (SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining FROM \"query_agent_test_v2\"), scored AS (SELECT *, ROUND((throughput_rate / NULLIF((SELECT AVG(throughput_rate) FROM raw), 0)) * 0.4 + (load_factor / NULLIF((SELECT AVG(load_factor) FROM raw), 0)) * 0.3 + (charge_remaining / NULLIF((SELECT AVG(charge_remaining) FROM raw), 0)) * 0.3, 4) AS composite_score FROM raw), ranked AS (SELECT *, RANK() OVER (ORDER BY composite_score DESC) AS overall_rank, NTILE(5) OVER (ORDER BY composite_score DESC) AS quintile FROM scored) SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining, composite_score, overall_rank, quintile FROM ranked WHERE quintile <= 2 ORDER BY composite_score DESC",
       "category": "combined",
       "time_range": {
         "start": 1780310397000000,
@@ -128,7 +128,7 @@
     },
     {
       "id": "Q042",
-      "sql": "WITH grid AS (SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining, cell_temp FROM \"query_agent_test\"), grid_ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS tput_rn, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY load_factor DESC) AS load_rn, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY charge_remaining ASC) AS charge_rn FROM grid), grid_scored AS (SELECT *, (tput_rn + load_rn + charge_rn) AS combined_rank_sum FROM grid_ranked), grid_final AS (SELECT *, RANK() OVER (PARTITION BY facility_zone ORDER BY combined_rank_sum ASC) AS multi_factor_rank FROM grid_scored) SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining, cell_temp, tput_rn, load_rn, charge_rn, combined_rank_sum, multi_factor_rank FROM grid_final WHERE multi_factor_rank <= 3 ORDER BY facility_zone ASC, multi_factor_rank ASC",
+      "sql": "WITH grid AS (SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining, cell_temp FROM \"query_agent_test_v2\"), grid_ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS tput_rn, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY load_factor DESC) AS load_rn, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY charge_remaining ASC) AS charge_rn FROM grid), grid_scored AS (SELECT *, (tput_rn + load_rn + charge_rn) AS combined_rank_sum FROM grid_ranked), grid_final AS (SELECT *, RANK() OVER (PARTITION BY facility_zone ORDER BY combined_rank_sum ASC) AS multi_factor_rank FROM grid_scored) SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor, charge_remaining, cell_temp, tput_rn, load_rn, charge_rn, combined_rank_sum, multi_factor_rank FROM grid_final WHERE multi_factor_rank <= 3 ORDER BY facility_zone ASC, multi_factor_rank ASC",
       "category": "combined",
       "time_range": {
         "start": 1780310457000000,
@@ -156,7 +156,7 @@
     },
     {
       "id": "Q043",
-      "sql": "SELECT t.facility_zone, t.sorter_model, ROUND(AVG(t.throughput_rate), 2) AS avg_tput, ROUND(AVG(t.load_factor), 2) AS avg_load, ROUND(AVG(t.throughput_rate) - MAX(z.zone_avg_tput), 2) AS tput_vs_zone FROM \"query_agent_test\" t JOIN (SELECT facility_zone AS zfz, ROUND(AVG(throughput_rate), 2) AS zone_avg_tput FROM \"query_agent_test\" GROUP BY facility_zone) z ON t.facility_zone = z.zfz WHERE t.throughput_rate IS NOT NULL GROUP BY t.facility_zone, t.sorter_model ORDER BY tput_vs_zone DESC",
+      "sql": "SELECT t.facility_zone, t.sorter_model, ROUND(AVG(t.throughput_rate), 2) AS avg_tput, ROUND(AVG(t.load_factor), 2) AS avg_load, ROUND(AVG(t.throughput_rate) - MAX(z.zone_avg_tput), 2) AS tput_vs_zone FROM \"query_agent_test_v2\" t JOIN (SELECT facility_zone AS zfz, ROUND(AVG(throughput_rate), 2) AS zone_avg_tput FROM \"query_agent_test_v2\" GROUP BY facility_zone) z ON t.facility_zone = z.zfz WHERE t.throughput_rate IS NOT NULL GROUP BY t.facility_zone, t.sorter_model ORDER BY tput_vs_zone DESC",
       "category": "combined",
       "time_range": {
         "start": 1780310517000000,
@@ -176,7 +176,7 @@
     },
     {
       "id": "Q044",
-      "sql": "WITH temp_summary AS (SELECT facility_zone, COUNT(*) AS readings, ROUND(AVG(cell_temp), 2) AS mean_temp, ROUND(STDDEV(cell_temp), 2) AS std_temp FROM \"query_agent_test\" WHERE cell_temp IS NOT NULL GROUP BY facility_zone), threshold AS (SELECT facility_zone, mean_temp, std_temp, mean_temp + 2 * std_temp AS upper_bound, mean_temp - 2 * std_temp AS lower_bound FROM temp_summary), anomalies AS (SELECT t._timestamp, t.pallet_id, t.facility_zone, t.sorter_model, t.cell_temp, th.mean_temp, th.std_temp, ROUND((t.cell_temp - th.mean_temp) / NULLIF(th.std_temp, 0), 3) AS zscore FROM \"query_agent_test\" t JOIN threshold th ON t.facility_zone = th.facility_zone WHERE t.cell_temp > th.upper_bound OR t.cell_temp < th.lower_bound) SELECT *, CASE WHEN zscore > 0 THEN 'SPIKE' ELSE 'DIP' END AS anomaly_type FROM anomalies ORDER BY ABS(zscore) DESC",
+      "sql": "WITH temp_summary AS (SELECT facility_zone, COUNT(*) AS readings, ROUND(AVG(cell_temp), 2) AS mean_temp, ROUND(STDDEV(cell_temp), 2) AS std_temp FROM \"query_agent_test_v2\" WHERE cell_temp IS NOT NULL GROUP BY facility_zone), threshold AS (SELECT facility_zone, mean_temp, std_temp, mean_temp + 2 * std_temp AS upper_bound, mean_temp - 2 * std_temp AS lower_bound FROM temp_summary), anomalies AS (SELECT t._timestamp, t.pallet_id, t.facility_zone, t.sorter_model, t.cell_temp, th.mean_temp, th.std_temp, ROUND((t.cell_temp - th.mean_temp) / NULLIF(th.std_temp, 0), 3) AS zscore FROM \"query_agent_test_v2\" t JOIN threshold th ON t.facility_zone = th.facility_zone WHERE t.cell_temp > th.upper_bound OR t.cell_temp < th.lower_bound) SELECT *, CASE WHEN zscore > 0 THEN 'SPIKE' ELSE 'DIP' END AS anomaly_type FROM anomalies ORDER BY ABS(zscore) DESC",
       "category": "combined",
       "time_range": {
         "start": 1780310577000000,
@@ -200,7 +200,7 @@
     },
     {
       "id": "Q045",
-      "sql": "WITH mode_perf AS (SELECT facility_zone, operation_mode, COUNT(*) AS ops, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode), ranked_perf AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY avg_tput DESC) AS perf_rank FROM mode_perf), top_perf AS (SELECT * FROM ranked_perf WHERE perf_rank = 1), charge_status AS (SELECT facility_zone, ROUND(AVG(charge_remaining), 2) AS avg_charge, COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS low_charge_count FROM \"query_agent_test\" GROUP BY facility_zone) SELECT tp.facility_zone, tp.operation_mode AS best_mode, tp.avg_tput, tp.avg_load, cs.avg_charge, cs.low_charge_count, CASE WHEN cs.avg_charge < 40.0 AND tp.avg_tput > 400.0 THEN 'REBALANCE' WHEN cs.avg_charge < 40.0 THEN 'RECHARGE' WHEN tp.avg_tput < 200.0 THEN 'OPTIMIZE' ELSE 'STABLE' END AS action FROM top_perf tp JOIN charge_status cs ON tp.facility_zone = cs.facility_zone ORDER BY tp.avg_tput DESC",
+      "sql": "WITH mode_perf AS (SELECT facility_zone, operation_mode, COUNT(*) AS ops, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test_v2\" GROUP BY facility_zone, operation_mode), ranked_perf AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY avg_tput DESC) AS perf_rank FROM mode_perf), top_perf AS (SELECT * FROM ranked_perf WHERE perf_rank = 1), charge_status AS (SELECT facility_zone, ROUND(AVG(charge_remaining), 2) AS avg_charge, COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS low_charge_count FROM \"query_agent_test_v2\" GROUP BY facility_zone) SELECT tp.facility_zone, tp.operation_mode AS best_mode, tp.avg_tput, tp.avg_load, cs.avg_charge, cs.low_charge_count, CASE WHEN cs.avg_charge < 40.0 AND tp.avg_tput > 400.0 THEN 'REBALANCE' WHEN cs.avg_charge < 40.0 THEN 'RECHARGE' WHEN tp.avg_tput < 200.0 THEN 'OPTIMIZE' ELSE 'STABLE' END AS action FROM top_perf tp JOIN charge_status cs ON tp.facility_zone = cs.facility_zone ORDER BY tp.avg_tput DESC",
       "category": "combined",
       "time_range": {
         "start": 1780310637000000,

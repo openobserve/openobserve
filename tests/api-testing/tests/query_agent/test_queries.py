@@ -25,11 +25,12 @@ for _fp in sorted(QUERIES_DIR.glob("*.json")):
 
 # ── Shared test body ────────────────────────────────────────────────────
 def _run_query(client, query):
+    size = 500
     json_data = search_payload(
         query["sql"],
         start_time=query["time_range"]["start"],
         end_time=query["time_range"]["end"],
-        size=150,
+        size=size,
     )
     resp = client.post("_search?type=logs", json=json_data)
     assert resp.status_code == 200, \
@@ -43,6 +44,8 @@ def _run_query(client, query):
     if expected.get("row_count") is not None:
         assert len(hits) == expected["row_count"], \
             f"{query['id']}: Expected {expected['row_count']} rows, got {len(hits)}"
+        assert len(hits) < size, \
+            f"{query['id']}: Got {len(hits)} rows at size={size} — result may be truncated"
 
     if len(hits) > 0:
         for col in expected.get("columns", []):

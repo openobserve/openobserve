@@ -2,7 +2,7 @@
   "queries": [
     {
       "id": "Q001",
-      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY facility_zone ORDER BY cnt DESC",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780307997000000,
@@ -19,7 +19,7 @@
     },
     {
       "id": "Q002",
-      "sql": "SELECT operation_mode, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" WHERE load_factor IS NOT NULL GROUP BY operation_mode ORDER BY avg_tput DESC",
+      "sql": "SELECT operation_mode, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL GROUP BY operation_mode ORDER BY avg_tput DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308057000000,
@@ -37,7 +37,7 @@
     },
     {
       "id": "Q003",
-      "sql": "SELECT sorter_model, COUNT(*) AS cnt FROM \"query_agent_test\" WHERE match_all('warehouse') GROUP BY sorter_model ORDER BY cnt DESC",
+      "sql": "SELECT sorter_model, COUNT(*) AS cnt FROM \"query_agent_test_v2\" WHERE match_all('warehouse') GROUP BY sorter_model ORDER BY cnt DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308117000000,
@@ -54,7 +54,7 @@
     },
     {
       "id": "Q004",
-      "sql": "SELECT SUM(throughput_rate) AS total_throughput FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL",
+      "sql": "SELECT SUM(throughput_rate) AS total_throughput FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL",
       "category": "aggregation",
       "time_range": {
         "start": 1780308177000000,
@@ -70,7 +70,7 @@
     },
     {
       "id": "Q005",
-      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test\" WHERE load_factor IS NOT NULL GROUP BY conveyor_lane HAVING AVG(load_factor) > 40.0 ORDER BY avg_load DESC",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL GROUP BY conveyor_lane HAVING AVG(load_factor) > 40.0 ORDER BY avg_load DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308237000000,
@@ -88,7 +88,7 @@
     },
     {
       "id": "Q006",
-      "sql": "SELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode ORDER BY facility_zone ASC, cnt DESC",
+      "sql": "SELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test_v2\" GROUP BY facility_zone, operation_mode ORDER BY facility_zone ASC, cnt DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308297000000,
@@ -107,7 +107,7 @@
     },
     {
       "id": "Q007",
-      "sql": "SELECT control_center, SUM(item_count) AS total_items, ROUND(AVG(charge_remaining), 2) AS avg_charge, MIN(charge_remaining) AS min_charge, MAX(charge_remaining) AS max_charge FROM \"query_agent_test\" GROUP BY control_center ORDER BY total_items DESC",
+      "sql": "SELECT control_center, SUM(item_count) AS total_items, ROUND(AVG(charge_remaining), 2) AS avg_charge, MIN(charge_remaining) AS min_charge, MAX(charge_remaining) AS max_charge FROM \"query_agent_test_v2\" GROUP BY control_center ORDER BY total_items DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308357000000,
@@ -127,7 +127,7 @@
     },
     {
       "id": "Q008",
-      "sql": "SELECT facility_zone, COUNT(*) AS cnt, COUNT(DISTINCT sorter_model) AS distinct_sorters FROM \"query_agent_test\" GROUP BY facility_zone ORDER BY cnt DESC",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt, COUNT(DISTINCT sorter_model) AS distinct_sorters FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308417000000,
@@ -145,7 +145,7 @@
     },
     {
       "id": "Q009",
-      "sql": "SELECT build_signature, ROUND(AVG(runtime_hours), 1) AS avg_runtime, MIN(runtime_hours) AS min_runtime, MAX(runtime_hours) AS max_runtime FROM \"query_agent_test\" WHERE runtime_hours IS NOT NULL GROUP BY build_signature ORDER BY avg_runtime DESC",
+      "sql": "SELECT build_signature, ROUND(AVG(runtime_hours), 1) AS avg_runtime, MIN(runtime_hours) AS min_runtime, MAX(runtime_hours) AS max_runtime FROM \"query_agent_test_v2\" WHERE runtime_hours IS NOT NULL GROUP BY build_signature ORDER BY avg_runtime DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308477000000,
@@ -164,7 +164,7 @@
     },
     {
       "id": "Q010",
-      "sql": "SELECT sorter_model, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor) + AVG(throughput_rate), 2) AS combined_score FROM \"query_agent_test\" WHERE load_factor IS NOT NULL AND throughput_rate IS NOT NULL GROUP BY sorter_model HAVING AVG(throughput_rate) > 300.0 ORDER BY combined_score DESC",
+      "sql": "SELECT sorter_model, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor) + AVG(throughput_rate), 2) AS combined_score FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL AND throughput_rate IS NOT NULL GROUP BY sorter_model HAVING AVG(throughput_rate) > 300.0 ORDER BY combined_score DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308537000000,
@@ -183,7 +183,7 @@
     },
     {
       "id": "Q011",
-      "sql": "SELECT operation_mode, COUNT(*) AS cnt, ROUND(CAST(COUNT(*) AS FLOAT) / NULLIF(SUM(COUNT(*)) OVER (), 0) * 100.0, 2) AS pct_of_total FROM \"query_agent_test\" GROUP BY operation_mode ORDER BY cnt DESC",
+      "sql": "SELECT operation_mode, COUNT(*) AS cnt, ROUND(CAST(COUNT(*) AS FLOAT) / NULLIF(SUM(COUNT(*)) OVER (), 0) * 100.0, 2) AS pct_of_total FROM \"query_agent_test_v2\" GROUP BY operation_mode ORDER BY cnt DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308597000000,
@@ -201,7 +201,7 @@
     },
     {
       "id": "Q012",
-      "sql": "SELECT facility_zone, COUNT(*) FILTER (WHERE load_factor > 60.0) AS high_load_cnt, COUNT(*) FILTER (WHERE load_factor <= 60.0) AS low_load_cnt, ROUND(AVG(cell_temp), 2) AS avg_cell_temp FROM \"query_agent_test\" GROUP BY facility_zone ORDER BY high_load_cnt DESC",
+      "sql": "SELECT facility_zone, COUNT(*) FILTER (WHERE load_factor > 60.0) AS high_load_cnt, COUNT(*) FILTER (WHERE load_factor <= 60.0) AS low_load_cnt, ROUND(AVG(cell_temp), 2) AS avg_cell_temp FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY high_load_cnt DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308657000000,
@@ -220,7 +220,7 @@
     },
     {
       "id": "Q013",
-      "sql": "SELECT conveyor_lane, COUNT(*) FILTER (WHERE operation_mode='auto') AS auto_cnt, COUNT(*) FILTER (WHERE operation_mode='manual') AS manual_cnt, COUNT(*) FILTER (WHERE operation_mode='hybrid') AS hybrid_cnt FROM \"query_agent_test\" GROUP BY conveyor_lane ORDER BY conveyor_lane ASC",
+      "sql": "SELECT conveyor_lane, COUNT(*) FILTER (WHERE operation_mode='auto') AS auto_cnt, COUNT(*) FILTER (WHERE operation_mode='manual') AS manual_cnt, COUNT(*) FILTER (WHERE operation_mode='hybrid') AS hybrid_cnt FROM \"query_agent_test_v2\" GROUP BY conveyor_lane ORDER BY conveyor_lane ASC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308717000000,
@@ -239,7 +239,7 @@
     },
     {
       "id": "Q014",
-      "sql": "SELECT control_center, ROUND(AVG(defect_limit), 3) AS avg_defect, ROUND(AVG(throughput_rate), 2) AS avg_tput, CASE WHEN AVG(defect_limit) > 2.0 THEN 'HIGH_DEFECT' WHEN AVG(throughput_rate) < 300.0 THEN 'LOW_THROUGHPUT' ELSE 'NOMINAL' END AS risk_flag FROM \"query_agent_test\" GROUP BY control_center ORDER BY avg_defect DESC",
+      "sql": "SELECT control_center, ROUND(AVG(defect_limit), 3) AS avg_defect, ROUND(AVG(throughput_rate), 2) AS avg_tput, CASE WHEN AVG(defect_limit) > 2.0 THEN 'HIGH_DEFECT' WHEN AVG(throughput_rate) < 300.0 THEN 'LOW_THROUGHPUT' ELSE 'NOMINAL' END AS risk_flag FROM \"query_agent_test_v2\" GROUP BY control_center ORDER BY avg_defect DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308777000000,
@@ -258,7 +258,7 @@
     },
     {
       "id": "Q015",
-      "sql": "SELECT sorter_model, facility_zone, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY sorter_model, facility_zone ORDER BY sorter_model ASC, cnt DESC",
+      "sql": "SELECT sorter_model, facility_zone, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY sorter_model, facility_zone ORDER BY sorter_model ASC, cnt DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308837000000,
@@ -276,7 +276,7 @@
     },
     {
       "id": "Q016",
-      "sql": "WITH mode_counts AS (SELECT facility_zone, operation_mode, COUNT(*) AS cnt FROM \"query_agent_test\" GROUP BY facility_zone, operation_mode), ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY cnt DESC) AS rn FROM mode_counts) SELECT facility_zone, cnt AS mode_count, operation_mode AS dominant_mode FROM ranked WHERE rn = 1 ORDER BY facility_zone ASC",
+      "sql": "WITH mode_counts AS (SELECT facility_zone, operation_mode, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY facility_zone, operation_mode), ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY cnt DESC) AS rn FROM mode_counts) SELECT facility_zone, cnt AS mode_count, operation_mode AS dominant_mode FROM ranked WHERE rn = 1 ORDER BY facility_zone ASC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308897000000,
@@ -294,7 +294,7 @@
     },
     {
       "id": "Q017",
-      "sql": "SELECT operation_mode, MAX(item_count) AS max_tput_item, MIN(item_count) AS min_tput_item, MAX(item_count) - MIN(item_count) AS spread FROM \"query_agent_test\" WHERE item_count > 0 GROUP BY operation_mode ORDER BY spread DESC",
+      "sql": "SELECT operation_mode, MAX(item_count) AS max_tput_item, MIN(item_count) AS min_tput_item, MAX(item_count) - MIN(item_count) AS spread FROM \"query_agent_test_v2\" WHERE item_count > 0 GROUP BY operation_mode ORDER BY spread DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780308957000000,
@@ -313,7 +313,7 @@
     },
     {
       "id": "Q018",
-      "sql": "SELECT conveyor_lane, SUM(scan_attempts) AS scan_total, ROUND(AVG(CAST(scan_attempts AS FLOAT)), 2) AS avg_scan, ROUND(CAST(COUNT(*) FILTER (WHERE scan_attempts >= 3) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS retry_rate FROM \"query_agent_test\" GROUP BY conveyor_lane ORDER BY retry_rate DESC",
+      "sql": "SELECT conveyor_lane, SUM(scan_attempts) AS scan_total, ROUND(AVG(CAST(scan_attempts AS FLOAT)), 2) AS avg_scan, ROUND(CAST(COUNT(*) FILTER (WHERE scan_attempts >= 3) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS retry_rate FROM \"query_agent_test_v2\" GROUP BY conveyor_lane ORDER BY retry_rate DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780309017000000,
@@ -332,7 +332,7 @@
     },
     {
       "id": "Q019",
-      "sql": "SELECT build_signature, ROUND(STDDEV(throughput_rate), 2) AS std_tput, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0), 4) AS cv_tput FROM \"query_agent_test\" WHERE throughput_rate IS NOT NULL GROUP BY build_signature HAVING COUNT(*) >= 2 ORDER BY cv_tput DESC",
+      "sql": "SELECT build_signature, ROUND(STDDEV(throughput_rate), 2) AS std_tput, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0), 4) AS cv_tput FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL GROUP BY build_signature HAVING COUNT(*) >= 2 ORDER BY cv_tput DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780309077000000,
@@ -351,7 +351,7 @@
     },
     {
       "id": "Q020",
-      "sql": "SELECT facility_zone, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS below_30_pct, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining > 70.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS above_70_pct FROM \"query_agent_test\" GROUP BY facility_zone ORDER BY below_30_pct DESC",
+      "sql": "SELECT facility_zone, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS below_30_pct, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining > 70.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS above_70_pct FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY below_30_pct DESC",
       "category": "aggregation",
       "time_range": {
         "start": 1780309137000000,
