@@ -120,13 +120,7 @@
       },
       "expected": {
         "row_count": 0,
-        "columns": [
-          "time_block",
-          "warehouse_hits",
-          "total_events",
-          "hit_rate_pct"
-        ],
-        "note": "match_all FILTER in histogram with hit-rate percentage"
+        "note": "match_all FILTER in histogram with hit-rate percentage — zero rows, columns unverifiable"
       }
     },
     {

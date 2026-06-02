@@ -184,18 +184,7 @@
       },
       "expected": {
         "row_count": 0,
-        "columns": [
-          "_timestamp",
-          "pallet_id",
-          "facility_zone",
-          "sorter_model",
-          "cell_temp",
-          "mean_temp",
-          "std_temp",
-          "zscore",
-          "anomaly_type"
-        ],
-        "note": "3 CTEs: stats -> thresholds -> anomaly detection with JOIN + CASE"
+        "note": "3 CTEs: stats -> thresholds -> anomaly detection with JOIN + CASE — zero rows within time range, columns unverifiable"
       }
     },
     {

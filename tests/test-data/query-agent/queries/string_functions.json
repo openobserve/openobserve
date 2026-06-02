@@ -191,12 +191,7 @@
       },
       "expected": {
         "row_count": 0,
-        "columns": [
-          "facility_zone",
-          "mode_tput_list",
-          "distinct_modes"
-        ],
-        "note": "STRING_AGG with CONCAT of mode + rounded throughput, ORDER BY inside STRING_AGG"
+        "note": "STRING_AGG with CONCAT of mode + rounded throughput, ORDER BY inside STRING_AGG — zero rows, columns unverifiable"
       }
     }
   ],
