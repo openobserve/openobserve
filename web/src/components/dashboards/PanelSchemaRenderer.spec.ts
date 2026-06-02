@@ -46,6 +46,7 @@ vi.mock("@/composables/dashboard/useAnnotationsData", () => ({
     toggleAddAnnotationMode: vi.fn(),
     handleAddAnnotation: vi.fn(),
     closeAddAnnotation: vi.fn(),
+    disableAddAnnotationMode: vi.fn(),
     fetchAllPanels: vi.fn(),
     panelsList: { value: [] },
   })),
@@ -1210,7 +1211,29 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("should emit updated:vrlFunctionFieldList when data has fields", async () => {
-      const mockData = ref([
+      // Start with empty data so the (non-immediate) data watcher fires when
+      // the loader resolves and populates the ref after mount.
+      const mockData = ref<any[]>([]);
+
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: mockData,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Simulate the loader delivering query results after mount.
+      mockData.value = [
         [
           {
             ts: "2024-01-01T10:00:00Z",
@@ -1229,23 +1252,7 @@ describe("PanelSchemaRenderer", () => {
             value: 12,
           },
         ],
-      ]);
-
-      vi.mocked(usePanelDataLoader).mockReturnValue({
-        data: mockData,
-        loading: ref(false),
-        errorDetail: ref({ message: "", code: "" }),
-        metadata: ref({}),
-        resultMetaData: ref({}),
-        annotations: ref([]),
-        lastTriggeredAt: ref(null),
-        isCachedDataDifferWithCurrentTimeRange: ref(false),
-        searchRequestTraceIds: ref([]),
-        loadingProgressPercentage: ref(0),
-        isPartialData: ref(false),
-      } as any);
-
-      wrapper = createWrapper();
+      ];
       await flushPromises();
 
       const emitted = wrapper.emitted("updated:vrlFunctionFieldList") || [];

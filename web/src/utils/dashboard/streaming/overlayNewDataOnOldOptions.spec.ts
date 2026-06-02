@@ -452,6 +452,8 @@ describe("overlayNewDataOnOldOptions", () => {
       };
       const newOpts = {
         series: [makeSeries("A", [[tsDate(0), 10]])],
+        xAxis: { type: "time" },
+        yAxis: { type: "value" },
       };
 
       const result = overlayNewDataOnOldOptions(oldOpts, newOpts);
@@ -471,6 +473,8 @@ describe("overlayNewDataOnOldOptions", () => {
       };
       const newOpts = {
         series: [makeSeries("B", [[tsDate(0), 10]])],
+        xAxis: { type: "time" },
+        yAxis: { type: "value" },
       };
 
       const result = overlayNewDataOnOldOptions(oldOpts, newOpts);
@@ -494,6 +498,8 @@ describe("overlayNewDataOnOldOptions", () => {
       };
       const newOpts = {
         series: [makeSeries("NEW", [[tsDate(3), 30]])],
+        xAxis: { type: "time" },
+        yAxis: { type: "value" },
       };
 
       const result = overlayNewDataOnOldOptions(
@@ -609,6 +615,8 @@ describe("overlayNewDataOnOldOptions", () => {
       const newOpts = {
         series: [makeSeries("A", [[tsDate(0), 10]])],
         legend: { data: ["A"] },
+        xAxis: { type: "time" },
+        yAxis: { type: "value" },
       };
 
       const result = overlayNewDataOnOldOptions(oldOpts, newOpts);
@@ -628,6 +636,8 @@ describe("overlayNewDataOnOldOptions", () => {
       const newOpts = {
         series: [makeSeries("A", [[tsDate(0), 10]])],
         legend: [{ data: ["A"] }],
+        xAxis: { type: "time" },
+        yAxis: { type: "value" },
       };
 
       const result = overlayNewDataOnOldOptions(oldOpts, newOpts);

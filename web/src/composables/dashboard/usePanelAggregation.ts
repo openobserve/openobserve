@@ -56,9 +56,6 @@ export const usePanelAggregation = ({
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -107,9 +104,6 @@ export const usePanelAggregation = ({
             }
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -137,9 +131,6 @@ export const usePanelAggregation = ({
           query.fields.target = null;
           query.fields.value = null;
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -183,9 +174,6 @@ export const usePanelAggregation = ({
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -224,9 +212,6 @@ export const usePanelAggregation = ({
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -282,6 +267,12 @@ export const usePanelAggregation = ({
           ].fields.stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
+        // These chart types reset to a single default query, so the active
+        // query index must return to the first query — otherwise a previously
+        // selected non-zero tab (multi-query layout) now points past the end of
+        // the queries array and downstream reads of queries[currentQueryIndex]
+        // would crash.
+        dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
         dashboardPanelData.data.queries[
@@ -311,6 +302,12 @@ export const usePanelAggregation = ({
           ].fields.stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
+        // These chart types reset to a single default query, so the active
+        // query index must return to the first query — otherwise a previously
+        // selected non-zero tab (multi-query layout) now points past the end of
+        // the queries array and downstream reads of queries[currentQueryIndex]
+        // would crash.
+        dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
         dashboardPanelData.data.queries[
@@ -341,6 +338,12 @@ export const usePanelAggregation = ({
           ].fields.stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
+        // These chart types reset to a single default query, so the active
+        // query index must return to the first query — otherwise a previously
+        // selected non-zero tab (multi-query layout) now points past the end of
+        // the queries array and downstream reads of queries[currentQueryIndex]
+        // would crash.
+        dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
         dashboardPanelData.data.queries[

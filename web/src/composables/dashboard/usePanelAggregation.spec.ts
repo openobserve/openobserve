@@ -385,6 +385,28 @@ describe("usePanelAggregation", () => {
           resetAggregationFunction();
           expect(panelData.data.queryType).toBe("");
         });
+
+        it("resets currentQueryIndex to 0 (and preserves the active query's stream) when collapsing a multi-query layout", () => {
+          // Reproduces the crash: on a multi-query chart with the SECOND tab
+          // active, switching to a single-query type collapses queries via
+          // getDefaultQueries(); the previously-active index (1) would then be
+          // out of bounds and queries[currentQueryIndex] reads would throw.
+          const panelData = makePanelData(chartType);
+          panelData.data.queries = [makeDefaultQuery(), makeDefaultQuery()];
+          panelData.data.queries[0].fields.stream = "first";
+          panelData.data.queries[1].fields.stream = "second";
+          panelData.data.queries[1].fields.stream_type = "metrics";
+          panelData.layout.currentQueryIndex = 1;
+
+          const { resetAggregationFunction } = makeAggregation(panelData);
+          expect(() => resetAggregationFunction()).not.toThrow();
+
+          expect(panelData.layout.currentQueryIndex).toBe(0);
+          expect(panelData.data.queries).toHaveLength(1);
+          // the active query's stream/type are carried onto the single query
+          expect(panelData.data.queries[0].fields.stream).toBe("second");
+          expect(panelData.data.queries[0].fields.stream_type).toBe("metrics");
+        });
       },
     );
 

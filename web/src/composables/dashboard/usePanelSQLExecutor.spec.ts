@@ -405,8 +405,10 @@ describe("usePanelSQLExecutor", () => {
       ]);
 
       const { ctx, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
-      const { executeSQL } = usePanelSQLExecutor(ctx);
-      await executeSQL(0, 300_000_000, null);
+      // Batching of multiple distinct queries into a single multi-stream call
+      // is implemented by executeMultiSQL (the _search_multi_stream path).
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
 
       // Should be exactly 1 API call for both queries
       expect(fetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
