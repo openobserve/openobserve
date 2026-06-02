@@ -187,10 +187,7 @@
         "columns": [
           "early_window",
           "early_cnt",
-          "early_avg_tput",
-          "late_window",
-          "late_cnt",
-          "late_avg_tput"
+          "early_avg_tput"
         ],
         "note": "FULL OUTER JOIN of two histograms splitting at mid-point timestamp"
       }
