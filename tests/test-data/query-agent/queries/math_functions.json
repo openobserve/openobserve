@@ -2,7 +2,7 @@
   "queries": [
     {
       "id": "Q094",
-      "sql": "SELECT ROUND(CAST(COUNT(CASE WHEN load_factor > 70.0 THEN 1 END) AS FLOAT) / NULLIF(COUNT(CASE WHEN load_factor <= 70.0 THEN 1 END), 0) * 100.0, 2) AS high_load_pct FROM \"query_agent_test_v2\"",
+      "sql": "SELECT ROUND(CAST(COUNT(CASE WHEN load_factor > 70.0 THEN 1 END) AS FLOAT) / NULLIF(COUNT(CASE WHEN load_factor <= 70.0 THEN 1 END), 0) * 100.0, 2) AS high_load_pct FROM \"{stream}\"",
       "category": "math_functions",
       "expected": {
         "row_count": 1,
@@ -12,13 +12,13 @@
         "note": "Computed percentage of high-load events"
       },
       "time_offset": {
-        "start_offset": 5577000000,
-        "end_offset": 5745000000
+        "start_offset": 5579000000,
+        "end_offset": 5743000000
       }
     },
     {
       "id": "Q095",
-      "sql": "SELECT _timestamp, pallet_id, throughput_rate, load_factor, ROUND(SQRT(throughput_rate * load_factor), 2) AS geo_mean_index, ROUND(POWER(throughput_rate / 100.0, 2), 3) AS squared_normalized, ROUND(ABS(load_factor - 50.0), 2) AS load_midpoint_dist FROM \"query_agent_test_v2\" WHERE throughput_rate > 0 AND load_factor > 0 ORDER BY geo_mean_index DESC LIMIT 12",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate, load_factor, ROUND(SQRT(throughput_rate * load_factor), 2) AS geo_mean_index, ROUND(POWER(throughput_rate / 100.0, 2), 3) AS squared_normalized, ROUND(ABS(load_factor - 50.0), 2) AS load_midpoint_dist FROM \"{stream}\" WHERE throughput_rate > 0 AND load_factor > 0 ORDER BY geo_mean_index DESC LIMIT 12",
       "category": "math_functions",
       "expected": {
         "row_count": 12,
@@ -34,13 +34,13 @@
         "note": "SQRT, POWER, ABS in one SELECT with geometric mean index"
       },
       "time_offset": {
-        "start_offset": 5637000000,
-        "end_offset": 5805000000
+        "start_offset": 5639000000,
+        "end_offset": 5803000000
       }
     },
     {
       "id": "Q096",
-      "sql": "SELECT _timestamp, item_count, package_size, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(package_size AS FLOAT), 0), 4) AS item_pkg_ratio, ROUND(CAST(item_count AS FLOAT) - CAST(package_size AS FLOAT) * FLOOR(CAST(item_count AS FLOAT) / CAST(package_size AS FLOAT)), 0) AS remainder, ROUND(GREATEST(CAST(item_count AS FLOAT), CAST(package_size AS FLOAT), CAST(scan_attempts AS FLOAT) * 100.0), 1) AS max_dimension FROM \"query_agent_test_v2\" WHERE item_count > 0 AND package_size > 0 ORDER BY item_pkg_ratio DESC",
+      "sql": "SELECT _timestamp, item_count, package_size, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(package_size AS FLOAT), 0), 4) AS item_pkg_ratio, ROUND(CAST(item_count AS FLOAT) - CAST(package_size AS FLOAT) * FLOOR(CAST(item_count AS FLOAT) / CAST(package_size AS FLOAT)), 0) AS remainder, ROUND(GREATEST(CAST(item_count AS FLOAT), CAST(package_size AS FLOAT), CAST(scan_attempts AS FLOAT) * 100.0), 1) AS max_dimension FROM \"{stream}\" WHERE item_count > 0 AND package_size > 0 ORDER BY item_pkg_ratio DESC",
       "category": "math_functions",
       "expected": {
         "row_count": 28,
@@ -55,13 +55,13 @@
         "note": "Division with NULLIF + MOD + GREATEST with computed expression"
       },
       "time_offset": {
-        "start_offset": 5697000000,
-        "end_offset": 5865000000
+        "start_offset": 5699000000,
+        "end_offset": 5863000000
       }
     },
     {
       "id": "Q097",
-      "sql": "SELECT _timestamp, cell_temp, ROUND(cell_temp, 1) AS rounded_temp, FLOOR(cell_temp) AS temp_floor, CEIL(cell_temp) AS temp_ceil, ROUND((cell_temp - FLOOR(cell_temp)) * 100.0, 1) AS fractional_pct, CASE WHEN cell_temp - FLOOR(cell_temp) >= 0.5 THEN 'rounds_up' ELSE 'rounds_down' END AS rounding_behavior FROM \"query_agent_test_v2\" WHERE cell_temp IS NOT NULL ORDER BY fractional_pct DESC",
+      "sql": "SELECT _timestamp, cell_temp, ROUND(cell_temp, 1) AS rounded_temp, FLOOR(cell_temp) AS temp_floor, CEIL(cell_temp) AS temp_ceil, ROUND((cell_temp - FLOOR(cell_temp)) * 100.0, 1) AS fractional_pct, CASE WHEN cell_temp - FLOOR(cell_temp) >= 0.5 THEN 'rounds_up' ELSE 'rounds_down' END AS rounding_behavior FROM \"{stream}\" WHERE cell_temp IS NOT NULL ORDER BY fractional_pct DESC",
       "category": "math_functions",
       "expected": {
         "row_count": 28,
@@ -77,13 +77,13 @@
         "note": "FLOOR, CEIL, fractional part computation, CASE on rounding direction"
       },
       "time_offset": {
-        "start_offset": 5757000000,
-        "end_offset": 5925000000
+        "start_offset": 5759000000,
+        "end_offset": 5923000000
       }
     },
     {
       "id": "Q098",
-      "sql": "SELECT facility_zone, COUNT(*) AS n, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(STDDEV(throughput_rate), 2) AS std_tput, ROUND((AVG(throughput_rate * throughput_rate) - POWER(AVG(throughput_rate), 2)), 3) AS variance_manual, ROUND(STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0), 4) AS cv FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone HAVING COUNT(*) >= 3 ORDER BY cv ASC",
+      "sql": "SELECT facility_zone, COUNT(*) AS n, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(STDDEV(throughput_rate), 2) AS std_tput, ROUND((AVG(throughput_rate * throughput_rate) - POWER(AVG(throughput_rate), 2)), 3) AS variance_manual, ROUND(STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0), 4) AS cv FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone HAVING COUNT(*) >= 3 ORDER BY cv ASC",
       "category": "math_functions",
       "expected": {
         "row_count": 4,
@@ -98,13 +98,13 @@
         "note": "Manual variance (E[X^2]-E[X]^2) + coefficient of variation per zone"
       },
       "time_offset": {
-        "start_offset": 5817000000,
-        "end_offset": 5985000000
+        "start_offset": 5819000000,
+        "end_offset": 5983000000
       }
     },
     {
       "id": "Q099",
-      "sql": "SELECT _timestamp, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / NULLIF(load_factor + charge_remaining, 0), 2) AS harmonic_component, ROUND((POWER(load_factor, 2) + POWER(charge_remaining, 2)) / 2.0, 2) AS quadratic_mean, ROUND(SQRT(POWER(load_factor - charge_remaining, 2)), 2) AS euclidean_dist FROM \"query_agent_test_v2\" WHERE load_factor > 0 AND charge_remaining > 0 ORDER BY harmonic_component DESC",
+      "sql": "SELECT _timestamp, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / NULLIF(load_factor + charge_remaining, 0), 2) AS harmonic_component, ROUND((POWER(load_factor, 2) + POWER(charge_remaining, 2)) / 2.0, 2) AS quadratic_mean, ROUND(SQRT(POWER(load_factor - charge_remaining, 2)), 2) AS euclidean_dist FROM \"{stream}\" WHERE load_factor > 0 AND charge_remaining > 0 ORDER BY harmonic_component DESC",
       "category": "math_functions",
       "expected": {
         "row_count": 28,
@@ -119,13 +119,13 @@
         "note": "Harmonic component, quadratic mean, Euclidean distance on (load, charge) pairs"
       },
       "time_offset": {
-        "start_offset": 5877000000,
-        "end_offset": 6045000000
+        "start_offset": 5879000000,
+        "end_offset": 6043000000
       }
     },
     {
       "id": "Q100",
-      "sql": "WITH global_stats AS (SELECT AVG(throughput_rate) AS avg_tput, AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate) AS var_tput, AVG(load_factor) AS avg_load, AVG(load_factor * load_factor) - AVG(load_factor) * AVG(load_factor) AS var_load FROM \"query_agent_test_v2\"), scored AS (SELECT t._timestamp, t.throughput_rate, t.load_factor, t.charge_remaining, gs.avg_tput, gs.avg_load, ROUND((t.throughput_rate - gs.avg_tput) / NULLIF(SQRT(gs.var_tput), 0), 4) AS zscore_tput, ROUND((t.load_factor - gs.avg_load) / NULLIF(SQRT(gs.var_load), 0), 4) AS zscore_load, ABS((t.throughput_rate - gs.avg_tput) / NULLIF(SQRT(gs.var_tput), 0)) AS abs_zscore_tput FROM \"query_agent_test_v2\" t CROSS JOIN global_stats gs WHERE t.throughput_rate IS NOT NULL AND t.load_factor IS NOT NULL) SELECT _timestamp, throughput_rate, load_factor, charge_remaining, avg_tput, avg_load, zscore_tput, zscore_load FROM scored ORDER BY abs_zscore_tput DESC LIMIT 12",
+      "sql": "WITH global_stats AS (SELECT AVG(throughput_rate) AS avg_tput, AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate) AS var_tput, AVG(load_factor) AS avg_load, AVG(load_factor * load_factor) - AVG(load_factor) * AVG(load_factor) AS var_load FROM \"{stream}\"), scored AS (SELECT t._timestamp, t.throughput_rate, t.load_factor, t.charge_remaining, gs.avg_tput, gs.avg_load, ROUND((t.throughput_rate - gs.avg_tput) / NULLIF(SQRT(gs.var_tput), 0), 4) AS zscore_tput, ROUND((t.load_factor - gs.avg_load) / NULLIF(SQRT(gs.var_load), 0), 4) AS zscore_load, ABS((t.throughput_rate - gs.avg_tput) / NULLIF(SQRT(gs.var_tput), 0)) AS abs_zscore_tput FROM \"{stream}\" t CROSS JOIN global_stats gs WHERE t.throughput_rate IS NOT NULL AND t.load_factor IS NOT NULL) SELECT _timestamp, throughput_rate, load_factor, charge_remaining, avg_tput, avg_load, zscore_tput, zscore_load FROM scored ORDER BY abs_zscore_tput DESC LIMIT 12",
       "category": "math_functions",
       "expected": {
         "row_count": 12,
@@ -142,13 +142,13 @@
         "note": "Z-score normalization using scalar subqueries for mean and stddev"
       },
       "time_offset": {
-        "start_offset": 5937000000,
-        "end_offset": 6105000000
+        "start_offset": 5939000000,
+        "end_offset": 6103000000
       }
     },
     {
       "id": "Q101",
-      "sql": "SELECT _timestamp, pallet_id, cell_temp, charge_remaining, ROUND(CAST(PERCENT_RANK() OVER (ORDER BY cell_temp) AS FLOAT), 4) AS temp_percentile, ROUND(cell_temp - AVG(cell_temp) OVER (), 2) AS temp_mean_diff, ROUND((cell_temp - AVG(cell_temp) OVER ()) / NULLIF(STDDEV(cell_temp) OVER (), 0), 4) AS temp_zscore_window FROM \"query_agent_test_v2\" WHERE cell_temp IS NOT NULL ORDER BY temp_percentile DESC",
+      "sql": "SELECT _timestamp, pallet_id, cell_temp, charge_remaining, ROUND(CAST(PERCENT_RANK() OVER (ORDER BY cell_temp) AS FLOAT), 4) AS temp_percentile, ROUND(cell_temp - AVG(cell_temp) OVER (), 2) AS temp_mean_diff, ROUND((cell_temp - AVG(cell_temp) OVER ()) / NULLIF(STDDEV(cell_temp) OVER (), 0), 4) AS temp_zscore_window FROM \"{stream}\" WHERE cell_temp IS NOT NULL ORDER BY temp_percentile DESC",
       "category": "math_functions",
       "expected": {
         "row_count": 28,
@@ -164,13 +164,13 @@
         "note": "PERCENT_RANK + window-based AVG/STDDEV for z-score"
       },
       "time_offset": {
-        "start_offset": 5997000000,
-        "end_offset": 6165000000
+        "start_offset": 5999000000,
+        "end_offset": 6163000000
       }
     },
     {
       "id": "Q102",
-      "sql": "SELECT _timestamp, ROUND(defect_limit, 2) AS defect, ROUND(load_factor, 2) AS load, ROUND(CAST(LN(NULLIF(throughput_rate, 0)) AS FLOAT), 4) AS log_tput, ROUND(CAST(LOG10(NULLIF(item_count, 0)) AS FLOAT), 4) AS log10_items, ROUND(CAST(EXP(ROUND(defect_limit, 2)) AS FLOAT), 4) AS exp_defect FROM \"query_agent_test_v2\" WHERE throughput_rate > 0 AND item_count > 0 AND defect_limit <= 2.0 ORDER BY log_tput DESC LIMIT 12",
+      "sql": "SELECT _timestamp, ROUND(defect_limit, 2) AS defect, ROUND(load_factor, 2) AS load, ROUND(CAST(LN(NULLIF(throughput_rate, 0)) AS FLOAT), 4) AS log_tput, ROUND(CAST(LOG10(NULLIF(item_count, 0)) AS FLOAT), 4) AS log10_items, ROUND(CAST(EXP(ROUND(defect_limit, 2)) AS FLOAT), 4) AS exp_defect FROM \"{stream}\" WHERE throughput_rate > 0 AND item_count > 0 AND defect_limit <= 2.0 ORDER BY log_tput DESC LIMIT 12",
       "category": "math_functions",
       "expected": {
         "row_count": 12,
@@ -185,8 +185,8 @@
         "note": "LN, LOG10, EXP with NULLIF guards"
       },
       "time_offset": {
-        "start_offset": 6057000000,
-        "end_offset": 6225000000
+        "start_offset": 6059000000,
+        "end_offset": 6223000000
       }
     }
   ],

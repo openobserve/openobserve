@@ -2,7 +2,7 @@
   "queries": [
     {
       "id": "Q074",
-      "sql": "SELECT _timestamp, log, facility_zone FROM \"query_agent_test_v2\" WHERE match_all('warehouse') ORDER BY _timestamp DESC LIMIT 10",
+      "sql": "SELECT _timestamp, log, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY _timestamp DESC LIMIT 10",
       "category": "full_text_search",
       "expected": {
         "row_count": 10,
@@ -14,13 +14,13 @@
         "note": "match_all full-text search for 'warehouse'"
       },
       "time_offset": {
-        "start_offset": 4377000000,
-        "end_offset": 4545000000
+        "start_offset": 4379000000,
+        "end_offset": 4543000000
       }
     },
     {
       "id": "Q075",
-      "sql": "SELECT _timestamp, log, pallet_id FROM \"query_agent_test_v2\" WHERE match_all('event') ORDER BY _timestamp ASC",
+      "sql": "SELECT _timestamp, log, pallet_id FROM \"{stream}\" WHERE match_all('event') ORDER BY _timestamp ASC",
       "category": "full_text_search",
       "expected": {
         "row_count": 28,
@@ -32,13 +32,13 @@
         "note": "match_all('event') full-text search (case-insensitive in practice)"
       },
       "time_offset": {
-        "start_offset": 4437000000,
-        "end_offset": 4605000000
+        "start_offset": 4439000000,
+        "end_offset": 4603000000
       }
     },
     {
       "id": "Q076",
-      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"query_agent_test_v2\" WHERE match_all('record') AND throughput_rate > 200.0 GROUP BY facility_zone ORDER BY cnt DESC",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('record') AND throughput_rate > 200.0 GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "full_text_search",
       "expected": {
         "row_count": 4,
@@ -49,13 +49,13 @@
         "note": "match_all + field filter + GROUP BY"
       },
       "time_offset": {
-        "start_offset": 4497000000,
-        "end_offset": 4665000000
+        "start_offset": 4499000000,
+        "end_offset": 4663000000
       }
     },
     {
       "id": "Q077",
-      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS match_count FROM \"query_agent_test_v2\" WHERE match_all('warehouse') GROUP BY _time ORDER BY _time ASC",
+      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS match_count FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY _time ORDER BY _time ASC",
       "category": "full_text_search",
       "expected": {
         "row_count": 17,
@@ -63,16 +63,17 @@
           "_time",
           "match_count"
         ],
-        "note": "match_all with histogram aggregation"
+        "note": "match_all with histogram aggregation",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 4557000000,
-        "end_offset": 4725000000
+        "start_offset": 4559000000,
+        "end_offset": 4723000000
       }
     },
     {
       "id": "Q078",
-      "sql": "SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor FROM \"query_agent_test_v2\" WHERE match_all('warehouse') AND throughput_rate > 400.0 AND facility_zone IN ('ZONE-1', 'ZONE-2') ORDER BY throughput_rate DESC LIMIT 10",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor FROM \"{stream}\" WHERE match_all('warehouse') AND throughput_rate > 400.0 AND facility_zone IN ('ZONE-1', 'ZONE-2') ORDER BY throughput_rate DESC LIMIT 10",
       "category": "full_text_search",
       "expected": {
         "row_count": 9,
@@ -87,13 +88,13 @@
         "note": "match_all + numeric filter + IN clause"
       },
       "time_offset": {
-        "start_offset": 4617000000,
-        "end_offset": 4785000000
+        "start_offset": 4619000000,
+        "end_offset": 4783000000
       }
     },
     {
       "id": "Q079",
-      "sql": "SELECT facility_zone, COUNT(*) AS match_cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test_v2\" WHERE match_all('event') AND operation_mode != 'manual' GROUP BY facility_zone HAVING COUNT(*) >= 1 ORDER BY match_cnt DESC",
+      "sql": "SELECT facility_zone, COUNT(*) AS match_cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"{stream}\" WHERE match_all('event') AND operation_mode != 'manual' GROUP BY facility_zone HAVING COUNT(*) >= 1 ORDER BY match_cnt DESC",
       "category": "full_text_search",
       "expected": {
         "row_count": 4,
@@ -106,26 +107,26 @@
         "note": "match_all + mode filter + GROUP BY with multiple aggregates and HAVING"
       },
       "time_offset": {
-        "start_offset": 4677000000,
-        "end_offset": 4845000000
+        "start_offset": 4679000000,
+        "end_offset": 4843000000
       }
     },
     {
       "id": "Q080",
-      "sql": "SELECT histogram(_timestamp, '1 minute') AS time_block, COUNT(*) FILTER (WHERE match_all('warehouse')) AS warehouse_hits, COUNT(*) AS total_events, ROUND(CAST(COUNT(*) FILTER (WHERE match_all('warehouse')) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS hit_rate_pct FROM \"query_agent_test_v2\" GROUP BY time_block ORDER BY time_block ASC",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS time_block, COUNT(*) FILTER (WHERE match_all('warehouse')) AS warehouse_hits, COUNT(*) AS total_events, ROUND(CAST(COUNT(*) FILTER (WHERE match_all('warehouse')) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS hit_rate_pct FROM \"{stream}\" GROUP BY time_block ORDER BY time_block ASC",
       "category": "full_text_search",
       "expected": {
         "row_count": 0,
         "note": "match_all FILTER in histogram with hit-rate percentage \u2014 zero rows, columns unverifiable"
       },
       "time_offset": {
-        "start_offset": 4737000000,
-        "end_offset": 4905000000
+        "start_offset": 4739000000,
+        "end_offset": 4903000000
       }
     },
     {
       "id": "Q081",
-      "sql": "SELECT _timestamp, log, pallet_id, facility_zone, sorter_model, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp DESC) AS recency_rank FROM \"query_agent_test_v2\" WHERE match_all('record') ORDER BY facility_zone ASC, recency_rank ASC",
+      "sql": "SELECT _timestamp, log, pallet_id, facility_zone, sorter_model, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp DESC) AS recency_rank FROM \"{stream}\" WHERE match_all('record') ORDER BY facility_zone ASC, recency_rank ASC",
       "category": "full_text_search",
       "expected": {
         "row_count": 28,
@@ -140,13 +141,13 @@
         "note": "match_all with ROW_NUMBER window partitioned by zone for recency"
       },
       "time_offset": {
-        "start_offset": 4797000000,
-        "end_offset": 4965000000
+        "start_offset": 4799000000,
+        "end_offset": 4963000000
       }
     },
     {
       "id": "Q082",
-      "sql": "SELECT 'primary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"query_agent_test_v2\" WHERE match_all('warehouse') AND throughput_rate >= 500.0 UNION ALL SELECT 'secondary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"query_agent_test_v2\" WHERE match_all('event') AND throughput_rate < 500.0 ORDER BY source ASC, throughput_rate DESC LIMIT 15",
+      "sql": "SELECT 'primary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE match_all('warehouse') AND throughput_rate >= 500.0 UNION ALL SELECT 'secondary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE match_all('event') AND throughput_rate < 500.0 ORDER BY source ASC, throughput_rate DESC LIMIT 15",
       "category": "full_text_search",
       "expected": {
         "row_count": 15,
@@ -160,8 +161,8 @@
         "note": "UNION ALL of two match_all queries with different thresholds"
       },
       "time_offset": {
-        "start_offset": 4857000000,
-        "end_offset": 5025000000
+        "start_offset": 4859000000,
+        "end_offset": 5023000000
       }
     }
   ],

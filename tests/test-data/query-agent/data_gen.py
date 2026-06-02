@@ -8,10 +8,11 @@ from datetime import datetime, timedelta, timezone
 
 random.seed(42)
 
-# Base timestamp — set once at import time so all records share the same origin.
-# Shifted 4 hours into the past so all generated timestamps (up to ~2.5 h ahead)
-# remain in the past, immediately searchable without adjusting the poll window.
-BASE_TS = int((datetime.now(timezone.utc) - timedelta(hours=4)).timestamp() * 1_000_000)
+# Base timestamp — rounded to the current minute so histogram() bucket
+# boundaries are deterministic across runs. Shifted 4 hours into the past
+# so all generated timestamps (~2.5 h ahead) remain in the past.
+_now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+BASE_TS = int((_now - timedelta(hours=4)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
     "pallet_id":       ["PL-001", "PL-002", "PL-003", "PL-004", "PL-005", "PL-006", "PL-007", "PL-008"],

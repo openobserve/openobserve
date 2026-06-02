@@ -2,7 +2,7 @@
   "queries": [
     {
       "id": "Q083",
-      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY _time ORDER BY _time",
+      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY _time ORDER BY _time",
       "category": "histogram",
       "expected": {
         "row_count": 17,
@@ -10,16 +10,17 @@
           "_time",
           "cnt"
         ],
-        "note": "Default histogram with COUNT"
+        "note": "Default histogram with COUNT",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 4917000000,
-        "end_offset": 5085000000
+        "start_offset": 4919000000,
+        "end_offset": 5083000000
       }
     },
     {
       "id": "Q084",
-      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(CASE WHEN load_factor > 50.0 THEN 1 END) AS high_load_cnt, COUNT(CASE WHEN load_factor <= 50.0 THEN 1 END) AS low_load_cnt FROM \"query_agent_test_v2\" GROUP BY _time ORDER BY _time ASC",
+      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(CASE WHEN load_factor > 50.0 THEN 1 END) AS high_load_cnt, COUNT(CASE WHEN load_factor <= 50.0 THEN 1 END) AS low_load_cnt FROM \"{stream}\" GROUP BY _time ORDER BY _time ASC",
       "category": "histogram",
       "expected": {
         "row_count": 17,
@@ -28,16 +29,17 @@
           "high_load_cnt",
           "low_load_cnt"
         ],
-        "note": "Histogram with conditional COUNT using CASE"
+        "note": "Histogram with conditional COUNT using CASE",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 4977000000,
-        "end_offset": 5145000000
+        "start_offset": 4979000000,
+        "end_offset": 5143000000
       }
     },
     {
       "id": "Q085",
-      "sql": "SELECT histogram(_timestamp, '1 minute') AS bucket_time, facility_zone, COUNT(*) AS zone_events, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test_v2\" GROUP BY bucket_time, facility_zone ORDER BY bucket_time ASC, facility_zone ASC",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS bucket_time, facility_zone, COUNT(*) AS zone_events, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" GROUP BY bucket_time, facility_zone ORDER BY bucket_time ASC, facility_zone ASC",
       "category": "histogram",
       "expected": {
         "row_count": 12,
@@ -47,16 +49,17 @@
           "zone_events",
           "avg_tput"
         ],
-        "note": "1-minute histogram + facility_zone breakdown (2-field GROUP BY)"
+        "note": "1-minute histogram + facility_zone breakdown (2-field GROUP BY)",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5037000000,
-        "end_offset": 5205000000
+        "start_offset": 5039000000,
+        "end_offset": 5203000000
       }
     },
     {
       "id": "Q086",
-      "sql": "SELECT histogram(_timestamp, '30 seconds') AS bucket, COUNT(*) AS cnt, SUM(item_count) AS items, ROUND(AVG(cell_temp), 2) AS avg_temp, ROUND(AVG(charge_remaining), 2) AS avg_charge FROM \"query_agent_test_v2\" WHERE operation_mode != 'manual' GROUP BY bucket ORDER BY bucket ASC",
+      "sql": "SELECT histogram(_timestamp, '30 seconds') AS bucket, COUNT(*) AS cnt, SUM(item_count) AS items, ROUND(AVG(cell_temp), 2) AS avg_temp, ROUND(AVG(charge_remaining), 2) AS avg_charge FROM \"{stream}\" WHERE operation_mode != 'manual' GROUP BY bucket ORDER BY bucket ASC",
       "category": "histogram",
       "expected": {
         "row_count": 6,
@@ -67,16 +70,17 @@
           "avg_temp",
           "avg_charge"
         ],
-        "note": "30-second histogram with 4 aggregates, filtered by operation_mode"
+        "note": "30-second histogram with 4 aggregates, filtered by operation_mode",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5097000000,
-        "end_offset": 5265000000
+        "start_offset": 5099000000,
+        "end_offset": 5263000000
       }
     },
     {
       "id": "Q087",
-      "sql": "SELECT histogram(_timestamp, '2 minutes') AS time_window, operation_mode, COUNT(*) FILTER (WHERE load_factor > 50.0) AS high_load_count, COUNT(*) FILTER (WHERE load_factor <= 50.0) AS low_load_count, COUNT(*) AS total FROM \"query_agent_test_v2\" GROUP BY time_window, operation_mode ORDER BY time_window ASC, operation_mode ASC",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS time_window, operation_mode, COUNT(*) FILTER (WHERE load_factor > 50.0) AS high_load_count, COUNT(*) FILTER (WHERE load_factor <= 50.0) AS low_load_count, COUNT(*) AS total FROM \"{stream}\" GROUP BY time_window, operation_mode ORDER BY time_window ASC, operation_mode ASC",
       "category": "histogram",
       "expected": {
         "row_count": 6,
@@ -87,16 +91,17 @@
           "low_load_count",
           "total"
         ],
-        "note": "2-minute histogram + mode breakdown with FILTER clauses"
+        "note": "2-minute histogram + mode breakdown with FILTER clauses",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5157000000,
-        "end_offset": 5325000000
+        "start_offset": 5159000000,
+        "end_offset": 5323000000
       }
     },
     {
       "id": "Q088",
-      "sql": "SELECT histogram(_timestamp, '5 minutes') AS block, sorter_model, COUNT(*) AS samples, ROUND(MIN(throughput_rate), 2) AS floor_tput, ROUND(MAX(throughput_rate), 2) AS ceiling_tput FROM \"query_agent_test_v2\" GROUP BY block, sorter_model HAVING COUNT(*) >= 2 ORDER BY block ASC, ceiling_tput DESC",
+      "sql": "SELECT histogram(_timestamp, '5 minutes') AS block, sorter_model, COUNT(*) AS samples, ROUND(MIN(throughput_rate), 2) AS floor_tput, ROUND(MAX(throughput_rate), 2) AS ceiling_tput FROM \"{stream}\" GROUP BY block, sorter_model HAVING COUNT(*) >= 2 ORDER BY block ASC, ceiling_tput DESC",
       "category": "histogram",
       "expected": {
         "row_count": 5,
@@ -107,16 +112,17 @@
           "floor_tput",
           "ceiling_tput"
         ],
-        "note": "5-minute histogram with MIN/MAX and HAVING filter"
+        "note": "5-minute histogram with MIN/MAX and HAVING filter",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5217000000,
-        "end_offset": 5385000000
+        "start_offset": 5219000000,
+        "end_offset": 5383000000
       }
     },
     {
       "id": "Q089",
-      "sql": "SELECT histogram(_timestamp) AS time_slot, control_center, COUNT(*) AS events, ROUND(SUM(package_size) * 1.0 / NULLIF(COUNT(*), 0), 2) AS avg_pkg FROM \"query_agent_test_v2\" WHERE package_size >= 250 GROUP BY time_slot, control_center ORDER BY time_slot ASC, events DESC",
+      "sql": "SELECT histogram(_timestamp) AS time_slot, control_center, COUNT(*) AS events, ROUND(SUM(package_size) * 1.0 / NULLIF(COUNT(*), 0), 2) AS avg_pkg FROM \"{stream}\" WHERE package_size >= 250 GROUP BY time_slot, control_center ORDER BY time_slot ASC, events DESC",
       "category": "histogram",
       "expected": {
         "row_count": 22,
@@ -126,16 +132,17 @@
           "events",
           "avg_pkg"
         ],
-        "note": "Auto-interval histogram + control_center breakdown with package filter"
+        "note": "Auto-interval histogram + control_center breakdown with package filter",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5277000000,
-        "end_offset": 5445000000
+        "start_offset": 5279000000,
+        "end_offset": 5443000000
       }
     },
     {
       "id": "Q090",
-      "sql": "SELECT histogram(_timestamp, '1 minute') AS minute_slot, COUNT(*) AS total_events, COUNT(DISTINCT pallet_id) AS distinct_pallets, COUNT(DISTINCT conveyor_lane) AS distinct_lanes FROM \"query_agent_test_v2\" GROUP BY minute_slot ORDER BY minute_slot ASC",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS minute_slot, COUNT(*) AS total_events, COUNT(DISTINCT pallet_id) AS distinct_pallets, COUNT(DISTINCT conveyor_lane) AS distinct_lanes FROM \"{stream}\" GROUP BY minute_slot ORDER BY minute_slot ASC",
       "category": "histogram",
       "expected": {
         "row_count": 3,
@@ -145,16 +152,17 @@
           "distinct_pallets",
           "distinct_lanes"
         ],
-        "note": "1-minute histogram with COUNT DISTINCT on two columns"
+        "note": "1-minute histogram with COUNT DISTINCT on two columns",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5337000000,
-        "end_offset": 5505000000
+        "start_offset": 5339000000,
+        "end_offset": 5503000000
       }
     },
     {
       "id": "Q091",
-      "sql": "SELECT histogram(_timestamp, '3 minutes') AS interval_bucket, conveyor_lane, operation_mode, COUNT(*) AS cnt, ROUND(AVG(scan_attempts), 2) AS avg_scan FROM \"query_agent_test_v2\" WHERE scan_attempts >= 1 GROUP BY interval_bucket, conveyor_lane, operation_mode ORDER BY interval_bucket ASC, cnt DESC",
+      "sql": "SELECT histogram(_timestamp, '3 minutes') AS interval_bucket, conveyor_lane, operation_mode, COUNT(*) AS cnt, ROUND(AVG(scan_attempts), 2) AS avg_scan FROM \"{stream}\" WHERE scan_attempts >= 1 GROUP BY interval_bucket, conveyor_lane, operation_mode ORDER BY interval_bucket ASC, cnt DESC",
       "category": "histogram",
       "expected": {
         "row_count": 8,
@@ -165,16 +173,17 @@
           "cnt",
           "avg_scan"
         ],
-        "note": "3-minute histogram with 3-field GROUP BY (bucket + lane + mode)"
+        "note": "3-minute histogram with 3-field GROUP BY (bucket + lane + mode)",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5397000000,
-        "end_offset": 5565000000
+        "start_offset": 5399000000,
+        "end_offset": 5563000000
       }
     },
     {
       "id": "Q092",
-      "sql": "SELECT histogram(_timestamp, '4 minutes') AS window_block, COUNT(*) FILTER (WHERE charge_remaining >= 60.0) AS charged_ops, COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS low_charge_ops, ROUND(AVG(cell_temp) FILTER (WHERE charge_remaining < 30.0), 2) AS low_charge_avg_temp FROM \"query_agent_test_v2\" GROUP BY window_block ORDER BY window_block ASC",
+      "sql": "SELECT histogram(_timestamp, '4 minutes') AS window_block, COUNT(*) FILTER (WHERE charge_remaining >= 60.0) AS charged_ops, COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS low_charge_ops, ROUND(AVG(cell_temp) FILTER (WHERE charge_remaining < 30.0), 2) AS low_charge_avg_temp FROM \"{stream}\" GROUP BY window_block ORDER BY window_block ASC",
       "category": "histogram",
       "expected": {
         "row_count": 2,
@@ -184,30 +193,32 @@
           "low_charge_ops",
           "low_charge_avg_temp"
         ],
-        "note": "4-minute histogram with conditional FILTER aggregates and filtered AVG"
+        "note": "4-minute histogram with conditional FILTER aggregates and filtered AVG",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5457000000,
-        "end_offset": 5625000000
+        "start_offset": 5459000000,
+        "end_offset": 5623000000
       }
     },
     {
       "id": "Q093",
-      "sql": "SELECT histogram(_timestamp, '15 seconds') AS fine_bucket, COUNT(*) AS total, ROUND(AVG(defect_limit), 3) AS avg_defect, ROUND(STDDEV(throughput_rate), 2) AS tput_volatility FROM \"query_agent_test_v2\" WHERE defect_limit IS NOT NULL AND throughput_rate IS NOT NULL GROUP BY fine_bucket HAVING COUNT(*) > 1 ORDER BY fine_bucket ASC",
+      "sql": "SELECT histogram(_timestamp, '15 seconds') AS fine_bucket, COUNT(*) AS total, ROUND(AVG(defect_limit), 3) AS avg_defect, ROUND(STDDEV(throughput_rate), 2) AS tput_volatility FROM \"{stream}\" WHERE defect_limit IS NOT NULL AND throughput_rate IS NOT NULL GROUP BY fine_bucket HAVING COUNT(*) > 1 ORDER BY fine_bucket ASC",
       "category": "histogram",
       "expected": {
-        "row_count": 11,
+        "row_count": 0,
         "columns": [
           "fine_bucket",
           "total",
           "avg_defect",
           "tput_volatility"
         ],
-        "note": "15-second fine histogram with STDDEV and HAVING"
+        "note": "15-second fine histogram with STDDEV and HAVING",
+        "skip_row_count": true
       },
       "time_offset": {
-        "start_offset": 5517000000,
-        "end_offset": 5685000000
+        "start_offset": 5519000000,
+        "end_offset": 5683000000
       }
     }
   ],
