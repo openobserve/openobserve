@@ -802,6 +802,71 @@ async function checkStreamSchema(stream: string): Promise<Set<string>> {
   }
 }
 
+function buildDetectionSQL(
+  config: ServiceDetectionConfig | null,
+  availableFields: Set<string>,
+  stream: string
+): string {
+  const timeRangeWhere = "_timestamp >= ? AND _timestamp < ?";
+
+  if (!config) {
+    // Fallback: original SQL without detection
+    return `SELECT
+      service_name,
+      COUNT(*) AS total_requests,
+      SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
+      CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
+      AVG(duration) AS avg_duration_ns,
+      MAX(duration) AS max_duration_ns,
+      approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
+      approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
+      approx_percentile_cont(duration, 0.99) AS p99_latency_ns
+    FROM "${stream}"
+    WHERE ${timeRangeWhere}
+    GROUP BY service_name
+    ORDER BY total_requests DESC`;
+  }
+
+  // Build CASE statement from detection rules
+  const detectionCases = [];
+
+  // Server spans keep original service_name
+  const serverKinds = config.server_kinds.map(k => `'${k}'`).join(', ');
+  detectionCases.push(`WHEN span_kind IN (${serverKinds}) THEN service_name`);
+
+  // Client spans apply detection rules
+  for (const rule of config.rules) {
+    const availableAttrs = rule.attributes.filter(attr => availableFields.has(attr));
+    if (availableAttrs.length === 0) continue;
+
+    const coalescedAttr = availableAttrs.length > 1
+      ? `COALESCE(${availableAttrs.join(', ')})`
+      : availableAttrs[0];
+
+    detectionCases.push(`WHEN ${coalescedAttr} IS NOT NULL THEN ${coalescedAttr}`);
+  }
+
+  const detectedServiceSQL = `CASE
+    ${detectionCases.join(' ')}
+    ELSE service_name
+  END AS detected_service_name`;
+
+  return `SELECT
+    ${detectedServiceSQL},
+    COUNT(*) AS total_requests,
+    SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
+    CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
+    AVG(duration) AS avg_duration_ns,
+    MAX(duration) AS max_duration_ns,
+    approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
+    approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
+    approx_percentile_cont(duration, 0.99) AS p99_latency_ns
+  FROM "${stream}"
+  WHERE ${timeRangeWhere}
+  GROUP BY detected_service_name
+  ORDER BY total_requests DESC`;
+}
+
 async function loadServicesCatalog() {
   const streamName = streamFilter.value?.replaceAll('"', "");
   if (!streamName) return;
@@ -906,7 +971,8 @@ defineExpose({
   loadServicesCatalog,
   streamFilter,
   serviceDetectionConfig,
-  checkStreamSchema
+  checkStreamSchema,
+  buildDetectionSQL
 });
 
 watch(
