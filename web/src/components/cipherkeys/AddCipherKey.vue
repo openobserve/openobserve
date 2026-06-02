@@ -58,7 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-bind:disable="isUpdatingCipherKey"
             :error="!!nameError"
             :error-message="nameError"
-            @update:model-value="nameError = ''"
+            @update:model-value="validateName()"
+            @blur="validateName()"
             tabindex="0"
           />
         </div>
@@ -132,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="add"
           :done="step > 2"
         >
-          <add-encryption-mechanism v-model:formData="formData" />
+          <add-encryption-mechanism ref="encryptionMechanismRef" v-model:formData="formData" />
           <div class="tw:flex tw:gap-2 tw:mt-4">
             <OButton
               data-test="add-cipher-key-step2-back-btn"
@@ -362,7 +363,8 @@ const validateStoreType = (): boolean => {
 const onSubmit = () => {
   const nameValid = validateName();
   const typeValid = validateStoreType();
-  if (!nameValid || !typeValid) {
+  const mechanismValid = encryptionMechanismRef.value?.validate?.() ?? true;
+  if (!nameValid || !typeValid || !mechanismValid) {
     toast({ variant: "error", message: 'Please fill all the required fields' });
     return;
   }
@@ -502,6 +504,7 @@ const goToCipherList = () => {
 // `validate()` method (which runs all field validators and sets the
 // inline error refs).
 const akeylessTypeRef = ref<any>(null);
+const encryptionMechanismRef = ref<any>(null);
 
 const validateStoreSecret = (): boolean => {
   const type = formData.value.key.store.type;

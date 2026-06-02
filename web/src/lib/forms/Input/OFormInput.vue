@@ -25,7 +25,7 @@ if (import.meta.env.DEV && !form) {
     :validators="
       props.validators
         ? {
-            onChange: (ctx: { value: unknown }) => {
+            onBlur: (ctx: { value: unknown }) => {
               for (const v of props.validators ?? []) {
                 const r = v(ctx.value as string | number | undefined);
                 if (r !== undefined) return r;
@@ -66,7 +66,7 @@ if (import.meta.env.DEV && !form) {
             ? String(field.state.meta.errors[0])
             : undefined
         "
-        @update:model-value="field.handleChange"
+        @update:model-value="(val: unknown) => { field.handleChange(val); field.handleBlur(); }"
         @blur="field.handleBlur"
       />
     </template>
