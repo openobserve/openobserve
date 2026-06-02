@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+            background: 'var(--o2-log-table-header-bg)',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :colspan="columnOrder.length"
             class="tw:font-bold"
             :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+              background: 'var(--o2-log-table-header-bg)',
               opacity: 0.7,
             }"
           >
@@ -238,7 +238,7 @@ class="tw:mr-1" />
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer"
             :class="[
               defaultColumns &&
               !wrap &&
@@ -252,7 +252,11 @@ class="tw:mr-1" />
                 ? store.state.theme === 'dark'
                   ? 'tw:bg-zinc-700'
                   : 'tw:bg-zinc-300'
-                : '',
+                : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                  ? virtualRow.index % 2 === 0
+                    ? 'log-row-base'
+                    : 'log-row-alt'
+                  : '',
               'table-row-hover',
             ]"
             @click="
@@ -1130,12 +1134,21 @@ defineExpose({
   height: 0.75rem !important;
 }
 
-// Add explicit hover styles for log rows
+// Log table row surface colours — driven by CSS vars per theme
+.log-row-base {
+  background-color: var(--o2-log-table-row-bg);
+}
+
+.log-row-alt {
+  background-color: var(--o2-log-table-row-alt-bg);
+}
+
 .table-row-hover {
   transition: background-color 0.15s ease-in-out;
+  border-bottom-color: var(--o2-log-table-row-border) !important;
 
   &:hover {
-    background-color: var(--o2-hover-gray) !important;
+    background-color: var(--o2-log-table-row-hover) !important;
   }
 }
 
