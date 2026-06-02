@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
+  isSqlQuery,
   buildSqlQuery,
   convertQueryIntoSingleLine,
   addLabelsToSQlQuery,
@@ -54,6 +55,78 @@ vi.mock("@/composables/useParser", () => ({
     }),
   }),
 }));
+
+describe("isSqlQuery", () => {
+  describe("returns true for full SQL statements", () => {
+    it("detects SELECT * FROM", () => {
+      expect(isSqlQuery('SELECT * FROM "stream"')).toBe(true);
+    });
+
+    it("detects SELECT with aggregation and GROUP BY", () => {
+      expect(
+        isSqlQuery(
+          'SELECT histogram(_timestamp) as x, count(*) as y FROM "stream" GROUP BY x',
+        ),
+      ).toBe(true);
+    });
+
+    it("detects WITH … SELECT (CTE)", () => {
+      expect(
+        isSqlQuery('WITH cte AS (SELECT * FROM "s") SELECT * FROM cte'),
+      ).toBe(true);
+    });
+
+    it("is case-insensitive", () => {
+      expect(isSqlQuery('select * from "stream"')).toBe(true);
+      expect(isSqlQuery('Select * From "stream"')).toBe(true);
+    });
+
+    it("handles leading whitespace and newlines", () => {
+      expect(isSqlQuery('  SELECT * FROM "stream"')).toBe(true);
+      expect(isSqlQuery('\n\nSELECT * FROM "stream"')).toBe(true);
+    });
+  });
+
+  describe("returns false for filter / WHERE-clause expressions (non-SQL mode)", () => {
+    it("rejects a simple equality filter", () => {
+      expect(isSqlQuery("level = 'error'")).toBe(false);
+    });
+
+    it("rejects compound filter conditions", () => {
+      expect(isSqlQuery("level = 'error' AND status = 500")).toBe(false);
+    });
+
+    it("rejects function-based filters", () => {
+      expect(isSqlQuery("str_match(log, 'error')")).toBe(false);
+      expect(isSqlQuery("match_all('error')")).toBe(false);
+    });
+
+    it("rejects field names that contain 'from'", () => {
+      expect(isSqlQuery("source_from = 'web'")).toBe(false);
+    });
+
+    it("rejects SQL inside a string value", () => {
+      expect(isSqlQuery("match_all('SELECT * FROM x')")).toBe(false);
+    });
+
+    it("rejects field names that start with 'select'", () => {
+      expect(isSqlQuery("select_count > 5")).toBe(false);
+    });
+
+    it("rejects field names that start with 'with'", () => {
+      expect(isSqlQuery("with_clause = 'true'")).toBe(false);
+    });
+
+    it("rejects empty string", () => {
+      expect(isSqlQuery("")).toBe(false);
+    });
+
+    it("rejects null-like values", () => {
+      expect(isSqlQuery(null as unknown as string)).toBe(false);
+      expect(isSqlQuery(undefined as unknown as string)).toBe(false);
+    });
+  });
+});
 
 describe("sqlUtils", () => {
   beforeEach(() => {

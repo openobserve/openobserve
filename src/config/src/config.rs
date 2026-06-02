@@ -776,7 +776,7 @@ pub struct Http {
     pub access_log_format: String,
     #[env_config(
         name = "ZO_HTTP_REAL_IP_SOURCE",
-        default = "XEnvoyExternalAddress,XRealIp",
+        default = "XEnvoyExternalAddress,XRealIp,RightmostXForwardedFor",
         help = "Comma-separated list of sources to resolve the real client IP; tried in \
                 order, first match wins. TCP peer (ConnectInfo) is always used as the final \
                 fallback. Supported entries: XEnvoyExternalAddress (Envoy/Istio), \
