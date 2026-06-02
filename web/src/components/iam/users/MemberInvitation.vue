@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-model="userEmail"
           :placeholder="t('user.inviteByEmail')"
-          style="width: 14rem"
+          class="tw:w-56"
         />
         <OTooltip :content="t('user.inviteByEmail')" side="top" max-width="16rem" />
       </div>
