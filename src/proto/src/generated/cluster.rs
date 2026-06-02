@@ -1064,6 +1064,8 @@ pub struct SearchQuery {
     pub action_id: ::prost::alloc::string::String,
     #[prost(int64, tag = "16")]
     pub histogram_interval: i64,
+    #[prost(string, optional, tag = "17")]
+    pub timezone: ::core::option::Option<::prost::alloc::string::String>,
     /// Simplified sampling: just specify ratio (0.0-1.0), backend uses optimal defaults
     /// Backend converts this to SamplingConfig for internal node communication
     #[prost(double, optional, tag = "18")]
