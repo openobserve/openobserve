@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div class="trace-combined-header-wrapper card-container">
+      <div v-if="showHeader" class="trace-combined-header-wrapper card-container">
         <!-- New Modern Header -->
         <header
           class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
@@ -1547,11 +1547,9 @@ export default defineComponent({
         return;
       }
 
-      // Standalone mode - fetch from API
-      if (props.mode === "standalone") {
-        await loadLogStreams();
-        await getTraceMeta();
-      }
+      // Fetch from API — standalone mode, or embedded with no pre-fetched spans
+      await loadLogStreams();
+      await getTraceMeta();
     };
 
     onMounted(() => {
@@ -1744,8 +1742,7 @@ export default defineComponent({
 
         const tracePromise = searchService.search(
           {
-            org_identifier: router.currentRoute.value.query
-              ?.org_identifier as string,
+            org_identifier: effectiveOrgIdentifier.value,
             query: req,
             page_type: "traces",
           },
@@ -1778,9 +1775,14 @@ export default defineComponent({
               actionEvents,
               allViewEvents,
             );
+            // RUM spans take priority over trace spans with the same span_id
+            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+            const deduplicatedTraceSpans = traceSpans.filter(
+              (s: any) => !rumSpanIds.has(s.span_id),
+            );
             searchObj.data.traceDetails.spanList = [
               ...rumSpans,
-              ...traceSpans,
+              ...deduplicatedTraceSpans,
             ];
             updateServiceColors();
             buildTracesTree();
@@ -1865,7 +1867,6 @@ export default defineComponent({
 
     const calculateTracePosition = () => {
       const tics = [];
-      console.log(timeRange);
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex relative-position trace-header-right"
+      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative trace-header-right"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"

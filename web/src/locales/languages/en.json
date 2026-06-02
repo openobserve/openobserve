@@ -503,6 +503,8 @@
     "viewTraceDetails": "View Trace Details",
     "routeChange": "Route",
     "initialView": "Initial",
+    "span": "span",
+    "spans": "spans",
     "failedToFetchTraces": "Failed to fetch trace data. Please try again.",
     "traceNotFound": "Trace details not found.",
     "failedToFetchTraceDetails": "Failed to load trace details. Please try again."

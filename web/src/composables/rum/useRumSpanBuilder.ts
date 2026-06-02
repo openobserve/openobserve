@@ -77,19 +77,18 @@ export default function useRumSpanBuilder(
    * Fetch action events for the given action ID.
    */
   const fetchActionEvents = async (
-    actionId: string,
+    actionId: string[],
     startTime: number,
     endTime: number,
   ): Promise<any[]> => {
     try {
       const orgId = getOrgId();
-      const sanitized = sanitizeTraceId(actionId);
       const res = await searchService.search(
         {
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE action_id = '${sanitized}' and type='action' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+              sql: `SELECT * FROM "_rumdata" WHERE action_id IN (${actionId.map((id) => `'${sanitizeTraceId(id)}'`).join(",")}) and type='action' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
               start_time: startTime - 10000000,
               end_time: endTime + 10000000,
               from: 0,
@@ -205,7 +204,7 @@ export default function useRumSpanBuilder(
       } catch {
         parsedActionIds = [];
       }
-      const primaryActionId = parsedActionIds[0] || "";
+      const primaryActionId = parsedActionIds || "";
 
       // Run all 3 queries in parallel
       const [viewEvents, actionEvents, allViewEvents] = await Promise.all([
