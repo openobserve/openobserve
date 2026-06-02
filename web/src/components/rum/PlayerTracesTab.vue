@@ -155,7 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-player-traces-tab-table"
           @click:dataRow="handleTraceRowClick"
         >
-          <template #cell-time="{ item }">
+          <template #cell-timestamp="{ item }">
+            <span class="tw:text-xs tw:whitespace-nowrap tw:tabular-nums">
+              {{ formatTraceTimestamp(item.metadata?.start_time) }}
+            </span>
+          </template>
+          <template #cell-sessionTime="{ item }">
             <span class="tw:text-xs tw:whitespace-nowrap tw:text-[var(--o2-text-secondary)]">
               {{ traceTimeOffset(item.metadata?.start_time) || "—" }}
             </span>
@@ -243,28 +248,34 @@ const {fetchQueryDataWithHttpStream} = useHttpStreaming();
 // ── Table column definitions ────────────────────────────────
 const traceColumns = computed(() => [
   {
-    id: "time",
+    id: "timestamp",
+    header: t("rum.timestamp"),
+    accessorFn: (row: any) => row.metadata?.start_time ?? 0,
+    meta: { align: "left", slot: true },
+  },
+  {
+    id: "sessionTime",
     header: t("rum.timeInSession"),
     accessorFn: (row: any) => row.metadata?.start_time ?? 0,
-    meta: { align: "left" },
+    meta: { align: "left", slot: true },
   },
   {
     id: "route",
     header: t("rum.route"),
     accessorFn: (row: any) => shortRoute(row.route),
-    meta: { align: "left" },
+    meta: { align: "left", slot: true },
   },
   {
     id: "duration",
     header: t("rum.duration"),
     accessorFn: (row: any) => row.metadata?.duration ?? 0,
-    meta: { align: "right" },
+    meta: { align: "right", slot: true },
   },
   {
     id: "errors",
     header: t("rum.errors"),
     accessorFn: (row: any) => row.metadata?.errorCount ?? 0,
-    meta: { align: "center" },
+    meta: { align: "center", slot: true },
   },
 ]);
 
@@ -280,6 +291,16 @@ function shortRoute(url: string): string {
   } catch {
     return url;
   }
+}
+
+function formatTraceTimestamp(startTimeUs: number): string {
+  if (!startTimeUs) return "—";
+  const ms = Math.floor(startTimeUs / 1000);
+  const d = new Date(ms);
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  const ss = d.getSeconds().toString().padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
 }
 
 function traceRelativeTimeMs(startTimeUs: number): number {
