@@ -77,7 +77,7 @@ where
         match ev {
             Event::Put(ev) => {
                 let Some((org, alert_id)) = parse_alert_key(&ev.key) else {
-                    log::error!("watch_alerts: failed to parse event key {}", &ev.key);
+                    log::error!("watch_alerts: failed to parse event key {}", ev.key);
                     continue;
                 };
                 let folder_id = ev.value.map(|v| String::from_utf8_lossy(&v).to_string());
@@ -87,7 +87,7 @@ where
             }
             Event::Delete(ev) => {
                 let Some((org, alert_id)) = parse_alert_key(&ev.key) else {
-                    log::error!("watch_alerts: failed to parse event key {}", &ev.key);
+                    log::error!("watch_alerts: failed to parse event key {}", ev.key);
                     continue;
                 };
                 let _ = (on_delete)(org, alert_id).await;

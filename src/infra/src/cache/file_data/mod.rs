@@ -109,7 +109,7 @@ impl CacheStrategy {
                     return None;
                 }
                 let mut idx = None;
-                for (_, val) in map.iter() {
+                for val in map.values() {
                     if !cache[*val].is_empty() {
                         idx = Some(*val);
                         break;

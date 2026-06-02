@@ -1598,18 +1598,10 @@ async fn process_dest_template(
     };
 
     let mut alert_query = String::new();
-    let function_content = if alert.query_condition.vrl_function.is_none() {
-        "".to_owned()
+    let function_content = if let Some(v) = &alert.query_condition.vrl_function {
+        format!("&functionContent={}", v.replace('+', "%2B"))
     } else {
-        format!(
-            "&functionContent={}",
-            alert
-                .query_condition
-                .vrl_function
-                .as_ref()
-                .unwrap()
-                .replace('+', "%2B")
-        )
+        "".to_owned()
     };
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {

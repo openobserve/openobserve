@@ -963,7 +963,7 @@ fn calculate_deltas_multi(
 
     // sort the results by response end time descending
     let mut results = results.to_vec();
-    results.sort_by(|a, b| b.response_end_time.cmp(&a.response_end_time));
+    results.sort_by_key(|k| k.response_end_time);
     for meta in results {
         cache_duration += meta.response_end_time - meta.response_start_time;
         current_start_time = meta.response_start_time;

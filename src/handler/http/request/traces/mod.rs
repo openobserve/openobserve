@@ -826,14 +826,14 @@ pub async fn get_latest_traces(
             if sort_order == "ASC" {
                 traces_data.sort_by_key(|k| k.duration);
             } else {
-                traces_data.sort_by(|a, b| b.duration.cmp(&a.duration));
+                traces_data.sort_by_key(|k| k.duration);
             }
         }
         _ => {
             if sort_order == "ASC" {
                 traces_data.sort_by_key(|k| k.start_time);
             } else {
-                traces_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+                traces_data.sort_by_key(|k| k.start_time);
             }
         }
     }

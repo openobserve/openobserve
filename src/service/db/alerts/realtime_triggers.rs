@@ -101,30 +101,31 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 item_key = updated_item_key;
 
                 // Get or parse the trigger value
-                let item_value: db::scheduler::Trigger =
-                    if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
-                        match db::scheduler::get(
-                            &org_id,
-                            config::meta::triggers::TriggerModule::Alert,
-                            &alert_id,
-                        )
-                        .await
-                        {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {e}");
-                                continue;
-                            }
+                let item_value: db::scheduler::Trigger = if let Some(val) = &ev.value
+                    && !val.is_empty()
+                {
+                    match json::from_slice(val) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error parsing trigger value: {e}");
+                            continue;
                         }
-                    } else {
-                        match json::from_slice(&ev.value.unwrap()) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error parsing trigger value: {e}");
-                                continue;
-                            }
+                    }
+                } else {
+                    match db::scheduler::get(
+                        &org_id,
+                        config::meta::triggers::TriggerModule::Alert,
+                        &alert_id,
+                    )
+                    .await
+                    {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {e}");
+                            continue;
                         }
-                    };
+                    }
+                };
 
                 REALTIME_ALERT_TRIGGERS
                     .write()

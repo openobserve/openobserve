@@ -161,13 +161,9 @@ pub fn get_value_from_path(value: &Value, path: &str) -> Option<Value> {
         if key.is_empty() {
             continue;
         }
-        match temp.as_object() {
-            Some(map) => match map.get(key) {
-                Some(v) => temp = v,
-                None => return None,
-            },
-            None => return None,
-        }
+        let map = temp.as_object()?;
+        let val = map.get(key)?;
+        temp = val;
     }
     match rest {
         None => Some(temp.to_owned()),

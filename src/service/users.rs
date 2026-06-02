@@ -356,17 +356,15 @@ pub async fn update_user(
                 }
                 new_user = local_user.clone();
                 if update_mode.is_self_update()
-                    && user.old_password.is_some()
-                    && user.new_password.is_some()
+                    && let Some(old_pass) = &user.old_password
+                    && let Some(new_pass) = &user.new_password
                 {
-                    if local_user.password.eq(&get_hash(
-                        &user.clone().old_password.unwrap(),
-                        &local_user.salt,
-                    )) {
-                        let new_pass = user.new_password.unwrap();
-
-                        new_user.password = get_hash(&new_pass, &local_user.salt);
-                        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+                    if local_user
+                        .password
+                        .eq(&get_hash(old_pass, &local_user.salt))
+                    {
+                        new_user.password = get_hash(new_pass, &local_user.salt);
+                        new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
                         log::info!("Password self updated for user: {email}");
                         is_updated = true;
                     } else {
@@ -380,11 +378,9 @@ pub async fn update_user(
                     message = "Please provide existing password";
                 } else if !update_mode.is_self_update()
                     && allow_password_update
-                    && user.new_password.is_some()
                     && !local_user.is_external
+                    && let Some(new_pass) = user.new_password
                 {
-                    let new_pass = user.new_password.unwrap();
-
                     new_user.password = get_hash(&new_pass, &local_user.salt);
                     new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
                     log::info!("Password by root updated for user: {email}");
@@ -393,15 +389,19 @@ pub async fn update_user(
                 } else if user.new_password.is_some() {
                     message = "You are not authorised to change the password";
                 }
-                if user.first_name.is_some() && !local_user.is_external {
-                    new_user.first_name = user.first_name.unwrap();
+                if let Some(first_name) = user.first_name
+                    && !local_user.is_external
+                {
+                    new_user.first_name = first_name;
                     is_updated = true;
                 }
-                if user.last_name.is_some() && !local_user.is_external {
-                    new_user.last_name = user.last_name.unwrap();
+                if let Some(last_name) = user.last_name
+                    && !local_user.is_external
+                {
+                    new_user.last_name = last_name;
                     is_updated = true;
                 }
-                if user.role.is_some()
+                if let Some(role) = user.role
                     && !local_user.is_external
                     && (!update_mode.is_self_update()
                         || (local_user.role.eq(&UserRole::Admin)
@@ -412,7 +412,7 @@ pub async fn update_user(
                 // if the User Role is Root, we do not change the Role
                 // Admins Role can still be mutable.
                 {
-                    let new_org_role = UserOrgRole::from(&user.role.unwrap());
+                    let new_org_role = UserOrgRole::from(&role);
                     old_role = Some(new_user.role);
                     new_user.role = new_org_role.base_role;
                     new_role = Some(new_user.role.clone());
@@ -433,8 +433,10 @@ pub async fn update_user(
                 // Token replacement is a privileged operation — only allow if the
                 // initiator is updating their own token OR has password-update rights
                 // (i.e. Root or Admin updating a non-root user).
-                if user.token.is_some() && (update_mode.is_self_update() || allow_password_update) {
-                    new_user.token = user.token.unwrap();
+                if let Some(token) = user.token
+                    && (update_mode.is_self_update() || allow_password_update)
+                {
+                    new_user.token = token;
                     is_org_updated = true;
                 }
 
