@@ -2332,7 +2332,10 @@
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
     },
-    "anomalyName": "Anomali Adı"
+    "anomalyName": "Anomali Adı",
+    "destinations": {
+      "saved": "Hedef kaydedildi"
+    }
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2349,7 +2352,16 @@
     "delete": "Sil",
     "variable_guide_header": "Şablon Değişken Kılavuzu",
     "variable_usage_examples": "Kullanım Örnekleri",
-    "body": "Vücut"
+    "body": "Vücut",
+    "clone": "Klon",
+    "cloneTitle": "Klon şablonu",
+    "systemReadOnly": "Önceden oluşturulmuş şablon - silme devre dışı bırakıldı. Değiştirilebilir bir kopya oluşturmak için klonlayın.",
+    "prebuiltBadge": "Önceden oluşturulmuş",
+    "prebuiltBadgeHint": "Sistem tarafından yönetilmektedir. Düzenleyebilirsiniz, ancak silme devre dışı bırakılmıştır.",
+    "customBadge": "Özel",
+    "filterAll": "Hepsi",
+    "filterPrebuilt": "Önceden oluşturulmuş",
+    "filterCustom": "Özel"
   },
   "alert_destinations": {
     "header": "Destinasyonlar",
@@ -2386,7 +2398,11 @@
     "custom": "Özel",
     "separator": "Ayırıcı",
     "separator_placeholder": "Ayırıcı girin (örn. |,\\ n,\\ t, boşluk)",
-    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)"
+    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)",
+    "filterAll": "Hepsi",
+    "filterPrebuilt": "Önceden oluşturulmuş",
+    "filterCustom": "Özel",
+    "templateDefaultBadge": "Varsayılan"
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",

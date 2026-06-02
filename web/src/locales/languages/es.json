@@ -2334,7 +2334,10 @@
       "destinationRequired": "¡Se requiere al menos un destino!",
       "disabledNotificationsInfo": "La detección de anomalías seguirá ejecutándose y escribirá los resultados en la secuencia _anomalies. Habilite las notificaciones para recibir alertas cuando se detecten anomalías."
     },
-    "anomalyName": "Nombre de la anomalía"
+    "anomalyName": "Nombre de la anomalía",
+    "destinations": {
+      "saved": "Destino guardado"
+    }
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2351,7 +2354,16 @@
     "delete": "Eliminar",
     "variable_guide_header": "Guía de variables de plantilla",
     "variable_usage_examples": "Ejemplos de uso",
-    "body": "Cuerpo"
+    "body": "Cuerpo",
+    "clone": "Clon",
+    "cloneTitle": "Plantilla de clonación",
+    "systemReadOnly": "Plantilla prediseñada: la eliminación está deshabilitada. Clónala para hacer una copia modificable.",
+    "prebuiltBadge": "Preconstruido",
+    "prebuiltBadgeHint": "Gestionado por el sistema. Puede editar, pero la eliminación está deshabilitada.",
+    "customBadge": "Personalizado",
+    "filterAll": "Todas",
+    "filterPrebuilt": "Preconstruido",
+    "filterCustom": "Personalizado"
   },
   "alert_destinations": {
     "header": "Destinos",
@@ -2388,7 +2400,11 @@
     "custom": "Personalizado",
     "separator": "Separador",
     "separator_placeholder": "Introduzca un separador (p. ej., |,\\n,\\ t, espacio)",
-    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)"
+    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)",
+    "filterAll": "Todas",
+    "filterPrebuilt": "Preconstruido",
+    "filterCustom": "Personalizado",
+    "templateDefaultBadge": "Predeterminado"
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",

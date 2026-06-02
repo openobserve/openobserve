@@ -2334,7 +2334,10 @@
       "destinationRequired": "Es ist mindestens ein Ziel erforderlich!",
       "disabledNotificationsInfo": "Die Anomalieerkennung wird weiterhin ausgeführt und die Ergebnisse werden in den _anomalies-Stream geschrieben. Aktivieren Sie Benachrichtigungen, um Benachrichtigungen zu erhalten, wenn Anomalien erkannt werden."
     },
-    "anomalyName": "Name der Anomalie"
+    "anomalyName": "Name der Anomalie",
+    "destinations": {
+      "saved": "Ziel gespeichert"
+    }
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2351,7 +2354,16 @@
     "delete": "Löschen",
     "variable_guide_header": "Leitfaden für Vorlagenvariablen",
     "variable_usage_examples": "Beispiele für die Verwendung",
-    "body": "Inhalt"
+    "body": "Inhalt",
+    "clone": "Klonen",
+    "cloneTitle": "Vorlage klonen",
+    "systemReadOnly": "Vorgefertigte Vorlage — Löschen ist deaktiviert. Klonen Sie sie, um eine modifizierbare Kopie zu erstellen.",
+    "prebuiltBadge": "Vorgefertigt",
+    "prebuiltBadgeHint": "Wird vom System verwaltet. Sie können bearbeiten, aber das Löschen ist deaktiviert.",
+    "customBadge": "Benutzerdefiniert",
+    "filterAll": "Alle",
+    "filterPrebuilt": "Vorgefertigt",
+    "filterCustom": "Benutzerdefiniert"
   },
   "alert_destinations": {
     "header": "Ziele",
@@ -2388,7 +2400,11 @@
     "custom": "Benutzerdefiniert",
     "separator": "Trennzeichen",
     "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
-    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)",
+    "filterAll": "Alle",
+    "filterPrebuilt": "Vorgefertigt",
+    "filterCustom": "Benutzerdefiniert",
+    "templateDefaultBadge": "Standard"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",

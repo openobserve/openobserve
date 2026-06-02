@@ -2332,7 +2332,10 @@
       "destinationRequired": "Er is minstens één bestemming vereist!",
       "disabledNotificationsInfo": "De detectie van afwijkingen wordt nog steeds uitgevoerd en de resultaten worden naar de _anomalieënstream geschreven. Schakel meldingen in om waarschuwingen te ontvangen wanneer er afwijkingen worden gedetecteerd."
     },
-    "anomalyName": "Naam van de anomalie"
+    "anomalyName": "Naam van de anomalie",
+    "destinations": {
+      "saved": "Bestemming opgeslagen"
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2349,7 +2352,16 @@
     "delete": "Verwijderen",
     "variable_guide_header": "Handleiding voor sjabloonvariabelen",
     "variable_usage_examples": "Voorbeelden van gebruik",
-    "body": "Lichaam"
+    "body": "Lichaam",
+    "clone": "Kloon",
+    "cloneTitle": "Sjabloon klonen",
+    "systemReadOnly": "Vooraf gebouwde sjabloon — verwijderen is uitgeschakeld. Kloon het om een aanpasbare kopie te maken.",
+    "prebuiltBadge": "Voorgebouwd",
+    "prebuiltBadgeHint": "Beheerd door het systeem. Je kunt bewerken, maar verwijderen is uitgeschakeld.",
+    "customBadge": "Op maat",
+    "filterAll": "Alles",
+    "filterPrebuilt": "Voorgebouwd",
+    "filterCustom": "Op maat"
   },
   "alert_destinations": {
     "header": "Bestemmingen",
@@ -2386,7 +2398,11 @@
     "custom": "Op maat",
     "separator": "Separator",
     "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
-    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
+    "filterAll": "Alles",
+    "filterPrebuilt": "Voorgebouwd",
+    "filterCustom": "Op maat",
+    "templateDefaultBadge": "Standaard"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",

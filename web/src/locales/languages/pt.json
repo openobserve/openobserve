@@ -2334,7 +2334,10 @@
       "destinationRequired": "É necessário pelo menos um destino!",
       "disabledNotificationsInfo": "A detecção de anomalias ainda será executada e gravará os resultados no fluxo _anomalies. Ative as notificações para receber alertas quando forem detectadas anomalias."
     },
-    "anomalyName": "Nome da anomalia"
+    "anomalyName": "Nome da anomalia",
+    "destinations": {
+      "saved": "Destino salvo"
+    }
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2351,7 +2354,16 @@
     "delete": "Excluir",
     "variable_guide_header": "Guia de variáveis de modelo",
     "variable_usage_examples": "Exemplos de uso",
-    "body": "Corpo"
+    "body": "Corpo",
+    "clone": "Clonar",
+    "cloneTitle": "Modelo de clone",
+    "systemReadOnly": "Modelo pré-construído — a exclusão está desativada. Clone para criar uma cópia modificável.",
+    "prebuiltBadge": "Pré-construído",
+    "prebuiltBadgeHint": "Gerenciado pelo sistema. Você pode editar, mas a exclusão está desativada.",
+    "customBadge": "Personalizado",
+    "filterAll": "Todos",
+    "filterPrebuilt": "Pré-construído",
+    "filterCustom": "Personalizado"
   },
   "alert_destinations": {
     "header": "Destinos",
@@ -2388,7 +2400,11 @@
     "custom": "Personalizado",
     "separator": "Separador",
     "separator_placeholder": "Insira o separador (por exemplo, |,\\n,\\ t, espaço)",
-    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)"
+    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)",
+    "filterAll": "Todos",
+    "filterPrebuilt": "Pré-construído",
+    "filterCustom": "Personalizado",
+    "templateDefaultBadge": "Padrão"
   },
   "metrics": {
     "searchMetric": "Pesquisar uma métrica",

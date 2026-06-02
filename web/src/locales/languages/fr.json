@@ -2334,7 +2334,10 @@
       "destinationRequired": "Au moins une destination est requise !",
       "disabledNotificationsInfo": "La détection des anomalies sera toujours exécutée et les résultats seront enregistrés dans le flux _anomalies. Activez les notifications pour recevoir des alertes lorsque des anomalies sont détectées."
     },
-    "anomalyName": "Nom de l'anomalie"
+    "anomalyName": "Nom de l'anomalie",
+    "destinations": {
+      "saved": "Destination enregistrée"
+    }
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2351,7 +2354,16 @@
     "delete": "Supprimer",
     "variable_guide_header": "Guide des variables du modèle",
     "variable_usage_examples": "Exemples d'utilisation",
-    "body": "Corps"
+    "body": "Corps",
+    "clone": "Cloner",
+    "cloneTitle": "Modèle de clonage",
+    "systemReadOnly": "Modèle prédéfini : la suppression est désactivée. Clonez-le pour en faire une copie modifiable.",
+    "prebuiltBadge": "Préconstruit",
+    "prebuiltBadgeHint": "Géré par le système. Vous pouvez modifier, mais la suppression est désactivée.",
+    "customBadge": "Personnalisé",
+    "filterAll": "Tous",
+    "filterPrebuilt": "Préconstruit",
+    "filterCustom": "Personnalisé"
   },
   "alert_destinations": {
     "header": "Destinations",
@@ -2388,7 +2400,11 @@
     "custom": "Personnalisé",
     "separator": "Séparateur",
     "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
-    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
+    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)",
+    "filterAll": "Tous",
+    "filterPrebuilt": "Préconstruit",
+    "filterCustom": "Personnalisé",
+    "templateDefaultBadge": "Par défaut"
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",

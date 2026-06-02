@@ -2332,7 +2332,10 @@
       "destinationRequired": "목적지가 하나 이상 필요합니다!",
       "disabledNotificationsInfo": "예외 항목 탐지는 계속 실행되고 결과를 _anomalies 스트림에 기록합니다.이상 징후가 감지되면 알림을 받을 수 있도록 하세요."
     },
-    "anomalyName": "예외 항목 이름"
+    "anomalyName": "예외 항목 이름",
+    "destinations": {
+      "saved": "목적지 저장"
+    }
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2349,7 +2352,16 @@
     "delete": "삭제",
     "variable_guide_header": "템플릿 변수 가이드",
     "variable_usage_examples": "사용 예시",
-    "body": "바디"
+    "body": "바디",
+    "clone": "클론",
+    "cloneTitle": "클론 템플릿",
+    "systemReadOnly": "사전 빌드된 템플릿 — 삭제가 비활성화되었습니다.복제하여 수정 가능한 사본을 만드세요.",
+    "prebuiltBadge": "사전 구축",
+    "prebuiltBadgeHint": "시스템에 의해 관리됩니다.편집은 가능하지만 삭제는 불가능합니다.",
+    "customBadge": "사용자 지정",
+    "filterAll": "모두",
+    "filterPrebuilt": "사전 구축",
+    "filterCustom": "사용자 지정"
   },
   "alert_destinations": {
     "header": "여행지",
@@ -2386,7 +2398,11 @@
     "custom": "사용자 지정",
     "separator": "분리기",
     "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
-    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
+    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
+    "filterAll": "모두",
+    "filterPrebuilt": "사전 구축",
+    "filterCustom": "사용자 지정",
+    "templateDefaultBadge": "디폴트"
   },
   "metrics": {
     "searchMetric": "지표 검색",

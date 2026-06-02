@@ -2351,7 +2351,10 @@
       "destinationRequired": "少なくとも 1 つの目的地が必要です!",
       "disabledNotificationsInfo": "異常検出は引き続き実行され、結果が _anomalies ストリームに書き込まれます。異常が検出されたときにアラートを受け取るように通知を有効にします。"
     },
-    "anomalyName": "アノマリー名"
+    "anomalyName": "アノマリー名",
+    "destinations": {
+      "saved": "目的地が保存されました"
+    }
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2368,7 +2371,16 @@
     "delete": "削除",
     "variable_guide_header": "テンプレート変数ガイド",
     "variable_usage_examples": "使用例",
-    "body": "ボディ"
+    "body": "ボディ",
+    "clone": "クローン",
+    "cloneTitle": "テンプレートを複製",
+    "systemReadOnly": "ビルド済みテンプレート — 削除は無効になっています。クローンを作成して、変更可能なコピーを作成します。",
+    "prebuiltBadge": "構築済み",
+    "prebuiltBadgeHint": "システムによって管理されます。編集はできますが、削除はできません。",
+    "customBadge": "カスタム",
+    "filterAll": "[すべて]",
+    "filterPrebuilt": "構築済み",
+    "filterCustom": "カスタム"
   },
   "alert_destinations": {
     "header": "アラート送信先",
@@ -2405,7 +2417,11 @@
     "custom": "カスタム",
     "separator": "セパレーター",
     "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
-    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
+    "filterAll": "[すべて]",
+    "filterPrebuilt": "構築済み",
+    "filterCustom": "カスタム",
+    "templateDefaultBadge": "デフォルト"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",
