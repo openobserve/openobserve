@@ -200,26 +200,6 @@ test.describe("Multi-SQL Query Support", () => {
   );
 
   test(
-    "add button is hidden for pivot table (single-query restriction)",
-    { tag: ["@multiSQL", "@P0", "@smoke"] },
-    async ({ page }) => {
-      const pm = new PageManager(page);
-      const msql = pm.dashboardMultiSQL;
-      const dashboardName = generateDashboardName();
-
-      await buildPanel(page, pm, dashboardName, {
-        chartType: "table",
-        yField: "kubernetes_container_hash",
-        breakdownField: "kubernetes_namespace_name",
-      });
-      await expect(msql.addQueryBtn).not.toBeVisible();
-
-      await msql.applyAndSave(pm);
-      await cleanupTestDashboard(page, pm, dashboardName);
-    }
-  );
-
-  test(
     "add up to 3 query tabs and switch between them",
     { tag: ["@multiSQL", "@P1"] },
     async ({ page }) => {

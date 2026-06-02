@@ -126,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
         <OButton
-          v-if="!isPivotTable"
           variant="ghost"
           size="icon"
           @click.stop="addTab"
@@ -958,11 +957,6 @@ export default defineComponent({
     border-radius: 50%;
   }
 }
-
-// The multi-query warning chip is an OBadge (variant="warning-soft" + ring).
-// Styling — including the correct amber palette in both light and dark mode —
-// comes from the badge tokens; the .dashboard-multi-query-warning class remains
-// only as a stable hook for e2e selectors.
 
 .query-tab-name-text {
   cursor: default;
