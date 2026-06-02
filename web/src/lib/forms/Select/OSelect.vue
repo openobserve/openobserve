@@ -85,7 +85,6 @@ const props = withDefaults(defineProps<SelectProps>(), {
   iconKey: undefined,
   labelPosition: "outside",
   rowClickSingleSelect: false,
-  optionTooltip: false,
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
@@ -992,7 +991,6 @@ const fieldWidthClass = computed(() => {
                 </template>
                 <span
                   v-else
-                  :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
                     'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
                     labelPosition === 'inside' && label
@@ -1338,7 +1336,7 @@ const fieldWidthClass = computed(() => {
                         >
                           <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full tw:overflow-hidden">
                             <span class="tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:leading-snug">
-                              <span class="tw:truncate tw:font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
+                              <span class="tw:truncate tw:font-medium">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
                                 class="tw:shrink-0 tw:text-[10px] tw:font-medium tw:px-1 tw:py-px tw:rounded tw:border tw:border-solid tw:leading-tight"
@@ -1382,7 +1380,7 @@ const fieldWidthClass = computed(() => {
                             v-else-if="iconKey"
                             class="tw:shrink-0 tw:size-4"
                           />
-                          <span class="tw:truncate" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{
+                          <span class="tw:truncate">{{
                             filteredOptions[vRow.index].label
                           }}</span>
                         </template>
