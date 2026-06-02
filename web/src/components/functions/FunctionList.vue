@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
   >
     <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
@@ -27,12 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('function.header')"
         icon="function"
         :subtitle="'Reusable VRL functions applied in pipelines'"
-        tabs-below
-        class="tw:shrink-0 tw:px-4"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-        <template #tabs>
-          <PipelineSectionTabs />
-        </template>
         <template #actions>
           <OButton
             variant="primary"
@@ -44,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="tw:flex-1 tw:min-h-0 tw:mt-2.5">
         <div class="card-container tw:h-full">
           <OTable
             :frame="false"
@@ -62,22 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:w-full tw:h-full"
           >
               <template #toolbar>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                  <OSearchInput
-                    data-test="functions-list-search-input"
-                    v-model="filterQuery"
-                    class="tw:flex-1"
-                    :placeholder="t('function.search')"
-                  />
-                </div>
+                <OSearchInput
+                  data-test="functions-list-search-input"
+                  v-model="filterQuery"
+                  class="tw:w-64"
+                  :placeholder="t('function.search')"
+                />
               </template>
               <template #empty>
-                <OEmptyState
-                  size="hero"
-                  preset="no-functions"
-                  :filtered="!!filterQuery"
-                  @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn({}))"
-                />
+                <NoData />
               </template>
 
               <template #cell-name="{ row, value }">
@@ -205,7 +194,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
@@ -215,18 +203,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "functionList",
   components: {
-    OEmptyState,
     AppPageHeader,
-    PipelineSectionTabs,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,
@@ -266,7 +250,7 @@ export default defineComponent({
         header: "#",
         accessorKey: "#",
         sortable: false,
-        size: TABLE_INDEX_COL_SIZE,
+        size: 67,
         meta: { align: "left" },
       },
       {

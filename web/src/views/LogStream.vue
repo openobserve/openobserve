@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only. The stream-type filter
            and search moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader :subtitle="'Index management and stream configuration'" icon="window">
-          <template #title><span data-test="log-stream-title-text">{{ t('logStream.header') }}</span></template>
+        <AppPageHeader :title="t('logStream.header')" :subtitle="'Index management and stream configuration'" icon="window">
           <template #actions>
             <OButton
               data-test="log-stream-refresh-stats-btn"
@@ -52,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-stream-table"
         :data="logStream"
         :columns="columns"
-        show-index
         row-key="_rowKey"
         :frame="false"
         selection="multiple"
@@ -68,9 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         :default-columns="false"
         :loading="loadingState"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="streams-log-stream-list"
         style="width: 100%; height: 100%"
       >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
@@ -157,13 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <div v-if="!loadingState">
-              <OEmptyState
-                size="hero"
-                preset="no-streams"
-                :filtered="!!filterQuery"
-                :hide-action="!filterQuery"
-                @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-              />
+              <NoData />
             </div>
           </template>
           <template #bottom="scope">
@@ -270,7 +259,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import {
@@ -279,7 +268,7 @@ import {
 } from "@/composables/useAppBreadcrumb";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
 import {
   getImageURL,
@@ -307,7 +296,7 @@ export default defineComponent({
     PageLayout,
     AppPageHeader,
     SchemaIndex,
-    OEmptyState,
+    NoData,
     AddStream,
     OButton,
     ODialog,
@@ -365,24 +354,24 @@ export default defineComponent({
     } = useStreams();
     const columns = ref<OTableColumnDef[]>([
       {
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 2,
+        meta: { align: "left" },
+      },
+      {
         id: "name",
         accessorKey: "name",
         header: t("logStream.name"),
         sortable: true,
-        resizable: true,
-        hideable: true,
-        minSize: 200,
-        // Elastic column: absorbs the table's leftover width so the fixed
-        // columns (#, type, sizes, actions) keep their exact widths.
-        meta: { align: "left", autoWidth: true },
+        meta: { align: "left" },
       },
       {
         id: "stream_type",
         accessorKey: "stream_type",
         header: t("logStream.type"),
-        size: COL.streamType,
-        resizable: true,
-        hideable: true,
+        size: 30,
         meta: { align: "left" },
       },
       {
@@ -391,48 +380,38 @@ export default defineComponent({
           row.doc_num?.toLocaleString?.() ?? row.doc_num,
         header: t("logStream.docNum"),
         sortable: true,
-        resizable: true,
-        hideable: true,
-        size: COL.count,
-        meta: { align: "right" },
+        size: 80,
+        meta: { align: "left" },
       },
       {
         id: "storage_size",
         accessorFn: (row: any) => formatSizeFromMB(row.storage_size),
         header: t("logStream.storageSize"),
         sortable: true,
-        resizable: true,
-        hideable: true,
-        size: COL.sizeBytes,
-        meta: { align: "right" },
+        size: 50,
+        meta: { align: "left" },
       },
       {
         id: "compressed_size",
         accessorFn: (row: any) => formatSizeFromMB(row.compressed_size),
         header: t("logStream.compressedSize"),
         sortable: true,
-        resizable: true,
-        hideable: true,
-        size: COL.sizeBytes,
-        meta: { align: "right" },
+        size: 50,
+        meta: { align: "left" },
       },
       {
         id: "index_size",
         accessorFn: (row: any) => formatSizeFromMB(row.index_size),
         header: t("logStream.indexSize"),
         sortable: true,
-        resizable: true,
-        hideable: true,
-        size: COL.sizeBytes,
-        meta: { align: "right" },
+        size: 50,
+        meta: { align: "left" },
       },
       {
         id: "actions",
         header: t("user.actions"),
         isAction: true,
-        // Initial hint only — OTable measures the rendered buttons and sizes
-        // the column to fit them exactly.
-        size: 120,
+        size: 50,
         meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
       },
     ]);
@@ -498,6 +477,7 @@ export default defineComponent({
         logStream.value = [];
 
         const offset = (currentPage.value - 1) * pageSize.value;
+        let counter = 1 + (offset < 0 ? 0 : offset);
         let streamResponse;
         // if(selectedStreamType.value == "all") {
         //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
@@ -535,6 +515,7 @@ export default defineComponent({
                   index_size = data.stats.index_size + " MB";
                 }
                 return {
+                  "#": counter <= 9 ? `0${counter++}` : counter++,
                   _rowKey: `${data.name}-${data.stream_type}`,
                   name: data.name,
                   doc_num: doc_num,

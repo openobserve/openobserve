@@ -413,9 +413,12 @@ defineExpose({
       <slot name="toolbar" />
     </div>
     <!-- ── Built-in global search ─────────────────────────── -->
+    <!-- No distinct background — matches the #toolbar slot so a table's search
+         row looks identical whether it uses the built-in filter or a custom
+         toolbar (kept consistent across IAM / settings / streams / etc.). -->
     <div
       v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)] tw:bg-[var(--color-table-header-bg)]"
+      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)]"
       data-test="o2-table-global-filter"
     >
       <div class="tw:relative tw:max-w-xs">

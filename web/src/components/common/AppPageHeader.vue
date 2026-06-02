@@ -32,9 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   band so detail views don't re-import it. The #subtitle slot is the escape
   hatch (e.g. to append a spinner) and takes precedence over the prop.
 
-  Overlays/dialogs (drawers, near-fullscreen panels) that don't change the URL
-  should pass `:back="{ label, to|onClick }"` (or the #back slot) for a leading
-  "‹ Parent" back-pill instead of a full breadcrumb.
+  Sub-navigation (CRUD add/edit, drill-down editors): pass
+  `:back="{ label, to|onClick }"` (or the #back slot). On a sub-page the leading
+  module-icon TILE is replaced by a Back button (a ‹ chevron in the same 8×8
+  footprint) — so a listing page shows the module icon and its add/edit page
+  shows a Back button in the exact same spot, with the title's X position
+  unchanged. The breadcrumb (chrome bar) still shows the full path.
 
   NOTE: title/heading font sizes use `!important` because the app defines
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
@@ -51,26 +54,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="app-page-header tw:shrink-0 tw:h-12 tw:flex tw:items-center tw:justify-between tw:gap-4"
   >
     <div class="tw:flex tw:items-center tw:gap-3 tw:min-w-0 tw:h-full tw:flex-1">
-      <!-- Overlay back-pill (leading, before the icon) -->
-      <div v-if="hasBack" class="tw:shrink-0">
+      <slot name="title-prefix" />
+
+      <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
+           footprint, so the title's X never shifts between list and add/edit). -->
+      <template v-if="hasBack">
         <slot name="back">
           <button
             type="button"
-            class="tw:flex tw:items-center tw:gap-1 tw:max-w-48 tw:text-text-secondary tw:px-1.5 tw:py-1 tw:rounded-md tw:outline-none tw:transition-colors tw:hover:text-text-primary tw:hover:bg-surface-subtle tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
-            :title="back?.label"
+            class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-8 tw:h-8 tw:rounded-lg tw:text-text-secondary tw:transition-colors tw:hover:bg-surface-subtle tw:hover:text-text-primary tw:outline-none tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+            :title="backLabel"
+            :aria-label="backLabel"
             data-test="app-page-header-back"
             @click="onBack"
           >
-            <OIcon name="chevron-left" size="sm" class="tw:shrink-0" />
-            <span class="tw:truncate">{{ back?.label }}</span>
+            <OIcon name="chevron-left" size="md" />
           </button>
         </slot>
-      </div>
+      </template>
 
-      <slot name="title-prefix" />
-
+      <!-- Listing/index page: the module icon tile. -->
       <span
-        v-if="icon"
+        v-else-if="icon"
         class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-8 tw:h-8 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text"
         aria-hidden="true"
       >
@@ -184,6 +189,9 @@ const hasSubtitle = computed(
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
 const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
+const backLabel = computed(() =>
+  props.back?.label ? `Back to ${props.back.label}` : "Back",
+);
 
 const onBack = () => {
   if (props.back?.onClick) props.back.onClick();

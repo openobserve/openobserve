@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("regex_patterns.create_pattern") }}</OButton>
       </template>
     </AppPageHeader>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
     <OTable
       :frame="false"
       data-test="regex-pattern-list-table"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar>
         <OSearchInput
           v-model="filterQuery"
-          class="tw:flex-1"
+          class="tw:w-64 no-border o2-search-input"
           :placeholder="t('regex_patterns.search')"
         />
       </template>
@@ -171,7 +171,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -197,7 +196,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
+        size: 67,
         meta: { align: "left" },
       },
       {

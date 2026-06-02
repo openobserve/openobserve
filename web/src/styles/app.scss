@@ -45,9 +45,7 @@ body {
   overflow: hidden;
   color: var(--o2-text-body);
   font-family: var(--font-sans);
-  /* Compact base — 13px body (HANDOFF §2.3 --fs). Components set their own
-     explicit sizes; this is the inherited default for untyped text. */
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: var(--font-normal);
   line-height: var(--leading-base);
 }
@@ -70,9 +68,7 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: var(--text-2xl);
-  // Design-system weight scale (HANDOFF.md §2.2): the title peak is 700.
-  // Never 800/900 — when everything is heavy, nothing stands out.
-  font-weight: var(--font-bold);
+  font-weight: var(--font-black);
   line-height: var(--leading-2xl);
   letter-spacing: var(--tracking-tight);
 }
@@ -147,10 +143,6 @@ code {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--o2-text-code);
-  // Mono treatment (HANDOFF §2.1): tabular figures + tight tracking so IDs,
-  // counts and timestamps align and read as machine output.
-  font-feature-settings: "tnum";
-  letter-spacing: -0.2px;
 }
 
 ::placeholder {
@@ -182,13 +174,13 @@ code {
   overflow: hidden;
 }
 
-// Standard section/panel used across pages. The app chrome (MainLayout) already
-// frames the whole content area in ONE bordered "content card", so per the design
-// system every inner section is FLUSH — no nested box border, no rounded corner.
-// Sections separate with border-soft dividers (border-bottom), not boxes.
-// Controlled here in one place: flip these to restyle every section app-wide.
+// Standard bordered section/panel used across pages. Per the design system we
+// use a BORDER (never a card-style box-shadow) so every layout section looks the
+// same — controlled here in one place.
 .card-container {
   background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  border: 0.0625rem solid var(--o2-border-color);
 }
 
 // .feature-card {
@@ -476,13 +468,8 @@ body.body--dark .ai-icon-button:hover {
 // Form-field label — shared by OInput / OTextarea / OSelect / OCombobox /
 // OCheckbox / ORadio / OSwitch / OOptionGroup / OToggleGroup.
 .o-input-label {
-  // Match the design-system body size (--text-sm = 13px) and the prototype's
-  // form-label spec. Was hardcoded to 0.875rem (14px), a step larger than every
-  // other label, which made form-field labels read as heavier/bolder.
-  font-size: var(--text-sm);
-  // Medium (500), not semibold — 600 read as too heavy/black on form labels.
-  // Unlayered, so this wins over the inline `tw:font-semibold` utility.
-  font-weight: 500;
+  font-size: 0.875rem;
+  font-weight: 600;
   line-height: 1.25;
   color: #262626;
 }
@@ -495,12 +482,12 @@ body.body--dark .o-input-label {
 // visibly distinct from enabled ones without becoming unreadable.
 .o-input-label--disabled {
   color: #a3a3a3 !important;
-  font-weight: 400 !important;
+  font-weight: 500 !important;
 }
 html.dark .o-input-label--disabled,
 body.body--dark .o-input-label--disabled {
   color: #c4c4c4 !important;
-  font-weight: 400 !important;
+  font-weight: 500 !important;
 }
 
 
@@ -641,46 +628,49 @@ body.body--dark [data-destructive-icon="true"]:hover {
 // ═══════════════════════════════════════════════════════════════
 // 9. Scrollbar Styling
 // ═══════════════════════════════════════════════════════════════
-// Always-visible scrollbar (prototype): a 9px track with a rounded thumb that
-// is colored at rest (not auto-hidden), inset via a 2px transparent border.
 ::-webkit-scrollbar {
-  width: 0.5625rem;  /* 9px */
-  height: 0.5625rem;
+  width: 0.4rem;
+  height: 0.4rem;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--o2-scrollbar-track-bg, transparent);
+  border-radius: 0.25rem;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-grey-300);
-  border-radius: 0.375rem;  /* 6px */
-  border: 2px solid transparent;
-  background-clip: content-box;
+  border-radius: 0.25rem;
+  background: transparent;
+  transition: background 0.3s ease;
+  cursor: pointer;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-grey-400);
-  background-clip: content-box;
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--o2-scrollbar-thumb-bg, transparent);
 }
 
-// Firefox — thin, thumb colored at rest.
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--o2-scrollbar-thumb-hover-bg, rgba(0, 0, 0, 0.1));
+  cursor: pointer;
+}
+
+*:hover::-webkit-scrollbar-thumb:active {
+  background: var(--o2-scrollbar-thumb-active-bg, rgba(0, 0, 0, 0.15));
+  cursor: grabbing;
+}
+
+*:hover::-webkit-scrollbar-track {
+  background: var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-grey-300) transparent;
+  scrollbar-color: transparent transparent;
 }
 
-// Dark mode — lift the thumb off the dark surfaces.
-.dark ::-webkit-scrollbar-thumb {
-  background: var(--color-grey-700);
-  background-clip: content-box;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-grey-600);
-  background-clip: content-box;
-}
-.dark * {
-  scrollbar-color: var(--color-grey-700) transparent;
+*:hover {
+  scrollbar-color: var(--o2-scrollbar-thumb-bg, transparent)
+                   var(--o2-scrollbar-track-hover-bg, rgba(0, 0, 0, 0.02));
 }
 
 // ═══════════════════════════════════════════════════════════════

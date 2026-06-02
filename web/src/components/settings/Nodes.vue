@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div class="tw:rounded-md tw:flex tw:flex-col" style="height: calc(100vh - 64px); overflow: hidden;">
     <!-- Standard page header on top (full-width). The filter panel (left) + table
          (right) sit below in the splitter — the standard header + left + right model. -->
     <AppPageHeader
@@ -90,7 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedRegionIdsUpdate"
                     >
                       <template #empty>
-                        <OEmptyState size="block" preset="no-nodes" />
+                        <div class="tw:w-full tw:text-center tw:p-3">
+                          <OIcon name="warning" size="md" />
+                          <span class="tw:ml-2">No data available</span>
+                        </div>
                       </template>
                     </OTable>
                   </div>
@@ -129,7 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedClusterIdsUpdate"
                     >
                       <template #empty>
-                        <OEmptyState size="block" preset="no-nodes" />
+                        <div class="tw:w-full tw:text-center tw:p-3">
+                          <OIcon name="warning" size="md" />
+                          <span class="tw:ml-2">No data available</span>
+                        </div>
                       </template>
                     </OTable>
                   </div>
@@ -419,9 +425,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pt-2">
         <OTable
-          class="tw:flex-1 tw:min-h-0"
+          class="tw:flex-1 tw:min-h-0 tw:mx-4"
           ref="qTable"
           data-test="nodes-main-table"
           :data="visibleRows"
@@ -442,19 +448,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               data-test="nodes-search-input"
               v-model="filterQuery"
-              class="tw:flex-1"
+              class="tw:w-64 no-border o2-search-input"
               :placeholder="t('nodes.search')"
             />
           </template>
-          <template #empty>
-            <OEmptyState
-              size="hero"
-              preset="no-nodes"
-              :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-            />
-          </template>
+          <template #empty><NoData /></template>
 
           <template #cell-id="{ row }">
             {{ row.id }}
@@ -529,7 +527,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -553,7 +551,7 @@ export default defineComponent({
   name: "PageCipherKeys",
   components: {
     AppPageHeader,
-    OEmptyState,
+    NoData,
     OButton,
     OProgressBar,
     OInput,

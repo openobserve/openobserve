@@ -25,8 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('ingestion.header')"
       icon="data-plus-line"
-      tabs-below
-      class="tw:shrink-0 tw:px-4"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
       <template #actions>
         <div class="tw:w-50 tw:flex-none">
@@ -86,69 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`ingestion.generateRUMTokenLabel`) }}
         </OButton>
       </template>
-      <template #tabs>
-        <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
-             up with the vertical sub-nav (Kubernetes/…) in the section below. -->
-        <div class="tw:-ml-3 tw:w-full">
-        <OTabs v-model="ingestTabType" align="left">
-          <ORouteTab
-            name="recommended"
-            :to="{ name: 'recommended', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.recommendedLabel')"
-          />
-          <ORouteTab
-            name="custom"
-            :to="{ name: 'custom', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.customLabel')"
-          />
-          <ORouteTab
-            name="server"
-            :to="{ name: 'servers', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.serverLabel')"
-          />
-          <ORouteTab
-            name="database"
-            :to="{ name: 'databases', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.databaseLabel')"
-          />
-          <ORouteTab
-            name="security"
-            :to="{ name: 'security', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.securityLabel')"
-          />
-          <ORouteTab
-            name="devops"
-            :to="{ name: 'devops', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.devopsLabel')"
-          />
-          <ORouteTab
-            name="networking"
-            :to="{ name: 'networking', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.networkingLabel')"
-          />
-          <ORouteTab
-            name="message-queues"
-            :to="{ name: 'message-queues', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.messageQueuesLabel')"
-          />
-          <ORouteTab
-            name="languages"
-            :to="{ name: 'languages', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.languagesLabel')"
-          />
-          <ORouteTab
-            name="ai-integrations"
-            :to="{ name: 'ai-integrations', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.aiLabel')"
-          />
-          <ORouteTab
-            name="others"
-            :to="{ name: 'others', query: { org_identifier: store.state.selectedOrganization.identifier } }"
-            :label="t('ingestion.otherLabel')"
-          />
-        </OTabs>
-        </div>
-      </template>
     </AppPageHeader>
     <ConfirmDialog
       title="Reset RUM Token"
@@ -168,7 +104,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="tw:w-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
+      <div class="card-container">
+        <div class="tw:ml-3">
+          <OTabs v-model="ingestTabType" horizontal align="left">
+            <ORouteTab
+              name="recommended"
+              :to="{
+                name: 'recommended',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.recommendedLabel')"
+            />
+            <ORouteTab
+              name="custom"
+              :to="{
+                name: 'custom',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.customLabel')"
+            />
+            <ORouteTab
+              name="server"
+              :to="{
+                name: 'servers',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.serverLabel')"
+            />
+            <ORouteTab
+              name="database"
+              :to="{
+                name: 'databases',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.databaseLabel')"
+            />
+
+            <ORouteTab
+              name="security"
+              :to="{
+                name: 'security',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.securityLabel')"
+            />
+
+            <ORouteTab
+              name="devops"
+              :to="{
+                name: 'devops',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.devopsLabel')"
+            />
+
+            <ORouteTab
+              name="networking"
+              :to="{
+                name: 'networking',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.networkingLabel')"
+            />
+            <ORouteTab
+              name="message-queues"
+              :to="{
+                name: 'message-queues',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.messageQueuesLabel')"
+            />
+            <ORouteTab
+              name="languages"
+              :to="{
+                name: 'languages',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.languagesLabel')"
+            />
+            <ORouteTab
+              name="ai-integrations"
+              :to="{
+                name: 'ai-integrations',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.aiLabel')"
+            />
+            <ORouteTab
+              name="others"
+              :to="{
+                name: 'others',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.otherLabel')"
+            />
+          </OTabs>
+        </div>
+      </div>
+    </div>
+    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pb-2.5">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"

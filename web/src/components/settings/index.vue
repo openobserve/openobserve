@@ -27,6 +27,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <SectionHub :groups="sectionGroups" class="tw:flex-1 tw:min-h-0" />
     </template>
+    <!-- Form-style sections (general, org params, license, correlation, domain):
+         the shell owns a FULL-WIDTH header (so the header matches the hub and
+         every other page exactly), and only the CONTENT is centered in a reading
+         column at the same width as the hub. -->
+    <template v-else-if="isConstrainedSection">
+      <AppPageHeader
+        :title="activeSectionItem?.label || ''"
+        :subtitle="activeSectionItem?.description || ''"
+        :icon="(activeSectionItem?.icon as any)"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      />
+      <ConstrainedPage size="lg" class="tw:flex-1 tw:min-h-0">
+        <router-view title="" />
+      </ConstrainedPage>
+    </template>
     <section
       v-else
       class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto"
@@ -38,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import SectionHub, {
   type SectionHubGroup,
   type SectionHubItem,
@@ -68,6 +84,7 @@ export default defineComponent({
   name: "AppSettings",
   components: {
     AppPageHeader,
+    ConstrainedPage,
     SectionHub,
   },
   setup() {
@@ -110,6 +127,19 @@ export default defineComponent({
     }));
     const activeSection = computed(
       () => routeToSettingsTab[route.name as string] ?? "",
+    );
+
+    // Form-style sections render in a centered reading column (ConstrainedPage);
+    // table/list sections (nodes, destinations, templates, …) stay full-width.
+    const CONSTRAINED_SECTIONS = new Set([
+      "general",
+      "organization",
+      "license",
+      "correlation_settings",
+      "domain_management",
+    ]);
+    const isConstrainedSection = computed(() =>
+      CONSTRAINED_SECTIONS.has(activeSection.value),
     );
 
     // Guard meta-only sections for non-meta users; the hub itself never redirects.
@@ -312,6 +342,12 @@ export default defineComponent({
       return items;
     });
 
+    // The active section's metadata (label + description) — drives the shell-owned
+    // full-width header for constrained form sections.
+    const activeSectionItem = computed(() =>
+      settingsItems.value.find((i) => i.key === activeSection.value),
+    );
+
     // Bucket the sections into ordered groups for SectionHub / the breadcrumb switcher.
     const sectionGroups = computed<SectionHubGroup[]>(() => {
       const buckets = new Map<string, SectionHubItem[]>();
@@ -378,6 +414,8 @@ export default defineComponent({
       isHub,
       hubRoute,
       activeSection,
+      isConstrainedSection,
+      activeSectionItem,
       sectionGroups,
       crumbs,
       handleSettingsRouting,

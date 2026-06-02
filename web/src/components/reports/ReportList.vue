@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only. Tabs / search / folder
            scope moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader icon="description" :subtitle="'Scheduled reports and exports'">
-          <template #title><span data-test="report-list-title">{{ t('reports.header') }}</span></template>
+        <AppPageHeader :title="t('reports.header')" icon="description" :subtitle="'Scheduled reports and exports'">
           <template #actions>
             <OButton
               data-test="report-list-add-report-btn"
@@ -38,24 +37,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
-    <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
+    <!-- Splitter: folder list left, table right -->
     <div
-      data-test="report-list-splitter"
-      class="report-list-table tw:flex-1 tw:flex tw:min-h-0"
+      class="tw:w-full report-list-table tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:pt-2.5"
     >
-      <!-- Left: folder list -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
-          <FolderList
-            type="reports"
-            @update:activeFolderId="updateActiveFolderId"
-          />
-        </div>
-      </div>
+      <OSplitter
+        v-model="splitterModel"
+        unit="px"
+        :limits="[200, 500]"
+        :horizontal="false"
+        style="height: 100%"
+        data-test="report-list-splitter"
+      >
+        <!-- Left: folder list -->
+        <template #before>
+          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full">
+              <FolderList
+                type="reports"
+                @update:activeFolderId="updateActiveFolderId"
+              />
+            </div>
+          </div>
+        </template>
 
-      <!-- Right: report table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+        <!-- Right: report table -->
+        <template #after>
+          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full card-container">
               <OTable
                 data-test="report-list-table"
                 :data="visibleRows"
@@ -72,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :persist-columns="true"
                 table-id="reports-report-list"
               >
-                <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
+                <!-- Toolbar: Scheduled/Cached tabs + search + folder-scope toggle -->
                 <template #toolbar>
                   <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
                     <div class="app-tabs-container">
@@ -83,79 +92,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
                       />
                     </div>
-                    <div class="tw:flex-1 tw:min-w-0">
-                      <OInput
-                        v-model="dynamicQueryModel"
-                        :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('reports.search')"
-                        :clearable="searchAcrossFolders"
-                        @clear="clearSearch"
-                        data-test="report-list-search-input"
-                        class="tw:w-full"
-                      >
-                        <template #icon-left>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                        <template #icon-right>
-                          <div
-                            role="radiogroup"
-                            aria-label="Search scope"
-                            class="tw:flex tw:items-center tw:gap-0.5 tw:self-center tw:mr-1 tw:p-0.5 tw:rounded-lg tw:bg-surface-subtle"
-                          >
-                            <button
-                              type="button"
-                              role="radio"
-                              :aria-checked="!searchAcrossFolders"
-                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
-                              :class="!searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
-                              data-test="report-list-search-scope-current"
-                              title="Search only this folder"
-                              @click="searchAcrossFolders = false"
-                            >
-                              <OIcon name="folder-outline" size="xs" />
-                              <span class="tw:whitespace-nowrap">This folder</span>
-                            </button>
-                            <button
-                              type="button"
-                              role="radio"
-                              :aria-checked="searchAcrossFolders"
-                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
-                              :class="searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
-                              data-test="report-list-search-across-folders-toggle"
-                              title="Search across all folders"
-                              @click="searchAcrossFolders = true"
-                            >
-                              <OIcon name="search" size="xs" />
-                              <span class="tw:whitespace-nowrap">All folders</span>
-                            </button>
-                          </div>
-                        </template>
-                      </OInput>
+                    <OSearchInput
+                      data-test="report-list-search-input"
+                      v-model="dynamicQueryModel"
+                      class="tw:ml-auto no-border o2-search-input tw:w-50"
+                      :placeholder="
+                        searchAcrossFolders
+                          ? t('dashboard.searchAcross')
+                          : t('reports.search')
+                      "
+                      @clear="clearSearch"
+                    />
+                    <div class="tw:whitespace-nowrap">
+                      <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
+                        <OSwitch
+                          data-test="report-list-search-across-folders-toggle"
+                          v-model="searchAcrossFolders"
+                          :label="t('dashboard.allFolders') || 'All Folders'"
+                          class="tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
+                        />
+                      </OTooltip>
                     </div>
                   </div>
                 </template>
-                <template #toolbar-trailing>
-                  <OButton
-                    variant="outline"
-                    size="icon-sm"
-                    icon-left="refresh"
-                    :loading="isLoadingReports"
-                    title="Reload reports"
-                    data-test="report-list-refresh-btn"
-                    @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
-                  />
-                </template>
                 <template #empty>
-                  <OEmptyState
-                    size="hero"
-                    preset="no-reports"
-                    :filtered="!!(filterQuery || searchQuery)"
-                    @action="
-                      (id) =>
-                        id === 'clear-filters'
-                          ? ((filterQuery = ''), (searchQuery = ''))
-                          : createNewReport()
-                    "
-                  />
+                  <NoData />
                 </template>
 
                 <!-- Name column: badges for type/preview -->
@@ -266,8 +227,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
-        </div>
-      </div>
+            </div>
+          </div>
+        </template>
+      </OSplitter>
     </div>
     </PageLayout>
 
@@ -313,7 +276,7 @@ import {
   useAppBreadcrumb,
   type Crumb,
 } from "@/composables/useAppBreadcrumb";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { formatDate } from "@/utils/date";
@@ -326,13 +289,14 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import OIcon from '@/lib/core/Icon/OIcon.vue';
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
+import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -407,11 +371,11 @@ const confirmBulkDelete = ref<boolean>(false);
 
 const columns = computed<OTableColumnDef[]>(() => {
   const base: OTableColumnDef[] = [
-    { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "center" } },
-    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, meta: { align: "left" } },
+    { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "center" } },
+    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, meta: { align: "left" } },
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: 150, meta: { align: "center" } },
     { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: 300, meta: { align: "center" } },
-    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: 220, meta: { align: "left" } },
     { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
   ];
 
@@ -424,7 +388,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       sortable: true,
       resizable: true,
       hideable: true,
-      size: COL.folder,
+      size: 150,
       meta: { align: "left" },
     });
   }

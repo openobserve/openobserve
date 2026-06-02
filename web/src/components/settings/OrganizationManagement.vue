@@ -49,13 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-organizations"
-            :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-          />
+          <NoData />
         </template>
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
@@ -137,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="extendTrialPrompt = false"
       @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3">
-        <div class="tw:font-bold">Week(s)</div>
-        <div class="tw:flex tw:gap-1">
+      <div>
+        <div class="float-left tw:font-bold">Week(s)</div>
+        <div class="float-right tw:gap-1">
           <span
             v-for="page in 4"
             :key="page"
@@ -147,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
               extendedTrial === page
-                ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
+                ? 'tw:bg-[var(--o2-primary)] tw:text-white'
                 : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
             ]"
           >
@@ -196,7 +190,7 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "../shared/grid/NoData.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -217,7 +211,7 @@ export default defineComponent({
   name: "PageAlerts",
   components: {
     AppPageHeader,
-    OEmptyState,
+    NoData,
     OButton,
     ODialog,
     OTooltip,
@@ -542,8 +536,8 @@ export default defineComponent({
 
     const toggleOrgStorage = async (row: any) => {
       const ok = await confirm({
-        title: "Enable BYOB",
-        message: `Are you sure you want to enable BYOB for "${row.name}"?`,
+        title: "Enable Storage Settings",
+        message: `Are you sure you want to enable storage settings for "${row.name}"?`,
       });
       if (ok) {
         loading.value = true;

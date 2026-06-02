@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
         <OTable
           :frame="false"
           data-test="iam-groups-table-section"
@@ -46,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
+          :global-filter-placeholder="t('iam.searchGroup')"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -57,15 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-              <OSearchInput
-                v-model="filterQuery"
-                :placeholder="t('iam.searchGroup')"
-                class="tw:flex-1"
-              />
-            </div>
-          </template>
           <template #cell-actions="{ row }">
             <div class="tw:flex tw:items-center tw:justify-center">
               <OButton
@@ -89,12 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <OEmptyState
-              size="hero"
-              preset="no-groups"
-              :filtered="!!filterQuery"
-              @action="(id) => id === 'create' ? addGroup() : (filterQuery = '')"
-            />
+            <NoData />
           </template>
           <template #bottom>
             <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ t('iam.groups') }}</span>
@@ -110,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
         </OTable>
-      </div>
     </div>
     <AddGroup
       v-model:open="showAddGroup"
@@ -141,7 +125,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
@@ -151,10 +135,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
 
@@ -195,7 +177,7 @@ const columns: OTableColumnDef[] = [
     id: "#",
     header: "#",
     accessorFn: (row: any) => row["#"],
-    size: TABLE_INDEX_COL_SIZE,
+    size: 36,
     minSize: 32,
     maxSize: 40,
     meta: { compactPadding: true, align: "left" },
@@ -205,7 +187,7 @@ const columns: OTableColumnDef[] = [
     header: t("iam.groupName"),
     accessorKey: "group_name",
     sortable: true,
-    meta: { align: "left", autoWidth: true, isName: true },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "actions",

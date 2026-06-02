@@ -27,6 +27,10 @@
     splitterLimits  — [min, max] px limits for OSplitter (default [0, 400])
     mainPanel       — when false, main content fills space without an inner border panel
                       (use for full-bleed content like the dashboard view; default true)
+    constrained     — when true (and no sidebar), the main content is centered in a
+                      max-width reading column (ConstrainedPage) instead of full width.
+                      Use for settings sections, single forms, org params, hubs, etc.
+    contentSize     — reading-column width when constrained ('sm'|'md'|'lg'|'xl'; default 'lg')
     headerClass     — override the default header wrapper class
                       (default: 'tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default')
 
@@ -110,6 +114,15 @@
       </section>
     </div>
 
+    <!-- ── Body: constrained reading column (no sidebar) ────────── -->
+    <ConstrainedPage
+      v-else-if="constrained"
+      :size="contentSize"
+      class="tw:flex-1 tw:min-h-0"
+    >
+      <slot />
+    </ConstrainedPage>
+
     <!-- ── Body: main only (no sidebar) ─────────────────────────── -->
     <template v-else>
       <!-- With bordered panel (default) -->
@@ -136,6 +149,7 @@ import { ref, computed, watch } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -143,6 +157,8 @@ const props = withDefaults(
     resizable?: boolean;
     splitterLimits?: [number, number];
     mainPanel?: boolean;
+    constrained?: boolean;
+    contentSize?: "sm" | "md" | "lg" | "xl";
     headerClass?: string;
   }>(),
   {
@@ -150,6 +166,8 @@ const props = withDefaults(
     resizable: false,
     splitterLimits: () => [0, 400] as [number, number],
     mainPanel: true,
+    constrained: false,
+    contentSize: "lg",
     headerClass: undefined,
   },
 );

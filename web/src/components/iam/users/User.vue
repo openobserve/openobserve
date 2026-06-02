@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
       <div class="card-container tw:h-full">
         <OTable
           :key="tableKey"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
+          :global-filter-placeholder="t('user.search')"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -67,26 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-              <OSearchInput
-                v-model="filterQuery"
-                :placeholder="t('user.search')"
-                data-test="user-list-search-input"
-                class="tw:flex-1"
-              />
-            </div>
-          </template>
           <template #empty>
-            <OEmptyState
-              size="hero"
-              preset="no-users"
-              :filtered="!!filterQuery"
-              @action="
-                (id) =>
-                  id === 'clear-filters' ? (filterQuery = '') : addRoutePush({})
-              "
-            />
+            <NoData />
           </template>
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
@@ -248,15 +230,13 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -270,8 +250,7 @@ export default defineComponent({
     OBadge,
     OIcon,
     ODialog,
-    OEmptyState,
-    OSearchInput,
+    NoData,
   },
   emits: [
     "updated:fields",
@@ -368,7 +347,7 @@ export default defineComponent({
           id: "#",
           header: "#",
           accessorFn: (row: any) => row["#"],
-          size: TABLE_INDEX_COL_SIZE,
+          size: 40,
           minSize: 32,
           maxSize: 50,
           meta: { compactPadding: true, align: "left" },
@@ -378,7 +357,6 @@ export default defineComponent({
           header: t("user.email"),
           accessorKey: "email",
           sortable: true,
-          size: COL.email,
           meta: { align: "left", autoWidth: true },
         },
         {
@@ -386,16 +364,16 @@ export default defineComponent({
           header: t("user.firstName"),
           accessorKey: "first_name",
           sortable: true,
-          size: COL.firstName,
-          meta: { align: "left", isName: true },
+          size: 150,
+          meta: { align: "left" },
         },
         {
           id: "last_name",
           header: t("user.lastName"),
           accessorKey: "last_name",
           sortable: true,
-          size: COL.lastName,
-          meta: { align: "left", isName: true },
+          size: 150,
+          meta: { align: "left" },
         },
       ];
 
@@ -406,7 +384,7 @@ export default defineComponent({
           header: "Auth",
           accessorKey: "auth_type",
           sortable: true,
-          size: COL.authType,
+          size: 120,
           meta: { align: "left" },
         });
       }
@@ -417,7 +395,7 @@ export default defineComponent({
         header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
-        size: COL.role,
+        size: 220,
         meta: { align: "left" },
       });
 

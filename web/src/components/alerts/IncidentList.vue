@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -52,9 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="alerts-incident-list"
         class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         data-test="incident-list-table"
         @row-click="viewIncident"
@@ -86,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-title="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
-            <span>
+            <span class="tw:font-medium">
               {{ row.title || formatDimensions(row.group_values) }}
             </span>
           </div>
@@ -99,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dimension-badge"
               :class="getDimensionColorClass(key)"
             >
-              <span>{{ key }}</span>=<span>{{ value }}</span>
+              <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
               <OTooltip :delay="300" :content="key + '=' + value" />
             </span>
             <span
@@ -114,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span>{{ key }}</span>=<span>{{ value }}</span>
+                      <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
                     </div>
                   </div>
                 </template>
@@ -151,13 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Empty state -->
         <template #empty>
           <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
-            <OEmptyState
-              size="hero"
-              preset="no-incidents"
-              :filtered="!!searchQuery"
-              :hide-action="!searchQuery"
-              @action="(id) => id === 'clear-filters' ? (searchQuery = '') : null"
-            />
+            <no-data />
           </div>
         </template>
 
@@ -187,7 +178,7 @@ import {
   useAppBreadcrumb,
   type Crumb,
 } from "@/composables/useAppBreadcrumb";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "../shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -196,14 +187,13 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "IncidentList",
   components: {
     PageLayout,
     AppPageHeader,
-    OEmptyState,
+    NoData,
     OButton,
     OSpinner,
     OSearchInput,
@@ -228,7 +218,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
+        size: 67,
         meta: { align: "center" },
       },
       {

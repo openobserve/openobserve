@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
         <div class="card-container tw:h-full">
           <OTable
             :frame="false"
@@ -55,32 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             :selected-ids="selectedAccountEmails"
             v-model:global-filter="filterQuery"
-            :show-global-filter="false"
+            :global-filter-placeholder="t('serviceAccounts.search')"
             filter-mode="client"
             :default-columns="false"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
-            <template #toolbar>
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <OSearchInput
-                  v-model="filterQuery"
-                  :placeholder="t('serviceAccounts.search')"
-                  class="tw:flex-1"
-                />
-              </div>
-            </template>
             <template #empty>
-              <OEmptyState
-                size="hero"
-                preset="no-service-accounts"
-                :filtered="!!filterQuery"
-                @action="
-                  (id) =>
-                    id === 'clear-filters'
-                      ? (filterQuery = '')
-                      : addRoutePush({})
-                "
-              />
+              <NoData />
             </template>
 
             <template #cell-email="{ row }">
@@ -258,7 +239,7 @@ import AddServiceAccount from "./AddServiceAccount.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import usersService from "@/services/users";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import {
@@ -267,9 +248,7 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -280,7 +259,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OSearchInput },
+  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -332,7 +311,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
+        size: 36,
         minSize: 32,
         maxSize: 40,
         meta: { align: "left", compactPadding: true },
@@ -342,7 +321,7 @@ export default defineComponent({
         header: t("user.email"),
         accessorKey: "email",
         sortable: true,
-        size: COL.email,
+        size: 550,
         meta: { align: "left" },
       },
       {
@@ -350,7 +329,6 @@ export default defineComponent({
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
-        size: COL.description,
         meta: { align: "left", autoWidth: true },
       },
       {
@@ -358,7 +336,7 @@ export default defineComponent({
         header: t("serviceAccounts.token"),
         accessorKey: "token",
         sortable: false,
-        size: COL.token,
+        size: 200,
         meta: { align: "left" },
       },
       {

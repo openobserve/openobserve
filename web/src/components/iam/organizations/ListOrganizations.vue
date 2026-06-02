@@ -37,8 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
       <OTable
           :frame="false"
           :data="organizations"
@@ -46,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="identifier"
           :loading="loading"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
+          :global-filter-placeholder="t('organization.search')"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -55,24 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
           :default-columns="false"
         >
-          <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-              <OSearchInput
-                v-model="filterQuery"
-                :placeholder="t('organization.search')"
-                class="tw:flex-1"
-                data-test="organizations-search-input"
-              />
-            </div>
-          </template>
           <template #empty>
-            <OEmptyState
-              size="hero"
-              preset="no-organizations"
-              :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-            />
+            <NoData />
           </template>
 
 
@@ -88,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
       </OTable>
-      </div>
     </div>
     <add-update-organization
       :open="showAddOrganizationDialog"
@@ -111,29 +93,24 @@ import { useI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageOrganization",
   components: {
     AddUpdateOrganization,
-    OEmptyState,
+    NoData,
     OButton,
     AppPageHeader,
-    OIcon,
     OTable,
-    OSearchInput,
 },
   setup() {
     const store = useStore();
@@ -156,10 +133,10 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
+        size: 36,
         minSize: 32,
         maxSize: 40,
-        meta: { align: "left", compactPadding: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+        meta: { align: "left", compactPadding: true },
       },
       {
         id: "name",
@@ -167,7 +144,7 @@ export default defineComponent({
         accessorKey: "name",
         sortable: true,
         size: 500,
-        meta: { align: "left", isName: true },
+        meta: { align: "left" },
       },
       {
         id: "identifier",

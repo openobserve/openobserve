@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Breadcrumb path lives in the chrome bar (published below). Row 1 carries
          the editable panel-name field (as the title) + the editor actions. -->
     <AppPageHeader
-      icon="dashboard"
-      class="tw:px-3 tw:border-b tw:border-border-default tw:mb-[0.625rem]"
+      :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack }"
+      class="tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.625rem]"
     >
           <template #title>
             <OInput
