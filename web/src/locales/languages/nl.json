@@ -3929,5 +3929,126 @@
       "two": "Schrijf VRL om JSON te parseren uit nginx-logboeken...",
       "three": "Bouw een dashboard voor de gezondheid van K8s nodes..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "We konden geen gegevens vinden",
+      "description": "Niets komt overeen met je huidige filters of tijdbereik. Probeer je zoekopdracht uit te breiden, het tijdsbereik te vergroten of de filters te wissen.",
+      "action": "Filters wissen",
+      "actionDesc": "Alle toegepaste filters opnieuw instellen"
+    },
+    "noLogs": {
+      "title": "Geen logboeken in dit bereik",
+      "description": "We hebben geen logboeken gevonden voor de geselecteerde stream en het geselecteerde tijdbereik. Probeer een groter tijdsbereik of een andere stream.",
+      "action": "Vergroot het tijdsbereik",
+      "actionDesc": "Zoek over een langere periode"
+    },
+    "noDashboards": {
+      "title": "Maak je eerste dashboard",
+      "description": "Dashboards brengen je statistieken, logboeken en sporen samen in één weergave. Bouw er een om aan de slag te gaan.",
+      "action": "Nieuw dashboard",
+      "actionDesc": "Begin met een leeg canvas",
+      "import": "Dashboard importeren",
+      "importDesc": "Een JSON-bestand op het dashboard uploaden",
+      "templates": "Sjablonen bekijken",
+      "templatesDesc": "Begin vanuit een communitydashboard"
+    },
+    "noPipelines": {
+      "title": "Maak je eerste pijplijn",
+      "description": "Pijplijnen transformeren en routeren uw gegevens zodra ze binnenkomen. Stel er een in om te beginnen met het vormgeven van je streams.",
+      "action": "Nieuwe pijplijn",
+      "actionDesc": "Bouw een flow vanuit het niets",
+      "import": "Pijplijn importeren",
+      "importDesc": "Een definitie van een pijplijn uploaden"
+    },
+    "noFunctions": {
+      "title": "Maak je eerste functie",
+      "description": "Functies verrijken en hervormen uw gegevens op het moment dat ze worden opgenomen of opgevraagd. Voeg er een toe om aan de slag te gaan.",
+      "action": "Nieuwe functie",
+      "actionDesc": "Schrijf een nieuwe VRL-functie"
+    },
+    "noStreams": {
+      "title": "Wachten op je eerste gegevens",
+      "description": "Er zijn nog geen gegevens binnengekomen. Sluit een bron aan en je streams worden hier automatisch weergegeven.",
+      "action": "Inslikken instellen",
+      "actionDesc": "Een gegevensbron aansluiten"
+    },
+    "noAlerts": {
+      "title": "Maak je eerste waarschuwing",
+      "description": "Waarschuwingen laten u weten op het moment dat uw gegevens een drempel overschrijden. Definieer er een om de monitoring te starten.",
+      "action": "Nieuwe waarschuwing",
+      "actionDesc": "Definieer een voorwaarde om te controleren"
+    },
+    "noIncidents": {
+      "title": "Geen actieve incidenten",
+      "description": "Je bent helemaal verstrikt — niets heeft op dit moment je aandacht nodig. De geactiveerde incidenten verschijnen hier."
+    },
+    "loadError": {
+      "title": "Er is iets misgegaan",
+      "description": "We konden deze gegevens niet laden. Het is meestal tijdelijk — probeer het zo meteen nog eens.",
+      "action": "Probeer het opnieuw",
+      "actionDesc": "Probeer de gegevens opnieuw te laden"
+    },
+    "noData": {
+      "title": "Hier nog niets",
+      "description": "Er zijn op dit moment geen gegevens om weer te geven."
+    },
+    "noTraces": {
+      "title": "Geen sporen gevonden",
+      "description": "Er komen geen sporen overeen met de geselecteerde service en het geselecteerde tijdbereik. Probeer een groter tijdsbereik of een andere service."
+    },
+    "noSearchHistory": {
+      "title": "Nog geen zoekgeschiedenis",
+      "description": "Zoekopdrachten die je uitvoert, worden hier weergegeven, zodat je ze opnieuw kunt bekijken en opnieuw kunt uitvoeren."
+    },
+    "noUsers": {
+      "title": "Nog geen gebruikers",
+      "description": "Nodig je teamgenoten uit om samen te werken in deze organisatie.",
+      "action": "Gebruiker toevoegen",
+      "actionDesc": "Nodig een teamgenoot uit via e-mail"
+    },
+    "noReports": {
+      "title": "Nog geen rapporten",
+      "description": "Plan een rapport om dashboards in je inbox te ontvangen.",
+      "action": "Nieuw rapport",
+      "actionDesc": "Een levering op het dashboard plannen"
+    },
+    "noQueries": {
+      "title": "Geen lopende zoekopdrachten",
+      "description": "Er zijn momenteel geen actieve zoekopdrachten. Langlopende zoekopdrachten worden hier weergegeven terwijl ze worden uitgevoerd."
+    },
+    "noServiceAccounts": {
+      "title": "Nog geen serviceaccounts",
+      "description": "Met serviceaccounts kunnen toepassingen worden geverifieerd met de API. Maak er een om aan de slag te gaan.",
+      "action": "Serviceaccount toevoegen",
+      "actionDesc": "Een API-serviceaccount aanmaken"
+    },
+    "noInvitations": {
+      "title": "Geen uitnodigingen in behandeling",
+      "description": "Uitnodigingen die je hebt verzonden of ontvangen, worden hier weergegeven."
+    },
+    "filtered": {
+      "title": "Geen {zelfstandig naamwoord} gevonden",
+      "description": "Er komt geen {noun} overeen met je huidige filters of zoekopdracht. Probeer ze aan te passen of te wissen.",
+      "action": "Filters wissen",
+      "actionDesc": "Alle filters opnieuw instellen en zoeken",
+      "fallbackNoun": "uitslagen"
+    },
+    "nouns": {
+      "logs": "logboeken",
+      "dashboards": "spatschermen",
+      "pipelines": "pijpleidingen",
+      "functions": "functioneert",
+      "streams": "stromen",
+      "alerts": "waarschuwingen",
+      "incidents": "incidenten",
+      "traces": "sporen",
+      "searches": "zoekopdrachten",
+      "users": "gebruikers",
+      "reports": "rapporten",
+      "queries": "vragen",
+      "serviceAccounts": "serviceaccounts",
+      "invitations": "uitnodigingen"
+    }
   }
 }

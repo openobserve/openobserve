@@ -3918,5 +3918,126 @@
       "two": "Schreiben Sie VRL, um JSON aus Nginx-Protokollen zu analysieren...",
       "three": "Erstellen Sie ein Dashboard für den K8s-Knotenstatus..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Wir konnten keine Daten finden",
+      "description": "Nichts entspricht Ihren aktuellen Filtern oder Ihrem aktuellen Zeitraum. Versuchen Sie, Ihre Suche zu erweitern, den Zeitraum zu erweitern oder die Filter zu löschen.",
+      "action": "Filter löschen",
+      "actionDesc": "Alle angewendeten Filter zurücksetzen"
+    },
+    "noLogs": {
+      "title": "Keine Logs in diesem Bereich",
+      "description": "Wir haben keine Logs für den ausgewählten Stream und Zeitbereich gefunden. Versuche es mit einem breiteren Zeitbereich oder einem anderen Stream.",
+      "action": "Zeitbereich erweitern",
+      "actionDesc": "Suche über einen längeren Zeitraum"
+    },
+    "noDashboards": {
+      "title": "Erstelle dein erstes Dashboard",
+      "description": "Dashboards führen Ihre Metriken, Logs und Traces in einer Ansicht zusammen. Erstellen Sie eines, um loszulegen.",
+      "action": "Neues Dashboard",
+      "actionDesc": "Beginne mit einer leeren Leinwand",
+      "import": "Dashboard importieren",
+      "importDesc": "Laden Sie eine Dashboard-JSON-Datei hoch",
+      "templates": "Vorlagen durchsuchen",
+      "templatesDesc": "Starte von einem Community-Dashboard"
+    },
+    "noPipelines": {
+      "title": "Erstellen Sie Ihre erste Pipeline",
+      "description": "Pipelines transformieren und leiten Ihre Daten weiter, sobald sie ankommen. Richten Sie eine ein, um mit der Gestaltung Ihrer Streams zu beginnen.",
+      "action": "Neue Pipeline",
+      "actionDesc": "Erstellen Sie einen Flow von Grund auf",
+      "import": "Pipeline importieren",
+      "importDesc": "Laden Sie eine Pipeline-Definition hoch"
+    },
+    "noFunctions": {
+      "title": "Erstelle deine erste Funktion",
+      "description": "Funktionen bereichern und gestalten Ihre Daten bei der Aufnahme oder Abfrage neu. Fügen Sie eine hinzu, um loszulegen.",
+      "action": "Neue Funktion",
+      "actionDesc": "Schreiben Sie eine neue VRL-Funktion"
+    },
+    "noStreams": {
+      "title": "Ich warte auf deine ersten Daten",
+      "description": "Es sind noch keine Daten eingetroffen. Verbinde eine Quelle und deine Streams werden hier automatisch angezeigt.",
+      "action": "Einnahme einrichten",
+      "actionDesc": "Eine Datenquelle verbinden"
+    },
+    "noAlerts": {
+      "title": "Erstelle deinen ersten Alert",
+      "description": "Benachrichtigungen benachrichtigen Sie, sobald Ihre Daten einen Schwellenwert überschreiten. Definieren Sie einen, um mit der Überwachung zu beginnen.",
+      "action": "Neue Warnung",
+      "actionDesc": "Definieren Sie eine zu überwachende Bedingung"
+    },
+    "noIncidents": {
+      "title": "Keine aktiven Vorfälle",
+      "description": "Sie sind alle beschäftigt — nichts braucht Ihre Aufmerksamkeit im Moment. Ausgelöste Vorfälle werden hier angezeigt."
+    },
+    "loadError": {
+      "title": "Etwas ist schief gelaufen",
+      "description": "Wir konnten diese Daten nicht laden. Es ist normalerweise vorübergehend — versuchen Sie es gleich noch einmal.",
+      "action": "Erneut versuchen",
+      "actionDesc": "Versuchen Sie erneut, die Daten zu laden"
+    },
+    "noData": {
+      "title": "Hier ist noch nichts",
+      "description": "Im Moment gibt es keine Daten zum Anzeigen."
+    },
+    "noTraces": {
+      "title": "Keine Spuren gefunden",
+      "description": "Keine Spuren stimmen mit dem ausgewählten Service und Zeitraum überein. Versuchen Sie es mit einem breiteren Zeitraum oder einem anderen Dienst."
+    },
+    "noSearchHistory": {
+      "title": "Noch kein Suchverlauf",
+      "description": "Suchanfragen, die Sie ausführen, werden hier aufgelistet, sodass Sie sie erneut aufrufen und ausführen können."
+    },
+    "noUsers": {
+      "title": "Noch keine Nutzer",
+      "description": "Laden Sie Ihre Teamkollegen ein, in dieser Organisation zusammenzuarbeiten.",
+      "action": "Nutzer hinzufügen",
+      "actionDesc": "Lade einen Teamkollegen per E-Mail ein"
+    },
+    "noReports": {
+      "title": "Noch keine Berichte",
+      "description": "Planen Sie einen Bericht, damit Dashboards in Ihren Posteingang geliefert werden.",
+      "action": "Neuer Bericht",
+      "actionDesc": "Planen Sie eine Dashboard-Lieferung"
+    },
+    "noQueries": {
+      "title": "Keine laufenden Abfragen",
+      "description": "Derzeit gibt es keine aktiven Abfragen. Abfragen mit langer Laufzeit werden hier angezeigt, während sie ausgeführt werden."
+    },
+    "noServiceAccounts": {
+      "title": "Noch keine Dienstkonten",
+      "description": "Dienstkonten ermöglichen es Anwendungen, sich mit der API zu authentifizieren. Erstellen Sie eine, um loszulegen.",
+      "action": "Dienstkonto hinzufügen",
+      "actionDesc": "Erstellen Sie ein API-Dienstkonto"
+    },
+    "noInvitations": {
+      "title": "Keine ausstehenden Einladungen",
+      "description": "Einladungen, die Sie gesendet oder erhalten haben, werden hier angezeigt."
+    },
+    "filtered": {
+      "title": "Kein {Substantiv} gefunden",
+      "description": "Kein {Substantiv} entspricht Ihren aktuellen Filtern oder Ihrer Suche. Versuchen Sie, sie anzupassen oder zu löschen.",
+      "action": "Filter löschen",
+      "actionDesc": "Alle Filter zurücksetzen und suchen",
+      "fallbackNoun": "Ergebnisse"
+    },
+    "nouns": {
+      "logs": "aufzeichnen",
+      "dashboards": "Dashboards",
+      "pipelines": "Rohrleitungen",
+      "functions": "Funktionen",
+      "streams": "Streams",
+      "alerts": "Warnungen",
+      "incidents": "Vorfälle",
+      "traces": "Spuren",
+      "searches": "sucht",
+      "users": "Benutzer",
+      "reports": "Berichte",
+      "queries": "Anfragen",
+      "serviceAccounts": "Dienstkonten",
+      "invitations": "Einladungen"
+    }
   }
 }

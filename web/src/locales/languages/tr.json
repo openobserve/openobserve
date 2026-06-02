@@ -3929,5 +3929,126 @@
       "two": "NGINX günlüklerinden JSON'u ayrıştırmak için VRL yazın...",
       "three": "K8s düğüm sağlığı için bir gösterge tablosu oluşturun..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Herhangi bir veri bulamadık",
+      "description": "Hiçbir şey mevcut filtrelerinizle veya zaman aralığınızla eşleşmiyor. Aramanızı genişletmeyi, zaman aralığını genişletmeyi veya filtreleri temizlemeyi deneyin.",
+      "action": "Filtreleri temizle",
+      "actionDesc": "Uygulanan tüm filtreleri sıfırla"
+    },
+    "noLogs": {
+      "title": "Bu aralıkta günlük yok",
+      "description": "Seçilen akış ve zaman aralığı için herhangi bir günlük bulamadık. Daha geniş bir zaman aralığı veya farklı bir akış deneyin.",
+      "action": "Zaman aralığını genişletin",
+      "actionDesc": "Daha uzun bir süre boyunca arama yapın"
+    },
+    "noDashboards": {
+      "title": "İlk panonuzu oluşturun",
+      "description": "Gösterge panoları metriklerinizi, günlüklerinizi ve izlerinizi tek bir görünümde bir araya getirir. Başlamak için bir tane oluşturun.",
+      "action": "Yeni gösterge tablosu",
+      "actionDesc": "Boş bir tuvalden başlayın",
+      "import": "Kontrol panosunu içe aktarma",
+      "importDesc": "Bir gösterge paneli JSON dosyası yükleyin",
+      "templates": "Şablonlara göz atın",
+      "templatesDesc": "Bir topluluk panosundan başlayın"
+    },
+    "noPipelines": {
+      "title": "İlk boru hattınızı oluşturun",
+      "description": "Boru hatları, verilerinizi ulaştıkça dönüştürür ve yönlendirir. Yayınlarınızı şekillendirmeye başlamak için bir tane ayarlayın.",
+      "action": "Yeni boru hattı",
+      "actionDesc": "Sıfırdan bir akış oluşturun",
+      "import": "İthalat boru hattı",
+      "importDesc": "Bir boru hattı tanımı yükleme"
+    },
+    "noFunctions": {
+      "title": "İlk fonksiyonunuzu oluşturun",
+      "description": "İşlevler, verilerinizi alma veya sorgulama anında zenginleştirir ve yeniden şekillendirir. Başlamak için bir tane ekleyin.",
+      "action": "Yeni fonksiyon",
+      "actionDesc": "Yeni bir VRL işlevi yazın"
+    },
+    "noStreams": {
+      "title": "İlk verilerinizi bekliyorum",
+      "description": "Henüz veri gelmedi. Bir kaynak bağladığınızda yayınlarınız burada otomatik olarak görünecektir.",
+      "action": "Yutmayı ayarlayın",
+      "actionDesc": "Veri kaynağını bağlama"
+    },
+    "noAlerts": {
+      "title": "İlk uyarınızı oluşturun",
+      "description": "Verileriniz bir eşiği geçtiği anda uyarılar sizi bilgilendirir. İzlemeye başlamak için birini tanımlayın.",
+      "action": "Yeni uyarı",
+      "actionDesc": "İzlenecek bir koşul tanımlayın"
+    },
+    "noIncidents": {
+      "title": "Aktif olay yok",
+      "description": "Hepiniz yakalandınız - şu anda hiçbir şeyin dikkatinize ihtiyacı yok. Tetiklenen olaylar burada görünecektir."
+    },
+    "loadError": {
+      "title": "Bir şeyler ters gitti",
+      "description": "Bu verileri yükleyemedik. Genellikle geçicidir - bir an içinde bir kez daha deneyin.",
+      "action": "Tekrar dene",
+      "actionDesc": "Verileri tekrar yüklemeyi deneyin"
+    },
+    "noData": {
+      "title": "Henüz burada bir şey yok",
+      "description": "Şu anda gösterilecek veri yok."
+    },
+    "noTraces": {
+      "title": "İz bulunamadı",
+      "description": "Seçilen hizmet ve zaman aralığıyla eşleşen hiçbir iz yoktur. Daha geniş bir zaman aralığı veya farklı bir hizmet deneyin."
+    },
+    "noSearchHistory": {
+      "title": "Henüz arama geçmişi yok",
+      "description": "Çalıştırdığınız aramalar burada listelenir, böylece onları tekrar ziyaret edebilir ve yeniden çalıştırabilirsiniz."
+    },
+    "noUsers": {
+      "title": "Henüz kullanıcı yok",
+      "description": "Takım arkadaşlarınızı bu organizasyonda işbirliği yapmaya davet edin.",
+      "action": "Kullanıcı ekle",
+      "actionDesc": "Bir takım arkadaşını e-posta ile davet et"
+    },
+    "noReports": {
+      "title": "Henüz rapor yok",
+      "description": "Kontrol panellerinin gelen kutunuza teslim edilmesini sağlamak için bir rapor planlayın.",
+      "action": "Yeni rapor",
+      "actionDesc": "Kontrol paneli teslimatı planlayın"
+    },
+    "noQueries": {
+      "title": "Çalışan sorgu yok",
+      "description": "Şu anda aktif sorgu yok. Uzun süren sorgular çalışırken burada görünecektir."
+    },
+    "noServiceAccounts": {
+      "title": "Henüz hizmet hesabı yok",
+      "description": "Hizmet hesapları, uygulamaların API ile kimlik doğrulaması yapmasına izin verir. Başlamak için bir tane oluşturun.",
+      "action": "Hizmet hesabı ekle",
+      "actionDesc": "Bir API hizmeti hesabı oluşturun"
+    },
+    "noInvitations": {
+      "title": "Bekleyen davetiye yok",
+      "description": "Gönderdiğiniz veya aldığınız davetiyeler burada görünecektir."
+    },
+    "filtered": {
+      "title": "{noun} bulunamadı",
+      "description": "Şu anki filtrelerinizle veya aramanızla eşleşen {isim} yok. Onları ayarlamayı veya temizlemeyi deneyin.",
+      "action": "Filtreleri temizle",
+      "actionDesc": "Tüm filtreleri sıfırlayın ve arayın",
+      "fallbackNoun": "sonuçlar"
+    },
+    "nouns": {
+      "logs": "günlükler",
+      "dashboards": "gösterge tabloları",
+      "pipelines": "boru hatları",
+      "functions": "işlevleri",
+      "streams": "akışları",
+      "alerts": "uyarılar",
+      "incidents": "olaylar",
+      "traces": "izleri",
+      "searches": "aramalar",
+      "users": "kullanıcıları",
+      "reports": "raporları",
+      "queries": "sorgular",
+      "serviceAccounts": "hizmet hesapları",
+      "invitations": "davetiyeleri"
+    }
   }
 }

@@ -3918,5 +3918,126 @@
       "two": "Escreva VRL para analisar o JSON dos logs do nginx...",
       "three": "Crie um painel para a integridade do nó K8s..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Não conseguimos encontrar nenhum dado",
+      "description": "Nada corresponde aos seus filtros ou intervalo de tempo atuais. Tente ampliar sua pesquisa, ampliar o intervalo de tempo ou limpar os filtros.",
+      "action": "Filtros claros",
+      "actionDesc": "Redefinir todos os filtros aplicados"
+    },
+    "noLogs": {
+      "title": "Não há registros neste intervalo",
+      "description": "Não encontramos nenhum registro para o stream e o intervalo de tempo selecionados. Experimente um intervalo de tempo maior ou um stream diferente.",
+      "action": "Amplie o intervalo de tempo",
+      "actionDesc": "Pesquise em um período mais longo"
+    },
+    "noDashboards": {
+      "title": "Crie seu primeiro painel",
+      "description": "Os painéis reúnem suas métricas, registros e rastreamentos em uma única visualização. Crie um para começar.",
+      "action": "Novo painel",
+      "actionDesc": "Comece com uma tela vazia",
+      "import": "Painel de importação",
+      "importDesc": "Carregar um arquivo JSON do painel",
+      "templates": "Navegue pelos modelos",
+      "templatesDesc": "Comece a partir de um painel da comunidade"
+    },
+    "noPipelines": {
+      "title": "Crie seu primeiro funil",
+      "description": "Os pipelines transformam e roteiam seus dados à medida que eles chegam. Configure um para começar a moldar seus streams.",
+      "action": "Novo gasoduto",
+      "actionDesc": "Crie um fluxo do zero",
+      "import": "Pipeline de importação",
+      "importDesc": "Faça upload de uma definição de pipeline"
+    },
+    "noFunctions": {
+      "title": "Crie sua primeira função",
+      "description": "As funções enriquecem e remodelam seus dados no momento da ingestão ou da consulta. Adicione um para começar.",
+      "action": "Nova função",
+      "actionDesc": "Escreva uma nova função VRL"
+    },
+    "noStreams": {
+      "title": "Aguardando seus primeiros dados",
+      "description": "Nenhum dado chegou ainda. Conecte uma fonte e seus streams aparecerão aqui automaticamente.",
+      "action": "Configurar a ingestão",
+      "actionDesc": "Conectar uma fonte de dados"
+    },
+    "noAlerts": {
+      "title": "Crie seu primeiro alerta",
+      "description": "Os alertas notificam você no momento em que seus dados ultrapassam um limite. Defina um para iniciar o monitoramento.",
+      "action": "Novo alerta",
+      "actionDesc": "Defina uma condição a ser monitorada"
+    },
+    "noIncidents": {
+      "title": "Sem incidentes ativos",
+      "description": "Você está ocupado — nada precisa de sua atenção no momento. Os incidentes desencadeados aparecerão aqui."
+    },
+    "loadError": {
+      "title": "Algo deu errado",
+      "description": "Não foi possível carregar esses dados. Geralmente é temporário — tente novamente em um momento.",
+      "action": "Tente novamente",
+      "actionDesc": "Tente carregar os dados novamente"
+    },
+    "noData": {
+      "title": "Nada aqui ainda",
+      "description": "Não há dados para mostrar no momento."
+    },
+    "noTraces": {
+      "title": "Nenhum vestígio encontrado",
+      "description": "Nenhum traço corresponde ao serviço e ao intervalo de tempo selecionados. Experimente um intervalo de tempo maior ou um serviço diferente."
+    },
+    "noSearchHistory": {
+      "title": "Ainda não há histórico de pesquisa",
+      "description": "As pesquisas que você executa serão listadas aqui para que você possa revisitá-las e executá-las novamente."
+    },
+    "noUsers": {
+      "title": "Ainda não há usuários",
+      "description": "Convide seus colegas de equipe para colaborar nessa organização.",
+      "action": "Adicionar usuário",
+      "actionDesc": "Convide um colega de equipe por e-mail"
+    },
+    "noReports": {
+      "title": "Ainda não há relatórios",
+      "description": "Agende um relatório para que os painéis sejam entregues em sua caixa de entrada.",
+      "action": "Novo relatório",
+      "actionDesc": "Agende a entrega de um painel"
+    },
+    "noQueries": {
+      "title": "Sem consultas em execução",
+      "description": "Não há consultas ativas no momento. As consultas de longa duração aparecerão aqui enquanto são executadas."
+    },
+    "noServiceAccounts": {
+      "title": "Ainda não há contas de serviço",
+      "description": "As contas de serviço permitem que os aplicativos se autentiquem com a API. Crie um para começar.",
+      "action": "Adicionar conta de serviço",
+      "actionDesc": "Crie uma conta de serviço de API"
+    },
+    "noInvitations": {
+      "title": "Sem convites pendentes",
+      "description": "Os convites que você enviou ou recebeu aparecerão aqui."
+    },
+    "filtered": {
+      "title": "Nenhum {substantivo} encontrado",
+      "description": "Nenhum {substantivo} corresponde aos seus filtros ou pesquisas atuais. Tente ajustá-los ou limpá-los.",
+      "action": "Filtros claros",
+      "actionDesc": "Redefina todos os filtros e pesquise",
+      "fallbackNoun": "resultados"
+    },
+    "nouns": {
+      "logs": "troncos",
+      "dashboards": "painéis",
+      "pipelines": "oleodutos",
+      "functions": "funções",
+      "streams": "córregos",
+      "alerts": "alertas",
+      "incidents": "incidentes",
+      "traces": "rastros",
+      "searches": "pesquisa",
+      "users": "usuários",
+      "reports": "notícias",
+      "queries": "consultas",
+      "serviceAccounts": "contas de serviço",
+      "invitations": "convites"
+    }
   }
 }

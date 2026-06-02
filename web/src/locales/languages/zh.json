@@ -3922,5 +3922,126 @@
       "two": "编写 VRL 来解析 nginx 日志中的 JSON...",
       "three": "为 K8s 节点运行状况构建仪表板..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "我们找不到任何数据",
+      "description": "没有与您当前的过滤条件或时间范围相匹配的内容。尝试扩大搜索范围、扩大时间范围或清除筛选条件。",
+      "action": "清除筛选条件",
+      "actionDesc": "重置所有应用的过滤器"
+    },
+    "noLogs": {
+      "title": "此范围内没有日志",
+      "description": "我们没有找到所选直播和时间范围的任何日志。尝试更宽的时间范围或其他直播。",
+      "action": "扩大时间范围",
+      "actionDesc": "在更长的时间内搜索"
+    },
+    "noDashboards": {
+      "title": "创建您的第一个仪表板",
+      "description": "仪表板将您的指标、日志和跟踪汇总到一个视图中。建造一个即可开始使用。",
+      "action": "新仪表板",
+      "actionDesc": "从空的画布开始",
+      "import": "导入控制面板",
+      "importDesc": "上传仪表板 JSON 文件",
+      "templates": "浏览模板",
+      "templatesDesc": "从社区仪表板开始"
+    },
+    "noPipelines": {
+      "title": "创建你的第一个管道",
+      "description": "管道会在数据到达时对其进行转换和路由。设置一个即可开始塑造您的直播。",
+      "action": "新管道",
+      "actionDesc": "从头开始构建流程",
+      "import": "导入管道",
+      "importDesc": "上传管道定义"
+    },
+    "noFunctions": {
+      "title": "创建你的第一个函数",
+      "description": "函数可在采集或查询时丰富和重塑您的数据。添加一个即可开始使用。",
+      "action": "新功能",
+      "actionDesc": "写一个新的 VRL 函数"
+    },
+    "noStreams": {
+      "title": "等待你的第一批数据",
+      "description": "尚未收到任何数据。连接来源，您的直播将自动显示在此处。",
+      "action": "设置摄取",
+      "actionDesc": "连接数据源"
+    },
+    "noAlerts": {
+      "title": "创建您的第一个提醒",
+      "description": "当您的数据超过阈值时，警报会通知您。定义一个开始监控。",
+      "action": "新警报",
+      "actionDesc": "定义要监控的条件"
+    },
+    "noIncidents": {
+      "title": "没有活跃事件",
+      "description": "你们都被困住了——现在没有什么需要你注意的。触发的事件将出现在此处。"
+    },
+    "loadError": {
+      "title": "出了点问题",
+      "description": "我们无法加载这些数据。这通常是暂时的，过一会再试一次。",
+      "action": "重试",
+      "actionDesc": "尝试再次加载数据"
+    },
+    "noData": {
+      "title": "这里还什么都没有",
+      "description": "目前没有数据可显示。"
+    },
+    "noTraces": {
+      "title": "未发现任何痕迹",
+      "description": "没有与所选服务和时间范围相匹配的追踪。尝试更宽的时间范围或其他服务。"
+    },
+    "noSearchHistory": {
+      "title": "尚无搜索记录",
+      "description": "您运行的搜索将在此处列出，因此您可以重新访问和重新运行这些搜索。"
+    },
+    "noUsers": {
+      "title": "还没有用户",
+      "description": "邀请你的队友在这个组织中协作。",
+      "action": "添加用户",
+      "actionDesc": "通过电子邮件邀请队友"
+    },
+    "noReports": {
+      "title": "尚无报告",
+      "description": "安排报告以将仪表板发送到您的收件箱。",
+      "action": "新报告",
+      "actionDesc": "安排仪表板交付"
+    },
+    "noQueries": {
+      "title": "没有正在运行的查询",
+      "description": "目前没有活跃的查询。长时间运行的查询将在运行时显示在此处。"
+    },
+    "noServiceAccounts": {
+      "title": "还没有服务账号",
+      "description": "服务帐号允许应用程序使用 API 进行身份验证。创建一个即可开始使用。",
+      "action": "添加服务账号",
+      "actionDesc": "创建 API 服务账号"
+    },
+    "noInvitations": {
+      "title": "没有待处理的邀请",
+      "description": "您发送或收到的邀请将显示在此处。"
+    },
+    "filtered": {
+      "title": "未找到 {名词}",
+      "description": "没有 {noun} 与您当前的筛选条件或搜索条件相匹配。尝试调整或清除它们。",
+      "action": "清除筛选条件",
+      "actionDesc": "重置所有筛选条件和搜索",
+      "fallbackNoun": "结果"
+    },
+    "nouns": {
+      "logs": "圆木",
+      "dashboards": "仪表板",
+      "pipelines": "管道",
+      "functions": "功能",
+      "streams": "流",
+      "alerts": "警报",
+      "incidents": "事件",
+      "traces": "痕迹",
+      "searches": "搜索",
+      "users": "用户",
+      "reports": "报告",
+      "queries": "查询",
+      "serviceAccounts": "服务账号",
+      "invitations": "邀请函"
+    }
   }
 }

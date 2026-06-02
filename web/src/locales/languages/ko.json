@@ -3929,5 +3929,126 @@
       "two": "nginx 로그에서 JSON을 구문 분석하기 위해 VRL을 작성하세요...",
       "three": "K8s 노드 상태를 위한 대시보드 구축..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "데이터를 찾을 수 없습니다",
+      "description": "현재 필터 또는 시간 범위와 일치하는 항목이 없습니다.검색 범위를 넓히거나, 시간 범위를 넓히거나, 필터를 지워 보세요.",
+      "action": "필터 지우기",
+      "actionDesc": "적용된 모든 필터 초기화"
+    },
+    "noLogs": {
+      "title": "이 범위에는 로그가 없습니다.",
+      "description": "선택한 스트림 및 시간 범위에 대한 로그를 찾지 못했습니다.시간 범위를 더 넓히거나 다른 스트림을 사용해 보세요.",
+      "action": "시간 범위 확대",
+      "actionDesc": "더 긴 기간에 걸친 검색"
+    },
+    "noDashboards": {
+      "title": "첫 대시보드 만들기",
+      "description": "대시보드는 지표, 로그 및 추적을 하나의 뷰로 제공합니다.하나를 만들어 시작하세요.",
+      "action": "새 대시보드",
+      "actionDesc": "빈 캔버스에서 시작",
+      "import": "대시보드 가져오기",
+      "importDesc": "대시보드 JSON 파일 업로드",
+      "templates": "템플릿 찾아보기",
+      "templatesDesc": "커뮤니티 대시보드에서 시작"
+    },
+    "noPipelines": {
+      "title": "첫 번째 파이프라인 생성",
+      "description": "파이프라인은 데이터가 도착하는 대로 데이터를 변환하고 라우팅합니다.하나를 설정하여 스트림 구성을 시작하세요.",
+      "action": "새 파이프라인",
+      "actionDesc": "처음부터 흐름 만들기",
+      "import": "임포트 파이프라인",
+      "importDesc": "파이프라인 정의 업로드"
+    },
+    "noFunctions": {
+      "title": "첫 번째 함수 만들기",
+      "description": "함수는 수집 또는 쿼리 시 데이터를 보강하고 재구성합니다.시작하려면 하나를 추가하세요.",
+      "action": "새 함수",
+      "actionDesc": "새 VRL 함수 작성"
+    },
+    "noStreams": {
+      "title": "첫 번째 데이터를 기다리는 중",
+      "description": "아직 데이터가 도착하지 않았습니다.소스를 연결하면 스트림이 여기에 자동으로 표시됩니다.",
+      "action": "인제스트 설정",
+      "actionDesc": "데이터 소스 연결"
+    },
+    "noAlerts": {
+      "title": "첫 번째 알림 만들기",
+      "description": "경고는 데이터가 임계값을 초과하는 순간을 알려줍니다.하나를 정의하여 모니터링을 시작하세요.",
+      "action": "새 알림",
+      "actionDesc": "모니터링할 조건 정의"
+    },
+    "noIncidents": {
+      "title": "활성 인시던트 없음",
+      "description": "당신은 모두 사로잡혔습니다. 지금 당장 주의를 기울일 필요는 없습니다.트리거된 인시던트가 여기에 표시됩니다."
+    },
+    "loadError": {
+      "title": "뭔가 잘못됐어",
+      "description": "이 데이터를 로드할 수 없습니다.보통은 일시적입니다. 잠시 후 다시 시도해 보세요.",
+      "action": "재시도",
+      "actionDesc": "데이터를 다시 로드해 보십시오."
+    },
+    "noData": {
+      "title": "여긴 아직 아무것도 없어",
+      "description": "지금은 표시할 데이터가 없습니다."
+    },
+    "noTraces": {
+      "title": "흔적을 찾을 수 없음",
+      "description": "선택한 서비스 및 시간 범위와 일치하는 추적이 없습니다.더 넓은 시간 범위 또는 다른 서비스를 사용해 보십시오."
+    },
+    "noSearchHistory": {
+      "title": "아직 검색 기록이 없습니다",
+      "description": "실행한 검색이 여기에 나열되므로 다시 방문하여 다시 실행할 수 있습니다."
+    },
+    "noUsers": {
+      "title": "아직 사용자 없음",
+      "description": "팀원을 초대하여 이 조직에서 협업하세요.",
+      "action": "사용자 추가",
+      "actionDesc": "이메일로 팀원 초대하기"
+    },
+    "noReports": {
+      "title": "아직 보고서 없음",
+      "description": "보고서를 예약하여 대시보드가 수신함으로 전달되도록 하세요.",
+      "action": "새 보고서",
+      "actionDesc": "대시보드 전송 예약"
+    },
+    "noQueries": {
+      "title": "실행 중인 쿼리 없음",
+      "description": "현재 활성 쿼리가 없습니다.장기 실행 쿼리는 실행 중에 여기에 표시됩니다."
+    },
+    "noServiceAccounts": {
+      "title": "아직 서비스 계정 없음",
+      "description": "서비스 계정을 사용하면 애플리케이션이 API를 통해 인증할 수 있습니다.계정을 만들어 시작하세요.",
+      "action": "서비스 계정 추가",
+      "actionDesc": "API 서비스 계정 생성"
+    },
+    "noInvitations": {
+      "title": "보류 중인 초대장 없음",
+      "description": "보내거나 받은 초대장이 여기에 표시됩니다."
+    },
+    "filtered": {
+      "title": "{명사} 를 찾을 수 없습니다.",
+      "description": "현재 필터 또는 검색과 일치하는 {noun} 이 (가) 없습니다.조정하거나 지워 보세요.",
+      "action": "필터 지우기",
+      "actionDesc": "모든 필터 재설정 및 검색",
+      "fallbackNoun": "결과"
+    },
+    "nouns": {
+      "logs": "로그",
+      "dashboards": "대시보드",
+      "pipelines": "파이프라인",
+      "functions": "기능",
+      "streams": "시냇물",
+      "alerts": "민첩한",
+      "incidents": "사건",
+      "traces": "추적",
+      "searches": "검색을 수행합니다",
+      "users": "사용자",
+      "reports": "보고서",
+      "queries": "의문",
+      "serviceAccounts": "서비스 계정",
+      "invitations": "초대장"
+    }
   }
 }
