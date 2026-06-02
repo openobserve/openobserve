@@ -17,9 +17,9 @@ env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
-  ZO_BASE_URL: http://localhost:5080/
-  ZO_BASE_URL_SC: http://localhost:5080/
-  WS_ZO_BASE_URL: ws://localhost:5080/
+  ZO_BASE_URL: http://127.0.0.1:5080/
+  ZO_BASE_URL_SC: http://127.0.0.1:5080/
+  WS_ZO_BASE_URL: ws://127.0.0.1:5080/
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_USAGE_PUBLISH_INTERVAL: 5
   ZO_ALERT_SCHEDULE_INTERVAL: 3
@@ -126,7 +126,7 @@ jobs:
           SERVER_PID_DEFAULT=$!
           echo "OpenObserve PID for default tests: $SERVER_PID_DEFAULT"
           for i in $(seq 1 60); do
-            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+            if curl -sf http://127.0.0.1:5080/healthz > /dev/null 2>&1; then
               echo "Server ready after ${i}s"; break
             fi
             sleep 1
@@ -229,7 +229,7 @@ jobs:
           ${{ matrix.config.env }} ${{ github.workspace }}/target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
           SERVER_PID=$!
           for i in $(seq 1 60); do
-            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+            if curl -sf http://127.0.0.1:5080/healthz > /dev/null 2>&1; then
               echo "Server ready after ${i}s"; break
             fi
             sleep 1
@@ -316,7 +316,7 @@ jobs:
       - name: Wait for /healthz
         run: |
           for i in $(seq 1 60); do
-            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then exit 0; fi
+            if curl -sf http://127.0.0.1:5080/healthz > /dev/null 2>&1; then exit 0; fi
             sleep 1
           done
           exit 1
@@ -335,13 +335,13 @@ jobs:
         # separate exercise once the noise floor here is understood).
         run: |
           rye run schemathesis run \
-            -u http://localhost:5080 \
+            -u http://127.0.0.1:5080 \
             --auth "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
             --checks not_a_server_error \
             -n 20 \
             --request-timeout 5 \
             -m positive \
-            http://localhost:5080/api-doc/openapi.json
+            http://127.0.0.1:5080/api-doc/openapi.json
         working-directory: tests/api-testing/
 
       - name: Upload OpenObserve server log on failure
