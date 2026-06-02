@@ -1362,7 +1362,9 @@ const fieldWidthClass = computed(() => {
                         <!-- Simple item: optional icon + label -->
                         <template v-else>
                           <!-- Per-option icon: prefer a raw Vue component (iconComponent),
-                             fall back to a string name (icon) resolved via OIcon registry. -->
+                             fall back to a string name (icon) resolved via OIcon registry.
+                             When iconKey is set but this option has no icon, reserve the
+                             same space with a blank spacer so labels stay aligned. -->
                           <component
                             v-if="filteredOptions[vRow.index].iconComponent"
                             :is="filteredOptions[vRow.index].iconComponent"
@@ -1373,6 +1375,10 @@ const fieldWidthClass = computed(() => {
                             :name="filteredOptions[vRow.index].icon"
                             size="sm"
                             class="tw:shrink-0"
+                          />
+                          <span
+                            v-else-if="iconKey"
+                            class="tw:shrink-0 tw:size-4"
                           />
                           <span class="tw:truncate">{{
                             filteredOptions[vRow.index].label
