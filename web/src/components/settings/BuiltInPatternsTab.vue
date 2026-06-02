@@ -20,17 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="filters-bar tw:p-3">
       <div class="tw:flex tw:gap-3">
         <div class="tw:w-full col-md-6">
-          <OInput
+          <OSearchInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
             clearable
             class="tw:w-full"
             data-test="built-in-pattern-search"
-          >
-            <template v-slot:icon-left>
-              <OIcon class="o2-search-input-icon" name="search" size="sm" />
-            </template>
-          </OInput>
+          />
         </div>
         <div class="tw:w-full col-md-4">
           <OSelect
@@ -244,7 +240,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -269,7 +265,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect , OInput, OCheckbox, OTooltip, OTextarea },
+  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect, OSearchInput, OCheckbox, OTooltip, OTextarea },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();

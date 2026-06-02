@@ -66,17 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div>
-            <OInput
+            <OSearchInput
               v-model="searchTerm"
               clearable
               :debounce="300"
               :placeholder="t('search.searchSavedFunction')"
               data-test="function-search-input"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
           </div>
 
           <div v-if="filteredTransformOptions.length" class="tw:max-h-72 tw:overflow-y-auto">
@@ -138,7 +134,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";

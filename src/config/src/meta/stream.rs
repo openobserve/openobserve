@@ -915,7 +915,7 @@ impl TimeRange {
             return ranges;
         }
         let mut ranges = ranges;
-        ranges.sort_by(|a, b| a.start.cmp(&b.start));
+        ranges.sort_by_key(|k| k.start);
         let mut result = Vec::new();
         let mut current = ranges[0].clone();
         for range in ranges.iter().skip(1) {

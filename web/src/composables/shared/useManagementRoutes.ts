@@ -149,7 +149,7 @@ const useManagementRoutes = () => {
           component: () =>
             import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
-            title: "Storage Settings",
+            title: "BYOB",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

@@ -9,15 +9,12 @@
     <!-- search input: sits left of the close button via #header-right -->
     <template #header-right>
       <div class="tw:flex">
-        <OInput
+        <OSearchInput
           v-model="searchQuery"
           placeholder="Search keywords..."
           data-test="query-inspector-search"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="xs" />
-          </template>
-        </OInput>
+          size="xs"
+        />
       </div>
     </template>
 
@@ -261,14 +258,14 @@ import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DOMPurify from "dompurify";
 import { copyToClipboard } from "@/utils/clipboard";
 
 export default defineComponent({
   name: "QueryInspector",
   emits: ["update:open"],
-  components: { OButton, ODialog, OInput,
+  components: { OButton, ODialog, OSearchInput,
     OIcon,
 },
   props: {

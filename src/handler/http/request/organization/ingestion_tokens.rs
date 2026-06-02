@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
-use config::meta::user::UserRole;
 use serde_json::json;
 
 use crate::{
@@ -26,10 +25,10 @@ use crate::{
                 OrgIngestionTokenListResponse, OrgIngestionTokenResponse,
             },
         },
-        utils::auth::{UserEmail, is_root_user},
+        utils::auth::UserEmail,
     },
     handler::http::extractors::Headers,
-    service::{ingestion_tokens, users},
+    service::ingestion_tokens,
 };
 
 /// List all org-level ingestion tokens (masked).
@@ -102,10 +101,11 @@ pub async fn create_ingestion_token(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        if !is_root_user(user_id) {
-            match users::get_user(Some(&org_id), user_id).await {
+        if !crate::common::utils::auth::is_root_user(user_id) {
+            match crate::service::users::get_user(Some(&org_id), user_id).await {
                 Some(initiator)
-                    if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
+                    if initiator.role == config::meta::user::UserRole::Admin
+                        || initiator.role == config::meta::user::UserRole::Root => {}
                 _ => {
                     return MetaHttpResponse::forbidden(
                         "Admin or Root role required to create ingestion tokens",
@@ -156,14 +156,15 @@ pub async fn enable_disable_ingestion_token(
     Path((org_id, name)): Path<(String, String)>,
     Json(body): Json<OrgIngestionTokenEnableRequest>,
 ) -> Response {
-    let user_id = user_email.user_id.as_str();
+    let _user_id = user_email.user_id.as_str();
 
     #[cfg(not(feature = "enterprise"))]
     {
-        if !is_root_user(user_id) {
-            match users::get_user(Some(&org_id), user_id).await {
+        if !crate::common::utils::auth::is_root_user(_user_id) {
+            match crate::service::users::get_user(Some(&org_id), _user_id).await {
                 Some(initiator)
-                    if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
+                    if initiator.role == config::meta::user::UserRole::Admin
+                        || initiator.role == config::meta::user::UserRole::Root => {}
                 _ => {
                     return MetaHttpResponse::forbidden(
                         "Admin or Root role required to manage ingestion tokens",

@@ -790,6 +790,10 @@
         "service_maps": {
           "name": "Service Graph",
           "note": "Visualize service dependencies"
+        },
+        "byob": {
+          "name": "Bring Your Own Bucket",
+          "note": "Route org data to your own cloud bucket"
         }
       },
       "buttons": {
@@ -2828,21 +2832,21 @@
     "search": "Search destination"
   },
   "storage_settings": {
-    "tabLabel": "Storage Settings",
-    "title": "Storage Settings",
-    "notEnabled": "storage settings is not enabled for this organization",
-    "notConfigured": "configure a custom storage provider for this organization's data",
+    "tabLabel": "BYOB",
+    "title": "Bring Your Own Bucket",
+    "notEnabled": "BYOB is not enabled for this organization",
+    "notConfigured": "Configure a custom bucket for this organization's data",
     "configured": "configured",
-    "heroHeadline": "Bring your own storage to",
+    "heroHeadline": "Bring your own bucket to",
     "heroSub": "Connect your own cloud bucket, data stays in your infrastructure — full control, zero lock-in.",
     "configureStorage": "Configure storage",
     "supportedProviders": "Supported providers",
-    "noStorageConfigured": "No storage configured",
+    "noStorageConfigured": "No bucket configured",
     "routeDataDesc": "Route this org's data to a dedicated bucket — independently of other orgs and global defaults.",
     "perOrgIsolation": "Per-org isolation",
     "appliesImmediately": "Applies to new data immediately",
     "usesOrgCredentials": "Uses org-scoped credentials",
-    "updateStorage": "Update Storage",
+    "updateStorage": "Update Bucket",
     "active": "active",
     "bucketName": "bucket name",
     "region": "region",
@@ -2857,7 +2861,7 @@
     "featureSecureTitle": "Secure & compliant",
     "featureSecureDesc": "Fine grained access keys, your sensitive data stays in your infrastructure.",
     "goBack": "Go Back",
-    "newStorageConfiguration": "New Storage Configuration",
+    "newStorageConfiguration": "New Bucket Configuration",
     "selectProviderDesc": "Select a cloud storage provider to store this organization's data.",
     "bucketNameRequired": "Bucket name is required",
     "accessKeyRequired": "Access key is required",

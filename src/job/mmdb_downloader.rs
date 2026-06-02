@@ -65,15 +65,15 @@ async fn run_download_files() {
 
         let fname = format!(
             "{}{}",
-            &cfg.common.mmdb_data_dir,
+            cfg.common.mmdb_data_dir,
             get_o2_config().common.mmdb_enterprise_file_name
         );
 
         update_maxmind_table(&fname).await;
     }
 
-    let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
-    let asn_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_ASN_FILE_NAME);
+    let city_fname = format!("{}{}", cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    let asn_fname = format!("{}{}", cfg.common.mmdb_data_dir, MMDB_ASN_FILE_NAME);
 
     let download_city_files =
         is_digest_different(&city_fname, &cfg.common.mmdb_geolite_citydb_sha256_url)
@@ -131,12 +131,12 @@ async fn run_download_files() {
 /// Update the maxmind client
 async fn update_maxmind_client() {
     let cfg = config::get_config();
-    let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    let city_fname = format!("{}{}", cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
     #[cfg(feature = "enterprise")]
     let city_fname = if get_o2_config().common.enable_enterprise_mmdb {
         format!(
             "{}{}",
-            &cfg.common.mmdb_data_dir,
+            cfg.common.mmdb_data_dir,
             get_o2_config().common.mmdb_enterprise_file_name
         )
     } else {

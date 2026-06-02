@@ -31,17 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:gap-3 tw:w-full">
         <OIcon name="bar-chart" size="sm" />
         <span class="tw:text-xl tw:font-semibold tw:whitespace-nowrap">Example of custom charts</span>
-        <OInput
+        <OSearchInput
           v-model="searchQuery"
           placeholder="Search charts..."
           clearable
           style="width: 280px; flex: 0 0 280px; margin-left: 16px;"
           @clear="searchQuery = ''"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="sm" />
-          </template>
-        </OInput>
+        />
         <div class="tw:flex-1" />
         <OButton
           variant="ghost"
@@ -182,7 +178,7 @@ import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customCha
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -193,7 +189,7 @@ export default defineComponent({
     OSeparator,
     CustomChartConfirmDialog,
     OButton,
-    OInput,
+    OSearchInput,
     OCard,
     OCardSection,
     OIcon,

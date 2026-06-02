@@ -3,6 +3,7 @@
 import type { InjectionKey } from "vue";
 
 export type CheckboxSize = "xs" | "sm" | "md";
+export type CheckboxColor = "primary" | "negative";
 /**
  * Identifier values used in group/custom-value mode. Excludes `boolean` on
  * purpose: Vue auto-coerces optional Boolean-typed props to `false` when not
@@ -37,6 +38,8 @@ export interface CheckboxProps {
   falseValue?: CheckboxPrimitive;
   /** Value to emit in indeterminate state in custom-value mode */
   indeterminateValue?: CheckboxPrimitive;
+  /** Colour scheme — "primary" (default blue) or "negative" (red/error) */
+  color?: CheckboxColor;
   /** Prevents interaction */
   disabled?: boolean;
   /** HTML id — forwarded to the native input for external label association */

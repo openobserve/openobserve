@@ -321,7 +321,7 @@ async fn get_sourcemap_file_data(
                 Err(err) => {
                     log::error!(
                         "[trace_id: {trace_id}] error getting sourcemap file from cluster {cluster} node {} for org_id {org} path {file_path} : {err:?}",
-                        &node.get_grpc_addr(),
+                        node.get_grpc_addr(),
                     );
                     let err = ErrorCodes::from_json(err.message())?;
                     Err(anyhow::anyhow!(

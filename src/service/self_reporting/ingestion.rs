@@ -128,7 +128,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         let creds = if cfg.common.usage_reporting_creds.starts_with("Basic") {
             cfg.common.usage_reporting_creds.to_string()
         } else {
-            format!("Basic {}", &cfg.common.usage_reporting_creds)
+            format!("Basic {}", cfg.common.usage_reporting_creds)
         };
         match reqwest::Client::new()
             .post(url)

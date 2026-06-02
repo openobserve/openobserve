@@ -528,7 +528,7 @@ pub async fn handle_otlp_request(
             let need_trigger = !stream_trigger_map.contains_key(&local_metric_name);
             if need_trigger && !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, local_metric_name);
+                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, local_metric_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();

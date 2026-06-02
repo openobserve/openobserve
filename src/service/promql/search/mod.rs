@@ -403,7 +403,7 @@ async fn search_in_cluster(
 
         log::info!(
             "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{},{})",
-            &node.grpc_addr,
+            node.grpc_addr,
             req_need_wal,
             req_query.start,
             req_query.end,
@@ -424,7 +424,7 @@ async fn search_in_cluster(
                     Err(err) => {
                         log::error!(
                             "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {err:?}",
-                            &node.get_grpc_addr(),
+                            node.get_grpc_addr(),
                         );
                         let err = ErrorCodes::from_json(err.message())
                             .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
@@ -435,7 +435,7 @@ async fn search_in_cluster(
 
                 log::info!(
                     "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {req_need_wal}, files: {}, scan_size: {} mb, took: {} ms",
-                    &node.get_grpc_addr(),
+                    node.get_grpc_addr(),
                     scan_stats.files,
                     scan_stats.original_size,
                     response.took,
@@ -585,7 +585,7 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
                     value: v,
                 })
                 .collect::<Vec<_>>();
-            samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            samples.sort_by_key(|k| k.timestamp);
             RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
         .collect::<Vec<_>>();
@@ -676,7 +676,7 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
                 .into_iter()
                 .map(|(_ts, v)| Arc::new(v.into()))
                 .collect::<Vec<_>>();
-            exemplars.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            exemplars.sort_by_key(|k| k.timestamp);
             RangeValue::new_with_exemplars(merged_metrics.get(&sig).unwrap().to_owned(), exemplars)
         })
         .collect::<Vec<_>>();

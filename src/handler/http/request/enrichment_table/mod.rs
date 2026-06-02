@@ -124,38 +124,30 @@ pub async fn save_enrichment_table(
     }
 
     match content_type {
-        Some(content_type) => {
+        Some(content_type)
             if content_type
                 .to_str()
                 .unwrap_or("")
-                .starts_with("multipart/form-data")
-            {
-                let append_data = match query.get("append") {
-                    Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
-                    None => false,
-                };
+                .starts_with("multipart/form-data") =>
+        {
+            let append_data = match query.get("append") {
+                Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
+                None => false,
+            };
 
-                // Extract multipart data using axum's Multipart
-                match extract_multipart(payload, append_data).await {
-                    Ok(json_record) => {
-                        match save_enrichment_data(&org_id, &table_name, json_record, append_data)
-                            .await
-                        {
-                            Ok(resp) => resp,
-                            Err(e) => MetaHttpResponse::internal_error(e.to_string()),
-                        }
+            // Extract multipart data using axum's Multipart
+            match extract_multipart(payload, append_data).await {
+                Ok(json_record) => {
+                    match save_enrichment_data(&org_id, &table_name, json_record, append_data).await
+                    {
+                        Ok(resp) => resp,
+                        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
                     }
-                    Err(e) => MetaHttpResponse::bad_request(e),
                 }
-            } else {
-                MetaHttpResponse::bad_request(
-                    "Bad Request, content-type must be multipart/form-data",
-                )
+                Err(e) => MetaHttpResponse::bad_request(e),
             }
         }
-        None => {
-            MetaHttpResponse::bad_request("Bad Request, content-type must be multipart/form-data")
-        }
+        _ => MetaHttpResponse::bad_request("Bad Request, content-type must be multipart/form-data"),
     }
 }
 

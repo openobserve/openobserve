@@ -162,7 +162,7 @@ pub async fn get_node_from_consistent_hash_within(
         }
     }
     // Wrap around to the beginning of the ring.
-    for (_, name) in nodes.iter() {
+    for name in nodes.values() {
         if allowed.contains(name) {
             return Some(name.clone());
         }
@@ -209,7 +209,7 @@ pub async fn get_nodes_from_consistent_hash(
         }
     }
     // Wrap around to the beginning of the ring.
-    for (_, name) in nodes.iter() {
+    for name in nodes.values() {
         result.insert(name.to_string());
         if result.len() >= n {
             break;

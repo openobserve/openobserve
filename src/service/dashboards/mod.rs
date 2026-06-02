@@ -616,7 +616,7 @@ async fn put(
     let title = dashboard
         .title()
         .map(|t| t.trim().to_string())
-        .and_then(|t| if t.is_empty() { None } else { Some(t) })
+        .filter(|t| !t.is_empty())
         .ok_or_else(|| DashboardError::PutMissingTitle)?;
     dashboard.set_title(title);
 

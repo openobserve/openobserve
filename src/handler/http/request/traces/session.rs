@@ -564,11 +564,10 @@ fn extract_first_user_message(
     let parsed: json::Value;
     let msgs_val: &json::Value = if val.is_array() {
         val
-    } else if let Some(s) = val.as_str() {
+    } else {
+        let s = val.as_str()?;
         parsed = json::from_str(s).ok()?;
         &parsed
-    } else {
-        return None;
     };
 
     // Resolve the actual messages array — either the top-level value, or a nested
@@ -577,10 +576,8 @@ fn extract_first_user_message(
         a
     } else if let Some(a) = msgs_val.get("messages").and_then(|v| v.as_array()) {
         a
-    } else if let Some(a) = msgs_val.get("contents").and_then(|v| v.as_array()) {
-        a
     } else {
-        return None;
+        msgs_val.get("contents").and_then(|v| v.as_array())?
     };
 
     for msg in arr {
@@ -737,7 +734,7 @@ fn aggregate_sessions(
             &details,
         ));
     }
-    sessions_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+    sessions_data.sort_by_key(|k| std::cmp::Reverse(k.start_time));
     sessions_data
 }
 

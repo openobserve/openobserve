@@ -28,7 +28,7 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
         &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
             anyhow::anyhow!(
                 "Failed to open TLS certificate file {}: {}",
-                &cfg.http.tls_cert_path,
+                cfg.http.tls_cert_path,
                 e
             )
         })?);
@@ -36,7 +36,7 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
         &mut BufReader::new(std::fs::File::open(&cfg.http.tls_key_path).map_err(|e| {
             anyhow::anyhow!(
                 "Failed to open TLS key file {}: {}",
-                &cfg.http.tls_key_path,
+                cfg.http.tls_key_path,
                 e
             )
         })?);
@@ -81,7 +81,7 @@ pub fn client_tls_config() -> Result<rustls::ClientConfig, anyhow::Error> {
                     std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
                         anyhow::anyhow!(
                             "Failed to open TLS certificate file {}: {}",
-                            &cfg.http.tls_cert_path,
+                            cfg.http.tls_cert_path,
                             e
                         )
                     })?,

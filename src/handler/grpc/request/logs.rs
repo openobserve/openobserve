@@ -34,7 +34,7 @@ impl LogsService for LogsServer {
         let metadata = request.metadata().clone();
         let msg = format!(
             "Please specify organization id with header key '{}' ",
-            &cfg.grpc.org_header_key
+            cfg.grpc.org_header_key
         );
         if !metadata.contains_key(&cfg.grpc.org_header_key) {
             return Err(Status::invalid_argument(msg));

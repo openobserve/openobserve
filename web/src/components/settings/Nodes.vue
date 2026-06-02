@@ -54,18 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('nodes.region')"
               >
                 <div class="tw:p-0">
-                  <OInput
+                  <OSearchInput
                     data-test="nodes-region-filter-search-input"
                     v-model="filterRegionQuery"
                     clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchRegion')"
                     class="tw:w-full filter-input"
-                  >
-                    <template #icon-left>
-                      <OIcon name="search" size="sm" />
-                    </template>
-                  </OInput>
+                  />
                   <OTable
                       data-test="nodes-region-table"
                       :data="visibleRegionRows"
@@ -100,18 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('nodes.cluster')"
                 >
                   <div class="tw:p-0">
-                    <OInput
+                    <OSearchInput
                       data-test="nodes-cluster-filter-search-input"
                       v-model="filterClusterQuery"
                       clearable
                       :debounce="1"
                       :placeholder="t('nodes.searchCluster')"
                       class="tw:w-full filter-input"
-                    >
-                      <template #icon-left>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                    </OInput>
+                    />
                     <OTable
                       data-test="nodes-cluster-table"
                       :data="visibleClusterRows"
@@ -427,15 +419,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("nodes.header") }}
           </div>
           <div class="tw:flex tw:h-[36px] tw:mb-2">
-            <OInput
+            <OSearchInput
+              data-test="nodes-search-input"
               v-model="filterQuery"
               class="tw:ml-0 tw:mb-1 tw:mr-2 no-border o2-search-input"
               :placeholder="t('nodes.search')"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" class="o2-search-input-icon" />
-              </template>
-            </OInput>
+            />
             <OButton variant="outline" size="sm-action" @click="getData(true)">
               {{ t("common.refresh") }}
             </OButton>
@@ -538,6 +527,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
@@ -563,6 +553,7 @@ export default defineComponent({
     OTooltip,
     ORange,
     OIcon,
+    OSearchInput,
     OBadge,
     OCollapsible,
     OSeparator,

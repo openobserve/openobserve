@@ -52,11 +52,17 @@ export default class LogsVisualise {
 
   async openVisualiseTab() {
     // Open Visualise Tab
-    await this.page.locator('[data-test="logs-visualize-toggle"]').click();
+    const visualizeToggle = this.page.locator('[data-test="logs-visualize-toggle"]');
+    // Wait for the toggle to be enabled before clicking
+    await visualizeToggle.waitFor({ state: "visible", timeout: 10000 });
+    await visualizeToggle.click();
 
-    // Wait for the visualization panel editor to load by checking for chart selector
-    const chartSelector = this.page.locator('[data-test="dashboard-addpanel-chart-selection-item"]').first();
-    await chartSelector.waitFor({ state: "visible", timeout: 15000 });
+    // Wait for the panel editor container to load (async component)
+    // It may be hidden if there's a query error, so wait for attached (in DOM)
+    await this.page.locator('[data-test="panel-editor-container"]').waitFor({
+      state: "attached",
+      timeout: 30000,
+    });
   }
 
   // Open visualise tab and ensure table chart is selected when VRL is present
@@ -117,12 +123,19 @@ export default class LogsVisualise {
 
   //set relative time selection
   async setRelative(date, time) {
-    await this.timeTab.waitFor({ state: "visible" });
+    // Wait for the date-time button to be enabled before interacting
+    await this.page.waitForSelector(
+      '[data-test="date-time-btn"]:not([disabled])',
+      { timeout: 15000 }
+    );
     await this.timeTab.click();
     await this.relativeTime.click();
-    await this.page
-      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
-      .click();
+    const selector = `[data-test="date-time-relative-${date}-${time}-btn"]`;
+    // Wait for the relative time button to be enabled (not just visible)
+    await this.page.waitForSelector(`${selector}:not([disabled])`, {
+      timeout: 15000,
+    });
+    await this.page.locator(selector).click();
   }
 
   //search and add fields
@@ -209,7 +222,7 @@ export default class LogsVisualise {
       `[data-test="selected-chart-${chartType}-item"]`
     );
     await chartOption.waitFor({ state: "visible" });
-    await chartOption.click();
+    await chartOption.click({ force: true });
   }
 
   //remove field
@@ -437,19 +450,24 @@ export default class LogsVisualise {
 
   // Get quick mode toggle state using the most reliable method
   async getQuickModeToggleState() {
-    const quickModeToggle = this.page.locator(
-      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    // Open utilities dropdown to access the quick mode toggle
+    const utilitiesBtn = this.page.locator(
+      '[data-test="logs-search-bar-utilities-menu-btn"]'
     );
+    await utilitiesBtn.waitFor({ state: "visible", timeout: 10000 });
+    await utilitiesBtn.click();
 
-    // Wait for the toggle to be present
-    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+    const quickModeSwitch = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-switch"]'
+    );
+    await quickModeSwitch.waitFor({ state: "visible", timeout: 10000 });
 
-    // Check aria-checked attribute - this is the most reliable indicator
-    // Falls back to aria-pressed if aria-checked is not available
-    let ariaChecked = await quickModeToggle.getAttribute("aria-checked");
-    if (ariaChecked === null) {
-      ariaChecked = await quickModeToggle.getAttribute("aria-pressed");
-    }
+    // OSwitch inner button carries aria-checked
+    const switchBtn = quickModeSwitch.locator('[data-test$="-btn"]');
+    const ariaChecked = await switchBtn.getAttribute("aria-checked");
+
+    // Close dropdown
+    await this.page.keyboard.press("Escape");
 
     return ariaChecked === "true";
   }
@@ -571,5 +589,64 @@ export default class LogsVisualise {
     const closeBtn = this.page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
     await closeBtn.click();
     await this.page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  // Verify toast message is visible with expected text
+  async verifyToastMessage(expectedText, timeout = 10000) {
+    const toast = this.page.locator('[data-test="o-toast-message"]', { hasText: expectedText }).first();
+    await expect(toast).toBeVisible({ timeout });
+    return toast;
+  }
+
+  // Open query inspector from a panel dropdown
+  async openPanelQueryInspector(panelName) {
+    // Wait for the dashboard view to fully load after panel save
+    await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    const dropdown = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    await dropdown.waitFor({ state: "visible", timeout: 20000 });
+    await dropdown.click();
+
+    const inspectorBtn = this.page.locator('[data-test="dashboard-query-inspector-panel"]');
+    await inspectorBtn.waitFor({ state: "visible", timeout: 10000 });
+    await inspectorBtn.click();
+    await this.waitForQueryInspector(this.page);
+  }
+
+  // Verify executed query in query inspector contains expected text
+  async verifyExecutedQueryContains(expectedTexts, queryIndex = 0) {
+    const executedQuery = this.page.locator(`[data-test="query-inspector-executed-query-${queryIndex}"]`);
+    await expect(executedQuery).toBeVisible({ timeout: 10000 });
+    for (const text of expectedTexts) {
+      await expect(executedQuery).toContainText(text);
+    }
+  }
+
+  // Click the dashboard back button
+  async clickDashboardBackBtn() {
+    await this.page.locator('[data-test="dashboard-back-btn"]').click();
+  }
+
+  // Get chart renderer canvas locator
+  getChartRendererCanvas() {
+    return this.page.locator('[data-test="chart-renderer"] canvas');
+  }
+
+  // Get dashboard error locator
+  getDashboardErrorLocator() {
+    return this.page.locator('[data-test="dashboard-error"]');
+  }
+
+  // Verify no dashboard errors are present
+  async verifyNoDashboardErrors() {
+    const errorLocator = this.getDashboardErrorLocator();
+    await expect(errorLocator).toHaveCount(0);
+  }
+
+  // Get connect null values toggle button locator
+  getConnectNullValuesToggle() {
+    return this.page.locator(
+      '[data-test="dashboard-config-connect-null-values"] [data-test$="-btn"]'
+    );
   }
 }
