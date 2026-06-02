@@ -36,9 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
           @update:model-value="onStreamChange"
           :disabled="availableStreams.length === 0"
-        >
-          <OTooltip v-if="availableStreams.length === 0" :content="t('traces.sessionsList.noStreamsTooltip')" />
-        </OSelect>
+        />
+        <OTooltip v-if="availableStreams.length === 0" :content="t('traces.sessionsList.noStreamsTooltip')" />
       </div>
 
       <!-- Count pill -->
