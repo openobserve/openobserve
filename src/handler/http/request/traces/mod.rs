@@ -826,14 +826,14 @@ pub async fn get_latest_traces(
             if sort_order == "ASC" {
                 traces_data.sort_by_key(|k| k.duration);
             } else {
-                traces_data.sort_by_key(|k| k.duration);
+                traces_data.sort_by_key(|k| std::cmp::Reverse(k.duration));
             }
         }
         _ => {
             if sort_order == "ASC" {
                 traces_data.sort_by_key(|k| k.start_time);
             } else {
-                traces_data.sort_by_key(|k| k.start_time);
+                traces_data.sort_by_key(|k| std::cmp::Reverse(k.start_time));
             }
         }
     }
@@ -1574,7 +1574,7 @@ async fn process_latest_traces_stream(
         if sort_order == "ASC" {
             partition_hits.sort_by_key(|k| k.start_time);
         } else {
-            partition_hits.sort_by_key(|k| k.start_time);
+            partition_hits.sort_by_key(|k| std::cmp::Reverse(k.start_time));
         }
 
         let deliverable: Vec<serde_json::Value> = partition_hits

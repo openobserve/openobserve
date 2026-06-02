@@ -734,7 +734,7 @@ fn aggregate_sessions(
             &details,
         ));
     }
-    sessions_data.sort_by_key(|k| k.start_time);
+    sessions_data.sort_by_key(|k| std::cmp::Reverse(k.start_time));
     sessions_data
 }
 

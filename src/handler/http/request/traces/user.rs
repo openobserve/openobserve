@@ -539,7 +539,7 @@ fn aggregate_users(
             &details,
         ));
     }
-    users_data.sort_by_key(|k| k.last_event);
+    users_data.sort_by_key(|k| std::cmp::Reverse(k.last_event));
     users_data
 }
 

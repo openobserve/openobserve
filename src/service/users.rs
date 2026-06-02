@@ -917,7 +917,7 @@ pub async fn list_users(
         }
     }
 
-    user_list.sort_by_key(|k| k.created_at);
+    user_list.sort_by_key(|k| std::cmp::Reverse(k.created_at));
     Ok(MetaHttpResponse::json(UserList { data: user_list }))
 }
 
