@@ -87,7 +87,7 @@ def ingest_query_agent_data():
         return
 
     # Flush so data is committed to storage
-    flush_resp = client.put("node/flush", prefix="")
+    flush_resp = client.put("node/flush")
     if flush_resp.status_code == 200:
         logging.info("Flush successful")
     elif flush_resp.status_code == 404:
