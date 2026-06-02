@@ -256,18 +256,14 @@ size="xs" class="warning" />{{
               <!-- Search input for filtering organizations -->
               <template #top>
                 <div class="tw:w-full">
-                  <OInput
+                  <OSearchInput
                     data-test="organization-search-input"
                     v-model="searchQuery"
                     clearable
                     :debounce="1"
                     autofocus
                     placeholder="Search Organization"
-                  >
-                    <template #icon-left>
-                      <OIcon name="search" size="sm" />
-                    </template>
-                  </OInput>
+                  />
                 </div>
               </template>
 
@@ -533,7 +529,7 @@ import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -550,7 +546,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-    OInput,
+    OSearchInput,
     ODropdown,
     OTable,
     ODropdownItem,
@@ -925,20 +921,5 @@ export default defineComponent({
   }
 }
 
-/* Hover "jump" on the utility icons RIGHT of the vertical separator
- * (theme switcher, slack, help, settings, profile). Scoped to the
- * `.header-utility-icons` wrapper so buttons on the LEFT (edition,
- * AI assist, org dropdown) are unaffected. `:deep` is needed because
- * OButton renders the actual <button> as a child of the scoped root. */
-.header-utility-icons :deep(button) {
-  transition: transform 0.15s ease;
 
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-}
 </style>

@@ -35,21 +35,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:flex tw:flex-row tw:gap-x-2 tw:justify-end tw:items-center"
           >
-            <OInput
+            <OSearchInput
               v-model="dynamicQueryModel"
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
                   : t('dashboard.search')
               "
-              :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
               data-test="dashboard-search"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
 
             <OSwitch
               data-test="dashboard-search-across-folders-toggle"
@@ -159,17 +154,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
               <!-- Search Input -->
               <div class="tw:flex folder-item tw:py-1 tw:w-full tw:px-2">
-                <OInput
+                <OSearchInput
                   v-model="folderSearchQuery"
                   data-test="folder-search"
                   placeholder="Search Folder"
                   clearable
                   class="tw:w-full"
-                >
-                  <template #icon-left>
-                    <OIcon name="search" size="sm" />
-                  </template>
-                </OInput>
+                />
                 <div></div>
               </div>
             </div>
@@ -482,7 +473,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 // @ts-nocheck
@@ -549,7 +540,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
-    OInput,
+    OSearchInput,
     OSwitch,
     OCheckbox,
     ODrawer,

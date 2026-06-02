@@ -52,16 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="iam-roles-selection-search-input"
         class="tw:mr-3"
       >
-        <OInput
+        <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
+          class="tw:h-[36px] tw:w-[200px]"
           placeholder="Search Roles"
-        >
-          <template #icon-left>
-            <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon" />
-          </template>
-        </OInput>
+        />
       </div>
     </div>
     <div data-test="iam-roles-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
@@ -101,8 +97,7 @@ import { watch, onBeforeMount, computed } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

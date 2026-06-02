@@ -178,22 +178,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
                       {{ t("common.excludeSearchTerm") }}
                     </ODropdownItem>
-                    <ODropdownItem
-                      v-if="!searchObj.data.stream.selectedFields.includes(row.field.toString())"
-                      data-test="log-details-include-field-btn"
-                      @select="addFieldToTable(row.field.toString())"
-                      icon-left="visibility"
-                    >
-                      {{ t("common.addFieldToTable") }}
-                    </ODropdownItem>
-                    <ODropdownItem
-                      v-else
-                      data-test="log-details-include-field-btn"
-                      @select="addFieldToTable(row.field.toString())"
-                      icon-left="visibility-off"
-                    >
-                      {{ t("common.removeFieldFromTable") }}
-                    </ODropdownItem>
+                    <template v-if="row.field !== store.state.zoConfig.timestamp_column">
+                      <ODropdownItem
+                        v-if="!searchObj.data.stream.selectedFields.includes(row.field.toString())"
+                        data-test="log-details-include-field-btn"
+                        @select="addFieldToTable(row.field.toString())"
+                        icon-left="visibility"
+                      >
+                        {{ t("common.addFieldToTable") }}
+                      </ODropdownItem>
+                      <ODropdownItem
+                        v-else
+                        data-test="log-details-include-field-btn"
+                        @select="addFieldToTable(row.field.toString())"
+                        icon-left="visibility-off"
+                      >
+                        {{ t("common.removeFieldFromTable") }}
+                      </ODropdownItem>
+                    </template>
                     <!-- Cross-link options -->
                     <template v-if="getCrossLinksForField(row.field).length > 0">
                       <ODropdownSeparator />
@@ -207,6 +209,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ crossLink.name }}
                       </ODropdownItem>
                     </template>
+                    <ODropdownItem
+                      v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                      data-test="log-details-table-send-to-ai-chat-btn"
+                      @select="sendToAiChat(JSON.stringify({ [row.field]: row.value }))"
+                    >
+                      <template #icon-left>
+                        <img :src="getBtnLogo" width="14" height="14" alt="" />
+                      </template>
+                      Send to AI Chat
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                      data-test="log-details-table-redirect-to-regex-pattern-btn"
+                      @select="createRegexPatternFromLogs(row.field, row.value)"
+                    >
+                      <template #icon-left>
+                        <img :src="regexIcon" width="14" height="14" alt="" />
+                      </template>
+                      {{ t("regex_patterns.create_regex_pattern_field") }}
+                    </ODropdownItem>
                   </ODropdown>
                   <pre
                     :data-test="`log-detail-${row.field}-value`"
@@ -774,6 +796,35 @@ export default defineComponent({
       emit("closeTable");
     };
 
+    const getBtnLogo = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg");
+    });
+
+    const regexIcon = computed(() => {
+      return getImageURL(
+        store.state.theme == "dark"
+          ? "images/regex_pattern/regex_icon_dark.svg"
+          : "images/regex_pattern/regex_icon_light.svg",
+      );
+    });
+
+    const createRegexPatternFromLogs = (key: string, value: any) => {
+      emit("closeTable");
+      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      router.push({
+        path: "/settings/regex_patterns",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          from: "logs",
+        },
+      });
+      store.state.organizationData.regexPatternPrompt = promptToBeAdded;
+      store.state.organizationData.regexPatternTestValue = value;
+      emit("sendToAiChat", promptToBeAdded);
+    };
+
     const showCorrelation = () => {
       console.log(
         "[DetailTable] showCorrelation called, emitting with modelValue:",
@@ -827,6 +878,9 @@ export default defineComponent({
       serviceStreamsEnabled,
       config,
       getContentSize,
+      getBtnLogo,
+      regexIcon,
+      createRegexPatternFromLogs,
     };
   },
   async created() {

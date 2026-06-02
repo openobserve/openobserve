@@ -17,17 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="azure-integration-grid">
     <div class="tw:mb-4">
-      <OInput
+      <OSearchInput
         v-model="searchQuery"
         placeholder="Search Azure services..."
         clearable
         class="tw:max-w-md"
         data-test="azure-integration-search"
-      >
-        <template #icon-left>
-          <OIcon name="search" size="sm" />
-        </template>
-      </OInput>
+      />
     </div>
 
     <div class="tw:mb-6">
@@ -69,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OInput from '@/lib/forms/Input/OInput.vue'
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue'
 import { defineComponent, ref, computed } from "vue";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import AzureIntegrationTile from "./AzureIntegrationTile.vue";
@@ -80,7 +76,7 @@ export default defineComponent({
   components: {
     OTabs, OTab,
     AzureIntegrationTile,
-    OInput,
+    OSearchInput,
     OIcon,
 },
   setup() {

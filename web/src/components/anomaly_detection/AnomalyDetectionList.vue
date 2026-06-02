@@ -16,16 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full tw:h-full">
-    <!-- Toolbar: search + refresh -->
+    <!-- Toolbar: refresh -->
     <div class="tw:flex tw:items-center tw:justify-end tw:px-2 tw:py-2 tw:gap-2">
       <OButton
-        icon-left="refresh"
-        variant="ghost"
-        size="icon-sm"
+        variant="outline"
+        size="sm"
         :loading="loading"
-        title="Refresh"
+        data-test="anomaly-detection-list-refresh-btn"
         @click="loadConfigs"
-      />
+      >
+        <template #icon-left><OIcon name="refresh" size="sm" /></template>
+        {{ t('common.refresh') }}
+      </OButton>
     </div>
 
     <OTable
@@ -229,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, onUnmounted } from "vue";
+import { defineComponent, ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import anomalyDetectionService from "@/services/anomaly_detection";
@@ -428,16 +430,8 @@ export default defineComponent({
       }
     };
 
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
-
     onMounted(() => {
       loadConfigs();
-      // Auto-refresh every 30 s so Last Triggered At / Status stay current.
-      pollTimer = setInterval(loadConfigs, 30_000);
-    });
-
-    onUnmounted(() => {
-      if (pollTimer !== null) clearInterval(pollTimer);
     });
 
     return {

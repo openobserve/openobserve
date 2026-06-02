@@ -1608,9 +1608,8 @@ describe("OrganizationManagement.vue", () => {
       });
 
       expect(mockConfirmFn).toHaveBeenCalledWith({
-        title: "Enable Storage Settings",
-        message:
-          'Are you sure you want to enable storage settings for "TestOrg"?',
+        title: "Enable BYOB",
+        message: 'Are you sure you want to enable BYOB for "TestOrg"?',
       });
     });
 

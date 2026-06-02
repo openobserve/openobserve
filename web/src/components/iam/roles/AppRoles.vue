@@ -26,14 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
           <div data-test="iam-roles-search-input">
-            <OInput
+            <OSearchInput
               v-model="filterQuery"
               class="tw:w-48"
-              :placeholder="t('iam.searchRole')"            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+              :placeholder="t('iam.searchRole')"
+            />
           </div>
           <OButton
             data-test="alert-list-add-alert-btn"
@@ -85,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";

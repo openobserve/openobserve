@@ -4,6 +4,32 @@ let parser: any;
 let parserImportPromise: Promise<any> | null = null;
 
 /**
+ * Returns true when the query is a full SQL statement, false when it is a plain
+ * filter/WHERE-clause expression used in non-SQL mode.
+ *
+ * Full SQL always starts with SELECT or WITH (CTE); filter expressions start
+ * with a field name, function call, or operator — never with those keywords.
+ *
+ * Examples that return true  (SQL mode):
+ *   SELECT * FROM "stream"
+ *   SELECT histogram(_timestamp) … FROM "stream" GROUP BY …
+ *   WITH cte AS (SELECT …) SELECT * FROM cte
+ *
+ * Examples that return false (filter / non-SQL mode):
+ *   level = 'error'
+ *   level = 'error' AND status = 500
+ *   str_match(log, 'error')
+ *   source_from = 'web'          ← "from" inside a field name, not SQL
+ *   match_all('SELECT * FROM x') ← SQL inside a string value, not a SQL query
+ */
+export const isSqlQuery = (query: string): boolean => {
+  if (!query || typeof query !== "string") return false;
+  // Anchored at start so field names like "select_count" or "with_clause"
+  // are not mistaken for SQL keywords.
+  return /^\s*(SELECT|WITH)\s+/i.test(query);
+};
+
+/**
  * Helper function to check if the query is a simple "SELECT * FROM....." query
  * @param query The SQL query string to check
  * @returns true if the query is a SELECT * query, false otherwise

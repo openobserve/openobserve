@@ -193,18 +193,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #top>
-            <OInput
+            <OSearchInput
               data-test="log-search-index-list-field-search-input"
               v-model="searchMetricLabel"
               data-cy="index-field-search-input"
               clearable
               :debounce="1"
               :placeholder="t('search.searchField')"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            />
           </template>
         </OTable>
       </div>
@@ -237,7 +233,7 @@ import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -248,7 +244,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
+  components: { EqualIcon, NotEqualIcon, OButton, OSearchInput, OInnerLoading,
     OIcon, OTable, OCollapsible, OFieldLabel,
 },
   props: ["modelValue", "metricsList"],

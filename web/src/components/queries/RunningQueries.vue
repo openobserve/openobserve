@@ -58,17 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="filterQuery = ''"
                 />
               </div>
-              <OInput
+              <OSearchInput
                 v-if="selectedSearchField == 'all'"
                 v-model="filterQuery"
                 class=" no-border o2-search-input"
                 :placeholder="t('queries.search')"
                 data-test="running-queries-search-input"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
+              />
               <div v-else class="o2-select-input o2-input">
                 <OSelect
                   v-model="filterQuery"
@@ -184,7 +180,7 @@ import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
@@ -192,13 +188,11 @@ import { durationFormatter } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OInput,
-    OIcon,
+  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
 },
   setup() {
     const store = useStore();
