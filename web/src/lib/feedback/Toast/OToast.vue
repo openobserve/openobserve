@@ -139,7 +139,7 @@ const isTopPosition = computed(() =>
     :duration="0"
     :class="[
       'tw:relative tw:pointer-events-auto',
-      'tw:w-fit tw:min-w-[18rem] tw:max-w-[calc(100vw-2rem)]',
+      'tw:w-[22rem] tw:max-w-[calc(100vw-2rem)]',
       'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
       isTopPosition ? 'tw:data-[state=open]:slide-in-from-top-4' : 'tw:data-[state=open]:slide-in-from-bottom-4',
       'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
