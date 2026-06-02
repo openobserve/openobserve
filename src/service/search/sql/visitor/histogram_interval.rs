@@ -546,4 +546,64 @@ mod tests {
         assert_eq!(convert_histogram_interval_to_seconds("3hr").unwrap(), 10800);
         assert_eq!(convert_histogram_interval_to_seconds("1d").unwrap(), 86400);
     }
+
+    #[test]
+    fn test_different_time_ranges_produce_different_intervals() {
+        let hour = 3600 * 1_000_000_i64;
+        let sql = "SELECT histogram(_timestamp) FROM logs";
+
+        let parse = |sql: &str| {
+            sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+                .unwrap()
+                .pop()
+                .unwrap()
+        };
+
+        let mut statement = parse(sql);
+
+        // Full query range (1 hour) produces interval 30s
+        let mut v1 = HistogramIntervalVisitor::new((0, 1 * hour));
+        let _ = statement.visit(&mut v1);
+        assert_eq!(v1.interval, Some(30));
+
+        // Small partition range (2 minutes) produces interval 10s
+        let mut statement = parse(sql);
+        let mut v2 = HistogramIntervalVisitor::new((0, 2 * 60 * 1_000_000));
+        let _ = statement.visit(&mut v2);
+        assert_eq!(v2.interval, Some(10));
+
+        // Medium partition range (1 hour) produces interval 30s again
+        let mut statement = parse(sql);
+        let mut v3 = HistogramIntervalVisitor::new((0, 1 * hour));
+        let _ = statement.visit(&mut v3);
+        assert_eq!(v3.interval, Some(30));
+    }
+
+    #[test]
+    fn test_validate_adjust_preserves_valid_interval_regardless_of_time_range() {
+        let hour = 3600 * 1_000_000_i64;
+        let minute = 60 * 1_000_000_i64;
+
+        // When query.histogram_interval is preset (non-zero), validate_and_adjust
+        // should preserve it regardless of the time range
+        let preset = 30; // 30 seconds
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 1 * hour)),
+            30
+        );
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 2 * minute)),
+            30
+        );
+
+        let preset = 3600; // 1 hour
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 1 * hour)),
+            3600
+        );
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 2 * minute)),
+            3600
+        );
+    }
 }

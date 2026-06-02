@@ -55,6 +55,7 @@ use crate::{
     service::search::{
         cache as search_cache,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        sql::Sql,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -179,6 +180,21 @@ pub async fn process_search_stream_request(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };
+
+    if req.query.histogram_interval == 0 {
+        if let Ok(sql) = Sql::new(
+            &req.query.clone().into(),
+            &org_id,
+            stream_type,
+            req.search_type,
+        )
+        .await
+        {
+            if let Some(interval) = sql.histogram_interval {
+                req.query.histogram_interval = interval;
+            }
+        }
+    }
 
     let started_at = chrono::Utc::now().timestamp_micros();
     let start = Instant::now();
