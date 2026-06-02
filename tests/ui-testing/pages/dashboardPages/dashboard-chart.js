@@ -482,10 +482,14 @@ export default class ChartTypeSelector {
   async enterCustomSQL(query) {
     await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
     await this.queryEditor.click();
-    // Clear any placeholder/default content, then type the new query
+    await this.page.keyboard.press("Escape"); // dismiss any open Monaco suggestion
     await this.page.keyboard.press("Control+a");
     await this.page.keyboard.press("Delete");
-    await this.page.keyboard.type(query);
+    // Use insertText (single input event) instead of type (per-character keydown events)
+    // to prevent Monaco's autocomplete from accepting suggestions mid-input and
+    // mangling the SQL (e.g. replacing table names with function calls).
+    await this.page.keyboard.insertText(query);
+    await this.page.keyboard.press("Escape"); // dismiss any suggestion triggered at end
     testLogger.debug('Entered custom SQL query', { query });
   }
 
