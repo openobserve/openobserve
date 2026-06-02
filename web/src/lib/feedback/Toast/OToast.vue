@@ -245,9 +245,12 @@ const isTopPosition = computed(() =>
         <OIcon name="close" size="sm" class="tw:size-4" aria-hidden="true" />
       </ToastClose>
 
-      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-lg -->
+      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-lg.
+           :key on the outer div ensures Vue remounts it (restarting the CSS animation)
+           whenever timerKey increments (i.e. a duplicate toast resets the timer). -->
       <div
         v-if="timeout > 0"
+        :key="timerKey"
         class="tw:absolute tw:bottom-0 tw:left-0 tw:right-0 tw:h-0.5"
         aria-hidden="true"
       >
