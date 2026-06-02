@@ -25,14 +25,7 @@ if (import.meta.env.DEV && !form) {
     :validators="
       props.validators
         ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as string | number | undefined);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-            onBlur: (ctx: { value: unknown }) => {
+            onChangeOrBlur: (ctx: { value: unknown }) => {
               for (const v of props.validators ?? []) {
                 const r = v(ctx.value as string | number | undefined);
                 if (r !== undefined) return r;
