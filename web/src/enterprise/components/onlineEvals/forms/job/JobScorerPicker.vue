@@ -4,51 +4,55 @@
       <span class="job-scorer-picker__title">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
       <span class="job-scorer-picker__hint">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
     </div>
-    <div class="job-scorer-picker__grid">
-      <label
-        v-for="scorer in scorers"
-        :key="entityId(scorer)"
-        class="job-scorer-option"
-        :class="{ 'job-scorer-option--selected': selectedIds.includes(entityId(scorer)) }"
-      >
-        <input
-          type="checkbox"
-          class="job-scorer-option__check"
-          :checked="selectedIds.includes(entityId(scorer))"
-          @change="$emit('toggle', entityId(scorer))"
-        />
-        <div class="job-scorer-option__body">
-          <strong class="job-scorer-option__name">{{ scorer.name }}</strong>
-          <small class="job-scorer-option__meta">{{
-            t("onlineEvals.job.scorerPicker.meta", {
-              type: scorerTypeOf(scorer).replace("_", " "),
-              version: scorer.version,
-            })
-          }}</small>
-        </div>
-      </label>
-      <div v-if="!scorers.length" class="job-scorer-picker__empty">
-        No scorers available. Create one first in the Scorers tab.
-      </div>
+    <OSelect
+      :model-value="modelValue"
+      :options="options"
+      multiple
+      searchable
+      :placeholder="t('onlineEvals.job.scorerPicker.placeholder')"
+      :search-placeholder="t('onlineEvals.job.scorerPicker.searchPlaceholder')"
+      size="md"
+      :disabled="!scorers.length"
+      data-test="job-form-scorer-select"
+      @update:model-value="onChange"
+    />
+    <div v-if="!scorers.length" class="job-scorer-picker__empty">
+      {{ t("onlineEvals.job.scorerPicker.empty") }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { Scorer } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf } from "../../utils/evalEntity";
 
-defineProps<{
+const props = defineProps<{
   scorers: Scorer[];
-  selectedIds: string[];
+  modelValue: string[];
 }>();
 
-defineEmits<{
-  (e: "toggle", scorerId: string): void;
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string[]): void;
 }>();
 
 const { t } = useI18n();
+
+const options = computed(() =>
+  props.scorers.map((scorer) => ({
+    label: scorer.name,
+    value: entityId(scorer),
+    badge: `${scorerTypeOf(scorer).replace("_", " ")} · v${scorer.version}`,
+  })),
+);
+
+function onChange(value: unknown) {
+  if (Array.isArray(value)) {
+    emit("update:modelValue", value.map((v) => String(v)));
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -74,89 +78,13 @@ const { t } = useI18n();
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.job-scorer-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
 .job-scorer-picker__empty {
-  grid-column: 1 / -1;
+  margin-top: 8px;
   padding: 12px 14px;
   border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
   border-radius: 6px;
   text-align: center;
   color: var(--color-text-secondary, var(--o2-text-secondary));
   font-size: 12px;
-}
-
-.job-scorer-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 54px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.job-scorer-option:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border));
-}
-
-.job-scorer-option--selected {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 6%, var(--color-card-bg));
-}
-
-.job-scorer-option__check {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid var(--color-input-border, var(--o2-border-input));
-  border-radius: 3px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.job-scorer-option__check:checked {
-  background: var(--color-primary-600, #3F7994);
-  border-color: var(--color-primary-600, #3F7994);
-}
-
-.job-scorer-option__check:checked::after {
-  content: "";
-  width: 7px;
-  height: 4px;
-  border-left: 1.5px solid white;
-  border-bottom: 1.5px solid white;
-  transform: rotate(-45deg) translate(0, -1px);
-}
-
-.job-scorer-option__body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.job-scorer-option__name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.job-scorer-option__meta {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 </style>

@@ -4596,8 +4596,6 @@
         "chipScorers": "Multiple Scorers",
         "chipSampling": "Sampling Control"
       },
-      "nameHelp": "A friendly name for this job. Cannot be renamed after creation.",
-      "streamHelp": "Lists trace-enabled streams in this project. Cannot be changed after creation.",
       "descriptionPlaceholder": "What does this job monitor?",
       "samplingValueHelp": "JSON: rate is a number 0-1, count is a positive integer.",
       "samplingHelp": "Apply after Filter. Controls cost — only matched spans count toward the rate.",
@@ -4610,7 +4608,6 @@
       "backTo": "Back to Eval Jobs",
       "createTitle": "Create Online Eval Job",
       "editTitle": "Edit Online Eval Job",
-      "subtitle": "Pick the stream, scorers, mapping, and sampling behavior for this evaluation job.",
       "stepper": {
         "target": "Target",
         "scorers": "Scorers",
@@ -4622,7 +4619,7 @@
       "nameLabel": "Name",
       "namePlaceholder": "Production Faithfulness Monitor",
       "streamLabel": "Input stream",
-      "streamPlaceholder": "default",
+      "streamPlaceholder": "Select Stream Name",
       "streamTypeLabel": "Stream type",
       "streamTypePlaceholder": "traces",
       "descriptionLabel": "Description",
@@ -4636,7 +4633,10 @@
       "scorerPicker": {
         "title": "Scorers",
         "hint": "Select one or more scorers to run for every matched span.",
-        "meta": "{type} · v{version}"
+        "meta": "{type} · v{version}",
+        "placeholder": "Select Scorers",
+        "searchPlaceholder": "Search scorers…",
+        "empty": "No scorers available. Create one first in the Scorers tab."
       },
       "filter": {
         "title": "Filter condition",

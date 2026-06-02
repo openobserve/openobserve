@@ -12,7 +12,6 @@
       <h1 class="job-form__title">
         {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
       </h1>
-      <span class="job-form__subtitle">{{ t("onlineEvals.job.subtitle") }}</span>
       <div class="job-form__top-spacer" />
       <button
         type="button"
@@ -60,7 +59,6 @@
               :disabled="mode === 'edit'"
               data-test="job-form-name-input"
             />
-            <div class="job-field__help">{{ t("onlineEvals.job.nameHelp") }}</div>
           </div>
 
           <div class="job-field">
@@ -77,7 +75,6 @@
               :disabled="mode === 'edit'"
               data-test="job-form-stream-select"
             />
-            <div class="job-field__help">{{ t("onlineEvals.job.streamHelp") }}</div>
           </div>
 
           <div class="job-field job-field--desc">
@@ -101,9 +98,8 @@
           </div>
 
           <JobScorerPicker
+            v-model="form.scorerIds"
             :scorers="scorers"
-            :selected-ids="form.scorerIds"
-            @toggle="toggleScorer"
           />
 
           <JobFilterBuilder
@@ -369,16 +365,6 @@ function applyPreset(preset: "rootSpans" | "llmCalls" | "toolCalls") {
       },
     ],
   } as any;
-}
-
-function toggleScorer(scorerId: string) {
-  const selected = new Set(form.value.scorerIds);
-  if (selected.has(scorerId)) selected.delete(scorerId);
-  else selected.add(scorerId);
-
-  form.value.scorerIds = [...selected];
-  if (!(scorerId in scorerVersions.value)) scorerVersions.value[scorerId] = null;
-  syncMappings();
 }
 
 function syncMappings() {
