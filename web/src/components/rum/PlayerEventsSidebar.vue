@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="events-container relative-position tw:h-full tw:flex tw:flex-col">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b tw:px-2 tw:py-2" />
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:px-2 tw:py-1 tw:my-1! tw:mx-2!" />
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
