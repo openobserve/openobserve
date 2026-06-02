@@ -1381,7 +1381,7 @@ const fieldWidthClass = computed(() => {
                             v-else-if="iconKey"
                             class="tw:shrink-0 tw:size-4"
                           />
-                          <span class="tw:truncate" :title="filteredOptions[vRow.index].label">{{
+                          <span class="tw:truncate" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{
                             filteredOptions[vRow.index].label
                           }}</span>
                         </template>
