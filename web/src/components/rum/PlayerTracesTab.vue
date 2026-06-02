@@ -61,56 +61,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="selectedTrace"
       class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
     >
-      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+      <!-- Trace detail header -->
+      <div class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
         <OButton
           variant="ghost"
-          size="sm"
+          size="xs"
           @click="closeTraceDetail"
           data-test="rum-player-traces-tab-back-btn"
+          aria-label="Back"
         >
-          <template #icon-left>
-            <OIcon name="arrow-back" size="sm" />
-          </template>
-          {{ t("common.back") }}
+          <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <OSeparator vertical class="tw:h-4" />
-        <small class="tw:text-[var(--o2-text-secondary)]">{{ selectedTrace.label }}</small>
+        <code class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:truncate tw:min-w-0 tw:flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
+        <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-shrink-0">
+          <span
+            v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+          >
+            <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
+          </span>
+          <span
+            v-if="selectedTrace.metadata?.duration"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+          >
+            <OIcon name="timer" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            {{ formatDuration(selectedTrace.metadata.duration / 1000) }}
+          </span>
+          <span
+            v-if="selectedTrace.metadata?.spanCount"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+          >
+            <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
+          </span>
+          <span
+            v-if="selectedTrace.metadata?.errorCount > 0"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-status-error)]/10 tw:text-[var(--o2-status-error)]"
+          >
+            <OIcon name="error" size="xs" />
+            {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
+          </span>
+        </div>
       </div>
-      <!-- Trace loading state -->
-      <div
-        v-if="traceLoading"
-        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-3"
-        data-test="rum-player-traces-tab-trace-loading"
-      >
-        <OSpinner size="md" />
-        <small>{{ t("rum.loadingErrorDetails") }}</small>
-      </div>
-      <!-- Trace error state -->
-      <div
-        v-else-if="traceError"
-        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-4 tw:p-4"
-        data-test="rum-player-traces-tab-trace-error"
-      >
-        <OIcon name="error-outline" size="lg" class="tw:text-[var(--o2-status-error)]" />
-        <p class="tw:text-center">{{ traceError }}</p>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="openTraceDetail(selectedTrace)"
-          data-test="rum-player-traces-tab-trace-retry-btn"
-        >
-          {{ t("common.retry") }}
-        </OButton>
-      </div>
-      <!-- Embedded TraceDetails -->
-      <div v-else class="tw:flex-1 tw:overflow-hidden">
+      <div class="tw:flex-1 tw:overflow-hidden">
         <TraceDetails
           mode="embedded"
           :trace-id-prop="selectedTrace.traceId"
           stream-name-prop="default"
-          :span-list-prop="selectedTraceSpanList"
+          :span-list-prop="[]"
           :start-time-prop="selectedTraceStartTime"
           :end-time-prop="selectedTraceEndTime"
+          :show-header="false"
           :show-back-button="false"
           :show-timeline="true"
           :show-log-stream-selector="false"
@@ -135,77 +137,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Trace cards list -->
       <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:px-2 tw:py-2 tw:flex tw:flex-col tw:gap-2">
-        <div
+        <OCard
           v-for="(view, index) in correlatedViews"
           :key="view.traceId"
-          class="tw:border tw:border-solid tw:rounded-lg tw:overflow-hidden tw:border-[var(--o2-border-color)] tw:min-h-fit! tw:h-fit!"
+          class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:overflow-hidden tw:min-h-fit! tw:h-fit! tw:cursor-pointer"
           :data-test="`rum-player-traces-tab-trace-card-${index}`"
+          @click="openTraceDetail(view)"
         >
           <!-- Card header -->
-          <div class="tw:flex tw:items-start tw:gap-2 tw:p-2">
-            <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col">
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <h4 class="tw:text-sm tw:font-semibold tw:truncate tw:text-[var(--o2-text-heading)]">
-                  {{ view.label }}
-                </h4>
-                <OBadge :variant="view.kind === 'load' ? 'default' : 'primary'" size="sm">
-                  {{ view.kind === "load" ? t("rum.initialView") : t("rum.routeChange") }}
-                </OBadge>
-              </div>
-              <code class="tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:truncate tw:block">
-                {{ shortRoute(view.route) }}
-              </code>
-            </div>
-          </div>
+          <OCardSection class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:pt-2 tw:pb-1.5">
+            <code class="tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:truncate tw:min-w-0 tw:flex-1">
+              {{ shortRoute(view.route) }}
+            </code>
+            <OBadge
+              v-if="view.metadata?.errorCount > 0"
+              variant="error-outline"
+              size="sm"
+              class="tw:flex-shrink-0 tw:px-1.5! tw:py-1!"
+            >
+              <OIcon name="error" size="xs" class="tw:mr-0.5" />
+              {{ view.metadata.errorCount }} {{ view.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
+            </OBadge>
+          </OCardSection>
 
           <!-- Card body: Trace metadata -->
-          <div v-if="view.metadata" class="tw:flex tw:flex-wrap tw:gap-1 tw:px-2.5 tw:pb-2">
+          <OCardSection v-if="view.metadata" class="tw:flex tw:flex-wrap tw:gap-1 tw:px-2.5 tw:pb-2">
             <!-- Duration -->
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)]">
+            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">
               <OIcon name="timer" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
               {{ formatTimeWithSuffix(view.metadata.duration) }}
             </span>
 
-            <!-- Error count (if any) -->
-            <span
-              v-if="view.metadata.errorCount > 0"
-              class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-status-error)]/10 tw:text-[var(--o2-status-error)]"
-            >
-              <OIcon name="error" size="xs" />
-              {{ view.metadata.errorCount }} {{ view.metadata.errorCount > 1 ? t("rum.errors") : t("rum.error") }}
-            </span>
-
             <!-- Service count -->
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)]">
+            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">
               <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
               {{ view.metadata.serviceCount }} {{ view.metadata.serviceCount > 1 ? 'services' : 'service' }}
             </span>
 
             <!-- Root operation -->
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)]">
+            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">
               {{ view.metadata.rootService }} → {{ view.metadata.rootOperation }}
             </span>
-          </div>
-
-          <!-- Card footer -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]">
-            <code class="tw:text-[0.625rem] tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-hover-accent)] tw:px-1.5 tw:py-0.5 tw:rounded tw:truncate">
-              {{ view.traceId }}
-            </code>
-            <div class="tw:flex-1" />
-            <OButton
-              variant="outline"
-              size="xs"
-              @click.stop="openTraceDetail(view)"
-              :data-test="`rum-player-traces-tab-view-details-btn-${index}`"
-            >
-              <template #icon-left>
-                <OIcon name="open-in-new" size="xs" />
-              </template>
-              {{ t("rum.viewTraceDetails") }}
-            </OButton>
-          </div>
-        </div>
+          </OCardSection>
+        </OCard>
       </div>
     </div>
   </div>
@@ -216,13 +190,14 @@ import { ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
-import { b64EncodeUnicode, formatTimeWithSuffix, generateTraceContext } from "@/utils/zincutils";
+import { formatDuration, formatTimeWithSuffix, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
 const { t } = useI18n();
@@ -254,11 +229,8 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const correlatedViews = ref<any[]>([]);
 const selectedTrace = ref<any>(null);
-const selectedTraceSpanList = ref<any[]>([]);
 const selectedTraceStartTime = ref(0);
 const selectedTraceEndTime = ref(0);
-const traceLoading = ref(false);
-const traceError = ref<string | null>(null);
 const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
@@ -273,6 +245,16 @@ function shortRoute(url: string): string {
   } catch {
     return url;
   }
+}
+
+function traceTimeOffset(startTimeUs: number): string {
+  const sessionStartMs = props.startTime;
+  if (!sessionStartMs) return "";
+  const offsetMs = Math.max(0, Math.floor(startTimeUs / 1000) - sessionStartMs);
+  const totalSec = Math.floor(offsetMs / 1000);
+  const min = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const sec = (totalSec % 60).toString().padStart(2, "0");
+  return `@ ${min}:${sec}`;
 }
 
 // ── Data fetching ───────────────────────────────────────────
@@ -311,6 +293,7 @@ async function fetchTraceMetadata(traceIds: string[]) {
       {
         data: (_payload, response) => {
           const hits = response.content?.results?.hits || [];
+          console.log(hits);
           hits.forEach((hit: any) => {
             metadata[hit.trace_id] = {
               duration: hit.duration,
@@ -318,7 +301,9 @@ async function fetchTraceMetadata(traceIds: string[]) {
               errorCount: hit.spans?.[1] || 0,
               serviceCount: hit.service_name?.length || 0,
               rootService: hit.first_event?.service_name || 'unknown',
-              rootOperation: hit.first_event?.operation_name || 'unknown'
+              rootOperation: hit.first_event?.operation_name || 'unknown',
+              start_time: hit.start_time,
+              end_time: hit.end_time,
             };
           });
         },
@@ -373,27 +358,29 @@ async function fetchTraces() {
     for (const hit of rumHits) {
       const traceId = hit._oo_trace_id;
       if (!traceId || traceMap.has(traceId)) continue;
+      const viewUrl = hit._view_url || hit.view_url || "";
       traceMap.set(traceId, {
         traceId,
-        route: hit.view_url || "",
-        label: hit.view_url ? shortRoute(hit.view_url).replace(/\/$/, "") || "/" : "View",
-        kind: hit.view_loading_type === "initial_load" ? "load" : "route_change",
-        viewId: hit.view_id || "",
+        route: viewUrl,
+        label: viewUrl ? shortRoute(viewUrl).replace(/\/$/, "") || "/" : traceId,
+        kind: (hit._view_loading_type || hit.view_loading_type) === "initial_load" ? "load" : "route_change",
+        viewId: hit._view_id || hit.view_id || "",
       });
     }
 
     const views = Array.from(traceMap.values());
 
-    // Fetch trace metadata for all trace IDs
+    // Fetch trace metadata for all trace IDs and filter to only those present in traces
+    let filteredViews = views;
     if (views.length > 0) {
       metadataLoading.value = true;
       try {
         const metadata = await fetchTraceMetadata(views.map(v => v.traceId));
 
-        // Merge metadata into views
-        views.forEach(view => {
-          view.metadata = metadata[view.traceId] || null;
-        });
+        // Only keep views whose trace_id exists in the traces stream
+        filteredViews = views
+          .filter(view => metadata[view.traceId])
+          .map(view => ({ ...view, metadata: metadata[view.traceId] }));
 
         traceMetadata.value = metadata;
       } catch (err: any) {
@@ -404,7 +391,7 @@ async function fetchTraces() {
       }
     }
 
-    correlatedViews.value = views;
+    correlatedViews.value = filteredViews;
   } catch (err: any) {
     error.value = err?.message || t("rum.failedToFetchTraces");
   } finally {
@@ -412,90 +399,29 @@ async function fetchTraces() {
   }
 }
 
-async function openTraceDetail(view: any) {
+function openTraceDetail(view: any) {
   selectedTrace.value = view;
-  traceLoading.value = true;
-  traceError.value = null;
 
-  try {
-    const orgId = store.state.selectedOrganization.identifier;
-    const nowMs = Date.now();
-    const searchStartTime = (props.startTime || (nowMs - 86400000)) * 1000;
-    const searchEndTime = (props.endTime || nowMs) * 1000;
-    const traceStream = "default";
+  const nowMs = Date.now();
+  const fallbackStart = (props.startTime || (nowMs - 86400000)) * 1000;
+  const fallbackEnd = (props.endTime || nowMs) * 1000;
 
-    // Fetch trace metadata for time range
-    const traceMetaResponse = await searchService.get_traces({
-      org_identifier: orgId,
-      start_time: searchStartTime,
-      end_time: searchEndTime,
-      filter: `trace_id='${view.traceId}'`,
-      size: 1,
-      from: 0,
-      stream_name: traceStream,
-    });
-
-    const traceMeta = traceMetaResponse.data?.hits?.[0];
-    if (!traceMeta) {
-      traceError.value = t("rum.traceNotFound");
-      traceLoading.value = false;
-      return;
-    }
-
-    const traceStartTime = Math.floor(traceMeta.start_time / 1000) - 10000;
-    const traceEndTime = Math.ceil(traceMeta.end_time / 1000) + 10000;
-
-    // Fetch all spans
-    const spansQuery = {
-      query: {
-        sql: b64EncodeUnicode(
-          `SELECT * FROM "${traceStream}" WHERE trace_id = '${view.traceId}' ORDER BY start_time`,
-        ),
-        start_time: traceStartTime,
-        end_time: traceEndTime,
-        from: 0,
-        size: 2500,
-      },
-      encoding: "base64",
-    };
-
-    const spansResponse = await searchService.search(
-      {
-        org_identifier: orgId,
-        query: spansQuery,
-        page_type: "traces",
-      },
-      "ui",
-    );
-
-    const spans = spansResponse.data?.hits || [];
-    const rootSpan = spans[0] || {};
-
-    selectedTraceSpanList.value = spans.map((s: any) => ({
-      ...s,
-      depth: s.depth || 0,
-      kind: s.span_kind || "i",
-      op: s.operation_name || s.operation || "span",
-      dur: s.duration || 0,
-      start: s.start_time ? s.start_time - rootSpan.start_time : 0,
-      svc: s.service_name || s.service || "unknown",
-    }));
-    selectedTraceStartTime.value = traceStartTime;
-    selectedTraceEndTime.value = traceEndTime;
-  } catch (err: any) {
-    traceError.value = err?.message || t("rum.failedToFetchTraceDetails");
-  } finally {
-    traceLoading.value = false;
+  const meta = traceMetadata.value[view.traceId];
+  console.log(traceMetadata, view, meta);
+  if (meta?.start_time && meta?.end_time) {
+    const ONE_MINUTE_US = 60_000_000;
+    selectedTraceStartTime.value = Math.floor(meta.start_time / 1000) - ONE_MINUTE_US;
+    selectedTraceEndTime.value = Math.ceil(meta.end_time / 1000) + ONE_MINUTE_US;
+  } else {
+    selectedTraceStartTime.value = fallbackStart;
+    selectedTraceEndTime.value = fallbackEnd;
   }
 }
 
 function closeTraceDetail() {
   selectedTrace.value = null;
-  selectedTraceSpanList.value = [];
   selectedTraceStartTime.value = 0;
   selectedTraceEndTime.value = 0;
-  traceLoading.value = false;
-  traceError.value = null;
 }
 
 // ── Lifecycle ───────────────────────────────────────────────
