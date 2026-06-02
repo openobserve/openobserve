@@ -186,15 +186,14 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: "auto",
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "type",
     header: t("onlineEvals.scorer.columns.type"),
     accessorFn: (row: Scorer) => scorerTypeOf(row),
     sortable: true,
-    size: 120,
+    size: 160,
     meta: { align: "left" },
   },
   {
@@ -232,7 +231,7 @@ const columns = computed(() => [
     id: "successRate",
     header: t("onlineEvals.scorer.columns.successRate"),
     sortable: false,
-    size: 160,
+    size: "auto",
     meta: { align: "left" },
   },
   {

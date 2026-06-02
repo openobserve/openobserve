@@ -17,9 +17,11 @@ the Free Software Foundation, either version 3 of the License, or
       :providers="providers"
       :score-configs="scoreConfigs"
       :score-config-versions="scoreConfigVersions"
+      :is-refreshing-providers="isRefreshingProviders"
       @saved="handleSaved"
       @cancel="closeFormPage"
       @request-versions="(id) => ensureScoreConfigVersions(orgId, id)"
+      @refresh-providers="refreshProviders"
     />
     <JobFormPage
       v-else-if="formPage?.entity === 'jobs'"
@@ -101,7 +103,7 @@ the Free Software Foundation, either version 3 of the License, or
 
       <ScorerTypeDialog
         v-if="scorerTypeDialog"
-        @close="scorerTypeDialog = false"
+        @close="closeScorerTypeDialog"
         @select="selectScorerType"
       />
 
@@ -231,8 +233,21 @@ const {
   providers,
   isLoading,
   loadAll,
+  loadProviders,
   ensureScoreConfigVersions,
 } = useOnlineEvalsData();
+
+const isRefreshingProviders = ref(false);
+
+async function refreshProviders() {
+  if (isRefreshingProviders.value) return;
+  isRefreshingProviders.value = true;
+  try {
+    await loadProviders(orgId.value);
+  } finally {
+    isRefreshingProviders.value = false;
+  }
+}
 
 type RowTab = Exclude<ActiveTab, "quality">;
 
@@ -432,6 +447,11 @@ function closeFormPage() {
 
 function selectScorerType(type: ScorerType) {
   pushRouteAction({ action: "add", scorer_type: type });
+}
+
+function closeScorerTypeDialog() {
+  scorerTypeDialog.value = false;
+  clearRouteAction();
 }
 
 async function handleSaved() {

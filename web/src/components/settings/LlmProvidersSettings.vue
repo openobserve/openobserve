@@ -14,19 +14,11 @@
         class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
         style="border-color: var(--color-dialog-header-border, var(--o2-border));"
       >
-        <div>
-          <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-            data-test="llm-providers-settings-title"
-          >
-            {{ t("llmProviders.title") }}
-          </div>
-          <div
-            class="tw:text-xs tw:mt-1"
-            style="color: var(--color-text-secondary, var(--o2-text-secondary));"
-          >
-            {{ t("llmProviders.subtitle") }}
-          </div>
+        <div
+          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
+          data-test="llm-providers-settings-title"
+        >
+          {{ t("llmProviders.title") }}
         </div>
         <div class="tw:flex tw:items-center">
           <OInput

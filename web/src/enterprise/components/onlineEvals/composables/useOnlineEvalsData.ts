@@ -43,6 +43,15 @@ export function useOnlineEvalsData() {
     }
   }
 
+  async function loadProviders(orgId: string) {
+    if (!orgId) return;
+    try {
+      providers.value = await onlineEvalsService.providers.list(orgId);
+    } catch (err: any) {
+      showError(err, t("onlineEvals.loadError"));
+    }
+  }
+
   async function ensureScoreConfigVersions(orgId: string, entityIdValue: string) {
     if (!orgId || scoreConfigVersions.value[entityIdValue]?.length > 1) return;
 
@@ -67,6 +76,7 @@ export function useOnlineEvalsData() {
     providers,
     isLoading,
     loadAll,
+    loadProviders,
     ensureScoreConfigVersions,
   };
 }

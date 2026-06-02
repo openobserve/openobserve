@@ -261,9 +261,7 @@ const { t } = useI18n();
   right: 12px;
   padding: 2px 8px;
   border-radius: 4px;
-  font: 700 9px/1.5 inherit;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font: 600 11px/1.5 inherit;
   background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
   color: var(--o2-status-warning-text);
 }

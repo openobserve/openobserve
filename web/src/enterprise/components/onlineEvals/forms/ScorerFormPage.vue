@@ -71,7 +71,6 @@
               :disabled="mode === 'edit'"
               data-test="scorer-form-name-input"
             />
-            <div class="scorer-field__help">{{ t("onlineEvals.scorer.nameHelp") }}</div>
           </div>
 
           <div class="scorer-field scorer-field--desc">
@@ -128,14 +127,6 @@
                 {{ t("onlineEvals.scorer.healthyLabel") }}
                 <span class="scorer-mono">{{ selectedHealthy }}</span>
               </span>
-              <button
-                type="button"
-                class="scorer-preview__clear"
-                :aria-label="t('onlineEvals.scorer.clear')"
-                @click="clearScoreConfig"
-              >
-                <OIcon name="close" size="xs" />
-              </button>
             </div>
           </div>
         </section>
@@ -152,13 +143,25 @@
               {{ t("onlineEvals.scorer.providerLabel") }}
               <span class="scorer-field__req">*</span>
             </label>
-            <OSelect
-              v-model="form.providerId"
-              :options="providerOptions"
-              :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-              size="md"
-              data-test="scorer-form-provider-select"
-            />
+            <div class="scorer-field__row">
+              <OSelect
+                v-model="form.providerId"
+                :options="providerOptions"
+                :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
+                size="md"
+                class="scorer-field__row-grow"
+                data-test="scorer-form-provider-select"
+              />
+              <OButton
+                variant="ghost"
+                size="icon-md"
+                icon-left="refresh"
+                :loading="isRefreshingProviders"
+                :title="t('onlineEvals.scorer.refreshProviders')"
+                data-test="scorer-form-provider-refresh-btn"
+                @click="$emit('refresh-providers')"
+              />
+            </div>
 
             <div v-if="selectedProvider" class="scorer-preview">
               <span class="scorer-preview__dot" />
@@ -178,7 +181,19 @@
               </span>
             </div>
 
-            <div class="scorer-field__help">{{ t("onlineEvals.scorer.providerHelp") }}</div>
+            <div class="scorer-field__help">
+              <i18n-t keypath="onlineEvals.scorer.providerHelp" tag="span">
+                <template #settingsLink>
+                  <router-link
+                    :to="{ name: 'llmProviders' }"
+                    class="scorer-field__help-link"
+                    target="_blank"
+                  >
+                    {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
+                  </router-link>
+                </template>
+              </i18n-t>
+            </div>
           </div>
 
           <div class="scorer-field">
@@ -347,12 +362,14 @@ const props = defineProps<{
   providers: Provider[];
   scoreConfigs: ScoreConfig[];
   scoreConfigVersions: Record<string, ScoreConfig[]>;
+  isRefreshingProviders?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
   (e: "request-versions", scoreConfigId: string): void;
+  (e: "refresh-providers"): void;
 }>();
 
 const { t } = useI18n();
@@ -379,21 +396,19 @@ const titleText = computed(() => {
     : t("onlineEvals.scorer.editTitleLlm");
 });
 
-const scoreConfigOptions = computed(() => [
-  { label: t("onlineEvals.scorer.producesScoreConfigNone"), value: "" },
-  ...props.scoreConfigs.map((config) => ({
+const scoreConfigOptions = computed(() =>
+  props.scoreConfigs.map((config) => ({
     label: config.name,
     value: entityId(config),
   })),
-]);
+);
 
-const providerOptions = computed(() => [
-  { label: t("onlineEvals.scorer.providerPlaceholder"), value: "" },
-  ...props.providers.map((provider) => ({
+const providerOptions = computed(() =>
+  props.providers.map((provider) => ({
     label: provider.name,
     value: provider.id,
   })),
-]);
+);
 
 const selectedScoreConfig = computed(() =>
   props.scoreConfigs.find((c) => entityId(c) === form.value.producesScoreConfigId) || null,
@@ -504,12 +519,6 @@ async function handleScoreConfigSelection() {
   form.value.pinScoreConfigVersion = false;
   form.value.producesScoreConfigVersion = "";
   await prepareSelectedScoreConfigVersion(false);
-}
-
-function clearScoreConfig() {
-  form.value.producesScoreConfigId = "";
-  form.value.producesScoreConfigVersion = "";
-  form.value.pinScoreConfigVersion = false;
 }
 
 async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
@@ -784,6 +793,27 @@ async function save() {
   margin-top: 4px;
 }
 
+.scorer-field__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scorer-field__row-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.scorer-field__help-link {
+  color: var(--color-primary-600, #3F7994);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.scorer-field__help-link:hover {
+  text-decoration: underline;
+}
+
 .scorer-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -825,26 +855,6 @@ async function save() {
 .scorer-preview__meta .scorer-mono {
   color: var(--color-text-primary, currentColor);
   font-weight: 600;
-}
-
-.scorer-preview__clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-left: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  cursor: pointer;
-}
-
-.scorer-preview__clear:hover {
-  background: color-mix(in srgb, var(--o2-status-error-text) 14%, transparent);
-  color: var(--o2-status-error-text);
 }
 
 .scorer-prompt-vars {
