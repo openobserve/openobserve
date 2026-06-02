@@ -161,17 +161,19 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.findComponent({ name: "AppTabs" }).exists()).toBe(true);
     });
 
-    it("passes 2 tabs to AppTabs with labels Breadcrumbs and Tags", () => {
+    it("passes 3 tabs to AppTabs with labels Breadcrumbs, Tags and Traces", () => {
       // Arrange
       const appTabs = wrapper.findComponent({ name: "AppTabs" });
       const tabs = appTabs.props("tabs");
 
       // Assert
-      expect(tabs).toHaveLength(2);
+      expect(tabs).toHaveLength(3);
       expect(tabs[0].label).toBe("Breadcrumbs");
       expect(tabs[0].value).toBe("breadcrumbs");
       expect(tabs[1].label).toBe("Tags");
       expect(tabs[1].value).toBe("tags");
+      expect(tabs[2].label).toBe("Traces");
+      expect(tabs[2].value).toBe("traces");
     });
 
     it("shows breadcrumbs content by default when component mounts", () => {
