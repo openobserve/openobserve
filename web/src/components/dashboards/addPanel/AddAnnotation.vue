@@ -1,6 +1,6 @@
 <template>
   <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
-    <OForm id="add-annotation-form" :default-values="{ title: annotationData.title }" @submit="saveAnnotation.execute()">
+    <OForm ref="formRef" :default-values="{ title: annotationData.title }" @submit="saveAnnotation.execute()">
     <div class="tw:flex tw:flex-col">
         <OFormInput
           name="title"
@@ -45,8 +45,7 @@
         <OButton
           variant="primary"
           size="sm-action"
-          type="submit"
-          form="add-annotation-form"
+          @click="formRef?.submit()"
           :loading="saveAnnotation.isLoading?.value"
           :disabled="!annotationData.title"
           >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
@@ -92,6 +91,7 @@ const props = defineProps({
 const emit = defineEmits(["remove", "close"]);
 
 const store = useStore();
+const formRef = ref(null);
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 

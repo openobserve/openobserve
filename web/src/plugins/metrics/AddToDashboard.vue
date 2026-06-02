@@ -1,19 +1,19 @@
 <template>
-  <ODialog
+  <ODrawer
     :open="open"
-    size="md"
+    :width="30"
     :title="t('dashboard.addDashboard')"
     secondary-button-label="Cancel"
     :primary-button-label="t('metrics.add')"
-    form-id="add-to-dashboard-form"
     :primary-button-loading="onSubmit.isLoading.value"
     :primary-button-disabled="!panelTitle.trim()"
     data-test="add-to-dashboard-dialog"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
+    @click:primary="handlePrimaryClick()"
   >
-    <OForm id="add-to-dashboard-form" :default-values="{ panelTitle: '' }" @submit="onSubmit.execute()">
-    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4">
+    <OForm ref="formRef" :default-values="{ panelTitle: '' }" @submit="onSubmit.execute()">
+    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 tw:px-3 tw:py-2">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
@@ -40,7 +40,7 @@
       />
     </div>
     </OForm>
-  </ODialog>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -53,7 +53,7 @@ import { addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OForm from '@/lib/forms/Form/OForm.vue';
 import OFormInput from '@/lib/forms/Input/OFormInput.vue';
@@ -68,7 +68,7 @@ export default defineComponent({
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
-    ODialog,
+    ODrawer,
     OInput,
     OForm,
     OFormInput,
@@ -201,6 +201,11 @@ export default defineComponent({
       }
     });
 
+    const formRef = ref(null);
+    const handlePrimaryClick = async () => {
+      formRef.value?.submit();
+    };
+
     return {
       t,
       getImageURL,
@@ -215,6 +220,8 @@ export default defineComponent({
       activeFolderId,
       activeTabId,
       updateSelectedDashboard,
+      formRef,
+      handlePrimaryClick,
     };
   },
 });
