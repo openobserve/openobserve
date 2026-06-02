@@ -50,6 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <PlayerTracesTab
         :session-id="sessionId"
         :current-time="currentTime"
+        :start-time="startTime"
+        :end-time="endTime"
+        @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
       />
     </template>
     <template v-else>
@@ -154,6 +157,14 @@ const props = defineProps({
     default: "",
   },
   currentTime: {
+    type: Number,
+    default: 0,
+  },
+  startTime: {
+    type: Number,
+    default: 0,
+  },
+  endTime: {
     type: Number,
     default: 0,
   },
