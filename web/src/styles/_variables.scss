@@ -373,12 +373,13 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-table-actions-bg: white;
 
-  // Log table surface tokens — mirrors OTable border/header tokens
+  // Log table surface tokens
   --o2-log-table-row-bg: #ffffff;
   --o2-log-table-row-alt-bg: #f7f8fa;
-  --o2-log-table-row-hover: #eef0f5;
-  --o2-log-table-row-border: var(--color-table-row-divider);
-  --o2-log-table-header-bg: var(--color-table-header-bg);
+  --o2-log-table-row-hover: #eff1fd;
+  --o2-log-table-row-border: #edeff3;
+  --o2-log-table-header-bg: #f1f3f7;
+  --o2-log-table-text: #27282e;
 
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
   --o2-tab-text-color: #{$o2-gray-1400};
@@ -620,12 +621,13 @@ $json-object-dark: #D1D5DB;         // Light gray
 
   --o2-table-actions-bg: #1f2223;
 
-  // Log table surface tokens — softer mid-tones, OTable header token
-  --o2-log-table-row-bg: #252a38;
-  --o2-log-table-row-alt-bg: #2a2f40;
-  --o2-log-table-row-hover: #303549;
-  --o2-log-table-row-border: rgba(0, 0, 0, 0.25);
+  // Log table surface tokens
+  --o2-log-table-row-bg: #21242c;
+  --o2-log-table-row-alt-bg: #252934;
+  --o2-log-table-row-hover: #3a4a78;
+  --o2-log-table-row-border: rgba(0, 0, 0, 0.42);
   --o2-log-table-header-bg: var(--color-table-header-bg);
+  --o2-log-table-text: var(--o2-text-heading);
 
   --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
   --o2-tab-text-color: #{$o2-gray-100};
