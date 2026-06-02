@@ -60,8 +60,10 @@ export default class DashboardactionPage {
   }
 
   // Get dashboard-error locator
+  // DashboardErrors.vue has two nested elements with the same data-test attribute;
+  // use .first() to avoid Playwright strict-mode throws on multi-element locators.
   getDashboardErrorLocator() {
-    return this.page.locator('[data-test="dashboard-error"]');
+    return this.page.locator('[data-test="dashboard-error"]').first();
   }
 
   // Generate a unique panel name

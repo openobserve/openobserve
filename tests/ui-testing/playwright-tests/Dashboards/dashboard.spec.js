@@ -841,13 +841,16 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("line");
 
-    // Set custom SQL — fields are populated client-side by the SQL parser
+    // Set custom SQL — fields are populated client-side by the SQL parser.
+    // Use `level` and `method` (guaranteed fields in e2e_automate) with
+    // impossible conditions so all counts are zero. This validates that the
+    // line chart renders zero-valued camelCase-aliased series without errors.
     await pm.chartTypeSelector.setCustomSQL(
       `SELECT histogram(_timestamp, '5 minute') AS "_time",
-       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE '4%' THEN 1 END) AS "4xxErrorCount",
-       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE 'tes%' THEN 1 END) AS "5xxErrorCount",
-       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_pod_id IS NULL THEN 1 END) AS "NullErrorCount",
-       COUNT(CASE WHEN kubernetes_container_name = 'prometheus' THEN 1 END) AS "pageViewCount"
+       COUNT(CASE WHEN level = 'nonexistentLevel_abc' THEN 1 END) AS "4xxErrorCount",
+       COUNT(CASE WHEN level = 'nonexistentLevel_def' THEN 1 END) AS "5xxErrorCount",
+       COUNT(CASE WHEN method = 'NONEXISTENT_METHOD_xyz' THEN 1 END) AS "NullErrorCount",
+       COUNT(CASE WHEN stream = 'nonexistentStream_xyz' THEN 1 END) AS "pageViewCount"
 FROM e2e_automate
 GROUP BY _time
 ORDER BY _time ASC`
