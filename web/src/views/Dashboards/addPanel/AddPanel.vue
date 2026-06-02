@@ -239,7 +239,6 @@ import {
 } from "@/composables/contextProviders";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
-import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboardPanelDefaults";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -542,17 +541,6 @@ export default defineComponent({
             dashboardPanelData.data,
             JSON.parse(JSON.stringify(panelData ?? {})),
           );
-
-          // Fill in config fields that may be missing from panels saved with older schema versions.
-          // Object.assign above fully replaces data.config, so any key absent in the saved panel
-          // becomes undefined — OSelect then shows blank because undefined != null (no-selection).
-          // Only fill keys that are actually missing; never overwrite saved values.
-          const defaultConfig = getDefaultDashboardPanelData(store).data.config;
-          for (const key of Object.keys(defaultConfig)) {
-            if (dashboardPanelData.data.config[key] === undefined) {
-              dashboardPanelData.data.config[key] = defaultConfig[key];
-            }
-          }
 
           // FIX: For custom_chart panels, ensure customQuery flag is always true
           // This prevents the query from being lost due to watchers that fire during mount
