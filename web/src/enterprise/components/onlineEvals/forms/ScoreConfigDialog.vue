@@ -121,7 +121,6 @@
         <div v-if="form.dataType === 'numeric'" class="sc-field">
           <label class="sc-field__label">
             {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
-            <span v-if="mode === 'edit'" class="sc-version-bump">{{ t("onlineEvals.scoreConfig.createsVersion", { nextVersion: nextVersionLabel }) }}</span>
           </label>
           <div class="sc-range-row">
             <span class="sc-range-row__label">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
@@ -147,7 +146,6 @@
         <div v-if="form.dataType === 'categorical'" class="sc-field">
           <label class="sc-field__label">
             {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
-            <span v-if="mode === 'edit'" class="sc-version-bump">{{ t("onlineEvals.scoreConfig.createsVersion", { nextVersion: nextVersionLabel }) }}</span>
           </label>
           <div class="sc-tag-input">
             <span v-for="(cat, idx) in form.categories" :key="`${cat}-${idx}`" class="sc-tag">
@@ -189,7 +187,6 @@
           <div class="sc-ht-section__head">
             <span class="sc-ht-section__kicker">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
             <span class="sc-ht-section__optional">{{ t("onlineEvals.scoreConfig.optional") }}</span>
-            <span v-if="mode === 'edit'" class="sc-version-bump">{{ t("onlineEvals.scoreConfig.createsVersion", { nextVersion: nextVersionLabel }) }}</span>
           </div>
           <p class="sc-ht-section__intro">{{ t("onlineEvals.scoreConfig.healthyThresholdIntro") }}</p>
 
@@ -798,18 +795,6 @@ async function save() {
   color: var(--o2-status-error-text);
 }
 
-.sc-version-bump {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 8px;
-  padding: 1px 6px;
-  font: 600 10px var(--o2-font);
-  letter-spacing: 0.02em;
-  color: var(--o2-status-warning-text);
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  border-radius: 3px;
-  vertical-align: middle;
-}
 
 .sc-ht-section {
   margin-top: 4px;
@@ -840,6 +825,7 @@ async function save() {
   border-radius: 3px;
   padding: 1px 6px;
 }
+
 
 .sc-ht-section__intro {
   margin: 0 0 10px;

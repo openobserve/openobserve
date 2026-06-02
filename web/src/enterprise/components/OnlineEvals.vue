@@ -65,6 +65,7 @@ the Free Software Foundation, either version 3 of the License, or
             :loading="isLoading"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
+            @view="(row) => openViewDialog(row)"
             @edit="(row) => openEditDialog(row)"
             @delete="(row) => deleteRow(row)"
           />
@@ -77,6 +78,7 @@ the Free Software Foundation, either version 3 of the License, or
             :loading="isLoading"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
+            @view="(row: Scorer) => openScorerView(row)"
             @edit="(row: Scorer) => openEditDialog(row)"
             @delete="(row: Scorer) => deleteRow(row)"
           />
@@ -85,9 +87,13 @@ the Free Software Foundation, either version 3 of the License, or
             :rows="(filteredRows as EvalJob[])"
             :search="filterQuery"
             :loading="isLoading"
+            :pending-status-id="pendingJobStatusId"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
+            @view="(row: EvalJob) => openJobView(row)"
             @edit="(row: EvalJob) => openEditDialog(row)"
+            @activate="(row: EvalJob) => activateJob(row)"
+            @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
           />
         </div>
@@ -106,6 +112,30 @@ the Free Software Foundation, either version 3 of the License, or
         :row="(dialog.row as ScoreConfig | null)"
         @saved="handleSaved"
         @cancel="closeDialog"
+      />
+
+      <ScoreConfigDetail
+        v-if="viewRow"
+        :row="viewRow"
+        :scorers="scorers"
+        @close="closeViewDialog"
+      />
+
+      <ScorerDetail
+        v-if="scorerViewRow"
+        :row="scorerViewRow"
+        :providers="providers"
+        :score-configs="scoreConfigs"
+        :jobs="jobs"
+        @close="closeScorerView"
+      />
+
+      <EvalJobDetail
+        v-if="jobViewRow"
+        :row="jobViewRow"
+        :scorers="scorers"
+        :score-configs="scoreConfigs"
+        @close="closeJobView"
       />
     </template>
   </div>
@@ -135,6 +165,9 @@ import EvalJobList from "./onlineEvals/EvalJobList.vue";
 import QualityPage from "./onlineEvals/QualityPage.vue";
 import ScorerTypeDialog from "./onlineEvals/forms/ScorerTypeDialog.vue";
 import ScoreConfigDialog from "./onlineEvals/forms/ScoreConfigDialog.vue";
+import ScoreConfigDetail from "./onlineEvals/forms/ScoreConfigDetail.vue";
+import ScorerDetail from "./onlineEvals/forms/ScorerDetail.vue";
+import EvalJobDetail from "./onlineEvals/forms/EvalJobDetail.vue";
 import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 
@@ -168,6 +201,11 @@ const dialog = ref<{ open: boolean; mode: "create" | "edit"; row: AnyRow | null 
   mode: "create",
   row: null,
 });
+
+const viewRow = ref<ScoreConfig | null>(null);
+const scorerViewRow = ref<Scorer | null>(null);
+const jobViewRow = ref<EvalJob | null>(null);
+const pendingJobStatusId = ref<string | null>(null);
 
 const {
   jobs,
@@ -271,12 +309,71 @@ function openCreateDialog() {
 }
 
 function openEditDialog(row: AnyRow) {
+  viewRow.value = null;
   pushRouteAction({ action: "update", id: rowIdOf(row) });
 }
 
 function closeDialog() {
   dialog.value = { open: false, mode: "create", row: null };
   clearRouteAction();
+}
+
+function openViewDialog(row: ScoreConfig) {
+  viewRow.value = row;
+}
+
+function closeViewDialog() {
+  viewRow.value = null;
+}
+
+function openScorerView(row: Scorer) {
+  scorerViewRow.value = row;
+}
+
+function closeScorerView() {
+  scorerViewRow.value = null;
+}
+
+function openJobView(row: EvalJob) {
+  jobViewRow.value = row;
+}
+
+function closeJobView() {
+  jobViewRow.value = null;
+}
+
+async function activateJob(row: EvalJob) {
+  if (pendingJobStatusId.value !== null) return;
+  pendingJobStatusId.value = row.id;
+  try {
+    await onlineEvalsService.jobs.activate(orgId.value, row.id);
+    toast({
+      variant: "success",
+      message: t("onlineEvals.actions.activated"),
+    });
+    await loadAll(orgId.value);
+  } catch (err: any) {
+    showError(err, t("onlineEvals.actions.activateError"));
+  } finally {
+    pendingJobStatusId.value = null;
+  }
+}
+
+async function pauseJob(row: EvalJob) {
+  if (pendingJobStatusId.value !== null) return;
+  pendingJobStatusId.value = row.id;
+  try {
+    await onlineEvalsService.jobs.pause(orgId.value, row.id);
+    toast({
+      variant: "success",
+      message: t("onlineEvals.actions.paused"),
+    });
+    await loadAll(orgId.value);
+  } catch (err: any) {
+    showError(err, t("onlineEvals.actions.pauseError"));
+  } finally {
+    pendingJobStatusId.value = null;
+  }
 }
 
 function openFormPage(entity: FullPageEntity, mode: "create" | "edit") {

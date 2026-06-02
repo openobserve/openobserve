@@ -70,7 +70,7 @@
             :page-size-options="[20, 50, 100, 250, 500]"
             width="100%"
             class="tw:w-full tw:h-full"
-            @row-click="(row: any) => $emit('edit', row)"
+            @row-click="(row: any) => $emit('view', row)"
           >
             <template #cell-status="{ row }">
               <span class="ej-status-chip" :class="`ej-status-chip--${statusOf(row)}`">
@@ -101,6 +101,28 @@
 
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
+                <OButton
+                  v-if="canActivate(row.status)"
+                  :data-test="`eval-job-list-${row.name}-activate-btn`"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('onlineEvals.actions.activate')"
+                  icon-left="play-arrow"
+                  :loading="pendingStatusId === row.id"
+                  :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                  @click.stop="$emit('activate', row)"
+                />
+                <OButton
+                  v-if="canPause(row.status)"
+                  :data-test="`eval-job-list-${row.name}-pause-btn`"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('onlineEvals.actions.pause')"
+                  icon-left="pause"
+                  :loading="pendingStatusId === row.id"
+                  :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                  @click.stop="$emit('pause', row)"
+                />
                 <OButton
                   :data-test="`eval-job-list-${row.name}-edit-btn`"
                   variant="ghost"
@@ -145,14 +167,29 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
+  /** ID of the job whose activate/pause request is currently in flight. */
+  pendingStatusId?: string | null;
 }>();
 
 const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: EvalJob): void;
+  (e: "view", row: EvalJob): void;
   (e: "delete", row: EvalJob): void;
+  (e: "activate", row: EvalJob): void;
+  (e: "pause", row: EvalJob): void;
 }>();
+
+function canActivate(status: EvalJobStatus): boolean {
+  // Per backend (`/activate` endpoint): allowed from draft, paused, degraded.
+  return status === "draft" || status === "paused" || status === "degraded";
+}
+
+function canPause(status: EvalJobStatus): boolean {
+  // Per backend (`/pause` endpoint): allowed from active, degraded.
+  return status === "active" || status === "degraded";
+}
 
 const { t } = useI18n();
 const statusFilter = ref<EvalJobStatus | null>(null);

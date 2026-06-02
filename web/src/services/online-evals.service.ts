@@ -216,6 +216,10 @@ const onlineEvalsService = {
     delete: async (orgId: string, jobId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/eval_jobs/${jobId}`);
     },
+    activate: async (orgId: string, jobId: string): Promise<EvalJob> =>
+      (await http().post(`/api/${orgId}/eval_jobs/${jobId}/activate`, {})).data,
+    pause: async (orgId: string, jobId: string): Promise<EvalJob> =>
+      (await http().post(`/api/${orgId}/eval_jobs/${jobId}/pause`, {})).data,
   },
 };
 

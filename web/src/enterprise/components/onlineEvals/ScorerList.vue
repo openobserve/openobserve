@@ -70,7 +70,7 @@
             :page-size-options="[20, 50, 100, 250, 500]"
             width="100%"
             class="tw:w-full tw:h-full"
-            @row-click="(row: any) => $emit('edit', row)"
+            @row-click="(row: any) => $emit('view', row)"
           >
             <template #cell-type="{ row }">
               <span class="sr-type-chip" :class="`sr-type-chip--${scorerTypeOf(row)}`">
@@ -154,6 +154,7 @@ const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: Scorer): void;
+  (e: "view", row: Scorer): void;
   (e: "delete", row: Scorer): void;
 }>();
 
