@@ -10,6 +10,7 @@ export function useTableSelection<TData>(
     selection: OTableSelectionMode;
     selectedIds?: string[];
     rowKey?: string;
+    isRowSelectable?: (row: TData) => boolean;
   },
   emit: any,
 ) {
@@ -55,11 +56,16 @@ export function useTableSelection<TData>(
     emitSelection(newSet);
   }
 
+  function getSelectableRows(): TData[] {
+    const rows = table.getRowModel().rows.map((r) => r.original);
+    if (!props.isRowSelectable) return rows;
+    return rows.filter((row) => props.isRowSelectable!(row));
+  }
+
   function toggleAllRows() {
     const newSet = new Set(localSelectedIds.value);
-    const allIds = props.selection === "multiple"
-      ? table.getRowModel().rows.map((r) => getRowId(r.original))
-      : [];
+    const selectableRows = props.selection === "multiple" ? getSelectableRows() : [];
+    const allIds = selectableRows.map((row) => getRowId(row));
 
     if (allIds.length === 0) return;
 
@@ -76,16 +82,16 @@ export function useTableSelection<TData>(
   }
 
   function isAllSelected(): boolean {
-    const rows = table.getRowModel().rows;
-    if (rows.length === 0) return false;
-    return rows.every((r) => isRowSelected(r.original));
+    const selectableRows = getSelectableRows();
+    if (selectableRows.length === 0) return false;
+    return selectableRows.every((row) => isRowSelected(row));
   }
 
   function isIndeterminate(): boolean {
-    const rows = table.getRowModel().rows;
-    if (rows.length === 0) return false;
-    const selectedCount = rows.filter((r) => isRowSelected(r.original)).length;
-    return selectedCount > 0 && selectedCount < rows.length;
+    const selectableRows = getSelectableRows();
+    if (selectableRows.length === 0) return false;
+    const selectedCount = selectableRows.filter((row) => isRowSelected(row)).length;
+    return selectedCount > 0 && selectedCount < selectableRows.length;
   }
 
   function clearSelection() {
