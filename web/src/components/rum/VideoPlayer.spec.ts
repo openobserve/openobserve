@@ -51,6 +51,7 @@ vi.mock("@openobserve/rrweb-player", () => ({
       totalTime: 120000,
     })),
     triggerResize: vi.fn(),
+    $set: vi.fn(),
   })),
 }));
 
@@ -436,6 +437,29 @@ describe("VideoPlayer", () => {
 
       // Act & Assert
       expect(() => wrapper.vm.togglePlay()).not.toThrow();
+    });
+  });
+
+  // ==========================================================================
+  // PLAYER SIZING
+  // ==========================================================================
+
+  describe("Player Sizing", () => {
+    it("sets playerRef style width when segments are loaded via setProps", async () => {
+      // Arrange — mount without segments (matching real usage: parent always starts empty)
+      const wrapper = mountComponent({ segments: [] });
+      await flushPromises();
+
+      // Act — add segments to trigger setupSession (via watcher)
+      await wrapper.setProps({ segments: mockSegments });
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Assert — playerRef should have been sized
+      const playerEl = wrapper.find("#player").element as HTMLElement;
+      expect(playerEl.style.width).toMatch(/^\d+px$/);
+
+      wrapper.unmount();
     });
   });
 });
