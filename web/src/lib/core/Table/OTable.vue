@@ -236,6 +236,7 @@ const selection = useTableSelection(table, {
   selection: props.selection,
   get selectedIds() { return props.selectedIds; },
   rowKey: props.rowKey,
+  get isRowSelectable() { return props.isRowSelectable; },
 }, emit);
 
 // ── Expansion ───────────────────────────────────────────────────
