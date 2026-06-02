@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
             @event-emitted="handleSidebarEvent"
-            class="tw:h-full"
+            class="tw:h-full tw:border-l tw:border-solid tw:border-[var(--o2-border-color)]"
           />
         </template>
       </OSplitter>
