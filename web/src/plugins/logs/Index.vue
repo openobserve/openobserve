@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
-    <div v-show="showSearchHistory">
+    <div v-show="showSearchHistory" class="full-height">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -403,7 +403,7 @@ size="md" />
         </div>
       </div>
     </div>
-    <div v-show="showSearchScheduler">
+    <div v-show="showSearchScheduler" class="full-height">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"

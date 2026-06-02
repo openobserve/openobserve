@@ -1,29 +1,12 @@
 ﻿<template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
-    <div class="">
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]"
-      >
-        <div class="tw:flex tw:items-center tw:py-2 tw:pl-3">
-          <div
-            data-test="search-history-alert-back-btn"
-            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer tw:font-[600]"
-            style="
-              border: 1.5px solid;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-            "
-            title="Go Back"
-            @click="closeSearchHistory"
-          >
-            <OIcon name="arrow-back-ios-new" size="xs" />
-          </div>
-          <div class="tw:text-xl tw:font-semibold tw:font-[600]" data-test="add-alert-title">
-            {{ t("search_history.title") }}
-          </div>
-        </div>
-        <div class="tw:flex tw:items-center tw:pr-3 tw:gap-3">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
+    <AppPageHeader
+      :title="t('search_history.title')"
+      icon="history"
+      :back="{ onClick: closeSearchHistory }"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
           <OButton
             data-test="search-history-wrap-content-btn"
             variant="ghost"
@@ -64,13 +47,11 @@
               {{ t("search_history.get_history") }}
             </OButton>
           </div>
-        </div>
-      </div>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div
-          class="tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container"
-        >
+      </template>
+    </AppPageHeader>
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
           <OTable
+            :frame="false"
             :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
             row-key="uuid"
@@ -87,11 +68,6 @@
             :wrap="wrapText"
             :horizontal-scroll="!wrapText"
             width="100%"
-            :style="
-              dataToBeLoaded.length > 0
-                ? 'height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;'
-                : 'height: 0px'
-            "
             @update:expanded-ids="onExpandedIdsChange"
           >
             <template #cell-sql="{ row }">
@@ -219,9 +195,6 @@
               </div>
             </template>
           </OTable>
-
-        </div>
-      </div>
     </div>
   </div>
 
@@ -252,6 +225,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -275,6 +249,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OTable,
+    AppPageHeader,
 },
   props: {
     isClicked: {
