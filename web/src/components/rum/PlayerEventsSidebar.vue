@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <OSeparator class="tw:mt-2" />
-      <div class="events-list">
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
           :key="filteredEvent.id + '-' + index"
@@ -263,11 +263,6 @@ const handleEventClick = (event: any) => {
   overflow: hidden;
 }
 
-.events-list {
-  height: calc(100vh - 12.9375rem);
-  overflow-x: hidden;
-  overflow-y: auto;
-}
 
 .event-container:hover {
   background-color: #ededed;
