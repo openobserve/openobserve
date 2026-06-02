@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <template v-else>
-                    <NoData />
+                    <OEmptyState size="hero" preset="no-alerts" @action="showAddUpdateFn({})" />
                   </template>
                 </template>
 
@@ -650,7 +650,7 @@ import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -706,7 +706,7 @@ export default defineComponent({
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     ImportAlert,
     DedupSummaryCards,

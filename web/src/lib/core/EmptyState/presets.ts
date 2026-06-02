@@ -1,0 +1,303 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// Preset catalog: the named empty-state scenarios used across the app. Each
+// preset bundles an illustration, a tone (variant), the i18n keys for its copy,
+// and one or more action cards (icon + title + description) rendered as
+// QuickStart-style cards. A call site is a one-liner:
+//
+//   <OEmptyState preset="no-dashboards" @action="onAction" />
+//
+// The `action` event fires with the clicked action's `id` so the page can route
+// (e.g. id === "import" vs id === "create"). Copy lives in i18n
+// (en.json → emptyState.*), NOT inline, so it stays translatable.
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+import type { IllustrationName } from "./illustrations";
+
+/** Tone of an empty state — drives subtle styling and signals intent. */
+export type EmptyStateVariant =
+  | "create"
+  | "no-results"
+  | "error"
+  | "neutral";
+
+/** A rich action card (icon + title + description) shown in an empty state. */
+export interface EmptyStateAction {
+  /** Icon shown in the card. */
+  icon: IconName;
+  /** i18n key for the card title. */
+  titleKey: string;
+  /** i18n key for the card description (optional). */
+  descriptionKey?: string;
+  /** Identifier emitted with the `action` event so call sites can route. */
+  id: string;
+}
+
+export interface EmptyStatePreset {
+  illustration: IllustrationName;
+  variant: EmptyStateVariant;
+  /** i18n key for the heading. */
+  titleKey: string;
+  /** i18n key for the supporting line (optional). */
+  descriptionKey?: string;
+  /** Action cards (icon + title + description). Rendered as QuickStart cards. */
+  actions?: EmptyStateAction[];
+}
+
+export const emptyStatePresets = {
+  // --- no results (a search/filter/time-range returned nothing) ------------
+  "no-search-results": {
+    illustration: "no-results",
+    variant: "no-results",
+    titleKey: "emptyState.noSearchResults.title",
+    descriptionKey: "emptyState.noSearchResults.description",
+    actions: [
+      {
+        id: "clear-filters",
+        icon: "filter-list",
+        titleKey: "emptyState.noSearchResults.action",
+        descriptionKey: "emptyState.noSearchResults.actionDesc",
+      },
+    ],
+  },
+  "no-logs": {
+    illustration: "logs",
+    variant: "no-results",
+    titleKey: "emptyState.noLogs.title",
+    descriptionKey: "emptyState.noLogs.description",
+    actions: [
+      {
+        id: "widen-range",
+        icon: "schedule",
+        titleKey: "emptyState.noLogs.action",
+        descriptionKey: "emptyState.noLogs.actionDesc",
+      },
+    ],
+  },
+
+  // --- first-run "create your first X" -------------------------------------
+  "no-dashboards": {
+    illustration: "board",
+    variant: "create",
+    titleKey: "emptyState.noDashboards.title",
+    descriptionKey: "emptyState.noDashboards.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDashboards.action",
+        descriptionKey: "emptyState.noDashboards.actionDesc",
+      },
+      {
+        id: "import",
+        icon: "upload-file",
+        titleKey: "emptyState.noDashboards.import",
+        descriptionKey: "emptyState.noDashboards.importDesc",
+      },
+      {
+        id: "templates",
+        icon: "dashboard-customize",
+        titleKey: "emptyState.noDashboards.templates",
+        descriptionKey: "emptyState.noDashboards.templatesDesc",
+      },
+    ],
+  },
+  "no-pipelines": {
+    illustration: "pipeline",
+    variant: "create",
+    titleKey: "emptyState.noPipelines.title",
+    descriptionKey: "emptyState.noPipelines.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noPipelines.action",
+        descriptionKey: "emptyState.noPipelines.actionDesc",
+      },
+      {
+        id: "import",
+        icon: "upload-file",
+        titleKey: "emptyState.noPipelines.import",
+        descriptionKey: "emptyState.noPipelines.importDesc",
+      },
+    ],
+  },
+  "no-functions": {
+    illustration: "function",
+    variant: "create",
+    titleKey: "emptyState.noFunctions.title",
+    descriptionKey: "emptyState.noFunctions.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noFunctions.action",
+        descriptionKey: "emptyState.noFunctions.actionDesc",
+      },
+    ],
+  },
+
+  // --- no ingestion / no data flowing in -----------------------------------
+  "no-streams": {
+    illustration: "hourglass",
+    variant: "create",
+    titleKey: "emptyState.noStreams.title",
+    descriptionKey: "emptyState.noStreams.description",
+    actions: [
+      {
+        id: "setup-ingestion",
+        icon: "cloud-upload",
+        titleKey: "emptyState.noStreams.action",
+        descriptionKey: "emptyState.noStreams.actionDesc",
+      },
+    ],
+  },
+
+  // --- all caught up -------------------------------------------------------
+  "no-alerts": {
+    illustration: "alert",
+    variant: "create",
+    titleKey: "emptyState.noAlerts.title",
+    descriptionKey: "emptyState.noAlerts.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAlerts.action",
+        descriptionKey: "emptyState.noAlerts.actionDesc",
+      },
+    ],
+  },
+
+  // --- failed to load ------------------------------------------------------
+  "load-error": {
+    illustration: "broken-panel",
+    variant: "error",
+    titleKey: "emptyState.loadError.title",
+    descriptionKey: "emptyState.loadError.description",
+    actions: [
+      {
+        id: "retry",
+        icon: "refresh",
+        titleKey: "emptyState.loadError.action",
+        descriptionKey: "emptyState.loadError.actionDesc",
+      },
+    ],
+  },
+
+  // --- generic fallback (used by NoData / OTableEmpty when no preset given) -
+  "no-data": {
+    illustration: "box",
+    variant: "neutral",
+    titleKey: "emptyState.noData.title",
+    descriptionKey: "emptyState.noData.description",
+  },
+
+  // --- additional list scenarios -------------------------------------------
+  "no-traces": {
+    illustration: "trace",
+    variant: "no-results",
+    titleKey: "emptyState.noTraces.title",
+    descriptionKey: "emptyState.noTraces.description",
+  },
+  "no-search-history": {
+    illustration: "history",
+    variant: "neutral",
+    titleKey: "emptyState.noSearchHistory.title",
+    descriptionKey: "emptyState.noSearchHistory.description",
+  },
+  "no-users": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noUsers.title",
+    descriptionKey: "emptyState.noUsers.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noUsers.action",
+        descriptionKey: "emptyState.noUsers.actionDesc",
+      },
+    ],
+  },
+  "no-reports": {
+    illustration: "report",
+    variant: "create",
+    titleKey: "emptyState.noReports.title",
+    descriptionKey: "emptyState.noReports.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noReports.action",
+        descriptionKey: "emptyState.noReports.actionDesc",
+      },
+    ],
+  },
+  "no-queries": {
+    illustration: "query",
+    variant: "neutral",
+    titleKey: "emptyState.noQueries.title",
+    descriptionKey: "emptyState.noQueries.description",
+  },
+  "no-incidents": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noIncidents.title",
+    descriptionKey: "emptyState.noIncidents.description",
+  },
+  "no-service-accounts": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noServiceAccounts.title",
+    descriptionKey: "emptyState.noServiceAccounts.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noServiceAccounts.action",
+        descriptionKey: "emptyState.noServiceAccounts.actionDesc",
+      },
+    ],
+  },
+  "no-invitations": {
+    illustration: "users",
+    variant: "neutral",
+    titleKey: "emptyState.noInvitations.title",
+    descriptionKey: "emptyState.noInvitations.description",
+  },
+} satisfies Record<string, EmptyStatePreset>;
+
+export type EmptyStatePresetName = keyof typeof emptyStatePresets;
+
+// i18n key for the noun used in the filtered ("No {noun} found") copy, per
+// preset. Presets not listed fall back to a generic "results".
+export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
+  "no-logs": "emptyState.nouns.logs",
+  "no-dashboards": "emptyState.nouns.dashboards",
+  "no-pipelines": "emptyState.nouns.pipelines",
+  "no-functions": "emptyState.nouns.functions",
+  "no-streams": "emptyState.nouns.streams",
+  "no-alerts": "emptyState.nouns.alerts",
+  "no-incidents": "emptyState.nouns.incidents",
+  "no-traces": "emptyState.nouns.traces",
+  "no-search-history": "emptyState.nouns.searches",
+  "no-users": "emptyState.nouns.users",
+  "no-reports": "emptyState.nouns.reports",
+  "no-queries": "emptyState.nouns.queries",
+  "no-service-accounts": "emptyState.nouns.serviceAccounts",
+  "no-invitations": "emptyState.nouns.invitations",
+};

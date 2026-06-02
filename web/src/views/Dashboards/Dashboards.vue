@@ -279,10 +279,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             <template #empty>
-              <NoDashboards
-                @create="addDashboard"
-                @import="importDashboard"
-                @templates="showAddDashboardFromGitHub = true"
+              <OEmptyState
+                size="hero"
+                preset="no-dashboards"
+                @action="
+                  (id) =>
+                    id === 'import'
+                      ? importDashboard()
+                      : id === 'templates'
+                        ? (showAddDashboardFromGitHub = true)
+                        : addDashboard()
+                "
               />
             </template>
             <template #bottom>
@@ -465,7 +472,7 @@ import {
   useAppBreadcrumb,
   type Crumb,
 } from "@/composables/useAppBreadcrumb";
-import NoDashboards from "@/components/common/empty-states/NoDashboards.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
@@ -507,7 +514,7 @@ export default defineComponent({
   components: {
     PageLayout,
     AppPageHeader,
-    NoDashboards,
+    OEmptyState,
     OButton,
     OIcon,
     ODropdown,

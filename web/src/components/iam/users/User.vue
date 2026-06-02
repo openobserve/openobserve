@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #empty>
-            <NoData />
+            <OEmptyState size="hero" preset="no-users" @action="addRoutePush({})" />
           </template>
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
@@ -230,7 +230,7 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -250,7 +250,7 @@ export default defineComponent({
     OBadge,
     OIcon,
     ODialog,
-    NoData,
+    OEmptyState,
   },
   emits: [
     "updated:fields",

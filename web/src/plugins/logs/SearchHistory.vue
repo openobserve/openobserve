@@ -177,8 +177,8 @@
             </template>
 
             <template #empty>
-              <div v-if="!isLoading" class="tw:flex tw:mx-auto">
-                <NoData />
+              <div v-if="!isLoading" class="tw:flex tw:w-full">
+                <OEmptyState size="hero" preset="no-search-history" />
               </div>
             </template>
 
@@ -216,6 +216,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -240,6 +241,7 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "SearchHistoryComponent",
   components: {
+    OEmptyState,
     DateTime,
     NoData,
     AppTabs,

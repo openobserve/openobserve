@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <div v-if="!loadingState">
-              <NoData />
+              <OEmptyState size="hero" preset="no-streams" hide-action />
             </div>
           </template>
           <template #bottom="scope">
@@ -268,7 +268,7 @@ import {
 } from "@/composables/useAppBreadcrumb";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
-import NoData from "../components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import segment from "../services/segment_analytics";
 import {
   getImageURL,
@@ -296,7 +296,7 @@ export default defineComponent({
     PageLayout,
     AppPageHeader,
     SchemaIndex,
-    NoData,
+    OEmptyState,
     AddStream,
     OButton,
     ODialog,

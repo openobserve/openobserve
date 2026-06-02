@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #empty>
-        <NoData />
+        <OEmptyState size="hero" preset="no-queries" hide-action />
       </template>
       <template #cell-actions="{ row }">
         <OButton
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, type Ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -99,7 +99,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, NoData, OButton, ODrawer, OSpinner, OTable },
+  components: { QueryList, OEmptyState, OButton, ODrawer, OSpinner, OTable },
   props: {
     rows: {
       type: Array,

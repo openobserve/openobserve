@@ -69,7 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #empty>
-                <NoData />
+                <OEmptyState
+                  size="hero"
+                  preset="no-functions"
+                  :filtered="!!filterQuery"
+                  @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn({}))"
+                />
               </template>
 
               <template #cell-name="{ row, value }">
@@ -197,6 +202,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
@@ -214,6 +220,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "functionList",
   components: {
+    OEmptyState,
     AppPageHeader,
     PipelineSectionTabs,
     OTable,

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
         >
           <template #empty>
-            <NoData />
+            <OEmptyState size="hero" preset="no-invitations" hide-action />
           </template>
           <template #cell-actions="{ row }">
             <div class="tw:flex tw:items-center tw:gap-2">
@@ -105,7 +105,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -113,7 +113,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "InvitationList",
   components: {
-    NoData,
+    OEmptyState,
     OButton,
     ODialog,
     OTable,

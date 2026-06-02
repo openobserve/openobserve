@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #empty>
-                  <NoData />
+                  <OEmptyState size="hero" preset="no-reports" @action="() => createNewReport()" />
                 </template>
 
                 <!-- Name column: badges for type/preview -->
@@ -261,7 +261,7 @@ import {
   useAppBreadcrumb,
   type Crumb,
 } from "@/composables/useAppBreadcrumb";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { formatDate } from "@/utils/date";

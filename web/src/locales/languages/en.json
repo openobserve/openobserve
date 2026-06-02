@@ -1,4 +1,125 @@
 {
+  "emptyState": {
+    "noSearchResults": {
+      "title": "We couldn't find any data",
+      "description": "Nothing matches your current filters or time range. Try broadening your search, widening the time range, or clearing the filters.",
+      "action": "Clear filters",
+      "actionDesc": "Reset all applied filters"
+    },
+    "noLogs": {
+      "title": "No logs in this range",
+      "description": "We didn't find any logs for the selected stream and time range. Try a wider time range or a different stream.",
+      "action": "Widen time range",
+      "actionDesc": "Search across a longer period"
+    },
+    "noDashboards": {
+      "title": "Create your first dashboard",
+      "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",
+      "action": "New dashboard",
+      "actionDesc": "Start from an empty canvas",
+      "import": "Import dashboard",
+      "importDesc": "Upload a dashboard JSON file",
+      "templates": "Browse templates",
+      "templatesDesc": "Start from a community dashboard"
+    },
+    "noPipelines": {
+      "title": "Create your first pipeline",
+      "description": "Pipelines transform and route your data as it arrives. Set one up to start shaping your streams.",
+      "action": "New pipeline",
+      "actionDesc": "Build a flow from scratch",
+      "import": "Import pipeline",
+      "importDesc": "Upload a pipeline definition"
+    },
+    "noFunctions": {
+      "title": "Create your first function",
+      "description": "Functions enrich and reshape your data at ingest or query time. Add one to get started.",
+      "action": "New function",
+      "actionDesc": "Write a new VRL function"
+    },
+    "noStreams": {
+      "title": "Waiting for your first data",
+      "description": "No data has arrived yet. Connect a source and your streams will show up here automatically.",
+      "action": "Set up ingestion",
+      "actionDesc": "Connect a data source"
+    },
+    "noAlerts": {
+      "title": "Create your first alert",
+      "description": "Alerts notify you the moment your data crosses a threshold. Define one to start monitoring.",
+      "action": "New alert",
+      "actionDesc": "Define a condition to monitor"
+    },
+    "noIncidents": {
+      "title": "No active incidents",
+      "description": "You're all caught up — nothing needs your attention right now. Triggered incidents will appear here."
+    },
+    "loadError": {
+      "title": "Something went wrong",
+      "description": "We couldn't load this data. It's usually temporary — give it another try in a moment.",
+      "action": "Retry",
+      "actionDesc": "Try loading the data again"
+    },
+    "noData": {
+      "title": "Nothing here yet",
+      "description": "There's no data to show right now."
+    },
+    "noTraces": {
+      "title": "No traces found",
+      "description": "No traces match the selected service and time range. Try a wider time range or a different service."
+    },
+    "noSearchHistory": {
+      "title": "No search history yet",
+      "description": "Searches you run will be listed here so you can revisit and re-run them."
+    },
+    "noUsers": {
+      "title": "No users yet",
+      "description": "Invite your teammates to collaborate in this organization.",
+      "action": "Add user",
+      "actionDesc": "Invite a teammate by email"
+    },
+    "noReports": {
+      "title": "No reports yet",
+      "description": "Schedule a report to get dashboards delivered to your inbox.",
+      "action": "New report",
+      "actionDesc": "Schedule a dashboard delivery"
+    },
+    "noQueries": {
+      "title": "No running queries",
+      "description": "There are no active queries right now. Long-running queries will appear here while they run."
+    },
+    "noServiceAccounts": {
+      "title": "No service accounts yet",
+      "description": "Service accounts let applications authenticate with the API. Create one to get started.",
+      "action": "Add service account",
+      "actionDesc": "Create an API service account"
+    },
+    "noInvitations": {
+      "title": "No pending invitations",
+      "description": "Invitations you've sent or received will show up here."
+    },
+    "filtered": {
+      "title": "No {noun} found",
+      "description": "No {noun} match your current filters or search. Try adjusting or clearing them.",
+      "action": "Clear filters",
+      "actionDesc": "Reset all filters and search",
+      "fallbackNoun": "results"
+    },
+    "nouns": {
+      "logs": "logs",
+      "dashboards": "dashboards",
+      "pipelines": "pipelines",
+      "functions": "functions",
+      "streams": "streams",
+      "alerts": "alerts",
+      "incidents": "incidents",
+      "traces": "traces",
+      "searches": "searches",
+      "users": "users",
+      "reports": "reports",
+      "queries": "queries",
+      "serviceAccounts": "service accounts",
+      "invitations": "invitations"
+    }
+  },
   "common": {
     "close": "Close",
     "cancel": "Cancel",

@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Empty state -->
         <template #empty>
           <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
-            <no-data />
+            <OEmptyState size="hero" preset="no-incidents" hide-action />
           </div>
         </template>
 
@@ -178,7 +178,7 @@ import {
   useAppBreadcrumb,
   type Crumb,
 } from "@/composables/useAppBreadcrumb";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -193,7 +193,7 @@ export default defineComponent({
   components: {
     PageLayout,
     AppPageHeader,
-    NoData,
+    OEmptyState,
     OButton,
     OSpinner,
     OSearchInput,

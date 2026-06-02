@@ -200,7 +200,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <no-data />
+          <OEmptyState
+            size="hero"
+            preset="no-pipelines"
+            :filtered="!!filterQuery"
+            @action="
+              (id) =>
+                id === 'clear-filters'
+                  ? (filterQuery = '')
+                  : id === 'import'
+                    ? goToImportPipeline()
+                    : goToCreatePipeline()
+            "
+          />
         </template>
 
         <template #bottom="bottomProps">
@@ -377,6 +389,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -648,8 +661,21 @@ onMounted(async () => {
   updateActiveTab();
 });
 
-const createPipeline = () => {
-  showCreatePipeline.value = true;
+// Empty-state "New pipeline" → the dedicated pipeline-builder page (not the
+// stream-selection side panel).
+const goToCreatePipeline = () => {
+  router.push({
+    name: "createPipeline",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
+};
+
+// Empty-state "Import pipeline" → the dedicated import page.
+const goToImportPipeline = () => {
+  router.push({
+    name: "importPipeline",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 const loading = ref(true);

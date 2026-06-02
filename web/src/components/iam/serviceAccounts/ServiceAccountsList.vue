@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #empty>
-              <NoData />
+              <OEmptyState size="hero" preset="no-service-accounts" @action="addRoutePush({})" />
             </template>
 
             <template #cell-email="{ row }">
@@ -239,7 +239,7 @@ import AddServiceAccount from "./AddServiceAccount.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import usersService from "@/services/users";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import {
@@ -259,7 +259,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge },
+  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
