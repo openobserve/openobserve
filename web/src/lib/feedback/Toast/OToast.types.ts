@@ -40,6 +40,8 @@ export interface ToastProps extends ToastOptions {
   open: boolean
   /** Number of identical toasts collapsed into this one; badge shown when > 1 */
   count?: number
+  /** Increments each time a duplicate resets the timer; used to restart the progress bar animation */
+  timerKey?: number
 }
 
 export interface ToastEmits {

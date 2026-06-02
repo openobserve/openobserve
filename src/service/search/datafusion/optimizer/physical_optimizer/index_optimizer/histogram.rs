@@ -315,6 +315,7 @@ mod tests {
                 start_time,
                 end_time,
                 histogram_interval,
+                None,
             )))
             .build();
         let ctx = SessionContext::new_with_state(state);
@@ -371,6 +372,7 @@ mod tests {
                 start_time,
                 end_time,
                 histogram_interval,
+                None,
             )))
             .build();
         let ctx = SessionContext::new_with_state(state);
