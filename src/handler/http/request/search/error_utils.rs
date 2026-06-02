@@ -86,12 +86,9 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
         )
             .into_response(),
         _ => (
-            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::BAD_REQUEST,
             [(ERROR_HEADER, err.to_string())],
-            Json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                err,
-            )),
+            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
     }
@@ -241,8 +238,8 @@ mod tests {
     #[test]
     fn test_map_error_to_http_response_serde_json_error() {
         // A malformed request body should surface as 400, not 500.
-        let json_err = config::utils::json::from_slice::<config::meta::search::Request>(b"\"\"")
-            .unwrap_err();
+        let json_err =
+            config::utils::json::from_slice::<config::meta::search::Request>(b"\"\"").unwrap_err();
         let err = errors::Error::SerdeJsonError(json_err);
         let response = map_error_to_http_response(&err, None);
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
