@@ -153,6 +153,8 @@ import {
   onBeforeUnmount,
   onMounted,
   onBeforeMount,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -197,6 +199,7 @@ const workerProcessId = ref(0);
 
 const sessionWidth = ref(0);
 const sessionHeight = ref(0);
+const resizeObserver = ref<ResizeObserver | null>(null);
 
 const speedOptions = [
   {
@@ -251,6 +254,24 @@ onBeforeMount(async () => {
   initializeWorker();
 });
 
+onMounted(() => {
+  attachResizeObserver();
+});
+
+onActivated(() => {
+  attachResizeObserver();
+  if (player.value) {
+    const { width, height } = calculatePlayerDimensions();
+    if (playerRef.value) playerRef.value.style.width = `${width}px`;
+    player.value.$set({ width, height });
+    updatePlayerState();
+  }
+});
+
+onDeactivated(() => {
+  detachResizeObserver();
+});
+
 const importVideoPlayer = async () => {
   const rrwebPlayerModule: any = await import("@openobserve/rrweb-player");
 
@@ -260,11 +281,29 @@ const importVideoPlayer = async () => {
 };
 
 onBeforeUnmount(() => {
+  detachResizeObserver();
   if (worker.value) {
     worker.value.terminate();
   }
   rrwebPlayer = null;
 });
+
+function attachResizeObserver() {
+  if (!playerContainerRef.value) return;
+  resizeObserver.value = new ResizeObserver(() => {
+    if (!player.value) return;
+    const { width, height } = calculatePlayerDimensions();
+    if (playerRef.value) playerRef.value.style.width = `${width}px`;
+    player.value.$set({ width, height });
+    updatePlayerState();
+  });
+  resizeObserver.value.observe(playerContainerRef.value);
+}
+
+function detachResizeObserver() {
+  resizeObserver.value?.disconnect();
+  resizeObserver.value = null;
+}
 
 function calculatePlayerDimensions(): { width: number; height: number } {
   if (!playerContainerRef.value) return { width: 0, height: 0 };

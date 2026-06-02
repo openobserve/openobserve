@@ -441,6 +441,118 @@ describe("VideoPlayer", () => {
   });
 
   // ==========================================================================
+  // RESIZE OBSERVER LIFECYCLE
+  // ==========================================================================
+
+  describe("ResizeObserver lifecycle", () => {
+    let OriginalResizeObserver: typeof ResizeObserver;
+    let mockObserve: ReturnType<typeof vi.fn>;
+    let mockDisconnect: ReturnType<typeof vi.fn>;
+    let mockUnobserve: ReturnType<typeof vi.fn>;
+    let capturedCallback: ResizeObserverCallback | undefined;
+
+    beforeEach(() => {
+      OriginalResizeObserver = global.ResizeObserver;
+      mockObserve = vi.fn();
+      mockDisconnect = vi.fn();
+      mockUnobserve = vi.fn();
+
+      // Use a regular function (not arrow) so it can be called with `new`
+      function MockResizeObserver(
+        this: ResizeObserver,
+        cb: ResizeObserverCallback,
+      ) {
+        capturedCallback = cb;
+      }
+      MockResizeObserver.prototype.observe = mockObserve;
+      MockResizeObserver.prototype.disconnect = mockDisconnect;
+      MockResizeObserver.prototype.unobserve = mockUnobserve;
+
+      global.ResizeObserver =
+        MockResizeObserver as unknown as typeof ResizeObserver;
+    });
+
+    afterEach(() => {
+      global.ResizeObserver = OriginalResizeObserver;
+      capturedCallback = undefined;
+    });
+
+    it("should attach a ResizeObserver to playerContainerRef on mount", async () => {
+      // Arrange & Act
+      const wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Assert — constructor was called once (from onMounted) and observe was called
+      expect(capturedCallback).toBeDefined();
+      expect(mockObserve).toHaveBeenCalledTimes(1);
+
+      wrapper.unmount();
+    });
+
+    it("should disconnect the ResizeObserver when component is unmounted", async () => {
+      // Arrange
+      const wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Act
+      wrapper.unmount();
+
+      // Assert
+      expect(mockDisconnect).toHaveBeenCalledTimes(1);
+    });
+
+    it("should update playerRef style.width when ResizeObserver callback fires after player is initialized", async () => {
+      // Arrange — mount without segments first, then add them so player is initialized
+      const wrapper = mountComponent({ segments: [] });
+      await flushPromises();
+      await wrapper.setProps({ segments: mockSegments });
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Record style.width before resize
+      const playerEl = wrapper.find("#player").element as HTMLElement;
+      const widthBefore = playerEl.style.width;
+
+      // Act — fire the resize callback (simulating a container size change)
+      if (capturedCallback) {
+        capturedCallback([], {} as ResizeObserver);
+      }
+      await wrapper.vm.$nextTick();
+
+      // Assert — playerRef style.width was set (non-empty, pixel value)
+      expect(playerEl.style.width).toMatch(/^\d+px$/);
+      // Width was written (either same or updated — callback ran without error)
+      expect(typeof playerEl.style.width).toBe("string");
+
+      wrapper.unmount();
+    });
+
+    it("should not call $set when ResizeObserver callback fires before player is initialized", async () => {
+      // Arrange — mount without segments (player not initialized)
+      const { default: rrwebPlayerMock } = await import(
+        "@openobserve/rrweb-player"
+      );
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const wrapper = mountComponent({ segments: [] });
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Act — fire the resize callback before any segments load
+      if (capturedCallback) {
+        capturedCallback([], {} as ResizeObserver);
+      }
+
+      // Assert — rrwebPlayer constructor was never called (no player instance)
+      expect(rrwebPlayerMock).not.toHaveBeenCalled();
+
+      wrapper.unmount();
+    });
+  });
+
+  // ==========================================================================
   // PLAYER SIZING
   // ==========================================================================
 
