@@ -161,6 +161,7 @@ import type {
   EvalJobStatus,
 } from "@/services/online-evals.service";
 import { statusOf, valueOf } from "./utils/evalEntity";
+import { formatDate } from "@/utils/date";
 import EvalJobEmptyState from "./EvalJobEmptyState.vue";
 
 const props = defineProps<{
@@ -268,7 +269,7 @@ const columns = computed(() => [
     header: t("onlineEvals.job.columns.created"),
     accessorFn: (row: EvalJob) => rowCreated(row),
     sortable: true,
-    size: 130,
+    size: 180,
     meta: { align: "left" },
   },
   {
@@ -317,7 +318,7 @@ function rowCreated(row: EvalJob) {
 
 function formatDateShort(value: number) {
   if (!value) return "—";
-  return new Date(value).toISOString().slice(0, 10);
+  return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
 </script>
 

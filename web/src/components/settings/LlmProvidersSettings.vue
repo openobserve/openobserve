@@ -122,6 +122,14 @@
         </OTable>
       </div>
     </template>
+
+    <ConfirmDialog
+      v-model="confirmDeleteOpen"
+      :title="t('onlineEvals.deleteTitle', { label: t('onlineEvals.singular.providers') })"
+      :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+      @update:ok="performDelete"
+      @update:cancel="cancelDelete"
+    />
   </div>
 </template>
 
@@ -147,6 +155,7 @@ import {
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import LlmProvidersEmptyState from "./LlmProvidersEmptyState.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const { t } = useI18n();
 const store = useStore();
@@ -157,6 +166,9 @@ const providers = ref<Provider[]>([]);
 const isLoading = ref(false);
 const searchQuery = ref("");
 const formPage = ref<{ mode: "create" | "edit"; row: Provider | null } | null>(null);
+
+const confirmDeleteOpen = ref(false);
+const pendingDeleteRow = ref<Provider | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
@@ -315,8 +327,19 @@ function syncFromRoute() {
   }
 }
 
-async function confirmDelete(row: Provider) {
-  if (!window.confirm(t("onlineEvals.deletePrompt", { name: row.name }))) return;
+function confirmDelete(row: Provider) {
+  pendingDeleteRow.value = row;
+  confirmDeleteOpen.value = true;
+}
+
+function cancelDelete() {
+  confirmDeleteOpen.value = false;
+  pendingDeleteRow.value = null;
+}
+
+async function performDelete() {
+  const row = pendingDeleteRow.value;
+  if (!row) return;
   try {
     await onlineEvalsService.providers.delete(orgId.value, row.id);
     toast({
@@ -326,6 +349,8 @@ async function confirmDelete(row: Provider) {
     await loadProviders();
   } catch (err: any) {
     showError(err, t("onlineEvals.deleteError", { label: t("onlineEvals.singular.providers").toLowerCase() }));
+  } finally {
+    pendingDeleteRow.value = null;
   }
 }
 </script>

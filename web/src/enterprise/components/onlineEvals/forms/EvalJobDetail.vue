@@ -78,30 +78,33 @@
             <span>{{ t("onlineEvals.job.detail.scorersEmpty") }}</span>
           </div>
           <ul v-else class="jd-scorers">
-            <li
-              v-for="item in resolvedScorers"
-              :key="item.id"
-              class="jd-scorers__card"
-              data-test="eval-job-detail-scorer-item"
-            >
-              <div class="jd-scorers__main">
-                <div class="jd-scorers__row">
-                  <span class="jd-mono jd-scorers__name">{{ item.name }}</span>
-                  <span
-                    v-if="item.scorerTypeLabel"
-                    class="jd-scorers__type"
-                    :class="`jd-scorers__type--${item.scorerType}`"
-                  >
-                    {{ item.scorerTypeLabel }}
-                  </span>
-                  <span class="jd-scorers__version">v{{ item.version }}</span>
+            <li v-for="item in resolvedScorers" :key="item.id">
+              <OButton
+                variant="ghost"
+                class="jd-scorers__card"
+                :data-test="`eval-job-detail-scorer-item-${item.name}`"
+                :disabled="!findScorerById(item.id)"
+                @click="onScorerClick(item.id)"
+              >
+                <div class="jd-scorers__main">
+                  <div class="jd-scorers__row">
+                    <span class="jd-mono jd-scorers__name">{{ item.name }}</span>
+                    <span
+                      v-if="item.scorerTypeLabel"
+                      class="jd-scorers__type"
+                      :class="`jd-scorers__type--${item.scorerType}`"
+                    >
+                      {{ item.scorerTypeLabel }}
+                    </span>
+                    <span class="jd-scorers__version">v{{ item.version }}</span>
+                  </div>
+                  <div v-if="item.scoreConfigName" class="jd-scorers__produces">
+                    {{ t("onlineEvals.job.detail.producesPrefix") }}
+                    <span class="jd-mono jd-scorers__produces-name">{{ item.scoreConfigName }}</span>
+                  </div>
                 </div>
-                <div v-if="item.scoreConfigName" class="jd-scorers__produces">
-                  {{ t("onlineEvals.job.detail.producesPrefix") }}
-                  <span class="jd-mono jd-scorers__produces-name">{{ item.scoreConfigName }}</span>
-                </div>
-              </div>
-              <OIcon name="chevron-right" size="sm" class="jd-scorers__chevron" />
+                <OIcon name="chevron-right" size="sm" class="jd-scorers__chevron" />
+              </OButton>
             </li>
           </ul>
         </section>
@@ -162,6 +165,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type {
   EvalJob,
   Scorer,
@@ -176,8 +180,9 @@ const props = defineProps<{
   scoreConfigs: ScoreConfig[];
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "close"): void;
+  (e: "view-scorer", row: Scorer): void;
 }>();
 
 const { t } = useI18n();
@@ -379,6 +384,15 @@ const hasInputMapping = computed(() => Object.keys(inputMapping.value).length > 
 function scorerNameFor(refId: string): string {
   const found = props.scorers.find((s) => entityId(s) === refId);
   return found?.name ?? refId;
+}
+
+function findScorerById(refId: string): Scorer | null {
+  return props.scorers.find((s) => entityId(s) === refId) ?? null;
+}
+
+function onScorerClick(refId: string) {
+  const scorer = findScorerById(refId);
+  if (scorer) emit("view-scorer", scorer);
 }
 
 // Wrap a variable in `{{ name }}` for display. The string concatenation
@@ -687,20 +701,26 @@ function formatTimestamp(microsOrMs: number): string {
   gap: 8px;
 }
 
+/* OButton overrides — multi-line card height + card-style surface. */
 .jd-scorers__card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--color-card-bg);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 6px;
+  width: 100%;
+  background: var(--color-card-bg) !important;
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent) !important;
+  border-radius: 6px !important;
   transition: border-color 0.15s, background 0.15s;
 }
 
-.jd-scorers__card:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 35%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
+.jd-scorers__card:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg)) !important;
+}
+
+.jd-scorers__card:deep(button) {
+  height: auto !important;
+  padding: 12px 14px !important;
+  gap: 10px;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .jd-scorers__main {

@@ -138,6 +138,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
+import { formatDate } from "@/utils/date";
 import ScoreConfigEmptyState from "./ScoreConfigEmptyState.vue";
 
 type DataType = "numeric" | "categorical" | "boolean";
@@ -233,7 +234,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.created"),
     accessorFn: (row: ScoreConfig) => rowCreated(row),
     sortable: true,
-    size: 130,
+    size: 180,
     meta: { align: "left" },
   },
   {
@@ -320,7 +321,7 @@ function usedByText(row: ScoreConfig) {
 
 function formatDateShort(value: number) {
   if (!value) return "—";
-  return new Date(value).toISOString().slice(0, 10);
+  return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
 </script>
 

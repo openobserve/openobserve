@@ -4,8 +4,7 @@
 // computed using each config's own healthy_threshold definition.
 
 import { computed, ref, type Ref } from "vue";
-import { useStore } from "vuex";
-import searchService from "@/services/search";
+import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import {
   dataTypeOf,
@@ -208,15 +207,11 @@ export function useQualityScoreConfigs(
   scoreConfigs: Ref<ScoreConfig[]>,
   dateWindow: Ref<DateWindow>,
 ) {
-  const store = useStore();
+  const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
   const aggByConfig = ref<Record<string, AggRow>>({});
   const trendByConfig = ref<Record<string, number[]>>({});
   const totalUniqueTracesAcrossConfigs = ref<number>(0);
-
-  const orgId = computed<string>(
-    () => store.state.selectedOrganization?.identifier ?? "default",
-  );
 
   async function refresh() {
     if (scoreConfigs.value.length === 0) {
@@ -233,32 +228,11 @@ export function useQualityScoreConfigs(
 
       const runQuery = async <T>(sqlText: string, label: string): Promise<T[] | null> => {
         try {
-          const response = await searchService.search(
-            {
-              org_identifier: orgId.value,
-              query: {
-                query: {
-                  sql: sqlText,
-                  start_time: startUs,
-                  end_time: endUs,
-                  from: 0,
-                  size: 5000,
-                  quick_mode: false,
-                  sql_mode: "full",
-                },
-              },
-              page_type: "logs",
-            },
-            "ui",
-          );
-          const hits = response?.data?.hits ?? [];
-          console.debug(`[Quality:${label}]`, {
-            hitCount: hits.length,
-            total: response?.data?.total,
-          });
+          const hits = await executeQuery(sqlText, startUs, endUs, "logs");
+          console.debug(`[Quality:${label}]`, { hitCount: hits.length });
           return hits as T[];
         } catch (err: any) {
-          console.warn(`[Quality:${label}] query failed:`, err?.response?.data ?? err);
+          console.warn(`[Quality:${label}] query failed:`, err);
           return null;
         }
       };

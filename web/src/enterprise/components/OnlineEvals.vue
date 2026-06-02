@@ -119,6 +119,7 @@ the Free Software Foundation, either version 3 of the License, or
         :row="viewRow"
         :scorers="scorers"
         @close="closeViewDialog"
+        @view-scorer="(row) => crossNavigateToScorer(row)"
       />
 
       <ScorerDetail
@@ -128,6 +129,7 @@ the Free Software Foundation, either version 3 of the License, or
         :score-configs="scoreConfigs"
         :jobs="jobs"
         @close="closeScorerView"
+        @view-job="(row) => crossNavigateToJob(row)"
       />
 
       <EvalJobDetail
@@ -136,6 +138,15 @@ the Free Software Foundation, either version 3 of the License, or
         :scorers="scorers"
         :score-configs="scoreConfigs"
         @close="closeJobView"
+        @view-scorer="(row) => crossNavigateToScorer(row)"
+      />
+
+      <ConfirmDialog
+        v-model="confirmDeleteOpen"
+        :title="pendingDeleteLabel"
+        :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+        @update:ok="performDelete"
+        @update:cancel="cancelDelete"
       />
     </template>
   </div>
@@ -170,6 +181,7 @@ import ScorerDetail from "./onlineEvals/forms/ScorerDetail.vue";
 import EvalJobDetail from "./onlineEvals/forms/EvalJobDetail.vue";
 import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 type ActiveTab = "quality" | "jobs" | "scorers" | "scoreConfigs";
 type FullPageEntity = Exclude<ActiveTab, "scoreConfigs" | "quality">;
@@ -206,6 +218,10 @@ const viewRow = ref<ScoreConfig | null>(null);
 const scorerViewRow = ref<Scorer | null>(null);
 const jobViewRow = ref<EvalJob | null>(null);
 const pendingJobStatusId = ref<string | null>(null);
+
+const confirmDeleteOpen = ref(false);
+const pendingDeleteRow = ref<AnyRow | null>(null);
+const pendingDeleteTab = ref<ActiveTab | null>(null);
 
 const {
   jobs,
@@ -247,6 +263,12 @@ const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>
 ]);
 
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
+
+const pendingDeleteLabel = computed(() => {
+  const tab = pendingDeleteTab.value;
+  if (!tab || tab === "quality") return t("onlineEvals.actions.delete");
+  return t("onlineEvals.deleteTitle", { label: t(`onlineEvals.singular.${tab}`) });
+});
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
@@ -318,28 +340,48 @@ function closeDialog() {
   clearRouteAction();
 }
 
+// All three "view" drawers push/clear the same `?action=view&id=<id>`
+// URL params so refresh keeps the drawer open and the URL is shareable.
+// The active tab in the route picks which entity is targeted.
+
 function openViewDialog(row: ScoreConfig) {
-  viewRow.value = row;
+  pushRouteAction({ action: "view", id: rowIdOf(row) });
 }
 
 function closeViewDialog() {
   viewRow.value = null;
+  clearRouteAction();
 }
 
 function openScorerView(row: Scorer) {
-  scorerViewRow.value = row;
+  pushRouteAction({ action: "view", id: rowIdOf(row) });
 }
 
 function closeScorerView() {
   scorerViewRow.value = null;
+  clearRouteAction();
 }
 
 function openJobView(row: EvalJob) {
-  jobViewRow.value = row;
+  pushRouteAction({ action: "view", id: rowIdOf(row) });
 }
 
 function closeJobView() {
   jobViewRow.value = null;
+  clearRouteAction();
+}
+
+/** Cross-navigation: from any detail drawer, jump to the detail drawer of a
+ * different entity. Pushes `tab`, `action`, and `id` to the URL in one
+ * router push so the activeTab watcher doesn't race against our query update
+ * and overwrite the `action` / `id` params. The URL → state watcher then
+ * syncs activeTab + opens the right drawer. */
+function crossNavigateToScorer(row: Scorer) {
+  pushRouteAction({ tab: "scorers", action: "view", id: entityId(row) });
+}
+
+function crossNavigateToJob(row: EvalJob) {
+  pushRouteAction({ tab: "jobs", action: "view", id: String(row.id) });
 }
 
 async function activateJob(row: EvalJob) {
@@ -409,8 +451,21 @@ function syncFromRoute() {
   formPage.value = null;
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
+  viewRow.value = null;
+  scorerViewRow.value = null;
+  jobViewRow.value = null;
 
-  if (action !== "add" && action !== "update") return;
+  if (action !== "add" && action !== "update" && action !== "view") return;
+
+  // View action — open the read-only detail drawer for the active tab.
+  if (action === "view" && typeof id === "string") {
+    const row = findRowById(tab, id);
+    if (!row) return;
+    if (tab === "scoreConfigs") viewRow.value = row as ScoreConfig;
+    else if (tab === "scorers") scorerViewRow.value = row as Scorer;
+    else if (tab === "jobs") jobViewRow.value = row as EvalJob;
+    return;
+  }
 
   if (tab === "scoreConfigs") {
     if (action === "add") {
@@ -452,22 +507,41 @@ watch(
   () => syncFromRoute(),
 );
 
-async function deleteRow(row: AnyRow) {
-  if (!window.confirm(t("onlineEvals.deletePrompt", { name: row.name }))) return;
+function deleteRow(row: AnyRow) {
+  pendingDeleteRow.value = row;
+  pendingDeleteTab.value = activeTab.value;
+  confirmDeleteOpen.value = true;
+}
+
+function cancelDelete() {
+  confirmDeleteOpen.value = false;
+  pendingDeleteRow.value = null;
+  pendingDeleteTab.value = null;
+}
+
+async function performDelete() {
+  const row = pendingDeleteRow.value;
+  const tab = pendingDeleteTab.value;
+  if (!row || !tab) return;
+  const singular = t(`onlineEvals.singular.${tab}`);
   try {
-    if (activeTab.value === "scoreConfigs")
+    if (tab === "scoreConfigs")
       await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
-    else if (activeTab.value === "scorers")
+    else if (tab === "scorers")
       await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
-    else await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
+    else if (tab === "jobs")
+      await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
 
     toast({
       variant: "success",
-      message: t("onlineEvals.deleted", { label: currentSingularLabel.value }),
+      message: t("onlineEvals.deleted", { label: singular }),
     });
     await loadAll(orgId.value);
   } catch (err: any) {
-    showError(err, t("onlineEvals.deleteError", { label: currentSingularLabel.value.toLowerCase() }));
+    showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
+  } finally {
+    pendingDeleteRow.value = null;
+    pendingDeleteTab.value = null;
   }
 }
 </script>

@@ -3,8 +3,7 @@
 // score_config_id and the active time window.
 
 import { ref, watch, type Ref } from "vue";
-import { useStore } from "vuex";
-import searchService from "@/services/search";
+import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf } from "../utils/evalEntity";
 import { chooseBucketInterval, type DateWindow } from "./useQualityData";
@@ -106,16 +105,12 @@ export function useQualityDetailCharts(
   splitByScorer: Ref<boolean>,
   splitBySourceType: Ref<boolean>,
 ) {
-  const store = useStore();
+  const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
   const numericTrend = ref<TrendPoint[]>([]);
   const numericDistribution = ref<DistributionBucket[]>([]);
   const booleanTrend = ref<BooleanTrendPoint[]>([]);
   const booleanTrendSeries = ref<BooleanTrendSeries[]>([]);
-
-  function orgId(): string {
-    return store.state.selectedOrganization?.identifier ?? "default";
-  }
 
   async function runQuery<T>(
     sqlText: string,
@@ -124,29 +119,11 @@ export function useQualityDetailCharts(
     endUs: number,
   ): Promise<T[]> {
     try {
-      const response = await searchService.search(
-        {
-          org_identifier: orgId(),
-          query: {
-            query: {
-              sql: sqlText,
-              start_time: startUs,
-              end_time: endUs,
-              from: 0,
-              size: 5000,
-              quick_mode: false,
-              sql_mode: "full",
-            },
-          },
-          page_type: "logs",
-        },
-        "ui",
-      );
-      const hits = response?.data?.hits ?? [];
+      const hits = await executeQuery(sqlText, startUs, endUs, "logs");
       console.debug(`[QualityCharts:${label}]`, { hitCount: hits.length });
       return hits as T[];
     } catch (err: any) {
-      console.warn(`[QualityCharts:${label}] failed:`, err?.response?.data ?? err);
+      console.warn(`[QualityCharts:${label}] failed:`, err);
       return [];
     }
   }

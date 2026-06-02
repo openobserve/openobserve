@@ -4,8 +4,7 @@
 // aggregates in parallel; one stream's failure doesn't break the page.
 
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
-import searchService from "@/services/search";
+import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 
 export type TimeRangeKey = "last1h" | "last24h" | "last7d" | "last30d";
 
@@ -142,69 +141,44 @@ function evaluatorSparklineSql(interval: string): string {
   ].join("\n");
 }
 
-async function fetchHits<T>(
-  orgId: string,
-  pageType: "logs" | "traces",
-  sql: string,
-  startUs: number,
-  endUs: number,
-  label: string,
-): Promise<T[]> {
-  try {
-    const response = await searchService.search(
-      {
-        org_identifier: orgId,
-        query: {
-          query: {
-            sql,
-            start_time: startUs,
-            end_time: endUs,
-            from: 0,
-            size: 1000,
-            quick_mode: false,
-            sql_mode: "full",
-          },
-        },
-        page_type: pageType,
-      },
-      "ui",
-    );
-    const hits = response?.data?.hits;
-    console.debug(`[Quality:${label}]`, {
-      pageType,
-      startUs,
-      endUs,
-      hitCount: Array.isArray(hits) ? hits.length : 0,
-      total: response?.data?.total,
-    });
-    return Array.isArray(hits) ? (hits as T[]) : [];
-  } catch (err: any) {
-    console.warn(`[Quality:${label}] ${pageType} query failed:`, err?.response?.data ?? err);
-    return [];
-  }
-}
-
-async function fetchAgg<T>(
-  orgId: string,
-  pageType: "logs" | "traces",
-  sql: string,
-  startUs: number,
-  endUs: number,
-  label: string,
-): Promise<T | null> {
-  const hits = await fetchHits<T>(orgId, pageType, sql, startUs, endUs, label);
-  return hits.length > 0 ? hits[0] : null;
-}
-
 export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
-  const store = useStore();
+  const { executeQuery } = useLLMStreamQuery();
   const sourceStream = ref<string>("__all__");
   const isLoading = ref(false);
   const kpis = ref<KpiCard[]>(emptyKpis());
 
-  const orgId = computed<string>(
-    () => store.state.selectedOrganization?.identifier ?? "default",
-  );
+  async function fetchHits<T>(
+    pageType: "logs" | "traces",
+    sql: string,
+    startUs: number,
+    endUs: number,
+    label: string,
+  ): Promise<T[]> {
+    try {
+      const hits = await executeQuery(sql, startUs, endUs, pageType);
+      console.debug(`[Quality:${label}]`, {
+        pageType,
+        startUs,
+        endUs,
+        hitCount: hits.length,
+      });
+      return hits as T[];
+    } catch (err: any) {
+      console.warn(`[Quality:${label}] ${pageType} query failed:`, err);
+      return [];
+    }
+  }
+
+  async function fetchAgg<T>(
+    pageType: "logs" | "traces",
+    sql: string,
+    startUs: number,
+    endUs: number,
+    label: string,
+  ): Promise<T | null> {
+    const hits = await fetchHits<T>(pageType, sql, startUs, endUs, label);
+    return hits.length > 0 ? hits[0] : null;
+  }
 
   async function refresh() {
     isLoading.value = true;
@@ -217,12 +191,12 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
       const interval = chooseBucketInterval(windowMs);
       const [scoresNow, scoresPrev, evalNow, evalPrev, scoresSeries, evalSeries] =
         await Promise.all([
-          fetchAgg<ScoresAggRow>(orgId.value, "logs", scoresSql(), startUs, endUs, "scores.now"),
-          fetchAgg<ScoresAggRow>(orgId.value, "logs", scoresSql(), prevStartUs, prevEndUs, "scores.prev"),
-          fetchAgg<EvaluatorAggRow>(orgId.value, "traces", evaluatorSql(), startUs, endUs, "eval.now"),
-          fetchAgg<EvaluatorAggRow>(orgId.value, "traces", evaluatorSql(), prevStartUs, prevEndUs, "eval.prev"),
-          fetchHits<ScoresBucketRow>(orgId.value, "logs", scoresSparklineSql(interval), startUs, endUs, "scores.spark"),
-          fetchHits<EvaluatorBucketRow>(orgId.value, "traces", evaluatorSparklineSql(interval), startUs, endUs, "eval.spark"),
+          fetchAgg<ScoresAggRow>("logs", scoresSql(), startUs, endUs, "scores.now"),
+          fetchAgg<ScoresAggRow>("logs", scoresSql(), prevStartUs, prevEndUs, "scores.prev"),
+          fetchAgg<EvaluatorAggRow>("traces", evaluatorSql(), startUs, endUs, "eval.now"),
+          fetchAgg<EvaluatorAggRow>("traces", evaluatorSql(), prevStartUs, prevEndUs, "eval.prev"),
+          fetchHits<ScoresBucketRow>("logs", scoresSparklineSql(interval), startUs, endUs, "scores.spark"),
+          fetchHits<EvaluatorBucketRow>("traces", evaluatorSparklineSql(interval), startUs, endUs, "eval.spark"),
         ]);
 
       const evaluatedSpark = scoresSeries.map((r) => toNumber(r.evaluated_c) ?? 0);

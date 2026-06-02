@@ -3,8 +3,7 @@
 // score_config_id, plus a uniqueness/total query so KPI cards can render.
 
 import { computed, ref, watch, type Ref } from "vue";
-import { useStore } from "vuex";
-import searchService from "@/services/search";
+import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf } from "../utils/evalEntity";
 import type { DateWindow } from "./useQualityData";
@@ -150,41 +149,19 @@ export function useQualityConfigDetail(
   selectedConfig: Ref<ScoreConfig | null>,
   dateWindow: Ref<DateWindow>,
 ) {
-  const store = useStore();
+  const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
   const numericAgg = ref<NumericAggRow | null>(null);
   const booleanAgg = ref<BooleanAggRow | null>(null);
   const categoricalRows = ref<CategoricalAggRow[]>([]);
 
-  const orgId = computed<string>(
-    () => store.state.selectedOrganization?.identifier ?? "default",
-  );
-
   async function runQuery<T>(sqlText: string, label: string, startUs: number, endUs: number) {
     try {
-      const response = await searchService.search(
-        {
-          org_identifier: orgId.value,
-          query: {
-            query: {
-              sql: sqlText,
-              start_time: startUs,
-              end_time: endUs,
-              from: 0,
-              size: 5000,
-              quick_mode: false,
-              sql_mode: "full",
-            },
-          },
-          page_type: "logs",
-        },
-        "ui",
-      );
-      const hits = response?.data?.hits ?? [];
+      const hits = await executeQuery(sqlText, startUs, endUs, "logs");
       console.debug(`[QualityDetail:${label}]`, { hitCount: hits.length });
       return hits as T[];
     } catch (err: any) {
-      console.warn(`[QualityDetail:${label}] query failed:`, err?.response?.data ?? err);
+      console.warn(`[QualityDetail:${label}] query failed:`, err);
       return [] as T[];
     }
   }

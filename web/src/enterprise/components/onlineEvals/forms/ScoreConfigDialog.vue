@@ -38,8 +38,17 @@
       <form class="sc-drawer__body" @submit.prevent="save">
         <div v-if="mode === 'edit'" class="sc-callout">
           <OIcon name="info" size="xs" />
-          <div>
-            <strong>{{ t("onlineEvals.scoreConfig.editInfoBanner", { nextVersion: nextVersionLabel }) }}</strong>
+          <div class="sc-callout__text">
+            <i18n-t
+              :keypath="`onlineEvals.scoreConfig.editInfoBannerEmphasis.${form.dataType}`"
+              tag="span"
+              class="sc-callout__lead"
+            >
+              <template #nextVersion>
+                <strong>{{ nextVersionLabel }}</strong>
+              </template>
+            </i18n-t>
+            <em class="sc-callout__detail">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
           </div>
         </div>
 
@@ -93,7 +102,6 @@
           </label>
           <div v-if="mode === 'edit'" class="sc-locked-row">
             <span class="sc-dtype-chip" :class="`sc-dtype-chip--${form.dataType}`">{{ form.dataType }}</span>
-            <span class="sc-locked-hint">{{ t("onlineEvals.scoreConfig.dataTypeLockHint") }}</span>
           </div>
           <template v-else>
             <div class="sc-dtype-grid">
@@ -229,17 +237,6 @@
                 />
               </label>
             </div>
-            <div class="sc-ht-example">
-              <OIcon name="info" size="xs" />
-              <span>
-                <code class="sc-mono">{{ t("onlineEvals.scoreConfig.thresholdExampleFaithfulness") }}</code>
-                {{ t("onlineEvals.scoreConfig.thresholdExampleUses") }}
-                <span class="sc-mono">≥ 0.7</span> {{ t("onlineEvals.scoreConfig.thresholdExampleHigher") }}.
-                <code class="sc-mono" style="margin-left: 6px">{{ t("onlineEvals.scoreConfig.thresholdExampleToxicity") }}</code>
-                {{ t("onlineEvals.scoreConfig.thresholdExampleUses") }}
-                <span class="sc-mono">≤ 0.3</span> {{ t("onlineEvals.scoreConfig.thresholdExampleLower") }}.
-              </span>
-            </div>
           </template>
 
           <!-- Categorical threshold -->
@@ -320,6 +317,7 @@
           variant="primary"
           size="sm-action"
           :loading="isSaving"
+          :disabled="mode === 'edit' && !isDirty"
           @click="save"
         >
           {{ mode === "create" ? t("onlineEvals.scoreConfig.createButton") : t("onlineEvals.scoreConfig.saveButton") }}
@@ -358,11 +356,14 @@ const { t } = useI18n();
 const isSaving = ref(false);
 const newCategory = ref("");
 const form = ref(initForm(props.row));
+const initialFormSnapshot = JSON.stringify(form.value);
 
 const nextVersionLabel = computed(() => {
   const v = props.row?.version ?? 0;
   return `v${v + 1}`;
 });
+
+const isDirty = computed(() => JSON.stringify(form.value) !== initialFormSnapshot);
 
 const defaultGteValue = computed(() => {
   if (form.value.dataType !== "numeric") return 0;
@@ -614,6 +615,22 @@ async function save() {
   color: var(--o2-status-info-text);
 }
 
+.sc-callout__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sc-callout__lead { font-weight: 400; }
+.sc-callout__lead strong { font-weight: 700; }
+
+.sc-callout__detail {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
 .sc-callout--neutral {
   background: color-mix(in srgb, var(--color-text-secondary, var(--o2-text-secondary)) 12%, transparent);
   border-color: var(--color-dialog-header-border, var(--o2-border));
@@ -669,11 +686,6 @@ async function save() {
   background: color-mix(in srgb, var(--color-text-secondary, var(--o2-text-secondary)) 12%, transparent);
   border: 1px solid var(--color-dialog-header-border, var(--o2-border));
   border-radius: 6px;
-}
-
-.sc-locked-hint {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 11px;
 }
 
 .sc-dtype-chip {
@@ -915,8 +927,8 @@ async function save() {
 
 .sc-ht-example code {
   font-family: var(--o2-font-mono);
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-weight: 700;
+  color: var(--color-text-primary, var(--o2-text));
 }
 
 .sc-ht-checks {
