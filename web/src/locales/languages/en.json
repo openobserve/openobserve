@@ -4086,10 +4086,119 @@
       "delete": "Delete"
     },
     "tabs": {
+      "quality": "Quality",
       "jobs": "Eval Jobs",
       "scorers": "Scorers",
       "scoreConfigs": "Score Configs",
       "providers": "Providers"
+    },
+    "quality": {
+      "scopeLabel": "All quality dimensions in this workspace",
+      "timeRange": {
+        "label": "Time range",
+        "last1h": "Past 1 hour",
+        "last24h": "Past 24 hours",
+        "last7d": "Past 7 days",
+        "last30d": "Past 30 days"
+      },
+      "sourceStream": {
+        "label": "Source stream",
+        "all": "All streams"
+      },
+      "refresh": "Refresh",
+      "kpis": {
+        "evaluated": {
+          "title": "Evaluated Traces",
+          "unit": "",
+          "hint": "Distinct trace IDs in _llm_scores within the window"
+        },
+        "qualityIssueRate": {
+          "title": "Quality Issue Rate",
+          "unit": "%",
+          "hint": "Evaluated traces with any dimension below threshold"
+        },
+        "evaluationCost": {
+          "title": "Evaluation Cost",
+          "unit": "$",
+          "hint": "Sum of LLM Judge scorer cost in the window"
+        },
+        "jobSuccess": {
+          "title": "Job Success",
+          "unit": "%",
+          "hint": "Online Eval Job run success rate"
+        },
+        "scorerFailures": {
+          "title": "Scorer Failures",
+          "unit": "",
+          "hint": "Failed scorer invocations in the window"
+        },
+        "latencyP95": {
+          "title": "Latency p95",
+          "unit": "s",
+          "hint": "Scorer-call p95 latency"
+        },
+        "vsPrev": "vs prev",
+        "noData": "—"
+      },
+      "loading": "Loading quality data…",
+      "detail": {
+        "loading": "Loading per-config breakdown…",
+        "noData": "No scores yet for this config in this window.",
+        "drillTitle": "Drill to traces",
+        "splitByScorer": "Split by scorer",
+        "splitBySourceType": "Split by source_type",
+        "trendTitle": "Trend",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Score distribution",
+        "compositionTitle": "Composition over time",
+        "categoryDistributionTitle": "Category distribution",
+        "passRateTitle": "Pass rate over time",
+        "trueFalseTitle": "True vs False",
+        "legendAvg": "Avg",
+        "legendP95": "p95",
+        "legendThreshold": "threshold {direction} {value}",
+        "legendHealthy": "healthy",
+        "legendUnhealthy": "unhealthy",
+        "kpis": {
+          "average": "Average",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50 / P95",
+          "unhealthy": "Unhealthy",
+          "healthy": "Healthy",
+          "coverage": "Coverage"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "All configs",
+        "empty": "No configs match this filter."
+      },
+      "overview": {
+        "title": "Score Configs Overview",
+        "countSuffix": "{n} configs",
+        "searchPlaceholder": "Filter configs…",
+        "loading": "Loading per-config aggregates…",
+        "emptyNoConfigsTitle": "No Score Configs yet",
+        "emptyNoConfigsHint": "Define your first Score Config to start tracking quality dimensions.",
+        "emptyWaitingTitle": "Waiting for the first scores to land",
+        "emptyWaitingHint": "Your Score Configs are declared, but no scores have been written to _llm_scores in this window yet.",
+        "waitingStepJob": "Activate an Online Eval Job that produces scores for one of these configs",
+        "waitingStepRange": "Widen the time range — scores from earlier today or this week may not be in this window",
+        "waitingStepRefresh": "Click Refresh — scores from an active job appear within ~1 minute of evaluation",
+        "waitingPrimaryCta": "Open Eval Jobs",
+        "waitingRefreshCta": "Refresh",
+        "noThreshold": "no threshold",
+        "columns": {
+          "scoreConfig": "Score Config",
+          "type": "Type",
+          "totalScores": "Total Scores",
+          "coverage": "Coverage",
+          "unhealthy": "Unhealthy",
+          "trend": "Trend",
+          "threshold": "Healthy if",
+          "updated": "Updated"
+        }
+      }
     },
     "singular": {
       "jobs": "Eval Job",
@@ -4112,6 +4221,7 @@
     },
     "buttons": {
       "cancel": "Cancel",
+      "close": "Close",
       "create": "Create",
       "save": "Save"
     },

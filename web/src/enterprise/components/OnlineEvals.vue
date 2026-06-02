@@ -53,8 +53,12 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
 
         <div class="online-evals__body">
+          <QualityPage
+            v-if="activeTab === 'quality'"
+            :score-configs="scoreConfigs"
+          />
           <ScoreConfigList
-            v-if="activeTab === 'scoreConfigs'"
+            v-else-if="activeTab === 'scoreConfigs'"
             :rows="(filteredRows as ScoreConfig[])"
             :scorers="scorers"
             :search="filterQuery"
@@ -128,13 +132,14 @@ import { showError } from "./onlineEvals/utils/evalFormat";
 import ScoreConfigList from "./onlineEvals/ScoreConfigList.vue";
 import ScorerList from "./onlineEvals/ScorerList.vue";
 import EvalJobList from "./onlineEvals/EvalJobList.vue";
+import QualityPage from "./onlineEvals/QualityPage.vue";
 import ScorerTypeDialog from "./onlineEvals/forms/ScorerTypeDialog.vue";
 import ScoreConfigDialog from "./onlineEvals/forms/ScoreConfigDialog.vue";
 import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 
-type ActiveTab = "jobs" | "scorers" | "scoreConfigs";
-type FullPageEntity = Exclude<ActiveTab, "scoreConfigs">;
+type ActiveTab = "quality" | "jobs" | "scorers" | "scoreConfigs";
+type FullPageEntity = Exclude<ActiveTab, "scoreConfigs" | "quality">;
 type AnyRow = EvalJob | Scorer | ScoreConfig;
 
 const store = useStore();
@@ -143,13 +148,13 @@ const router = useRouter();
 const { t } = useI18n();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const VALID_TABS: ActiveTab[] = ["jobs", "scorers", "scoreConfigs"];
+const VALID_TABS: ActiveTab[] = ["quality", "jobs", "scorers", "scoreConfigs"];
 
 function parseTabFromRoute(value: unknown): ActiveTab {
   if (typeof value === "string" && (VALID_TABS as string[]).includes(value)) {
     return value as ActiveTab;
   }
-  return "jobs";
+  return "quality";
 }
 
 const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
@@ -175,15 +180,18 @@ const {
   ensureScoreConfigVersions,
 } = useOnlineEvalsData();
 
-const rowsByTab = computed<Record<ActiveTab, AnyRow[]>>(() => ({
+type RowTab = Exclude<ActiveTab, "quality">;
+
+const rowsByTab = computed<Record<RowTab, AnyRow[]>>(() => ({
   jobs: jobs.value,
   scorers: scorers.value,
   scoreConfigs: scoreConfigs.value,
 }));
 
-const filteredRows = computed(() => {
+const filteredRows = computed<AnyRow[]>(() => {
+  if (activeTab.value === "quality") return [];
   const query = filterQuery.value.trim().toLowerCase();
-  const rows = rowsByTab.value[activeTab.value];
+  const rows = rowsByTab.value[activeTab.value as RowTab];
   if (!query) return rows;
 
   return rows.filter((row) =>
@@ -193,10 +201,11 @@ const filteredRows = computed(() => {
   );
 });
 
-const tabs = computed(() => [
-  { value: "jobs" as ActiveTab, label: t("onlineEvals.tabs.jobs") },
-  { value: "scorers" as ActiveTab, label: t("onlineEvals.tabs.scorers") },
-  { value: "scoreConfigs" as ActiveTab, label: t("onlineEvals.tabs.scoreConfigs") },
+const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>>(() => [
+  { value: "quality", label: t("onlineEvals.tabs.quality") },
+  { value: "jobs", label: t("onlineEvals.tabs.jobs") },
+  { value: "scorers", label: t("onlineEvals.tabs.scorers") },
+  { value: "scoreConfigs", label: t("onlineEvals.tabs.scoreConfigs") },
 ]);
 
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
@@ -228,6 +237,7 @@ function rowIdOf(row: AnyRow): string {
 }
 
 function findRowById(tab: ActiveTab, id: string): AnyRow | null {
+  if (tab === "quality") return null;
   const rows = rowsByTab.value[tab];
   if (tab === "jobs") {
     return (rows.find((r) => String((r as EvalJob).id) === id) as AnyRow) ?? null;
