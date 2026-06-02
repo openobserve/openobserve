@@ -81,9 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
           >
-            <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
-            {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
             <OIcon name="play-arrow" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
           </button>
           <span
             v-if="selectedTrace.metadata?.duration"
@@ -132,11 +131,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- List view -->
     <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full">
       <!-- Filter bar -->
-      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-        <small class="tw:text-[var(--o2-text-secondary)] tw:font-semibold">
-          {{ correlatedViews.length }} {{ t("menu.traces").toLowerCase() }}
-        </small>
-        <div class="tw:flex-1" />
+      <div class="tw:flex tw:items-center tw:px-2 tw:py-1 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:shrink-0 tw:min-h-[2rem]">
+        <OBadge
+          variant="default"
+          data-test="rum-player-traces-tab-count-badge"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OBadge>
+        <OBadge
+          v-if="totalErrorCount > 0"
+          variant="error"
+          data-test="rum-player-traces-tab-error-count-badge"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
+        >{{ `${formatLargeNumber(totalErrorCount)} ${totalErrorCount === 1 ? t("rum.error") : t("rum.errors")}` }}</OBadge>
       </div>
 
       <!-- Traces table -->
@@ -149,39 +155,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-text-highlight="false"
           :enable-status-bar="false"
           :default-columns="false"
-          :enable-column-reorder="false"
+          :enable-column-reorder="true"
           :enable-ai-context-button="false"
           :row-class="traceRowClass"
           data-test="rum-player-traces-tab-table"
           @click:dataRow="handleTraceRowClick"
         >
-          <template #cell-timestamp="{ item }">
-            <span class="tw:text-xs tw:whitespace-nowrap tw:tabular-nums">
-              {{ formatTraceTimestamp(item.metadata?.start_time) }}
-            </span>
-          </template>
-          <template #cell-route="{ item }">
-            <span
-              class="tw:truncate tw:font-mono tw:text-xs tw:block"
-              :title="item.route"
+          <template #cell-timestamp="{ item, cell }">
+            <div
+              class="tw:overflow-hidden tw:whitespace-nowrap"
+              :style="{ width: cell.column.getSize() + 'px' }"
             >
-              {{ shortRoute(item.route) }}
-            </span>
+              <span class="tw:text-xs tw:tabular-nums">
+                {{ formatTraceTimestamp(item.metadata?.start_time) }}
+              </span>
+            </div>
           </template>
-          <template #cell-duration="{ item }">
-            <span class="tw:text-xs tw:tabular-nums">
-              {{ formatTimeWithSuffix(item.metadata?.duration) }}
-            </span>
-          </template>
-          <template #cell-errors="{ item }">
-            <OBadge
-              v-if="item.metadata?.errorCount > 0"
-              variant="error-outline"
-              size="sm"
+          <template #cell-route="{ item, cell }">
+            <div
+              class="tw:overflow-hidden"
+              :style="{ width: cell.column.getSize() + 'px' }"
             >
-              {{ item.metadata.errorCount }}
-            </OBadge>
-            <span v-else class="tw:text-[var(--o2-text-muted)] tw:text-xs">—</span>
+              <span
+                class="tw:truncate tw:font-mono tw:text-xs tw:block"
+                :title="item.route"
+              >
+                {{ shortRoute(item.route) }}
+              </span>
+            </div>
+          </template>
+          <template #cell-duration="{ item, cell }">
+            <div
+              class="tw:overflow-hidden tw:whitespace-nowrap"
+              :style="{ width: cell.column.getSize() + 'px' }"
+            >
+              <span class="tw:text-xs tw:tabular-nums">
+                {{ formatTimeWithSuffix(item.metadata?.duration) }}
+              </span>
+            </div>
+          </template>
+          <template #cell-errors="{ item, cell }">
+            <div
+              class="tw:overflow-hidden tw:flex tw:justify-center"
+              :style="{ width: cell.column.getSize() + 'px' }"
+            >
+              <OBadge
+                v-if="item.metadata?.errorCount > 0"
+                variant="error-outline"
+                size="sm"
+              >
+                {{ item.metadata.errorCount }}
+              </OBadge>
+              <span v-else class="tw:text-[var(--o2-text-muted)] tw:text-xs">—</span>
+            </div>
           </template>
         </TenstackTable>
       </div>
@@ -194,7 +220,7 @@ import { ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
-import { formatDuration, formatTimeWithSuffix, generateTraceContext } from "@/utils/zincutils";
+import { formatDuration, formatLargeNumber, formatTimeWithSuffix, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -238,6 +264,10 @@ const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
 
+const totalErrorCount = computed(() =>
+  correlatedViews.value.reduce((sum, v) => sum + (v.metadata?.errorCount || 0), 0),
+);
+
 const {fetchQueryDataWithHttpStream} = useHttpStreaming();
 
 // ── Table column definitions ────────────────────────────────
@@ -246,24 +276,36 @@ const traceColumns = computed(() => [
     id: "timestamp",
     header: t("rum.timestamp"),
     accessorFn: (row: any) => row.metadata?.start_time ?? 0,
+    size: 80,
+    minSize: 60,
+    maxSize: 200,
     meta: { align: "left", slot: true },
   },
   {
     id: "route",
     header: t("rum.route"),
     accessorFn: (row: any) => shortRoute(row.route),
+    size: 200,
+    minSize: 80,
+    maxSize: 600,
     meta: { align: "left", slot: true },
   },
   {
     id: "duration",
     header: t("rum.duration"),
     accessorFn: (row: any) => row.metadata?.duration ?? 0,
+    size: 100,
+    minSize: 50,
+    maxSize: 200,
     meta: { align: "right", slot: true },
   },
   {
     id: "errors",
     header: t("rum.errors"),
     accessorFn: (row: any) => row.metadata?.errorCount ?? 0,
+    size: 100,
+    minSize: 50,
+    maxSize: 120,
     meta: { align: "center", slot: true },
   },
 ]);
@@ -282,29 +324,30 @@ function shortRoute(url: string): string {
   }
 }
 
-function formatTraceTimestamp(startTimeUs: number): string {
-  if (!startTimeUs) return "—";
-  const ms = Math.floor(startTimeUs / 1000);
-  const d = new Date(ms);
-  const hh = d.getHours().toString().padStart(2, "0");
-  const mm = d.getMinutes().toString().padStart(2, "0");
-  const ss = d.getSeconds().toString().padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
+// Converts nanosecond trace timestamp to millisecond offset from session start,
+// matching SessionViewer's formatTimeDifference(event.date, session.start_time) pattern.
+function traceRelativeTimeMs(startTimeNs: number): number {
+  if (!props.startTime || !startTimeNs) return 0;
+  const startTimeMs = Math.floor(startTimeNs / 1_000_000);
+  return Math.max(0, startTimeMs - props.startTime);
 }
 
-function traceRelativeTimeMs(startTimeUs: number): number {
-  if (!props.startTime || !startTimeUs) return 0;
-  return Math.max(0, Math.floor(startTimeUs / 1000) - props.startTime);
+function formatTraceTimestamp(startTimeNs: number): string {
+  if (!startTimeNs || !props.startTime) return "—";
+  const offsetMs = traceRelativeTimeMs(startTimeNs);
+  const totalSec = Math.floor(offsetMs / 1000);
+  const mm = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const ss = (totalSec % 60).toString().padStart(2, "0");
+  return `${mm}:${ss}`;
 }
 
-function traceTimeOffset(startTimeUs: number): string {
-  const sessionStartMs = props.startTime;
-  if (!sessionStartMs) return "";
-  const offsetMs = Math.max(0, Math.floor(startTimeUs / 1000) - sessionStartMs);
+function traceTimeOffset(startTimeNs: number): string {
+  if (!props.startTime) return "";
+  const offsetMs = traceRelativeTimeMs(startTimeNs);
   const totalSec = Math.floor(offsetMs / 1000);
   const min = Math.floor(totalSec / 60).toString().padStart(2, "0");
   const sec = (totalSec % 60).toString().padStart(2, "0");
-  return `@ ${min}:${sec}`;
+  return `${min}:${sec}`;
 }
 
 // ── Data fetching ───────────────────────────────────────────
@@ -427,10 +470,11 @@ async function fetchTraces() {
       try {
         const metadata = await fetchTraceMetadata(views.map(v => v.traceId));
 
-        // Only keep views whose trace_id exists in the traces stream
+        // Only keep views whose trace_id exists in the traces stream, sorted by start time
         filteredViews = views
           .filter(view => metadata[view.traceId])
-          .map(view => ({ ...view, metadata: metadata[view.traceId] }));
+          .map(view => ({ ...view, metadata: metadata[view.traceId] }))
+          .sort((a, b) => (a.metadata.start_time ?? 0) - (b.metadata.start_time ?? 0));
 
         traceMetadata.value = metadata;
       } catch (err: any) {
