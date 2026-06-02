@@ -47,8 +47,12 @@ def ingest_query_agent_data():
     else:
         logging.warning("Flush returned %s: %s", flush_resp.status_code, flush_resp.text[:200])
 
-    # Poll until all records are searchable
+    # Poll until all records are searchable.
     expected = len(records)
+    # Timestamp of the very last record — used to verify the tail of the
+    # dataset is queryable, not just the total count (which can be satisfied
+    # by old data from previous runs at different timestamps).
+    _max_ts = max(r["_timestamp"] for r in records)
 
     def _data_is_searchable():
         now = datetime.now(UTC)
@@ -67,7 +71,27 @@ def ingest_query_agent_data():
         if r.status_code != 200:
             return False
         hits = r.json().get("hits", [])
-        return bool(hits and hits[0].get("c", 0) >= expected)
+        if not (hits and hits[0].get("c", 0) >= expected):
+            return False
+        # Verify the highest-timestamp record is searchable.
+        # A COUNT(*) can be satisfied by old data from prior runs whose
+        # timestamps differ from the current ingestion batch. Without this
+        # secondary check, tests for later-numbered queries (which have
+        # higher offsets from BASE_TS) can fail with 0 results.
+        tail_payload = {
+            "query": {
+                "sql": f'SELECT COUNT(*) AS c FROM "{stream}"',
+                "start_time": _max_ts - 60_000_000,
+                "end_time": _max_ts + 60_000_000,
+                "from": 0,
+                "size": 1,
+            }
+        }
+        tr = client.post("_search?type=logs", json=tail_payload)
+        if tr.status_code != 200:
+            return False
+        thits = tr.json().get("hits", [])
+        return bool(thits and thits[0].get("c", 0) >= 1)
 
     wait_until(_data_is_searchable, timeout=120, interval=1.0,
                msg=f"query_agent_test_v2 data not searchable ({expected} records)")

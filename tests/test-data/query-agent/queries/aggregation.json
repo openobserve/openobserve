@@ -4,10 +4,6 @@
       "id": "Q001",
       "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780307997000000,
-        "end": 1780308165000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -15,16 +11,16 @@
           "cnt"
         ],
         "note": "GROUP BY facility_zone with COUNT, ORDER BY cnt DESC"
+      },
+      "time_offset": {
+        "start_offset": -3000000,
+        "end_offset": 165000000
       }
     },
     {
       "id": "Q002",
       "sql": "SELECT operation_mode, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL GROUP BY operation_mode ORDER BY avg_tput DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308057000000,
-        "end": 1780308225000000
-      },
       "expected": {
         "row_count": 3,
         "columns": [
@@ -33,16 +29,16 @@
           "avg_tput"
         ],
         "note": "GROUP BY operation_mode with multiple AVG aggregates"
+      },
+      "time_offset": {
+        "start_offset": 57000000,
+        "end_offset": 225000000
       }
     },
     {
       "id": "Q003",
       "sql": "SELECT sorter_model, COUNT(*) AS cnt FROM \"query_agent_test_v2\" WHERE match_all('warehouse') GROUP BY sorter_model ORDER BY cnt DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308117000000,
-        "end": 1780308285000000
-      },
       "expected": {
         "row_count": 5,
         "columns": [
@@ -50,32 +46,32 @@
           "cnt"
         ],
         "note": "GROUP BY sorter_model with WHERE match_all filter"
+      },
+      "time_offset": {
+        "start_offset": 117000000,
+        "end_offset": 285000000
       }
     },
     {
       "id": "Q004",
       "sql": "SELECT SUM(throughput_rate) AS total_throughput FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308177000000,
-        "end": 1780308345000000
-      },
       "expected": {
         "row_count": 1,
         "columns": [
           "total_throughput"
         ],
         "note": "Single-row aggregate: SUM with WHERE filter"
+      },
+      "time_offset": {
+        "start_offset": 177000000,
+        "end_offset": 345000000
       }
     },
     {
       "id": "Q005",
       "sql": "SELECT conveyor_lane, COUNT(*) AS cnt, ROUND(AVG(load_factor), 2) AS avg_load FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL GROUP BY conveyor_lane HAVING AVG(load_factor) > 40.0 ORDER BY avg_load DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308237000000,
-        "end": 1780308405000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -84,16 +80,16 @@
           "avg_load"
         ],
         "note": "GROUP BY with HAVING on AVG"
+      },
+      "time_offset": {
+        "start_offset": 237000000,
+        "end_offset": 405000000
       }
     },
     {
       "id": "Q006",
       "sql": "SELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"query_agent_test_v2\" GROUP BY facility_zone, operation_mode ORDER BY facility_zone ASC, cnt DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308297000000,
-        "end": 1780308465000000
-      },
       "expected": {
         "row_count": 8,
         "columns": [
@@ -103,16 +99,16 @@
           "avg_tput"
         ],
         "note": "Multi-column GROUP BY with AVG and COUNT"
+      },
+      "time_offset": {
+        "start_offset": 297000000,
+        "end_offset": 465000000
       }
     },
     {
       "id": "Q007",
       "sql": "SELECT control_center, SUM(item_count) AS total_items, ROUND(AVG(charge_remaining), 2) AS avg_charge, MIN(charge_remaining) AS min_charge, MAX(charge_remaining) AS max_charge FROM \"query_agent_test_v2\" GROUP BY control_center ORDER BY total_items DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308357000000,
-        "end": 1780308525000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -123,16 +119,16 @@
           "max_charge"
         ],
         "note": "Multiple aggregates: SUM, AVG, MIN, MAX on charge_remaining"
+      },
+      "time_offset": {
+        "start_offset": 357000000,
+        "end_offset": 525000000
       }
     },
     {
       "id": "Q008",
       "sql": "SELECT facility_zone, COUNT(*) AS cnt, COUNT(DISTINCT sorter_model) AS distinct_sorters FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308417000000,
-        "end": 1780308585000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -141,16 +137,16 @@
           "distinct_sorters"
         ],
         "note": "COUNT and COUNT DISTINCT in same GROUP BY"
+      },
+      "time_offset": {
+        "start_offset": 417000000,
+        "end_offset": 585000000
       }
     },
     {
       "id": "Q009",
       "sql": "SELECT build_signature, ROUND(AVG(runtime_hours), 1) AS avg_runtime, MIN(runtime_hours) AS min_runtime, MAX(runtime_hours) AS max_runtime FROM \"query_agent_test_v2\" WHERE runtime_hours IS NOT NULL GROUP BY build_signature ORDER BY avg_runtime DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308477000000,
-        "end": 1780308645000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -160,16 +156,16 @@
           "max_runtime"
         ],
         "note": "AVG, MIN, MAX on runtime_hours grouped by build_signature"
+      },
+      "time_offset": {
+        "start_offset": 477000000,
+        "end_offset": 645000000
       }
     },
     {
       "id": "Q010",
       "sql": "SELECT sorter_model, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor) + AVG(throughput_rate), 2) AS combined_score FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL AND throughput_rate IS NOT NULL GROUP BY sorter_model HAVING AVG(throughput_rate) > 300.0 ORDER BY combined_score DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308537000000,
-        "end": 1780308705000000
-      },
       "expected": {
         "row_count": 5,
         "columns": [
@@ -179,16 +175,16 @@
           "combined_score"
         ],
         "note": "Computed aggregate expression (avg_load + avg_tput) with HAVING"
+      },
+      "time_offset": {
+        "start_offset": 537000000,
+        "end_offset": 705000000
       }
     },
     {
       "id": "Q011",
       "sql": "SELECT operation_mode, COUNT(*) AS cnt, ROUND(CAST(COUNT(*) AS FLOAT) / NULLIF(SUM(COUNT(*)) OVER (), 0) * 100.0, 2) AS pct_of_total FROM \"query_agent_test_v2\" GROUP BY operation_mode ORDER BY cnt DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308597000000,
-        "end": 1780308765000000
-      },
       "expected": {
         "row_count": 3,
         "columns": [
@@ -197,16 +193,16 @@
           "pct_of_total"
         ],
         "note": "Window-based percentage of total within GROUP BY result"
+      },
+      "time_offset": {
+        "start_offset": 597000000,
+        "end_offset": 765000000
       }
     },
     {
       "id": "Q012",
       "sql": "SELECT facility_zone, COUNT(*) FILTER (WHERE load_factor > 60.0) AS high_load_cnt, COUNT(*) FILTER (WHERE load_factor <= 60.0) AS low_load_cnt, ROUND(AVG(cell_temp), 2) AS avg_cell_temp FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY high_load_cnt DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308657000000,
-        "end": 1780308825000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -216,16 +212,16 @@
           "avg_cell_temp"
         ],
         "note": "Conditional COUNT with CASE filtered GROUP BY"
+      },
+      "time_offset": {
+        "start_offset": 657000000,
+        "end_offset": 825000000
       }
     },
     {
       "id": "Q013",
       "sql": "SELECT conveyor_lane, COUNT(*) FILTER (WHERE operation_mode='auto') AS auto_cnt, COUNT(*) FILTER (WHERE operation_mode='manual') AS manual_cnt, COUNT(*) FILTER (WHERE operation_mode='hybrid') AS hybrid_cnt FROM \"query_agent_test_v2\" GROUP BY conveyor_lane ORDER BY conveyor_lane ASC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308717000000,
-        "end": 1780308885000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -235,16 +231,16 @@
           "hybrid_cnt"
         ],
         "note": "Multiple FILTER aggregates for pivot-style output"
+      },
+      "time_offset": {
+        "start_offset": 717000000,
+        "end_offset": 885000000
       }
     },
     {
       "id": "Q014",
       "sql": "SELECT control_center, ROUND(AVG(defect_limit), 3) AS avg_defect, ROUND(AVG(throughput_rate), 2) AS avg_tput, CASE WHEN AVG(defect_limit) > 2.0 THEN 'HIGH_DEFECT' WHEN AVG(throughput_rate) < 300.0 THEN 'LOW_THROUGHPUT' ELSE 'NOMINAL' END AS risk_flag FROM \"query_agent_test_v2\" GROUP BY control_center ORDER BY avg_defect DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308777000000,
-        "end": 1780308945000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -254,16 +250,16 @@
           "risk_flag"
         ],
         "note": "CASE in SELECT of GROUP BY for computed classification"
+      },
+      "time_offset": {
+        "start_offset": 777000000,
+        "end_offset": 945000000
       }
     },
     {
       "id": "Q015",
       "sql": "SELECT sorter_model, facility_zone, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY sorter_model, facility_zone ORDER BY sorter_model ASC, cnt DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308837000000,
-        "end": 1780309005000000
-      },
       "expected": {
         "row_count": 5,
         "columns": [
@@ -272,16 +268,16 @@
           "cnt"
         ],
         "note": "GROUP BY ROLLUP-style two-column grouping (simulated with regular GROUP BY)"
+      },
+      "time_offset": {
+        "start_offset": 837000000,
+        "end_offset": 1005000000
       }
     },
     {
       "id": "Q016",
       "sql": "WITH mode_counts AS (SELECT facility_zone, operation_mode, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY facility_zone, operation_mode), ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY cnt DESC) AS rn FROM mode_counts) SELECT facility_zone, cnt AS mode_count, operation_mode AS dominant_mode FROM ranked WHERE rn = 1 ORDER BY facility_zone ASC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308897000000,
-        "end": 1780309065000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -290,16 +286,16 @@
           "dominant_mode"
         ],
         "note": "Subquery-based mode aggregation + dominant mode via CTE"
+      },
+      "time_offset": {
+        "start_offset": 897000000,
+        "end_offset": 1065000000
       }
     },
     {
       "id": "Q017",
       "sql": "SELECT operation_mode, MAX(item_count) AS max_tput_item, MIN(item_count) AS min_tput_item, MAX(item_count) - MIN(item_count) AS spread FROM \"query_agent_test_v2\" WHERE item_count > 0 GROUP BY operation_mode ORDER BY spread DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780308957000000,
-        "end": 1780309125000000
-      },
       "expected": {
         "row_count": 3,
         "columns": [
@@ -309,16 +305,16 @@
           "spread"
         ],
         "note": "MAX-MIN spread computation in GROUP BY"
+      },
+      "time_offset": {
+        "start_offset": 957000000,
+        "end_offset": 1125000000
       }
     },
     {
       "id": "Q018",
       "sql": "SELECT conveyor_lane, SUM(scan_attempts) AS scan_total, ROUND(AVG(CAST(scan_attempts AS FLOAT)), 2) AS avg_scan, ROUND(CAST(COUNT(*) FILTER (WHERE scan_attempts >= 3) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS retry_rate FROM \"query_agent_test_v2\" GROUP BY conveyor_lane ORDER BY retry_rate DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780309017000000,
-        "end": 1780309185000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -328,16 +324,16 @@
           "retry_rate"
         ],
         "note": "SUM + AVG + computed rate per lane"
+      },
+      "time_offset": {
+        "start_offset": 1017000000,
+        "end_offset": 1185000000
       }
     },
     {
       "id": "Q019",
       "sql": "SELECT build_signature, ROUND(STDDEV(throughput_rate), 2) AS std_tput, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0), 4) AS cv_tput FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL GROUP BY build_signature HAVING COUNT(*) >= 2 ORDER BY cv_tput DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780309077000000,
-        "end": 1780309245000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -347,16 +343,16 @@
           "cv_tput"
         ],
         "note": "STDDEV + AVG + coefficient of variation per build"
+      },
+      "time_offset": {
+        "start_offset": 1077000000,
+        "end_offset": 1245000000
       }
     },
     {
       "id": "Q020",
       "sql": "SELECT facility_zone, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS below_30_pct, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining > 70.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS above_70_pct FROM \"query_agent_test_v2\" GROUP BY facility_zone ORDER BY below_30_pct DESC",
       "category": "aggregation",
-      "time_range": {
-        "start": 1780309137000000,
-        "end": 1780309305000000
-      },
       "expected": {
         "row_count": 4,
         "columns": [
@@ -365,6 +361,10 @@
           "above_70_pct"
         ],
         "note": "Percentage-bucketized aggregation with FILTER"
+      },
+      "time_offset": {
+        "start_offset": 1137000000,
+        "end_offset": 1305000000
       }
     }
   ],

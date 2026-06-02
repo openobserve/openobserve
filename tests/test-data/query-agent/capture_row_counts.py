@@ -20,7 +20,7 @@ QUERIES_DIR = Path(__file__).parent / "queries"
 STREAM = "query_agent_test_v2"
 
 # Shared deterministic data generator
-from data_gen import build_dataset  # noqa: E402
+from data_gen import BASE_TS, build_dataset  # noqa: E402
 
 session = requests.Session()
 session.headers["Authorization"] = f"Basic {AUTH}"
@@ -81,11 +81,12 @@ for fp in sorted(QUERIES_DIR.glob("*.json")):
         query_data = json.load(f)
     dirty = False
     for q in query_data["queries"]:
+        offset = q["time_offset"]
         payload = {
             "query": {
                 "sql": q["sql"],
-                "start_time": q["time_range"]["start"],
-                "end_time": q["time_range"]["end"],
+                "start_time": BASE_TS + offset["start_offset"],
+                "end_time": BASE_TS + offset["end_offset"],
                 "from": 0,
                 "size": 500,
             }

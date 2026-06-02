@@ -4,10 +4,6 @@
       "id": "Q135",
       "sql": "SELECT sorter_model, throughput_rate, ROW_NUMBER() OVER (PARTITION BY sorter_model ORDER BY throughput_rate DESC) AS rank, DENSE_RANK() OVER (PARTITION BY sorter_model ORDER BY throughput_rate DESC) AS drank FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL",
       "category": "window",
-      "time_range": {
-        "start": 1780316037000000,
-        "end": 1780316205000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -17,16 +13,16 @@
           "drank"
         ],
         "note": "ROW_NUMBER + DENSE_RANK partitioned by sorter_model"
+      },
+      "time_offset": {
+        "start_offset": 8037000000,
+        "end_offset": 8205000000
       }
     },
     {
       "id": "Q136",
       "sql": "SELECT _timestamp, throughput_rate, LAG(throughput_rate, 1, 0) OVER (ORDER BY _timestamp) AS prev_tput, LEAD(throughput_rate, 1, 0) OVER (ORDER BY _timestamp) AS next_tput FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL ORDER BY _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316097000000,
-        "end": 1780316265000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -36,16 +32,16 @@
           "next_tput"
         ],
         "note": "LAG and LEAD with literal defaults"
+      },
+      "time_offset": {
+        "start_offset": 8097000000,
+        "end_offset": 8265000000
       }
     },
     {
       "id": "Q137",
       "sql": "SELECT facility_zone, load_factor, RANK() OVER (PARTITION BY facility_zone ORDER BY load_factor DESC) AS rank, DENSE_RANK() OVER (PARTITION BY facility_zone ORDER BY load_factor DESC) AS dense_rnk FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL",
       "category": "window",
-      "time_range": {
-        "start": 1780316157000000,
-        "end": 1780316325000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -55,16 +51,16 @@
           "dense_rnk"
         ],
         "note": "RANK + DENSE_RANK partitioned by facility_zone"
+      },
+      "time_offset": {
+        "start_offset": 8157000000,
+        "end_offset": 8325000000
       }
     },
     {
       "id": "Q138",
       "sql": "SELECT _timestamp, throughput_rate, SUM(throughput_rate) OVER (ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total, AVG(throughput_rate) OVER (ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS moving_avg_3 FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL ORDER BY _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316217000000,
-        "end": 1780316385000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -74,16 +70,16 @@
           "moving_avg_3"
         ],
         "note": "Running total + 3-row moving average"
+      },
+      "time_offset": {
+        "start_offset": 8217000000,
+        "end_offset": 8385000000
       }
     },
     {
       "id": "Q139",
       "sql": "SELECT facility_zone, sorter_model, COUNT(*) AS cnt, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY COUNT(*) DESC) AS rn FROM \"query_agent_test_v2\" GROUP BY facility_zone, sorter_model ORDER BY facility_zone ASC, rn ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316277000000,
-        "end": 1780316445000000
-      },
       "expected": {
         "row_count": 5,
         "columns": [
@@ -93,16 +89,16 @@
           "rn"
         ],
         "note": "Window over GROUP BY result"
+      },
+      "time_offset": {
+        "start_offset": 8277000000,
+        "end_offset": 8445000000
       }
     },
     {
       "id": "Q140",
       "sql": "SELECT _timestamp, operation_mode, throughput_rate, FIRST_VALUE(throughput_rate) OVER (PARTITION BY operation_mode ORDER BY _timestamp) AS first_tput, LAST_VALUE(throughput_rate) OVER (PARTITION BY operation_mode ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_tput FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL ORDER BY operation_mode, _timestamp",
       "category": "window",
-      "time_range": {
-        "start": 1780316337000000,
-        "end": 1780316505000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -113,16 +109,16 @@
           "last_tput"
         ],
         "note": "FIRST_VALUE + LAST_VALUE with full partition frame"
+      },
+      "time_offset": {
+        "start_offset": 8337000000,
+        "end_offset": 8505000000
       }
     },
     {
       "id": "Q141",
       "sql": "SELECT _timestamp, load_factor, PERCENT_RANK() OVER (ORDER BY load_factor) AS pct_rank, NTILE(4) OVER (ORDER BY load_factor) AS quartile FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL ORDER BY load_factor ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316397000000,
-        "end": 1780316565000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -132,16 +128,16 @@
           "quartile"
         ],
         "note": "PERCENT_RANK and NTILE(4) across all rows"
+      },
+      "time_offset": {
+        "start_offset": 8397000000,
+        "end_offset": 8565000000
       }
     },
     {
       "id": "Q142",
       "sql": "SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rank_in_zone, RANK() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rank_dense, DENSE_RANK() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS dense_rnk, LAG(throughput_rate, 1, 0) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS prev_tput, LEAD(throughput_rate, 1, 0) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS next_tput FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL ORDER BY facility_zone ASC, rank_in_zone ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316457000000,
-        "end": 1780316625000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -156,16 +152,16 @@
           "next_tput"
         ],
         "note": "5 window functions: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD"
+      },
+      "time_offset": {
+        "start_offset": 8457000000,
+        "end_offset": 8625000000
       }
     },
     {
       "id": "Q143",
       "sql": "SELECT _timestamp, control_center, item_count, SUM(item_count) OVER (PARTITION BY control_center ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_items, AVG(item_count) OVER (PARTITION BY control_center ORDER BY _timestamp ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS ma_4_items, ROUND(AVG(CAST(item_count AS FLOAT)) OVER (PARTITION BY control_center), 1) AS center_avg FROM \"query_agent_test_v2\" WHERE item_count > 0 ORDER BY control_center ASC, _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316517000000,
-        "end": 1780316685000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -177,16 +173,16 @@
           "center_avg"
         ],
         "note": "Running total + 4-row moving average + partition average"
+      },
+      "time_offset": {
+        "start_offset": 8517000000,
+        "end_offset": 8685000000
       }
     },
     {
       "id": "Q144",
       "sql": "SELECT _timestamp, sorter_model, load_factor, charge_remaining, FIRST_VALUE(load_factor) OVER (PARTITION BY sorter_model ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS first_load, LAST_VALUE(load_factor) OVER (PARTITION BY sorter_model ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_load, NTH_VALUE(load_factor, 2) OVER (PARTITION BY sorter_model ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS second_load FROM \"query_agent_test_v2\" WHERE load_factor IS NOT NULL ORDER BY sorter_model ASC, _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316577000000,
-        "end": 1780316745000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -199,16 +195,16 @@
           "second_load"
         ],
         "note": "FIRST_VALUE, LAST_VALUE, NTH_VALUE with full partition frame"
+      },
+      "time_offset": {
+        "start_offset": 8577000000,
+        "end_offset": 8745000000
       }
     },
     {
       "id": "Q145",
       "sql": "SELECT facility_zone, operation_mode, cnt, ROUND(SUM(cnt) OVER (PARTITION BY facility_zone), 0) AS zone_total, ROUND(CAST(cnt AS FLOAT) / NULLIF(SUM(cnt) OVER (PARTITION BY facility_zone), 0) * 100.0, 2) AS zone_pct, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY cnt DESC) AS rn FROM (SELECT facility_zone, operation_mode, COUNT(*) AS cnt FROM \"query_agent_test_v2\" GROUP BY facility_zone, operation_mode) grouped ORDER BY facility_zone ASC, rn ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316637000000,
-        "end": 1780316805000000
-      },
       "expected": {
         "row_count": 8,
         "columns": [
@@ -220,16 +216,16 @@
           "rn"
         ],
         "note": "Window over pre-aggregated subquery: zone_total, zone_pct, ROW_NUMBER"
+      },
+      "time_offset": {
+        "start_offset": 8637000000,
+        "end_offset": 8805000000
       }
     },
     {
       "id": "Q146",
       "sql": "SELECT _timestamp, conveyor_lane, package_size, ROUND(CUME_DIST() OVER (PARTITION BY conveyor_lane ORDER BY package_size), 4) AS cum_dist, ROUND(PERCENT_RANK() OVER (PARTITION BY conveyor_lane ORDER BY package_size), 4) AS pct_rank, NTILE(4) OVER (PARTITION BY conveyor_lane ORDER BY package_size) AS quartile FROM \"query_agent_test_v2\" WHERE package_size > 0 ORDER BY conveyor_lane ASC, package_size ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316697000000,
-        "end": 1780316865000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -241,16 +237,16 @@
           "quartile"
         ],
         "note": "CUME_DIST, PERCENT_RANK, NTILE(4) in one SELECT, partitioned by lane"
+      },
+      "time_offset": {
+        "start_offset": 8697000000,
+        "end_offset": 8865000000
       }
     },
     {
       "id": "Q147",
       "sql": "SELECT _timestamp, pallet_id, build_signature, runtime_hours, LAG(runtime_hours, 2, 0) OVER (PARTITION BY build_signature ORDER BY runtime_hours) AS hours_2_back, LEAD(runtime_hours, 2, 9999) OVER (PARTITION BY build_signature ORDER BY runtime_hours) AS hours_2_ahead, ROUND(runtime_hours - LAG(runtime_hours, 1, 0) OVER (PARTITION BY build_signature ORDER BY runtime_hours), 1) AS delta_from_prev FROM \"query_agent_test_v2\" WHERE runtime_hours IS NOT NULL ORDER BY build_signature ASC, runtime_hours ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316757000000,
-        "end": 1780316925000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -263,16 +259,16 @@
           "delta_from_prev"
         ],
         "note": "LAG(offset=2) + LEAD(offset=2) + computed delta from LAG(offset=1)"
+      },
+      "time_offset": {
+        "start_offset": 8757000000,
+        "end_offset": 8925000000
       }
     },
     {
       "id": "Q148",
       "sql": "SELECT _timestamp, facility_zone, throughput_rate, ROUND(SUM(throughput_rate) OVER w1, 2) AS zone_running_sum, ROUND(MIN(throughput_rate) OVER w1, 2) AS zone_running_min, ROUND(MAX(throughput_rate) OVER w1, 2) AS zone_running_max, ROUND(AVG(throughput_rate) OVER w2, 2) AS zone_moving_avg_5 FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL WINDOW w1 AS (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), w2 AS (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) ORDER BY facility_zone ASC, _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316817000000,
-        "end": 1780316985000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -285,16 +281,16 @@
           "zone_moving_avg_5"
         ],
         "note": "Named WINDOW clauses (w1, w2) with different frame specs"
+      },
+      "time_offset": {
+        "start_offset": 8817000000,
+        "end_offset": 8985000000
       }
     },
     {
       "id": "Q149",
       "sql": "SELECT _timestamp, control_center, sorter_model, throughput_rate, ROW_NUMBER() OVER (PARTITION BY control_center ORDER BY throughput_rate DESC) AS rn_by_tput, ROW_NUMBER() OVER (PARTITION BY control_center ORDER BY load_factor DESC) AS rn_by_load, ROW_NUMBER() OVER (PARTITION BY control_center ORDER BY charge_remaining ASC) AS rn_by_charge FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL AND load_factor IS NOT NULL AND charge_remaining IS NOT NULL ORDER BY control_center ASC, rn_by_tput ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316877000000,
-        "end": 1780317045000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -307,16 +303,16 @@
           "rn_by_charge"
         ],
         "note": "Three ROW_NUMBER windows with different ORDER BY, same PARTITION BY"
+      },
+      "time_offset": {
+        "start_offset": 8877000000,
+        "end_offset": 9045000000
       }
     },
     {
       "id": "Q150",
       "sql": "SELECT _timestamp, pallet_id, facility_zone, cell_temp, ROUND(AVG(cell_temp) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 10 PRECEDING AND CURRENT ROW), 2) AS rolling_avg_temp, COUNT(*) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 10 PRECEDING AND CURRENT ROW) AS window_count FROM \"query_agent_test_v2\" WHERE cell_temp IS NOT NULL ORDER BY facility_zone ASC, _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316937000000,
-        "end": 1780317105000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -328,16 +324,16 @@
           "window_count"
         ],
         "note": "ROWS-based rolling window with 10 PRECEDING for temp rolling avg"
+      },
+      "time_offset": {
+        "start_offset": 8937000000,
+        "end_offset": 9105000000
       }
     },
     {
       "id": "Q151",
       "sql": "SELECT _timestamp, pallet_id, operation_mode, item_count, ROUND(SUM(item_count) OVER (PARTITION BY operation_mode ORDER BY _timestamp ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING), 1) AS forward_sum, ROUND(AVG(item_count) OVER (PARTITION BY operation_mode ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING), 1) AS centered_avg_5 FROM \"query_agent_test_v2\" WHERE item_count IS NOT NULL ORDER BY operation_mode ASC, _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780316997000000,
-        "end": 1780317165000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -349,16 +345,16 @@
           "centered_avg_5"
         ],
         "note": "Forward-looking SUM + centered 5-row AVG"
+      },
+      "time_offset": {
+        "start_offset": 8997000000,
+        "end_offset": 9165000000
       }
     },
     {
       "id": "Q152",
       "sql": "SELECT _timestamp, facility_zone, sorter_model, throughput_rate, load_factor, ROUND((ROW_NUMBER() OVER w)::FLOAT / NULLIF((COUNT(*) OVER w)::FLOAT, 0), 4) AS relative_position, ROUND(load_factor - AVG(load_factor) OVER w, 2) AS load_deviation, ROUND((throughput_rate - MIN(throughput_rate) OVER w) / NULLIF(MAX(throughput_rate) OVER w - MIN(throughput_rate) OVER w, 0), 4) AS tput_normalized FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL AND load_factor IS NOT NULL WINDOW w AS (PARTITION BY facility_zone, sorter_model) ORDER BY facility_zone ASC, sorter_model ASC, _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780317057000000,
-        "end": 1780317225000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -372,16 +368,16 @@
           "tput_normalized"
         ],
         "note": "Named window with 2-column PARTITION, relative_position + deviation + normalization"
+      },
+      "time_offset": {
+        "start_offset": 9057000000,
+        "end_offset": 9225000000
       }
     },
     {
       "id": "Q153",
       "sql": "SELECT _timestamp, conveyor_lane, cell_temp, ROUND(cell_temp - LAG(cell_temp, 1, 0) OVER (PARTITION BY conveyor_lane ORDER BY _timestamp), 2) AS temp_diff, ROUND(AVG(cell_temp) OVER (PARTITION BY conveyor_lane ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2) AS lane_avg_temp FROM \"query_agent_test_v2\" WHERE cell_temp IS NOT NULL ORDER BY conveyor_lane ASC, _timestamp ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780317117000000,
-        "end": 1780317285000000
-      },
       "expected": {
         "row_count": 28,
         "columns": [
@@ -392,16 +388,16 @@
           "lane_avg_temp"
         ],
         "note": "Window with LAG-based temperature change detection"
+      },
+      "time_offset": {
+        "start_offset": 9117000000,
+        "end_offset": 9285000000
       }
     },
     {
       "id": "Q154",
       "sql": "SELECT facility_zone, sorter_model, throughput_rate, SUM(throughput_rate) OVER (PARTITION BY facility_zone) AS total_tput_zone, SUM(throughput_rate) OVER (PARTITION BY sorter_model) AS total_tput_sort, ROUND(throughput_rate / NULLIF(SUM(throughput_rate) OVER (PARTITION BY facility_zone), 0) * 100.0, 2) AS pct_of_zone, ROUND(throughput_rate / NULLIF(SUM(throughput_rate) OVER (PARTITION BY sorter_model), 0) * 100.0, 2) AS pct_of_sorter FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL ORDER BY facility_zone ASC, throughput_rate DESC",
       "category": "window",
-      "time_range": {
-        "start": 1780317177000000,
-        "end": 1780317345000000
-      },
       "expected": {
         "row_count": 25,
         "columns": [
@@ -414,16 +410,16 @@
           "pct_of_sorter"
         ],
         "note": "Double SUM-over-partition for hierarchical percentages"
+      },
+      "time_offset": {
+        "start_offset": 9177000000,
+        "end_offset": 9345000000
       }
     },
     {
       "id": "Q155",
       "sql": "SELECT _timestamp, pallet_id, operation_mode, throughput_rate, ROUND(AVG(throughput_rate) OVER (), 2) AS tput_avg_all, ROUND(throughput_rate - AVG(throughput_rate) OVER (), 2) AS tput_diff, RANK() OVER (PARTITION BY operation_mode ORDER BY throughput_rate DESC) AS relative_rank FROM \"query_agent_test_v2\" WHERE throughput_rate IS NOT NULL ORDER BY operation_mode ASC, relative_rank ASC",
       "category": "window",
-      "time_range": {
-        "start": 1780317237000000,
-        "end": 1780317405000000
-      },
       "expected": {
         "row_count": 19,
         "columns": [
@@ -436,6 +432,10 @@
           "relative_rank"
         ],
         "note": "Unpartitioned window AVG + partitioned RANK comparison"
+      },
+      "time_offset": {
+        "start_offset": 9237000000,
+        "end_offset": 9405000000
       }
     }
   ],

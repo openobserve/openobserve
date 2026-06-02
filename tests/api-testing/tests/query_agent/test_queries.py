@@ -7,6 +7,7 @@ new .json file into the directory.  Zero test code changes.
 
 import json
 import logging
+import sys
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,9 @@ import pytest
 from support.factories import search_payload
 
 QUERIES_DIR = Path(__file__).parent.parent.parent.parent / "test-data" / "query-agent" / "queries"
+DATA_GEN_DIR = Path(__file__).parent.parent.parent.parent / "test-data" / "query-agent"
+sys.path.insert(0, str(DATA_GEN_DIR))
+from data_gen import BASE_TS  # noqa: E402
 
 # ── Discover category files ─────────────────────────────────────────────
 _CATEGORIES: dict[str, list[dict]] = {}
@@ -26,10 +30,11 @@ for _fp in sorted(QUERIES_DIR.glob("*.json")):
 # ── Shared test body ────────────────────────────────────────────────────
 def _run_query(client, query):
     size = 500
+    offset = query["time_offset"]
     json_data = search_payload(
         query["sql"],
-        start_time=query["time_range"]["start"],
-        end_time=query["time_range"]["end"],
+        start_time=BASE_TS + offset["start_offset"],
+        end_time=BASE_TS + offset["end_offset"],
         size=size,
     )
     resp = client.post("_search?type=logs", json=json_data)
