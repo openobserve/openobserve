@@ -465,7 +465,9 @@ mod tests {
     #[test]
     fn test_prebuilt_read_only_is_forbidden() {
         assert_eq!(
-            status(TemplateError::PrebuiltReadOnly("prebuilt_slack".to_string())),
+            status(TemplateError::PrebuiltReadOnly(
+                "prebuilt_slack".to_string()
+            )),
             StatusCode::FORBIDDEN
         );
     }

@@ -14,6 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::destinations::{Template, TemplateType};
+// The "is this a system-managed template?" check lives next to
+// `get_prebuilt_template` in `config::prebuilt_loader` so the HTTP model, the
+// service-layer guards below, and any future caller all derive the same
+// answer from one place. Re-exported here as a thin wrapper so existing
+// callers in this module keep working without a long path.
+pub use config::prebuilt_loader::is_prebuilt_template_name;
 
 use crate::{
     common::{
@@ -22,13 +28,6 @@ use crate::{
     },
     service::db::{self, alerts::templates::TemplateError},
 };
-
-// The "is this a system-managed template?" check lives next to
-// `get_prebuilt_template` in `config::prebuilt_loader` so the HTTP model, the
-// service-layer guards below, and any future caller all derive the same
-// answer from one place. Re-exported here as a thin wrapper so existing
-// callers in this module keep working without a long path.
-pub use config::prebuilt_loader::is_prebuilt_template_name;
 
 pub async fn save(
     name: &str,
