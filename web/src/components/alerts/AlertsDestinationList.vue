@@ -18,39 +18,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
-      <div class="tw:flex-shrink-0">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-          style="position: sticky; top: 0; z-index: 1000;"
-        >
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-destinations-list-title">
-            {{ t("alert_destinations.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end tw:gap-2">
-            <OSearchInput
-              v-model="filterQuery"
-              data-test="destination-list-search-input"
-              class="tw:h-[36px] tw:w-[200px]"
-              :placeholder="t('alert_destinations.search')"
-            />
-            <OButton
-              variant="outline"
-              size="sm"
-              @click="importDestination"
-              data-test="destination-import"
-            >{{ t(`dashboard.import`) }}</OButton>
-            <OButton
-              data-test="alert-destination-list-add-alert-btn"
-              variant="primary"
-              size="sm"
-              :disabled="!templates.length"
-              @click="editDestination(null)"
-            >{{ t(`alert_destinations.add`) }}</OButton>
-          </div>
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <AppPageHeader
+        :title="t('alert_destinations.header')"
+        icon="location-on"
+        :subtitle="'Where triggered alerts are delivered'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            @click="importDestination"
+            data-test="destination-import"
+          >{{ t(`dashboard.import`) }}</OButton>
+          <OButton
+            data-test="alert-destination-list-add-alert-btn"
+            variant="primary"
+            size="sm"
+            :disabled="!templates.length"
+            @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton>
+        </template>
+      </AppPageHeader>
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
         <OTable
+          :frame="false"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
@@ -67,6 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              data-test="destination-list-search-input"
+              class="tw:w-64"
+              :placeholder="t('alert_destinations.search')"
+            />
+          </template>
           <template #bottom="{ totalRows }">
             <span class="o2-table-footer-title tw:text-primary">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
@@ -242,6 +243,7 @@ import OBadge from '@/lib/core/Badge/OBadge.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 interface ConformDelete {
   visible: boolean;
@@ -250,6 +252,7 @@ interface ConformDelete {
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    AppPageHeader,
     OIcon,
     AddDestination,
     NoData,

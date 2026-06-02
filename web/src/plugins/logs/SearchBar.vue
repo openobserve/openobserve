@@ -877,7 +877,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden">
+    <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
+         the right (4px wrapper + 6px), aligning with the results panel below. -->
+    <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden tw:pr-1.5">
       <div
         class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
         :class="{ 'expand-on-focus': isFocused }"

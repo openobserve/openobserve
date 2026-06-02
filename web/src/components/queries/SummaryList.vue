@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OTable
     v-if="isMetaOrg"
+    :frame="false"
     data-test="running-queries-table"
     :data="rows"
     :columns="columns"

@@ -17,37 +17,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="min-height: inherit;">
     <div>
-      <!-- Header bar -->
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-          style="position: sticky; top: 0; z-index: 1000;"
-        >
-          <div
-            class="tw:font-[600] tw:flex tw:items-center tw:gap-2 tw:w-full"
-            data-test="ingestion-tokens-title-text"
+      <!-- Standard section header: title + description + Create action. -->
+      <AppPageHeader
+        :title="t('ingestion.tokenManagementTitle')"
+        :subtitle="t('ingestion.orgLevelExplanation')"
+        icon="key"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:mb-2.5"
+      >
+        <template #actions>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            data-test="add-ingestion-token"
+            @click="showCreateForm = true"
           >
-            {{ t("ingestion.tokenManagementTitle") }}
-            <OIcon
-              name="info-outline"
-              size="sm"
-              class="tw:cursor-pointer"
-            >
-              <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="400px" />
-            </OIcon>
-          </div>
-          <div class="tw:w-full tw:flex tw:justify-end">
-            <OButton
-              variant="primary"
-              size="sm-action"
-              data-test="add-ingestion-token"
-              @click="showCreateForm = true"
-            >
-              {{ t('ingestion.createTokenBtn') }}
-            </OButton>
-          </div>
-        </div>
-      </div>
+            {{ t('ingestion.createTokenBtn') }}
+          </OButton>
+        </template>
+      </AppPageHeader>
 
       <div>
         <div class="tw:w-full tw:h-full">
@@ -56,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: calc(100vh - var(--navbar-height) - 92px)"
           >
             <OTable
+              :frame="false"
               :data="tokens"
               :columns="columns"
               row-key="name"
@@ -178,6 +166,7 @@ import { ref, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -200,7 +189,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { OButton, OIcon, OTooltip, ODialog, OInput, OTable },
+  components: { AppPageHeader, OButton, OIcon, OTooltip, ODialog, OInput, OTable },
   setup() {
     const store = useStore();
     const { t } = useI18n();

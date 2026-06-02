@@ -16,43 +16,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
-        <div
-          data-test="iam-groups-section-title"
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
+    <!-- Standard page header: title + actions only. Search moved into the
+         table's own toolbar (built-in global filter). -->
+    <AppPageHeader
+      :title="t('iam.groups')"
+      :subtitle="'Group users together to assign roles'"
+      icon="group"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          data-test="iam-groups-add-group-btn"
+          variant="primary"
+          size="sm"
+          @click="addGroup"
         >
-          {{ t("iam.groups") }}
-        </div>
-        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-          <div data-test="iam-groups-search-input">
-            <OSearchInput
-              v-model="filterQuery"
-              class="tw:w-[12.5rem]"
-              :placeholder="t('iam.searchGroup')"
-            />
-          </div>
-          <OButton
-            data-test="iam-groups-add-group-btn"
-            variant="primary"
-            size="sm"
-            class="tw:!h-8"
-            @click="addGroup"
-          >
-            {{ t('iam.addGroup') }}
-          </OButton>
-        </div>
-      </div>
-    </div>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+          {{ t('iam.addGroup') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
         <OTable
+          :frame="false"
           data-test="iam-groups-table-section"
           :data="rows"
           :columns="columns"
           row-key="group_name"
           :loading="loading"
           :selected-ids="selectedGroupNames"
-          :global-filter="filterQuery"
+          v-model:global-filter="filterQuery"
+          :global-filter-placeholder="t('iam.searchGroup')"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -61,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selection="multiple"
           filter-mode="client"
           :default-columns="false"
-          :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #cell-actions="{ row }">
@@ -130,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";

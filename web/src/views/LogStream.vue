@@ -17,24 +17,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="tw:p-0 tw:flex tw:flex-col">
-    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pb-2.5 tw:pt-1">
-      <div class="card-container tw:mb-2.5">
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-          <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-            data-test="log-stream-title-text"
-          >
-            {{ t("logStream.header") }}
-          </div>
-          <div class="tw:flex tw:items-start">
-            <div class="tw:flex tw:justify-between tw:items-end">
+  <div data-test="alert-list-page" class="tw:h-full">
+    <PageLayout
+      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+    >
+      <!-- Row 1: standard header — title + actions only. The stream-type filter
+           and search moved into the table's own toolbar below. -->
+      <template #header>
+        <AppPageHeader :title="t('logStream.header')" :subtitle="'Index management and stream configuration'" icon="window">
+          <template #actions>
+            <OButton
+              data-test="log-stream-refresh-stats-btn"
+              variant="outline"
+              size="sm-action"
+              @click="getLogStream(true)"
+            >
+              {{ t(`logStream.refreshStats`) }}
+            </OButton>
+            <OButton
+              v-if="isSchemaUDSEnabled"
+              data-test="log-stream-add-stream-btn"
+              variant="primary"
+              size="sm-action"
+              @click="addStream"
+            >
+              {{ t(`logStream.add`) }}
+            </OButton>
+          </template>
+        </AppPageHeader>
+      </template>
+
+      <OTable
+        data-test="log-stream-table"
+        :data="logStream"
+        :columns="columns"
+        row-key="_rowKey"
+        :frame="false"
+        selection="multiple"
+        v-model:selected-ids="selectedIds"
+        pagination="server"
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-size-options="pageSizeOptions"
+        :total-count="totalCount"
+        sorting="server"
+        v-model:sort-by="sortBy"
+        v-model:sort-order="sortOrder"
+        :show-global-filter="false"
+        :default-columns="false"
+        :loading="loadingState"
+        style="width: 100%; height: 100%"
+      >
+          <!-- Toolbar inside the table frame: stream-type filter + search. -->
+          <template #toolbar>
+            <div
+              class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full"
+            >
               <OToggleGroup
                 :model-value="streamActiveTab"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
-                class="tw:mr-2"
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
@@ -61,64 +102,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("logStream.labelMetadata") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-            </div>
-            <div>
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="tw:ml-auto no-border o2-search-input"
+                class="tw:w-64 no-border o2-search-input"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />
             </div>
-            <OButton
-              data-test="log-stream-refresh-stats-btn"
-              variant="outline"
-              size="sm-action"
-              class="tw:ml-2"
-              @click="getLogStream(true)"
-            >
-              {{ t(`logStream.refreshStats`) }}
-            </OButton>
-            <OButton
-              v-if="isSchemaUDSEnabled"
-              data-test="log-stream-add-stream-btn"
-              variant="primary"
-              size="sm-action"
-              class="tw:ml-2"
-              @click="addStream"
-            >
-              {{ t(`logStream.add`) }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <OTable
-          data-test="log-stream-table"
-          :data="logStream"
-          :columns="columns"
-          row-key="_rowKey"
-          selection="multiple"
-          v-model:selected-ids="selectedIds"
-          pagination="server"
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-size-options="pageSizeOptions"
-          :total-count="totalCount"
-          sorting="server"
-          v-model:sort-by="sortBy"
-          v-model:sort-order="sortOrder"
-          :show-global-filter="false"
-          :default-columns="false"
-          :loading="loadingState"
-          width="100%"
-          :style="
-            logStream?.length
-              ? 'width: 100%; height: 100%'
-              : 'width: 100%'
-          "
-        >
+          </template>
           <!--
             Render the stream-name cell with a deterministic per-name data-test.
             Tests can target a specific stream row via
@@ -186,8 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTable>
-      </div>
-    </div>
+    </PageLayout>
 
     <SchemaIndex v-if="showIndexSchemaDialog" v-model="schemaData" v-model:open="showIndexSchemaDialog" @close="showIndexSchemaDialog = false" />
 
@@ -258,6 +249,8 @@ import {
   defineComponent,
   ref,
   onActivated,
+  onDeactivated,
+  onUnmounted,
   onBeforeMount,
   type Ref,
 } from "vue";
@@ -267,6 +260,12 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  useAppBreadcrumb,
+  type Crumb,
+} from "@/composables/useAppBreadcrumb";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
@@ -294,6 +293,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "PageLogStream",
   components: {
+    PageLayout,
+    AppPageHeader,
     SchemaIndex,
     NoData,
     AddStream,
@@ -823,6 +824,18 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
+    // Publish the module breadcrumb to the top chrome bar (Streams is a flat L1
+    // page; the crumb is just the module name). `crumbs` reads only `t`, so the
+    // immediate watch is TDZ-safe here.
+    const crumbs = computed<Crumb[]>(() => [
+      { label: t("logStream.header"), icon: "window", current: true },
+    ]);
+    const { publish, clear } = useAppBreadcrumb();
+    watch(crumbs, (c) => publish(c), { immediate: true });
+    onActivated(() => publish(crumbs.value));
+    onDeactivated(clear);
+    onUnmounted(clear);
+
     return {
       t,
       router,

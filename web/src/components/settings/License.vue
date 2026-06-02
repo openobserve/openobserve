@@ -1,7 +1,6 @@
 <template>
   <div class="tw:p-3">
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
-    <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_management") }}</div>
 
     <div v-if="loading" class="tw:p-3 tw:flex tw:flex-col tw:items-center tw:justify-center">
       <OSpinner size="md" />

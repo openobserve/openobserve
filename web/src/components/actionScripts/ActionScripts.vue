@@ -17,59 +17,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="action-scripts-list-page">
-    <div
-      v-if="!showAddActionScriptDialog"
-      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
-    >
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]"
+  <div data-test="action-scripts-list-page" class="tw:h-full">
+    <div v-if="!showAddActionScriptDialog" class="tw:h-full">
+      <PageLayout
+        :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      >
+        <!-- Row 1: standard header — title + actions only. Search moved into the
+             table's own toolbar below. -->
+        <template #header>
+          <AppPageHeader :title="t('actions.header')" icon="code" :subtitle="'Custom automation and scripting'">
+            <template #actions>
+              <OButton
+                data-test="action-list-add-btn"
+                variant="primary"
+                size="sm"
+                @click="showAddUpdateFn({})"
+                >{{ t("actions.add") }}</OButton
+              >
+            </template>
+          </AppPageHeader>
+        </template>
+        <OTable
+          data-test="action-scripts-table"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="id"
+          :frame="false"
+          :loading="loading"
+          :selected-ids="selectedActionScriptIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[5, 10, 20, 50, 100]"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <div
-            class="tw:font-[600] tw:text-[20px]"
-            data-test="alerts-list-title"
-          >
-            {{ t("actions.header") }}
-          </div>
-          <div
-            class="tw:full-width tw:flex tw:items-center tw:justify-end tw:gap-3"
-          >
+          <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="tw:ml-auto no-border o2-search-input"
+              class="tw:w-64 no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             />
-            <OButton
-              data-test="action-list-add-btn"
-              variant="primary"
-              size="sm"
-              @click="showAddUpdateFn({})"
-              >{{ t("actions.add") }}</OButton
-            >
-          </div>
-        </div>
-      </div>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-124px)]">
-          <OTable
-            data-test="action-scripts-table"
-            :data="visibleRows"
-            :columns="columns"
-            row-key="id"
-            :loading="loading"
-            :selected-ids="selectedActionScriptIds"
-            selection="multiple"
-            pagination="client"
-            :page-size="20"
-            :page-size-options="[5, 10, 20, 50, 100]"
-            sorting="client"
-            filter-mode="client"
-            :default-columns="false"
-            :show-global-filter="false"
-            @update:selected-ids="handleSelectedIdsUpdate"
-          >
+          </template>
             <template #empty>
               <NoData />
             </template>
@@ -125,8 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
-        </div>
-      </div>
+      </PageLayout>
     </div>
     <template v-else>
       <div class="tw:w-full">
@@ -209,11 +201,19 @@ import {
   ref,
   onBeforeMount,
   onActivated,
+  onDeactivated,
+  onUnmounted,
   watch,
   defineAsyncComponent,
   computed,
 } from "vue";
 import type { Ref } from "vue";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  useAppBreadcrumb,
+  type Crumb,
+} from "@/composables/useAppBreadcrumb";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -265,6 +265,8 @@ interface ActionScriptList {
 export default defineComponent({
   name: "AlertList",
   components: {
+    PageLayout,
+    AppPageHeader,
     OIcon,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
@@ -766,6 +768,17 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    // Publish the module breadcrumb to the top chrome bar (Actions is a flat L1
+    // page). `crumbs` reads only `t`, so the immediate watch is TDZ-safe.
+    const crumbs = computed<Crumb[]>(() => [
+      { label: t("actions.header"), icon: "code", current: true },
+    ]);
+    const { publish, clear } = useAppBreadcrumb();
+    watch(crumbs, (c) => publish(c), { immediate: true });
+    onActivated(() => publish(crumbs.value));
+    onDeactivated(clear);
+    onUnmounted(clear);
 
     return {
       t,

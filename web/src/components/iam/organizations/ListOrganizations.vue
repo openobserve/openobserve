@@ -18,37 +18,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-      style="position: sticky; top: 0; z-index: 1000 ;"
-      >
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
-          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-            <OSearchInput
-              v-model="filterQuery"
-              class="tw:w-[12.5rem]"
-              :placeholder="t('organization.search')"
-              data-test="organizations-search-input"
-            />
-            <OButton
-              variant="primary"
-              size="sm"
-              class="tw:!h-8"
-              @click="addOrganization"
-              data-test="Add Organization"
-            >
-              {{ t('organization.add') }}
-            </OButton>
-          </div>
-        </div>
-    </div>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <!-- Standard page header: title + actions only. Search moved into the
+         table's own toolbar (built-in global filter). -->
+    <AppPageHeader
+      :title="t('organization.header')"
+      :subtitle="'Organizations you can access'"
+      icon="corporate-fare"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          variant="primary"
+          size="sm"
+          @click="addOrganization"
+          data-test="Add Organization"
+        >
+          {{ t('organization.add') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
       <OTable
+          :frame="false"
           :data="organizations"
           :columns="columns"
           row-key="identifier"
           :loading="loading"
-          :global-filter="filterQuery"
+          v-model:global-filter="filterQuery"
+          :global-filter-placeholder="t('organization.search')"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -56,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
-          :show-global-filter="false"
         >
           <template #empty>
             <NoData />
@@ -99,7 +95,7 @@ import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
@@ -113,7 +109,7 @@ export default defineComponent({
     AddUpdateOrganization,
     NoData,
     OButton,
-    OSearchInput,
+    AppPageHeader,
     OTable,
 },
   setup() {

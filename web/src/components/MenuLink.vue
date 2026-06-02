@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :target="target"
     :class="[
       'nav-menu-item',
-      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:py-2 tw:px-1 tw:min-h-6 tw:rounded-md tw:border-l-2 tw:border-l-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
-      'tw:text-tabs-inactive-text tw:hover:bg-tabs-hover-bg tw:hover:text-tabs-active-text',
+      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:transition-colors tw:duration-250 tw:ease-in-out tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      'tw:text-tabs-inactive-text',
       { 'menu-link-function': title === 'Functions' }
     ]"
     :aria-current="isActive ? 'page' : undefined"
@@ -91,10 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="[
       'nav-menu-item',
-      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:py-2 tw:px-1 tw:min-h-6 tw:rounded-md tw:border-l-2 tw:border-l-transparent tw:transition-[background-color,border-color,color] tw:duration-250 tw:ease-in-out tw:will-change-[background-color] tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
-      isActive
-        ? 'tw:bg-tabs-active-bg tw:text-tabs-active-text tw:border-l-tabs-indicator!'
-        : 'tw:text-tabs-inactive-text tw:hover:bg-tabs-hover-bg tw:hover:text-tabs-active-text',
+      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:transition-colors tw:duration-250 tw:ease-in-out tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      isActive ? 'tw:text-primary-600' : 'tw:text-tabs-inactive-text',
       { 'nav-menu-item--active': isActive, 'menu-link-function': title === 'Functions' }
     ]"
     :target="target"

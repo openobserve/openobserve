@@ -22,56 +22,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
   >
     <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
-      <div class="tw:shrink-0">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]">
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="enrichment-tables-list-title">
-              {{ t("function.enrichmentTables") }}
-            </div>
-            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OToggleGroup
-                :model-value="selectedFilter"
-                @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
-                class="tw:mr-2"
-                data-test="enrichment-tables-list-tabs"
-              >
-                <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                  {{ t("function.filterAll") }}
-                </OToggleGroupItem>
-                <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
-                  <template #icon-left><OIcon name="upload" size="sm" /></template>
-                  {{ t("function.filterFile") }}
-                </OToggleGroupItem>
-                <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
-                  <template #icon-left><OIcon name="link" size="sm" /></template>
-                  {{ t("function.filterUrl") }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-
-              <OSearchInput
-                data-test="enrichment-tables-search-input"
-                v-model="filterQuery"
-                class="tw:ml-2 tw:w-[200px]"
-                :placeholder="t('function.searchEnrichmentTable')"
-              />
-              <OButton
-                data-test="enrichment-tables-add-btn"
-                class="tw:ml-2"
-                variant="primary"
-                size="sm"
-                @click="showAddUpdateFn(null)"
-              >
-                {{ t(`function.addEnrichmentTable`) }}
-              </OButton>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+      <!-- Standard section header: title + actions only. Type filter + search
+           moved into the table's own toolbar below. -->
+      <AppPageHeader
+        :title="t('function.enrichmentTables')"
+        icon="dataset"
+        :subtitle="'Lookup tables that enrich ingested data'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template #actions>
+          <OButton
+            data-test="enrichment-tables-add-btn"
+            variant="primary"
+            size="sm"
+            @click="showAddUpdateFn(null)"
+          >
+            {{ t(`function.addEnrichmentTable`) }}
+          </OButton>
+        </template>
+      </AppPageHeader>
+      <div class="tw:flex-1 tw:min-h-0 tw:mt-2.5">
         <div class="card-container tw:h-full">
             <OTable
               ref="qTable"
+              :frame="false"
               data-test="enrichment-tables-list-table"
               :data="visibleRows"
               :columns="columns"
@@ -89,6 +63,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width="100%"
               class="tw:w-full tw:h-full"
             >
+              <!-- Toolbar: type filter + search -->
+              <template #toolbar>
+                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <OToggleGroup
+                    :model-value="selectedFilter"
+                    @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
+                    data-test="enrichment-tables-list-tabs"
+                  >
+                    <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                      <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                      {{ t("function.filterAll") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
+                      <template #icon-left><OIcon name="upload" size="sm" /></template>
+                      {{ t("function.filterFile") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
+                      <template #icon-left><OIcon name="link" size="sm" /></template>
+                      {{ t("function.filterUrl") }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                  <OSearchInput
+                    data-test="enrichment-tables-search-input"
+                    v-model="filterQuery"
+                    class="tw:ml-auto tw:w-64"
+                    :placeholder="t('function.searchEnrichmentTable')"
+                  />
+                </div>
+              </template>
               <template #empty>
                 <NoData />
               </template>
@@ -346,6 +349,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -355,6 +359,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
+    AppPageHeader,
     AddEnrichmentTable,
     NoData,
     ConfirmDialog,

@@ -47,8 +47,10 @@ interface AppCrumbState {
 const state = reactive<AppCrumbState>({ routeKey: "", crumbs: null, token: 0 });
 let seq = 0;
 
-const keyOf = (route: RouteLocationNormalizedLoaded): string =>
-  String(route.name ?? route.path);
+// `route` can be undefined when a page is mounted without a router (unit tests);
+// guard so publish()/clear() degrade gracefully instead of throwing.
+const keyOf = (route: RouteLocationNormalizedLoaded | undefined): string =>
+  String(route?.name ?? route?.path ?? "");
 
 /** Page-side: publish/clear this page's crumbs into the chrome. */
 export function useAppBreadcrumb() {

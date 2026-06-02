@@ -30,13 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
+          <!-- px-1 (4px), not 10px: the search bar's own content already carries
+               a 6px internal inset (toolbar p-1.5 + editor ml-1.5), so 4+6=10px
+               lines the toolbar/editor up with the 10px field-list & results
+               panels below. -->
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
+            class="tw:w-full tw:h-full tw:px-1 tw:pt-1"
           >
             <search-bar
               data-test="logs-search-bar"
               ref="searchBarRef"
-              class="card-container"
               :fieldValues="fieldValues"
               @searchdata="searchData"
               @onChangeInterval="onChangeInterval"
@@ -280,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-else
                       data-test="logs-search-search-result"
-                      class="full-height card-container"
+                      class="full-height"
                     >
                       <search-result
                         ref="searchResultRef"
@@ -3467,9 +3470,12 @@ export default defineComponent({
 
 <style lang="scss">
 .logPage {
-  height: calc(100vh - var(--navbar-height));
-  min-height: calc(100vh - var(--navbar-height)) !important;
-  max-height: calc(100vh - var(--navbar-height)) !important;
+  // Fill the app content card (MainLayout's o2-content-scroll already sizes the
+  // available area below the nav + chrome). Computing height from 100vh here
+  // double-counts the content card's padding/border and overflows → page scroll.
+  height: 100%;
+  min-height: 100% !important;
+  max-height: 100% !important;
   overflow: hidden !important;
 
   .index-menu .field_list .field_overlay .field_label,

@@ -17,18 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <template v-if="!showImportRegexPatternDialog">
-    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0">
-      <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="regex-pattern-list-title">
-        {{ t("regex_patterns.title") }}
-      </div>
-      <div class="tw:flex">
-        <OSearchInput
-          v-model="filterQuery"
-          class="tw:ml-auto no-border o2-search-input"
-          :placeholder="t('regex_patterns.search')"
-        />
+    <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+    <AppPageHeader
+      :title="t('regex_patterns.title')"
+      icon="pattern"
+      :subtitle="'Reusable regex patterns for redaction'"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
         <OButton
-          class="tw:ml-2"
           variant="outline"
           size="sm"
           @click="importRegexPattern"
@@ -36,15 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("regex_patterns.import") }}</OButton>
         <OButton
           data-test="regex-pattern-list-add-pattern-btn"
-          class="tw:ml-2"
           variant="primary"
           size="sm"
           @click="createRegexPattern"
         >{{ t("regex_patterns.create_pattern") }}</OButton>
-      </div>
-    </div>
-    <div class="tw:flex-1 tw:min-h-0">
+      </template>
+    </AppPageHeader>
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
     <OTable
+      :frame="false"
       data-test="regex-pattern-list-table"
       :data="visibleRows"
       :columns="columns"
@@ -61,6 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="listLoading"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
+      <template #toolbar>
+        <OSearchInput
+          v-model="filterQuery"
+          class="tw:w-64 no-border o2-search-input"
+          :placeholder="t('regex_patterns.search')"
+        />
+      </template>
       <template #empty>
         <div v-if="!listLoading && filterQuery == ''">
           <NoRegexPatterns @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
@@ -166,10 +170,12 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "RegexPatternList",
   components: {
+    AppPageHeader,
     NoRegexPatterns,
     ConfirmDialog,
     AddRegexPattern,

@@ -19,6 +19,7 @@ defineProps<{
 
 const emit = defineEmits<{
   "update:selectedIds": [ids: string[]];
+  "update:globalFilter": [value: string];
   edit: [row: any];
   delete: [row: any];
   "bulk-delete": [];
@@ -56,11 +57,13 @@ const columns: OTableColumnDef[] = [
 
 <template>
   <OTable
+    :frame="false"
     :data="data"
     :columns="columns"
     :loading="loading"
     :selected-ids="selectedIds"
     :global-filter="globalFilter"
+    :global-filter-placeholder="t('iam.searchRole')"
     pagination="client"
     :page-size="20"
     :page-size-options="[20, 50, 100, 250, 500]"
@@ -70,8 +73,8 @@ const columns: OTableColumnDef[] = [
     row-key="role_name"
     filter-mode="client"
     :default-columns="false"
-    :show-global-filter="false"
     @update:selected-ids="emit('update:selectedIds', $event)"
+    @update:global-filter="emit('update:globalFilter', $event)"
   >
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">

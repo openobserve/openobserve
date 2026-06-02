@@ -15,73 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="report-list-page"
-    class="tw:p-0 tw:flex tw:flex-col"
-  >
-    <!-- Header bar -->
-    <div class="tw:w-full tw:px-[0.625rem] tw:pt-1">
-      <div class="card-container">
-        <div
-          class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] tw:items-center"
-        >
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="report-list-title">
-            {{ t("reports.header") }}
-          </div>
-
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <!-- Scheduled / Cached tabs -->
-            <div class="app-tabs-container tw:mr-2">
-              <app-tabs
-                class="tabs-selection-container"
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
-              />
-            </div>
-
-            <!-- Search input -->
-            <OSearchInput
-              data-test="report-list-search-input"
-              v-model="dynamicQueryModel"
-              class="tw:ml-auto no-border o2-search-input tw:w-[150px]"
-              :placeholder="
-                searchAcrossFolders
-                  ? t('dashboard.searchAcross')
-                  : t('reports.search')
-              "
-              @clear="clearSearch"
-            />
-
-            <!-- All Folders toggle -->
-            <div class="tw:ml-2 tw:whitespace-nowrap">
-              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
-                <OSwitch
-                  data-test="report-list-search-across-folders-toggle"
-                  v-model="searchAcrossFolders"
-                  :label="t('dashboard.allFolders') || 'All Folders'"
-                  class="tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
-                />
-              </OTooltip>
-            </div>
-
+  <div data-test="report-list-page" class="tw:h-full">
+    <PageLayout
+      :main-panel="false"
+      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+    >
+      <!-- Row 1: standard header — title + actions only. Tabs / search / folder
+           scope moved into the table's own toolbar below. -->
+      <template #header>
+        <AppPageHeader :title="t('reports.header')" icon="description" :subtitle="'Scheduled reports and exports'">
+          <template #actions>
             <OButton
               data-test="report-list-add-report-btn"
               variant="primary"
               size="sm"
-              class="tw:ml-2"
               @click="createNewReport"
             >
               {{ t(`reports.add`) }}
             </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+          </template>
+        </AppPageHeader>
+      </template>
 
     <!-- Splitter: folder list left, table right -->
     <div
-      class="tw:w-full report-list-table tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+      class="tw:w-full report-list-table tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:pt-2.5"
     >
       <OSplitter
         v-model="splitterModel"
@@ -112,18 +70,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data="visibleRows"
                 :columns="columns"
                 row-key="report_id"
+                :frame="false"
                 :loading="isLoadingReports"
                 pagination="client"
                 selection="multiple"
                 v-model:selected-ids="selectedReportIds"
-                style="width: 100%"
-                :style="
-                  hasVisibleRows
-                    ? 'width: 100%; height: 100%'
-                    : 'width: 100%'
-                "
+                style="width: 100%; height: 100%"
                 :show-global-filter="false"
               >
+                <!-- Toolbar: Scheduled/Cached tabs + search + folder-scope toggle -->
+                <template #toolbar>
+                  <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                    <div class="app-tabs-container">
+                      <app-tabs
+                        class="tabs-selection-container"
+                        :tabs="tabs"
+                        v-model:active-tab="activeTab"
+                        @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
+                      />
+                    </div>
+                    <OSearchInput
+                      data-test="report-list-search-input"
+                      v-model="dynamicQueryModel"
+                      class="tw:ml-auto no-border o2-search-input tw:w-50"
+                      :placeholder="
+                        searchAcrossFolders
+                          ? t('dashboard.searchAcross')
+                          : t('reports.search')
+                      "
+                      @clear="clearSearch"
+                    />
+                    <div class="tw:whitespace-nowrap">
+                      <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
+                        <OSwitch
+                          data-test="report-list-search-across-folders-toggle"
+                          v-model="searchAcrossFolders"
+                          :label="t('dashboard.allFolders') || 'All Folders'"
+                          class="tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
+                        />
+                      </OTooltip>
+                    </div>
+                  </div>
+                </template>
                 <template #empty>
                   <NoData />
                 </template>
@@ -241,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+    </PageLayout>
 
     <!-- Single delete confirm -->
     <ConfirmDialog
@@ -274,10 +263,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 
-import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
+import { ref, onBeforeMount, onActivated, onDeactivated, onUnmounted, reactive, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  useAppBreadcrumb,
+  type Crumb,
+} from "@/composables/useAppBreadcrumb";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -308,6 +303,16 @@ const { t } = useI18n();
 const router = useRouter();
 const { track } = useReo();
 const store = useStore();
+
+// Publish the module breadcrumb to the top chrome bar (Reports is a flat L1 page).
+const crumbs = computed<Crumb[]>(() => [
+  { label: t("reports.header"), icon: "description", current: true },
+]);
+const { publish, clear } = useAppBreadcrumb();
+watch(crumbs, (c) => publish(c), { immediate: true });
+onActivated(() => publish(crumbs.value));
+onDeactivated(clear);
+onUnmounted(clear);
 
 // ── Folder state ──────────────────────────────────────────────────────────────
 const splitterModel = ref(200);

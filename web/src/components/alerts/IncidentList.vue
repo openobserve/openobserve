@@ -15,16 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:flex tw:pt-1">
-    <div class="tw:w-full tw:h-full tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
-      <!-- Header with title and search -->
-      <div class="card-container tw:mb-2.5">
-        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="incidents-list-title">
-            {{ t("alerts.incidents.title") }}
-          </div>
-
-          <div class="tw:flex tw:items-center tw:gap-2">
+  <div data-test="incident-list" class="tw:h-full">
+    <PageLayout
+      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+    >
+      <!-- Row 1: standard header — title + actions only. Search moved into the
+           table's own toolbar below. -->
+      <template #header>
+        <AppPageHeader
+          :title="t('alerts.incidents.title')"
+          icon="notifications-active"
+          :subtitle="'Incident management and tracking'"
+        >
+          <template #actions>
             <OButton
               variant="outline"
               size="sm"
@@ -32,34 +35,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
             >Refresh</OButton>
-            <OSearchInput
-              v-model="searchQuery"
-              :placeholder="t('alerts.incidents.search')"
-              data-test="incident-search-input"
-              clearable
-            />
-          </div>
-        </div>
-      </div>
-      <!-- Incidents table -->
-      <div class="card-container tw:overflow-hidden tw:flex-1 tw:min-h-0">
-        <OTable
-          ref="qTableRef"
-          :data="visibleIncidents"
-          :columns="columns"
-          :loading="loading"
-          row-key="id"
-          pagination="client"
-          :page-size="pageSize"
-          :page-size-options="[20, 50, 100, 250, 500]"
-          sorting="client"
-          filter-mode="client"
-          :default-columns="false"
-          :show-global-filter="false"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          data-test="incident-list-table"
-          @row-click="viewIncident"
-        >
+          </template>
+        </AppPageHeader>
+      </template>
+      <OTable
+        ref="qTableRef"
+        :data="visibleIncidents"
+        :columns="columns"
+        :frame="false"
+        :loading="loading"
+        row-key="id"
+        pagination="client"
+        :page-size="pageSize"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        data-test="incident-list-table"
+        @row-click="viewIncident"
+      >
+        <template #toolbar>
+          <OSearchInput
+            v-model="searchQuery"
+            class="tw:w-64"
+            :placeholder="t('alerts.incidents.search')"
+            data-test="incident-search-input"
+            clearable
+          />
+        </template>
         <template #cell-status="{ row }">
           <span
             class="status-badge"
@@ -156,18 +161,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         </OTable>
-      </div>
-    </div>
+    </PageLayout>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
+import { defineComponent, ref, computed, onMounted, onActivated, onDeactivated, onUnmounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  useAppBreadcrumb,
+  type Crumb,
+} from "@/composables/useAppBreadcrumb";
 import NoData from "../shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -181,6 +191,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "IncidentList",
   components: {
+    PageLayout,
+    AppPageHeader,
     NoData,
     OButton,
     OSpinner,
@@ -516,6 +528,17 @@ export default defineComponent({
         timeout: 1500,
       });
     };
+
+    // Publish the module breadcrumb to the top chrome bar (Incidents is a flat
+    // L1 page). `crumbs` reads only `t`, so the immediate watch is TDZ-safe.
+    const crumbs = computed<Crumb[]>(() => [
+      { label: t("alerts.incidents.title"), icon: "notifications-active", current: true },
+    ]);
+    const { publish, clear } = useAppBreadcrumb();
+    watch(crumbs, (c) => publish(c), { immediate: true });
+    onActivated(() => publish(crumbs.value));
+    onDeactivated(clear);
+    onUnmounted(clear);
 
     return {
       t,

@@ -22,35 +22,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
   >
     <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
-      <div class="tw:shrink-0">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]">
-              {{ t("function.header") }}
-            </div>
-            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OSearchInput
-                data-test="functions-list-search-input"
-                v-model="filterQuery"
-                class="tw:ml-2 tw:w-[200px]"
-                :placeholder="t('function.search')"
-              />
-              <OButton
-                class="tw:ml-2"
-                variant="primary"
-                size="sm"
-                data-test="function-list-add-function-btn"
-                @click="showAddUpdateFn({})"
-              >
-                {{ t(`function.add`) }}
-              </OButton>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <AppPageHeader
+        :title="t('function.header')"
+        icon="function"
+        :subtitle="'Reusable VRL functions applied in pipelines'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template #actions>
+          <OButton
+            variant="primary"
+            size="sm"
+            data-test="function-list-add-function-btn"
+            @click="showAddUpdateFn({})"
+          >
+            {{ t(`function.add`) }}
+          </OButton>
+        </template>
+      </AppPageHeader>
+      <div class="tw:flex-1 tw:min-h-0 tw:mt-2.5">
         <div class="card-container tw:h-full">
           <OTable
+            :frame="false"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
@@ -64,6 +57,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width="100%"
             class="tw:w-full tw:h-full"
           >
+              <template #toolbar>
+                <OSearchInput
+                  data-test="functions-list-search-input"
+                  v-model="filterQuery"
+                  class="tw:w-64"
+                  :placeholder="t('function.search')"
+                />
+              </template>
               <template #empty>
                 <NoData />
               </template>
@@ -201,6 +202,7 @@ import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -208,6 +210,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "functionList",
   components: {
+    AppPageHeader,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,

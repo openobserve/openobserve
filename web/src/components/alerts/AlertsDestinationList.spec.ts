@@ -79,6 +79,7 @@ const OTableStub = {
   emits: ["update:selected-ids"],
   template: `
     <div data-test="o-table-stub">
+      <slot name="toolbar" />
       <slot name="empty" />
       <slot name="actions" />
       <slot name="bottom" :totalRows="data ? data.length : 0" />
@@ -180,7 +181,7 @@ describe("AlertsDestinationList", () => {
     it("renders the list title", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      const title = wrapper.find('[data-test="alert-destinations-list-title"]');
+      const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });
 

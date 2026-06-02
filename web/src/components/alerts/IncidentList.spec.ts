@@ -56,6 +56,7 @@ const OTableStub = {
   emits: ["row-click"],
   template: `
     <div data-test="incident-list-table">
+      <slot name="toolbar" />
       <slot name="empty" />
       <slot name="bottom" />
       <template v-for="row in data" :key="row.id">
@@ -177,11 +178,13 @@ describe("IncidentList.vue", () => {
 
     it("renders the list title", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="incidents-list-title"]').exists()).toBe(true);
+      // Title now lives in the standard AppPageHeader (row 1).
+      expect(wrapper.find(".app-page-header h1").text()).toContain("Incident");
     });
 
     it("renders the search input", () => {
       wrapper = createWrapper();
+      // Search moved into the table's own toolbar (#toolbar slot).
       expect(wrapper.find('[data-test="incident-search-input"]').exists()).toBe(true);
     });
 

@@ -163,9 +163,7 @@ describe("PipelinesDestinationList", () => {
     it("renders the list title", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-destinations-list-title"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
     });
 
     it("renders the table when no editor is open", async () => {

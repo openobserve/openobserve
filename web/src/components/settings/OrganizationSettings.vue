@@ -1,5 +1,6 @@
 <template>
   <div>
+    <!-- Section header is provided full-width by the Settings shell. -->
     <div class="tw:px-3 tw:pt-3 tw:pb-3">
       <div class="tw:text-base tw:font-bold">
         {{ t("settings.logDetails") }}

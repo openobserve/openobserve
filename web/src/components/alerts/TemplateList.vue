@@ -17,22 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
+      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <AppPageHeader
+        :title="t('alert_templates.header')"
+        icon="description"
+        :subtitle="'Reusable alert message templates'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-        <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-templates-list-title">
-            {{ t("alert_templates.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end tw:gap-2">
-            <OSearchInput
-              v-model="filterQuery"
-              class="tw:ml-auto"
-              :placeholder="t('template.search')"
-            />
+        <template #actions>
           <OButton
             variant="outline"
             size="sm-action"
-            class="tw:ml-2"
             @click="importTemplate"
             data-test="template-import"
             >{{ t(`dashboard.import`) }}</OButton
@@ -41,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="template-list-add-btn"
             variant="primary"
             size="sm"
-            class="tw:ml-2"
             @click="editTemplate(null)"
             >{{ t(`alert_templates.add`) }}</OButton
           >
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+        </template>
+      </AppPageHeader>
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
       <OTable
+        :frame="false"
         data-test="alert-templates-list-table"
         :data="visibleRows"
         :columns="columns"
@@ -66,6 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
+        <template #toolbar>
+          <OSearchInput
+            v-model="filterQuery"
+            class="tw:w-64"
+            :placeholder="t('template.search')"
+          />
+        </template>
         <template #empty>
           <NoData />
         </template>
@@ -171,6 +173,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";

@@ -18,34 +18,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
-      <!-- Header bar -->
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+      <!-- Standard section header: title + actions only. Search moved into the
+           table toolbar below. -->
+      <AppPageHeader
+        :title="t('aiToolset.header')"
+        icon="smart-toy"
+        :subtitle="'Configure AI tool integrations'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-        <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="ai-toolsets-list-title"
-        >
-          {{ t("aiToolset.header") }}
-        </div>
-        <div class="col-auto tw:flex">
-          <OSearchInput
-            v-model="filterQuery"
-            class="tw:ml-auto no-border o2-search-input"
-            :placeholder="t('aiToolset.search')"
-          />
+        <template #actions>
           <OButton
-            class="tw:ml-2"
             data-test="ai-toolsets-add-btn"
             variant="primary"
             size="sm-action"
             @click="addToolset"
           >{{ t('aiToolset.add') }}</OButton>
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <!-- Table -->
+      <div class="card-container tw:mt-2.5 tw:overflow-hidden">
       <OTable
+        :frame="false"
         :data="visibleRows"
         :columns="columns"
         row-key="id"
@@ -56,6 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-columns="false"
         :show-global-filter="false"
       >
+        <template #toolbar>
+          <OSearchInput
+            v-model="filterQuery"
+            class="tw:w-64 no-border o2-search-input"
+            :placeholder="t('aiToolset.search')"
+          />
+        </template>
         <template #empty><NoData /></template>
 
         <template #cell-kind="{ row }">
@@ -84,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
       </OTable>
+      </div>
     </div>
 
     <!-- Add / Edit form -->
@@ -120,6 +122,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 // Distinct variants so each kind reads visually different (mcp=blue, cli=green,
 // skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
 const KIND_VARIANTS: Record<string, string> = {
@@ -132,6 +135,7 @@ const KIND_VARIANTS: Record<string, string> = {
 export default defineComponent({
   name: "PageAiToolsets",
   components: {
+    AppPageHeader,
     NoData,
     ConfirmDialog,
     AddAiToolset,

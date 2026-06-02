@@ -16,15 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="edit-group-section" class="tw:flex tw:flex-col tw:h-full">
+    <!-- Sub-page header: the listing's icon becomes a Back button (→ Groups). -->
+    <AppPageHeader
+      :title="groupDetails.group_name"
+      :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
     <div
       data-test="edit-group-section-title"
       class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
     <div class="card-container tw:py-3">
-      <span style="font-size: 18px" class="tw:px-4">
-      {{ groupDetails.group_name }}
-      </span>
-  <OSeparator />
     <AppTabs
       data-test="edit-group-tabs"
       :tabs="tabs"
@@ -92,6 +94,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { onBeforeMount } from "vue";

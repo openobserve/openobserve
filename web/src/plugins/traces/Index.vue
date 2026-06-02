@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
+  <div class="tw:rounded-md tracePage tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -41,8 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
+          <!-- px-1 (4px): the search bar's own 6px internal inset (toolbar p-1.5)
+               + 4px = 10px, aligning the bar with the 10px field-list & results
+               panels below (matches the Logs page). -->
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
+            class="tw:w-full tw:h-full tw:px-1 tw:pt-1"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -53,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :activeTab="activeTab"
               :isLLMSpanPresent="isLLMSpanPresent"
               :hasLLMStreams="hasLLMStreams"
-              class="card-container"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
               @update:activeTab="activeTab = $event"

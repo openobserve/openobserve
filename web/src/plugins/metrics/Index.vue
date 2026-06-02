@@ -16,87 +16,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5" data-test="metrics-page">
-    <!-- Header Section -->
-    <div
-      class="tw:flex tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1"
-      style="height: 48px; overflow-y: auto"
+    <!-- Standard page header: title + icon + all query controls on ONE line
+         (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
+    <AppPageHeader
+      :title="t('search.metrics')"
+      icon="bar-chart"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:mb-2.5"
     >
-      <div class="card-container tw:w-full tw:h-full tw:flex">
-        <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:grow">
-          <div
-            class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold"
-          >
-            <span>
-              {{ t("search.metrics") }}
-            </span>
-          </div>
-          <syntax-guide-metrics />
-          <MetricLegends />
-        </div>
-        <div
-          class="tw:text-right tw:flex tw:flex-row tw:justify-end tw:items-center tw:gap-2"
+      <template #actions>
+        <syntax-guide-metrics />
+        <MetricLegends />
+        <DateTimePickerDashboard
+          v-if="
+            !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
+            selectedDate
+          "
+          v-model="selectedDate"
+          ref="dateTimePickerRef"
+          :disable="disable"
+          class="dashboard-icons"
+          data-test="metrics-date-picker"
+        />
+        <AutoRefreshInterval
+          v-if="
+            !['html', 'markdown', 'custom_chart'].includes(
+              dashboardPanelData.data.type,
+            )
+          "
+          v-model="refreshInterval"
+          trigger
+          :min-refresh-interval="
+            store.state?.zoConfig?.min_auto_refresh_interval || 5
+          "
+          @trigger="runQuery"
+          class="dashboard-icons"
+          data-test="metrics-auto-refresh"
+        />
+        <template
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
-          <DateTimePickerDashboard
-            v-if="
-              !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
-              selectedDate
-            "
-            v-model="selectedDate"
-            ref="dateTimePickerRef"
-            :disable="disable"
-            class="dashboard-icons"
-            data-test="metrics-date-picker"
-          />
-          <AutoRefreshInterval
-            v-if="
-              !['html', 'markdown', 'custom_chart'].includes(
-                dashboardPanelData.data.type,
-              )
-            "
-            v-model="refreshInterval"
-            trigger
-            :min-refresh-interval="
-              store.state?.zoConfig?.min_auto_refresh_interval || 5
-            "
-            @trigger="runQuery"
-            class="dashboard-icons"
-            data-test="metrics-auto-refresh"
-          />
-          <div
-            v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-            class="dashboard-icons tw:mr-2"
+          <OButton
+            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+            variant="outline-destructive"
+            size="sm-toolbar"
+            data-test="metrics-cancel"
+            @click="cancelAddPanelQuery"
           >
-            <OButton
-              v-if="
-                config.isEnterprise == 'true' && searchRequestTraceIds.length
-              "
-              variant="outline-destructive"
-              size="sm-toolbar"
-              data-test="metrics-cancel"
-              @click="cancelAddPanelQuery"
-            >
-              <span
-                class="tw:relative tw:flex tw:items-center tw:justify-center"
-              >
-                <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
-                <span class="tw:absolute">{{ t("panel.cancel") }}</span>
-              </span>
-            </OButton>
-            <OButton
-              v-else
-              variant="primary"
-              size="sm-toolbar"
-              data-test="metrics-apply"
-              :loading="disable"
-              :disabled="disable"
-              @click="runQuery"
-            >
-              {{ t("metrics.runQuery") }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+            <span class="tw:relative tw:flex tw:items-center tw:justify-center">
+              <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
+              <span class="tw:absolute">{{ t("panel.cancel") }}</span>
+            </span>
+          </OButton>
+          <OButton
+            v-else
+            variant="primary"
+            size="sm-toolbar"
+            data-test="metrics-apply"
+            :loading="disable"
+            :disabled="disable"
+            @click="runQuery"
+          >
+            {{ t("metrics.runQuery") }}
+          </OButton>
+        </template>
+      </template>
+    </AppPageHeader>
 
     <!-- PanelEditor Content Area -->
     <PanelEditor
@@ -139,6 +123,7 @@ import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -164,6 +149,7 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
+    AppPageHeader,
     DateTimePickerDashboard,
     SyntaxGuideMetrics,
     MetricLegends,

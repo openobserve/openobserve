@@ -319,7 +319,8 @@ describe("CipherKeys", () => {
 
     it("should render cipher keys list title", () => {
       const wrapper = createWrapper();
-      const title = wrapper.find('[data-test="cipher-keys-list-title"]');
+      // Title now lives in the standard AppPageHeader (row 1).
+      const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });
 
@@ -691,7 +692,7 @@ describe("CipherKeys", () => {
     it("should have proper data-test attributes for interactive elements", () => {
       const wrapper = createWrapper();
       
-      expect(wrapper.find('[data-test="cipher-keys-list-title"]').exists()).toBe(true);
+      expect(wrapper.find('.app-page-header h1').exists()).toBe(true);
     });
 
     it("should render action buttons with proper data-test attributes", async () => {

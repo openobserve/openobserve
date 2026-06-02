@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing here — their content components have their own headers. -->
     <AppPageHeader
       v-if="showPipelineActions || isDetailView"
-      title=""
+      :title="showPipelineActions ? t('function.streamPipeline') : breadcrumbLabel"
+      :icon="showPipelineActions ? 'lan' : undefined"
+      :back="detailBack"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >
       <template #actions>
@@ -238,6 +240,21 @@ export default defineComponent({
       () => detailLabels[routeName.value]?.() ?? "",
     );
 
+    // On a detail sub-page (editor/create/history/backfill) the leading icon
+    // becomes a Back button to the pipelines list, mirroring the CRUD sub-page
+    // pattern used elsewhere. Undefined on the list page (icon stays).
+    const detailBack = computed(() =>
+      isDetailView.value
+        ? {
+            label: t("function.streamPipeline"),
+            to: {
+              name: "pipelines",
+              query: { org_identifier: orgIdentifier.value },
+            },
+          }
+        : undefined,
+    );
+
     // Breadcrumb: Pipeline(link → default section) › <Section ▾>  (› detail).
     // The root crumb makes Pipelines consistent with Settings/IAM.
     const crumbs = computed<Crumb[]>(() => {
@@ -263,7 +280,10 @@ export default defineComponent({
     // keep-alive re-entry; clear on leave — the chrome's route-key gate guards
     // against stale crumbs).
     const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
+    // Republish on route change too (not just when crumbs change value): the
+    // /pipeline → /pipelines redirect changes the route key without changing the
+    // crumbs, and the chrome's route-key gate would otherwise drop them.
+    watch([crumbs, routeName], () => publish(crumbs.value), { immediate: true });
     onActivated(() => publish(crumbs.value));
     onDeactivated(clear);
     onUnmounted(clear);
@@ -328,6 +348,7 @@ export default defineComponent({
       pipelineSections,
       isDetailView,
       breadcrumbLabel,
+      detailBack,
       crumbs,
       showPipelineActions,
       shouldCollapseActions,

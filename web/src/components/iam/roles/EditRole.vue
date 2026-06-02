@@ -16,13 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:flex-col tw:pb-[0.625rem] tw:h-full" data-test="edit-role-page">
+    <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
+    <AppPageHeader
+      :title="editingRole"
+      :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
       class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
     <div class="card-container tw:py-2 tw:flex tw:flex-col">
-          <span style="font-size: 18px;" class="tw:px-3 tw:mb-2">{{ editingRole }}</span>
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -305,6 +310,7 @@ import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";

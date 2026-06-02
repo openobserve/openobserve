@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <PageLayout
     :key="store.state.selectedOrganization.identifier"
     :sidebar-width="200"
-    :header-class="'tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default'"
+    :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
   >
     <!-- ── Page header (row 1) ──────────────────────────────────────
          The breadcrumb path now lives in the top chrome bar (published

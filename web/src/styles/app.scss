@@ -174,10 +174,13 @@ code {
   overflow: hidden;
 }
 
+// Standard bordered section/panel used across pages. Per the design system we
+// use a BORDER (never a card-style box-shadow) so every layout section looks the
+// same — controlled here in one place.
 .card-container {
   background-color: var(--o2-card-bg);
   border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
+  border: 0.0625rem solid var(--o2-border-color);
 }
 
 // .feature-card {

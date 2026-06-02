@@ -17,18 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div>
-      <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
-        <div class="tw:text-xl tw:tracking-[0.005em]" data-test="org-management-list-title">
-          {{ t("settings.organizationManagement") }}
-        </div>
-        <OSearchInput
-          data-test="org-management-search-input"
-          v-model="filterQuery"
-          class="tw:ml-auto no-border o2-search-input"
-          :placeholder="t('settings.searchOrgs')"
-        />
-      </div>
+      <!-- Standard section header: title only. Search moved into the table toolbar. -->
+      <AppPageHeader
+        :title="t('settings.organizationManagement')"
+        icon="lan"
+        :subtitle="'Create and manage organizations'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      />
+      <div class="card-container tw:mt-2.5 tw:overflow-hidden">
       <OTable
+        :frame="false"
         data-test="org-management-list-table"
         :data="visibleRows"
         :columns="columns"
@@ -42,6 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         :loading="loading"
       >
+        <template #toolbar>
+          <OSearchInput
+            data-test="org-management-search-input"
+            v-model="filterQuery"
+            class="tw:w-64 no-border o2-search-input"
+            :placeholder="t('settings.searchOrgs')"
+          />
+        </template>
         <template #empty>
           <NoData />
         </template>
@@ -110,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
+      </div>
     </div>
 
     <!-- Extend Trial Dialog -->
@@ -198,10 +205,12 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    AppPageHeader,
     NoData,
     OButton,
     ODialog,

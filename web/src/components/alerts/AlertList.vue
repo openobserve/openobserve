@@ -19,116 +19,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-list-page"
-    class="tw:flex tw:flex-col"
-    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
+    class="tw:flex tw:flex-col tw:h-full"
   >
-    <div
-      class="tw:shrink-0 tw:px-[0.625rem]"
+    <PageLayout
       v-if="!showAddAlertDialog && !showImportAlertDialog"
+      :main-panel="false"
+      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
     >
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-          <div class="tw:flex tw:items-center tw:gap-4">
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-              data-test="alert-list-title"
+      <!-- Row 1: standard header — title + actions only (Import/Add). The alert
+           type toggle, search and folder scope moved into the table toolbar. -->
+      <template #header>
+        <AppPageHeader :title="t('alerts.header')" :subtitle="'Alert rules and notification channels'" icon="shield-alert-outline">
+          <template #actions>
+            <!-- Import button -->
+            <OButton
+              :class="isCompactToolbar ? 'compact-icon-btn' : ''"
+              variant="outline"
+              size="sm"
+              @click="importAlert"
+              data-test="alert-import"
+              icon-left="upload-file"
             >
-              {{ t("alerts.header") }}
-            </div>
-          </div>
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <!-- Alert Tabs -->
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
-              class="tw:mr-2"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("alerts.all") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                {{ t("alerts.scheduled") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                {{ t("alerts.realTime") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
-                <template #icon-left><OIcon name="query-stats" size="sm" /></template>
-                {{ t("alerts.anomalyDetection") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <!-- Search for Alerts -->
-            <OSearchInput
-              v-model="dynamicQueryModel"
-              :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
-              data-test="alert-list-search-input"
-              @clear="clearSearchHistory"
-              class="tw:ml-2 tw:w-[200px]"
-            />
-            <!-- All Folders toggle -->
-            <OSwitch
-              data-test="alert-list-search-across-folders-toggle"
-              v-model="searchAcrossFolders"
-              size="lg"
-              class="tw:ml-2 tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
-            >
-              <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
-              <template #tooltip>
-                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
-              </template>
-            </OSwitch>
-          </div>
-          <!-- Import button -->
-          <OButton
-            :class="[
-              'tw:ml-2',
-              isCompactToolbar
-                ? 'compact-icon-btn'
-                : '',
-            ]"
-            variant="outline"
-            size="sm"
-            @click="importAlert"
-            data-test="alert-import"
-            icon-left="upload-file"
-          >
-            <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-            <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
-          </OButton>
-          <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
-          <OButton
-            data-test="alert-list-add-alert-btn"
-            class="tw:ml-2"
-            variant="primary"
-            size="sm"
-            :disabled="!destinations.length || !templates.length"
-            :title="!destinations.length ? t('alerts.noDestinations') : ''"
-            @click="
-              activeTab === 'anomalyDetection'
-                ? router.push({
-                    name: 'addAnomalyDetection',
-                    query: {
-                      org_identifier:
-                        store.state.selectedOrganization.identifier,
-                      folder: activeFolderId,
-                      tab: activeTab,
-                    },
-                  })
-                : showAddUpdateFn({})
-            "
-          >{{ t(`alerts.add`) }}</OButton>
-        </div>
-      </div>
-    </div>
+              <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
+            </OButton>
+            <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
+            <OButton
+              data-test="alert-list-add-alert-btn"
+              variant="primary"
+              size="sm"
+              :disabled="!destinations.length || !templates.length"
+              :title="!destinations.length ? t('alerts.noDestinations') : ''"
+              @click="
+                activeTab === 'anomalyDetection'
+                  ? router.push({
+                      name: 'addAnomalyDetection',
+                      query: {
+                        org_identifier:
+                          store.state.selectedOrganization.identifier,
+                        folder: activeFolderId,
+                        tab: activeTab,
+                      },
+                    })
+                  : showAddUpdateFn({})
+              "
+            >{{ t(`alerts.add`) }}</OButton>
+          </template>
+        </AppPageHeader>
+      </template>
+
     <div
-      v-if="!showAddAlertDialog && !showImportAlertDialog"
       data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2.5 tw:pb-2.5 tw:pt-2.5 tw:gap-2.5"
     >
       <!-- Left: FolderList -->
       <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
@@ -144,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:h-full card-container">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <OTable
+                :frame="false"
                 v-model:selected-ids="selectedAlertIds"
                 selection="multiple"
                 data-test="alert-list-table"
@@ -159,6 +102,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :default-columns="false"
                 @row-click="triggerExpand"
               >
+                <!-- Toolbar: alert-type filter + search + folder scope. -->
+                <template #toolbar>
+                  <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                    <OToggleGroup
+                      :model-value="activeTab"
+                      @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
+                    >
+                      <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                        <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                        {{ t("alerts.all") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+                        <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                        {{ t("alerts.scheduled") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
+                        <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                        {{ t("alerts.realTime") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
+                        <template #icon-left><OIcon name="query-stats" size="sm" /></template>
+                        {{ t("alerts.anomalyDetection") }}
+                      </OToggleGroupItem>
+                    </OToggleGroup>
+                    <OSearchInput
+                      v-model="dynamicQueryModel"
+                      :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
+                      data-test="alert-list-search-input"
+                      @clear="clearSearchHistory"
+                      class="tw:ml-auto tw:w-50"
+                    />
+                    <OSwitch
+                      data-test="alert-list-search-across-folders-toggle"
+                      v-model="searchAcrossFolders"
+                      size="lg"
+                      class="tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
+                    >
+                      <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
+                      <template #tooltip>
+                        <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
+                      </template>
+                    </OSwitch>
+                  </div>
+                </template>
 
 
                 <template #cell-name="{ row }">
@@ -505,6 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    </PageLayout>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
         v-model="formData"
@@ -624,13 +612,21 @@ import {
   ref,
   onBeforeMount,
   onActivated,
+  onDeactivated,
   onBeforeUnmount,
+  onUnmounted,
   watch,
   defineAsyncComponent,
   onMounted,
   computed,
   reactive,
 } from "vue";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  useAppBreadcrumb,
+  type Crumb,
+} from "@/composables/useAppBreadcrumb";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -692,6 +688,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "AlertList",
   components: {
+    PageLayout,
+    AppPageHeader,
     OSeparator,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
@@ -2614,6 +2612,17 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    // Publish the module breadcrumb to the top chrome bar (Alerts is a flat L1
+    // page). `crumbs` reads only `t`, so the immediate watch is TDZ-safe.
+    const crumbs = computed<Crumb[]>(() => [
+      { label: t("alerts.header"), icon: "shield-alert-outline", current: true },
+    ]);
+    const { publish, clear } = useAppBreadcrumb();
+    watch(crumbs, (c) => publish(c), { immediate: true });
+    onActivated(() => publish(crumbs.value));
+    onDeactivated(clear);
+    onUnmounted(clear);
 
     return {
       t,

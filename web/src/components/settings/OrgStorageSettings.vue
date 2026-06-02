@@ -17,14 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="org-storage-settings ">
       <template v-if="currentAction === 'list'">
-          <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
-        >
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]">
-            {{ t('storage_settings.title') }}
-          </div>
-        </div>
-   
+          <AppPageHeader
+            :title="t('storage_settings.title')"
+            icon="cloud"
+            :subtitle="'Per-organization storage configuration'"
+            class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+          />
+
     <!-- Loading state -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
       <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
@@ -267,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from "vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";

@@ -41,10 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Breadcrumb path lives in the chrome bar (published below). Row 1
                shows the dashboard name + actions. In fullscreen/print the chrome
                is hidden, so this title is the only heading on screen. -->
+          <!-- Normal mode: the icon tile is a Back button (→ dashboards list).
+               Fullscreen/print hide the chrome, so there we keep the module icon
+               as the only on-screen branding (no back affordance). -->
           <AppPageHeader
             :title="currentDashboardData.data?.title"
-            icon="dashboard"
-            class="tw:px-3 tw:border-b tw:border-border-default"
+            :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
+            :back="
+              !isFullscreen && store.state.printMode !== true
+                ? { label: t('dashboard.header'), onClick: goBackToDashboardList }
+                : undefined
+            "
+            class="tw:px-4 tw:border-b tw:border-border-default"
           >
           <template #actions>
             <OButton

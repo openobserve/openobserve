@@ -18,53 +18,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+    <!-- Standard page header: title + actions only. The user search moved into
+         the table's own toolbar (built-in global filter) per the layout system. -->
+    <AppPageHeader
+      :title="t('iam.basicUsers')"
+      :subtitle="'People with access to this organization'"
+      icon="person"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
-      <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="user-title-text"
+      <template #actions>
+        <member-invitation
+          v-if="config.isCloud == 'true'"
+          :key="currentUserRole"
+          v-model:currentrole="currentUserRole"
+          @invite-sent="handleInviteSent"
+        />
+        <OButton
+          v-else
+          variant="primary"
+          size="sm"
+          @click="addRoutePush({})"
+          data-test="add-basic-user"
         >
-          {{ t("iam.basicUsers") }}
-        </div>
-        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-          <OSearchInput
-              v-model="filterQuery"
-              class="tw:w-[12.5rem]"
-              :placeholder="t('user.search')"
-              data-test="iam-users-search-input"
-            />
-          <div class="tw:w-1/2" v-if="config.isCloud == 'true'">
-            <member-invitation
-              :key="currentUserRole"
-              v-model:currentrole="currentUserRole"
-              @invite-sent="handleInviteSent"
-            />
-          </div>
-          <div class="tw:w-1/2" v-else>
-            <OButton
-              variant="primary"
-              size="sm"
-              class="tw:!h-8"
-              @click="addRoutePush({})"
-              data-test="add-basic-user"
-            >
-              {{ t('user.add') }}
-            </OButton>
-          </div>
-        </div>
-        </div>
-    </div>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+          {{ t('user.add') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
       <div class="card-container tw:h-full">
         <OTable
           :key="tableKey"
+          :frame="false"
           :data="rows"
           :columns="columns"
           row-key="email"
           :loading="loading"
           :selected-ids="selectedUserIds"
-          :global-filter="filterQuery"
+          v-model:global-filter="filterQuery"
+          :global-filter-placeholder="t('user.search')"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -74,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
-          :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #empty>
@@ -221,7 +211,7 @@ import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
@@ -251,6 +241,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
+    AppPageHeader,
     OTable,
     UpdateUserRole,
     AddUser,
@@ -259,7 +250,6 @@ export default defineComponent({
     OBadge,
     OIcon,
     ODialog,
-    OSearchInput,
     NoData,
   },
   emits: [

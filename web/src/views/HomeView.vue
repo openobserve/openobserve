@@ -15,12 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md tw:px-[0.625rem] tw:pt-1 home-page"
-    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view tw:pb-2' : ''"
+    class="tw:rounded-md tw:p-2.5 home-page"
+    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view' : ''"
     data-test="home-page"
   >
+    <!-- No card-container here: the page already renders inside MainLayout's
+         bordered content card, so an inner panel border would double-frame the
+         home page. Keep only the layout classes. -->
     <div
-      class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+      class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
     >
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
       <div
@@ -64,10 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- Overview tab -->
+      <!-- Overview tab (no inner card-container — the outer section panel
+           already provides the border; avoids a double-bordered card). -->
       <div
         v-if="activeHomeTab === 'overview'"
-        class="card-container home-tab-panel"
+        class="home-tab-panel"
       >
         <OverviewTab />
       </div>
@@ -275,8 +279,10 @@ export default defineComponent({
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--color-tabs-bar-border);
-  margin: 0 0.625rem 0 0.625rem;
-  padding-top: 0.25rem;
+  /* No extra margin/padding-top: the page root (p-2.5) already provides an equal
+     10px frame on all sides. The tab buttons' own horizontal padding lines their
+     text up with the content below, so the tab bar sits flush at the 10px frame
+     edge (equal top + side padding) rather than double-padding the sides. */
 }
 
 .home-tab-btn {
@@ -349,6 +355,17 @@ export default defineComponent({
 .home-ai-panel :deep(.chat-content-wrapper),
 .home-ai-panel :deep(.chat-content) {
   overflow: visible;
+}
+
+/* The home tab sets chat-content to overflow:visible (above) so the input's
+   glow can spill — but that removes the clip that normally bounds the message
+   list. Without min-height:0, the flex:1 chat-content + messages-container grow
+   to their content height and push the input bar off the bottom. min-height:0
+   lets them shrink within their flex columns so the message list scrolls and
+   the input stays pinned at the bottom. */
+.home-ai-panel :deep(.chat-content),
+.home-ai-panel :deep(.messages-container) {
+  min-height: 0;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */

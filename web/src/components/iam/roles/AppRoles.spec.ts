@@ -64,12 +64,16 @@ afterEach(() => {
 describe('AppRoles - rendering', () => {
   it('renders the section title', async () => {
     const wrapper = await mountAppRoles();
-    expect(wrapper.find('[data-test="iam-roles-section-title"]').exists()).toBe(true);
+    // Title now lives in the standard AppPageHeader (row 1).
+    expect(wrapper.find('.app-page-header h1').text()).toContain('Roles');
   });
 
   it('renders the search input', async () => {
     const wrapper = await mountAppRoles();
-    expect(wrapper.find('[data-test="iam-roles-search-input"]').exists()).toBe(true);
+    // Search moved into the table's built-in toolbar filter.
+    expect(
+      wrapper.find('[data-test="o2-table-global-filter-input"]').exists(),
+    ).toBe(true);
   });
 
   it('renders the roles table', async () => {

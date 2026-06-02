@@ -62,9 +62,8 @@ describe("Alert List", async () => {
   });
 
   it("Should render alerts title", () => {
-    expect(
-      wrapper.find('[data-test="alert-templates-list-title"]').text()
-    ).toBe("Templates");
+    // Title now lives in the standard AppPageHeader (row 1).
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Templates");
   });
 
   it("Should reder table with templates", () => {
