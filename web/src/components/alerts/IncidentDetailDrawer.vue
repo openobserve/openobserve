@@ -1196,7 +1196,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import IncidentStatusBadge from "@/components/alerts/badges/IncidentStatusBadge.vue";
-import IncidentSeverityBadge from "@/components/alerts/IncidentSeverityBadge.vue";
+import IncidentSeverityBadge from "@/components/alerts/badges/IncidentSeverityBadge.vue";
 import StreamTypeBadge from "@/components/common/badges/StreamTypeBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";

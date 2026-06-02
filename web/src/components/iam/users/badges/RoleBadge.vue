@@ -40,7 +40,7 @@ const props = withDefaults(defineProps<{
   size?: BadgeSize;
   dataTest?: string;
 }>(), {
-  size: "sm",
+  size: "md",
   dataTest: "role-badge",
 });
 

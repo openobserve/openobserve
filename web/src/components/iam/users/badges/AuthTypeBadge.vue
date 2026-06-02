@@ -30,7 +30,7 @@ const props = withDefaults(defineProps<{
   size?: BadgeSize;
   dataTest?: string;
 }>(), {
-  size: "sm",
+  size: "md",
   dataTest: "auth-type-badge",
 });
 
