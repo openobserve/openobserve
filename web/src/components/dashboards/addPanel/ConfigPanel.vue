@@ -506,6 +506,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model.number="dashboardPanelData.data.config.decimals"
           min="0"
           max="100"
+          @update:model-value="
+            (val: number) => {
+              if (typeof val === 'number' && (val < 0 || val > 100)) {
+                decimalsTouched = true;
+              }
+            }
+          "
           @blur="
             () => {
               decimalsTouched = true;
