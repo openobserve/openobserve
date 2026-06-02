@@ -499,7 +499,14 @@
     "initialView": "初始",
     "failedToFetchTraces": "无法获取跟踪数据。请重试。",
     "traceNotFound": "未找到追踪详情。",
-    "failedToFetchTraceDetails": "加载追踪详情失败。请重试。"
+    "failedToFetchTraceDetails": "加载追踪详情失败。请重试。",
+    "span": "跨度",
+    "spans": "跨度",
+    "errorTraces": "错误痕迹",
+    "seekToMoment": "在会议中寻求这一刻",
+    "timeInSession": "会话时间",
+    "route": "路线",
+    "duration": "持续时间"
   },
   "about": {
     "name": "OpenObserve",

@@ -499,7 +499,14 @@
     "initialView": "İlk",
     "failedToFetchTraces": "İzleme verileri alınamadı. Lütfen tekrar deneyin.",
     "traceNotFound": "İzleme ayrıntıları bulunamadı.",
-    "failedToFetchTraceDetails": "İzleme ayrıntıları yüklenemedi. Lütfen tekrar deneyin."
+    "failedToFetchTraceDetails": "İzleme ayrıntıları yüklenemedi. Lütfen tekrar deneyin.",
+    "span": "kapsamak",
+    "spans": "açıklıklar",
+    "errorTraces": "hata izleri",
+    "seekToMoment": "Oturumda bu anı arayın",
+    "timeInSession": "Oturum Saati",
+    "route": "Güzergah",
+    "duration": "Süre"
   },
   "about": {
     "name": "Açık Gözlem",

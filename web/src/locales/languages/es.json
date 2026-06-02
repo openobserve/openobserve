@@ -499,7 +499,14 @@
     "initialView": "Inicial",
     "failedToFetchTraces": "No se pudieron obtener los datos de seguimiento. Por favor, inténtelo de nuevo.",
     "traceNotFound": "No se han encontrado detalles de rastreo.",
-    "failedToFetchTraceDetails": "No se pudieron cargar los detalles del seguimiento. Por favor, inténtelo de nuevo."
+    "failedToFetchTraceDetails": "No se pudieron cargar los detalles del seguimiento. Por favor, inténtelo de nuevo.",
+    "span": "lapso",
+    "spans": "se extiende",
+    "errorTraces": "rastros de errores",
+    "seekToMoment": "Busca este momento de la sesión",
+    "timeInSession": "Tiempo de sesión",
+    "route": "Ruta",
+    "duration": "Duración"
   },
   "about": {
     "name": "Abrir Observe",

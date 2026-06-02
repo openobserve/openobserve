@@ -499,7 +499,14 @@
     "initialView": "Anfänglich",
     "failedToFetchTraces": "Ablaufverfolgungsdaten konnten nicht abgerufen werden. Bitte versuchen Sie es erneut.",
     "traceNotFound": "Die Trace-Details wurden nicht gefunden.",
-    "failedToFetchTraceDetails": "Die Trace-Details konnten nicht geladen werden. Bitte versuchen Sie es erneut."
+    "failedToFetchTraceDetails": "Die Trace-Details konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "span": "spannen",
+    "spans": "überspannt",
+    "errorTraces": "Fehlerspuren",
+    "seekToMoment": "Suchen Sie in der Sitzung nach diesem Moment",
+    "timeInSession": "Uhrzeit der Sitzung",
+    "route": "Route",
+    "duration": "Dauer"
   },
   "about": {
     "name": "Observe öffnen",
