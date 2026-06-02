@@ -1498,9 +1498,19 @@ export default defineComponent({
       showPositiveNotification,
     });
 
+    // Trellis only applies when EVERY query has a breakdown field (each
+    // breakdown value becomes a subplot). Mirrors the converter's isTrellis.
+    const allQueriesHaveBreakdown = computed(
+      () =>
+        (panelSchema.value?.queries?.length ?? 0) > 0 &&
+        panelSchema.value.queries.every(
+          (q: any) => (q?.fields?.breakdown?.length ?? 0) > 0,
+        ),
+    );
+
     const chartPanelHeight = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
@@ -1512,7 +1522,7 @@ export default defineComponent({
 
     const chartPanelClass = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {

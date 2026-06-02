@@ -2491,11 +2491,14 @@ export default defineComponent({
       return supportedTypes.includes(dashboardPanelData.data.type);
     });
 
+    // Trellis requires EVERY query to have a breakdown field, so treat the
+    // breakdown as "empty" (disabling the trellis options) when ANY query is
+    // missing one — not just the currently selected query tab.
     const isBreakdownFieldEmpty = computed(() => {
+      const queries = dashboardPanelData.data.queries || [];
       return (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.breakdown?.length == 0
+        queries.length === 0 ||
+        queries.some((q: any) => (q?.fields?.breakdown?.length ?? 0) === 0)
       );
     });
 

@@ -222,7 +222,15 @@ export const convertMultiSQLData = async (
   // C1: loop on all search query data with per-query schema
   const options: any = [];
   const isMultiQuery = searchQueryData.length > 1;
-  const isTrellis = !!panelSchema.config?.trellis?.layout;
+  // Trellis is only valid when EVERY query has a breakdown field — each
+  // breakdown value becomes a subplot, so a query without a breakdown can't be
+  // split into subplots and would break the shared grid/axis layout.
+  const isTrellis =
+    !!panelSchema.config?.trellis?.layout &&
+    (panelSchema.queries?.length ?? 0) > 0 &&
+    panelSchema.queries.every(
+      (q: any) => (q?.fields?.breakdown?.length ?? 0) > 0,
+    );
 
   for (let i = 0; i < searchQueryData.length; i++) {
     // Get the original query index from metadata (handling time-shifts gracefully)
@@ -230,13 +238,17 @@ export const convertMultiSQLData = async (
 
     // Create a per-query schema view: set queries[0] to the current query
     // so contextBuilder.ts reads the correct query's fields.
-    // When multi-query + trellis, disable trellis for individual conversions;
-    // it will be re-applied on the merged result to avoid grid/axis conflicts.
+    // When multi-query, always disable trellis for individual conversions:
+    // - If all queries have breakdown (isTrellis), it will be re-applied on
+    //   the merged result to avoid grid/axis conflicts.
+    // - If NOT all queries have breakdown (!isTrellis), trellis must not be
+    //   applied at all — otherwise queries with breakdown get trellis grids
+    //   while queries without don't, causing mismatched axes on merge.
     if (!panelSchema.queries[panelQueryIndex]) continue;
     const querySchema = {
       ...panelSchema,
       queries: [panelSchema.queries[panelQueryIndex]],
-      ...(isMultiQuery && isTrellis
+      ...(isMultiQuery
         ? { config: { ...panelSchema.config, trellis: undefined } }
         : {}),
     };
