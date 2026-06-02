@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="streamOptions"
       data-cy="index-dropdown"
       class="metric-select-input"
-      :option-tooltip="true"
       @update:model-value="onMetricChange"
     >
       <template v-if="selectedMetric?.type" #icon-left>
