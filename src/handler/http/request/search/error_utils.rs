@@ -77,6 +77,14 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             )),
         )
             .into_response(),
+        // A JSON deserialization failure means the client sent a malformed
+        // request body, so surface it as 400 rather than a 500 server error.
+        errors::Error::SerdeJsonError(_) => (
+            StatusCode::BAD_REQUEST,
+            [(ERROR_HEADER, err.to_string())],
+            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
+        )
+            .into_response(),
         _ => (
             StatusCode::INTERNAL_SERVER_ERROR,
             [(ERROR_HEADER, err.to_string())],
@@ -228,6 +236,16 @@ mod tests {
         let err = errors::Error::Message("Generic error".to_string());
         let response = map_error_to_http_response(&err, None);
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_map_error_to_http_response_serde_json_error() {
+        // A malformed request body should surface as 400, not 500.
+        let json_err = config::utils::json::from_slice::<config::meta::search::Request>(b"\"\"")
+            .unwrap_err();
+        let err = errors::Error::SerdeJsonError(json_err);
+        let response = map_error_to_http_response(&err, None);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[test]
