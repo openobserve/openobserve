@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <PageLayout
     :key="store.state.selectedOrganization.identifier"
-    :sidebar-width="200"
+    :main-panel="false"
     :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
   >
     <!-- ── Page header (row 1) ──────────────────────────────────────
@@ -82,113 +82,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
     </template>
 
-    <!-- ── Folder rail ──────────────────────────────────────────── -->
-    <template #sidebar>
-      <div
-          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-2 tw:pb-2"
-        >
-          <h2
-            class="tw:text-sm! tw:font-semibold! tw:leading-tight! tw:text-text-primary"
-          >
-            {{ t("dashboard.folderLabel") }}
-          </h2>
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            icon-left="add"
-            @click.stop="addFolder"
-            data-test="dashboard-new-folder-btn"
-            title="Add Folder"
+    <!-- Folder rail + table — matches the Alerts/Reports layout. -->
+    <div class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2.5 tw:pb-2.5 tw:pt-2.5 tw:gap-2.5">
+      <!-- Left: shared folder list (same component as Alerts/Reports) -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: 200 + 'px' }">
+        <div class="tw:h-full">
+          <FolderList
+            type="dashboards"
+            @update:activeFolderId="updateActiveFolderId"
           />
         </div>
-        <!-- Folder search -->
-        <div class="tw:px-3 tw:pb-2">
-          <OInput
-            v-model="folderSearchQuery"
-            data-test="folder-search"
-            placeholder="Search folders"
-            clearable
-            class="tw:w-full"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
-        </div>
-        <nav
-          class="tw:flex-1 tw:overflow-y-auto tw:px-2 tw:pb-2 tw:flex tw:flex-col tw:gap-0.5"
-          data-test="dashboards-folder-tabs"
-        >
-          <div
-            v-for="(tab, index) in filteredFolders"
-            :key="tab.folderId"
-            class="tw:group/row tw:relative tw:rounded-md tw:transition-colors"
-            :class="
-              activeFolderId === tab.folderId
-                ? 'tw:bg-tabs-active-bg tw:text-tabs-active-text tw:font-semibold'
-                : 'tw:text-tabs-inactive-text tw:hover:bg-tabs-hover-bg tw:hover:text-tabs-hover-text'
-            "
-            :data-test="`dashboard-folder-tab-${tab.folderId}`"
-            :data-test-folder-name="tab.name"
-          >
-            <button
-              type="button"
-              class="tw:flex tw:items-center tw:w-full tw:text-left tw:px-2 tw:py-1.5 tw:rounded-md tw:outline-none tw:transition-shadow tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
-              @click="activeFolderId = tab.folderId"
-              :data-test="`dashboard-folder-tab-name-${tab.name}`"
-            >
-              <span
-                class="tw:flex-1 tw:truncate tw:pr-5 tw:text-sm"
-                :title="tab.name"
-                :data-test="`dashboard-folder-name-${tab.name}`"
-                >{{ tab.name }}</span
-              >
-            </button>
-            <span
-              v-if="
-                index ||
-                (folderSearchQuery?.length > 0 &&
-                  index == 0 &&
-                  tab.folderId.toLowerCase() != 'default')
-              "
-              class="tw:absolute tw:right-1 tw:top-1/2 tw:-translate-y-1/2 tw:flex tw:items-center tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible"
-            >
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    size="icon-xs"
-                    variant="ghost"
-                    icon-left="more-vert"
-                    data-test="dashboard-more-icon"
-                  />
-                </template>
-                <ODropdownItem
-                  @select="editFolder(tab.folderId)"
-                  data-test="dashboard-edit-folder-icon"
-                >
-                  <template #icon-left>
-                    <OIcon name="edit" size="xs" />
-                  </template>
-                  Edit
-                </ODropdownItem>
-                <ODropdownItem
-                  variant="destructive"
-                  @select="showDeleteFolderDialogFn(tab.folderId)"
-                  data-test="dashboard-delete-folder-icon"
-                >
-                  <template #icon-left>
-                    <OIcon name="delete" size="xs" />
-                  </template>
-                  Delete
-                </ODropdownItem>
-              </ODropdown>
-            </span>
-          </div>
-        </nav>
-    </template>
+      </div>
 
-    <!-- ── Table + dialogs ──────────────────────────────────────── -->
-    <div class="tw:h-full tw:overflow-hidden">
+      <!-- Right: dashboards table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
           <OTable
             ref="oTableRef"
             :data="dashboards"
@@ -431,6 +339,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTable>
         </div>
+      </div>
+    </div>
 
         <!-- add dashboard -->
         <ODrawer
@@ -570,6 +480,7 @@ import {
   moveModuleToAnotherFolder,
 } from "../../utils/commons.ts";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
 import { debounce, filter, forIn } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
@@ -611,6 +522,7 @@ export default defineComponent({
     ConfirmDialog,
     AddFolder,
     MoveDashboardToAnotherFolder,
+    FolderList,
   },
   setup() {
     const store = useStore();

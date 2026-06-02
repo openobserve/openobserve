@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw:pb-[0.625rem] tw:flex-shrink-0"
+      class="tw:px-2.5 tw:pt-2.5 tw:pb-[0.625rem] tw:flex-shrink-0"
     >
     <div class="card-container tw:py-2 tw:flex tw:flex-col">
            <AppTabs
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </div>
 
 
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:px-2.5 tw:pb-2.5">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"

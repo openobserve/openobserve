@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("regex_patterns.create_pattern") }}</OButton>
       </template>
     </AppPageHeader>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:mx-2.5 tw:mt-2.5 tw:mb-2.5 tw:overflow-hidden">
     <OTable
       :frame="false"
       data-test="regex-pattern-list-table"

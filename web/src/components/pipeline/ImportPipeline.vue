@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="baseImportRef"
     title="Import Pipeline"
     test-prefix="pipeline"
+    hide-header
     :is-importing="isPipelineImporting"
     :editor-heights="{
       urlEditor: 'calc(100vh - 285px)',
@@ -340,6 +341,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
   </base-import>
+
+  <!-- Actions live in the pipeline shell's AppPageHeader (Functions.vue), next
+       to the "Pipelines › Import" breadcrumb — the shell owns the single header
+       so BaseImport's built-in header is hidden (hide-header). -->
+  <Teleport to="#o2-page-actions">
+    <OButton
+      variant="outline"
+      size="sm-action"
+      data-test="pipeline-import-cancel-btn"
+      @click="baseImportRef?.handleCancel()"
+    >
+      {{ t("function.cancel") }}
+    </OButton>
+    <OButton
+      variant="primary"
+      size="sm-action"
+      type="submit"
+      data-test="pipeline-import-json-btn"
+      :loading="isPipelineImporting"
+      :disabled="isPipelineImporting"
+      @click="baseImportRef?.handleImport()"
+    >
+      {{ t("dashboard.import") }}
+    </OButton>
+  </Teleport>
 </template>
 
 <script lang="ts">
@@ -360,6 +386,7 @@ import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -374,6 +401,7 @@ export default defineComponent({
   name: "ImportPipeline",
   components: {
     OSeparator,
+    OButton,
     BaseImport,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),

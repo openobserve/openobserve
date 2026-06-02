@@ -32,6 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :back="detailBack"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >
+      <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
+           title on the list page; hidden on detail sub-pages (editor/history). -->
+      <template v-if="showPipelineActions" #tabs>
+        <PipelineSectionTabs />
+      </template>
       <template #actions>
         <template v-if="showPipelineActions">
           <template v-if="!shouldCollapseActions">
@@ -123,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import {
   useAppBreadcrumb,
   type Crumb,
@@ -151,6 +157,7 @@ export default defineComponent({
   name: "AppFunctions",
   components: {
     AppPageHeader,
+    PipelineSectionTabs,
     OButton,
     ODropdown,
     ODropdownItem,

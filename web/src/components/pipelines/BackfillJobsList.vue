@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="backfill-jobs-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
     <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
          next to the "Pipelines › Backfill Jobs" breadcrumb. -->
@@ -63,10 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </Teleport>
 
     <!-- Jobs Table -->
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
       <div class="card-container tw:h-full">
           <OTable
             ref="qTableRef"
+            :frame="false"
             :data="filteredJobs"
             :columns="columns"
             row-key="job_id"

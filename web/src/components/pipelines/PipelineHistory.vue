@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-history-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
     <!-- Controls live in the shell header (Functions.vue #o2-page-actions),
          next to the "Pipelines › History" breadcrumb — no bespoke 2nd header. -->
@@ -73,12 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
       </OButton>
     </Teleport>
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
       <div
         data-test="pipeline-history-table"
         class="pipeline-history-table card-container tw:h-full"
       >
         <OTable
+          :frame="false"
           :data="rows"
           :columns="columns"
           row-key="id"

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="enrichment-tables-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
     <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
       <!-- Standard section header: title + actions only. Type filter + search
@@ -30,6 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="'Lookup tables that enrich ingested data'"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
+        <template #tabs>
+          <PipelineSectionTabs />
+        </template>
         <template #actions>
           <OButton
             data-test="enrichment-tables-add-btn"
@@ -41,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:flex-1 tw:min-h-0 tw:mt-2.5">
+      <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
         <div class="card-container tw:h-full">
             <OTable
               ref="qTable"
@@ -350,6 +353,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -360,6 +364,7 @@ export default defineComponent({
   name: "EnrichmentTableList",
   components: {
     AppPageHeader,
+    PipelineSectionTabs,
     AddEnrichmentTable,
     NoData,
     ConfirmDialog,

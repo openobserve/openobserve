@@ -42,6 +42,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <router-view title="" />
       </ConstrainedPage>
     </template>
+    <!-- Full-width section that keeps the shell-owned header (e.g. correlation). -->
+    <template v-else-if="isHeaderedSection">
+      <AppPageHeader
+        :title="activeSectionItem?.label || ''"
+        :subtitle="activeSectionItem?.description || ''"
+        :icon="(activeSectionItem?.icon as any)"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      />
+      <section class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
+        <router-view title="" />
+      </section>
+    </template>
     <section
       v-else
       class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto"
@@ -135,11 +147,17 @@ export default defineComponent({
       "general",
       "organization",
       "license",
-      "correlation_settings",
       "domain_management",
     ]);
     const isConstrainedSection = computed(() =>
       CONSTRAINED_SECTIONS.has(activeSection.value),
+    );
+
+    // Full-width sections that still want the shell-owned header (their content
+    // fills the whole width instead of a centered reading column).
+    const HEADERED_FULLWIDTH_SECTIONS = new Set(["correlation_settings"]);
+    const isHeaderedSection = computed(() =>
+      HEADERED_FULLWIDTH_SECTIONS.has(activeSection.value),
     );
 
     // Guard meta-only sections for non-meta users; the hub itself never redirects.
@@ -392,6 +410,20 @@ export default defineComponent({
       ];
       if (route.name === "modelPricingEditor")
         list.push({ label: "Edit", current: true });
+      // Cipher keys open the add/edit form in-place via ?action=add|edit (the
+      // route name stays "cipherKeys"), so derive the trailing crumb from the
+      // query rather than a child route name.
+      if (
+        route.name === "cipherKeys" &&
+        (route.query.action === "add" || route.query.action === "edit")
+      )
+        list.push({
+          label:
+            route.query.action === "edit"
+              ? t("cipherKey.update")
+              : t("cipherKey.add"),
+          current: true,
+        });
       return list;
     });
 
@@ -415,6 +447,7 @@ export default defineComponent({
       hubRoute,
       activeSection,
       isConstrainedSection,
+      isHeaderedSection,
       activeSectionItem,
       sectionGroups,
       crumbs,

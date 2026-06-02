@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage tw:pt-1">
-    <div class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto">
+  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage tw:pt-2.5">
+    <div class="tw:h-full tw:overflow-auto">
       <div class="tw:px-2 tw:py-2 tw:h-full">
         <!-- Hero Section -->
         <div class="hero-section">

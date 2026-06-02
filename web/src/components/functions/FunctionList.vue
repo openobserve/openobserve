@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
     <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
@@ -29,6 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="'Reusable VRL functions applied in pipelines'"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
+        <template #tabs>
+          <PipelineSectionTabs />
+        </template>
         <template #actions>
           <OButton
             variant="primary"
@@ -40,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:flex-1 tw:min-h-0 tw:mt-2.5">
+      <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
         <div class="card-container tw:h-full">
           <OTable
             :frame="false"
@@ -203,6 +206,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -211,6 +215,7 @@ export default defineComponent({
   name: "functionList",
   components: {
     AppPageHeader,
+    PipelineSectionTabs,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,

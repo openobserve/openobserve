@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
         <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="invitation-title-text">

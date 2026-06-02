@@ -15,9 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full" :class="containerClass" :style="containerStyle">
-    <!-- Header Section -->
-    <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
+  <div
+    class="tw:w-full"
+    :class="[containerClass, hideHeader ? 'tw:pt-[0.625rem]' : '']"
+    :style="containerStyle"
+  >
+    <!-- Header Section (hidden when the host page provides its own page header,
+         e.g. the pipeline shell's AppPageHeader — avoids a duplicate header). -->
+    <div v-if="!hideHeader" class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
       <div class="tw:flex tw:px-4 tw:items-center tw:justify-between tw:flex-nowrap tw:h-[68px]" :class="headerClass">
         <div class="tw:flex tw:flex-col">
           <div class="tw:flex">
@@ -283,6 +288,12 @@ export default defineComponent({
     showSplitter: {
       type: Boolean,
       default: true,
+    },
+    // Hide the built-in header (title + back + cancel/import buttons) when the
+    // host page already renders its own page header and teleports the actions.
+    hideHeader: {
+      type: Boolean,
+      default: false,
     },
     // Custom heights for different editor sections
     editorHeights: {

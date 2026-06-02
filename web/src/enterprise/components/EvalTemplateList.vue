@@ -17,60 +17,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
-    <!-- Header bar -->
-    <div class="tw:shrink-0">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
+    <!-- Standard section header: title + section tabs + actions. -->
+    <AppPageHeader
+      :title="t('evalTemplate.header')"
+      icon="fact-check"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #title>
+        <span data-test="eval-template-list-title">{{ t("evalTemplate.header") }}</span>
+      </template>
+      <template #tabs>
+        <PipelineSectionTabs />
+      </template>
+      <template #actions>
+        <OSearchInput
+          data-test="eval-template-list-search-input"
+          v-model="filterQuery"
+          class="tw:w-[200px]"
+          :placeholder="t('evalTemplate.search')"
+        />
+        <OButton
+          data-test="eval-template-list-refresh-btn"
+          variant="outline"
+          size="sm"
+          @click="loadTemplates"
         >
-          <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-            data-test="eval-template-list-title"
-          >
-            {{ t("evalTemplate.header") }}
-          </div>
-
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <!-- Search input -->
-            <OSearchInput
-              data-test="eval-template-list-search-input"
-              v-model="filterQuery"
-              class="tw:ml-2 tw:w-[200px]"
-              :placeholder="t('evalTemplate.search')"
-            />
-
-            <!-- Refresh button -->
-            <OButton
-              data-test="eval-template-list-refresh-btn"
-              variant="outline"
-              size="sm"
-              class="tw:ml-2"
-              @click="loadTemplates"
-            >
-              {{ t('common.refresh') }}
-            </OButton>
-
-            <!-- Add button -->
-            <OButton
-              data-test="eval-template-list-add-btn"
-              variant="primary"
-              size="sm"
-              class="tw:ml-2"
-              @click="goToCreate"
-            >
-              {{ t('evalTemplate.newTemplate') }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+          {{ t('common.refresh') }}
+        </OButton>
+        <OButton
+          data-test="eval-template-list-add-btn"
+          variant="primary"
+          size="sm"
+          @click="goToCreate"
+        >
+          {{ t('evalTemplate.newTemplate') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
 
     <!-- Table area -->
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
       <div class="card-container tw:h-full">
         <OTable
+          :frame="false"
           data-test="eval-template-list-table"
           :data="rows"
           :columns="columns"
@@ -172,9 +163,11 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Template {

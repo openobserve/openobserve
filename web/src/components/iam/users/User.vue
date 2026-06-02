@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mt-2.5">
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
       <div class="card-container tw:h-full">
         <OTable
           :key="tableKey"

@@ -37,34 +37,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
-    <!-- Splitter: folder list left, table right -->
+    <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
     <div
-      class="tw:w-full report-list-table tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:pt-2.5"
+      data-test="report-list-splitter"
+      class="report-list-table tw:flex-1 tw:flex tw:min-h-0 tw:px-2.5 tw:pb-2.5 tw:pt-2.5 tw:gap-2.5"
     >
-      <OSplitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[200, 500]"
-        :horizontal="false"
-        style="height: 100%"
-        data-test="report-list-splitter"
-      >
-        <!-- Left: folder list -->
-        <template #before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full">
-              <FolderList
-                type="reports"
-                @update:activeFolderId="updateActiveFolderId"
-              />
-            </div>
-          </div>
-        </template>
+      <!-- Left: folder list -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+        <div class="tw:h-full">
+          <FolderList
+            type="reports"
+            @update:activeFolderId="updateActiveFolderId"
+          />
+        </div>
+      </div>
 
-        <!-- Right: report table -->
-        <template #after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full card-container">
+      <!-- Right: report table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
               <OTable
                 data-test="report-list-table"
                 :data="visibleRows"
@@ -224,10 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
-            </div>
-          </div>
-        </template>
-      </OSplitter>
+        </div>
+      </div>
     </div>
     </PageLayout>
 
@@ -292,7 +280,6 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const MoveAcrossFolders = defineAsyncComponent(

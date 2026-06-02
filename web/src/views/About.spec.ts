@@ -316,15 +316,18 @@ describe("About", () => {
     expect(tagline.exists()).toBe(true);
   });
 
-  it("should have card container with proper styling", () => {
+  it("should render the scrollable content container", () => {
     const wrapper = mount(About, {
       global: {
         plugins: [i18n, store, router],
       },
     });
 
-    const cardContainer = wrapper.find(".card-container");
-    expect(cardContainer.exists()).toBe(true);
+    // The About page renders directly on the layout surface (no inner
+    // card-container border); content sits in a full-height scroll container.
+    const scrollContainer = wrapper.find(".aboutPage > div");
+    expect(scrollContainer.exists()).toBe(true);
+    expect(scrollContainer.classes()).toContain("tw:overflow-auto");
   });
 
   it("should display build badge icon", () => {

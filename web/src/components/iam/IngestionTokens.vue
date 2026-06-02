@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <div>
-        <div class="tw:w-full tw:h-full">
+        <div class="tw:w-full tw:h-full tw:px-2.5 tw:pb-2.5">
           <div
             class="card-container"
             style="height: calc(100vh - var(--navbar-height) - 92px)"
