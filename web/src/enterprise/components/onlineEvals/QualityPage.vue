@@ -29,7 +29,11 @@
       </div>
     </div>
 
-    <section v-if="!selectedConfig" class="quality-page__kpis" aria-label="Tier 1 KPIs">
+    <QualityKpiSkeleton
+      v-if="!selectedConfig && showKpiSkeleton"
+      :count="6"
+    />
+    <section v-else-if="!selectedConfig" class="quality-page__kpis" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in kpis"
         :key="kpi.id"
@@ -97,6 +101,7 @@ import {
 import { useQualityConfigDetail } from "./composables/useQualityConfigDetail";
 import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
 import QualityKpiCard from "./quality/QualityKpiCard.vue";
+import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityConfigSidebar from "./quality/QualityConfigSidebar.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
@@ -220,6 +225,13 @@ async function refreshAll() {
   syncDateWindow();
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts()]);
 }
+
+/** Show the skeleton only on the *initial* load — i.e. when we're loading AND
+ * no KPI values have been populated yet. Subsequent refreshes keep the rendered
+ * cards visible (with their previous values + a subtle refresh spinner). */
+const showKpiSkeleton = computed(
+  () => isLoading.value && kpis.value.every((k) => k.value == null),
+);
 
 onMounted(() => {
   void refreshAll();
