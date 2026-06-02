@@ -506,19 +506,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model.number="dashboardPanelData.data.config.decimals"
           min="0"
           max="100"
-          @update:model-value="
-            (value: any) =>
-              (dashboardPanelData.data.config.decimals =
-                typeof value == 'number' && value >= 0 && value <= 100 ? value : null)
-          "
           @blur="
             () => {
               decimalsTouched = true;
-              if (dashboardPanelData.data.config.decimals == null)
-                dashboardPanelData.data.config.decimals = 2
+              const val = dashboardPanelData.data.config.decimals;
+              // Empty field → silently reset to default 2
+              if (val == null || val === '') {
+                dashboardPanelData.data.config.decimals = 2;
+              }
+              // Invalid value (out of range) → keep it and show error
             }
           "
-          :error="decimalsTouched && (dashboardPanelData.data.config.decimals === null || dashboardPanelData.data.config.decimals < 0 || dashboardPanelData.data.config.decimals > 100)"
+          :error="decimalsTouched && typeof dashboardPanelData.data.config.decimals === 'number' && (dashboardPanelData.data.config.decimals < 0 || dashboardPanelData.data.config.decimals > 100)"
           :error-message="t('dashboard.decimalsMustBeBetween')"
           :label="t('dashboard.decimals')"
           data-test="dashboard-config-decimals"
