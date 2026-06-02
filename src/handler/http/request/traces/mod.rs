@@ -63,6 +63,145 @@ mod schema_compat;
 pub mod session;
 pub mod user;
 
+// Service Detection Infrastructure
+use serde::Deserialize;
+use std::collections::HashMap as StdHashMap;
+
+static SPAN_KIND_MAP: std::sync::LazyLock<StdHashMap<&'static str, &'static str>> =
+    std::sync::LazyLock::new(|| {
+        let mut m = StdHashMap::new();
+        m.insert("0", "UNSPECIFIED");
+        m.insert("1", "INTERNAL");
+        m.insert("2", "SERVER");
+        m.insert("3", "CLIENT");
+        m.insert("4", "PRODUCER");
+        m.insert("5", "CONSUMER");
+        m
+    });
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServiceDetectionRule {
+    pub attributes: Vec<String>,
+    #[serde(default)]
+    pub sub_attributes: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServiceDetectionConfig {
+    pub server_kinds: Vec<String>,
+    pub rules: Vec<ServiceDetectionRule>,
+}
+
+fn resolve_span_identity(
+    service_name: &str,
+    span_kind: Option<&str>,
+    attrs: &StdHashMap<String, String>,
+    config: &ServiceDetectionConfig,
+) -> String {
+    let effective_service = if service_name.is_empty() {
+        "unknown"
+    } else {
+        service_name
+    };
+
+    let Some(kind_str) = span_kind else {
+        return effective_service.to_string();
+    };
+
+    let mapped = SPAN_KIND_MAP.get(kind_str).copied().unwrap_or(kind_str);
+
+    if config.server_kinds.iter().any(|k| k == kind_str || k == mapped) {
+        return effective_service.to_string();
+    }
+
+    for rule in &config.rules {
+        let mut base: Option<&str> = None;
+        for attr in &rule.attributes {
+            if let Some(v) = attrs.get(attr.as_str()) {
+                base = Some(v.as_str());
+                break;
+            }
+        }
+        let Some(base_val) = base else { continue };
+
+        if let Some(subs) = &rule.sub_attributes {
+            for sub in subs {
+                if let Some(v) = attrs.get(sub.as_str()) {
+                    return v.clone();
+                }
+            }
+        }
+
+        return base_val.to_string();
+    }
+
+    effective_service.to_string()
+}
+
+fn build_detection_case_sql(config: &ServiceDetectionConfig) -> String {
+    // Build server kinds list from config (supports both names and numbers)
+    let server_kinds: Vec<String> = config
+        .server_kinds
+        .iter()
+        .map(|k| format!("'{}'", k))
+        .collect();
+
+    let mut case_parts = vec![format!(
+        "WHEN span_kind IN ({}) THEN service_name",
+        server_kinds.join(", ")
+    )];
+
+    // Generate CASE WHEN logic for each detection rule from config
+    for rule in &config.rules {
+        for attr in &rule.attributes {
+            if let Some(sub_attrs) = &rule.sub_attributes {
+                for sub_attr in sub_attrs {
+                    case_parts.push(format!(
+                        "WHEN \"{}\" IS NOT NULL AND \"{}\" IS NOT NULL THEN \"{}\"",
+                        attr, sub_attr, sub_attr
+                    ));
+                }
+            }
+            case_parts.push(format!(
+                "WHEN \"{}\" IS NOT NULL THEN \"{}\"",
+                attr, attr
+            ));
+        }
+    }
+
+    case_parts.push("ELSE service_name".to_string());
+    format!("CASE {} END", case_parts.join(" "))
+}
+
+async fn load_trace_service_detection(org_id: &str) -> Option<ServiceDetectionConfig> {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::service::db::system_settings;
+        use o2_enterprise::enterprise::common::config::O2_KEY_FIELDS_SETTING_KEY;
+
+        let setting = system_settings::get_resolved(Some(org_id), None, O2_KEY_FIELDS_SETTING_KEY)
+            .await
+            .ok()
+            .flatten()?;
+
+        let config: ServiceDetectionConfig = serde_json::from_value(
+            setting
+                .setting_value
+                .get("traces")?
+                .get("service_detection")?
+                .clone(),
+        )
+        .ok()?;
+
+        Some(config)
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        None
+    }
+}
+
 #[derive(Default, Clone, Debug)]
 pub(crate) struct TraceDetail {
     pub(crate) start_time: i64,
@@ -1068,6 +1207,9 @@ pub async fn get_latest_traces_stream(
 
     let use_cache = get_use_cache_from_request(&query);
 
+    // Load service detection config
+    let service_detection = load_trace_service_detection(&org_id).await;
+
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
 
     tokio::spawn(
@@ -1088,6 +1230,7 @@ pub async fn get_latest_traces_stream(
             has_gen_ai_fields,
             use_cache,
             range_error,
+            service_detection,
             tx,
         )
         .instrument(http_span),
@@ -1151,6 +1294,7 @@ async fn process_latest_traces_stream(
     has_gen_ai_fields: bool,
     use_cache: bool,
     range_error: String,
+    service_detection: Option<ServiceDetectionConfig>,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) {
     let stream_type = StreamType::Traces;
@@ -1498,6 +1642,7 @@ async fn process_latest_traces_stream(
             &stream_name,
             &sender,
             &format!("partition [{p_start},{p_end}]"),
+            service_detection.clone(),
         )
         .await
         else {
@@ -1580,6 +1725,7 @@ async fn process_latest_traces_stream(
             &stream_name,
             &sender,
             "non-ts",
+            service_detection.clone(),
         )
         .await
         else {
@@ -1661,6 +1807,7 @@ async fn run_q2_for_traces(
     stream_name: &str,
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     log_ctx: &str,
+    service_detection: Option<ServiceDetectionConfig>,
 ) -> Option<HashMap<String, TraceResponseItem>> {
     let mut q2_start = window_start;
     let mut q2_end = window_end;
@@ -1887,11 +2034,23 @@ async fn run_q2_for_traces(
             .filter(|tid| !tid.is_empty())
             .collect::<Vec<String>>()
             .join("','");
-        let svc_sql = format!(
-            "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-             GROUP BY trace_id, service_name"
-        );
+        let svc_sql = if let Some(cfg) = &service_detection {
+            let detection_case = build_detection_case_sql(cfg);
+            format!(
+                "SELECT trace_id, {} as service_name, count(*) AS svc_count, max(duration) AS svc_duration \
+                 FROM \"{}\" WHERE trace_id IN ('{}') \
+                 GROUP BY trace_id, {}",
+                detection_case, stream_name, multi_ids_str, detection_case
+            )
+        } else {
+            // Fallback to original query when no detection config
+            format!(
+                "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
+                 FROM \"{}\" WHERE trace_id IN ('{}') \
+                 GROUP BY trace_id, service_name",
+                stream_name, multi_ids_str
+            )
+        };
         let mut req3 = base_req.clone();
         req3.query.sql = svc_sql;
         req3.query.from = 0;
@@ -1994,5 +2153,125 @@ mod tests {
         assert_eq!(item.service_name, "my-service");
         assert_eq!(item.count, 42);
         assert_eq!(item.duration, 1000);
+    }
+
+    #[cfg(test)]
+    mod service_detection_tests {
+        use super::*;
+
+        fn default_config() -> ServiceDetectionConfig {
+            ServiceDetectionConfig {
+                server_kinds: vec!["SERVER".into(), "INTERNAL".into(), "UNSPECIFIED".into()],
+                rules: vec![
+                    ServiceDetectionRule {
+                        attributes: vec!["db_system".into(), "db.system".into()],
+                        sub_attributes: Some(vec!["db_name".into(), "db.name".into()]),
+                    },
+                    ServiceDetectionRule {
+                        attributes: vec!["messaging_system".into()],
+                        sub_attributes: Some(vec!["messaging_destination_name".into()]),
+                    },
+                ],
+            }
+        }
+
+        fn attrs(pairs: &[(&str, &str)]) -> StdHashMap<String, String> {
+            pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        }
+
+        #[test]
+        fn server_span_returns_service_name() {
+            let cfg = default_config();
+            let a = attrs(&[("db_system", "postgresql"), ("db_name", "orders")]);
+            assert_eq!(resolve_span_identity("svc-a", Some("SERVER"), &a, &cfg), "svc-a");
+        }
+
+        #[test]
+        fn client_db_returns_db_name() {
+            let cfg = default_config();
+            let a = attrs(&[("db_system", "postgresql"), ("db_name", "orders")]);
+            assert_eq!(resolve_span_identity("svc-a", Some("CLIENT"), &a, &cfg), "orders");
+        }
+
+        #[test]
+        fn client_db_no_sub_returns_db_system() {
+            let cfg = default_config();
+            let a = attrs(&[("db_system", "redis")]);
+            assert_eq!(resolve_span_identity("svc-a", Some("CLIENT"), &a, &cfg), "redis");
+        }
+
+        #[test]
+        fn numeric_kind_3_is_client() {
+            let cfg = default_config();
+            let a = attrs(&[("db_system", "postgresql"), ("db_name", "catalog")]);
+            assert_eq!(resolve_span_identity("svc-a", Some("3"), &a, &cfg), "catalog");
+        }
+
+        #[test]
+        fn no_matching_rule_falls_back_to_service_name() {
+            let cfg = default_config();
+            let a = attrs(&[]);
+            assert_eq!(resolve_span_identity("svc-a", Some("CLIENT"), &a, &cfg), "svc-a");
+        }
+
+        #[test]
+        fn empty_service_name_returns_unknown() {
+            let cfg = default_config();
+            let a = attrs(&[]);
+            assert_eq!(resolve_span_identity("", Some("CLIENT"), &a, &cfg), "unknown");
+        }
+
+        #[test]
+        fn none_span_kind_returns_service_name() {
+            let cfg = default_config();
+            let a = attrs(&[("db_system", "postgresql")]);
+            assert_eq!(resolve_span_identity("svc-a", None, &a, &cfg), "svc-a");
+        }
+
+        #[test]
+        fn build_case_sql_generates_server_condition() {
+            let cfg = default_config();
+            let case_sql = build_detection_case_sql(&cfg);
+            assert!(case_sql.contains("WHEN span_kind IN ('SERVER', 'INTERNAL', 'UNSPECIFIED') THEN service_name"));
+        }
+
+        #[test]
+        fn build_case_sql_generates_db_detection_logic() {
+            let cfg = default_config();
+            let case_sql = build_detection_case_sql(&cfg);
+            assert!(case_sql.contains("WHEN \"db_system\" IS NOT NULL AND \"db_name\" IS NOT NULL THEN \"db_name\""));
+            assert!(case_sql.contains("WHEN \"db_system\" IS NOT NULL THEN \"db_system\""));
+            assert!(case_sql.contains("WHEN \"db.system\" IS NOT NULL AND \"db.name\" IS NOT NULL THEN \"db.name\""));
+        }
+
+        #[test]
+        fn build_case_sql_generates_messaging_detection_logic() {
+            let cfg = default_config();
+            let case_sql = build_detection_case_sql(&cfg);
+            assert!(case_sql.contains("WHEN \"messaging_system\" IS NOT NULL AND \"messaging_destination_name\" IS NOT NULL THEN \"messaging_destination_name\""));
+            assert!(case_sql.contains("WHEN \"messaging_system\" IS NOT NULL THEN \"messaging_system\""));
+        }
+
+        #[test]
+        fn build_case_sql_has_fallback() {
+            let cfg = default_config();
+            let case_sql = build_detection_case_sql(&cfg);
+            assert!(case_sql.contains("ELSE service_name"));
+            assert!(case_sql.starts_with("CASE "));
+            assert!(case_sql.ends_with(" END"));
+        }
+
+        #[test]
+        fn build_case_sql_empty_rules() {
+            let cfg = ServiceDetectionConfig {
+                server_kinds: vec!["SERVER".into()],
+                rules: vec![],
+            };
+            let case_sql = build_detection_case_sql(&cfg);
+            assert!(case_sql.contains("WHEN span_kind IN ('SERVER') THEN service_name"));
+            assert!(case_sql.contains("ELSE service_name"));
+            // Should not contain any attribute-based detection
+            assert!(!case_sql.contains("db_system"));
+        }
     }
 }
