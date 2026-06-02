@@ -317,10 +317,10 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                 if alert.trigger_condition.silence > 0 {
                     log::debug!(
                         "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
-                        &alert.org_id,
-                        &alert.stream_type,
-                        &alert.stream_name,
-                        &alert.name
+                        alert.org_id,
+                        alert.stream_type,
+                        alert.stream_name,
+                        alert.name
                     );
 
                     let next_run_at = Utc::now().timestamp_micros()

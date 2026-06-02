@@ -320,7 +320,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                 .super_cluster
                 .enabled
             {
-                let key = format!("{PIPELINES_WATCH_PREFIX}{}", &pipeline.id);
+                let key = format!("{PIPELINES_WATCH_PREFIX}{}", pipeline.id);
                 match config::utils::json::to_vec(pipeline) {
                     Err(e) => {
                         log::error!(
@@ -436,7 +436,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     stream_exec_pl.insert(stream_params.clone(), exec_pl);
                                     log::info!(
                                         "[Pipeline::watch]: realtime pipeline {} added to cache.",
-                                        &pipeline.id
+                                        pipeline.id
                                     );
                                 }
                             };

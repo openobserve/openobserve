@@ -218,7 +218,7 @@ pub fn parse_ip_addr(ip_address: &str) -> Result<(IpAddr, Option<u16>), AddrPars
                 sock_addr.ip()
             })
             .map_err(|e| {
-                log::error!("Error parsing IP address: {}, {}", &ip_address, e);
+                log::error!("Error parsing IP address: {}, {}", ip_address, e);
                 e
             })
     })?;

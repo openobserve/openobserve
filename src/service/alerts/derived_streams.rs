@@ -86,18 +86,17 @@ pub async fn save(
                 ));
             }
         }
-        QueryType::PromQL => {
-            if derived_stream
+        QueryType::PromQL
+            if (derived_stream
                 .query_condition
                 .promql
                 .as_ref()
                 .is_some_and(|promql| promql.is_empty())
-                || derived_stream.query_condition.promql_condition.is_none()
-            {
-                return Err(anyhow::anyhow!(
-                    "Scheduled pipeline with PromQL mode should have a query and condition"
-                ));
-            }
+                || derived_stream.query_condition.promql_condition.is_none()) =>
+        {
+            return Err(anyhow::anyhow!(
+                "Scheduled pipeline with PromQL mode should have a query and condition"
+            ));
         }
         _ => {}
     };

@@ -149,9 +149,8 @@ pub async fn get_current_topology(
     );
 
     log::debug!(
-        "[ServiceGraph] Processing {} edge records for org '{}'",
+        "[ServiceGraph] Processing {} edge records for org '{org_id}'",
         edges.len(),
-        &org_id
     );
 
     let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology(edges, baselines);

@@ -8,8 +8,8 @@ RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 FROM public.ecr.aws/zinclabs/rust:trixie-sccache AS builder
 
-# RUN rustup toolchain install nightly-2025-11-11
-# RUN rustup default nightly-2025-11-11
+# RUN rustup toolchain install nightly-2026-05-20
+# RUN rustup default nightly-2026-05-20
 # RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 RUN rustc --version && sccache --version

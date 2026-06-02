@@ -93,7 +93,7 @@ fn get_udf_vrl(
                     col.value(i).replace("\"", "\\\"")
                 ));
             }
-            obj_str.push_str(&format!(" \n {}", &local_func));
+            obj_str.push_str(&format!(" \n {}", local_func));
             match compile_vrl_function(&obj_str, &local_org_id) {
                 Ok(res) => {
                     let registry = res.config.get_custom::<TableRegistry>().unwrap();

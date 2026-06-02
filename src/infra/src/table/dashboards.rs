@@ -192,26 +192,26 @@ pub async fn put(
     // Get the fields that will be inserted into or updated in the database.
     let dashboard_id = dashboard
         .dashboard_id()
-        .and_then(|s| if s.is_empty() { None } else { Some(s) })
+        .filter(|&s| !s.is_empty())
         .ok_or(errors::PutDashboardError::MissingDashboardId)?
         .to_owned();
     let owner = dashboard
         .owner()
-        .and_then(|s| if s.is_empty() { None } else { Some(s) })
+        .filter(|&s| !s.is_empty())
         .ok_or(errors::PutDashboardError::MissingOwner)?
         .to_owned();
     let title = dashboard
         .title()
-        .and_then(|s| if s.is_empty() { None } else { Some(s) })
+        .filter(|&s| !s.is_empty())
         .ok_or(errors::PutDashboardError::MissingTitle)?
         .to_owned();
     let role = dashboard
         .role()
-        .and_then(|s| if s.is_empty() { None } else { Some(s) })
+        .filter(|&s| !s.is_empty())
         .map(|r| r.to_owned());
     let description = dashboard
         .description()
-        .and_then(|s| if s.is_empty() { None } else { Some(s) })
+        .filter(|&s| !s.is_empty())
         .map(|d| d.to_owned());
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
@@ -407,9 +407,7 @@ async fn list_models(
     };
 
     // Apply the optional title substring filter.
-    let title_pat = params
-        .title_pat
-        .and_then(|p| if p.is_empty() { None } else { Some(p) });
+    let title_pat = params.title_pat.filter(|p| !p.is_empty());
     let query = if let Some(title_pat) = title_pat {
         let pattern = format!("%{}%", title_pat.to_lowercase());
         query.filter(Expr::expr(Func::lower(Expr::col(dashboards::Column::Title))).like(pattern))

@@ -168,12 +168,12 @@ pub async fn handle_cache_responses_and_deltas(
     // sort both deltas and cache by order_by
     match cache_order_by {
         OrderBy::Desc => {
-            deltas.sort_by(|a, b| b.delta_start_time.cmp(&a.delta_start_time));
-            cached_resp.sort_by(|a, b| b.response_start_time.cmp(&a.response_start_time));
+            deltas.sort_by_key(|k| std::cmp::Reverse(k.delta_start_time));
+            cached_resp.sort_by_key(|k| std::cmp::Reverse(k.response_start_time));
         }
         OrderBy::Asc => {
-            deltas.sort_by(|a, b| a.delta_start_time.cmp(&b.delta_start_time));
-            cached_resp.sort_by(|a, b| a.response_start_time.cmp(&b.response_start_time));
+            deltas.sort_by_key(|k| k.delta_start_time);
+            cached_resp.sort_by_key(|k| k.response_start_time);
         }
     }
 

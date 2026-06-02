@@ -75,7 +75,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
 
                 log::info!(
                     "[trace_id {trace_id}] delete_cached_results->grpc: request node: {}",
-                    &node_addr
+                    node_addr
                 );
 
                 let token: MetadataValue<_> = get_internal_grpc_token()
@@ -84,7 +84,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
                     log::error!(
                         "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
+                        node.grpc_addr,
                         err
                     );
                     server_internal_error("connect search node error")
@@ -108,7 +108,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
                     Err(err) => {
                         log::error!(
                             "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, get_cached_results err: {:?}",
-                            &node.grpc_addr,
+                            node.grpc_addr,
                             err
                         );
                         let err = ErrorCodes::from_json(err.message())?;
@@ -143,14 +143,14 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
                     true => {
                         log::debug!(
                             "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, delete success",
-                            &node.grpc_addr
+                            node.grpc_addr
                         );
                     }
                     false => {
                         delete_response = false;
                         log::error!(
                             "[trace_id {trace_id}] delete_cached_results->grpc: node delete error: node: {}",
-                            &node.grpc_addr
+                            node.grpc_addr
                         );
                     }
                 },

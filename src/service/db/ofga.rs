@@ -129,7 +129,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                log::info!("[WATCH] Got store id {}", &item_value.store_id);
+                log::info!("[WATCH] Got store id {}", item_value.store_id);
                 OFGA_STORE_ID.insert("store_id".to_owned(), item_value.store_id);
             }
             db::Event::Delete(_) => {
@@ -146,7 +146,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (_, item_value) in ret {
         let json_val: OFGAModel = json::from_slice(&item_value).unwrap();
-        log::info!("Caching store id {}", &json_val.store_id);
+        log::info!("Caching store id {}", json_val.store_id);
         OFGA_STORE_ID.insert("store_id".to_owned(), json_val.store_id);
     }
     log::info!("/ofga/model Cached ");
