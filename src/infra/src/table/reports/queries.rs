@@ -457,7 +457,9 @@ impl ListReportsQueryResult {
         query = query
             .order_by_asc(reports::Column::Name)
             .order_by_asc(folders::Column::Name);
-        if let Some((page_size, page_idx)) = params.page_size_and_idx {
+        if let Some((page_size, page_idx)) = params.page_size_and_idx
+            && page_size > 0
+        {
             query = query.offset(page_size * page_idx).limit(page_size);
         }
 

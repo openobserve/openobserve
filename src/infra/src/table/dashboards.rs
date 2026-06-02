@@ -421,7 +421,9 @@ async fn list_models(
         .order_by_asc(folders::Column::Name);
 
     // Execute the query, either getting all results or a specific page of results.
-    let results = if let Some((page_size, page_idx)) = params.page_size_and_idx {
+    let results = if let Some((page_size, page_idx)) = params.page_size_and_idx
+        && page_size > 0
+    {
         query.paginate(db, page_size).fetch_page(page_idx).await?
     } else {
         query.all(db).await?
