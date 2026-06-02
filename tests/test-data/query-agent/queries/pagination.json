@@ -12,7 +12,16 @@
           "facility_zone",
           "throughput_rate"
         ],
-        "note": "LIMIT 8 OFFSET 4 \u2014 skips first 4 rows in DESC throughput order"
+        "note": "LIMIT 8 OFFSET 4 \u2014 skips first 4 rows in DESC throughput order",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "pallet_id": "PL-006"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6119000000,
@@ -30,7 +39,21 @@
           "operation_mode",
           "cnt"
         ],
-        "note": "GROUP BY with LIMIT/OFFSET pagination on aggregates"
+        "note": "GROUP BY with LIMIT/OFFSET pagination on aggregates",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "hybrid",
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6179000000,
@@ -49,7 +72,15 @@
           "throughput_rate",
           "row_num"
         ],
-        "note": "CTE with ROW_NUMBER for pagination; rows 5-10"
+        "note": "CTE with ROW_NUMBER for pagination; rows 5-10",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-A7"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6239000000,
@@ -69,7 +100,16 @@
           "sorter_model",
           "throughput_rate"
         ],
-        "note": "Keyset pagination using subquery with OFFSET as reference"
+        "note": "Keyset pagination using subquery with OFFSET as reference",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-3",
+              "sorter_model": "SORT-M3"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6299000000,
@@ -90,7 +130,21 @@
           "throughput_rate",
           "row_idx"
         ],
-        "note": "CTE with ROW_NUMBER for page 2 (rows 7-14)"
+        "note": "CTE with ROW_NUMBER for page 2 (rows 7-14)",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "control_center": "CC-ALPHA",
+              "pallet_id": "PL-005"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6359000000,
@@ -109,7 +163,21 @@
           "cnt",
           "avg_tput"
         ],
-        "note": "GROUP BY with LIMIT/OFFSET pagination on aggregated results"
+        "note": "GROUP BY with LIMIT/OFFSET pagination on aggregated results",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual",
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6419000000,
@@ -129,7 +197,16 @@
           "throughput_rate",
           "rn"
         ],
-        "note": "Per-partition pagination: rows 2-4 within each facility_zone by throughput"
+        "note": "Per-partition pagination: rows 2-4 within each facility_zone by throughput",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "pallet_id": "PL-005"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6479000000,
@@ -149,7 +226,21 @@
           "load_factor",
           "charge_remaining"
         ],
-        "note": "Second page (OFFSET 7, LIMIT 7) with dual ORDER BY"
+        "note": "Second page (OFFSET 7, LIMIT 7) with dual ORDER BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "conveyor_lane": "LANE-A",
+              "pallet_id": "PL-005"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6539000000,
@@ -169,7 +260,21 @@
           "cell_temp",
           "temp_rank"
         ],
-        "note": "Top-8 hottest + coldest via UNION of two RANK windows with LIMIT 16"
+        "note": "Top-8 hottest + coldest via UNION of two RANK windows with LIMIT 16",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "pallet_id": "PL-002"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6599000000,

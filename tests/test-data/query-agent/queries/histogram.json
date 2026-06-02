@@ -11,7 +11,14 @@
           "cnt"
         ],
         "note": "Default histogram with COUNT",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4919000000,
@@ -30,7 +37,14 @@
           "low_load_cnt"
         ],
         "note": "Histogram with conditional COUNT using CASE",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "high_load_cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4979000000,
@@ -50,7 +64,20 @@
           "avg_tput"
         ],
         "note": "1-minute histogram + facility_zone breakdown (2-field GROUP BY)",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "zone_events",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5039000000,
@@ -71,7 +98,14 @@
           "avg_charge"
         ],
         "note": "30-second histogram with 4 aggregates, filtered by operation_mode",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5099000000,
@@ -92,7 +126,20 @@
           "total"
         ],
         "note": "2-minute histogram + mode breakdown with FILTER clauses",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "high_load_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5159000000,
@@ -113,7 +160,20 @@
           "ceiling_tput"
         ],
         "note": "5-minute histogram with MIN/MAX and HAVING filter",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "samples",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5219000000,
@@ -133,7 +193,20 @@
           "avg_pkg"
         ],
         "note": "Auto-interval histogram + control_center breakdown with package filter",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "control_center": "CC-DELTA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "events",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5279000000,
@@ -153,7 +226,14 @@
           "distinct_lanes"
         ],
         "note": "1-minute histogram with COUNT DISTINCT on two columns",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "total_events",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5339000000,
@@ -174,7 +254,21 @@
           "avg_scan"
         ],
         "note": "3-minute histogram with 3-field GROUP BY (bucket + lane + mode)",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual",
+              "conveyor_lane": "LANE-B"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5399000000,
@@ -194,7 +288,14 @@
           "low_charge_avg_temp"
         ],
         "note": "4-minute histogram with conditional FILTER aggregates and filtered AVG",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "charged_ops",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5459000000,
@@ -214,7 +315,14 @@
           "tput_volatility"
         ],
         "note": "15-second fine histogram with STDDEV and HAVING",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "total",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5519000000,

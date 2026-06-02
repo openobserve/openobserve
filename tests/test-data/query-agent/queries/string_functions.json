@@ -30,7 +30,19 @@
           "first_word"
         ],
         "note": "re_match + split_part on log field",
-        "skip_row_count": true
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "first_word": "Q114"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "matched",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6779000000,
@@ -72,7 +84,14 @@
           "suffix_num"
         ],
         "note": "re_match with regex character class + split_part on dash delimiter",
-        "skip_row_count": true
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "pallet_id": "PL-001"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6899000000,
@@ -91,7 +110,20 @@
           "op_modes",
           "event_cnt"
         ],
-        "note": "STRING_AGG with DISTINCT + ORDER BY, second STRING_AGG for another column"
+        "note": "STRING_AGG with DISTINCT + ORDER BY, second STRING_AGG for another column",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "control_center": "CC-ALPHA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "event_cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6959000000,
@@ -112,7 +144,15 @@
           "build_suffix",
           "replaced_sig"
         ],
-        "note": "SUBSTR (two positions) + REPLACE + LIKE pattern filter"
+        "note": "SUBSTR (two positions) + REPLACE + LIKE pattern filter",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "pallet_id": "PL-001"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 7019000000,
@@ -134,7 +174,15 @@
           "location_type"
         ],
         "note": "Nested: LOWER(CONCAT(SUBSTR, SUBSTR)) + CASE with re_match on CONCAT result",
-        "skip_row_count": true
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "conveyor_lane": "LANE-B"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 7079000000,
@@ -155,7 +203,16 @@
           "exclude_q5",
           "filtered_sorter"
         ],
-        "note": "COALESCE + NULLIF + chained COALESCE(NULLIF(...))"
+        "note": "COALESCE + NULLIF + chained COALESCE(NULLIF(...))",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-X1",
+              "pallet_id": "PL-001"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 7139000000,
@@ -178,7 +235,19 @@
           "record_pos"
         ],
         "note": "re_match (two patterns) + LENGTH + POSITION on log field",
-        "skip_row_count": true
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "pallet_id": "PL-003"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "record_pos",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 7199000000,
@@ -192,7 +261,8 @@
       "expected": {
         "row_count": 0,
         "note": "STRING_AGG with CONCAT of mode + rounded throughput, ORDER BY inside STRING_AGG \u2014 zero rows, columns unverifiable",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": []
       },
       "time_offset": {
         "start_offset": 7259000000,

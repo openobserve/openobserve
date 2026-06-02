@@ -9,7 +9,14 @@
         "columns": [
           "high_load_pct"
         ],
-        "note": "Computed percentage of high-load events"
+        "note": "Computed percentage of high-load events",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "high_load_pct",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5579000000,
@@ -31,7 +38,20 @@
           "squared_normalized",
           "load_midpoint_dist"
         ],
-        "note": "SQRT, POWER, ABS in one SELECT with geometric mean index"
+        "note": "SQRT, POWER, ABS in one SELECT with geometric mean index",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "pallet_id": "PL-002"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5639000000,
@@ -52,7 +72,14 @@
           "remainder",
           "max_dimension"
         ],
-        "note": "Division with NULLIF + MOD + GREATEST with computed expression"
+        "note": "Division with NULLIF + MOD + GREATEST with computed expression",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "item_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5699000000,
@@ -74,7 +101,14 @@
           "fractional_pct",
           "rounding_behavior"
         ],
-        "note": "FLOOR, CEIL, fractional part computation, CASE on rounding direction"
+        "note": "FLOOR, CEIL, fractional part computation, CASE on rounding direction",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5759000000,
@@ -95,7 +129,20 @@
           "variance_manual",
           "cv"
         ],
-        "note": "Manual variance (E[X^2]-E[X]^2) + coefficient of variation per zone"
+        "note": "Manual variance (E[X^2]-E[X]^2) + coefficient of variation per zone",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-4"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "variance_manual",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5819000000,
@@ -116,7 +163,14 @@
           "quadratic_mean",
           "euclidean_dist"
         ],
-        "note": "Harmonic component, quadratic mean, Euclidean distance on (load, charge) pairs"
+        "note": "Harmonic component, quadratic mean, Euclidean distance on (load, charge) pairs",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5879000000,
@@ -139,7 +193,14 @@
           "zscore_tput",
           "zscore_load"
         ],
-        "note": "Z-score normalization using scalar subqueries for mean and stddev"
+        "note": "Z-score normalization using scalar subqueries for mean and stddev",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5939000000,
@@ -161,7 +222,20 @@
           "temp_mean_diff",
           "temp_zscore_window"
         ],
-        "note": "PERCENT_RANK + window-based AVG/STDDEV for z-score"
+        "note": "PERCENT_RANK + window-based AVG/STDDEV for z-score",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "pallet_id": "PL-002"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 5999000000,
@@ -182,7 +256,14 @@
           "log10_items",
           "exp_defect"
         ],
-        "note": "LN, LOG10, EXP with NULLIF guards"
+        "note": "LN, LOG10, EXP with NULLIF guards",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "defect",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 6059000000,

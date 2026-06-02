@@ -11,7 +11,15 @@
           "log",
           "facility_zone"
         ],
-        "note": "match_all full-text search for 'warehouse'"
+        "note": "match_all full-text search for 'warehouse'",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4379000000,
@@ -29,7 +37,15 @@
           "log",
           "pallet_id"
         ],
-        "note": "match_all('event') full-text search (case-insensitive in practice)"
+        "note": "match_all('event') full-text search (case-insensitive in practice)",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "pallet_id": "PL-001"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4439000000,
@@ -46,7 +62,20 @@
           "facility_zone",
           "cnt"
         ],
-        "note": "match_all + field filter + GROUP BY"
+        "note": "match_all + field filter + GROUP BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4499000000,
@@ -64,7 +93,14 @@
           "match_count"
         ],
         "note": "match_all with histogram aggregation",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "match_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4559000000,
@@ -85,7 +121,21 @@
           "throughput_rate",
           "load_factor"
         ],
-        "note": "match_all + numeric filter + IN clause"
+        "note": "match_all + numeric filter + IN clause",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4619000000,
@@ -104,7 +154,20 @@
           "avg_tput",
           "avg_load"
         ],
-        "note": "match_all + mode filter + GROUP BY with multiple aggregates and HAVING"
+        "note": "match_all + mode filter + GROUP BY with multiple aggregates and HAVING",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "match_cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4679000000,
@@ -117,7 +180,14 @@
       "category": "full_text_search",
       "expected": {
         "row_count": 0,
-        "note": "match_all FILTER in histogram with hit-rate percentage \u2014 zero rows, columns unverifiable"
+        "note": "match_all FILTER in histogram with hit-rate percentage \u2014 zero rows, columns unverifiable",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "total_events",
+            "min": 1
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4739000000,
@@ -138,7 +208,21 @@
           "sorter_model",
           "recency_rank"
         ],
-        "note": "match_all with ROW_NUMBER window partitioned by zone for recency"
+        "note": "match_all with ROW_NUMBER window partitioned by zone for recency",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "sorter_model": "SORT-X1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "recency_rank",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4799000000,
@@ -158,7 +242,16 @@
           "facility_zone",
           "throughput_rate"
         ],
-        "note": "UNION ALL of two match_all queries with different thresholds"
+        "note": "UNION ALL of two match_all queries with different thresholds",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "pallet_id": "PL-002"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4859000000,

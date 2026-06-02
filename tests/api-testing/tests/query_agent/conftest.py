@@ -9,6 +9,7 @@ slate — accumulated data from prior runs cannot bleed into query results.
 
 import json
 import logging
+import re
 import sys
 import time
 from datetime import datetime, timedelta, UTC
@@ -82,7 +83,99 @@ def run_query(client, query, *, skip_fts_count=False):
         for col in expected.get("columns", []):
             assert col in hits[0], f"{query['id']}: Expected column '{col}' not in response"
 
+    _run_content_assertions(query, sql, hits)
+
     logging.info("%s passed: %d rows", query["id"], len(hits))
+
+
+# ── Content + Order Assertions ──────────────────────────────────────────────
+def _paren_depth(text, pos):
+    """Return the nesting depth of parentheses at *pos* within *text*."""
+    depth = 0
+    for c in text[:pos]:
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+    return depth
+
+
+def _run_content_assertions(query, sql, hits):
+    """Validate result content: not-null columns, ORDER BY direction, and
+    any explicit assertions defined in the query JSON.
+
+    Auto-inferred from existing data:
+      - *not_null*: every column in expected.columns must be non-null
+      - *order*: parsed from the SQL ORDER BY clause
+
+    Explicit (opt-in, per-query in JSON ``expected.assertions``):
+      - *row_contains*: at least one row matches the given key/value pairs
+      - *value_range*: numeric column values are within [min, max]
+    """
+    qid = query["id"]
+    expected = query.get("expected", {})
+
+    # Collect assertions: explicit JSON ones + auto-inferred
+    assertions: list[dict] = list(expected.get("assertions", []))
+
+    # Auto-infer order from the outermost SQL ORDER BY clause.
+    # Window-function ORDER BYs (inside OVER parentheses) are excluded.
+    order_matches = [
+        m for m in re.finditer(
+            r"ORDER\s+BY\s+([^\s,]+)\s*(ASC|DESC)?",
+            sql, re.IGNORECASE,
+        )
+        if _paren_depth(sql, m.start()) == 0  # top-level only
+    ]
+    if order_matches:
+        m = order_matches[-1]
+        col = m.group(1).strip().strip('"').strip("'")
+        direction = (m.group(2) or "ASC").upper()
+        assertions.append({"type": "order", "column": col, "direction": direction})
+
+    # Execute each assertion
+    for i, a in enumerate(assertions):
+        a_type = a["type"]
+        label = f"{qid}: [{i}] {a_type}"
+
+        if a_type == "not_null":
+            col = a["column"]
+            for j, hit in enumerate(hits):
+                assert hit.get(col) is not None, \
+                    f"{label}: '{col}' is null in row {j}"
+
+        elif a_type == "order":
+            col = a["column"]
+            direction = a.get("direction", "ASC")
+            values = [hit.get(col) for hit in hits if col in hit]
+            if len(values) < 2:
+                continue  # single row — trivially ordered
+            ordered = values == sorted(values) if direction == "ASC" \
+                else values == sorted(values, reverse=True)
+            assert ordered, \
+                f"{label}: '{col}' not in {direction} order — {values[:5]}..."
+
+        elif a_type == "row_contains":
+            match = a["match"]
+            found = any(
+                all(hit.get(k) == v for k, v in match.items())
+                for hit in hits
+            )
+            assert found, \
+                f"{label}: no row matches {match}"
+
+        elif a_type == "value_range":
+            col = a["column"]
+            for j, hit in enumerate(hits):
+                val = hit.get(col)
+                if val is None:
+                    continue
+                if "min" in a:
+                    assert val >= a["min"], \
+                        f"{label}: {col}={val} < min={a['min']} in row {j}"
+                if "max" in a:
+                    assert val <= a["max"], \
+                        f"{label}: {col}={val} > max={a['max']} in row {j}"
 
 
 # ── Session fixture: ingest data (no flush) ────────────────────────────────

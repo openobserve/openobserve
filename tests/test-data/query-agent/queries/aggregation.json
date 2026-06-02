@@ -10,7 +10,20 @@
           "facility_zone",
           "cnt"
         ],
-        "note": "GROUP BY facility_zone with COUNT, ORDER BY cnt DESC"
+        "note": "GROUP BY facility_zone with COUNT, ORDER BY cnt DESC",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": -1000000,
@@ -28,7 +41,15 @@
           "avg_load",
           "avg_tput"
         ],
-        "note": "GROUP BY operation_mode with multiple AVG aggregates"
+        "note": "GROUP BY operation_mode with multiple AVG aggregates",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "hybrid"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 59000000,
@@ -45,7 +66,20 @@
           "sorter_model",
           "cnt"
         ],
-        "note": "GROUP BY sorter_model with WHERE match_all filter"
+        "note": "GROUP BY sorter_model with WHERE match_all filter",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-X1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 119000000,
@@ -61,7 +95,14 @@
         "columns": [
           "total_throughput"
         ],
-        "note": "Single-row aggregate: SUM with WHERE filter"
+        "note": "Single-row aggregate: SUM with WHERE filter",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "total_throughput",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 179000000,
@@ -79,7 +120,20 @@
           "cnt",
           "avg_load"
         ],
-        "note": "GROUP BY with HAVING on AVG"
+        "note": "GROUP BY with HAVING on AVG",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "conveyor_lane": "LANE-B"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 239000000,
@@ -98,7 +152,21 @@
           "cnt",
           "avg_tput"
         ],
-        "note": "Multi-column GROUP BY with AVG and COUNT"
+        "note": "Multi-column GROUP BY with AVG and COUNT",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto",
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 299000000,
@@ -118,7 +186,20 @@
           "min_charge",
           "max_charge"
         ],
-        "note": "Multiple aggregates: SUM, AVG, MIN, MAX on charge_remaining"
+        "note": "Multiple aggregates: SUM, AVG, MIN, MAX on charge_remaining",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "control_center": "CC-BETA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "total_items",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 359000000,
@@ -136,7 +217,20 @@
           "cnt",
           "distinct_sorters"
         ],
-        "note": "COUNT and COUNT DISTINCT in same GROUP BY"
+        "note": "COUNT and COUNT DISTINCT in same GROUP BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 419000000,
@@ -174,7 +268,20 @@
           "avg_tput",
           "combined_score"
         ],
-        "note": "Computed aggregate expression (avg_load + avg_tput) with HAVING"
+        "note": "Computed aggregate expression (avg_load + avg_tput) with HAVING",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "combined_score",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 539000000,
@@ -192,7 +299,20 @@
           "cnt",
           "pct_of_total"
         ],
-        "note": "Window-based percentage of total within GROUP BY result"
+        "note": "Window-based percentage of total within GROUP BY result",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 599000000,
@@ -211,7 +331,20 @@
           "low_load_cnt",
           "avg_cell_temp"
         ],
-        "note": "Conditional COUNT with CASE filtered GROUP BY"
+        "note": "Conditional COUNT with CASE filtered GROUP BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "high_load_cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 659000000,
@@ -230,7 +363,20 @@
           "manual_cnt",
           "hybrid_cnt"
         ],
-        "note": "Multiple FILTER aggregates for pivot-style output"
+        "note": "Multiple FILTER aggregates for pivot-style output",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "conveyor_lane": "LANE-A"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "auto_cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 719000000,
@@ -249,7 +395,20 @@
           "avg_tput",
           "risk_flag"
         ],
-        "note": "CASE in SELECT of GROUP BY for computed classification"
+        "note": "CASE in SELECT of GROUP BY for computed classification",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "control_center": "CC-BETA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "avg_defect",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 779000000,
@@ -267,7 +426,21 @@
           "facility_zone",
           "cnt"
         ],
-        "note": "GROUP BY ROLLUP-style two-column grouping (simulated with regular GROUP BY)"
+        "note": "GROUP BY ROLLUP-style two-column grouping (simulated with regular GROUP BY)",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 839000000,
@@ -285,7 +458,20 @@
           "mode_count",
           "dominant_mode"
         ],
-        "note": "Subquery-based mode aggregation + dominant mode via CTE"
+        "note": "Subquery-based mode aggregation + dominant mode via CTE",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "mode_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 899000000,
@@ -304,7 +490,15 @@
           "min_tput_item",
           "spread"
         ],
-        "note": "MAX-MIN spread computation in GROUP BY"
+        "note": "MAX-MIN spread computation in GROUP BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 959000000,
@@ -323,7 +517,20 @@
           "avg_scan",
           "retry_rate"
         ],
-        "note": "SUM + AVG + computed rate per lane"
+        "note": "SUM + AVG + computed rate per lane",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "conveyor_lane": "LANE-B"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "scan_total",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1019000000,
@@ -342,7 +549,14 @@
           "avg_load",
           "cv_tput"
         ],
-        "note": "STDDEV + AVG + coefficient of variation per build"
+        "note": "STDDEV + AVG + coefficient of variation per build",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "cv_tput",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1079000000,
@@ -360,7 +574,20 @@
           "below_30_pct",
           "above_70_pct"
         ],
-        "note": "Percentage-bucketized aggregation with FILTER"
+        "note": "Percentage-bucketized aggregation with FILTER",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-4"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "below_30_pct",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1139000000,

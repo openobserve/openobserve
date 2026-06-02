@@ -13,7 +13,20 @@
           "avg_load",
           "error_rate"
         ],
-        "note": "Two CTEs + JOIN with derived rates"
+        "note": "Two CTEs + JOIN with derived rates",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-4"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "events",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2099000000,
@@ -32,7 +45,14 @@
           "load_category",
           "rank_in_category"
         ],
-        "note": "CASE in SELECT and PARTITION BY; window over computed category"
+        "note": "CASE in SELECT and PARTITION BY; window over computed category",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "rank_in_category",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2159000000,
@@ -51,7 +71,20 @@
           "avg_tput",
           "sorter_list"
         ],
-        "note": "STRING_AGG for pipe-delimited sorter list per zone + GROUP BY aggregates"
+        "note": "STRING_AGG for pipe-delimited sorter list per zone + GROUP BY aggregates",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2219000000,
@@ -71,7 +104,21 @@
           "sum_load",
           "avg_tput"
         ],
-        "note": "Multi-column GROUP BY + 3 aggregates + ORDER BY sum DESC"
+        "note": "Multi-column GROUP BY + 3 aggregates + ORDER BY sum DESC",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual",
+              "facility_zone": "ZONE-2"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2279000000,
@@ -94,7 +141,16 @@
           "deviation",
           "outlier_flag"
         ],
-        "note": "Window running avg + deviation + outlier detection with CASE"
+        "note": "Window running avg + deviation + outlier detection with CASE",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "sorter_model": "SORT-X1"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2339000000,
@@ -119,7 +175,21 @@
           "overall_rank",
           "quintile"
         ],
-        "note": "3 CTEs: weighted scoring + rank + NTILE, filter top 40%"
+        "note": "3 CTEs: weighted scoring + rank + NTILE, filter top 40%",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2399000000,
@@ -147,7 +217,21 @@
           "combined_rank_sum",
           "multi_factor_rank"
         ],
-        "note": "4 CTEs: 3 rankings + combined sum + RANK, top-3 per zone"
+        "note": "4 CTEs: 3 rankings + combined sum + RANK, top-3 per zone",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "sorter_model": "SORT-X1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2459000000,
@@ -167,7 +251,16 @@
           "avg_load",
           "tput_vs_zone"
         ],
-        "note": "JOIN with derived zone stats + deviation from zone average"
+        "note": "JOIN with derived zone stats + deviation from zone average",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-4",
+              "sorter_model": "SORT-Z9"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2519000000,
@@ -202,7 +295,20 @@
           "low_charge_count",
           "action"
         ],
-        "note": "3 CTEs + JOIN + multi-branch CASE: performance + charge -> action"
+        "note": "3 CTEs + JOIN + multi-branch CASE: performance + charge -> action",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "avg_charge",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2639000000,

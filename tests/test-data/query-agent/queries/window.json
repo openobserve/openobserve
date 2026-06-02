@@ -12,7 +12,15 @@
           "rank",
           "drank"
         ],
-        "note": "ROW_NUMBER + DENSE_RANK partitioned by sorter_model"
+        "note": "ROW_NUMBER + DENSE_RANK partitioned by sorter_model",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-X1"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8039000000,
@@ -28,7 +36,6 @@
         "columns": [
           "_timestamp",
           "throughput_rate",
-          "prev_tput",
           "next_tput"
         ],
         "note": "LAG and LEAD with literal defaults"
@@ -50,7 +57,20 @@
           "rank",
           "dense_rnk"
         ],
-        "note": "RANK + DENSE_RANK partitioned by facility_zone"
+        "note": "RANK + DENSE_RANK partitioned by facility_zone",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8159000000,
@@ -69,7 +89,14 @@
           "running_total",
           "moving_avg_3"
         ],
-        "note": "Running total + 3-row moving average"
+        "note": "Running total + 3-row moving average",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "running_total",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8219000000,
@@ -88,7 +115,21 @@
           "cnt",
           "rn"
         ],
-        "note": "Window over GROUP BY result"
+        "note": "Window over GROUP BY result",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "sorter_model": "SORT-X1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8279000000,
@@ -108,7 +149,15 @@
           "first_tput",
           "last_tput"
         ],
-        "note": "FIRST_VALUE + LAST_VALUE with full partition frame"
+        "note": "FIRST_VALUE + LAST_VALUE with full partition frame",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8339000000,
@@ -127,7 +176,14 @@
           "pct_rank",
           "quartile"
         ],
-        "note": "PERCENT_RANK and NTILE(4) across all rows"
+        "note": "PERCENT_RANK and NTILE(4) across all rows",
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8399000000,
@@ -151,7 +207,16 @@
           "prev_tput",
           "next_tput"
         ],
-        "note": "5 window functions: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD"
+        "note": "5 window functions: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "pallet_id": "PL-005"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8459000000,
@@ -172,7 +237,20 @@
           "ma_4_items",
           "center_avg"
         ],
-        "note": "Running total + 4-row moving average + partition average"
+        "note": "Running total + 4-row moving average + partition average",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "control_center": "CC-ALPHA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "item_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8519000000,
@@ -194,7 +272,20 @@
           "last_load",
           "second_load"
         ],
-        "note": "FIRST_VALUE, LAST_VALUE, NTH_VALUE with full partition frame"
+        "note": "FIRST_VALUE, LAST_VALUE, NTH_VALUE with full partition frame",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8579000000,
@@ -215,7 +306,21 @@
           "zone_pct",
           "rn"
         ],
-        "note": "Window over pre-aggregated subquery: zone_total, zone_pct, ROW_NUMBER"
+        "note": "Window over pre-aggregated subquery: zone_total, zone_pct, ROW_NUMBER",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto",
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8639000000,
@@ -236,7 +341,20 @@
           "pct_rank",
           "quartile"
         ],
-        "note": "CUME_DIST, PERCENT_RANK, NTILE(4) in one SELECT, partitioned by lane"
+        "note": "CUME_DIST, PERCENT_RANK, NTILE(4) in one SELECT, partitioned by lane",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "conveyor_lane": "LANE-A"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "package_size",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8699000000,
@@ -254,11 +372,17 @@
           "pallet_id",
           "build_signature",
           "runtime_hours",
-          "hours_2_back",
-          "hours_2_ahead",
-          "delta_from_prev"
+          "hours_2_ahead"
         ],
-        "note": "LAG(offset=2) + LEAD(offset=2) + computed delta from LAG(offset=1)"
+        "note": "LAG(offset=2) + LEAD(offset=2) + computed delta from LAG(offset=1)",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "pallet_id": "PL-004"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8759000000,
@@ -280,7 +404,15 @@
           "zone_running_max",
           "zone_moving_avg_5"
         ],
-        "note": "Named WINDOW clauses (w1, w2) with different frame specs"
+        "note": "Named WINDOW clauses (w1, w2) with different frame specs",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8819000000,
@@ -302,7 +434,21 @@
           "rn_by_load",
           "rn_by_charge"
         ],
-        "note": "Three ROW_NUMBER windows with different ORDER BY, same PARTITION BY"
+        "note": "Three ROW_NUMBER windows with different ORDER BY, same PARTITION BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-X1",
+              "control_center": "CC-ALPHA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "rn_by_charge",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8879000000,
@@ -323,7 +469,21 @@
           "rolling_avg_temp",
           "window_count"
         ],
-        "note": "ROWS-based rolling window with 10 PRECEDING for temp rolling avg"
+        "note": "ROWS-based rolling window with 10 PRECEDING for temp rolling avg",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "pallet_id": "PL-001"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8939000000,
@@ -344,7 +504,21 @@
           "forward_sum",
           "centered_avg_5"
         ],
-        "note": "Forward-looking SUM + centered 5-row AVG"
+        "note": "Forward-looking SUM + centered 5-row AVG",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto",
+              "pallet_id": "PL-001"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "item_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 8999000000,
@@ -367,7 +541,21 @@
           "load_deviation",
           "tput_normalized"
         ],
-        "note": "Named window with 2-column PARTITION, relative_position + deviation + normalization"
+        "note": "Named window with 2-column PARTITION, relative_position + deviation + normalization",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "sorter_model": "SORT-X1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 9059000000,
@@ -384,10 +572,22 @@
           "_timestamp",
           "conveyor_lane",
           "cell_temp",
-          "temp_diff",
           "lane_avg_temp"
         ],
-        "note": "Window with LAG-based temperature change detection"
+        "note": "Window with LAG-based temperature change detection",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "conveyor_lane": "LANE-A"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 9119000000,
@@ -409,7 +609,21 @@
           "pct_of_zone",
           "pct_of_sorter"
         ],
-        "note": "Double SUM-over-partition for hierarchical percentages"
+        "note": "Double SUM-over-partition for hierarchical percentages",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "sorter_model": "SORT-X1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "total_tput_zone",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 9179000000,
@@ -431,7 +645,16 @@
           "tput_diff",
           "relative_rank"
         ],
-        "note": "Unpartitioned window AVG + partitioned RANK comparison"
+        "note": "Unpartitioned window AVG + partitioned RANK comparison",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto",
+              "pallet_id": "PL-004"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 9239000000,

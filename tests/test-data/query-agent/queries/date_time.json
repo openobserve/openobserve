@@ -11,7 +11,14 @@
           "cnt"
         ],
         "note": "Histogram with explicit 2-minute interval",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 3719000000,
@@ -30,7 +37,20 @@
           "cnt"
         ],
         "note": "1-minute histogram + GROUP BY operation_mode",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 3779000000,
@@ -50,7 +70,15 @@
           "log"
         ],
         "note": "ORDER BY DESC LIMIT 5 for most recent events",
-        "skip_row_count": true
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "pallet_id": "PL-002"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 3839000000,
@@ -70,7 +98,14 @@
           "max_tput"
         ],
         "note": "Histogram with SUM/MIN/MAX aggregates",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "total_tput",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 3899000000,
@@ -90,7 +125,14 @@
           "hybrid_cnt"
         ],
         "note": "1-min histogram with 3 FILTER-counts as pivot per bucket",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "auto_cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 3959000000,
@@ -111,7 +153,20 @@
           "min_charge"
         ],
         "note": "30-sec histogram + zone breakdown + HAVING avg_load > 30",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4019000000,
@@ -132,7 +187,14 @@
           "peak_rank"
         ],
         "note": "CTE with histogram + window over histogram buckets",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4079000000,
@@ -154,7 +216,20 @@
           "high_scan_pct"
         ],
         "note": "5-min histogram + sorter breakdown + computed high_scan_pct, HAVING >=2",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "samples",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4139000000,
@@ -176,7 +251,21 @@
           "avg_charge"
         ],
         "note": "Default histogram + 3-field GROUP BY with item filter",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual",
+              "control_center": "CC-DELTA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "event_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4199000000,
@@ -195,7 +284,14 @@
           "early_avg_tput"
         ],
         "note": "FULL OUTER JOIN of two histograms splitting at mid-point timestamp",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "early_cnt",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4259000000,
@@ -215,7 +311,14 @@
           "avg_tput_cool"
         ],
         "note": "1-min histogram with conditional AVGs (hot vs cool temp split using CASE)",
-        "skip_row_count": true
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "total_events",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 4319000000,

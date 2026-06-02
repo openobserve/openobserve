@@ -13,7 +13,16 @@
           "facility_zone",
           "throughput_rate"
         ],
-        "note": "SELECT with IN filter and compound AND condition"
+        "note": "SELECT with IN filter and compound AND condition",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "sorter_model": "SORT-A7"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1199000000,
@@ -48,7 +57,21 @@
           "cell_temp",
           "build_signature"
         ],
-        "note": "SELECT * returning all generated columns"
+        "note": "SELECT * returning all generated columns",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "auto",
+              "facility_zone": "ZONE-4"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1259000000,
@@ -71,7 +94,21 @@
           "load_tier",
           "temp_category"
         ],
-        "note": "Complex WHERE with AND/OR/IN/NOT, two CASE expressions, multi-column ORDER BY"
+        "note": "Complex WHERE with AND/OR/IN/NOT, two CASE expressions, multi-column ORDER BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-3",
+              "sorter_model": "SORT-M3"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1319000000,
@@ -90,7 +127,16 @@
           "facility_zone",
           "build_signature"
         ],
-        "note": "DISTINCT on 4 columns with BETWEEN, NOT IN, and range filter"
+        "note": "DISTINCT on 4 columns with BETWEEN, NOT IN, and range filter",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "hybrid",
+              "facility_zone": "ZONE-3"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1379000000,
@@ -112,7 +158,21 @@
           "utilization_index",
           "items_per_scan"
         ],
-        "note": "Computed columns (utilization_index, items_per_scan) with NULLIF guards"
+        "note": "Computed columns (utilization_index, items_per_scan) with NULLIF guards",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "conveyor_lane": "LANE-B",
+              "pallet_id": "PL-006"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1439000000,
@@ -133,7 +193,21 @@
           "cell_temp",
           "alert_status"
         ],
-        "note": "4-branch nested CASE for alert classification, complex OR/NOT WHERE"
+        "note": "4-branch nested CASE for alert classification, complex OR/NOT WHERE",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual",
+              "control_center": "CC-BETA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1499000000,
@@ -155,7 +229,21 @@
           "charge_remaining",
           "effective_capacity"
         ],
-        "note": "Triple-factor computed column (effective_capacity) with 3-column filtering"
+        "note": "Triple-factor computed column (effective_capacity) with 3-column filtering",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "sorter_model": "SORT-A7"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1559000000,
@@ -177,7 +265,16 @@
           "runtime_days",
           "usage_class"
         ],
-        "note": "LIKE patterns with OR chain, computed days column, CASE classification"
+        "note": "LIKE patterns with OR chain, computed days column, CASE classification",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual",
+              "sorter_model": "SORT-X1"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1619000000,
@@ -198,7 +295,21 @@
           "segment_label",
           "defect_str"
         ],
-        "note": "COALESCE with type casting + subquery in WHERE (IN with SELECT DISTINCT)"
+        "note": "COALESCE with type casting + subquery in WHERE (IN with SELECT DISTINCT)",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "control_center": "CC-BETA"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1679000000,
@@ -220,7 +331,20 @@
           "total_weight_kg",
           "shipment_tier"
         ],
-        "note": "Computed weight column + 4-tier CASE classification"
+        "note": "Computed weight column + 4-tier CASE classification",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "item_count",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1739000000,
@@ -241,7 +365,21 @@
           "retry_flag",
           "retry_flag_derived"
         ],
-        "note": "Derived table subquery computing boolean flag, outer filter on derived column"
+        "note": "Derived table subquery computing boolean flag, outer filter on derived column",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "sorter_model": "SORT-A7",
+              "pallet_id": "PL-002"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "scan_attempts",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1799000000,
@@ -261,7 +399,21 @@
           "cell_temp",
           "ambient_deviation"
         ],
-        "note": "Correlated scalar subquery for deviation, outer ABS filter"
+        "note": "Correlated scalar subquery for deviation, outer ABS filter",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "conveyor_lane": "LANE-B"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "cell_temp",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1859000000,
@@ -283,7 +435,21 @@
           "stress_index",
           "health_status"
         ],
-        "note": "Computed stress_index + 4-branch health_status CASE, dual ORDER BY"
+        "note": "Computed stress_index + 4-branch health_status CASE, dual ORDER BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "operation_mode": "manual",
+              "conveyor_lane": "LANE-D"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1919000000,
@@ -303,7 +469,21 @@
           "throughput_rate",
           "load_factor"
         ],
-        "note": "DISTINCT ON (facility_zone) for top-1 per zone by throughput"
+        "note": "DISTINCT ON (facility_zone) for top-1 per zone by throughput",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-1",
+              "sorter_model": "SORT-X1"
+            }
+          },
+          {
+            "type": "value_range",
+            "column": "load_factor",
+            "min": 0
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 1979000000,
@@ -322,7 +502,16 @@
           "facility_zone",
           "stream"
         ],
-        "note": "Simple filter with stream=stdout and ORDER BY"
+        "note": "Simple filter with stream=stdout and ORDER BY",
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "facility_zone": "ZONE-2",
+              "stream": "stdout"
+            }
+          }
+        ]
       },
       "time_offset": {
         "start_offset": 2039000000,
