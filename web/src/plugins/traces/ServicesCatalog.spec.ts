@@ -182,6 +182,17 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock stream service for schema checking
+// ---------------------------------------------------------------------------
+import streamService from "@/services/stream";
+
+vi.mock("@/services/stream", () => ({
+  default: {
+    schema: vi.fn()
+  }
+}));
+
+// ---------------------------------------------------------------------------
 // Mock vue-router
 // ---------------------------------------------------------------------------
 const mockRouterPush = vi.fn();
@@ -1899,6 +1910,83 @@ describe("ServicesCatalog", () => {
         );
         expect(decodedSql).toContain('FROM "production-stream"');
       });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Schema Checking
+  // -----------------------------------------------------------------------
+  describe("Schema Checking", () => {
+    it("should check stream schema and return available fields", async () => {
+      const mockSchema = {
+        data: {
+          schema: [
+            { name: "service_name" },
+            { name: "span_kind" },
+            { name: "db_system" },
+            { name: "db_name" }
+          ]
+        }
+      };
+
+      vi.mocked(streamService.schema).mockResolvedValueOnce(mockSchema);
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const result = await wrapper.vm.checkStreamSchema("test_stream");
+      const expectedFields = new Set(["service_name", "span_kind", "db_system", "db_name"]);
+
+      expect(result).toEqual(expectedFields);
+      expect(streamService.schema).toHaveBeenCalledWith("test-org", "test_stream", "traces");
+    });
+
+    it("should handle schema API error gracefully", async () => {
+      vi.mocked(streamService.schema).mockRejectedValueOnce(new Error("Schema API error"));
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const result = await wrapper.vm.checkStreamSchema("test_stream");
+
+      expect(result).toEqual(new Set());
+      expect(streamService.schema).toHaveBeenCalledWith("test-org", "test_stream", "traces");
+    });
+
+    it("should handle schema with fields property instead of schema", async () => {
+      const mockSchema = {
+        data: {
+          fields: [
+            { name: "service_name" },
+            { name: "operation_name" }
+          ]
+        }
+      };
+
+      vi.mocked(streamService.schema).mockResolvedValueOnce(mockSchema);
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const result = await wrapper.vm.checkStreamSchema("test_stream");
+      const expectedFields = new Set(["service_name", "operation_name"]);
+
+      expect(result).toEqual(expectedFields);
+    });
+
+    it("should handle empty schema response", async () => {
+      const mockSchema = {
+        data: {}
+      };
+
+      vi.mocked(streamService.schema).mockResolvedValueOnce(mockSchema);
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const result = await wrapper.vm.checkStreamSchema("test_stream");
+
+      expect(result).toEqual(new Set());
     });
   });
 

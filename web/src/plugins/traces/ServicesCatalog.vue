@@ -442,6 +442,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import streamService from "@/services/stream";
 
 const { t } = useI18n();
 const store = useStore();
@@ -786,6 +787,21 @@ async function loadServiceDetectionConfig() {
   }
 }
 
+async function checkStreamSchema(stream: string): Promise<Set<string>> {
+  try {
+    const response = await streamService.schema(
+      searchObj.organizationIdentifier,
+      stream,
+      "traces"
+    );
+    const fields = response.data?.schema || response.data?.fields || [];
+    return new Set(fields.map((f: any) => f.name));
+  } catch (error) {
+    console.warn("Schema check failed for stream:", stream, error);
+    return new Set();
+  }
+}
+
 async function loadServicesCatalog() {
   const streamName = streamFilter.value?.replaceAll('"', "");
   if (!streamName) return;
@@ -886,7 +902,12 @@ ORDER BY total_requests DESC`;
 }
 
 // Expose for parent ref access
-defineExpose({ loadServicesCatalog, streamFilter, serviceDetectionConfig });
+defineExpose({
+  loadServicesCatalog,
+  streamFilter,
+  serviceDetectionConfig,
+  checkStreamSchema
+});
 
 watch(
   () => [
