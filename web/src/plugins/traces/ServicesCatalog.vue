@@ -807,6 +807,14 @@ function buildDetectionSQL(
   availableFields: Set<string>,
   stream: string
 ): string {
+  // Input validation
+  if (!stream || typeof stream !== 'string' || stream.trim().length === 0) {
+    throw new Error('Invalid stream parameter');
+  }
+
+  // Escape stream name for SQL identifier (basic escaping)
+  const escapedStream = stream.replace(/"/g, '""');
+
   const timeRangeWhere = "_timestamp >= ? AND _timestamp < ?";
 
   if (!config) {
@@ -821,22 +829,39 @@ function buildDetectionSQL(
       approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
       approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
       approx_percentile_cont(duration, 0.99) AS p99_latency_ns
-    FROM "${stream}"
+    FROM "${escapedStream}"
     WHERE ${timeRangeWhere}
     GROUP BY service_name
     ORDER BY total_requests DESC`;
   }
 
+  // Validate config structure
+  if (!config.server_kinds || !Array.isArray(config.server_kinds) || config.server_kinds.length === 0) {
+    throw new Error('Invalid or empty server_kinds in service detection config');
+  }
+
+  if (!config.rules || !Array.isArray(config.rules)) {
+    throw new Error('Invalid rules in service detection config');
+  }
+
   // Build CASE statement from detection rules
   const detectionCases = [];
 
-  // Server spans keep original service_name
-  const serverKinds = config.server_kinds.map(k => `'${k}'`).join(', ');
+  // Server spans keep original service_name - escape string values
+  const serverKinds = config.server_kinds
+    .map(k => `'${String(k).replace(/'/g, "''")}'`) // Escape single quotes
+    .join(', ');
   detectionCases.push(`WHEN span_kind IN (${serverKinds}) THEN service_name`);
 
   // Client spans apply detection rules
   for (const rule of config.rules) {
-    const availableAttrs = rule.attributes.filter(attr => availableFields.has(attr));
+    if (!rule.attributes || !Array.isArray(rule.attributes) || rule.attributes.length === 0) {
+      continue; // Skip invalid rules
+    }
+
+    const availableAttrs = rule.attributes.filter(attr =>
+      typeof attr === 'string' && availableFields.has(attr)
+    );
     if (availableAttrs.length === 0) continue;
 
     const coalescedAttr = availableAttrs.length > 1
@@ -861,7 +886,7 @@ function buildDetectionSQL(
     approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
     approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
     approx_percentile_cont(duration, 0.99) AS p99_latency_ns
-  FROM "${stream}"
+  FROM "${escapedStream}"
   WHERE ${timeRangeWhere}
   GROUP BY detected_service_name
   ORDER BY total_requests DESC`;
@@ -890,80 +915,78 @@ async function loadServicesCatalog() {
 
   const { start_time, end_time } = getTimeRange();
 
-  const sql = `SELECT
-  service_name,
-  COUNT(*) AS total_requests,
-  SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
-  CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
-  AVG(duration) AS avg_duration_ns,
-  MAX(duration) AS max_duration_ns,
-  approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
-  approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
-  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
-FROM "${streamName}"
-GROUP BY service_name
-ORDER BY total_requests DESC`;
+  try {
+    // Check stream schema for service detection
+    const availableFields = await checkStreamSchema(streamName);
 
-  currentTraceId = generateTraceContext().traceId;
+    // Build SQL with service detection if config is available
+    const sql = buildDetectionSQL(serviceDetectionConfig.value, availableFields, streamName);
 
-  await fetchQueryDataWithHttpStream(
-    {
-      queryReq: {
-        query: {
-          sql: b64EncodeUnicode(sql),
-          start_time,
-          end_time,
-          from: 0,
-          size: -1,
+    currentTraceId = generateTraceContext().traceId;
+
+    await fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          query: {
+            sql: b64EncodeUnicode(sql),
+            start_time,
+            end_time,
+            from: 0,
+            size: -1,
+          },
+          encoding: "base64",
         },
-        encoding: "base64",
+        type: "search",
+        pageType: "traces",
+        searchType: "ui",
+        traceId: currentTraceId,
+        org_id: searchObj.organizationIdentifier,
       },
-      type: "search",
-      pageType: "traces",
-      searchType: "ui",
-      traceId: currentTraceId,
-      org_id: searchObj.organizationIdentifier,
-    },
-    {
-      data: (_payload: any, response: any) => {
-        if (
-          response.type === "search_response_hits" ||
-          response.type === "search_response_metadata"
-        ) {
-          const hits: any[] = response.content?.results?.hits ?? [];
-          const serviceMap = new Map(
-            services.value.map((s) => [s.service_name, s]),
-          );
-          for (const hit of hits) {
-            const name = hit.service_name ?? "";
-            serviceMap.set(name, {
-              service_name: name,
-              total_requests: hit.total_requests ?? 0,
-              error_count: hit.error_count ?? 0,
-              error_rate: hit.error_rate ?? 0,
-              avg_duration_ns: hit.avg_duration_ns ?? 0,
-              max_duration_ns: hit.max_duration_ns ?? 0,
-              p50_latency_ns: hit.p50_latency_ns ?? 0,
-              p95_latency_ns: hit.p95_latency_ns ?? 0,
-              p99_latency_ns: hit.p99_latency_ns ?? 0,
-              status: deriveStatus(hit.error_rate ?? 0),
-            });
+      {
+        data: (_payload: any, response: any) => {
+          if (
+            response.type === "search_response_hits" ||
+            response.type === "search_response_metadata"
+          ) {
+            const hits: any[] = response.content?.results?.hits ?? [];
+            const serviceMap = new Map(
+              services.value.map((s) => [s.service_name, s]),
+            );
+            for (const hit of hits) {
+              // Use detected_service_name if available (from service detection), otherwise fall back to service_name
+              const name = hit.detected_service_name ?? hit.service_name ?? "";
+              serviceMap.set(name, {
+                service_name: name,
+                total_requests: hit.total_requests ?? 0,
+                error_count: hit.error_count ?? 0,
+                error_rate: hit.error_rate ?? 0,
+                avg_duration_ns: hit.avg_duration_ns ?? 0,
+                max_duration_ns: hit.max_duration_ns ?? 0,
+                p50_latency_ns: hit.p50_latency_ns ?? 0,
+                p95_latency_ns: hit.p95_latency_ns ?? 0,
+                p99_latency_ns: hit.p99_latency_ns ?? 0,
+                status: deriveStatus(hit.error_rate ?? 0),
+              });
+            }
+            services.value = Array.from(serviceMap.values());
           }
-          services.value = Array.from(serviceMap.values());
-        }
+        },
+        error: (_payload: any, _response: any) => {
+          isLoading.value = false;
+        },
+        complete: (_payload: any, _response: any) => {
+          isLoading.value = false;
+        },
+        reset: (_payload: any, _response: any) => {
+          services.value = [];
+          isLoading.value = false;
+        },
       },
-      error: (_payload: any, _response: any) => {
-        isLoading.value = false;
-      },
-      complete: (_payload: any, _response: any) => {
-        isLoading.value = false;
-      },
-      reset: (_payload: any, _response: any) => {
-        services.value = [];
-        isLoading.value = false;
-      },
-    },
-  );
+    );
+  } catch (error) {
+    console.error("Error loading services catalog:", error);
+    isLoading.value = false;
+  }
 }
 
 // Expose for parent ref access
