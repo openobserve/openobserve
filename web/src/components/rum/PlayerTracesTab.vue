@@ -160,11 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ formatTraceTimestamp(item.metadata?.start_time) }}
             </span>
           </template>
-          <template #cell-sessionTime="{ item }">
-            <span class="tw:text-xs tw:whitespace-nowrap tw:text-[var(--o2-text-secondary)]">
-              {{ traceTimeOffset(item.metadata?.start_time) || "—" }}
-            </span>
-          </template>
           <template #cell-route="{ item }">
             <span
               class="tw:truncate tw:font-mono tw:text-xs tw:block"
@@ -250,12 +245,6 @@ const traceColumns = computed(() => [
   {
     id: "timestamp",
     header: t("rum.timestamp"),
-    accessorFn: (row: any) => row.metadata?.start_time ?? 0,
-    meta: { align: "left", slot: true },
-  },
-  {
-    id: "sessionTime",
-    header: t("rum.timeInSession"),
     accessorFn: (row: any) => row.metadata?.start_time ?? 0,
     meta: { align: "left", slot: true },
   },
