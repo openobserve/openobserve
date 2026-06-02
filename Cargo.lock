@@ -7704,7 +7704,7 @@ dependencies = [
 [[package]]
 name = "proc-macro-error-attr2"
 version = "2.0.0"
-source = "git+https://github.com/hengfeiyang/proc-macro-error-2?branch=main#93071d687b5daeea01b05a3ceebd4187dd0c0fa6"
+source = "git+https://github.com/hengfeiyang/proc-macro-error-2?branch=main#3aec7aa1c9c4c9de7019f1b9f919e19380342bbf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7713,7 +7713,7 @@ dependencies = [
 [[package]]
 name = "proc-macro-error2"
 version = "2.0.1"
-source = "git+https://github.com/hengfeiyang/proc-macro-error-2?branch=main#93071d687b5daeea01b05a3ceebd4187dd0c0fa6"
+source = "git+https://github.com/hengfeiyang/proc-macro-error-2?branch=main#3aec7aa1c9c4c9de7019f1b9f919e19380342bbf"
 dependencies = [
  "proc-macro-error-attr2",
  "proc-macro2",
