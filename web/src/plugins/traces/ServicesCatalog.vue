@@ -805,17 +805,24 @@ async function checkStreamSchema(stream: string): Promise<Set<string>> {
 function buildDetectionSQL(
   config: ServiceDetectionConfig | null,
   availableFields: Set<string>,
-  stream: string
+  stream: string,
+  startTime: number,
+  endTime: number
 ): string {
   // Input validation
   if (!stream || typeof stream !== 'string' || stream.trim().length === 0) {
     throw new Error('Invalid stream parameter');
   }
 
+  // Validate time parameters
+  if (typeof startTime !== 'number' || typeof endTime !== 'number' || startTime >= endTime) {
+    throw new Error('Invalid time parameters');
+  }
+
   // Escape stream name for SQL identifier (basic escaping)
   const escapedStream = stream.replace(/"/g, '""');
 
-  const timeRangeWhere = "_timestamp >= ? AND _timestamp < ?";
+  const timeRangeWhere = `_timestamp >= ${startTime} AND _timestamp < ${endTime}`;
 
   if (!config) {
     // Fallback: original SQL without detection
@@ -868,11 +875,11 @@ function buildDetectionSQL(
       ? `COALESCE(${availableAttrs.join(', ')})`
       : availableAttrs[0];
 
-    detectionCases.push(`WHEN ${coalescedAttr} IS NOT NULL THEN ${coalescedAttr}`);
+    detectionCases.push(` WHEN ${coalescedAttr} IS NOT NULL THEN ${coalescedAttr}`);
   }
 
   const detectedServiceSQL = `CASE
-    ${detectionCases.join(' ')}
+    ${detectionCases.join('')}
     ELSE service_name
   END AS detected_service_name`;
 
@@ -920,7 +927,7 @@ async function loadServicesCatalog() {
     const availableFields = await checkStreamSchema(streamName);
 
     // Build SQL with service detection if config is available
-    const sql = buildDetectionSQL(serviceDetectionConfig.value, availableFields, streamName);
+    const sql = buildDetectionSQL(serviceDetectionConfig.value, availableFields, streamName, start_time, end_time);
 
     currentTraceId = generateTraceContext().traceId;
 
