@@ -118,10 +118,9 @@ jobs:
 
           | Severity | File:Line | Issue | Fix |
           |----------|-----------|-------|-----|
-          | High | `src/main.rs:42` | Potential null pointer dereference. | Use `if let Some(x) = opt` to safely unwrap. |
-          | Medium | `src/utils.rs:128` | Unnecessary clone before iteration. | Use `&collection` instead of cloning. |
-          | Low | `src/lib.rs:55` | Redundant check in if-else chain. | Merge conditions into a match expression. |
+          | High | `__PATH__:__LINE__` | __ISSUE_DESC__ | __FIX_DESC__ |
           ```
+          (one row per finding; replace __placeholders__ with real data)
 
           If NO issues found:
           ```
@@ -142,7 +141,7 @@ jobs:
           - DO NOT use any emojis anywhere in the output
           ENDINSTRUCTIONS
 
-          SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
+          SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity. CRITICAL: Only flag issues you can prove from the diff alone. Do NOT flag changes that appear intentional (renames, format changes, API updates). Never guess about compile errors or ownership semantics you cannot verify. If unsure, skip it. Do NOT use words like 'may' or 'might' — state a concrete problem or say nothing."
 
           RESPONSE=$(jq -n \
             --arg model "deepseek-chat" \
