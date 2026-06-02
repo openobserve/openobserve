@@ -5,25 +5,29 @@
       "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "cnt"
         ],
-        "note": "GROUP BY facility_zone with COUNT, ORDER BY cnt DESC",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "6"
+          ],
+          [
+            "ZONE-2",
+            "6"
+          ],
+          [
+            "ZONE-3",
+            "4"
+          ],
+          [
+            "ZONE-4",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": -1000000,
@@ -35,21 +39,29 @@
       "sql": "SELECT operation_mode, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" WHERE load_factor IS NOT NULL GROUP BY operation_mode ORDER BY avg_tput DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 3,
         "columns": [
           "operation_mode",
           "avg_load",
           "avg_tput"
         ],
-        "note": "GROUP BY operation_mode with multiple AVG aggregates",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "hybrid"
-            }
-          }
-        ]
+        "results": [
+          [
+            "hybrid",
+            "74.9",
+            "660.0"
+          ],
+          [
+            "manual",
+            "69.71",
+            "604.5"
+          ],
+          [
+            "auto",
+            "35.17",
+            "292.22"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 59000000,
@@ -61,25 +73,33 @@
       "sql": "SELECT sorter_model, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY sorter_model ORDER BY cnt DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 5,
         "columns": [
           "sorter_model",
           "cnt"
         ],
-        "note": "GROUP BY sorter_model with WHERE match_all filter",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "sorter_model": "SORT-X1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "SORT-X1",
+            "9"
+          ],
+          [
+            "SORT-A7",
+            "9"
+          ],
+          [
+            "SORT-M3",
+            "5"
+          ],
+          [
+            "SORT-Q5",
+            "3"
+          ],
+          [
+            "SORT-Z9",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 119000000,
@@ -91,18 +111,15 @@
       "sql": "SELECT SUM(throughput_rate) AS total_throughput FROM \"{stream}\" WHERE throughput_rate IS NOT NULL",
       "category": "aggregation",
       "expected": {
-        "row_count": 1,
         "columns": [
           "total_throughput"
         ],
-        "note": "Single-row aggregate: SUM with WHERE filter",
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "total_throughput",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "14280.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 179000000,
@@ -114,26 +131,34 @@
       "sql": "SELECT conveyor_lane, COUNT(*) AS cnt, ROUND(AVG(load_factor), 2) AS avg_load FROM \"{stream}\" WHERE load_factor IS NOT NULL GROUP BY conveyor_lane HAVING AVG(load_factor) > 40.0 ORDER BY avg_load DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "conveyor_lane",
           "cnt",
           "avg_load"
         ],
-        "note": "GROUP BY with HAVING on AVG",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "conveyor_lane": "LANE-B"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "LANE-B",
+            "9",
+            "75.53"
+          ],
+          [
+            "LANE-D",
+            "5",
+            "69.86"
+          ],
+          [
+            "LANE-C",
+            "5",
+            "51.24"
+          ],
+          [
+            "LANE-A",
+            "9",
+            "40.67"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 239000000,
@@ -145,28 +170,63 @@
       "sql": "SELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" GROUP BY facility_zone, operation_mode ORDER BY facility_zone ASC, cnt DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 8,
         "columns": [
           "facility_zone",
           "operation_mode",
           "cnt",
           "avg_tput"
         ],
-        "note": "Multi-column GROUP BY with AVG and COUNT",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "auto",
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "auto",
+            "6",
+            "170.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "3",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "6",
+            "610.0"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "3",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "3",
+            "480.0"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "2",
+            "290.0"
+          ],
+          [
+            "ZONE-4",
+            "manual",
+            "3",
+            "555.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "2",
+            "610.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 299000000,
@@ -178,7 +238,6 @@
       "sql": "SELECT control_center, SUM(item_count) AS total_items, ROUND(AVG(charge_remaining), 2) AS avg_charge, MIN(charge_remaining) AS min_charge, MAX(charge_remaining) AS max_charge FROM \"{stream}\" GROUP BY control_center ORDER BY total_items DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "control_center",
           "total_items",
@@ -186,20 +245,37 @@
           "min_charge",
           "max_charge"
         ],
-        "note": "Multiple aggregates: SUM, AVG, MIN, MAX on charge_remaining",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "control_center": "CC-BETA"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "total_items",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "CC-BETA",
+            "2325",
+            "60.1",
+            "25.0",
+            "88.7"
+          ],
+          [
+            "CC-DELTA",
+            "1505",
+            "26.2",
+            "5.0",
+            "58.0"
+          ],
+          [
+            "CC-GAMMA",
+            "1420",
+            "63.5",
+            "42.5",
+            "95.0"
+          ],
+          [
+            "CC-ALPHA",
+            "594",
+            "39.53",
+            "10.0",
+            "75.3"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 359000000,
@@ -211,26 +287,34 @@
       "sql": "SELECT facility_zone, COUNT(*) AS cnt, COUNT(DISTINCT sorter_model) AS distinct_sorters FROM \"{stream}\" GROUP BY facility_zone ORDER BY cnt DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "cnt",
           "distinct_sorters"
         ],
-        "note": "COUNT and COUNT DISTINCT in same GROUP BY",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "9",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "9",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 419000000,
@@ -242,14 +326,39 @@
       "sql": "SELECT build_signature, ROUND(AVG(runtime_hours), 1) AS avg_runtime, MIN(runtime_hours) AS min_runtime, MAX(runtime_hours) AS max_runtime FROM \"{stream}\" WHERE runtime_hours IS NOT NULL GROUP BY build_signature ORDER BY avg_runtime DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "build_signature",
           "avg_runtime",
           "min_runtime",
           "max_runtime"
         ],
-        "note": "AVG, MIN, MAX on runtime_hours grouped by build_signature"
+        "results": [
+          [
+            "BS-2025-D4",
+            "444.0",
+            "360",
+            "500"
+          ],
+          [
+            "BS-2026-B2",
+            "373.3",
+            "48",
+            "1000"
+          ],
+          [
+            "BS-2026-A1",
+            "278.0",
+            "24",
+            "720"
+          ],
+          [
+            "BS-2026-C3",
+            "148.8",
+            "120",
+            "168"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 479000000,
@@ -261,27 +370,45 @@
       "sql": "SELECT sorter_model, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor) + AVG(throughput_rate), 2) AS combined_score FROM \"{stream}\" WHERE load_factor IS NOT NULL AND throughput_rate IS NOT NULL GROUP BY sorter_model HAVING AVG(throughput_rate) > 300.0 ORDER BY combined_score DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 5,
         "columns": [
           "sorter_model",
           "avg_load",
           "avg_tput",
           "combined_score"
         ],
-        "note": "Computed aggregate expression (avg_load + avg_tput) with HAVING",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "sorter_model": "SORT-A7"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "combined_score",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "SORT-A7",
+            "75.53",
+            "686.67",
+            "762.2"
+          ],
+          [
+            "SORT-Z9",
+            "72.8",
+            "610.0",
+            "682.8"
+          ],
+          [
+            "SORT-Q5",
+            "67.9",
+            "555.0",
+            "622.9"
+          ],
+          [
+            "SORT-M3",
+            "51.24",
+            "404.0",
+            "455.24"
+          ],
+          [
+            "SORT-X1",
+            "40.67",
+            "355.0",
+            "395.67"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 539000000,
@@ -293,26 +420,29 @@
       "sql": "SELECT operation_mode, COUNT(*) AS cnt, ROUND(CAST(COUNT(*) AS FLOAT) / NULLIF(SUM(COUNT(*)) OVER (), 0) * 100.0, 2) AS pct_of_total FROM \"{stream}\" GROUP BY operation_mode ORDER BY cnt DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 3,
         "columns": [
           "operation_mode",
           "cnt",
           "pct_of_total"
         ],
-        "note": "Window-based percentage of total within GROUP BY result",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "manual"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "manual",
+            "12",
+            "42.86000061035156"
+          ],
+          [
+            "auto",
+            "10",
+            "35.709999084472656"
+          ],
+          [
+            "hybrid",
+            "6",
+            "21.43000030517578"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 599000000,
@@ -324,27 +454,39 @@
       "sql": "SELECT facility_zone, COUNT(*) FILTER (WHERE load_factor > 60.0) AS high_load_cnt, COUNT(*) FILTER (WHERE load_factor <= 60.0) AS low_load_cnt, ROUND(AVG(cell_temp), 2) AS avg_cell_temp FROM \"{stream}\" GROUP BY facility_zone ORDER BY high_load_cnt DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "high_load_cnt",
           "low_load_cnt",
           "avg_cell_temp"
         ],
-        "note": "Conditional COUNT with CASE filtered GROUP BY",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-2"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "high_load_cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-2",
+            "6",
+            "3",
+            "27.07"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "0",
+            "29.38"
+          ],
+          [
+            "ZONE-1",
+            "3",
+            "6",
+            "28.9"
+          ],
+          [
+            "ZONE-3",
+            "0",
+            "5",
+            "25.7"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 659000000,
@@ -356,27 +498,39 @@
       "sql": "SELECT conveyor_lane, COUNT(*) FILTER (WHERE operation_mode='auto') AS auto_cnt, COUNT(*) FILTER (WHERE operation_mode='manual') AS manual_cnt, COUNT(*) FILTER (WHERE operation_mode='hybrid') AS hybrid_cnt FROM \"{stream}\" GROUP BY conveyor_lane ORDER BY conveyor_lane ASC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "conveyor_lane",
           "auto_cnt",
           "manual_cnt",
           "hybrid_cnt"
         ],
-        "note": "Multiple FILTER aggregates for pivot-style output",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "conveyor_lane": "LANE-A"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "auto_cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "LANE-A",
+            "6",
+            "3",
+            "0"
+          ],
+          [
+            "LANE-B",
+            "0",
+            "6",
+            "3"
+          ],
+          [
+            "LANE-C",
+            "2",
+            "0",
+            "3"
+          ],
+          [
+            "LANE-D",
+            "2",
+            "3",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 719000000,
@@ -388,27 +542,39 @@
       "sql": "SELECT control_center, ROUND(AVG(defect_limit), 3) AS avg_defect, ROUND(AVG(throughput_rate), 2) AS avg_tput, CASE WHEN AVG(defect_limit) > 2.0 THEN 'HIGH_DEFECT' WHEN AVG(throughput_rate) < 300.0 THEN 'LOW_THROUGHPUT' ELSE 'NOMINAL' END AS risk_flag FROM \"{stream}\" GROUP BY control_center ORDER BY avg_defect DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "control_center",
           "avg_defect",
           "avg_tput",
           "risk_flag"
         ],
-        "note": "CASE in SELECT of GROUP BY for computed classification",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "control_center": "CC-BETA"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "avg_defect",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "CC-BETA",
+            "2.5",
+            "686.67",
+            "HIGH_DEFECT"
+          ],
+          [
+            "CC-ALPHA",
+            "1.933",
+            "355.0",
+            "NOMINAL"
+          ],
+          [
+            "CC-DELTA",
+            "1.52",
+            "577.0",
+            "NOMINAL"
+          ],
+          [
+            "CC-GAMMA",
+            "1.22",
+            "404.0",
+            "NOMINAL"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 779000000,
@@ -420,27 +586,39 @@
       "sql": "SELECT sorter_model, facility_zone, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY sorter_model, facility_zone ORDER BY sorter_model ASC, cnt DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 5,
         "columns": [
           "sorter_model",
           "facility_zone",
           "cnt"
         ],
-        "note": "GROUP BY ROLLUP-style two-column grouping (simulated with regular GROUP BY)",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-2",
-              "sorter_model": "SORT-A7"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "SORT-A7",
+            "ZONE-2",
+            "9"
+          ],
+          [
+            "SORT-M3",
+            "ZONE-3",
+            "5"
+          ],
+          [
+            "SORT-Q5",
+            "ZONE-4",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "ZONE-1",
+            "9"
+          ],
+          [
+            "SORT-Z9",
+            "ZONE-4",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 839000000,
@@ -452,26 +630,34 @@
       "sql": "WITH mode_counts AS (SELECT facility_zone, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY facility_zone, operation_mode), ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY cnt DESC) AS rn FROM mode_counts) SELECT facility_zone, cnt AS mode_count, operation_mode AS dominant_mode FROM ranked WHERE rn = 1 ORDER BY facility_zone ASC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "mode_count",
           "dominant_mode"
         ],
-        "note": "Subquery-based mode aggregation + dominant mode via CTE",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "mode_count",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "6",
+            "auto"
+          ],
+          [
+            "ZONE-2",
+            "6",
+            "manual"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "hybrid"
+          ],
+          [
+            "ZONE-4",
+            "3",
+            "manual"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 899000000,
@@ -483,22 +669,33 @@
       "sql": "SELECT operation_mode, MAX(item_count) AS max_tput_item, MIN(item_count) AS min_tput_item, MAX(item_count) - MIN(item_count) AS spread FROM \"{stream}\" WHERE item_count > 0 GROUP BY operation_mode ORDER BY spread DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 3,
         "columns": [
           "operation_mode",
           "max_tput_item",
           "min_tput_item",
           "spread"
         ],
-        "note": "MAX-MIN spread computation in GROUP BY",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "manual"
-            }
-          }
-        ]
+        "results": [
+          [
+            "manual",
+            "500",
+            "88",
+            "412"
+          ],
+          [
+            "auto",
+            "410",
+            "50",
+            "360"
+          ],
+          [
+            "hybrid",
+            "200",
+            "155",
+            "45"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 959000000,
@@ -510,27 +707,39 @@
       "sql": "SELECT conveyor_lane, SUM(scan_attempts) AS scan_total, ROUND(AVG(CAST(scan_attempts AS FLOAT)), 2) AS avg_scan, ROUND(CAST(COUNT(*) FILTER (WHERE scan_attempts >= 3) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS retry_rate FROM \"{stream}\" GROUP BY conveyor_lane ORDER BY retry_rate DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "conveyor_lane",
           "scan_total",
           "avg_scan",
           "retry_rate"
         ],
-        "note": "SUM + AVG + computed rate per lane",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "conveyor_lane": "LANE-B"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "scan_total",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "LANE-B",
+            "33",
+            "3.67",
+            "66.66999816894531"
+          ],
+          [
+            "LANE-C",
+            "11",
+            "2.2",
+            "60.0"
+          ],
+          [
+            "LANE-D",
+            "11",
+            "2.2",
+            "60.0"
+          ],
+          [
+            "LANE-A",
+            "15",
+            "1.67",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 1019000000,
@@ -542,21 +751,39 @@
       "sql": "SELECT build_signature, ROUND(STDDEV(throughput_rate), 2) AS std_tput, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0), 4) AS cv_tput FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY build_signature HAVING COUNT(*) >= 2 ORDER BY cv_tput DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "build_signature",
           "std_tput",
           "avg_load",
           "cv_tput"
         ],
-        "note": "STDDEV + AVG + coefficient of variation per build",
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "cv_tput",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "BS-2026-A1",
+            "278.04",
+            "40.67",
+            "0.7832"
+          ],
+          [
+            "BS-2026-B2",
+            "276.22",
+            "75.53",
+            "0.4023"
+          ],
+          [
+            "BS-2026-C3",
+            "104.07",
+            "51.24",
+            "0.2576"
+          ],
+          [
+            "BS-2025-D4",
+            "30.12",
+            "69.86",
+            "0.0522"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 1079000000,
@@ -568,26 +795,34 @@
       "sql": "SELECT facility_zone, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining < 30.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS below_30_pct, ROUND(CAST(COUNT(*) FILTER (WHERE charge_remaining > 70.0) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS above_70_pct FROM \"{stream}\" GROUP BY facility_zone ORDER BY below_30_pct DESC",
       "category": "aggregation",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "below_30_pct",
           "above_70_pct"
         ],
-        "note": "Percentage-bucketized aggregation with FILTER",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-4"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "below_30_pct",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-4",
+            "60.0",
+            "0.0"
+          ],
+          [
+            "ZONE-1",
+            "33.33000183105469",
+            "33.33000183105469"
+          ],
+          [
+            "ZONE-2",
+            "33.33000183105469",
+            "33.33000183105469"
+          ],
+          [
+            "ZONE-3",
+            "0.0",
+            "40.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 1139000000,

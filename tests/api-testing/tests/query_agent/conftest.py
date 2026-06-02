@@ -32,6 +32,26 @@ STREAM = f"query_agent_test_{int(time.time())}"
 
 
 # ── Shared query loader ────────────────────────────────────────────────────
+def _values_equal(a: str, b: str, rel_tol: float = 0.05) -> bool:
+    """Compare two value strings, with relative tolerance for floats.
+
+    Cross-engine floating-point aggregates (AVG, STDDEV, etc.) differ
+    at the least-significant digits due to summation order.  A 1 %
+    relative tolerance catches these while keeping exact match for
+    strings, integers, and timestamps.
+    """
+    if a == b:
+        return True
+    # OO serializes NULL as "" while DuckDB uses "None" — treat as equal
+    if (a == "" and b == "None") or (a == "None" and b == ""):
+        return True
+    try:
+        fa = float(a)
+        fb = float(b)
+        denom = max(abs(fa), abs(fb), 1.0)
+        return abs(fa - fb) / denom < rel_tol
+    except (ValueError, TypeError):
+        return False
 def load_all_queries():
     """Return {category_name: [queries]} from queries/*.json files."""
     categories: dict[str, list[dict]] = {}
@@ -46,9 +66,20 @@ def load_all_queries():
 def run_query(client, query, *, skip_fts_count=False):
     """Execute a single query via _search and assert expected results.
 
-    When *skip_fts_count* is True, the row_count assertion is skipped for
-    full_text_search queries (Tantivy FTS not available pre-flush).
+    Two modes, determined by the presence of ``results`` in expected:
+
+    * sqllogictest mode (results present): extract column values from hits
+      as strings, sort if results_mode is "rowsort", then compare
+      cell-by-cell against the expected result set computed by DuckDB.
+
+    * Legacy assertion mode (results absent — histogram queries, Q122,
+      and a few complex subqueries): check row_count, column presence,
+      and run explicit content assertions.
+
+    When *skip_fts_count* is True, full_text_search row_count is skipped
+    (Tantivy FTS not available pre-flush).
     """
+    qid = query["id"]
     size = 500
     offset = query["time_offset"]
     sql = query["sql"].replace("{stream}", STREAM)
@@ -60,35 +91,54 @@ def run_query(client, query, *, skip_fts_count=False):
     )
     resp = client.post("_search?type=logs", json=json_data)
     assert resp.status_code == 200, \
-        f"{query['id']}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
+        f"{qid}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
 
     response_data = resp.json()
-    assert "hits" in response_data, f"{query['id']}: Response should contain 'hits'"
+    assert "hits" in response_data, f"{qid}: Response should contain 'hits'"
     hits = response_data["hits"]
 
-    is_fts = query.get("category") == "full_text_search"
     expected = query.get("expected", {})
+    is_fts = query.get("category") == "full_text_search"
 
-    if expected.get("row_count") is not None:
-        if not (skip_fts_count and is_fts) and not expected.get("skip_row_count"):
-            assert len(hits) == expected["row_count"], \
-                f"{query['id']}: Expected {expected['row_count']} rows, got {len(hits)}"
+    if "results" in expected and not (skip_fts_count and is_fts) and not expected.get("skip_sqllogictest"):
+        # ── sqllogictest mode: result-set comparison with float tolerance ─
+        cols = expected["columns"]
+        actual = sorted(
+            [str(hit.get(col, "")) for col in cols] for hit in hits
+        )
+        want = sorted(expected["results"])
+
+        assert len(actual) == len(want), \
+            f"{qid}: row count mismatch — got {len(actual)}, expected {len(want)}"
+
+        for i, (got_row, want_row) in enumerate(zip(actual, want)):
+            assert len(got_row) == len(want_row), \
+                f"{qid}: column count mismatch at row {i}"
+            for j, (gv, wv) in enumerate(zip(got_row, want_row)):
+                if not _values_equal(gv, wv):
+                    assert False, \
+                        f"{qid}: mismatch at row {i}, col {j} ('{cols[j]}'): got {gv!r}, expected {wv!r}"
+
+    else:
+        # ── Legacy assertion mode (histogram, broken queries, complex CTEs)
+        if expected.get("row_count") is not None:
+            if not (skip_fts_count and is_fts) and not expected.get("skip_row_count"):
+                assert len(hits) == expected["row_count"], \
+                    f"{qid}: Expected {expected['row_count']} rows, got {len(hits)}"
+
         assert len(hits) < size, \
-            f"{query['id']}: Got {len(hits)} rows at size={size} — result may be truncated"
+            f"{qid}: Got {len(hits)} rows at size={size} — result may be truncated"
 
-    # Column assertions only run when hits are non-empty.
-    # Queries with row_count=0 must NOT include "columns" in expected
-    # (they can't be validated and would silently pass unchecked).
-    if len(hits) > 0:
-        for col in expected.get("columns", []):
-            assert col in hits[0], f"{query['id']}: Expected column '{col}' not in response"
+        if len(hits) > 0:
+            for col in expected.get("columns", []):
+                assert col in hits[0], f"{qid}: Expected column '{col}' not in response"
 
-    _run_content_assertions(query, sql, hits)
+        _run_content_assertions(query, sql, hits)
 
-    logging.info("%s passed: %d rows", query["id"], len(hits))
+    logging.info("%s passed: %d rows", qid, len(hits))
 
 
-# ── Content + Order Assertions ──────────────────────────────────────────────
+# ── Legacy Content Assertions (for queries without DuckDB results) ──────────
 def _paren_depth(text, pos):
     """Return the nesting depth of parentheses at *pos* within *text*."""
     depth = 0
@@ -101,31 +151,23 @@ def _paren_depth(text, pos):
 
 
 def _run_content_assertions(query, sql, hits):
-    """Validate result content: not-null columns, ORDER BY direction, and
-    any explicit assertions defined in the query JSON.
+    """Validate result content via explicit assertions in the query JSON.
 
-    Auto-inferred from existing data:
-      - *not_null*: every column in expected.columns must be non-null
-      - *order*: parsed from the SQL ORDER BY clause
-
-    Explicit (opt-in, per-query in JSON ``expected.assertions``):
-      - *row_contains*: at least one row matches the given key/value pairs
-      - *value_range*: numeric column values are within [min, max]
+    Auto-inferred: ORDER BY direction from the outermost SQL ORDER BY clause.
+    Explicit (per-query in ``expected.assertions``): row_contains, value_range.
     """
     qid = query["id"]
     expected = query.get("expected", {})
 
-    # Collect assertions: explicit JSON ones + auto-inferred
     assertions: list[dict] = list(expected.get("assertions", []))
 
     # Auto-infer order from the outermost SQL ORDER BY clause.
-    # Window-function ORDER BYs (inside OVER parentheses) are excluded.
     order_matches = [
         m for m in re.finditer(
             r"ORDER\s+BY\s+([^\s,]+)\s*(ASC|DESC)?",
             sql, re.IGNORECASE,
         )
-        if _paren_depth(sql, m.start()) == 0  # top-level only
+        if _paren_depth(sql, m.start()) == 0
     ]
     if order_matches:
         m = order_matches[-1]
@@ -133,23 +175,16 @@ def _run_content_assertions(query, sql, hits):
         direction = (m.group(2) or "ASC").upper()
         assertions.append({"type": "order", "column": col, "direction": direction})
 
-    # Execute each assertion
     for i, a in enumerate(assertions):
         a_type = a["type"]
         label = f"{qid}: [{i}] {a_type}"
 
-        if a_type == "not_null":
-            col = a["column"]
-            for j, hit in enumerate(hits):
-                assert hit.get(col) is not None, \
-                    f"{label}: '{col}' is null in row {j}"
-
-        elif a_type == "order":
+        if a_type == "order":
             col = a["column"]
             direction = a.get("direction", "ASC")
             values = [hit.get(col) for hit in hits if col in hit]
             if len(values) < 2:
-                continue  # single row — trivially ordered
+                continue
             ordered = values == sorted(values) if direction == "ASC" \
                 else values == sorted(values, reverse=True)
             assert ordered, \

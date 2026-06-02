@@ -5,13 +5,61 @@
       "sql": "SELECT _timestamp, COALESCE(facility_zone, 'UNKNOWN_ZONE') AS safe_zone, CONCAT(sorter_model, ' @ ', control_center) AS sorter_op_label FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 12",
       "category": "string_functions",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "safe_zone",
           "sorter_op_label"
         ],
-        "note": "COALESCE + CONCAT combining sorter and facility zone"
+        "results": [
+          [
+            "ZONE-1",
+            "SORT-X1 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Q5 @ CC-DELTA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-A7 @ CC-BETA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-A7 @ CC-BETA"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3 @ CC-GAMMA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-A7 @ CC-BETA"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3 @ CC-GAMMA"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Z9 @ CC-DELTA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Q5 @ CC-DELTA"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 6719000000,
@@ -23,26 +71,61 @@
       "sql": "SELECT _timestamp, re_match(log, 'warehouse|event') AS matched, split_part(log, ' ', 1) AS first_word FROM \"{stream}\" WHERE log IS NOT NULL ORDER BY _timestamp DESC LIMIT 12",
       "category": "string_functions",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "matched",
           "first_word"
         ],
-        "note": "re_match + split_part on log field",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "first_word": "Q114"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "matched",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q116"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q116"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q116"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q113"
+          ],
+          [
+            "True",
+            "Q115"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 6779000000,
@@ -54,16 +137,100 @@
       "sql": "SELECT _timestamp, UPPER(pallet_id) AS pallet_upper, LOWER(conveyor_lane) AS lane_lower, CONCAT(sorter_model, '-', operation_mode) AS sorter_op, TRIM(COALESCE(build_signature, '')) AS clean_build, LENGTH(CONCAT(facility_zone, '-', control_center)) AS label_len FROM \"{stream}\" WHERE pallet_id IS NOT NULL ORDER BY _timestamp DESC LIMIT 12",
       "category": "string_functions",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "pallet_upper",
           "lane_lower",
           "sorter_op",
           "clean_build",
           "label_len"
         ],
-        "note": "5 string functions: UPPER, LOWER, CONCAT, TRIM+COALESCE, LENGTH+CONCAT"
+        "results": [
+          [
+            "PL-002",
+            "lane-b",
+            "SORT-A7-manual",
+            "BS-2026-B2",
+            "14"
+          ],
+          [
+            "PL-003",
+            "lane-c",
+            "SORT-M3-hybrid",
+            "BS-2026-C3",
+            "15"
+          ],
+          [
+            "PL-006",
+            "lane-b",
+            "SORT-A7-hybrid",
+            "BS-2026-B2",
+            "14"
+          ],
+          [
+            "PL-001",
+            "lane-a",
+            "SORT-X1-auto",
+            "BS-2026-A1",
+            "15"
+          ],
+          [
+            "PL-002",
+            "lane-b",
+            "SORT-A7-manual",
+            "BS-2026-B2",
+            "14"
+          ],
+          [
+            "PL-005",
+            "lane-a",
+            "SORT-X1-manual",
+            "BS-2026-A1",
+            "15"
+          ],
+          [
+            "PL-008",
+            "lane-d",
+            "SORT-Q5-manual",
+            "BS-2025-D4",
+            "15"
+          ],
+          [
+            "PL-001",
+            "lane-a",
+            "SORT-X1-auto",
+            "BS-2026-A1",
+            "15"
+          ],
+          [
+            "PL-004",
+            "lane-d",
+            "SORT-Z9-auto",
+            "BS-2025-D4",
+            "15"
+          ],
+          [
+            "PL-007",
+            "lane-c",
+            "SORT-M3-auto",
+            "BS-2026-C3",
+            "15"
+          ],
+          [
+            "PL-002",
+            "lane-b",
+            "SORT-A7-manual",
+            "BS-2026-B2",
+            "14"
+          ],
+          [
+            "PL-003",
+            "lane-c",
+            "SORT-M3-hybrid",
+            "BS-2026-C3",
+            "15"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 6839000000,
@@ -75,23 +242,183 @@
       "sql": "SELECT _timestamp, pallet_id, re_match(pallet_id, 'PL-00[1-4]') AS is_front_pallet, split_part(pallet_id, '-', 1) AS prefix, split_part(pallet_id, '-', 2) AS suffix_num FROM \"{stream}\" WHERE re_match(pallet_id, 'PL-00[1-8]') = TRUE ORDER BY suffix_num ASC",
       "category": "string_functions",
       "expected": {
-        "row_count": 28,
         "columns": [
-          "_timestamp",
           "pallet_id",
           "is_front_pallet",
           "prefix",
           "suffix_num"
         ],
-        "note": "re_match with regex character class + split_part on dash delimiter",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "pallet_id": "PL-001"
-            }
-          }
-        ]
+        "results": [
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-002",
+            "True",
+            "PL",
+            "002"
+          ],
+          [
+            "PL-002",
+            "True",
+            "PL",
+            "002"
+          ],
+          [
+            "PL-002",
+            "True",
+            "PL",
+            "002"
+          ],
+          [
+            "PL-002",
+            "True",
+            "PL",
+            "002"
+          ],
+          [
+            "PL-002",
+            "True",
+            "PL",
+            "002"
+          ],
+          [
+            "PL-002",
+            "True",
+            "PL",
+            "002"
+          ],
+          [
+            "PL-003",
+            "True",
+            "PL",
+            "003"
+          ],
+          [
+            "PL-003",
+            "True",
+            "PL",
+            "003"
+          ],
+          [
+            "PL-003",
+            "True",
+            "PL",
+            "003"
+          ],
+          [
+            "PL-004",
+            "True",
+            "PL",
+            "004"
+          ],
+          [
+            "PL-004",
+            "True",
+            "PL",
+            "004"
+          ],
+          [
+            "PL-005",
+            "False",
+            "PL",
+            "005"
+          ],
+          [
+            "PL-005",
+            "False",
+            "PL",
+            "005"
+          ],
+          [
+            "PL-005",
+            "False",
+            "PL",
+            "005"
+          ],
+          [
+            "PL-006",
+            "False",
+            "PL",
+            "006"
+          ],
+          [
+            "PL-006",
+            "False",
+            "PL",
+            "006"
+          ],
+          [
+            "PL-006",
+            "False",
+            "PL",
+            "006"
+          ],
+          [
+            "PL-007",
+            "False",
+            "PL",
+            "007"
+          ],
+          [
+            "PL-007",
+            "False",
+            "PL",
+            "007"
+          ],
+          [
+            "PL-008",
+            "False",
+            "PL",
+            "008"
+          ],
+          [
+            "PL-008",
+            "False",
+            "PL",
+            "008"
+          ],
+          [
+            "PL-008",
+            "False",
+            "PL",
+            "008"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 6899000000,
@@ -103,27 +430,40 @@
       "sql": "SELECT control_center, STRING_AGG(DISTINCT sorter_model, ' | ' ORDER BY sorter_model ASC) AS sorter_models, STRING_AGG(DISTINCT operation_mode, ', ') AS op_modes, COUNT(*) AS event_cnt FROM \"{stream}\" WHERE control_center IS NOT NULL GROUP BY control_center HAVING COUNT(*) >= 2 ORDER BY event_cnt DESC",
       "category": "string_functions",
       "expected": {
-        "row_count": 4,
         "columns": [
           "control_center",
           "sorter_models",
           "op_modes",
           "event_cnt"
         ],
-        "note": "STRING_AGG with DISTINCT + ORDER BY, second STRING_AGG for another column",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "control_center": "CC-ALPHA"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "event_cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "CC-ALPHA",
+            "SORT-X1",
+            "auto, manual",
+            "9"
+          ],
+          [
+            "CC-BETA",
+            "SORT-A7",
+            "hybrid, manual",
+            "9"
+          ],
+          [
+            "CC-GAMMA",
+            "SORT-M3",
+            "hybrid, auto",
+            "5"
+          ],
+          [
+            "CC-DELTA",
+            "SORT-Q5 | SORT-Z9",
+            "auto, manual",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 6959000000,
@@ -135,24 +475,177 @@
       "sql": "SELECT _timestamp, pallet_id, build_signature, SUBSTR(build_signature, 1, 8) AS build_prefix, SUBSTR(build_signature, 10, 2) AS build_suffix, REPLACE(build_signature, 'BS-', 'BUILD_') AS replaced_sig FROM \"{stream}\" WHERE build_signature LIKE 'BS-2026-%' ORDER BY build_signature ASC, _timestamp ASC",
       "category": "string_functions",
       "expected": {
-        "row_count": 23,
         "columns": [
-          "_timestamp",
           "pallet_id",
           "build_signature",
           "build_prefix",
           "build_suffix",
           "replaced_sig"
         ],
-        "note": "SUBSTR (two positions) + REPLACE + LIKE pattern filter",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "pallet_id": "PL-001"
-            }
-          }
-        ]
+        "results": [
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-005",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-005",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-005",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-006",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-006",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-006",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-003",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ],
+          [
+            "PL-007",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ],
+          [
+            "PL-003",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ],
+          [
+            "PL-007",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ],
+          [
+            "PL-003",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 7019000000,
@@ -164,25 +657,212 @@
       "sql": "SELECT _timestamp, pallet_id, conveyor_lane, facility_zone, LOWER(CONCAT(SUBSTR(conveyor_lane, 1, 4), '-', SUBSTR(facility_zone, 5, 1))) AS short_code, CASE WHEN re_match(CONCAT(conveyor_lane, '-', facility_zone), 'LANE-[AB]-ZONE-[12]') THEN 'core' ELSE 'edge' END AS location_type FROM \"{stream}\" WHERE conveyor_lane IS NOT NULL AND facility_zone IS NOT NULL ORDER BY location_type ASC, short_code ASC",
       "category": "string_functions",
       "expected": {
-        "row_count": 28,
         "columns": [
-          "_timestamp",
           "pallet_id",
           "conveyor_lane",
           "facility_zone",
           "short_code",
           "location_type"
         ],
-        "note": "Nested: LOWER(CONCAT(SUBSTR, SUBSTR)) + CASE with re_match on CONCAT result",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-2",
-              "conveyor_lane": "LANE-B"
-            }
-          }
-        ]
+        "results": [
+          [
+            "PL-001",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-001",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-005",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-006",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-001",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-001",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-001",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-006",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-005",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-005",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-006",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-001",
+            "LANE-A",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "ZONE-2",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-008",
+            "LANE-D",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-008",
+            "LANE-D",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-008",
+            "LANE-D",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-003",
+            "LANE-C",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-004",
+            "LANE-D",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-007",
+            "LANE-C",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-004",
+            "LANE-D",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-003",
+            "LANE-C",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-007",
+            "LANE-C",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-003",
+            "LANE-C",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 7079000000,
@@ -194,25 +874,100 @@
       "sql": "SELECT _timestamp, pallet_id, sorter_model, COALESCE(sorter_model, 'UNKNOWN_SORTER') AS safe_sorter, NULLIF(sorter_model, 'SORT-Q5') AS exclude_q5, COALESCE(NULLIF(sorter_model, 'SORT-Q5'), 'FILTERED') AS filtered_sorter FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 12",
       "category": "string_functions",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "pallet_id",
           "sorter_model",
           "safe_sorter",
           "exclude_q5",
           "filtered_sorter"
         ],
-        "note": "COALESCE + NULLIF + chained COALESCE(NULLIF(...))",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "sorter_model": "SORT-X1",
-              "pallet_id": "PL-001"
-            }
-          }
-        ]
+        "results": [
+          [
+            "PL-001",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-008",
+            "SORT-Q5",
+            "SORT-Q5",
+            "None",
+            "FILTERED"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "PL-007",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "PL-004",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-008",
+            "SORT-Q5",
+            "SORT-Q5",
+            "None",
+            "FILTERED"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 7139000000,
@@ -224,9 +979,7 @@
       "sql": "SELECT _timestamp, log, pallet_id, re_match(log, 'warehouse|event') AS has_keyword, re_match(log, '[0-9]+') AS has_digit, LENGTH(log) AS msg_length, POSITION('record' IN log) AS record_pos FROM \"{stream}\" WHERE re_match(log, 'warehouse') = TRUE ORDER BY msg_length DESC LIMIT 12",
       "category": "string_functions",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "log",
           "pallet_id",
           "has_keyword",
@@ -234,20 +987,106 @@
           "msg_length",
           "record_pos"
         ],
-        "note": "re_match (two patterns) + LENGTH + POSITION on log field",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "pallet_id": "PL-003"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "record_pos",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "Q119 warehouse event record 7",
+            "PL-008",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q119 warehouse event record 8",
+            "PL-001",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q119 warehouse event record 9",
+            "PL-002",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q120 warehouse event record 4",
+            "PL-005",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q120 warehouse event record 5",
+            "PL-006",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q120 warehouse event record 6",
+            "PL-007",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q120 warehouse event record 7",
+            "PL-008",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q120 warehouse event record 8",
+            "PL-001",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q120 warehouse event record 9",
+            "PL-002",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 0",
+            "PL-001",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 1",
+            "PL-002",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 2",
+            "PL-003",
+            "True",
+            "True",
+            "29",
+            "22"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 7199000000,

@@ -5,26 +5,29 @@
       "sql": "SELECT load_tier, COUNT(*) AS cnt, approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.95) AS p95_tput FROM (SELECT CASE WHEN load_factor < 30.0 THEN 'light' WHEN load_factor < 65.0 THEN 'moderate' ELSE 'heavy' END AS load_tier, throughput_rate FROM \"{stream}\" WHERE throughput_rate IS NOT NULL AND load_factor IS NOT NULL) sub GROUP BY load_tier ORDER BY load_tier ASC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 3,
         "columns": [
           "load_tier",
           "cnt",
           "p95_tput"
         ],
-        "note": "Subquery with CASE classification + approx_percentile_cont",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "load_tier": "heavy"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "heavy",
+            "14",
+            "900.0"
+          ],
+          [
+            "light",
+            "6",
+            "190.0"
+          ],
+          [
+            "moderate",
+            "8",
+            "480.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 2699000000,
@@ -36,27 +39,39 @@
       "sql": "WITH total_counts AS (SELECT facility_zone, COUNT(*) AS total_events FROM \"{stream}\" GROUP BY facility_zone), auto_counts AS (SELECT facility_zone, COUNT(*) AS auto_events FROM \"{stream}\" WHERE operation_mode = 'auto' GROUP BY facility_zone) SELECT tc.facility_zone, tc.total_events, COALESCE(ac.auto_events, 0) AS auto_events, ROUND(CAST(COALESCE(ac.auto_events, 0) AS FLOAT) / CAST(tc.total_events AS FLOAT) * 100.0, 2) AS auto_pct FROM total_counts tc LEFT JOIN auto_counts ac ON tc.facility_zone = ac.facility_zone ORDER BY auto_pct DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "total_events",
           "auto_events",
           "auto_pct"
         ],
-        "note": "Two CTEs with LEFT JOIN for percentage computation",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "total_events",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "9",
+            "6",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "2",
+            "40.0"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "2",
+            "40.0"
+          ],
+          [
+            "ZONE-2",
+            "9",
+            "0",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 2759000000,
@@ -68,26 +83,84 @@
       "sql": "SELECT pallet_id, throughput_rate, load_factor FROM \"{stream}\" WHERE throughput_rate > (SELECT AVG(throughput_rate) FROM \"{stream}\" WHERE throughput_rate IS NOT NULL) ORDER BY throughput_rate DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 14,
         "columns": [
           "pallet_id",
           "throughput_rate",
           "load_factor"
         ],
-        "note": "Subquery in WHERE with scalar aggregate; above-avg throughput rows",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "pallet_id": "PL-002"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "load_factor",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "PL-002",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "PL-002",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "PL-002",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "PL-006",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "PL-006",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "PL-006",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "PL-005",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "PL-005",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "PL-005",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "PL-004",
+            "610.0",
+            "72.8"
+          ],
+          [
+            "PL-004",
+            "610.0",
+            "72.8"
+          ],
+          [
+            "PL-008",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "PL-008",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "PL-008",
+            "555.0",
+            "67.9"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 2819000000,
@@ -99,26 +172,34 @@
       "sql": "SELECT derived.facility_zone, derived.avg_tput, derived.cnt FROM (SELECT facility_zone, ROUND(AVG(throughput_rate), 2) AS avg_tput, COUNT(*) AS cnt FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone) AS derived WHERE derived.avg_tput > 300.0 ORDER BY derived.avg_tput DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "avg_tput",
           "cnt"
         ],
-        "note": "Derived table subquery in FROM with outer WHERE filter",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-2"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-2",
+            "686.67",
+            "9"
+          ],
+          [
+            "ZONE-4",
+            "577.0",
+            "5"
+          ],
+          [
+            "ZONE-3",
+            "404.0",
+            "5"
+          ],
+          [
+            "ZONE-1",
+            "355.0",
+            "9"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 2879000000,
@@ -130,22 +211,74 @@
       "sql": "SELECT _timestamp, facility_zone, throughput_rate, (SELECT ROUND(AVG(throughput_rate), 2) FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.throughput_rate IS NOT NULL) AS zone_avg FROM \"{stream}\" t1 WHERE throughput_rate IS NOT NULL ORDER BY _timestamp ASC LIMIT 12",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "facility_zone",
           "throughput_rate",
           "zone_avg"
         ],
-        "note": "Correlated scalar subquery computing per-zone average",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "150.0",
+            "355.0"
+          ],
+          [
+            "ZONE-4",
+            "555.0",
+            "577.0"
+          ],
+          [
+            "ZONE-1",
+            "725.0",
+            "355.0"
+          ],
+          [
+            "ZONE-2",
+            "320.0",
+            "686.67"
+          ],
+          [
+            "ZONE-1",
+            "190.0",
+            "355.0"
+          ],
+          [
+            "ZONE-2",
+            "840.0",
+            "686.67"
+          ],
+          [
+            "ZONE-3",
+            "480.0",
+            "404.0"
+          ],
+          [
+            "ZONE-2",
+            "900.0",
+            "686.67"
+          ],
+          [
+            "ZONE-3",
+            "290.0",
+            "404.0"
+          ],
+          [
+            "ZONE-4",
+            "610.0",
+            "577.0"
+          ],
+          [
+            "ZONE-1",
+            "150.0",
+            "355.0"
+          ],
+          [
+            "ZONE-4",
+            "555.0",
+            "577.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 2939000000,
@@ -157,22 +290,64 @@
       "sql": "WITH ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY sorter_model ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\" WHERE throughput_rate IS NOT NULL) SELECT _timestamp, sorter_model, throughput_rate, rn FROM ranked WHERE rn <= 2 ORDER BY sorter_model, rn",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 10,
         "columns": [
-          "_timestamp",
           "sorter_model",
           "throughput_rate",
           "rn"
         ],
-        "note": "CTE with ROW_NUMBER to get top 2 per sorter_model",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "sorter_model": "SORT-A7"
-            }
-          }
-        ]
+        "results": [
+          [
+            "SORT-A7",
+            "900.0",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "900.0",
+            "2"
+          ],
+          [
+            "SORT-M3",
+            "480.0",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "480.0",
+            "2"
+          ],
+          [
+            "SORT-Q5",
+            "555.0",
+            "1"
+          ],
+          [
+            "SORT-Q5",
+            "555.0",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "725.0",
+            "1"
+          ],
+          [
+            "SORT-X1",
+            "725.0",
+            "2"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 2999000000,
@@ -184,7 +359,6 @@
       "sql": "WITH zone_stats AS (SELECT facility_zone, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(cell_temp), 2) AS avg_temp FROM \"{stream}\" GROUP BY facility_zone), mode_stats AS (SELECT facility_zone, operation_mode, COUNT(*) AS mode_cnt FROM \"{stream}\" GROUP BY facility_zone, operation_mode), ranked_modes AS (SELECT facility_zone, operation_mode, mode_cnt, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY mode_cnt DESC) AS rn FROM mode_stats) SELECT zs.facility_zone, zs.cnt, zs.avg_tput, zs.avg_temp, rm.operation_mode AS top_mode, rm.mode_cnt FROM zone_stats zs JOIN ranked_modes rm ON zs.facility_zone = rm.facility_zone AND rm.rn = 1 ORDER BY zs.avg_tput DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "cnt",
@@ -193,20 +367,41 @@
           "top_mode",
           "mode_cnt"
         ],
-        "note": "3 CTEs: stats + mode_stats + ranked with JOIN for top mode per zone",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-2"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-2",
+            "9",
+            "686.67",
+            "27.07",
+            "manual",
+            "6"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "577.0",
+            "29.38",
+            "manual",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "404.0",
+            "25.7",
+            "hybrid",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "9",
+            "355.0",
+            "28.9",
+            "auto",
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3059000000,
@@ -218,9 +413,7 @@
       "sql": "WITH base AS (SELECT * FROM \"{stream}\" WHERE throughput_rate IS NOT NULL AND load_factor IS NOT NULL), stats AS (SELECT facility_zone, operation_mode, COUNT(*) AS n, ROUND(AVG(throughput_rate), 2) AS mu, ROUND(AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate), 2) AS var_tput FROM base GROUP BY facility_zone, operation_mode) SELECT b._timestamp, b.facility_zone, b.operation_mode, b.throughput_rate, s.mu, s.var_tput, ROUND((b.throughput_rate - s.mu) * (b.throughput_rate - s.mu) / NULLIF(s.var_tput, 0), 3) AS sq_dev_ratio FROM base b JOIN stats s ON b.facility_zone = s.facility_zone AND b.operation_mode = s.operation_mode WHERE s.var_tput > 0 ORDER BY sq_dev_ratio DESC LIMIT 15",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "facility_zone",
           "operation_mode",
           "throughput_rate",
@@ -228,16 +421,105 @@
           "var_tput",
           "sq_dev_ratio"
         ],
-        "note": "2 CTEs with statistical computation (manual variance), JOIN on 2 columns",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "manual",
-              "facility_zone": "ZONE-2"
-            }
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "170.0",
+            "400.0",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "900.0",
+            "610.0",
+            "84100.0",
+            "1.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "170.0",
+            "400.0",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "900.0",
+            "610.0",
+            "84100.0",
+            "1.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "150.0",
+            "170.0",
+            "400.0",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "320.0",
+            "610.0",
+            "84100.0",
+            "1.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "170.0",
+            "400.0",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "900.0",
+            "610.0",
+            "84100.0",
+            "1.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "150.0",
+            "170.0",
+            "400.0",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "320.0",
+            "610.0",
+            "84100.0",
+            "1.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "150.0",
+            "170.0",
+            "400.0",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "320.0",
+            "610.0",
+            "84100.0",
+            "1.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3119000000,
@@ -249,7 +531,6 @@
       "sql": "WITH ranked AS (SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\" WHERE throughput_rate IS NOT NULL), top3 AS (SELECT * FROM ranked WHERE rn <= 3) SELECT 'top' AS segment, facility_zone, pallet_id, throughput_rate, rn FROM top3 UNION ALL SELECT 'bottom' AS segment, ranked.facility_zone, ranked.pallet_id, ranked.throughput_rate, ranked.rn FROM ranked WHERE ranked.rn > (SELECT MAX(rn) - 3 FROM ranked r2 WHERE r2.facility_zone = ranked.facility_zone) ORDER BY facility_zone ASC, segment ASC, rn ASC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 24,
         "columns": [
           "segment",
           "facility_zone",
@@ -257,16 +538,177 @@
           "throughput_rate",
           "rn"
         ],
-        "note": "2 CTEs with UNION ALL combining top and bottom extremes",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1",
-              "pallet_id": "PL-001"
-            }
-          }
-        ]
+        "results": [
+          [
+            "bottom",
+            "ZONE-1",
+            "PL-001",
+            "150.0",
+            "7"
+          ],
+          [
+            "bottom",
+            "ZONE-1",
+            "PL-001",
+            "150.0",
+            "8"
+          ],
+          [
+            "bottom",
+            "ZONE-1",
+            "PL-001",
+            "150.0",
+            "9"
+          ],
+          [
+            "top",
+            "ZONE-1",
+            "PL-005",
+            "725.0",
+            "1"
+          ],
+          [
+            "top",
+            "ZONE-1",
+            "PL-005",
+            "725.0",
+            "2"
+          ],
+          [
+            "top",
+            "ZONE-1",
+            "PL-005",
+            "725.0",
+            "3"
+          ],
+          [
+            "bottom",
+            "ZONE-2",
+            "PL-002",
+            "320.0",
+            "7"
+          ],
+          [
+            "bottom",
+            "ZONE-2",
+            "PL-002",
+            "320.0",
+            "8"
+          ],
+          [
+            "bottom",
+            "ZONE-2",
+            "PL-002",
+            "320.0",
+            "9"
+          ],
+          [
+            "top",
+            "ZONE-2",
+            "PL-002",
+            "900.0",
+            "1"
+          ],
+          [
+            "top",
+            "ZONE-2",
+            "PL-002",
+            "900.0",
+            "2"
+          ],
+          [
+            "top",
+            "ZONE-2",
+            "PL-002",
+            "900.0",
+            "3"
+          ],
+          [
+            "bottom",
+            "ZONE-3",
+            "PL-003",
+            "480.0",
+            "3"
+          ],
+          [
+            "bottom",
+            "ZONE-3",
+            "PL-007",
+            "290.0",
+            "4"
+          ],
+          [
+            "bottom",
+            "ZONE-3",
+            "PL-007",
+            "290.0",
+            "5"
+          ],
+          [
+            "top",
+            "ZONE-3",
+            "PL-003",
+            "480.0",
+            "1"
+          ],
+          [
+            "top",
+            "ZONE-3",
+            "PL-003",
+            "480.0",
+            "2"
+          ],
+          [
+            "top",
+            "ZONE-3",
+            "PL-003",
+            "480.0",
+            "3"
+          ],
+          [
+            "bottom",
+            "ZONE-4",
+            "PL-008",
+            "555.0",
+            "3"
+          ],
+          [
+            "bottom",
+            "ZONE-4",
+            "PL-008",
+            "555.0",
+            "4"
+          ],
+          [
+            "bottom",
+            "ZONE-4",
+            "PL-008",
+            "555.0",
+            "5"
+          ],
+          [
+            "top",
+            "ZONE-4",
+            "PL-004",
+            "610.0",
+            "1"
+          ],
+          [
+            "top",
+            "ZONE-4",
+            "PL-004",
+            "610.0",
+            "2"
+          ],
+          [
+            "top",
+            "ZONE-4",
+            "PL-008",
+            "555.0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3179000000,
@@ -278,7 +720,6 @@
       "sql": "WITH lane_activity AS (SELECT conveyor_lane, facility_zone, COUNT(*) AS events FROM \"{stream}\" GROUP BY conveyor_lane, facility_zone), global_avg AS (SELECT ROUND(AVG(CAST(events AS FLOAT)), 2) AS avg_events FROM lane_activity), above_avg AS (SELECT la.conveyor_lane, la.facility_zone, la.events, ga.avg_events, ROUND(CAST(la.events AS FLOAT) - ga.avg_events, 2) AS diff_from_avg FROM lane_activity la CROSS JOIN global_avg ga WHERE la.events > ga.avg_events) SELECT * FROM above_avg ORDER BY diff_from_avg DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 2,
         "columns": [
           "conveyor_lane",
           "facility_zone",
@@ -286,21 +727,23 @@
           "avg_events",
           "diff_from_avg"
         ],
-        "note": "CROSS JOIN between lane_activity CTE and global_avg CTE for above-average",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-2",
-              "conveyor_lane": "LANE-B"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "events",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "LANE-A",
+            "ZONE-1",
+            "9",
+            "7.0",
+            "2.0"
+          ],
+          [
+            "LANE-B",
+            "ZONE-2",
+            "9",
+            "7.0",
+            "2.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3239000000,
@@ -312,25 +755,212 @@
       "sql": "WITH zone_stats AS (SELECT facility_zone, ROUND(AVG(cell_temp), 2) AS zone_avg_temp FROM \"{stream}\" GROUP BY facility_zone) SELECT t1._timestamp, t1.pallet_id, t1.facility_zone, t1.throughput_rate, ROW_NUMBER() OVER (PARTITION BY t1.facility_zone ORDER BY t1.throughput_rate DESC) AS rank_by_zone, zs.zone_avg_temp FROM \"{stream}\" t1 JOIN zone_stats zs ON t1.facility_zone = zs.facility_zone WHERE t1.throughput_rate IS NOT NULL ORDER BY t1.facility_zone ASC, rank_by_zone ASC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 28,
         "columns": [
-          "_timestamp",
           "pallet_id",
           "facility_zone",
           "throughput_rate",
           "rank_by_zone",
           "zone_avg_temp"
         ],
-        "note": "Correlated subquery in SELECT: custom rank + zone average via CTE JOIN",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1",
-              "pallet_id": "PL-005"
-            }
-          }
-        ]
+        "results": [
+          [
+            "PL-005",
+            "ZONE-1",
+            "725.0",
+            "1",
+            "28.9"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "725.0",
+            "2",
+            "28.9"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "725.0",
+            "3",
+            "28.9"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "190.0",
+            "4",
+            "28.9"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "190.0",
+            "5",
+            "28.9"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "190.0",
+            "6",
+            "28.9"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "150.0",
+            "7",
+            "28.9"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "150.0",
+            "8",
+            "28.9"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "150.0",
+            "9",
+            "28.9"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "900.0",
+            "1",
+            "27.07"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "900.0",
+            "2",
+            "27.07"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "900.0",
+            "3",
+            "27.07"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "840.0",
+            "4",
+            "27.07"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "840.0",
+            "5",
+            "27.07"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "840.0",
+            "6",
+            "27.07"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0",
+            "7",
+            "27.07"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0",
+            "8",
+            "27.07"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0",
+            "9",
+            "27.07"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "480.0",
+            "1",
+            "25.7"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "480.0",
+            "2",
+            "25.7"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "480.0",
+            "3",
+            "25.7"
+          ],
+          [
+            "PL-007",
+            "ZONE-3",
+            "290.0",
+            "4",
+            "25.7"
+          ],
+          [
+            "PL-007",
+            "ZONE-3",
+            "290.0",
+            "5",
+            "25.7"
+          ],
+          [
+            "PL-004",
+            "ZONE-4",
+            "610.0",
+            "1",
+            "29.38"
+          ],
+          [
+            "PL-004",
+            "ZONE-4",
+            "610.0",
+            "2",
+            "29.38"
+          ],
+          [
+            "PL-008",
+            "ZONE-4",
+            "555.0",
+            "3",
+            "29.38"
+          ],
+          [
+            "PL-008",
+            "ZONE-4",
+            "555.0",
+            "4",
+            "29.38"
+          ],
+          [
+            "PL-008",
+            "ZONE-4",
+            "555.0",
+            "5",
+            "29.38"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3299000000,
@@ -342,23 +972,63 @@
       "sql": "SELECT * FROM (SELECT facility_zone, operation_mode, avg_tput, RANK() OVER (PARTITION BY facility_zone ORDER BY avg_tput DESC) AS rnk FROM (SELECT facility_zone, operation_mode, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone, operation_mode) inner_agg) ranked_agg WHERE rnk <= 2 ORDER BY facility_zone ASC, rnk ASC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 8,
         "columns": [
           "facility_zone",
           "operation_mode",
           "avg_tput",
           "rnk"
         ],
-        "note": "3-level nested: innermost aggregate -> middle RANK window -> outer WHERE filter",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "manual",
-              "facility_zone": "ZONE-1"
-            }
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "725.0",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "170.0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "840.0",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "610.0",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "480.0",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "290.0",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "610.0",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "manual",
+            "555.0",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3359000000,
@@ -370,23 +1040,88 @@
       "sql": "SELECT t1._timestamp, t1.pallet_id AS pallet_a, t2.pallet_id AS pallet_b, t1.facility_zone, ABS(t1.throughput_rate - t2.throughput_rate) AS tput_diff FROM \"{stream}\" t1 JOIN \"{stream}\" t2 ON t1.facility_zone = t2.facility_zone AND t1._timestamp < t2._timestamp AND t1.pallet_id != t2.pallet_id WHERE t1.throughput_rate IS NOT NULL AND t2.throughput_rate IS NOT NULL ORDER BY tput_diff ASC LIMIT 12",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 12,
         "columns": [
-          "_timestamp",
           "pallet_a",
           "pallet_b",
           "facility_zone",
           "tput_diff"
         ],
-        "note": "Self-join with inequality condition for pair-wise comparison",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-4"
-            }
-          }
-        ]
+        "results": [
+          [
+            "PL-008",
+            "PL-004",
+            "ZONE-4",
+            "55.0"
+          ],
+          [
+            "PL-004",
+            "PL-008",
+            "ZONE-4",
+            "55.0"
+          ],
+          [
+            "PL-008",
+            "PL-004",
+            "ZONE-4",
+            "55.0"
+          ],
+          [
+            "PL-004",
+            "PL-008",
+            "ZONE-4",
+            "55.0"
+          ],
+          [
+            "PL-008",
+            "PL-004",
+            "ZONE-4",
+            "55.0"
+          ],
+          [
+            "PL-004",
+            "PL-008",
+            "ZONE-4",
+            "55.0"
+          ],
+          [
+            "PL-002",
+            "PL-006",
+            "ZONE-2",
+            "60.0"
+          ],
+          [
+            "PL-006",
+            "PL-002",
+            "ZONE-2",
+            "60.0"
+          ],
+          [
+            "PL-002",
+            "PL-006",
+            "ZONE-2",
+            "60.0"
+          ],
+          [
+            "PL-006",
+            "PL-002",
+            "ZONE-2",
+            "60.0"
+          ],
+          [
+            "PL-002",
+            "PL-006",
+            "ZONE-2",
+            "60.0"
+          ],
+          [
+            "PL-006",
+            "PL-002",
+            "ZONE-2",
+            "60.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 3419000000,
@@ -398,7 +1133,6 @@
       "sql": "WITH temp_classified AS (SELECT _timestamp, pallet_id, facility_zone, cell_temp, CASE WHEN cell_temp >= 30.0 THEN 'HIGH' WHEN cell_temp >= 22.0 THEN 'MEDIUM' ELSE 'LOW' END AS temp_class FROM \"{stream}\" WHERE cell_temp IS NOT NULL), class_summary AS (SELECT facility_zone, temp_class, COUNT(*) AS cnt, ROUND(AVG(cell_temp), 2) AS avg_temp FROM temp_classified GROUP BY facility_zone, temp_class), pivot AS (SELECT facility_zone, SUM(CASE WHEN temp_class='HIGH' THEN cnt ELSE 0 END) AS high_cnt, SUM(CASE WHEN temp_class='MEDIUM' THEN cnt ELSE 0 END) AS med_cnt, SUM(CASE WHEN temp_class='LOW' THEN cnt ELSE 0 END) AS low_cnt FROM class_summary GROUP BY facility_zone) SELECT *, ROUND(CAST(high_cnt AS FLOAT) / NULLIF(high_cnt + med_cnt + low_cnt, 0) * 100.0, 2) AS high_pct FROM pivot ORDER BY high_pct DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "high_cnt",
@@ -406,20 +1140,37 @@
           "low_cnt",
           "high_pct"
         ],
-        "note": "3 CTEs: CASE classification -> grouped summary -> pivot with pct computation",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "high_cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-1",
+            "6",
+            "0",
+            "3",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "3",
+            "0",
+            "40.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "3",
+            "3",
+            "33.33000183105469"
+          ],
+          [
+            "ZONE-3",
+            "0",
+            "5",
+            "0",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3479000000,
@@ -431,23 +1182,27 @@
       "sql": "SELECT t1.facility_zone, t1.sorter_model, t1.avg_tput, t1.avg_load FROM (SELECT facility_zone, sorter_model, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"{stream}\" GROUP BY facility_zone, sorter_model) t1 WHERE t1.avg_tput > (SELECT ROUND(AVG(throughput_rate) * 0.8, 2) FROM \"{stream}\") AND EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.charge_remaining < 20.0) ORDER BY t1.avg_tput DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 2,
         "columns": [
           "facility_zone",
           "sorter_model",
           "avg_tput",
           "avg_load"
         ],
-        "note": "Derived table + scalar subquery + EXISTS with low-charge check",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-4",
-              "sorter_model": "SORT-Z9"
-            }
-          }
-        ]
+        "results": [
+          [
+            "ZONE-4",
+            "SORT-Z9",
+            "610.0",
+            "72.8"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Q5",
+            "555.0",
+            "67.9"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3539000000,
@@ -459,9 +1214,7 @@
       "sql": "WITH mode_counts AS (SELECT facility_zone, operation_mode, COUNT(*) AS peer_count FROM \"{stream}\" GROUP BY facility_zone, operation_mode), zone_load AS (SELECT facility_zone, ROUND(AVG(load_factor), 2) AS zone_avg_load FROM \"{stream}\" GROUP BY facility_zone) SELECT t1._timestamp, t1.pallet_id, t1.facility_zone, t1.throughput_rate, t1.operation_mode, t1.cell_temp, mc.peer_count, zl.zone_avg_load FROM \"{stream}\" t1 JOIN mode_counts mc ON t1.facility_zone = mc.facility_zone AND t1.operation_mode = mc.operation_mode JOIN zone_load zl ON t1.facility_zone = zl.facility_zone WHERE mc.peer_count >= 2 ORDER BY t1.facility_zone ASC, t1.throughput_rate DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 28,
         "columns": [
-          "_timestamp",
           "pallet_id",
           "facility_zone",
           "throughput_rate",
@@ -470,21 +1223,261 @@
           "peer_count",
           "zone_avg_load"
         ],
-        "note": "Two CTEs with JOINs for peer count and zone average",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "manual",
-              "facility_zone": "ZONE-2"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cell_temp",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "PL-005",
+            "ZONE-1",
+            "725.0",
+            "manual",
+            "35.7",
+            "3",
+            "40.67"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "725.0",
+            "manual",
+            "35.7",
+            "3",
+            "40.67"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "725.0",
+            "manual",
+            "35.7",
+            "3",
+            "40.67"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "190.0",
+            "auto",
+            "32.5",
+            "6",
+            "40.67"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "190.0",
+            "auto",
+            "32.5",
+            "6",
+            "40.67"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "190.0",
+            "auto",
+            "32.5",
+            "6",
+            "40.67"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "150.0",
+            "auto",
+            "18.5",
+            "6",
+            "40.67"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "150.0",
+            "auto",
+            "18.5",
+            "6",
+            "40.67"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "150.0",
+            "auto",
+            "18.5",
+            "6",
+            "40.67"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "900.0",
+            "manual",
+            "40.0",
+            "6",
+            "75.53"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "900.0",
+            "manual",
+            "40.0",
+            "6",
+            "75.53"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "900.0",
+            "manual",
+            "40.0",
+            "6",
+            "75.53"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "840.0",
+            "hybrid",
+            "19.2",
+            "3",
+            "75.53"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "840.0",
+            "hybrid",
+            "19.2",
+            "3",
+            "75.53"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "840.0",
+            "hybrid",
+            "19.2",
+            "3",
+            "75.53"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0",
+            "manual",
+            "22.0",
+            "6",
+            "75.53"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0",
+            "manual",
+            "22.0",
+            "6",
+            "75.53"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0",
+            "manual",
+            "22.0",
+            "6",
+            "75.53"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "480.0",
+            "hybrid",
+            "26.3",
+            "3",
+            "51.24"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "480.0",
+            "hybrid",
+            "26.3",
+            "3",
+            "51.24"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "480.0",
+            "hybrid",
+            "26.3",
+            "3",
+            "51.24"
+          ],
+          [
+            "PL-007",
+            "ZONE-3",
+            "290.0",
+            "auto",
+            "24.8",
+            "2",
+            "51.24"
+          ],
+          [
+            "PL-007",
+            "ZONE-3",
+            "290.0",
+            "auto",
+            "24.8",
+            "2",
+            "51.24"
+          ],
+          [
+            "PL-004",
+            "ZONE-4",
+            "610.0",
+            "auto",
+            "30.1",
+            "2",
+            "69.86"
+          ],
+          [
+            "PL-004",
+            "ZONE-4",
+            "610.0",
+            "auto",
+            "30.1",
+            "2",
+            "69.86"
+          ],
+          [
+            "PL-008",
+            "ZONE-4",
+            "555.0",
+            "manual",
+            "28.9",
+            "3",
+            "69.86"
+          ],
+          [
+            "PL-008",
+            "ZONE-4",
+            "555.0",
+            "manual",
+            "28.9",
+            "3",
+            "69.86"
+          ],
+          [
+            "PL-008",
+            "ZONE-4",
+            "555.0",
+            "manual",
+            "28.9",
+            "3",
+            "69.86"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3599000000,
@@ -496,26 +1489,34 @@
       "sql": "WITH chain_builder AS (SELECT _timestamp, pallet_id, facility_zone, runtime_hours, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY runtime_hours ASC) AS seq, COUNT(*) OVER (PARTITION BY facility_zone) AS zone_cnt FROM \"{stream}\" WHERE runtime_hours IS NOT NULL), chains AS (SELECT facility_zone, pallet_id, runtime_hours, seq, zone_cnt, CASE WHEN seq < zone_cnt THEN 1 ELSE 0 END AS has_next FROM chain_builder) SELECT facility_zone, COUNT(*) AS chain_count, ROUND(AVG(runtime_hours), 1) AS avg_hours FROM chains GROUP BY facility_zone ORDER BY chain_count DESC",
       "category": "cte_subquery",
       "expected": {
-        "row_count": 4,
         "columns": [
           "facility_zone",
           "chain_count",
           "avg_hours"
         ],
-        "note": "Non-recursive CTE with window-based chaining by runtime_hours",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "chain_count",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "ZONE-2",
+            "9",
+            "373.3"
+          ],
+          [
+            "ZONE-1",
+            "9",
+            "278.0"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "444.0"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "148.8"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3659000000,

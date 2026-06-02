@@ -62,23 +62,39 @@
       "sql": "SELECT _timestamp, pallet_id, facility_zone, log FROM \"{stream}\" ORDER BY _timestamp DESC LIMIT 5",
       "category": "date_time",
       "expected": {
-        "row_count": 5,
         "columns": [
-          "_timestamp",
           "pallet_id",
           "facility_zone",
           "log"
         ],
-        "note": "ORDER BY DESC LIMIT 5 for most recent events",
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-2",
-              "pallet_id": "PL-002"
-            }
-          }
-        ]
+        "results": [
+          [
+            "PL-002",
+            "ZONE-2",
+            "Q065 warehouse event record 9"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "Q067 warehouse event record 2"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "Q066 warehouse event record 5"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "Q065 warehouse event record 8"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "Q067 warehouse event record 1"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3839000000,

@@ -7,25 +7,27 @@ Parquet files.
 """
 
 import logging
+import time
 
 import pytest
 
 from support.client import OpenObserveClient
-from tests.query_agent.conftest import load_all_queries, run_query
+from tests.query_agent.conftest import load_all_queries, run_query, STREAM
 
 
 @pytest.fixture(scope="module")
 def post_flush(ingest_query_agent_data):
-    """Trigger flush after memtable phase completes.
+    """Trigger flush after memtable phase completes, then re-poll.
 
     Module-scoped + depends on the session-scoped ingestion fixture,
     so this runs AFTER all test_1_memtable tests finish but BEFORE
     any tests in this module start.
     """
-    client = OpenObserveClient()
-    stream = "query_agent_test_v2"
+    from datetime import datetime, timedelta, UTC
+    from support.wait import wait_until
 
-    # Use prefix="" because /node/flush sits outside the /api/{org} prefix
+    client = OpenObserveClient()
+
     resp = client.put("node/flush", prefix="")
     if resp.status_code == 200:
         logging.info("Flush succeeded — Parquet + Tantivy indexes generated")
@@ -34,11 +36,31 @@ def post_flush(ingest_query_agent_data):
     else:
         logging.warning("Flush returned %s: %s", resp.status_code, resp.text[:200])
 
-    # Brief wait for index generation
-    import time
     time.sleep(2)
 
-    logging.info("Post-flush phase ready")
+    # Re-poll until all data is searchable via Parquet + Tantivy
+    def _data_searchable():
+        now = datetime.now(UTC)
+        end_us = int(now.timestamp() * 1_000_000)
+        start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
+        payload = {
+            "query": {
+                "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
+                "start_time": start_us,
+                "end_time": end_us,
+                "from": 0,
+                "size": 1,
+            }
+        }
+        r = client.post("_search?type=logs", json=payload)
+        if r.status_code != 200:
+            return False
+        hits = r.json().get("hits", [])
+        return bool(hits and hits[0].get("c", 0) >= 1)
+
+    wait_until(_data_searchable, timeout=60, interval=1.0,
+               msg=f"{STREAM} data not searchable after flush")
+    logging.info("Post-flush: data searchable")
 
 
 # ── Query helpers ────────────────────────────────────────────────────────
