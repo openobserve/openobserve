@@ -4160,6 +4160,114 @@
       },
       "selectAtLeastOne": "Selecteer minstens één scorer",
       "saveError": "Kon de evaluatietaak niet opslaan"
+    },
+    "quality": {
+      "scopeLabel": "Alle kwaliteitsdimensies in deze werkruimte",
+      "timeRange": {
+        "label": "Tijdbereik",
+        "last1h": "Afgelopen 1 uur",
+        "last24h": "Afgelopen 24 uur",
+        "last7d": "Afgelopen 7 dagen",
+        "last30d": "Afgelopen 30 dagen"
+      },
+      "sourceStream": {
+        "label": "Bronstream",
+        "all": "Alle streams"
+      },
+      "refresh": "Vernieuwen",
+      "kpis": {
+        "evaluated": {
+          "title": "Geëvalueerde sporen",
+          "unit": "",
+          "hint": "Verschillende trace-ID's in _llm_scores in het venster"
+        },
+        "qualityIssueRate": {
+          "title": "Uitgiftepercentage kwaliteit",
+          "unit": "%",
+          "hint": "Geëvalueerde sporen met elke dimensie onder de drempelwaarde"
+        },
+        "evaluationCost": {
+          "title": "Evaluatiekosten",
+          "unit": "$",
+          "hint": "De som van de kosten van de LLM Judge-scorer in het venster"
+        },
+        "jobSuccess": {
+          "title": "Succes op het werk",
+          "unit": "%",
+          "hint": "Succespercentage voor online Eval Job Run"
+        },
+        "scorerFailures": {
+          "title": "Mislukkingen van de scorer",
+          "unit": "",
+          "hint": "Mislukte aanroepen van de scorer in het venster"
+        },
+        "latencyP95": {
+          "title": "Latentie p95",
+          "unit": "s",
+          "hint": "Latentie van Scorer-call p95"
+        },
+        "vsPrev": "versus de vorige",
+        "noData": "—"
+      },
+      "loading": "Kwaliteitsgegevens worden geladen...",
+      "detail": {
+        "loading": "Uitsplitsing per configuratie wordt geladen...",
+        "noData": "Nog geen scores voor deze configuratie in dit venster.",
+        "drillTitle": "Tot in de sporen boren",
+        "splitByScorer": "Gesplitst per scorer",
+        "splitBySourceType": "Gesplitst op source_type",
+        "trendTitle": "Trend",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Scoreverdeling",
+        "compositionTitle": "Samenstelling in de loop van de tijd",
+        "categoryDistributionTitle": "Distributie van categorieën",
+        "passRateTitle": "Slagpercentage in de loop van de tijd",
+        "trueFalseTitle": "Waar versus onwaar",
+        "legendAvg": "Gem",
+        "legendP95": "p95",
+        "legendThreshold": "drempelwaarde {richting} {waarde}",
+        "legendHealthy": "gezond",
+        "legendUnhealthy": "ongezond",
+        "kpis": {
+          "average": "Gemiddeld",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Ongezond",
+          "healthy": "Gezond",
+          "coverage": "Dekking"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Alle configuraties",
+        "empty": "Er zijn geen configuraties die overeenkomen met dit filter."
+      },
+      "overview": {
+        "title": "Overzicht van Score Configs",
+        "countSuffix": "{n} configureert",
+        "searchPlaceholder": "Filterconfiguraties...",
+        "loading": "Aggregaten per configuratie worden geladen...",
+        "emptyNoConfigsTitle": "Nog geen Score-configuraties",
+        "emptyNoConfigsHint": "Definieer uw eerste scoreconfiguratie om te beginnen met het bijhouden van kwaliteitsdimensies.",
+        "emptyWaitingTitle": "Wachten tot de eerste scores binnen zijn",
+        "emptyWaitingHint": "Je scoreconfiguraties zijn gedeclareerd, maar er zijn nog geen scores naar _llm_scores geschreven in dit venster.",
+        "waitingStepJob": "Activeer een online evaluatietaak die scores oplevert voor een van deze configuraties",
+        "waitingStepRange": "Vergroot het tijdsbereik — scores van eerder vandaag of deze week vallen mogelijk niet binnen dit venster",
+        "waitingStepRefresh": "Klik op Vernieuwen — de scores van een actieve taak verschijnen binnen ~1 minuut na de evaluatie",
+        "waitingPrimaryCta": "Openstaande vacatures bij Eval",
+        "waitingRefreshCta": "Vernieuwen",
+        "noThreshold": "geen drempel",
+        "columns": {
+          "scoreConfig": "Scoreconfiguratie",
+          "type": "Typ",
+          "totalScores": "Totale scores",
+          "coverage": "Dekking",
+          "unhealthy": "Ongezond",
+          "trend": "Trend",
+          "threshold": "Gezond als",
+          "updated": "Bijgewerkt"
+        }
+      }
     }
   },
   "llmProviders": {

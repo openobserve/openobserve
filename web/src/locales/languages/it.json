@@ -4158,6 +4158,114 @@
       },
       "selectAtLeastOne": "Seleziona almeno un marcatore",
       "saveError": "Impossibile salvare il lavoro di valutazione"
+    },
+    "quality": {
+      "scopeLabel": "Tutte le dimensioni di qualità in questo spazio di lavoro",
+      "timeRange": {
+        "label": "Intervallo di tempo",
+        "last1h": "Ultima 1 ora",
+        "last24h": "Ultime 24 ore",
+        "last7d": "Ultimi 7 giorni",
+        "last30d": "Ultimi 30 giorni"
+      },
+      "sourceStream": {
+        "label": "Stream di origine",
+        "all": "Tutti gli stream"
+      },
+      "refresh": "Aggiorna",
+      "kpis": {
+        "evaluated": {
+          "title": "Tracce valutate",
+          "unit": "",
+          "hint": "ID di traccia distinti in _llm_scores all'interno della finestra"
+        },
+        "qualityIssueRate": {
+          "title": "Percentuale di problemi di qualità",
+          "unit": "%",
+          "hint": "Tracce valutate con qualsiasi dimensione al di sotto della soglia"
+        },
+        "evaluationCost": {
+          "title": "Costo di valutazione",
+          "unit": "$",
+          "hint": "Somma del costo del LLM Judge scorer nella finestra"
+        },
+        "jobSuccess": {
+          "title": "Successo lavorativo",
+          "unit": "%",
+          "hint": "Percentuale di successo di Eval Job online"
+        },
+        "scorerFailures": {
+          "title": "Fallimenti del marcatore",
+          "unit": "",
+          "hint": "Richiami dello scorer non riusciti nella finestra"
+        },
+        "latencyP95": {
+          "title": "Latenza p95",
+          "unit": "s",
+          "hint": "Latenza p95 Scorer-call"
+        },
+        "vsPrev": "vs precedente",
+        "noData": "—"
+      },
+      "loading": "Caricamento dei dati di qualità...",
+      "detail": {
+        "loading": "Caricamento della suddivisione per configurazione...",
+        "noData": "Non ci sono ancora punteggi per questa configurazione in questa finestra.",
+        "drillTitle": "Trapana fino alle tracce",
+        "splitByScorer": "Diviso per marcatore",
+        "splitBySourceType": "Dividi per source_type",
+        "trendTitle": "Tendenza",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Distribuzione del punteggio",
+        "compositionTitle": "Composizione nel tempo",
+        "categoryDistributionTitle": "Distribuzione delle categorie",
+        "passRateTitle": "Percentuale di superamento nel tempo",
+        "trueFalseTitle": "Vero vs falso",
+        "legendAvg": "Media",
+        "legendP95": "p95",
+        "legendThreshold": "soglia {direzione} {valore}",
+        "legendHealthy": "salutare",
+        "legendUnhealthy": "malsano",
+        "kpis": {
+          "average": "Media",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Malsano",
+          "healthy": "Salutare",
+          "coverage": "Copertura"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Tutte le configurazioni",
+        "empty": "Nessuna configurazione corrisponde a questo filtro."
+      },
+      "overview": {
+        "title": "Panoramica delle configurazioni delle partiture",
+        "countSuffix": "{n} configurazioni",
+        "searchPlaceholder": "Configurazioni dei filtri...",
+        "loading": "Caricamento degli aggregati per configurazione...",
+        "emptyNoConfigsTitle": "Nessuna configurazione dei punteggi ancora",
+        "emptyNoConfigsHint": "Definisci il tuo primo Score Config per iniziare a tracciare le dimensioni della qualità.",
+        "emptyWaitingTitle": "Aspettando che arrivino i primi punteggi",
+        "emptyWaitingHint": "Le tue configurazioni di punteggio sono dichiarate, ma nessun punteggio è stato ancora scritto in _llm_scores in questa finestra.",
+        "waitingStepJob": "Attiva un processo di valutazione online che produce punteggi per una di queste configurazioni",
+        "waitingStepRange": "Allarga l'intervallo di tempo: i punteggi di oggi o di questa settimana potrebbero non essere in questa finestra",
+        "waitingStepRefresh": "Fai clic su Aggiorna: i punteggi di un lavoro attivo vengono visualizzati entro circa 1 minuto dalla valutazione",
+        "waitingPrimaryCta": "Apri offerte di lavoro Eval",
+        "waitingRefreshCta": "Aggiorna",
+        "noThreshold": "nessuna soglia",
+        "columns": {
+          "scoreConfig": "Configurazione del punteggio",
+          "type": "Tipo",
+          "totalScores": "Punteggi totali",
+          "coverage": "Copertura",
+          "unhealthy": "Malsano",
+          "trend": "Tendenza",
+          "threshold": "Sano se",
+          "updated": "Aggiornato"
+        }
+      }
     }
   },
   "llmProviders": {

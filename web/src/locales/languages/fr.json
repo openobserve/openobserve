@@ -4149,6 +4149,114 @@
       },
       "selectAtLeastOne": "Sélectionnez au moins un buteur",
       "saveError": "Impossible d'enregistrer la tâche d'évaluation"
+    },
+    "quality": {
+      "scopeLabel": "Toutes les dimensions de qualité dans cet espace de travail",
+      "timeRange": {
+        "label": "Plage de temps",
+        "last1h": "Au cours de la dernière heure",
+        "last24h": "Dernières 24 heures",
+        "last7d": "7 derniers jours",
+        "last30d": "30 derniers jours"
+      },
+      "sourceStream": {
+        "label": "Flux source",
+        "all": "Tous les streams"
+      },
+      "refresh": "Actualiser",
+      "kpis": {
+        "evaluated": {
+          "title": "Traces évaluées",
+          "unit": "",
+          "hint": "Identifiants de trace distincts dans _llm_scores dans la fenêtre"
+        },
+        "qualityIssueRate": {
+          "title": "Taux de problèmes de qualité",
+          "unit": "%",
+          "hint": "Traces évaluées dont toutes les dimensions sont inférieures au seuil"
+        },
+        "evaluationCost": {
+          "title": "Coût de l'évaluation",
+          "unit": "$",
+          "hint": "Somme du coût du buteur du juge LLM dans la fenêtre"
+        },
+        "jobSuccess": {
+          "title": "Réussite professionnelle",
+          "unit": "%",
+          "hint": "Taux de réussite des tests d'évaluation en ligne"
+        },
+        "scorerFailures": {
+          "title": "Défaillances des buteurs",
+          "unit": "",
+          "hint": "Échec de l'invocation des buteurs dans la fenêtre"
+        },
+        "latencyP95": {
+          "title": "Latence p95",
+          "unit": "s",
+          "hint": "Latence p95 de l'appel du marqueur"
+        },
+        "vsPrev": "contre le précédent",
+        "noData": "—"
+      },
+      "loading": "Chargement de données de qualité...",
+      "detail": {
+        "loading": "Répartition du chargement par configuration...",
+        "noData": "Il n'y a pas encore de score pour cette configuration dans cette fenêtre.",
+        "drillTitle": "Percer jusqu'aux traces",
+        "splitByScorer": "Divisé par buteur",
+        "splitBySourceType": "Diviser par source_type",
+        "trendTitle": "Tendance",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Répartition des scores",
+        "compositionTitle": "Composition au fil du temps",
+        "categoryDistributionTitle": "Distribution des catégories",
+        "passRateTitle": "Taux de réussite au fil du temps",
+        "trueFalseTitle": "Vrai contre faux",
+        "legendAvg": "Moyenne",
+        "legendP95": "page 95",
+        "legendThreshold": "seuil {direction} {valeur}",
+        "legendHealthy": "en bonne santé",
+        "legendUnhealthy": "mauvais pour la santé",
+        "kpis": {
+          "average": "Moyenne",
+          "p50": "P50",
+          "p95": "PAGE 95",
+          "p50p95": "P50 ET P95",
+          "unhealthy": "Malsain",
+          "healthy": "En bonne santé",
+          "coverage": "Couverture"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Toutes les configurations",
+        "empty": "Aucune configuration ne correspond à ce filtre."
+      },
+      "overview": {
+        "title": "Vue d'ensemble des configurations de score",
+        "countSuffix": "{n} configurations",
+        "searchPlaceholder": "Configurations de filtres...",
+        "loading": "Chargement des agrégats par configuration...",
+        "emptyNoConfigsTitle": "Aucune configuration de score pour le moment",
+        "emptyNoConfigsHint": "Définissez votre première configuration de score pour commencer à suivre les dimensions de qualité.",
+        "emptyWaitingTitle": "En attendant l'arrivée des premiers scores",
+        "emptyWaitingHint": "Vos configurations de score sont déclarées, mais aucun score n'a encore été écrit dans _llm_scores dans cette fenêtre.",
+        "waitingStepJob": "Activez une tâche d'évaluation en ligne qui génère des scores pour l'une de ces configurations",
+        "waitingStepRange": "Élargissez l'intervalle de temps : les scores du début de la journée ou de cette semaine peuvent ne pas figurer dans cette fenêtre",
+        "waitingStepRefresh": "Cliquez sur Actualiser : les scores d'une offre d'emploi active apparaissent environ une minute après l'évaluation",
+        "waitingPrimaryCta": "Emplois chez Open Eval",
+        "waitingRefreshCta": "Actualiser",
+        "noThreshold": "pas de seuil",
+        "columns": {
+          "scoreConfig": "Configuration du score",
+          "type": "Tapez",
+          "totalScores": "Total des scores",
+          "coverage": "Couverture",
+          "unhealthy": "Malsain",
+          "trend": "Tendance",
+          "threshold": "En bonne santé si",
+          "updated": "Mis à jour"
+        }
+      }
     }
   },
   "llmProviders": {

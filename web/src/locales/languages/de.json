@@ -4149,6 +4149,114 @@
       },
       "selectAtLeastOne": "Wählen Sie mindestens einen Scorer aus",
       "saveError": "Fehler beim Speichern des Evaluierungsauftrags"
+    },
+    "quality": {
+      "scopeLabel": "Alle Qualitätsabmessungen in diesem Arbeitsbereich",
+      "timeRange": {
+        "label": "Zeitbereich",
+        "last1h": "Letzte 1 Stunde",
+        "last24h": "Letzte 24 Stunden",
+        "last7d": "Letzte 7 Tage",
+        "last30d": "Letzte 30 Tage"
+      },
+      "sourceStream": {
+        "label": "Quellstream",
+        "all": "Alle Streams"
+      },
+      "refresh": "Auffrischen",
+      "kpis": {
+        "evaluated": {
+          "title": "Bewertete Spuren",
+          "unit": "",
+          "hint": "Eindeutige Trace-IDs in _llm_scores innerhalb des Fensters"
+        },
+        "qualityIssueRate": {
+          "title": "Rate an Qualitätsproblemen",
+          "unit": "%",
+          "hint": "Ausgewertete Spuren mit einer beliebigen Dimension unter dem Schwellenwert"
+        },
+        "evaluationCost": {
+          "title": "Kosten der Bewertung",
+          "unit": "$",
+          "hint": "Summe der LLM Judge Scorer-Kosten im Fenster"
+        },
+        "jobSuccess": {
+          "title": "Erfolg im Beruf",
+          "unit": "%",
+          "hint": "Erfolgsquote bei der Ausführung von Online-Evaluationsaufträgen"
+        },
+        "scorerFailures": {
+          "title": "Torschützenausfälle",
+          "unit": "",
+          "hint": "Fehlgeschlagene Scorer-Aufrufe im Fenster"
+        },
+        "latencyP95": {
+          "title": "Latenz p95",
+          "unit": "s",
+          "hint": "Scorer-Call p95-Latenz"
+        },
+        "vsPrev": "gegen voriges",
+        "noData": "—"
+      },
+      "loading": "Qualitätsdaten werden geladen...",
+      "detail": {
+        "loading": "Aufschlüsselung pro Konfiguration wird geladen...",
+        "noData": "Noch keine Ergebnisse für diese Konfiguration in diesem Fenster.",
+        "drillTitle": "Auf Spuren bohren",
+        "splitByScorer": "Geteilt nach Torschütze",
+        "splitBySourceType": "Aufgeteilt nach Quelltyp",
+        "trendTitle": "Trend",
+        "trendSubtitle": "{ConfigName}, {bucket}",
+        "distributionTitle": "Verteilung der Punktzahlen",
+        "compositionTitle": "Zusammensetzung im Laufe der Zeit",
+        "categoryDistributionTitle": "Kategorie Vertrieb",
+        "passRateTitle": "Erfolgsquote im Laufe der Zeit",
+        "trueFalseTitle": "Wahr gegen Falsch",
+        "legendAvg": "Durchschn.",
+        "legendP95": "p95",
+        "legendThreshold": "Schwellenwert {Richtung} {Wert}",
+        "legendHealthy": "gesund",
+        "legendUnhealthy": "ungesund",
+        "kpis": {
+          "average": "Durchschnittlich",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Ungesund",
+          "healthy": "Gesund",
+          "coverage": "Deckung"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Alle Konfigurationen",
+        "empty": "Keine Konfigurationen stimmen mit diesem Filter überein."
+      },
+      "overview": {
+        "title": "Score-Konfigurationen im Überblick",
+        "countSuffix": "{n} Konfigurationen",
+        "searchPlaceholder": "Konfigurationen filtern...",
+        "loading": "Aggregate pro Konfiguration werden geladen...",
+        "emptyNoConfigsTitle": "Noch keine Score-Konfigurationen",
+        "emptyNoConfigsHint": "Definieren Sie Ihre erste Score-Konfiguration, um mit der Verfolgung von Qualitätsdimensionen zu beginnen.",
+        "emptyWaitingTitle": "Ich warte darauf, dass die ersten Ergebnisse landen",
+        "emptyWaitingHint": "Ihre Score-Konfigurationen sind deklariert, aber es wurden noch keine Ergebnisse in _llm_scores in diesem Fenster geschrieben.",
+        "waitingStepJob": "Aktiviere einen Online-Evaluierungsjob, der Ergebnisse für eine dieser Konfigurationen generiert",
+        "waitingStepRange": "Den Zeitraum erweitern — Ergebnisse von heute oder Anfang dieser Woche werden möglicherweise nicht in diesem Fenster angezeigt",
+        "waitingStepRefresh": "Klicken Sie auf Aktualisieren — die Ergebnisse eines aktiven Jobs werden innerhalb von ~1 Minute nach der Bewertung angezeigt",
+        "waitingPrimaryCta": "Öffnen Sie Eval Jobs",
+        "waitingRefreshCta": "Auffrischen",
+        "noThreshold": "kein Schwellenwert",
+        "columns": {
+          "scoreConfig": "Punktekonfiguration",
+          "type": "Typ",
+          "totalScores": "Gesamtpunktzahl",
+          "coverage": "Deckung",
+          "unhealthy": "Ungesund",
+          "trend": "Trend",
+          "threshold": "Gesund wenn",
+          "updated": "aktualisiert"
+        }
+      }
     }
   },
   "llmProviders": {

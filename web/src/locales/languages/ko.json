@@ -4160,6 +4160,114 @@
       },
       "selectAtLeastOne": "최소 한 명의 득점자 선택",
       "saveError": "평가 작업을 저장하지 못했습니다."
+    },
+    "quality": {
+      "scopeLabel": "이 작업 공간의 모든 품질 치수",
+      "timeRange": {
+        "label": "시간 범위",
+        "last1h": "지난 1시간",
+        "last24h": "지난 24시간",
+        "last7d": "지난 7일",
+        "last30d": "지난 30일"
+      },
+      "sourceStream": {
+        "label": "소스 스트림",
+        "all": "모든 스트림"
+      },
+      "refresh": "새로 고침",
+      "kpis": {
+        "evaluated": {
+          "title": "평가된 트레이스",
+          "unit": "",
+          "hint": "윈도우 내 _llm_scores의 고유한 트레이스 ID"
+        },
+        "qualityIssueRate": {
+          "title": "품질 문제 발생률",
+          "unit": "%",
+          "hint": "모든 치수가 임계값 미만인 평가된 트레이스"
+        },
+        "evaluationCost": {
+          "title": "평가 비용",
+          "unit": "$",
+          "hint": "창의 LLM 심사 위원 채점자 비용 합계"
+        },
+        "jobSuccess": {
+          "title": "취업 성공",
+          "unit": "%",
+          "hint": "온라인 평가 작업 실행 성공률"
+        },
+        "scorerFailures": {
+          "title": "득점자 실패",
+          "unit": "",
+          "hint": "창에서 채점자 호출이 실패했습니다."
+        },
+        "latencyP95": {
+          "title": "레이턴시 p95",
+          "unit": "s",
+          "hint": "스코어-콜 p95 레이턴시"
+        },
+        "vsPrev": "vs 이전",
+        "noData": "—"
+      },
+      "loading": "품질 데이터 로드 중...",
+      "detail": {
+        "loading": "구성별 분석을 로드하는 중...",
+        "noData": "이 창에는 이 구성에 대한 점수가 아직 없습니다.",
+        "drillTitle": "드릴 투 트레이스",
+        "splitByScorer": "득점자별 분할",
+        "splitBySourceType": "소스_유형별 분할",
+        "trendTitle": "트렌드",
+        "trendSubtitle": "{구성 이름}, {버킷}",
+        "distributionTitle": "점수 분포",
+        "compositionTitle": "시간 경과에 따른 구성",
+        "categoryDistributionTitle": "카테고리 분포",
+        "passRateTitle": "시간 경과에 따른 합격률",
+        "trueFalseTitle": "진실 대 거짓",
+        "legendAvg": "평균",
+        "legendP95": "p95",
+        "legendThreshold": "임계값 {방향} {값}",
+        "legendHealthy": "건강한",
+        "legendUnhealthy": "건강에 해로운",
+        "kpis": {
+          "average": "평균",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "건강에 해로운",
+          "healthy": "건강한",
+          "coverage": "커버리지"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "모든 구성",
+        "empty": "이 필터와 일치하는 구성이 없습니다."
+      },
+      "overview": {
+        "title": "점수 구성 개요",
+        "countSuffix": "{n} 개의 구성",
+        "searchPlaceholder": "필터 구성...",
+        "loading": "구성별 애그리게이트 로드 중...",
+        "emptyNoConfigsTitle": "점수 구성이 아직 없습니다",
+        "emptyNoConfigsHint": "첫 번째 점수 구성을 정의하여 품질 측정기준 추적을 시작하세요.",
+        "emptyWaitingTitle": "첫 번째 점수가 나오기를 기다리는 중",
+        "emptyWaitingHint": "점수 구성이 선언되었지만 이 창의 _llm_scores에 아직 점수가 기록되지 않았습니다.",
+        "waitingStepJob": "이러한 구성 중 하나에 대한 점수를 산출하는 온라인 평가 작업을 활성화합니다.",
+        "waitingStepRange": "시간 범위를 넓히세요. 오늘 초나 이번 주의 점수는 이 창에 없을 수도 있습니다.",
+        "waitingStepRefresh": "새로 고침을 클릭합니다. 평가 후 약 1분 이내에 활성 작업의 점수가 표시됩니다.",
+        "waitingPrimaryCta": "공개 평가 채용공고",
+        "waitingRefreshCta": "새로 고침",
+        "noThreshold": "임계값 없음",
+        "columns": {
+          "scoreConfig": "점수 구성",
+          "type": "타입",
+          "totalScores": "총점",
+          "coverage": "커버리지",
+          "unhealthy": "건강에 해로운",
+          "trend": "트렌드",
+          "threshold": "건강한 경우",
+          "updated": "업데이트됨"
+        }
+      }
     }
   },
   "llmProviders": {

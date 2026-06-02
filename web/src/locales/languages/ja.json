@@ -4149,6 +4149,114 @@
       },
       "selectAtLeastOne": "スコアラーを少なくとも 1 人選択してください",
       "saveError": "評価ジョブの保存に失敗しました"
+    },
+    "quality": {
+      "scopeLabel": "このワークスペースのすべての品質ディメンション",
+      "timeRange": {
+        "label": "時間範囲",
+        "last1h": "過去 1 時間",
+        "last24h": "過去 24 時間",
+        "last7d": "過去 7 日間",
+        "last30d": "過去 30 日間"
+      },
+      "sourceStream": {
+        "label": "ソースストリーム",
+        "all": "すべてのストリーム"
+      },
+      "refresh": "リフレッシュ",
+      "kpis": {
+        "evaluated": {
+          "title": "評価済みトレース",
+          "unit": "",
+          "hint": "ウィンドウ内の _llm_score 内の個別のトレース ID"
+        },
+        "qualityIssueRate": {
+          "title": "品質問題率",
+          "unit": "%",
+          "hint": "いずれかのディメンションがしきい値を下回っている評価済みトレース"
+        },
+        "evaluationCost": {
+          "title": "評価コスト",
+          "unit": "$",
+          "hint": "ウィンドウに表示される LLM ジャッジスコアラー費用の合計"
+        },
+        "jobSuccess": {
+          "title": "仕事の成功",
+          "unit": "%",
+          "hint": "オンライン評価ジョブの実行成功率"
+        },
+        "scorerFailures": {
+          "title": "スコアラーの失敗",
+          "unit": "",
+          "hint": "ウィンドウでのスコアラーの呼び出しが失敗しました"
+        },
+        "latencyP95": {
+          "title": "レイテンシー p95",
+          "unit": "s",
+          "hint": "スコアーコール p95 レイテンシー"
+        },
+        "vsPrev": "対前へ",
+        "noData": "—"
+      },
+      "loading": "品質データを読み込んでいます...",
+      "detail": {
+        "loading": "設定ごとの内訳を読み込んでいます...",
+        "noData": "このウィンドウには、この構成のスコアはまだありません。",
+        "drillTitle": "ドリル・トゥ・トレース",
+        "splitByScorer": "得点者による分割",
+        "splitBySourceType": "ソースタイプで分割",
+        "trendTitle": "トレンド",
+        "trendSubtitle": "{設定名}、{バケット}",
+        "distributionTitle": "スコア分布",
+        "compositionTitle": "時間の経過に伴う構成",
+        "categoryDistributionTitle": "カテゴリ分布",
+        "passRateTitle": "経時的な合格率",
+        "trueFalseTitle": "真と偽",
+        "legendAvg": "平均",
+        "legendP95": "95",
+        "legendThreshold": "しきい値 {方向} {値}",
+        "legendHealthy": "健康",
+        "legendUnhealthy": "不健全です",
+        "kpis": {
+          "average": "アベレージ",
+          "p50": "50",
+          "p95": "95",
+          "p50p95": "P50/P95",
+          "unhealthy": "不健康",
+          "healthy": "ヘルシー",
+          "coverage": "カバレッジ"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "すべての構成",
+        "empty": "このフィルターに一致する設定はありません。"
+      },
+      "overview": {
+        "title": "スコア設定の概要",
+        "countSuffix": "{n} コンフィグ",
+        "searchPlaceholder": "フィルター構成...",
+        "loading": "設定ごとのアグリゲートをロード中...",
+        "emptyNoConfigsTitle": "スコア設定はまだありません",
+        "emptyNoConfigsHint": "最初の Score Config を定義して、品質ディメンションのトラッキングを開始しましょう。",
+        "emptyWaitingTitle": "最初のスコアが出るのを待っています",
+        "emptyWaitingHint": "スコア設定は宣言されましたが、このウィンドウの _llm_scoresにはまだスコアが書き込まれていません。",
+        "waitingStepJob": "これらの構成のいずれかのスコアを生成するオンライン評価ジョブをアクティブにする",
+        "waitingStepRange": "時間範囲を広げてください。今日または今週の初めのスコアは、このウィンドウに表示されない場合があります",
+        "waitingStepRefresh": "[更新] をクリックします。アクティブなジョブのスコアは、評価から 1 分以内に表示されます。",
+        "waitingPrimaryCta": "評価ジョブを開く",
+        "waitingRefreshCta": "リフレッシュ",
+        "noThreshold": "敷居なし",
+        "columns": {
+          "scoreConfig": "スコア設定",
+          "type": "タイプ",
+          "totalScores": "合計得点",
+          "coverage": "カバレッジ",
+          "unhealthy": "不健康",
+          "trend": "トレンド",
+          "threshold": "もし健康なら",
+          "updated": "更新済み"
+        }
+      }
     }
   },
   "llmProviders": {

@@ -4147,6 +4147,114 @@
       },
       "selectAtLeastOne": "Selecciona al menos un anotador",
       "saveError": "No se pudo guardar el trabajo de evaluación"
+    },
+    "quality": {
+      "scopeLabel": "Todas las dimensiones de calidad en este espacio de trabajo",
+      "timeRange": {
+        "label": "Intervalo de tiempo",
+        "last1h": "Última hora",
+        "last24h": "Últimas 24 horas",
+        "last7d": "Últimos 7 días",
+        "last30d": "Últimos 30 días"
+      },
+      "sourceStream": {
+        "label": "Secuencia de origen",
+        "all": "Todas las transmisiones"
+      },
+      "refresh": "Refrescar",
+      "kpis": {
+        "evaluated": {
+          "title": "Trazas evaluadas",
+          "unit": "",
+          "hint": "Identificadores de seguimiento distintos en _llm_scores dentro de la ventana"
+        },
+        "qualityIssueRate": {
+          "title": "Tasa de emisión de calidad",
+          "unit": "%",
+          "hint": "Trazas evaluadas con cualquier dimensión por debajo del umbral"
+        },
+        "evaluationCost": {
+          "title": "Costo de evaluación",
+          "unit": "$",
+          "hint": "Suma del costo del anotador de LLM Judge en la ventana"
+        },
+        "jobSuccess": {
+          "title": "Éxito laboral",
+          "unit": "%",
+          "hint": "Tasa de éxito de ejecución de trabajos de evaluación en línea"
+        },
+        "scorerFailures": {
+          "title": "Fallos goleadores",
+          "unit": "",
+          "hint": "Invocaciones de anotadores fallidas en la ventana"
+        },
+        "latencyP95": {
+          "title": "Latencia p95",
+          "unit": "s",
+          "hint": "Latencia p95 de Scorer-call"
+        },
+        "vsPrev": "contra el anterior",
+        "noData": "—"
+      },
+      "loading": "Cargando datos de calidad...",
+      "detail": {
+        "loading": "Cargando el desglose por configuración...",
+        "noData": "Aún no hay puntuaciones para esta configuración en esta ventana.",
+        "drillTitle": "Perforar hasta las huellas",
+        "splitByScorer": "Dividir por goleador",
+        "splitBySourceType": "Dividir por source_type",
+        "trendTitle": "Tendencia",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Distribución de puntajes",
+        "compositionTitle": "Composición a lo largo del tiempo",
+        "categoryDistributionTitle": "Distribución de categorías",
+        "passRateTitle": "Tasa de aprobación a lo largo del tiempo",
+        "trueFalseTitle": "Verdadero contra falso",
+        "legendAvg": "Promedio",
+        "legendP95": "p95",
+        "legendThreshold": "umbral {dirección} {valor}",
+        "legendHealthy": "saludable",
+        "legendUnhealthy": "insalubres",
+        "kpis": {
+          "average": "Promedio",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/ P95",
+          "unhealthy": "Insalubre",
+          "healthy": "Saludable",
+          "coverage": "Cobertura"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Todas las configuraciones",
+        "empty": "Ninguna configuración coincide con este filtro."
+      },
+      "overview": {
+        "title": "Descripción general de las configuraciones de puntuación",
+        "countSuffix": "{n} configuraciones",
+        "searchPlaceholder": "Configuraciones de filtro...",
+        "loading": "Cargando agregados por configuración...",
+        "emptyNoConfigsTitle": "Aún no hay configuraciones de puntuación",
+        "emptyNoConfigsHint": "Defina su primera configuración de puntuación para empezar a rastrear las dimensiones de calidad.",
+        "emptyWaitingTitle": "Esperando a que lleguen los primeros puntajes",
+        "emptyWaitingHint": "Sus configuraciones de partituras están declaradas, pero aún no se ha escrito ninguna partitura en _llm_scores en esta ventana.",
+        "waitingStepJob": "Active un trabajo de evaluación en línea que produzca puntuaciones para una de estas configuraciones",
+        "waitingStepRange": "Amplíe el intervalo de tiempo: es posible que las puntuaciones de principios de hoy o de esta semana no aparezcan en esta ventana",
+        "waitingStepRefresh": "Haga clic en Actualizar: las puntuaciones de un trabajo activo aparecen aproximadamente 1 minuto después de la evaluación",
+        "waitingPrimaryCta": "Abrir Eval Jobs",
+        "waitingRefreshCta": "Refrescar",
+        "noThreshold": "sin umbral",
+        "columns": {
+          "scoreConfig": "Configuración de puntuación",
+          "type": "Tipo",
+          "totalScores": "Puntuaciones totales",
+          "coverage": "Cobertura",
+          "unhealthy": "Insalubre",
+          "trend": "Tendencia",
+          "threshold": "Saludable si",
+          "updated": "Actualizada"
+        }
+      }
     }
   },
   "llmProviders": {

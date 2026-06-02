@@ -4153,6 +4153,114 @@
       },
       "selectAtLeastOne": "至少选择一名记分员",
       "saveError": "无法保存评估作业"
+    },
+    "quality": {
+      "scopeLabel": "此工作空间中的所有质量维度",
+      "timeRange": {
+        "label": "时间范围",
+        "last1h": "过去 1 小时",
+        "last24h": "过去 24 小时",
+        "last7d": "过去 7 天",
+        "last30d": "过去 30 天"
+      },
+      "sourceStream": {
+        "label": "源码流",
+        "all": "所有直播"
+      },
+      "refresh": "刷新",
+      "kpis": {
+        "evaluated": {
+          "title": "评估过的痕迹",
+          "unit": "",
+          "hint": "窗口中 _llm_scores 中的不同跟踪 ID"
+        },
+        "qualityIssueRate": {
+          "title": "质量问题率",
+          "unit": "%",
+          "hint": "评估任何维度低于阈值的轨迹"
+        },
+        "evaluationCost": {
+          "title": "评估成本",
+          "unit": "$",
+          "hint": "窗口中 LLM Judge 记分员成本的总和"
+        },
+        "jobSuccess": {
+          "title": "工作成功",
+          "unit": "%",
+          "hint": "在线评估任务运行成功率"
+        },
+        "scorerFailures": {
+          "title": "记分手失败",
+          "unit": "",
+          "hint": "窗口中的记分器调用失败"
+        },
+        "latencyP95": {
+          "title": "延迟 p95",
+          "unit": "s",
+          "hint": "Scorer-call p95 延迟"
+        },
+        "vsPrev": "vs 上一页",
+        "noData": "—"
+      },
+      "loading": "正在加载质量数据...",
+      "detail": {
+        "loading": "正在加载每个配置的细分...",
+        "noData": "此窗口中此配置尚无分数。",
+        "drillTitle": "钻到痕迹",
+        "splitByScorer": "按记分手划分",
+        "splitBySourceType": "按源类型拆分",
+        "trendTitle": "趋势",
+        "trendSubtitle": "{configName}，{存储桶}",
+        "distributionTitle": "分数分布",
+        "compositionTitle": "随着时间的推移构成",
+        "categoryDistributionTitle": "类别分布",
+        "passRateTitle": "一段时间内的及格率",
+        "trueFalseTitle": "对与错",
+        "legendAvg": "平均值",
+        "legendP95": "p95",
+        "legendThreshold": "阈值 {方向} {值}",
+        "legendHealthy": "健康",
+        "legendUnhealthy": "不健康",
+        "kpis": {
+          "average": "平均值",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "不健康",
+          "healthy": "健康",
+          "coverage": "覆盖范围"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "所有配置",
+        "empty": "没有与该过滤器匹配的配置。"
+      },
+      "overview": {
+        "title": "分数配置概述",
+        "countSuffix": "{n} 个配置",
+        "searchPlaceholder": "筛选配置...",
+        "loading": "正在加载每个配置的聚合...",
+        "emptyNoConfigsTitle": "还没有分数配置",
+        "emptyNoConfigsHint": "定义您的第一个分数配置以开始跟踪质量维度。",
+        "emptyWaitingTitle": "等待第一个比分落下",
+        "emptyWaitingHint": "您的分数配置已声明，但尚未在此窗口中向 _llm_scores 写入任何分数。",
+        "waitingStepJob": "激活在线评估任务，为其中一个配置生成分数",
+        "waitingStepRange": "扩大时间范围——今天早些时候或本周早些时候的分数可能不在此窗口中",
+        "waitingStepRefresh": "单击 “刷新” — 当前工作的分数将在评估后约 1 分钟内显示",
+        "waitingPrimaryCta": "空缺评估任务",
+        "waitingRefreshCta": "刷新",
+        "noThreshold": "没有门槛",
+        "columns": {
+          "scoreConfig": "分数配置",
+          "type": "类型",
+          "totalScores": "总分数",
+          "coverage": "覆盖范围",
+          "unhealthy": "不健康",
+          "trend": "趋势",
+          "threshold": "如果是健康的",
+          "updated": "已更新"
+        }
+      }
     }
   },
   "llmProviders": {

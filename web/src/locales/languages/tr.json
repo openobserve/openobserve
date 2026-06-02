@@ -4160,6 +4160,114 @@
       },
       "selectAtLeastOne": "En az bir golcü seçin",
       "saveError": "Eval işi kaydedilemedi"
+    },
+    "quality": {
+      "scopeLabel": "Bu çalışma alanındaki tüm kalite boyutları",
+      "timeRange": {
+        "label": "Zaman aralığı",
+        "last1h": "Son 1 saat",
+        "last24h": "Son 24 saat",
+        "last7d": "Son 7 gün",
+        "last30d": "Son 30 gün"
+      },
+      "sourceStream": {
+        "label": "Kaynak akışı",
+        "all": "Tüm yayınlar"
+      },
+      "refresh": "Yenile",
+      "kpis": {
+        "evaluated": {
+          "title": "Değerlendirilen İzler",
+          "unit": "",
+          "hint": "Penceredeki _llm_scores içindeki farklı izleme kimlikleri"
+        },
+        "qualityIssueRate": {
+          "title": "Kalite Sorun Oranı",
+          "unit": "%",
+          "hint": "Eşiğin altında herhangi bir boyuta sahip değerlendirilmiş izler"
+        },
+        "evaluationCost": {
+          "title": "Değerlendirme Maliyeti",
+          "unit": "$",
+          "hint": "Penceredeki LLM Jüri puanı maliyetinin toplamı"
+        },
+        "jobSuccess": {
+          "title": "İş Başarısı",
+          "unit": "%",
+          "hint": "Online Eval İş koşusu başarı oranı"
+        },
+        "scorerFailures": {
+          "title": "Golcü Başarısızlıkları",
+          "unit": "",
+          "hint": "Pencerede başarısız golcü çağrıları"
+        },
+        "latencyP95": {
+          "title": "Gecikme p95",
+          "unit": "s",
+          "hint": "Scorer-call p95 gecikmesi"
+        },
+        "vsPrev": "öncekine karşı",
+        "noData": "—"
+      },
+      "loading": "Kalite verileri yükleniyor...",
+      "detail": {
+        "loading": "Yapılandırma başına dökümü yükleniyor...",
+        "noData": "Bu pencerede bu yapılandırma için henüz puan yok.",
+        "drillTitle": "İzlere delin",
+        "splitByScorer": "Golcü tarafından bölünür",
+        "splitBySourceType": "Source_type ile bölün",
+        "trendTitle": "Eğilim",
+        "trendSubtitle": "{configName}, {kutu}",
+        "distributionTitle": "Puan dağılımı",
+        "compositionTitle": "Zamanla kompozisyon",
+        "categoryDistributionTitle": "Kategori dağılımı",
+        "passRateTitle": "Zaman içinde geçiş oranı",
+        "trueFalseTitle": "Doğru vs Yanlış",
+        "legendAvg": "Ort",
+        "legendP95": "p95",
+        "legendThreshold": "eşik {yön} {değer}",
+        "legendHealthy": "sağlıklı",
+        "legendUnhealthy": "sağlıksız",
+        "kpis": {
+          "average": "Ortalama",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Sağlıksız",
+          "healthy": "Sağlıklı",
+          "coverage": "Kapsam"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Tüm yapılandırmalar",
+        "empty": "Bu filtreyle eşleşen hiçbir yapılandırma yok."
+      },
+      "overview": {
+        "title": "Puan Yapılandırmalarına Genel Bakış",
+        "countSuffix": "{n} yapılandırmalar",
+        "searchPlaceholder": "Yapılandırmaları filtrele...",
+        "loading": "Yapılandırma başına toplamalar yükleniyor...",
+        "emptyNoConfigsTitle": "Henüz Puan Yapılandırması Yok",
+        "emptyNoConfigsHint": "Kalite boyutlarını izlemeye başlamak için ilk Skor Yapılandırmanızı tanımlayın.",
+        "emptyWaitingTitle": "İlk skorların inmesini bekliyorum",
+        "emptyWaitingHint": "Skor Yapılandırmalarınız bildirildi, ancak bu pencerede _llm_scores öğesine henüz puan yazılmadı.",
+        "waitingStepJob": "Bu yapılandırmalardan biri için puan üreten bir Çevrimiçi Değerlendirme İşini etkinleştirin",
+        "waitingStepRange": "Zaman aralığını genişletin - bugünün erken saatlerinde veya bu haftanın puanları bu pencerede olmayabilir",
+        "waitingStepRefresh": "Yenile'yi tıklayın — etkin bir işten alınan puanlar değerlendirmeden sonraki yaklaşık 1 dakika içinde görünür",
+        "waitingPrimaryCta": "Açık Eval İş İlanları",
+        "waitingRefreshCta": "Yenile",
+        "noThreshold": "eşik yok",
+        "columns": {
+          "scoreConfig": "Puan Yapılandırması",
+          "type": "Tür",
+          "totalScores": "Toplam Skorlar",
+          "coverage": "Kapsam",
+          "unhealthy": "Sağlıksız",
+          "trend": "Eğilim",
+          "threshold": "Sağlıklı ise",
+          "updated": "Güncellendi"
+        }
+      }
     }
   },
   "llmProviders": {
