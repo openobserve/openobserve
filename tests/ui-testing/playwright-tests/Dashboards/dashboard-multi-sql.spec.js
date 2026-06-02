@@ -228,14 +228,35 @@ test.describe("Multi-SQL Query Support", () => {
       const dashboardName = generateDashboardName();
 
       await buildPanel(page, pm, dashboardName, { chartType: "bar" });
+
+      // Give each query a DISTINCT Y-axis field so switching tabs is actually
+      // verifiable (and so every query passes save validation — empty queries
+      // fail with "Query N: Add at least one field …").
+      // Q1 (index 0) already has y = kubernetes_container_hash from buildPanel.
       await msql.addQueryTab(1);
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
+
       await msql.addQueryTab(2);
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+
+      // Switching tabs must surface that query's own Y-axis field.
+      const yLayout = page.locator('[data-test="dashboard-y-layout"]');
+
+      await msql.switchToQueryTab(0);
+      await expect(msql.queryTab(0)).toBeVisible();
+      await expect(yLayout).toContainText("kubernetes_container_hash");
 
       await msql.switchToQueryTab(1);
       await expect(msql.queryTab(1)).toBeVisible();
+      await expect(yLayout).toContainText("kubernetes_namespace_name");
 
       await msql.switchToQueryTab(2);
       await expect(msql.queryTab(2)).toBeVisible();
+      await expect(yLayout).toContainText("kubernetes_pod_name");
 
       await msql.applyAndSave(pm);
       await cleanupTestDashboard(page, pm, dashboardName);
@@ -342,7 +363,12 @@ test.describe("Multi-SQL Query Support", () => {
       await expect(msql.queryTabVisibility(1)).toBeVisible();
 
       await msql.toggleQueryVisibility(0);
-      await expect(msql.queryTabVisibility(0)).toContainText("visibility_off");
+      // The eye icon is an OIcon (SVG, no text). Its hidden state is exposed via
+      // the data-test-hidden attribute rather than icon-font text content.
+      await expect(msql.queryTabVisibility(0)).toHaveAttribute(
+        "data-test-hidden",
+        "true",
+      );
 
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
@@ -364,7 +390,10 @@ test.describe("Multi-SQL Query Support", () => {
       const dashboardName = generateDashboardName();
 
       await buildPanel(page, pm, dashboardName, { chartType: "bar" });
-      await msql.addQueryTab(1);
+      // Configure the second query — an empty query fails save validation
+      // ("Query 2: Add at least one field …"), which would leave the panel on
+      // the add_panel page and break teardown.
+      await addAndConfigureSecondQuery(pm);
 
       await expect(msql.warningBanner).not.toBeVisible();
 
@@ -396,7 +425,9 @@ test.describe("Multi-SQL Query Support", () => {
         chartType: "table",
         yField: "kubernetes_container_hash",
       });
-      await msql.addQueryTab(1);
+      // Configure the second query so the panel passes save validation (every
+      // query is validated); the pivot warning itself does not block saving.
+      await addAndConfigureSecondQuery(pm);
 
       await msql.switchToQueryTab(0);
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "p");

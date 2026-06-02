@@ -94,6 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="cursor: pointer"
                   size="sm"
                   :data-test="`dashboard-panel-query-tab-visibility-${index}`"
+                  :data-test-hidden="
+                    (dashboardPanelData.layout.hiddenQueries || []).includes(index)
+                      ? 'true'
+                      : 'false'
+                  "
                 />
                 <OTooltip
                   :content="
@@ -121,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
         <OButton
+          v-if="!isPivotTable"
           variant="ghost"
           size="icon"
           @click.stop="addTab"
@@ -128,14 +134,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
         >
         </OButton>
-        <!-- D5: Warning for restricted chart types with multiple queries -->
-        <div
+        <!-- D5: Warning for restricted chart types with multiple queries.
+             Outlined soft-background chip (warning-soft variant + ring),
+             height-aligned (h-8) with the toolbar's size="sm" buttons. -->
+        <OBadge
           v-if="multiQueryWarning"
-          class="dashboard-multi-query-warning"
+          variant="warning-soft"
+          size="sm"
+          icon="info-outline"
+          class="dashboard-multi-query-warning tw:h-8 tw:mr-2 tw:ring-1 tw:ring-inset tw:ring-current"
         >
-          <OIcon name="info-outline" size="xs" />
-          <span>{{ multiQueryWarning }}</span>
-        </div>
+          {{ multiQueryWarning }}
+        </OBadge>
       </div>
       <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0">
         <OSwitch
@@ -322,6 +332,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -338,6 +349,7 @@ export default defineComponent({
     OIcon,
     OSplitter,
     OInput,
+    OBadge,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -483,18 +495,22 @@ export default defineComponent({
     const vrlFnEditorRef = ref(null);
 
 
+    // A table panel with a breakdown field is a pivot table, which only
+    // supports a single query (so the add-query button is hidden and a warning
+    // is shown if multiple queries already exist).
+    const isPivotTable = computed(
+      () =>
+        dashboardPanelData.data.type === "table" &&
+        (dashboardPanelData.data.queries?.[0]?.fields?.breakdown?.length ?? 0) >
+          0,
+    );
+
     // D5: Warning banner for restricted chart types with multiple queries
     const multiQueryWarning = computed(() => {
       if (dashboardPanelData.data.queries.length <= 1) return null;
       if (promqlMode.value) return null;
 
-      const type = dashboardPanelData.data.type;
-
-      const pivotQuery = dashboardPanelData.data.queries?.[0];
-      const isPivot =
-        type === "table" &&
-        (pivotQuery?.fields?.breakdown?.length ?? 0) > 0;
-      if (isPivot) {
+      if (isPivotTable.value) {
         return t("dashboard.multiQueryWarning", { chartType: "Pivot Table" });
       }
 
@@ -893,6 +909,7 @@ export default defineComponent({
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,
       multiQueryWarning,
+      isPivotTable,
       handleQueryUpdate,
       handleLanguageChange,
       handleAskAI,
@@ -942,18 +959,10 @@ export default defineComponent({
   }
 }
 
-.dashboard-multi-query-warning {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
-  color: var(--o2-status-warning-text);
-  background: var(--o2-status-warning-bg);
-  border-radius: 4px;
-  white-space: nowrap;
-  margin-right: 8px;
-}
+// The multi-query warning chip is an OBadge (variant="warning-soft" + ring).
+// Styling — including the correct amber palette in both light and dark mode —
+// comes from the badge tokens; the .dashboard-multi-query-warning class remains
+// only as a stable hook for e2e selectors.
 
 .query-tab-name-text {
   cursor: default;

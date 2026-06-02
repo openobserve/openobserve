@@ -39,9 +39,12 @@ export default class DashboardMultiSQL {
     return this.page.locator(`[data-test="dashboard-panel-query-tab-name-${index}"]`);
   }
 
-  /** Locator for the rename input at given index */
+  /** Locator for the rename input at given index.
+   * The OInput wrapper carries the `...-input-${index}` data-test; the actual
+   * <input> element is the inner `...-field` node (OInput convention), which is
+   * what fill()/press() must target. */
   queryTabNameInput(index) {
-    return this.page.locator(`[data-test="dashboard-panel-query-tab-name-input-${index}"]`);
+    return this.page.locator(`[data-test="dashboard-panel-query-tab-name-input-${index}-field"]`);
   }
 
   /** Locator for the remove (close) icon at given index */
@@ -59,9 +62,11 @@ export default class DashboardMultiSQL {
     return this.page.locator(`[data-test="dashboard-config-query-tab-${index}"]`);
   }
 
-  /** Locator for the config legend input at given index */
+  /** Locator for the config legend (per-query label) input at given index.
+   * The OInput wrapper carries the `dashboard-config-legend-${index}` data-test;
+   * the editable <input> is the inner `...-field` node (OInput convention). */
   configLegend(index) {
-    return this.page.locator(`[data-test="dashboard-config-legend-${index}"]`);
+    return this.page.locator(`[data-test="dashboard-config-legend-${index}-field"]`);
   }
 
   /**
