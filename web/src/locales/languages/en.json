@@ -507,7 +507,11 @@
     "spans": "spans",
     "failedToFetchTraces": "Failed to fetch trace data. Please try again.",
     "traceNotFound": "Trace details not found.",
-    "failedToFetchTraceDetails": "Failed to load trace details. Please try again."
+    "failedToFetchTraceDetails": "Failed to load trace details. Please try again.",
+    "seekToMoment": "Seek to this moment in the session",
+    "timeInSession": "Time",
+    "route": "Route",
+    "duration": "Duration"
   },
   "about": {
     "name": "OpenObserve",

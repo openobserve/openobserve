@@ -93,6 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :sessionDetails="sessionDetails"
             :session-id="sessionId"
             :current-time="currentTime"
+            :start-time="sessionState.data.selectedSession?.start_time || 0"
+            :end-time="sessionState.data.selectedSession?.end_time || 0"
             @event-emitted="handleSidebarEvent"
             class="tw:h-full"
           />

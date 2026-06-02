@@ -74,13 +74,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <code class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:truncate tw:min-w-0 tw:flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
         <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-shrink-0">
-          <span
+          <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer hover:tw:bg-[var(--o2-border-color)]"
+            :title="t('rum.seekToMoment')"
+            data-test="rum-player-traces-tab-seek-btn"
+            @click="seekToTrace(selectedTrace)"
           >
             <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
             {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
-          </span>
+            <OIcon name="play-arrow" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+          </button>
           <span
             v-if="selectedTrace.metadata?.duration"
             class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
@@ -135,58 +139,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex-1" />
       </div>
 
-      <!-- Trace cards list -->
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:px-2 tw:py-2 tw:flex tw:flex-col tw:gap-2">
-        <OCard
-          v-for="(view, index) in correlatedViews"
-          :key="view.traceId"
-          class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:overflow-hidden tw:min-h-fit! tw:h-fit! tw:cursor-pointer"
-          :data-test="`rum-player-traces-tab-trace-card-${index}`"
-          @click="openTraceDetail(view)"
+      <!-- Traces table -->
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <TenstackTable
+          :rows="correlatedViews"
+          :columns="traceColumns"
+          :use-virtual-scroll="false"
+          :row-height="32"
+          :enable-row-expand="false"
+          :enable-text-highlight="false"
+          :enable-status-bar="false"
+          :default-columns="false"
+          :enable-column-reorder="false"
+          :enable-ai-context-button="false"
+          :row-class="traceRowClass"
+          data-test="rum-player-traces-tab-table"
+          @click:dataRow="handleTraceRowClick"
         >
-          <!-- Card header -->
-          <OCardSection class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:pt-2 tw:pb-1.5">
-            <code class="tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:truncate tw:min-w-0 tw:flex-1">
-              {{ shortRoute(view.route) }}
-            </code>
+          <template #cell-time="{ item }">
+            <span class="tw:text-xs tw:whitespace-nowrap tw:text-[var(--o2-text-secondary)]">
+              {{ traceTimeOffset(item.metadata?.start_time) || "—" }}
+            </span>
+          </template>
+          <template #cell-route="{ item }">
+            <span
+              class="tw:truncate tw:font-mono tw:text-xs tw:block"
+              :title="item.route"
+            >
+              {{ shortRoute(item.route) }}
+            </span>
+          </template>
+          <template #cell-duration="{ item }">
+            <span class="tw:text-xs tw:tabular-nums">
+              {{ formatTimeWithSuffix(item.metadata?.duration) }}
+            </span>
+          </template>
+          <template #cell-errors="{ item }">
             <OBadge
-              v-if="view.metadata?.errorCount > 0"
+              v-if="item.metadata?.errorCount > 0"
               variant="error-outline"
               size="sm"
-              class="tw:flex-shrink-0 tw:px-1.5! tw:py-1!"
             >
-              <OIcon name="error" size="xs" class="tw:mr-0.5" />
-              {{ view.metadata.errorCount }} {{ view.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
+              {{ item.metadata.errorCount }}
             </OBadge>
-          </OCardSection>
-
-          <!-- Card body: Trace metadata -->
-          <OCardSection v-if="view.metadata" class="tw:flex tw:flex-wrap tw:gap-1 tw:px-2.5 tw:pb-2">
-            <!-- Duration -->
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">
-              <OIcon name="timer" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
-              {{ formatTimeWithSuffix(view.metadata.duration) }}
-            </span>
-
-            <!-- Service count -->
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">
-              <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
-              {{ view.metadata.serviceCount }} {{ view.metadata.serviceCount > 1 ? 'services' : 'service' }}
-            </span>
-
-            <!-- Root operation -->
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">
-              {{ view.metadata.rootService }} → {{ view.metadata.rootOperation }}
-            </span>
-          </OCardSection>
-        </OCard>
+            <span v-else class="tw:text-[var(--o2-text-muted)] tw:text-xs">—</span>
+          </template>
+        </TenstackTable>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
@@ -196,8 +201,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import TenstackTable from "@/components/TenstackTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
 const { t } = useI18n();
@@ -237,6 +241,38 @@ const metadataError = ref<string | null>(null);
 
 const {fetchQueryDataWithHttpStream} = useHttpStreaming();
 
+// ── Table column definitions ────────────────────────────────
+const traceColumns = computed(() => [
+  {
+    id: "time",
+    header: t("rum.timeInSession"),
+    accessorFn: (row: any) => row.metadata?.start_time ?? 0,
+    meta: { align: "left" },
+  },
+  {
+    id: "route",
+    header: t("rum.route"),
+    accessorFn: (row: any) => shortRoute(row.route),
+    meta: { align: "left" },
+  },
+  {
+    id: "duration",
+    header: t("rum.duration"),
+    accessorFn: (row: any) => row.metadata?.duration ?? 0,
+    meta: { align: "right" },
+  },
+  {
+    id: "errors",
+    header: t("rum.errors"),
+    accessorFn: (row: any) => row.metadata?.errorCount ?? 0,
+    meta: { align: "center" },
+  },
+]);
+
+function traceRowClass(row: any): string {
+  return row.metadata?.errorCount > 0 ? "trace-row--error" : "";
+}
+
 // ── Formatting helpers ──────────────────────────────────────
 function shortRoute(url: string): string {
   try {
@@ -245,6 +281,11 @@ function shortRoute(url: string): string {
   } catch {
     return url;
   }
+}
+
+function traceRelativeTimeMs(startTimeUs: number): number {
+  if (!props.startTime || !startTimeUs) return 0;
+  return Math.max(0, Math.floor(startTimeUs / 1000) - props.startTime);
 }
 
 function traceTimeOffset(startTimeUs: number): string {
@@ -424,6 +465,21 @@ function closeTraceDetail() {
   selectedTraceEndTime.value = 0;
 }
 
+function handleTraceRowClick(view: any) {
+  openTraceDetail(view);
+  const relativeTimeMs = traceRelativeTimeMs(view.metadata?.start_time);
+  if (relativeTimeMs > 0) {
+    emit("event-emitted", "trace-row-click", { relativeTime: relativeTimeMs });
+  }
+}
+
+function seekToTrace(view: any) {
+  const relativeTimeMs = traceRelativeTimeMs(view.metadata?.start_time);
+  if (relativeTimeMs >= 0) {
+    emit("event-emitted", "trace-seek", { relativeTime: relativeTimeMs });
+  }
+}
+
 // ── Lifecycle ───────────────────────────────────────────────
 onMounted(() => {
   fetchTraces();
@@ -446,9 +502,7 @@ watch(
   overflow: hidden;
 }
 
-.body--dark {
-  .hover\:tw\:bg-\[var\(--o2-hover-accent\)\]:hover {
-    background: var(--o2-hover-accent);
-  }
+:deep(.trace-row--error td:first-child) {
+  border-left: 2px solid var(--o2-status-error);
 }
 </style>
