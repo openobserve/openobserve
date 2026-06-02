@@ -872,9 +872,7 @@ const fieldWidthClass = computed(() => {
     :class="[
       'tw:flex tw:flex-col tw:gap-1',
       fieldWidthClass,
-      // Inside-label: grow to fit label text when it is wider than the
-      // natural container width, but don't shrink smaller than the container.
-      labelPosition === 'inside' ? 'tw:min-w-max' : '',
+      labelPosition === 'inside' ? 'tw:min-w-0' : '',
     ]"
   >
     <!-- Label -->

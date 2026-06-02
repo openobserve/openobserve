@@ -586,7 +586,7 @@ pub async fn remote_write(
             let need_trigger = !stream_trigger_map.contains_key(&stream_name);
             if need_trigger && !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, stream_name);
+                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
@@ -1162,7 +1162,7 @@ async fn prom_ha_handler(
                 "Electing {} new leader for {} as last received data from {} at {} ",
                 replica_label,
                 cluster_name,
-                &leader.name,
+                leader.name,
                 Utc.timestamp_nanos(last_received * 1000)
             );
             leader.name = replica_label.to_owned();

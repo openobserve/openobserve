@@ -23,13 +23,7 @@ pub fn get_float_value(val: &Value) -> f64 {
         Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
         // f64, i64, u64 both can be converted to f64
         Value::Number(v) => v.as_f64().unwrap_or(0.0),
-        Value::Bool(v) => {
-            if *v {
-                1.0
-            } else {
-                0.0
-            }
-        }
+        Value::Bool(v) if *v => 1.0,
         _ => 0.0,
     }
 }
@@ -42,13 +36,7 @@ pub fn get_int_value(val: &Value) -> i64 {
             Some(v) => v,
             None => v.as_f64().unwrap_or(0.0) as i64,
         },
-        Value::Bool(v) => {
-            if *v {
-                1
-            } else {
-                0
-            }
-        }
+        Value::Bool(v) if *v => 1,
         _ => 0,
     }
 }
@@ -61,13 +49,7 @@ pub fn get_uint_value(val: &Value) -> u64 {
             Some(v) => v,
             None => v.as_f64().unwrap_or(0.0) as u64,
         },
-        Value::Bool(v) => {
-            if *v {
-                1
-            } else {
-                0
-            }
-        }
+        Value::Bool(v) if *v => 1,
         _ => 0,
     }
 }
@@ -179,13 +161,9 @@ pub fn get_value_from_path(value: &Value, path: &str) -> Option<Value> {
         if key.is_empty() {
             continue;
         }
-        match temp.as_object() {
-            Some(map) => match map.get(key) {
-                Some(v) => temp = v,
-                None => return None,
-            },
-            None => return None,
-        }
+        let map = temp.as_object()?;
+        let val = map.get(key)?;
+        temp = val;
     }
     match rest {
         None => Some(temp.to_owned()),

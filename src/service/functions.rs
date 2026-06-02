@@ -432,7 +432,7 @@ pub async fn list_functions(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("function:{}", &function.name))
+                    .contains(&format!("function:{}", function.name))
                 || permitted
                     .as_ref()
                     .unwrap()

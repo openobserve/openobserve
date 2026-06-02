@@ -450,10 +450,10 @@ pub async fn merge_by_stream(
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
             match job_strategy {
                 MergeStrategy::FileSize => {
-                    files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
+                    files_with_size.sort_by_key(|k| k.meta.original_size);
                 }
                 MergeStrategy::FileTime => {
-                    files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+                    files_with_size.sort_by_key(|k| k.meta.min_ts);
                 }
                 MergeStrategy::TimeRange => {
                     files_with_size = sort_by_time_range(files_with_size);
@@ -807,7 +807,7 @@ pub async fn merge_files(
         fi += 1;
         log::info!(
             "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
-            &file.key
+            file.key
         );
         let buf = file_data::get(&file.account, &file.key, None).await?;
         let file_format = FileFormat::from_extension(&file.key)
@@ -817,7 +817,7 @@ pub async fn merge_files(
             Err(e) => {
                 log::error!(
                     "[COMPACTOR:WORKER:{thread_id}:{fi}] read schema error for file: {}, err: {e}",
-                    &file.key
+                    file.key
                 );
                 return Err(e);
             }
@@ -953,7 +953,7 @@ pub async fn merge_files(
             new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
         }
         MergeParquetResult::Multiple { bufs, file_metas } => {
-            for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
+            for (buf, file_meta) in bufs.into_iter().zip(file_metas) {
                 let mut new_file_meta = file_meta;
                 new_file_meta.compressed_size = buf.len() as i64;
                 if new_file_meta.compressed_size == 0 {

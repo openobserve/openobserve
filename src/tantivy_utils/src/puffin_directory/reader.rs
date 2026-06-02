@@ -158,7 +158,7 @@ impl Directory for PuffinDirReader {
                 Some(ext) => ext,
                 None => return Ok(false),
             };
-            let dir_path = format!("{}.{}", &EMPTY_PUFFIN_SEG_ID.as_str(), ext);
+            let dir_path = format!("{}.{}", EMPTY_PUFFIN_SEG_ID.as_str(), ext);
             EMPTY_PUFFIN_DIRECTORY.exists(&PathBuf::from(dir_path))
         } else {
             Ok(true)

@@ -510,10 +510,8 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                                 self.timestamp_alias = Some(col.name.clone())
                             }
                         }
-                        Expr::ScalarFunction(_) => {
-                            if is_ts_hist_udf(expr, &self.timestamp_alias) {
-                                self.ts_hist_alias = Some(get_col_name(expr));
-                            }
+                        Expr::ScalarFunction(_) if is_ts_hist_udf(expr, &self.timestamp_alias) => {
+                            self.ts_hist_alias = Some(get_col_name(expr));
                         }
                         _ => {}
                     }
@@ -774,6 +772,7 @@ mod tests {
             skip_wal: false,
             action_id: "".to_string(),
             histogram_interval: 5,
+            timezone: None,
             sampling_ratio: None,
         };
         Sql::new(&query, "parse_test", StreamType::Logs, None)

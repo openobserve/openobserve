@@ -223,7 +223,7 @@ pub async fn list_pipelines(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("pipeline:{}", &pipeline.id))
+                    .contains(&format!("pipeline:{}", pipeline.id))
                 || permitted
                     .as_ref()
                     .unwrap()

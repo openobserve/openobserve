@@ -638,9 +638,6 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
-    let Ok(mut schema) = infra::schema::get(org_id, stream_name, stream_type).await else {
-        return Ok(MetaHttpResponse::not_found("stream not found"));
-    };
     let Some(mut settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await
     else {
         return Ok(MetaHttpResponse::not_found("stream not found"));
@@ -659,20 +656,19 @@ pub async fn update_stream_settings(
             fields.push(arrow_schema::Field::new(name, data_type, true));
         }
         let new_schema = Schema::new(fields);
-        schema =
-            match infra::schema::merge(org_id, stream_name, stream_type, &new_schema, None).await {
-                Ok(Some((s, _))) => s,
-                Ok(None) => {
-                    return Err(Error::other(
-                        "error in update stream settings: update schema is empty".to_string(),
-                    ));
-                }
-                Err(e) => {
-                    return Err(Error::other(format!(
-                        "error in update stream settings: {e}"
-                    )));
-                }
-            };
+        match infra::schema::merge(org_id, stream_name, stream_type, &new_schema, None).await {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                return Err(Error::other(
+                    "error in update stream settings: update schema is empty".to_string(),
+                ));
+            }
+            Err(e) => {
+                return Err(Error::other(format!(
+                    "error in update stream settings: {e}"
+                )));
+            }
+        };
     }
 
     if let Some(v) = new_settings.storage_type {

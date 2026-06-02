@@ -441,13 +441,12 @@ async fn prepare_alert(
                 }
             }
         }
-        QueryType::PromQL => {
-            if alert.query_condition.promql.is_none()
+        QueryType::PromQL
+            if (alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || alert.query_condition.promql_condition.is_none()
-            {
-                return Err(AlertError::PromqlMissingQuery);
-            }
+                || alert.query_condition.promql_condition.is_none()) =>
+        {
+            return Err(AlertError::PromqlMissingQuery);
         }
         _ => {}
     }
@@ -869,9 +868,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         {
             Ok(Some(outcome)) => {
                 log::info!(
-                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
-                    org_id,
-                    &alert.name,
+                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
+                    alert.name,
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
@@ -879,9 +877,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             }
             Ok(None) => {
                 log::debug!(
-                    "No incident correlation for manually triggered alert {}/{}",
-                    org_id,
-                    &alert.name
+                    "No incident correlation for manually triggered alert {org_id}/{}",
+                    alert.name
                 );
                 false
             }
@@ -949,9 +946,8 @@ pub async fn trigger_by_name(
         {
             Ok(Some(outcome)) => {
                 log::info!(
-                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
-                    org_id,
-                    &alert.name,
+                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
+                    alert.name,
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
@@ -959,9 +955,8 @@ pub async fn trigger_by_name(
             }
             Ok(None) => {
                 log::debug!(
-                    "No incident correlation for manually triggered alert {}/{}",
-                    org_id,
-                    &alert.name
+                    "No incident correlation for manually triggered alert {org_id}/{}",
+                    alert.name
                 );
                 false
             }
@@ -1599,18 +1594,10 @@ async fn process_dest_template(
     };
 
     let mut alert_query = String::new();
-    let function_content = if alert.query_condition.vrl_function.is_none() {
-        "".to_owned()
+    let function_content = if let Some(v) = &alert.query_condition.vrl_function {
+        format!("&functionContent={}", v.replace('+', "%2B"))
     } else {
-        format!(
-            "&functionContent={}",
-            alert
-                .query_condition
-                .vrl_function
-                .as_ref()
-                .unwrap()
-                .replace('+', "%2B")
-        )
+        "".to_owned()
     };
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {

@@ -358,10 +358,9 @@ impl InputOutputExtractor {
     ) -> Option<(Option<json::Value>, Option<json::Value>)> {
         let events: Vec<json::Value> = if let Some(s) = events_val.as_str() {
             serde_json::from_str(s).ok()?
-        } else if let Some(arr) = events_val.as_array() {
-            arr.clone()
         } else {
-            return None;
+            let arr = events_val.as_array()?;
+            arr.clone()
         };
 
         let choice_event = events

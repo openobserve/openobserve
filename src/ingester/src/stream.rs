@@ -78,7 +78,7 @@ impl Stream {
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::new();
-        for (_, partition) in self.partitions.iter() {
+        for partition in self.partitions.values() {
             let (part_schema_size, partitions) = partition
                 .persist(id, idx, org_id, stream_type, stream_name)
                 .await?;

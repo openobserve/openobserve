@@ -32,6 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               labelPosition="inside"
               class="dynamic-input"
               :style="inputStyle"
+              :error="!!panelNameError"
+              :error-message="panelNameError"
+              @update:model-value="panelNameError = ''"
             />
           </template>
           <template #actions>
@@ -308,6 +311,7 @@ export default defineComponent({
     const errorData: any = reactive({
       errors: [],
     });
+    const panelNameError = ref("");
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
@@ -1084,6 +1088,7 @@ export default defineComponent({
 
       // Clear the tracking arrays
       variablesCreatedInSession.value = [];
+      panelNameError.value = "";
       variablesWithCurrentPanel.value = [];
 
       return router.push({
@@ -1175,6 +1180,7 @@ export default defineComponent({
           dashboardData.data.title.trim() == ""
         ) {
           errors.push("Name of Panel is required");
+          panelNameError.value = "Panel name is required.";
         }
       }
 
@@ -1832,6 +1838,7 @@ export default defineComponent({
       currentPanelId,
       panelEditorRef,
       dashboardDataForPanelEditor,
+      panelNameError,
     };
   },
   methods: {

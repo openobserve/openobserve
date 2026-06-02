@@ -149,9 +149,9 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                 ) {
                     log::warn!(
                         "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
-                        &org_id,
+                        org_id,
                         stream_type,
-                        &stream_name,
+                        stream_name,
                     );
                     continue;
                 }
@@ -244,10 +244,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                     None,
                 ) {
                     log::warn!(
-                        "[DOWNSAMPLING] the stream [{}/{}/{}] is deleting, just skip",
-                        &org_id,
-                        stream_type,
-                        &stream_name,
+                        "[DOWNSAMPLING] the stream [{org_id}/{stream_type}/{stream_name}] is deleting, just skip",
                     );
                     continue;
                 }
