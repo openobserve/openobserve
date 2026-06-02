@@ -78,6 +78,15 @@ export default defineComponent({
       algorithmTouched,
       providerTypeOptions,
       plainAlgorithmOptions,
+      validate: () => {
+        providerTypeTouched.value = true;
+        algorithmTouched.value = true;
+        const providerValid = !!frmData.value.key.mechanism.type;
+        const algorithmValid =
+          frmData.value.key.mechanism.type !== 'simple' ||
+          !!frmData.value.key.mechanism.simple_algorithm;
+        return providerValid && algorithmValid;
+      },
     };
   },
 });

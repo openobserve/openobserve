@@ -509,14 +509,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.decimals =
-                typeof value == 'number' && value >= 0 ? value : null)
+                typeof value == 'number' && value >= 0 && value <= 100 ? value : null)
           "
           @blur="
             () => {
+              decimalsTouched = true;
               if (dashboardPanelData.data.config.decimals == null)
                 dashboardPanelData.data.config.decimals = 2
             }
           "
+          :error="decimalsTouched && (dashboardPanelData.data.config.decimals === null || dashboardPanelData.data.config.decimals < 0 || dashboardPanelData.data.config.decimals > 100)"
+          :error-message="t('dashboard.decimalsMustBeBetween')"
           :label="t('dashboard.decimals')"
           data-test="dashboard-config-decimals"
         />
@@ -2605,6 +2608,8 @@ export default defineComponent({
       }
     });
 
+    const decimalsTouched = ref(false);
+
     return {
       t,
       dashboardPanelData,
@@ -2673,6 +2678,7 @@ export default defineComponent({
       allSectionsExpanded,
       toggleAllSections,
       isPivotMode,
+      decimalsTouched,
     };
   },
 });
