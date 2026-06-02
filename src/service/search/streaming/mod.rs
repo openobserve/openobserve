@@ -42,6 +42,7 @@ use o2_enterprise::enterprise::{
     },
     log_patterns::{PatternAccumulator, PatternExtractionConfig},
 };
+use sqlparser::ast::VisitMut;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -55,7 +56,9 @@ use crate::{
     service::search::{
         cache as search_cache,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::Sql,
+        sql::visitor::histogram_interval::{
+            HistogramIntervalVisitor, validate_and_adjust_histogram_interval,
+        },
     },
 };
 #[cfg(feature = "enterprise")]
@@ -182,16 +185,27 @@ pub async fn process_search_stream_request(
     };
 
     if req.query.histogram_interval == 0 {
-        if let Ok(sql) = Sql::new(
-            &req.query.clone().into(),
-            &org_id,
-            stream_type,
-            req.search_type,
-        )
-        .await
-        {
-            if let Some(interval) = sql.histogram_interval {
-                req.query.histogram_interval = interval;
+        match sqlparser::parser::Parser::parse_sql(
+            &sqlparser::dialect::GenericDialect {},
+            &req.query.sql,
+        ) {
+            Ok(mut stmts) => {
+                if let Some(mut stmt) = stmts.pop() {
+                    let mut visitor =
+                        HistogramIntervalVisitor::new((req.query.start_time, req.query.end_time));
+                    let _ = stmt.visit(&mut visitor);
+                    if let Some(interval) = visitor.interval {
+                        req.query.histogram_interval = validate_and_adjust_histogram_interval(
+                            interval,
+                            (req.query.start_time, req.query.end_time),
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {trace_id}] failed to pre-compute histogram_interval, will recompute per-partition: {e}"
+                );
             }
         }
     }

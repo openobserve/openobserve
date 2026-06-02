@@ -606,4 +606,48 @@ mod tests {
             3600
         );
     }
+
+    /// Simulates the streaming fix: pre-compute interval from the full query time range,
+    /// then verify that running the visitor over each partition's (smaller) time range
+    /// with that preset value produces the same interval every time.
+    #[test]
+    fn test_preset_interval_is_consistent_across_partitions() {
+        let hour = 3600 * 1_000_000_i64;
+        let sql = "SELECT histogram(_timestamp) FROM logs";
+
+        let parse = |sql: &str| {
+            sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+                .unwrap()
+                .pop()
+                .unwrap()
+        };
+
+        // Step 1: pre-compute from full query range (mirrors mod.rs fix)
+        let full_range = (0_i64, 1 * hour);
+        let preset_interval = {
+            let mut stmt = parse(sql);
+            let mut v = HistogramIntervalVisitor::new(full_range);
+            let _ = stmt.visit(&mut v);
+            v.interval
+                .map(|i| validate_and_adjust_histogram_interval(i, full_range))
+                .unwrap_or(0)
+        };
+        assert_eq!(preset_interval, 30, "full-range interval should be 30s");
+
+        // Step 2: simulate three partitions with different time ranges;
+        // each uses the preset value — all must agree
+        let partitions: &[(i64, i64)] = &[
+            (0, 2 * 60 * 1_000_000),  // 2 min partition
+            (0, 15 * 60 * 1_000_000), // 15 min partition
+            (0, 1 * hour),            // full-range partition
+        ];
+
+        for &(start, end) in partitions {
+            let adjusted = validate_and_adjust_histogram_interval(preset_interval, (start, end));
+            assert_eq!(
+                adjusted, preset_interval,
+                "partition ({start},{end}) should preserve preset interval {preset_interval}, got {adjusted}"
+            );
+        }
+    }
 }
