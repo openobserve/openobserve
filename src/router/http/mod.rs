@@ -228,13 +228,13 @@ async fn proxy_request(
 
     // Extract method and headers before consuming the request
     let method = req.method().clone();
-    let mut headers = build_request_headers(req.headers(), is_streaming);
+    let headers = build_request_headers(req.headers(), is_streaming);
 
     // Read the request body once and keep it buffered so it can be re-sent on
     // each fail-over attempt. The body is held fully in memory (bounded by the
     // usual request size limits); buffering is required because a consumed
     // stream cannot be replayed onto another node.
-    let mut body = match req.into_body().collect().await {
+    let body = match req.into_body().collect().await {
         Ok(collected) => collected.to_bytes(),
         Err(e) => {
             log::error!("Failed to read request body: {:?}", e);
@@ -251,39 +251,33 @@ async fn proxy_request(
     let mut last_error: Option<(String, reqwest::Error)> = None;
 
     for (i, node) in nodes.iter().take(attempts).enumerate() {
-        let is_last = i + 1 >= attempts;
         let target = ProxyTarget::new(&path, node);
-        // Move the buffered headers/body into the final attempt; clone only when
-        // a further retry may follow. `Bytes::clone` is a cheap ref-count bump.
-        let (req_headers, req_body) = if is_last {
-            (std::mem::take(&mut headers), std::mem::take(&mut body))
-        } else {
-            (headers.clone(), body.clone())
-        };
+        // `body` is `Bytes`, so `clone()` is a cheap ref-count bump, not a copy.
         let upstream_req = match method {
-            Method::GET => client.get(&target.full_url).headers(req_headers),
+            Method::GET => client.get(&target.full_url).headers(headers.clone()),
             Method::POST => client
                 .post(&target.full_url)
-                .headers(req_headers)
-                .body(req_body),
+                .headers(headers.clone())
+                .body(body.clone()),
             Method::PUT => client
                 .put(&target.full_url)
-                .headers(req_headers)
-                .body(req_body),
+                .headers(headers.clone())
+                .body(body.clone()),
             Method::DELETE => client
                 .delete(&target.full_url)
-                .headers(req_headers)
-                .body(req_body),
+                .headers(headers.clone())
+                .body(body.clone()),
             Method::PATCH => client
                 .patch(&target.full_url)
-                .headers(req_headers)
-                .body(req_body),
+                .headers(headers.clone())
+                .body(body.clone()),
             _ => return (StatusCode::METHOD_NOT_ALLOWED).into_response(),
         };
 
         match upstream_req.send().await {
             Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
             Err(e) => {
+                let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
                     log::warn!(
                         "proxy request failed: {} -> {}, error: {e}, retrying on another node",
@@ -386,27 +380,20 @@ async fn proxy_with_body_routing(
     candidates.extend(nodes.into_iter().filter(|n| n.uuid != primary.uuid));
 
     let is_streaming = is_streaming_endpoint(query_path);
-    let mut req_headers = build_request_headers(&headers, is_streaming);
+    let req_headers = build_request_headers(&headers, is_streaming);
     let client = get_http_client();
     let attempts = max_attempts(candidates.len());
     let mut last_error: Option<(String, reqwest::Error)> = None;
 
     for (i, node) in candidates.iter().take(attempts).enumerate() {
-        let is_last = i + 1 >= attempts;
         let target = ProxyTarget::new(&path, node);
-        // Move the headers into the final attempt; clone only when a retry may
-        // follow.
-        let headers = if is_last {
-            std::mem::take(&mut req_headers)
-        } else {
-            req_headers.clone()
-        };
         let upstream_req =
-            build_payload_request(client, &target.full_url, headers, &querier_payload);
+            build_payload_request(client, &target.full_url, req_headers.clone(), &querier_payload);
 
         match upstream_req.send().await {
             Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
             Err(e) => {
+                let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
                     log::warn!(
                         "proxy request failed: {} -> {}, error: {e}, retrying on another node",
