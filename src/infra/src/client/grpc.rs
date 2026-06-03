@@ -70,13 +70,8 @@ pub async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Statu
 }
 
 /// Whether a gRPC client connection to `grpc_addr` should use TLS.
-///
-/// The decision is driven by the address scheme instead of a global toggle, so a node can
-/// reach intra-cluster peers over h2c (`http://`) while using TLS for connections that go
-/// through a TLS-terminating load balancer (`https://`, e.g. a super cluster's public
-/// address). This keeps the client and server TLS configuration independent.
 fn grpc_addr_uses_tls(grpc_addr: &str) -> bool {
-    grpc_addr.starts_with("https://")
+    grpc_addr.to_lowercase().starts_with("https://")
 }
 
 pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
