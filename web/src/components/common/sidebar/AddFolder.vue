@@ -21,14 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
       secondary-button-label="Cancel"
       primary-button-label="Save"
+      form-id="add-folder-sidebar-form"
       :primary-button-loading="onSubmit.isLoading.value"
       data-test="dashboard-folder-dialog"
       @update:open="$emit('update:open', $event)"
       @click:secondary="$emit('update:open', false)"
-      @click:primary="submit()"
     >
       <div>
-        <OForm ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
+        <OForm id="add-folder-sidebar-form" ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
           <OFormInput
             name="name"
             :label="t('dashboard.nameOfVariable') + '*'"
@@ -137,11 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const { track } = useReo();
   
       const onSubmit = useLoading(async () => {
-        await addFolderForm.value.validate().then(async (valid: any) => {
-          if (!valid) {
-            return false;
-          }
-
           // Sync OForm-owned values back to local state
           const formVals = addFolderForm.value.form.state.values as { name: string; description: string };
           folderData.value.name = formVals.name ?? folderData.value.name;
@@ -192,11 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             button: "Save New Folder",
             page: "Folders",
           });
-        });
       });
   
-      const submit = () => onSubmit.execute();
-
       return {
         t,
         disableColor,
@@ -209,7 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         getImageURL,
         onSubmit,
         defaultValue,
-        submit,
       };
     },
   });

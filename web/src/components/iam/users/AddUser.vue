@@ -21,12 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
     :primaryButtonLabel="t('user.save')"
     :secondaryButtonLabel="t('user.cancel')"
-    @click:primary="onSubmit"
+    form-id="add-user-form"
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:w-full">
-        <OForm ref="updateUserForm" @submit="onSubmit">
+        <OForm id="add-user-form" ref="updateUserForm" @submit="onSubmit">
           <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>

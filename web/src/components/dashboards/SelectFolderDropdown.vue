@@ -54,10 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-folder-move-dialog"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
-    :primary-button-disabled="isAddingFolder"
-    :primary-button-loading="isAddingFolder"
+    form-id="add-folder-dashboards-form"
     @click:secondary="showAddFolderDialog = false"
-    @click:primary="handleAddFolder"
   >
     <AddFolder
       ref="addFolderRef"
@@ -98,17 +96,6 @@ export default defineComponent({
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
     const addFolderRef: any = ref(null);
-    const isAddingFolder = ref(false);
-
-    const handleAddFolder = async () => {
-      if (!addFolderRef.value || isAddingFolder.value) return;
-      isAddingFolder.value = true;
-      try {
-        await addFolderRef.value.submit();
-      } finally {
-        isAddingFolder.value = false;
-      }
-    };
 
     const getInitialFolderValue = (): string => {
       // priority: activeFolderId > query.folder > default
@@ -168,8 +155,6 @@ export default defineComponent({
       updateFolderList,
       showAddFolderDialog,
       addFolderRef,
-      isAddingFolder,
-      handleAddFolder,
       computedStyle,
     };
   },

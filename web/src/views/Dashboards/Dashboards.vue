@@ -380,9 +380,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-add-dialog"
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
+            form-id="add-dashboard-form"
             :primary-button-loading="addDashboardRef?.onSubmit?.isLoading?.value"
             @click:secondary="showAddDashboardDialog = false"
-            @click:primary="addDashboardRef?.submit()"
           >
             <AddDashboard
               ref="addDashboardRef"
@@ -410,8 +410,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-folder-dialog"
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
+            form-id="add-folder-dashboards-form"
             @click:secondary="showAddFolderDialog = false"
-            @click:primary="addFolderRef?.submit()"
           >
             <AddFolder
               ref="addFolderRef"

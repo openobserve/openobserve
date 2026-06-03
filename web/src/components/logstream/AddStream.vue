@@ -23,12 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('logStream.add')"
     :secondary-button-label="t('logStream.cancel')"
     :primary-button-label="t('common.save')"
+    form-id="add-stream-form"
     @update:open="emits('update:open', $event)"
     @click:secondary="emits('update:open', false)"
-    @click:primary="submitForm"
   >
     <div class="tw:w-full">
-      <OForm :default-values="streamInputsDefault" @submit="submitForm">
+      <OForm id="add-stream-form" :default-values="streamInputsDefault" @submit="submitForm">
         <div class="tw:mt-2">
           <OInput
             data-test="add-stream-name-input"

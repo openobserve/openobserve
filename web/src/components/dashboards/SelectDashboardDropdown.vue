@@ -47,10 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title="New dashboard"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
+    form-id="add-dashboard-form"
     data-test="dashboard-dashboard-add-dialog"
     @update:open="showAddDashboardDialog = $event"
     @click:secondary="showAddDashboardDialog = false"
-    @click:primary="addDashboardRef?.submit()"
   >
     <AddDashboard
       ref="addDashboardRef"

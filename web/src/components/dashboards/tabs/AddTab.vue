@@ -21,13 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="editMode ? 'Edit Tab' : 'Add Tab'"
     secondary-button-label="Cancel"
     primary-button-label="Save"
+    form-id="add-tab-form"
     :primary-button-loading="onSubmit.isLoading.value"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
-    @click:primary="submit()"
   >
     <div>
-      <OForm ref="addTabForm" :default-values="{ name: '' }" @submit="onSubmit.execute">
+      <OForm id="add-tab-form" ref="addTabForm" :default-values="{ name: '' }" @submit="onSubmit.execute">
         <OFormInput
           name="name"
           label="Name*"
@@ -137,8 +137,6 @@ export default defineComponent({
     );
 
     const onSubmit = useLoading(async () => {
-      const valid = await addTabForm.value.validate();
-      if (!valid) return;
       // Sync form values back to local state
       tabData.value.name = (addTabForm.value.form.state.values.name as string) ?? tabData.value.name;
       try {
@@ -199,8 +197,6 @@ export default defineComponent({
         }
     });
 
-    const submit = () => onSubmit.execute();
-
     return {
       t,
       tabData,
@@ -208,7 +204,6 @@ export default defineComponent({
       store,
       isValidIdentifier,
       onSubmit,
-      submit,
     };
   },
 });

@@ -5,14 +5,14 @@
     :title="t('dashboard.addDashboard')"
     secondary-button-label="Cancel"
     :primary-button-label="t('metrics.add')"
+    form-id="add-to-dashboard-form"
     :primary-button-loading="onSubmit.isLoading.value"
     :primary-button-disabled="!panelTitle.trim()"
     data-test="add-to-dashboard-dialog"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
-    @click:primary="handlePrimaryClick()"
   >
-    <OForm ref="formRef" :default-values="{ panelTitle: '' }" @submit="onSubmit.execute()">
+    <OForm id="add-to-dashboard-form" :default-values="{ panelTitle: '' }" @submit="onSubmit.execute()">
     <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
@@ -201,11 +201,6 @@ export default defineComponent({
       }
     });
 
-    const formRef = ref(null);
-    const handlePrimaryClick = async () => {
-      formRef.value?.submit();
-    };
-
     return {
       t,
       getImageURL,
@@ -220,8 +215,6 @@ export default defineComponent({
       activeFolderId,
       activeTabId,
       updateSelectedDashboard,
-      formRef,
-      handlePrimaryClick,
     };
   },
 });

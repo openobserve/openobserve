@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-      <OForm ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
+      <OForm id="add-folder-dashboards-form" ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
         <OFormInput
           name="name"
           :label="t('dashboard.nameOfVariable') + '*'"
