@@ -34,7 +34,7 @@ You MUST output your findings as a single block of structured XML. Do not includ
     <category>YOUR_CATEGORY</category>
     <severity>critical|warning|suggestion</severity>
     <file>path/to/file.rs</file>
-    <line>42</line>
+    <line>NUMBER</line>
     <summary>One-line summary of the issue</summary>
     <description>
       Detailed explanation of the bug or issue.
@@ -48,6 +48,13 @@ You MUST output your findings as a single block of structured XML. Do not includ
   <!-- Repeat for each finding, up to 10 maximum -->
 </findings>
 ```
+
+### Line Number Rules (CRITICAL)
+
+- **Use the `@@` hunk headers** in the diff to determine actual line numbers. The format is `@@ -old_start,old_count +new_start,new_count @@`.
+- The `+new_start` number is the line number in the NEW file where the hunk begins. Count forward from there for lines with `+` prefix.
+- **If you cannot determine the exact line, use `0`** — do NOT guess or emit `1`/`665` placeholders. A `0` line number is more honest and prevents noise.
+- Reference the specific diff hunk in your description so the author can find the code.
 
 If you find NO issues, output:
 ```xml

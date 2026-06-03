@@ -205,37 +205,61 @@ async function callAnthropic(systemPrompt, userPrompt, model, timeoutMs = AGENT_
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        temperature: 0.0,
-        system: systemPrompt.slice(0, 100_000),
-        messages: [{ role: "user", content: userPrompt.slice(0, 150_000) }],
-      }),
-      signal: controller.signal,
-    });
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Anthropic API error ${resp.status}: ${err.slice(0, 500)}`);
-    }
-
-    const data = await resp.json();
-    return data.content?.[0]?.text || "";
-  } finally {
-    clearTimeout(timer);
+  // Try primary model, fall back to claude-3-5-sonnet on 404/auth errors
+  const modelsToTry = [model];
+  if (model !== "claude-3-5-sonnet-20241022" && !model.startsWith("claude-3-5-sonnet")) {
+    modelsToTry.push("claude-3-5-sonnet-20241022");
   }
+
+  let lastError = null;
+  for (const modelId of modelsToTry) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      if (modelId !== model) {
+        console.log(`[${isoNow()}] Anthropic failback: trying ${modelId} instead of ${model}`);
+      }
+
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: modelId,
+          max_tokens: 4096,
+          temperature: 0.0,
+          system: systemPrompt.slice(0, 100_000),
+          messages: [{ role: "user", content: userPrompt.slice(0, 150_000) }],
+        }),
+        signal: controller.signal,
+      });
+
+      if (resp.status === 404 || resp.status === 403 || resp.status === 401) {
+        const errText = await resp.text();
+        lastError = new Error(`Anthropic ${resp.status} for ${modelId}: ${errText.slice(0, 300)}`);
+        console.error(`[${isoNow()}] Anthropic ${resp.status} for ${modelId}, trying next...`);
+        continue;
+      }
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        const truncated = errText.slice(0, 500);
+        console.error(`[${isoNow()}] Anthropic HTTP ${resp.status}: ${truncated}`);
+        throw new Error(`Anthropic API error ${resp.status}: ${truncated}`);
+      }
+
+      const data = await resp.json();
+      return data.content?.[0]?.text || "";
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  throw lastError || new Error("All Anthropic models failed");
 }
 
 async function callDeepSeek(systemPrompt, userPrompt, model, timeoutMs = AGENT_TIMEOUT_MS) {
@@ -393,6 +417,47 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview) 
   }
 }
 
+// ─── Sanitization ──────────────────────────────────────────────────────────
+
+function sanitizeReviewBody(body) {
+  if (!body) return "";
+
+  // If body is JSON-wrapped (edge case from bad LLM output), unwrap it
+  let cleaned = body;
+  if (cleaned.trim().startsWith("{") && cleaned.trim().endsWith("}")) {
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (parsed.body && typeof parsed.body === "string") {
+        cleaned = parsed.body;
+      }
+    } catch {
+      // Not valid JSON, leave as-is
+    }
+  }
+
+  // Unescape common escaped sequences from LLM output
+  cleaned = cleaned.replace(/\\n/g, "\n");
+  cleaned = cleaned.replace(/\\t/g, "\t");
+  cleaned = cleaned.replace(/\\"/g, '"');
+
+  // Remove any XML boundary tags that escaped into the output
+  const boundaryTags = ["mr_input", "mr_body", "mr_comments", "mr_details",
+    "changed_files", "existing_inline_findings", "previous_review",
+    "custom_review_instructions", "review_task", "pr_context", "diff",
+    "all_findings", "coordinator_task", "overall_pr_context", "risk_tier",
+    "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
+    "category", "severity", "file", "line", "summary", "description", "suggestion"];
+  const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
+  cleaned = cleaned.replace(boundaryPattern, "");
+
+  // Ensure the marker is at the very start
+  if (!cleaned.trimStart().startsWith(REVIEW_MARKER)) {
+    cleaned = REVIEW_MARKER + "\n" + cleaned.replace(REVIEW_MARKER, "");
+  }
+
+  return cleaned.trim();
+}
+
 // ─── Coordinator pass ─────────────────────────────────────────────────────
 
 async function runCoordinator(agentResults, prContext, tier, existingReview) {
@@ -459,7 +524,36 @@ async function runCoordinator(agentResults, prContext, tier, existingReview) {
 
 function buildFallbackReview(agentResults, tier, failedAgents) {
   const allFindings = agentResults.flatMap(r => r.findings);
-  if (allFindings.length === 0) {
+
+  const seen = new Map();
+  const deduped = [];
+  for (const f of allFindings) {
+    const key = `${(f.category || "").toLowerCase()}|${(f.summary || "").toLowerCase().slice(0, 120)}`;
+    const existing = seen.get(key);
+    if (existing) {
+      const severityRank = { critical: 3, warning: 2, suggestion: 1, low: 0 };
+      if ((severityRank[f.severity?.toLowerCase()] || 0) > (severityRank[existing.severity?.toLowerCase()] || 0)) {
+        existing.severity = f.severity;
+        existing.description = f.description || existing.description;
+        existing.suggestion = f.suggestion || existing.suggestion;
+        existing.file = f.file || existing.file;
+        existing.line = f.line || existing.line;
+      }
+    } else {
+      seen.set(key, f);
+      deduped.push(f);
+    }
+  }
+
+  const MAX_FALLBACK_FINDINGS = 15;
+  const sorted = deduped
+    .sort((a, b) => {
+      const rank = { critical: 3, warning: 2, suggestion: 1, low: 0 };
+      return (rank[b.severity?.toLowerCase()] || 0) - (rank[a.severity?.toLowerCase()] || 0);
+    })
+    .slice(0, MAX_FALLBACK_FINDINGS);
+
+  if (sorted.length === 0) {
     return `${REVIEW_MARKER}
 ## AI Code Review
 
@@ -470,37 +564,48 @@ LGTM — No issues found by automated reviewers.
 <details>
 <summary>Review Details</summary>
 - Risk tier: ${tier}
-- Failed reviewers: ${failedAgents.length > 0 ? failedAgents.map(r => r.agentName).join(", ") : "none"}
+${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
 </details>`;
   }
 
   const byCategory = {};
-  for (const f of allFindings) {
-    (byCategory[f.category] ||= []).push(f);
+  for (const f of sorted) {
+    const cat = (f.category || "general").toLowerCase();
+    (byCategory[cat] ||= []).push(f);
   }
 
   const sections = [];
   for (const [cat, findings] of Object.entries(byCategory)) {
     sections.push(`### ${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
     for (const f of findings) {
-      sections.push(`- **${f.severity.toUpperCase()}** — \`${f.file}:${f.line}\` — ${f.summary}`);
+      const loc = f.file && f.line ? `\`${f.file}:${f.line}\`` : f.file ? `\`${f.file}\`` : "";
+      sections.push(`- **${(f.severity || "suggestion").toUpperCase()}** ${loc ? `${loc} — ` : ""}${f.summary}`);
+      if (f.suggestion) sections.push(`  - Fix: ${f.suggestion}`);
     }
   }
+
+  const failureNote = failedAgents.length > 0
+    ? `\n> Note: ${failedAgents.map(r => r.agentName).join(", ")} failed to complete. Findings are from available reviewers only.`
+    : "";
+
+  const dedupNote = allFindings.length > sorted.length
+    ? `\n> Deduplicated: ${allFindings.length} raw findings → ${sorted.length} unique (${allFindings.length - sorted.length} duplicates removed).`
+    : "";
 
   return `${REVIEW_MARKER}
 ## AI Code Review
 
 ### Decision: approved_with_comments
 
-Automated review — coordinator pass skipped due to error. Findings below are un-deduplicated.
+${deduped.length > 0 ? `Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.` : ""}${failureNote}${dedupNote}
 
 ${sections.join("\n")}
 
 <details>
 <summary>Review Details</summary>
 - Risk tier: ${tier}
-- Failed reviewers: ${failedAgents.length > 0 ? failedAgents.map(r => r.agentName).join(", ") : "none"}
-- Note: Coordinator consolidation was skipped — findings may contain duplicates
+- Reviewers completed: ${agentResults.filter(r => !r.error).map(r => r.agentName).join(", ") || "none"}
+${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
 </details>`;
 }
 
@@ -517,9 +622,8 @@ function findExistingReviewComment(prNumber) {
 }
 
 function postReviewComment(prNumber, body) {
-  const payload = JSON.stringify({ body });
-  const tmpFile = `/tmp/review_comment_${randomUUID()}.json`;
-  writeFileSync(tmpFile, payload);
+  const tmpFile = `/tmp/review_comment_${randomUUID()}.txt`;
+  writeFileSync(tmpFile, body, "utf-8");
   try {
     gh(`pr comment "${prNumber}" --body-file "${tmpFile}"`);
   } finally {
@@ -630,7 +734,11 @@ async function main() {
   console.log(`[${isoNow()}] All reviewers complete. Total findings: ${totalFindings}, Failures: ${failedAgents.length}`);
 
   // 7. Coordinator pass
-  const finalReview = await runCoordinator(results, prContext, tier, existingReview);
+  let finalReview = await runCoordinator(results, prContext, tier, existingReview);
+
+  // Sanitize and validate before posting
+  finalReview = sanitizeReviewBody(finalReview);
+  console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
   // 8. Post or update review
   if (existingCommentId) {
