@@ -130,6 +130,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         start_time,
         end_time,
         sql.histogram_interval.unwrap_or_default(),
+        sql.timezone.clone(),
     )));
     if let Some(limit) = limit {
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));

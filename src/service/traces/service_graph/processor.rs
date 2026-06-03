@@ -199,6 +199,7 @@ async fn process_stream(
             streaming_output: false,
             sampling_config: None,
             sampling_ratio: None,
+            timezone: None,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

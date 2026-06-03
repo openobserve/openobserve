@@ -15,7 +15,8 @@
 
 use std::sync::LazyLock as Lazy;
 
-use chrono::{DateTime, Datelike, Duration, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDateTime, Offset, TimeZone, Utc};
+use chrono_tz::Tz;
 
 use crate::utils::json;
 
@@ -226,33 +227,58 @@ pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
 }
 
 pub fn parse_timezone_to_offset(offset: &str) -> i64 {
-    // let offset = "+08:00"; // or "-07:00" or "UTC"
-    let sign: i64;
-    let time: &str;
+    parse_timezone_to_offset_opt(offset).expect("Invalid time zone offset")
+}
 
-    if let Some(stripped) = offset.strip_prefix('+') {
-        sign = 1;
-        time = stripped;
+/// Parse a fixed timezone offset string into seconds east of UTC.
+///
+/// Accepts the same forms as [`parse_timezone_to_offset`] (`"+08:00"`, `"-07:00"`,
+/// `"UTC"`, `"CST"`, empty string), but returns `None` for unsupported / malformed
+/// input (e.g. IANA names like `"Asia/Shanghai"`) instead of panicking. Use this
+/// whenever the timezone string can come from user-supplied SQL.
+pub fn parse_timezone_to_offset_opt(offset: &str) -> Option<i64> {
+    // let offset = "+08:00"; // or "-07:00" or "UTC"
+    let (sign, time): (i64, &str) = if let Some(stripped) = offset.strip_prefix('+') {
+        (1, stripped)
     } else if let Some(stripped) = offset.strip_prefix('-') {
-        sign = -1;
-        time = stripped;
+        (-1, stripped)
     } else if offset.eq_ignore_ascii_case("cst") {
-        sign = 1;
-        time = "+08:00";
+        (1, "08:00")
     } else if offset.eq_ignore_ascii_case("utc") || offset.is_empty() {
-        sign = 0;
-        time = "00:00";
+        (0, "00:00")
     } else {
-        panic!("Invalid time zone offset");
+        return None;
+    };
+
+    // convert time (HH:MM) to seconds
+    let mut seconds: i64 = 0;
+    for part in time.split(':') {
+        let val = part.parse::<i64>().ok()?;
+        seconds = seconds * 60 + val * 60;
     }
 
-    // convert time to seconds
-    let seconds: i64 = time
-        .split(':')
-        .map(|val| val.parse::<i64>().unwrap())
-        .fold(0, |acc, val| acc * 60 + val * 60);
+    Some(sign * seconds)
+}
 
-    sign * seconds
+/// Resolve a timezone string into seconds east of UTC, evaluated at `reference_micros`.
+///
+/// Accepts everything [`parse_timezone_to_offset_opt`] does (fixed offsets like
+/// `"+08:00"`, plus `"UTC"`, `"CST"`, empty) **and** IANA zone names like
+/// `"America/Los_Angeles"`. For a named zone the offset in effect at `reference_micros`
+/// is returned, so DST is resolved for that instant — a query range that straddles a
+/// DST transition resolves to this single offset. Returns `None` for input that is
+/// neither a known fixed offset nor a valid IANA name.
+pub fn parse_timezone_to_offset_at(timezone: &str, reference_micros: i64) -> Option<i64> {
+    // fast path: fixed offset / "UTC" / "CST" / ""
+    if let Some(offset) = parse_timezone_to_offset_opt(timezone) {
+        return Some(offset);
+    }
+    // IANA named zone, resolved at the reference instant
+    let tz: Tz = timezone.parse().ok()?;
+    let reference = DateTime::<Utc>::from_timestamp_micros(reference_micros)
+        .unwrap_or_else(|| DateTime::<Utc>::from_timestamp_micros(0).unwrap());
+    let offset = tz.offset_from_utc_datetime(&reference.naive_utc());
+    Some(offset.fix().local_minus_utc() as i64)
 }
 
 #[inline(always)]
@@ -451,6 +477,49 @@ mod tests {
         assert_eq!(parse_timezone_to_offset("CST"), 28800);
         assert_eq!(parse_timezone_to_offset("+08:00"), 28800);
         assert_eq!(parse_timezone_to_offset("-08:00"), -28800);
+    }
+
+    #[test]
+    fn test_parse_timezone_to_offset_opt() {
+        // valid forms match the panicking variant
+        assert_eq!(parse_timezone_to_offset_opt(""), Some(0));
+        assert_eq!(parse_timezone_to_offset_opt("UTC"), Some(0));
+        assert_eq!(parse_timezone_to_offset_opt("CST"), Some(28800));
+        assert_eq!(parse_timezone_to_offset_opt("+08:00"), Some(28800));
+        assert_eq!(parse_timezone_to_offset_opt("-08:00"), Some(-28800));
+        // fractional offsets (e.g. IST +05:30, Nepal +05:45)
+        assert_eq!(parse_timezone_to_offset_opt("+05:30"), Some(19800));
+        assert_eq!(parse_timezone_to_offset_opt("-05:45"), Some(-20700));
+        // invalid / unsupported input returns None instead of panicking
+        assert_eq!(parse_timezone_to_offset_opt("America/New_York"), None);
+        assert_eq!(parse_timezone_to_offset_opt("+ab:cd"), None);
+    }
+
+    #[test]
+    fn test_parse_timezone_to_offset_at() {
+        let winter = 1_704_067_200_000_000; // 2024-01-01T00:00:00Z
+        let summer = 1_719_792_000_000_000; // 2024-07-01T00:00:00Z
+        // fixed offsets still work (reference ignored)
+        assert_eq!(parse_timezone_to_offset_at("+08:00", winter), Some(28800));
+        assert_eq!(parse_timezone_to_offset_at("UTC", winter), Some(0));
+        assert_eq!(parse_timezone_to_offset_at("", winter), Some(0));
+        // IANA zone without DST -> constant offset
+        assert_eq!(
+            parse_timezone_to_offset_at("Asia/Shanghai", winter),
+            Some(8 * 3600)
+        );
+        // IANA zone with DST: America/Los_Angeles is PST (-8h) in winter, PDT (-7h) in summer
+        assert_eq!(
+            parse_timezone_to_offset_at("America/Los_Angeles", winter),
+            Some(-8 * 3600)
+        );
+        assert_eq!(
+            parse_timezone_to_offset_at("America/Los_Angeles", summer),
+            Some(-7 * 3600)
+        );
+        // invalid input -> None (no panic)
+        assert_eq!(parse_timezone_to_offset_at("Not/AZone", winter), None);
+        assert_eq!(parse_timezone_to_offset_at("garbage", winter), None);
     }
 
     #[test]

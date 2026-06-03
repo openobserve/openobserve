@@ -125,6 +125,8 @@ export interface SelectProps {
    *   and closes the dropdown), while clicking the checkbox still toggles it.
    */
   rowClickSingleSelect?: boolean;
+  /** When true, shows the full option label as a native tooltip on hover (useful when labels are truncated). */
+  optionTooltip?: boolean;
 }
 
 export interface SelectEmits {

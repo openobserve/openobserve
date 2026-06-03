@@ -163,6 +163,14 @@ const createWrapper = (props: Record<string, any> = {}) => {
     global: {
       stubs: {
         ODrawer: ODrawerStub,
+        OForm: {
+          name: "OForm",
+          template: "<form class='o-form-stub' @submit.prevent='$emit(\"submit\", {})'><slot /></form>",
+          emits: ["submit"],
+          methods: {
+            submit() { (this as any).$emit("submit", {}); },
+          },
+        },
         QForm: {
           template:
             "<form class='q-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
