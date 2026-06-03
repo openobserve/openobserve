@@ -21,7 +21,7 @@ export interface DetailKpi {
 
 interface NumericAggRow {
   total?: number | string;
-  unique_traces?: number | string;
+  unique_spans?: number | string;
   avg_v?: number | string | null;
   p50_v?: number | string | null;
   p95_v?: number | string | null;
@@ -30,14 +30,14 @@ interface NumericAggRow {
 
 export interface BooleanAggRow {
   total?: number | string;
-  unique_traces?: number | string;
+  unique_spans?: number | string;
   trues?: number | string;
   falses?: number | string;
 }
 
 export interface CategoricalAggRow {
   total?: number | string;
-  unique_traces?: number | string;
+  unique_spans?: number | string;
   value_categorical?: string | null;
   c?: number | string;
 }
@@ -110,7 +110,7 @@ function numericSql(configIdEscaped: string, unhealthy: string | null): string {
   return [
     "SELECT",
     "  COUNT(*) AS total,",
-    "  COUNT(DISTINCT trace_id) AS unique_traces,",
+    "  COUNT(DISTINCT span_id) AS unique_spans,",
     "  AVG(value_numeric) AS avg_v,",
     "  approx_percentile_cont(value_numeric, 0.5) AS p50_v,",
     "  approx_percentile_cont(value_numeric, 0.95) AS p95_v,",
@@ -124,7 +124,7 @@ function booleanSql(configIdEscaped: string): string {
   return [
     "SELECT",
     "  COUNT(*) AS total,",
-    "  COUNT(DISTINCT trace_id) AS unique_traces,",
+    "  COUNT(DISTINCT span_id) AS unique_spans,",
     "  COUNT(CASE WHEN value_boolean = true THEN 1 END) AS trues,",
     "  COUNT(CASE WHEN value_boolean = false THEN 1 END) AS falses",
     'FROM "_llm_scores"',
@@ -264,7 +264,7 @@ export function useQualityConfigDetail(
       cards.push({
         id: "coverage",
         titleKey: "coverage",
-        value: toNumber(agg?.unique_traces),
+        value: toNumber(agg?.unique_spans),
         context: `of ${total} scores`,
         format: "count",
       });
@@ -294,7 +294,7 @@ export function useQualityConfigDetail(
         {
           id: "coverage",
           titleKey: "coverage",
-          value: toNumber(agg?.unique_traces),
+          value: toNumber(agg?.unique_spans),
           context: `of ${total} scores`,
           format: "count",
         },

@@ -21,7 +21,7 @@ export interface ScoreConfigRow {
   description: string;
   dataType: "numeric" | "categorical" | "boolean" | "unknown";
   totalScores: number;
-  uniqueTraces: number;
+  uniqueSpans: number;
   coveragePct: number | null;
   unhealthyCount: number | null;
   unhealthyPct: number | null;
@@ -36,7 +36,7 @@ export interface ScoreConfigRow {
 interface AggRow {
   score_config_id?: string | null;
   total_scores?: number | string;
-  unique_traces?: number | string;
+  unique_spans?: number | string;
   unhealthy_count?: number | string;
   last_updated_us?: number | string | null;
 }
@@ -148,7 +148,7 @@ function buildRichAggSql(configs: ScoreConfig[]): string {
     "SELECT",
     "  CAST(score_config_id AS VARCHAR) AS score_config_id,",
     "  COUNT(*) AS total_scores,",
-    "  COUNT(DISTINCT trace_id) AS unique_traces,",
+    "  COUNT(DISTINCT span_id) AS unique_spans,",
     unhealthyExpr,
     "  MAX(_timestamp) AS last_updated_us",
     'FROM "_llm_scores"',
@@ -166,7 +166,7 @@ function buildPlainAggSql(): string {
     "SELECT",
     "  CAST(score_config_id AS VARCHAR) AS score_config_id,",
     "  COUNT(*) AS total_scores,",
-    "  COUNT(DISTINCT trace_id) AS unique_traces,",
+    "  COUNT(DISTINCT span_id) AS unique_spans,",
     "  CAST(NULL AS INTEGER) AS unhealthy_count,",
     "  MAX(_timestamp) AS last_updated_us",
     'FROM "_llm_scores"',
@@ -211,7 +211,7 @@ export function useQualityScoreConfigs(
   const isLoading = ref(false);
   const aggByConfig = ref<Record<string, AggRow>>({});
   const trendByConfig = ref<Record<string, number[]>>({});
-  const totalUniqueTracesAcrossConfigs = ref<number>(0);
+  const totalUniqueSpansAcrossConfigs = ref<number>(0);
 
   async function refresh() {
     if (scoreConfigs.value.length === 0) {
@@ -250,12 +250,12 @@ export function useQualityScoreConfigs(
       for (const hit of aggHits) {
         if (hit.score_config_id) {
           byId[String(hit.score_config_id)] = hit;
-          const u = toNumber(hit.unique_traces) ?? 0;
+          const u = toNumber(hit.unique_spans) ?? 0;
           if (u > maxUnique) maxUnique = u;
         }
       }
       aggByConfig.value = byId;
-      totalUniqueTracesAcrossConfigs.value = maxUnique;
+      totalUniqueSpansAcrossConfigs.value = maxUnique;
 
       // Surface ID-matching diagnostics. If any local config doesn't appear
       // here as "matched", its row will say 0 in the table.
@@ -289,13 +289,13 @@ export function useQualityScoreConfigs(
   }
 
   const rows = computed<ScoreConfigRow[]>(() => {
-    const denom = totalUniqueTracesAcrossConfigs.value;
+    const denom = totalUniqueSpansAcrossConfigs.value;
     const out: ScoreConfigRow[] = scoreConfigs.value.map((config) => {
       const configId = entityId(config); // stable cross-version id for the row key
       const lookup = joinId(config); // per-version id that matches score_config_id
       const agg = aggByConfig.value[lookup];
       const total = toNumber(agg?.total_scores) ?? 0;
-      const uniqueTraces = toNumber(agg?.unique_traces) ?? 0;
+      const uniqueSpans = toNumber(agg?.unique_spans) ?? 0;
       const unhealthy = toNumber(agg?.unhealthy_count);
       const lastUpdatedUs = toNumber(agg?.last_updated_us);
       const t = thresholdForConfig(config);
@@ -309,8 +309,8 @@ export function useQualityScoreConfigs(
         description: config.description ?? "",
         dataType,
         totalScores: total,
-        uniqueTraces,
-        coveragePct: denom > 0 ? (uniqueTraces / denom) * 100 : null,
+        uniqueSpans,
+        coveragePct: denom > 0 ? (uniqueSpans / denom) * 100 : null,
         unhealthyCount: unhealthy,
         unhealthyPct:
           unhealthy != null && total > 0 ? (unhealthy / total) * 100 : null,

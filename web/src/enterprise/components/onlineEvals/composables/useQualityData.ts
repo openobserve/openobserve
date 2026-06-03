@@ -95,10 +95,13 @@ function emptyKpis(): KpiCard[] {
 // data_type has been written. Per-config unhealthy detection (which can
 // reference all three) lives on the Tier 2 query instead.
 function scoresSql(): string {
+  // Scores are written per-span (each evaluated span produces one row per
+  // scorer), so the right unit for "evaluated" is distinct span_id, not
+  // trace_id. A single trace can have many evaluated spans.
   return [
     "SELECT",
-    "  COUNT(DISTINCT trace_id) AS evaluated_count,",
-    "  COUNT(DISTINCT CASE WHEN data_type = 'boolean' AND value_boolean = false THEN trace_id END) AS unhealthy_count",
+    "  COUNT(DISTINCT span_id) AS evaluated_count,",
+    "  COUNT(DISTINCT CASE WHEN data_type = 'boolean' AND value_boolean = false THEN span_id END) AS unhealthy_count",
     'FROM "_llm_scores"',
   ].join("\n");
 }
@@ -116,11 +119,12 @@ function evaluatorSql(): string {
 }
 
 function scoresSparklineSql(interval: string): string {
+  // Same span-level rollup as scoresSql() — distinct span_id per bucket.
   return [
     "SELECT",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
-    "  COUNT(DISTINCT trace_id) AS evaluated_c,",
-    "  COUNT(DISTINCT CASE WHEN data_type = 'boolean' AND value_boolean = false THEN trace_id END) AS unhealthy_c",
+    "  COUNT(DISTINCT span_id) AS evaluated_c,",
+    "  COUNT(DISTINCT CASE WHEN data_type = 'boolean' AND value_boolean = false THEN span_id END) AS unhealthy_c",
     'FROM "_llm_scores"',
     "GROUP BY bucket",
     "ORDER BY bucket",

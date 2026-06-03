@@ -4116,14 +4116,14 @@
       "refresh": "Refresh",
       "kpis": {
         "evaluated": {
-          "title": "Evaluated Traces",
+          "title": "Evaluated Spans",
           "unit": "",
-          "hint": "Distinct trace IDs in _llm_scores within the window"
+          "hint": "Distinct span IDs in _llm_scores within the window"
         },
         "qualityIssueRate": {
           "title": "Quality Issue Rate",
           "unit": "%",
-          "hint": "Evaluated traces with any dimension below threshold"
+          "hint": "Evaluated spans with any dimension below threshold"
         },
         "evaluationCost": {
           "title": "Evaluation Cost",
