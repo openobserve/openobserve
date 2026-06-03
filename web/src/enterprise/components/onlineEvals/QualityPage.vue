@@ -10,13 +10,12 @@
           class="quality-page__date-picker"
           data-test="quality-time-range-picker"
         />
-        <OSelect
-          v-model="sourceStream"
-          :options="sourceStreamOptions"
-          size="md"
-          class="quality-page__select"
-          data-test="quality-source-stream-select"
-        />
+        <!--
+          Stream selector is intentionally hidden. All evaluation scores land in
+          the single `_llm_scores` stream, so filtering by source is meaningless
+          for the current single-stream setup. Re-enable when multi-stream
+          score sinks become a real use case.
+        -->
         <OButton
           variant="outline"
           size="icon-sm"
@@ -90,7 +89,6 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
@@ -357,10 +355,6 @@ function onDrill(kpiId: string) {
 
   router.push({ name: "logs", query: queryParams }).catch(() => {});
 }
-
-const sourceStreamOptions = computed(() => [
-  { value: "__all__", label: t("onlineEvals.quality.sourceStream.all") },
-]);
 </script>
 
 <style lang="scss" scoped>
