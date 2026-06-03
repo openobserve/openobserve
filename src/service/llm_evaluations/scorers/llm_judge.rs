@@ -25,7 +25,7 @@ use infra::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::schema_derivation::derive_output_schema;
+use super::schema_derivation::{REASONING_FIELD, derive_output_schema};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmJudgeOutput {
@@ -120,50 +120,17 @@ pub async fn run_llm_judge(
     let result = provider.run(&call_params).await?;
     let latency = start.elapsed();
 
-    let metadata = if output_schema.metadata_fields.is_empty() {
-        None
-    } else {
-        let mut meta = serde_json::json!({});
-        for field in &output_schema.metadata_fields {
-            if let Some(val) = result.value.get(field) {
-                meta[field] = val.clone();
-            }
-        }
-        if meta.as_object().map(|o| o.is_empty()).unwrap_or(true) {
-            None
-        } else {
-            Some(meta)
-        }
-    };
+    let metadata = extract_metadata(&result.value, &output_schema.metadata_fields);
 
     let reasoning = result
         .value
-        .get("reasoning")
+        .get(REASONING_FIELD)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
     let value_field = &output_schema.value_field;
-    let (value_numeric, value_categorical, value_boolean) = match score_config.data_type {
-        ScoreConfigDataType::Numeric => (
-            result.value.get(value_field).and_then(|v| v.as_f64()),
-            None,
-            None,
-        ),
-        ScoreConfigDataType::Categorical => (
-            None,
-            result
-                .value
-                .get(value_field)
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            None,
-        ),
-        ScoreConfigDataType::Boolean => (
-            None,
-            None,
-            result.value.get(value_field).and_then(|v| v.as_bool()),
-        ),
-    };
+    let (value_numeric, value_categorical, value_boolean) =
+        extract_score_value(&result.value, score_config.data_type, value_field);
 
     Ok(LlmJudgeOutput {
         value_numeric,
@@ -178,6 +145,47 @@ pub async fn run_llm_judge(
         model_used: result.model_used,
         latency_ms: latency.as_millis() as i64,
     })
+}
+
+fn extract_metadata(value: &Value, metadata_fields: &[String]) -> Option<Value> {
+    if metadata_fields.is_empty() {
+        return None;
+    }
+
+    let mut meta = serde_json::json!({});
+    for field in metadata_fields {
+        if let Some(val) = value.get(field) {
+            meta[field] = val.clone();
+        }
+    }
+    if meta.as_object().map(|o| o.is_empty()).unwrap_or(true) {
+        None
+    } else {
+        Some(meta)
+    }
+}
+
+fn extract_score_value(
+    value: &Value,
+    data_type: ScoreConfigDataType,
+    value_field: &str,
+) -> (Option<f64>, Option<String>, Option<bool>) {
+    match data_type {
+        ScoreConfigDataType::Numeric => {
+            (value.get(value_field).and_then(|v| v.as_f64()), None, None)
+        }
+        ScoreConfigDataType::Categorical => (
+            None,
+            value
+                .get(value_field)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            None,
+        ),
+        ScoreConfigDataType::Boolean => {
+            (None, None, value.get(value_field).and_then(|v| v.as_bool()))
+        }
+    }
 }
 
 pub(super) fn render_template(template: &str, input_variables: &HashMap<String, Value>) -> String {
@@ -214,5 +222,43 @@ pub(super) fn get_nested_attr(attrs: &HashMap<String, Value>, path: &str) -> Str
                 v => v.to_string(),
             })
             .unwrap_or_default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extracts_numeric_score_from_fixed_score_field() {
+        let value = serde_json::json!({
+            "score": 0.75,
+            "reasoning": "grounded",
+            "failure_mode": "none"
+        });
+
+        let (numeric, categorical, boolean) =
+            extract_score_value(&value, ScoreConfigDataType::Numeric, "score");
+        let metadata = extract_metadata(&value, &["failure_mode".to_string()]);
+
+        assert_eq!(numeric, Some(0.75));
+        assert_eq!(categorical, None);
+        assert_eq!(boolean, None);
+        assert_eq!(metadata, Some(serde_json::json!({"failure_mode": "none"})));
+    }
+
+    #[test]
+    fn extracts_categorical_and_boolean_scores_from_fixed_score_field() {
+        let categorical = serde_json::json!({"score": "high"});
+        let boolean = serde_json::json!({"score": true});
+
+        assert_eq!(
+            extract_score_value(&categorical, ScoreConfigDataType::Categorical, "score"),
+            (None, Some("high".to_string()), None)
+        );
+        assert_eq!(
+            extract_score_value(&boolean, ScoreConfigDataType::Boolean, "score"),
+            (None, None, Some(true))
+        );
     }
 }

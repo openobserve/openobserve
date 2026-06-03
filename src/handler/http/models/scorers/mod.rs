@@ -86,7 +86,8 @@ pub struct LlmJudgeScorerRequest {
     #[serde(default)]
     pub produces_score_config_version: Option<i32>,
     pub template: String,
-    pub output_schema: Value,
+    #[serde(default)]
+    pub output_schema: Option<Value>,
     pub params: LlmJudgeScorerParams,
 }
 
@@ -240,6 +241,27 @@ pub struct ScorerTestRequestBody {
     pub input_variables: Value,
 }
 
+/// Request body for previewing the derived LLM Judge output schema.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LlmJudgeOutputSchemaRequestBody {
+    #[serde(default)]
+    pub produces_score_config_id: Option<String>,
+    #[serde(default)]
+    pub produces_score_config_version: Option<i32>,
+    #[serde(default)]
+    pub include_reasoning: Option<bool>,
+    #[serde(default)]
+    pub extra_metadata_fields: Vec<String>,
+}
+
+/// Response body for a derived LLM Judge output schema preview.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LlmJudgeOutputSchemaResponseBody {
+    pub output_schema: Value,
+}
+
 pub fn extract_template_variables(template: &str) -> Vec<String> {
     let mut variables = Vec::new();
     let mut start = 0;
@@ -304,7 +326,7 @@ impl From<ScorerRequestBody> for infra::table::scorers::Scorer {
                 scorer.produces_score_config_id,
                 scorer.produces_score_config_version,
                 scorer.template,
-                Some(scorer.output_schema),
+                None,
                 params_to_value(scorer.params),
             ),
             ScorerCreateConfig::Remote(scorer) => (
@@ -352,7 +374,7 @@ impl From<ScorerUpdateRequestBody> for infra::table::scorers::Scorer {
                 scorer.produces_score_config_id,
                 scorer.produces_score_config_version,
                 scorer.template,
-                scorer.output_schema,
+                None,
                 params_to_value(scorer.params),
             ),
             ScorerUpdateConfig::Remote(scorer) => (
@@ -473,7 +495,7 @@ mod tests {
                 produces_score_config_id: Some("scfg-entity-1".to_string()),
                 produces_score_config_version: Some(1),
                 template: "Judge {{input}}".to_string(),
-                output_schema: serde_json::json!({"type": "object"}),
+                output_schema: Some(serde_json::json!({"type": "object"})),
                 params: LlmJudgeScorerParams {
                     provider_id: "p1".to_string(),
                     model: Some("gpt-4o".to_string()),
@@ -493,6 +515,29 @@ mod tests {
         assert_eq!(scorer.produces_score_config_version, Some(1));
         assert_eq!(scorer.template, "Judge {{input}}");
         assert_eq!(scorer.params["provider_id"], "p1");
+    }
+
+    #[test]
+    fn test_llm_judge_request_deserialize_without_output_schema() {
+        let body: ScorerRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "acc_judge",
+            "scorer": {
+                "type": "llm_judge",
+                "producesScoreConfigId": "scfg-entity-1",
+                "template": "Judge {{input}}",
+                "params": {
+                    "provider_id": "p1",
+                    "include_reasoning": true,
+                    "extra_metadata_fields": ["failure_mode"]
+                }
+            }
+        }))
+        .unwrap();
+
+        let scorer = infra::table::scorers::Scorer::from(body);
+        assert_eq!(scorer.scorer_type, "llm_judge");
+        assert!(scorer.output_schema.is_none());
+        assert_eq!(scorer.params["extra_metadata_fields"][0], "failure_mode");
     }
 
     #[test]

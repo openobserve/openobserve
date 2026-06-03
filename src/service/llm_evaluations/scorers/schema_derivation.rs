@@ -26,6 +26,9 @@ pub struct DerivedSchema {
     pub metadata_fields: Vec<String>,
 }
 
+pub const SCORE_FIELD: &str = "score";
+pub const REASONING_FIELD: &str = "reasoning";
+
 pub fn derive_output_schema(
     data_type: ScoreConfigDataType,
     numeric_range: Option<&Value>,
@@ -33,7 +36,7 @@ pub fn derive_output_schema(
     extra_metadata_fields: &[String],
     include_reasoning: bool,
 ) -> Result<DerivedSchema> {
-    let (value_schema, value_field) = match data_type {
+    let value_schema = match data_type {
         ScoreConfigDataType::Numeric => {
             let mut schema = serde_json::json!({
                 "type": "number",
@@ -45,7 +48,7 @@ pub fn derive_output_schema(
                 schema["minimum"] = serde_json::json!(min);
                 schema["maximum"] = serde_json::json!(max);
             }
-            (schema, "value_numeric")
+            schema
         }
         ScoreConfigDataType::Categorical => {
             let allowed: Vec<&str> = categories
@@ -55,29 +58,23 @@ pub fn derive_output_schema(
             if allowed.is_empty() {
                 anyhow::bail!("categories must be provided for categorical data_type");
             }
-            (
-                serde_json::json!({
-                    "type": "string",
-                    "enum": allowed,
-                    "description": "The categorical score value"
-                }),
-                "value_categorical",
-            )
-        }
-        ScoreConfigDataType::Boolean => (
             serde_json::json!({
-                "type": "boolean",
-                "description": "The boolean pass/fail result"
-            }),
-            "value_boolean",
-        ),
+                "type": "string",
+                "enum": allowed,
+                "description": "The categorical score value"
+            })
+        }
+        ScoreConfigDataType::Boolean => serde_json::json!({
+            "type": "boolean",
+            "description": "The boolean pass/fail result"
+        }),
     };
 
     let mut properties = serde_json::json!({});
-    properties[&value_field] = value_schema;
+    properties[SCORE_FIELD] = value_schema;
 
     if include_reasoning {
-        properties["reasoning"] = serde_json::json!({
+        properties[REASONING_FIELD] = serde_json::json!({
             "type": "string",
             "description": "Brief explanation of the score"
         });
@@ -95,7 +92,7 @@ pub fn derive_output_schema(
                 }
             })
             .collect::<String>();
-        if !sanitized.is_empty() && sanitized != value_field && sanitized != "reasoning" {
+        if !sanitized.is_empty() && sanitized != SCORE_FIELD && sanitized != REASONING_FIELD {
             metadata_fields.push(sanitized.clone());
             properties[&sanitized] = serde_json::json!({
                 "type": "string",
@@ -104,9 +101,9 @@ pub fn derive_output_schema(
         }
     }
 
-    let mut required_fields = vec![value_field.to_string()];
+    let mut required_fields = vec![SCORE_FIELD.to_string()];
     if include_reasoning {
-        required_fields.push("reasoning".to_string());
+        required_fields.push(REASONING_FIELD.to_string());
     }
 
     Ok(DerivedSchema {
@@ -116,7 +113,72 @@ pub fn derive_output_schema(
             "required": required_fields,
             "additionalProperties": false
         }),
-        value_field: value_field.to_string(),
+        value_field: SCORE_FIELD.to_string(),
         metadata_fields,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derives_numeric_score_schema_from_range() {
+        let schema = derive_output_schema(
+            ScoreConfigDataType::Numeric,
+            Some(&serde_json::json!({"min": 0.0, "max": 1.0})),
+            None,
+            &["failure_mode".to_string()],
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(schema.value_field, "score");
+        assert_eq!(schema.json_schema["properties"]["score"]["type"], "number");
+        assert_eq!(schema.json_schema["properties"]["score"]["minimum"], 0.0);
+        assert_eq!(schema.json_schema["properties"]["score"]["maximum"], 1.0);
+        assert_eq!(
+            schema.json_schema["required"],
+            serde_json::json!(["score", "reasoning"])
+        );
+        assert_eq!(schema.metadata_fields, vec!["failure_mode".to_string()]);
+    }
+
+    #[test]
+    fn derives_categorical_score_schema_from_categories() {
+        let schema = derive_output_schema(
+            ScoreConfigDataType::Categorical,
+            None,
+            Some(&serde_json::json!(["low", "medium", "high"])),
+            &[],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(schema.json_schema["properties"]["score"]["type"], "string");
+        assert_eq!(
+            schema.json_schema["properties"]["score"]["enum"],
+            serde_json::json!(["low", "medium", "high"])
+        );
+        assert_eq!(schema.json_schema["required"], serde_json::json!(["score"]));
+    }
+
+    #[test]
+    fn derives_boolean_score_schema() {
+        let schema = derive_output_schema(
+            ScoreConfigDataType::Boolean,
+            None,
+            None,
+            &[
+                "score".to_string(),
+                "reasoning".to_string(),
+                "debug flag".to_string(),
+            ],
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(schema.json_schema["properties"]["score"]["type"], "boolean");
+        assert_eq!(schema.metadata_fields, vec!["debug_flag".to_string()]);
+    }
 }

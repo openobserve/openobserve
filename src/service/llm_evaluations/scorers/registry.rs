@@ -46,6 +46,9 @@ pub enum ScorerError {
     #[error("Score config version not found")]
     ScoreConfigVersionNotFound,
 
+    #[error("Invalid LLM Judge output schema: {0}")]
+    InvalidOutputSchema(String),
+
     #[error("Scorer name already exists")]
     DuplicateName,
 }
@@ -261,6 +264,7 @@ mod tests {
             ScorerError::InvalidScorerType("bad".to_string()),
             ScorerError::ScorerTypeImmutable,
             ScorerError::ProducesScoreConfigIdImmutable,
+            ScorerError::InvalidOutputSchema("bad".to_string()),
             ScorerError::DuplicateName,
         ];
         for c in cases {

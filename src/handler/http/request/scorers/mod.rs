@@ -22,10 +22,14 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::scorers::{
         ListScorerVersionsResponseBody, ListScorersQuery, ListScorersResponseBody,
-        ScorerRequestBody, ScorerResponseBody, ScorerTestRequestBody, ScorerTestResponseBody,
-        ScorerUpdateRequestBody,
+        LlmJudgeOutputSchemaRequestBody, LlmJudgeOutputSchemaResponseBody, ScorerRequestBody,
+        ScorerResponseBody, ScorerTestRequestBody, ScorerTestResponseBody, ScorerUpdateRequestBody,
     },
-    service::llm_evaluations::scorers::registry::{self as scorers, ScorerError},
+    service::llm_evaluations::scorers::{
+        llm_judge::ScoreConfigInfo,
+        registry::{self as scorers, ScorerError},
+        schema_derivation::derive_output_schema,
+    },
 };
 
 impl From<ScorerError> for Response {
@@ -40,6 +44,7 @@ impl From<ScorerError> for Response {
             | ScorerError::ScorerTypeImmutable
             | ScorerError::ProducesScoreConfigIdImmutable
             | ScorerError::ScoreConfigVersionNotFound
+            | ScorerError::InvalidOutputSchema(_)
             | ScorerError::DuplicateName => MetaHttpResponse::bad_request(value),
         }
     }
@@ -275,6 +280,81 @@ pub async fn test_scorer(
     }
 }
 
+/// PreviewLlmJudgeOutputSchema
+#[utoipa::path(
+    post,
+    path = "/{org_id}/scorers/llm_judge/output_schema",
+    context_path = "/api",
+    tag = "Scorers",
+    operation_id = "PreviewLlmJudgeOutputSchema",
+    summary = "Preview derived LLM Judge output schema",
+    description = "Derives the LLM Judge structured output schema from the selected score config and extra metadata fields.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(LlmJudgeOutputSchemaRequestBody), description = "Schema derivation inputs"),
+    responses(
+        (status = 200, body = inline(LlmJudgeOutputSchemaResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "preview_llm_judge_output_schema"})),
+    ),
+)]
+pub async fn preview_llm_judge_output_schema(
+    Path(org_id): Path<String>,
+    axum::Json(body): axum::Json<LlmJudgeOutputSchemaRequestBody>,
+) -> Response {
+    match derive_llm_judge_output_schema(&org_id, &body).await {
+        Ok(output_schema) => {
+            MetaHttpResponse::json(LlmJudgeOutputSchemaResponseBody { output_schema })
+        }
+        Err(err) => err.into(),
+    }
+}
+
+async fn derive_llm_judge_output_schema(
+    org_id: &str,
+    body: &LlmJudgeOutputSchemaRequestBody,
+) -> Result<serde_json::Value, ScorerError> {
+    let score_config = score_config_info_for_schema_request(org_id, body).await?;
+    let schema = derive_output_schema(
+        score_config.data_type,
+        score_config.numeric_range.as_ref(),
+        score_config.categories.as_ref(),
+        &body.extra_metadata_fields,
+        body.include_reasoning.unwrap_or(true),
+    )
+    .map_err(|err| ScorerError::InvalidOutputSchema(err.to_string()))?;
+
+    Ok(schema.json_schema)
+}
+
+async fn score_config_info_for_schema_request(
+    org_id: &str,
+    body: &LlmJudgeOutputSchemaRequestBody,
+) -> Result<ScoreConfigInfo, ScorerError> {
+    let Some(entity_id) = body
+        .produces_score_config_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+    else {
+        return Ok(ScoreConfigInfo::default());
+    };
+
+    let score_config = match body.produces_score_config_version {
+        Some(version) => {
+            infra::table::score_configs::get_by_entity_id_and_version(org_id, entity_id, version)
+                .await?
+        }
+        None => infra::table::score_configs::get_by_entity_id(org_id, entity_id).await?,
+    };
+
+    score_config
+        .as_ref()
+        .map(ScoreConfigInfo::from)
+        .ok_or(ScorerError::ScoreConfigVersionNotFound)
+}
+
 async fn run_scorer_test(
     org_id: &str,
     scorer_entity_id: &str,
@@ -427,6 +507,7 @@ mod tests {
             (ScorerError::InvalidScorerType("x".to_string()), 400),
             (ScorerError::ScorerTypeImmutable, 400),
             (ScorerError::ProducesScoreConfigIdImmutable, 400),
+            (ScorerError::InvalidOutputSchema("bad".to_string()), 400),
             (ScorerError::DuplicateName, 400),
         ];
         for (err, expected) in cases {

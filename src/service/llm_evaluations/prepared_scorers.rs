@@ -121,7 +121,7 @@ impl PreparedLlmJudgeScorer {
             scorer.template.clone()
         };
 
-        let include_reasoning = params.include_reasoning.unwrap_or(false);
+        let include_reasoning = params.include_reasoning.unwrap_or(true);
         let extra_metadata_fields = params.extra_metadata_fields.clone().unwrap_or_default();
 
         let scorer_cfg = ScorerConfig {

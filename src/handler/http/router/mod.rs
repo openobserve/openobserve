@@ -865,6 +865,7 @@ pub fn service_routes() -> Router {
         // Scorers (Online Eval Phase 2)
         // NOTE: /{entity_id}/versions and /{entity_id}/test must precede /{entity_id}
         .route("/{org_id}/scorers", get(scorers::list_scorers).post(scorers::create_scorer))
+        .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
         .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
         .route("/{org_id}/scorers/{entity_id}/test", post(scorers::test_scorer))
         .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
