@@ -348,6 +348,8 @@ jobs:
             --exclude-path "/api/{org_id}/prometheus/api/v1/write" \
             --exclude-path "/api/{org_id}/dashboards" \
             --exclude-path "/api/{org_id}/dashboards/{dashboard_id}" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}" \
             --exclude-path "/api/{org_id}/pipelines/history" \
             --exclude-path "/api/{org_id}/organizations/assume_service_account" \
             http://localhost:5080/api-doc/openapi.json
