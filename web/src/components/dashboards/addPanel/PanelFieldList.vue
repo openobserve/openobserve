@@ -50,6 +50,7 @@
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
             :title="currentStream"
+            option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
           >

@@ -17,43 +17,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div
-      class="tw:w-full tw:flex tw:ml-2"
+      class="tw:flex tw:items-center tw:gap-3"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
-
-
-      <div
-        class="tw:flex invite-user"
-        style="width: calc(100% - 110px); display: inline-flex"
-      >
+      <div style="position: relative">
         <OInput
           v-model="userEmail"
           :placeholder="t('user.inviteByEmail')"
-          style="width: calc(100% - 120px)"
-          class="tw:pr-2"
+          class="tw:w-56"
         />
-        <div class="tw:flex tw:justify-center">
-          <OSelect
-            v-model="selectedRole"
-            :options="options"
-            labelKey="label"
-            valueKey="value"
-            style="width: 120px"
-            class="tw:pr-2"
-          />
-        </div>
+        <OTooltip :content="t('user.inviteByEmail')" side="top" max-width="16rem" />
       </div>
-      <span style="width: 100px; display: block; float: right; position: relative; top: 1px;">
-        <OButton
-          variant="primary"
-          size="xs"
-          class="tw:!h-8"
-          :disabled="userEmail == ''"
-          @click="inviteUser()"
-        >
-          {{ t('user.sendInvite') }}
-        </OButton>
-      </span>
+      <OSelect
+        v-model="selectedRole"
+        :options="options"
+        labelKey="label"
+        valueKey="value"
+        style="width: 120px"
+      />
+      <OButton
+        variant="primary"
+        size="xs"
+        class="tw:!h-8"
+        :disabled="userEmail == ''"
+        @click="inviteUser()"
+      >
+        {{ t('user.sendInvite') }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -63,6 +53,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { validateEmail } from "@/utils/zincutils";
@@ -74,7 +65,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MemberInvitationPage",
-  components: { OButton, OInput, OSelect },
+  components: { OButton, OInput, OSelect, OTooltip },
   props: {
     currentrole: {
       type: String,

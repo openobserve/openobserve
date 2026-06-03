@@ -157,7 +157,9 @@ export function generateDestinationHeaders(type: string, credentials: Record<str
       }
       break;
     case 'opsgenie':
-      headers['Authorization'] = `GenieKey ${credentials.apiKey}`;
+      if (credentials.apiKey) {
+        headers['Authorization'] = `GenieKey ${credentials.apiKey}`;
+      }
       break;
     case 'servicenow':
       // Note: Basic auth credentials are passed separately to backend for secure handling

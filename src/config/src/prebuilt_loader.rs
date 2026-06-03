@@ -317,7 +317,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_opsgenie".to_string(),
-                    body: r#"{"message": "Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"message": "Alert: {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -341,7 +341,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_servicenow".to_string(),
-                    body: r#"{"short_description": "Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"short_description": "Alert: {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],

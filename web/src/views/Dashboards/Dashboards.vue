@@ -380,6 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-add-dialog"
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
+            :primary-button-loading="addDashboardRef?.onSubmit?.isLoading?.value"
             @click:secondary="showAddDashboardDialog = false"
             @click:primary="addDashboardRef?.submit()"
           >
