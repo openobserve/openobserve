@@ -378,8 +378,12 @@ async fn proxy_with_body_routing(
 
     for (i, node) in candidates.iter().take(attempts).enumerate() {
         let target = ProxyTarget::new(&path, node);
-        let upstream_req =
-            build_payload_request(client, &target.full_url, req_headers.clone(), &querier_payload);
+        let upstream_req = build_payload_request(
+            client,
+            &target.full_url,
+            req_headers.clone(),
+            &querier_payload,
+        );
 
         match upstream_req.send().await {
             Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
