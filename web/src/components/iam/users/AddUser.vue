@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <OInput
-            v-if="!existingUser"
+            v-if="!existingUser && !isCloud"
             v-model="formData.first_name"
             :label="t('user.firstName')"
             class="showLabelOnTop tw:mt-2"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <OInput
-            v-if="!existingUser"
+            v-if="!existingUser && !isCloud"
             v-model="formData.last_name"
             :label="t('user.lastName')"
             class="showLabelOnTop tw:mt-2"
@@ -115,16 +115,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop tw:mt-2"
             multiple
             data-test="user-custom-role-field"
-            :disable="filterdOption.length === 0 || !!formData.is_external"
+            :disable="isCloud ? filterdOption.length === 0 : (filterdOption.length === 0 || !!formData.is_external)"
             :hint="
-              formData.is_external
-                ? t('user.externalUserCustomRoleHint')
-                : filterdOption.length === 0
-                  ? t('user.noCustomRolesHint')
-                  : ''
+              isCloud
+                ? (filterdOption.length === 0 ? t('user.noCustomRolesHint') : '')
+                : formData.is_external
+                  ? t('user.externalUserCustomRoleHint')
+                  : filterdOption.length === 0
+                    ? t('user.noCustomRolesHint')
+                    : ''
             "
           />
-          <div v-if="beingUpdated" class="tw:mt-2">
+          <div v-if="beingUpdated && !isCloud" class="tw:mt-2">
             <OSwitch
               v-model="formData.change_password"
               :label="t('user.changePassword')"
@@ -299,6 +301,10 @@ export default defineComponent({
     customRoles: {
       type: Array,
       default: () => [],
+    },
+    isCloud: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["update:modelValue", "updated", "update:open"],
