@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- SUPER / PAYER ORG VIEW -->
       <div
         v-if="role === 'super'"
-        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
+        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
         data-test="org-group-super-view"
       >
         <!-- Stat cards -->
@@ -74,20 +74,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("billing.billingGroup.viewUsage") }}
             <template #icon-right>
-              <OIcon name="arrow_forward" size="sm" class="tw:ml-1" />
+              <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
             </template>
           </OButton>
         </div>
 
         <!-- Child orgs table (children only) -->
-        <div class="tw:flex-1 tw:min-h-0">
+        <div class="tw:shrink-0">
           <OTable
             :data="filteredSuperRows"
             :columns="superColumns"
             row-key="key"
             pagination="client"
             :page-size="10"
-            class="tw:h-full"
+            :page-size-options="[10, 20, 50, 100]"
+            :fill-height="false"
             data-test="org-group-members-table"
           >
             <template #empty>
@@ -144,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("billing.billingGroup.viewUsage") }}
               <template #icon-right>
-                <OIcon name="arrow_forward" size="sm" class="tw:ml-1" />
+                <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
               </template>
             </OButton>
           </div>
@@ -153,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="og-hero__right" data-test="org-group-child-details">
             <div class="og-feature">
               <div class="og-feature__icon">
-                <OIcon name="person_add" />
+                <OIcon name="person-add" />
               </div>
               <div class="og-feature__content">
                 <div class="og-feature__title">
@@ -166,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="og-feature">
               <div class="og-feature__icon">
-                <OIcon name="how_to_reg" />
+                <OIcon name="how-to-reg" />
               </div>
               <div class="og-feature__content">
                 <div class="og-feature__title">
@@ -213,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="token"
             pagination="client"
             :page-size="10"
+            :page-size-options="[10, 20, 50, 100]"
             class="tw:h-full"
             data-test="org-group-invites-table"
           >
@@ -254,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="og-empty__icon-outer">
             <div class="og-empty__icon-inner">
-              <OIcon name="group_add" size="lg" class="og-empty__icon" />
+              <OIcon name="group-add" size="lg" class="og-empty__icon" />
             </div>
           </div>
 
@@ -276,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="allowedForBillingGroup">
             <div class="og-empty__chips">
               <span class="og-empty__chip">
-                <OIcon name="receipt_long" size="xs" />
+                <OIcon name="receipt-long" size="xs" />
                 {{ t("billing.billingGroup.chipConsolidatedBill") }}
               </span>
               <span class="og-empty__chip">
@@ -470,12 +472,9 @@ export default defineComponent({
       );
     };
 
-    // Child view headline: show the payer org name (truncated to 10 chars),
-    // falling back to the identifier when no name is returned.
     const payerName = computed(() => {
       const name = membership.value?.payer_org_name || "";
-      if (!name) return membership.value?.payer_org_id || "";
-      return name.length > 100 ? `${name.substring(0, 100)}...` : name;
+      return name || membership.value?.payer_org_id || "";
     });
 
 
@@ -890,7 +889,7 @@ export default defineComponent({
     margin-bottom: 16px;
   }
   &__brand {
-    color: var(--o2-primary-color);
+    color: var(--o2-text-heading);
     word-break: break-word;
     cursor: pointer;
   }

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="managed-empty__icon-outer">
         <div class="managed-empty__icon-inner">
-          <OIcon name="account_balance" size="lg" class="managed-empty__icon" />
+          <OIcon name="account-balance" size="lg" class="managed-empty__icon" />
         </div>
       </div>
 
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="managed-empty__chips">
         <span class="managed-empty__chip">
-          <OIcon name="receipt_long" size="xs" />
+          <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
         <span class="managed-empty__chip">
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("billing.billingGroup.viewOrgGroup") }}
         <template #icon-right>
-          <OIcon name="arrow_forward" size="sm" class="tw:ml-1" />
+          <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
         </template>
       </OButton>
     </div>

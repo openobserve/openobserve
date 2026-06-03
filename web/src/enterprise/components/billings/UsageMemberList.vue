@@ -152,12 +152,13 @@ export default defineComponent({
         return null;
       }
       const currentOrg = store.state.selectedOrganization;
+      const label = currentOrg.label || currentOrg.identifier;
       return {
         value: "current",
-        primary: currentOrg.name || currentOrg.identifier,
-        secondary: currentOrg.name ? currentOrg.identifier : "",
-        title: currentOrg.name
-          ? `${currentOrg.name} | ${currentOrg.identifier}`
+        primary: label,
+        secondary: currentOrg.label ? currentOrg.identifier : "",
+        title: currentOrg.label
+          ? `${currentOrg.label} | ${currentOrg.identifier}`
           : currentOrg.identifier,
       };
     });
@@ -216,6 +217,10 @@ export default defineComponent({
   &--active {
     background-color: var(--o2-primary-btn-bg);
     color: white;
+
+    &:hover {
+      background-color: var(--o2-primary-btn-bg);
+    }
 
     .member-id {
       opacity: 0.85;
@@ -288,17 +293,14 @@ export default defineComponent({
     &--vertical {
       margin: 5px;
 
-      .o-tab {
+      :deep(.o-tab) {
         justify-content: flex-start;
         padding: 0.375rem 1rem 0.375rem 1.25rem;
         border-radius: 0.5rem;
         min-height: 1.5rem;
         text-transform: none;
 
-        &--active {
-          background-color: var(--o2-primary-btn-bg);
-          color: white;
-
+        &[data-state="active"] {
           .member-id {
             opacity: 0.85;
           }
