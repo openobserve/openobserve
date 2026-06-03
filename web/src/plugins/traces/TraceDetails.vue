@@ -2461,9 +2461,6 @@ export default defineComponent({
     };
 
     const handleExpandToFullView = () => {
-      // Navigate to full trace details page from embedded mode
-      if (props.mode !== "embedded") return;
-
       const query: any = {
         trace_id: effectiveTraceId.value,
         stream: effectiveStreamName.value,

@@ -3344,6 +3344,7 @@
     "querySource": "Query Source"
   },
   "traces": {
+    "openInFullView": "Open in full view",
     "viewLogs": "View Logs",
     "viewRelated": "View Related",
     "backToLogs": "Back to Logs",

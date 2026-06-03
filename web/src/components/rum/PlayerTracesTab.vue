@@ -105,10 +105,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
             {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
           </span>
+          <OButton
+            variant="outline"
+            size="chip"
+            @click="traceDetailsRef?.handleExpandToFullView()"
+            data-test="rum-player-traces-tab-open-full-btn"
+            :aria-label="t('traces.openInFullView')"
+          >
+            <OIcon name="open-in-new" size="sm" />
+            <OTooltip :content="t('traces.openInFullView')" />
+          </OButton>
         </div>
       </div>
       <div class="tw:flex-1 tw:overflow-hidden">
         <TraceDetails
+          ref="traceDetailsRef"
           mode="embedded"
           :trace-id-prop="selectedTrace.traceId"
           stream-name-prop="default"
@@ -221,6 +232,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
@@ -256,6 +268,7 @@ const correlatedViews = ref<any[]>([]);
 const selectedTrace = ref<any>(null);
 const selectedTraceStartTime = ref(0);
 const selectedTraceEndTime = ref(0);
+const traceDetailsRef = ref<any>(null);
 const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
