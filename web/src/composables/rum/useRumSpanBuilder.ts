@@ -320,43 +320,6 @@ export default function useRumSpanBuilder(
     };
   };
 
-  const buildSessionSpans = (
-    allViewEvents: any[],
-    traceId: string,
-  ): any[] => {
-    const sessionIds = new Set(
-      allViewEvents.map((e: any) => e.session_id).filter(Boolean),
-    );
-    const allDates = allViewEvents
-      .map((e: any) => e.date)
-      .filter((d: any) => typeof d === "number");
-    const globalMin = allDates.length ? Math.min(...allDates) : 0;
-    const globalMax = allDates.length ? Math.max(...allDates) : 0;
-
-    return [...sessionIds].map((sessionId) => {
-      const sessionEvents = allViewEvents.filter(
-        (e: any) => e.session_id === sessionId,
-      );
-      const dates = sessionEvents
-        .map((e: any) => e.date)
-        .filter((d: any) => typeof d === "number");
-      return {
-        [tsCol()]: dates.length ? Math.min(...dates) : globalMin,
-        start_time: (dates.length ? Math.min(...dates) : globalMin) * 1_000_000,
-        end_time: (dates.length ? Math.max(...dates) : globalMax) * 1_000_000,
-        duration: ((dates.length ? Math.max(...dates) : globalMax) - (dates.length ? Math.min(...dates) : globalMin)) * 1000,
-        span_id: `rum_session_${sessionId}`,
-        trace_id: traceId || undefined,
-        operation_name: `RUM Session: ${String(sessionId).substring(0, 8)}`,
-        service_name: "Frontend",
-        span_status: "OK",
-        span_kind: SPAN_KIND_UNSPECIFIED,
-        rum_event_type: "session",
-        rum_session_id: sessionId,
-      };
-    });
-  };
-
   const buildViewSpans = (
     viewEvents: any[],
     traceId: string,
@@ -378,9 +341,7 @@ export default function useRumSpanBuilder(
         end_time: ((view.date || 0) + (viewDuration/1000000)) * 1_000_000,
         duration: viewDuration/1000,
         span_id: `rum_view_${view.view_id}`,
-        reference_parent_span_id: view.session_id
-          ? `rum_session_${view.session_id}`
-          : "",
+        reference_parent_span_id: "",
         trace_id: traceId || undefined,
         operation_name: `View: ${view.view_url || view.view_name || "Unknown Page"}`,
         service_name: view.service || "Frontend",
@@ -621,7 +582,6 @@ export default function useRumSpanBuilder(
       classifyLeafEvents(allViewEvents);
 
     const spans: any[] = [
-      ...buildSessionSpans(allViewEvents, traceId),
       ...buildViewSpans(viewEvents, traceId),
       ...buildActionSpans(actionEvents, firstTracedResource, traceId, tracedTimestamp),
       ...buildResourceSpans(apiCalls, actionEvents),

@@ -297,7 +297,7 @@ const traceColumns = computed(() => [
   },
   {
     id: "status",
-    header: t("traces.status"),
+    header: t("common.status"),
     accessorFn: (row: any) => row.metadata?.errorCount ?? 0,
     size: 120,
     minSize: 80,
