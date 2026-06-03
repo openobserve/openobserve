@@ -613,9 +613,11 @@ export const usePanelSQLExecutor = (ctx: {
               }
             })();
 
-            // Add empty objects to state.resultMetaData for the results of this query
+            // Initialize empty slots for this query's data/metadata; both are
+            // overwritten below with the actual searchResponse values. Use []
+            // to match the streaming/time-shift paths' initialization.
             state.data.push([]);
-            state?.resultMetaData?.push([{}]); // Initialize as array with one element
+            state?.resultMetaData?.push([]);
 
             const currentQueryIndex = state.data.length - 1;
 
@@ -729,8 +731,10 @@ export const usePanelSQLExecutor = (ctx: {
         }
       })();
 
+      // Initialize empty slots; data/metadata are overwritten below with the
+      // actual searchResponse values. Use [] to match the streaming path.
       state.data.push([]);
-      state.resultMetaData.push([{}]);
+      state.resultMetaData.push([]);
       state.metadata.queries.push({ panelQueryIndex: 0 });
 
       const currentQueryIndex = state.data.length - 1;

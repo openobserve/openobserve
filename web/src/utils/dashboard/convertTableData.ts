@@ -48,8 +48,12 @@ export const convertTableData = (
     return { rows: [], columns: [] };
   }
 
-  const x = panelSchema?.queries[0].fields?.x || [];
-  const y = panelSchema?.queries[0].fields?.y || [];
+  const x = (panelSchema?.queries || []).flatMap(
+    (q: any) => q?.fields?.x || [],
+  );
+  const y = (panelSchema?.queries || []).flatMap(
+    (q: any) => q?.fields?.y || [],
+  );
   let columnData = [...x, ...y];
   // Avoid deep cloning - use shallow copy and work with original data
   let tableRows = searchQueryData[0];
