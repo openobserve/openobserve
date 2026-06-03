@@ -40,10 +40,15 @@ export class IngestionTokensPage {
             page.locator(`[data-test="o2-table-row-${name}"]`);
 
         // ============================================================
+        // Table
+        // ============================================================
+        this.tokenTable = page.locator('table');
+        this.tokenTableRows = page.locator('table tbody tr');
+
+        // ============================================================
         // Revealed token dialog
         // ============================================================
-        this.revealedTokenCode = page.locator('[data-test="o-dialog-primary-btn"]')
-            .locator('xpath=ancestor::*[@role="dialog"]//code');
+        this.revealedTokenCode = page.locator('[role="dialog"] code');
     }
 
     // ----- navigation -----

@@ -29,10 +29,10 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await expect(pageManager.ingestionTokensPage.createTokenButton).toBeVisible();
 
         // Verify table renders — OTable with row-key renders rows in tbody
-        const table = page.locator('table');
+        const table = pageManager.ingestionTokensPage.tokenTable;
         await expect(table).toBeVisible({ timeout: 5000 });
         // At least one row in tbody (token rows)
-        const rows = table.locator('tbody tr');
+        const rows = pageManager.ingestionTokensPage.tokenTableRows;
         await expect(rows.first()).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Test completed successfully');
@@ -68,7 +68,7 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.verifySuccessMessage('Token created successfully.');
 
         // Revealed dialog should show the token
-        const revealedCode = page.locator('[role="dialog"] code');
+        const revealedCode = pageManager.ingestionTokensPage.revealedTokenCode;
         await expect(revealedCode).toBeVisible({ timeout: 5000 });
         const tokenText = await revealedCode.textContent();
         expect(tokenText).toMatch(/^o2oi_/);
@@ -136,7 +136,7 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.clickCreate();
 
         // Wait for revealed dialog
-        const revealedCode = page.locator('[role="dialog"] code');
+        const revealedCode = pageManager.ingestionTokensPage.revealedTokenCode;
         await expect(revealedCode).toBeVisible({ timeout: 5000 });
         const tokenText = await revealedCode.textContent();
         expect(tokenText).toMatch(/^o2oi_/);
