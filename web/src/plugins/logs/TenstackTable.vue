@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'container tw:rounded-none! tw:overflow-x-auto tw:relative',
       !props.scrollEl ? 'table-container' : '',
     ]"
+    style="color: var(--o2-log-table-text)"
   >
     <table
       v-if="table"
@@ -62,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+            background: 'var(--o2-log-table-header-bg)',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -140,23 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </th>
         </vue-draggable>
 
-        <tr v-if="loading" class="tw:w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="tw:font-bold"
-            :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
-              opacity: 0.7,
-            }"
-          >
-            <div
-              class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center"
-            >
-              <OSpinner size="xs" />
-              {{ t("confirmDialog.loading") }}
-            </div>
-          </td>
-        </tr>
+
         <tr v-if="!loading && errMsg != ''" class="tw:w-full">
           <td
             :colspan="columnOrder.length"
@@ -217,6 +202,37 @@ class="tw:mr-1" />
           </td>
         </tr>
       </thead>
+
+      <!-- Skeleton loading body — replaces the old spinner row -->
+      <tbody
+        v-if="loading"
+        data-test="logs-table-skeleton-body"
+        aria-busy="true"
+        aria-label="Loading logs"
+      >
+        <!-- Rows use tw:flex to match the real virtual rows exactly -->
+        <tr
+          v-for="r in SKEL_ROW_COUNT"
+          :key="`skel-${r}`"
+          class="logs-skel-row tw:flex tw:items-center tw:w-full"
+          :style="{ animationDelay: `${(r - 1) * 40}ms` }"
+        >
+          <td
+            v-for="(header, c) in headers"
+            :key="header.id"
+            class="tw:px-2 tw:overflow-hidden"
+            :class="c === 0 ? 'tw:pl-4' : ''"
+            :style="skelTdStyle(header, c)"
+          >
+            <span
+              class="logs-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+              :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
+              aria-hidden="true"
+            />
+          </td>
+        </tr>
+      </tbody>
+
       <tbody
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
@@ -238,8 +254,11 @@ class="tw:mr-1" />
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
             :class="[
+              'tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px]',
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                ? 'tw:cursor-pointer'
+                : 'tw:cursor-default',
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
@@ -252,8 +271,14 @@ class="tw:mr-1" />
                 ? store.state.theme === 'dark'
                   ? 'tw:bg-zinc-700'
                   : 'tw:bg-zinc-300'
+                : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                  ? virtualRow.index % 2 === 0
+                    ? 'log-row-base'
+                    : 'log-row-alt'
+                  : '',
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                ? 'table-row-hover'
                 : '',
-              'table-row-hover',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
@@ -432,7 +457,6 @@ import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface StreamField {
   name: string;
@@ -770,6 +794,28 @@ const isResizingHeader = ref(false);
 const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 
 const headers = computed(() => headerGroups.value.headers);
+
+// Skeleton loading helpers — mirrors OTable shimmer pattern
+const SKEL_ROW_COUNT = 12;
+const SKEL_BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
+const SKEL_JITTER     = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
+// Timestamp column: pill sized to "2026-06-02 12:09:00.349" (23 chars × 7.2 px/char in monospace 12 px)
+const SKEL_TIMESTAMP_PX = Math.round("2026-06-02 12:09:00.349".length * 7.2);
+const skelCellWidth = (r: number, c: number): number => {
+  const base = SKEL_BASE_WIDTHS[c % SKEL_BASE_WIDTHS.length] ?? 60;
+  const jit  = SKEL_JITTER[(r + c) % SKEL_JITTER.length] ?? 0;
+  return Math.max(25, Math.min(85, base + jit));
+};
+// Mirror the exact width/flex logic from real cells so the skeleton columns align perfectly.
+// Source column: width:'auto' in real rows → flex:1 here to fill remaining row space.
+// All other columns: fixed width from the CSS variable (same as real rows).
+const skelTdStyle = (header: any, c: number): Record<string, string> => {
+  const colId = header.column.id;
+  const isStretchSource = colId === 'source' && !header.column.getCanResize();
+  if (isStretchSource) return { flex: '1 1 0', minWidth: '0' };
+  const w = `calc(var(--col-${colId}-size) * 1px)`;
+  return { width: w, minWidth: w, flexShrink: '0' };
+};
 
 watch(
   () => headers.value,
@@ -1130,12 +1176,22 @@ defineExpose({
   height: 0.75rem !important;
 }
 
-// Add explicit hover styles for log rows
+// Log table row surface colours — driven by CSS vars per theme
+.log-row-base {
+  background-color: var(--o2-log-table-row-bg);
+}
+
+.log-row-alt {
+  background-color: var(--o2-log-table-row-alt-bg);
+}
+
 .table-row-hover {
-  transition: background-color 0.15s ease-in-out;
+  transition: background-color 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
+  border-bottom-color: var(--o2-log-table-row-border) !important;
 
   &:hover {
-    background-color: var(--o2-hover-gray) !important;
+    background-color: var(--o2-log-table-row-hover) !important;
+    box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
   }
 }
 
@@ -1164,5 +1220,44 @@ defineExpose({
 // Suppress the hover box-shadow — it visually bleeds outside the row boundary
 :deep(.ai-btn:hover) {
   box-shadow: none !important;
+}
+
+// ── Loading skeleton ─────────────────────────────────────────────
+.logs-skel-row {
+  opacity: 0;
+  animation: logs-skel-row-in 320ms ease-out forwards;
+  border-bottom: 1px solid var(--o2-log-table-row-border);
+  height: 29px;
+  background-color: var(--o2-log-table-row-bg);
+
+  &:nth-child(even) {
+    background-color: var(--o2-log-table-row-alt-bg);
+  }
+}
+
+.logs-skel-pill {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton-base)      0%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base)      100%
+  );
+  background-size: 200% 100%;
+  animation: logs-skel-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes logs-skel-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes logs-skel-row-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logs-skel-row  { opacity: 1; animation: none; }
+  .logs-skel-pill { animation: none; }
 }
 </style>

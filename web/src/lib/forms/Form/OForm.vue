@@ -62,10 +62,10 @@ async function validate(): Promise<boolean> {
   // concurrently. Without `greedy`, run them sequentially and stop at the
   // first failure to match q-form semantics.
   if (props.greedy) {
-    await form.validateAllFields("change");
+    await form.validateAllFields("submit");
   } else {
     for (const name of registeredFieldPaths()) {
-      await form.validateField(name, "change");
+      await form.validateField(name, "submit");
       const err = form.getFieldMeta(name)?.errors ?? [];
       if (err.length > 0) return false;
     }

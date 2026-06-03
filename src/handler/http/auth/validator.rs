@@ -261,7 +261,7 @@ pub async fn validate_credentials(
                 if !is_ingestion_path {
                     return Ok(TokenValidationResponse {
                         is_valid: false,
-                        user_email: format!("ingestion:{}@{}", token_name, org_id),
+                        user_email: user_id.to_string(),
                         is_internal_user: false,
                         user_role: None,
                         user_name: token_name.clone(),
@@ -272,12 +272,12 @@ pub async fn validate_credentials(
 
                 return Ok(TokenValidationResponse {
                     is_valid: true,
-                    user_email: format!("ingestion:{}@{}", token_name, org_id),
+                    user_email: user_id.to_string(),
                     is_internal_user: true,
                     user_role: None,
                     user_name: token_name.clone(),
                     family_name: "".to_string(),
-                    given_name: token_name.clone(),
+                    given_name: token_name,
                 });
             }
 
@@ -298,7 +298,7 @@ pub async fn validate_credentials(
                     if !is_ingestion_path {
                         return Ok(TokenValidationResponse {
                             is_valid: false,
-                            user_email: format!("ingestion:{}@{}", token_record.name, org_id),
+                            user_email: user_id.to_string(),
                             is_internal_user: false,
                             user_role: None,
                             user_name: token_record.name.clone(),
@@ -309,7 +309,7 @@ pub async fn validate_credentials(
 
                     return Ok(TokenValidationResponse {
                         is_valid: true,
-                        user_email: format!("ingestion:{}@{}", token_record.name, org_id),
+                        user_email: user_id.to_string(),
                         is_internal_user: true,
                         user_role: None,
                         user_name: token_record.name.clone(),
