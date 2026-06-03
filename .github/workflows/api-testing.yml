@@ -342,9 +342,10 @@ jobs:
             --request-timeout 5 \
             -m positive \
             --suppress-health-check=filter_too_much \
-            --exclude-path "/api/{org_id}/v1/traces" \
             --exclude-path "/api/{org_id}/v1/logs" \
             --exclude-path "/api/{org_id}/v1/metrics" \
+            --exclude-path "/api/{org_id}/v1/traces" \
+            --exclude-path "/api/{org_id}/loki/api/v1/push" \
             --exclude-path "/api/{org_id}/prometheus/api/v1/write" \
             --exclude-path "/api/{org_id}/dashboards" \
             --exclude-path "/api/{org_id}/dashboards/{dashboard_id}" \
