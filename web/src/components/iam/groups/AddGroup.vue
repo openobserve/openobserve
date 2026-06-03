@@ -14,13 +14,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODrawer data-test="add-group-dialog"
+  <ODialog data-test="add-group-dialog"
     :open="open"
-    :width="30"
+    size="sm"
     :title="t('iam.addGroup')"
     @update:open="emits('update:open', $event)"
   >
-    <div data-test="add-group-section" class="tw:p-4">
+    <div data-test="add-group-section">
       <OInput
         v-model.trim="name"
         :label="t('common.name') + ' *'"
@@ -53,13 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { createGroup } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";

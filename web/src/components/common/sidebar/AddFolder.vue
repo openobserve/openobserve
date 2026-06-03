@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <ODrawer
+    <ODialog
       :open="open"
-      :width="20"
+      size="sm"
       :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
       secondary-button-label="Cancel"
       primary-button-label="Save"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="$emit('update:open', false)"
       @click:primary="submit()"
     >
-      <div class="tw:p-4">
+      <div>
         <OForm ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
           <OFormInput
             name="name"
@@ -43,12 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OForm>
       </div>
-    </ODrawer>
+    </ODialog>
   </template>
   
   <script lang="ts">
   import { defineComponent, ref, watch } from "vue";
-  import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+  import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
   import OForm from "@/lib/forms/Form/OForm.vue";
   import OFormInput from "@/lib/forms/Input/OFormInput.vue";
   import { createFolder, createFolderByType, updateFolder, updateFolderByType } from "@/utils/commons";
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   export default defineComponent({
     name: "CommonAddFolder",
-    components: { ODrawer, OForm, OFormInput },
+    components: { ODialog, OForm, OFormInput },
     props: {
       open: {
         type: Boolean,

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="dashboard-tab-settings-add-tab-dialog"
+  <ODialog data-test="dashboard-tab-settings-add-tab-dialog"
     :open="open"
-    :width="20"
+    size="sm"
     :title="editMode ? 'Edit Tab' : 'Add Tab'"
     secondary-button-label="Cancel"
     primary-button-label="Save"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @click:primary="submit()"
   >
-    <div class="tw:p-4">
+    <div>
       <OForm ref="addTabForm" :default-values="{ name: '' }" @submit="onSubmit.execute">
         <OFormInput
           name="name"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OForm>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -48,7 +48,7 @@ import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
@@ -61,7 +61,7 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddTab",
-  components: { ODrawer, OForm, OFormInput },
+  components: { ODialog, OForm, OFormInput },
   props: {
     open: {
       type: Boolean,

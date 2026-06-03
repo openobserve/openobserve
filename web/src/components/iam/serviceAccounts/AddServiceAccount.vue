@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-service-account-dialog"
+  <ODialog data-test="add-service-account-dialog"
     :open="open"
-    :width="30"
+    size="sm"
     :title="beingUpdated ? t('serviceAccounts.update') : t('serviceAccounts.add')"
     @update:open="$emit('update:open', $event)"
   >
-    <div class="tw:p-4">
+    <div>
       <div>
           <OInput
             v-if="!beingUpdated"
@@ -60,13 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -88,7 +88,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODrawer, OInput },
+  components: { OButton, ODialog, OInput },
   props: {
     open: {
       type: Boolean,

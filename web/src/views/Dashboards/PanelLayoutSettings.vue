@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="panel-layout-settings-drawer"
+  <ODialog data-test="panel-layout-settings-dialog"
     :open="open"
     size="sm"
     :title="t('panel.layout')"
@@ -27,15 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
     data-test="panel-layout-settings-content"
-    class="tw:p-0 tw:w-[300px]!"
+    class="tw:p-0"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
     style="min-height: inherit"
   >
-    <div class="tw:mx-3">
+    <div>
       <div
         data-test="panel-layout-settings-height"
         class="o2-input"
-        style="padding-top: 12px"
       >
         <OInput
           v-model.number="updatedLayout.h"
@@ -62,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -71,13 +70,13 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { ODrawer, OInput, OTooltip,
+  components: { ODialog, OInput, OTooltip,
     OIcon,
 },
   props: {

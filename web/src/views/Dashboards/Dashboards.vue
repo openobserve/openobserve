@@ -373,9 +373,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTable>
 
           <!-- add dashboard -->
-          <ODrawer
+          <ODialog
             v-model:open="showAddDashboardDialog"
-            :width="30"
+            size="md"
             :title="t('dashboard.createdashboard')"
             data-test="dashboard-add-dialog"
             :secondary-button-label="t('dashboard.cancel')"
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @updated="updateDashboardList"
               :activeFolderId="activeFolderId"
             />
-          </ODrawer>
+          </ODialog>
 
           <!-- add dashboard from GitHub gallery -->
           <AddDashboardFromGitHub
@@ -399,9 +399,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- add/edit folder -->
-          <ODrawer
+          <ODialog
             v-model:open="showAddFolderDialog"
-            :width="30"
+            size="sm"
             :title="
               isFolderEditMode
                 ? t('dashboard.updateFolder')
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :edit-mode="isFolderEditMode"
               :folder-id="selectedFolderToEdit ?? 'default'"
             />
-          </ODrawer>
+          </ODialog>
 
           <!-- move dashboard to another folder -->
           <MoveDashboardToAnotherFolder
@@ -470,7 +470,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -544,7 +544,7 @@ export default defineComponent({
     OSearchInput,
     OSwitch,
     OCheckbox,
-    ODrawer,
+    ODialog,
     AddDashboard,
     OTooltip,
     AddDashboardFromGitHub,

@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs } from "vue";
+import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs, inject, provide } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 
@@ -21,6 +21,13 @@ const $attrs = useAttrs();
 // using the audit pattern: [data-test="<parent>"] [data-test="o-dialog-*-btn"].
 // (DialogRoot is renderless, so default attribute inheritance would lose it.)
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+
+// Stacking support: each nested ODialog gets a higher z-index layer
+const dialogDepth = inject<number>("o2DialogDepth", 0);
+provide("o2DialogDepth", dialogDepth + 1);
+
+const overlayZIndex = computed(() => 5999 + dialogDepth * 1000);
+const contentZIndex = computed(() => 6000 + dialogDepth * 1000);
 
 const props = withDefaults(defineProps<DialogProps>(), {
   persistent: false,
@@ -285,8 +292,9 @@ watch(internalOpen, (open) => {
       <!-- Overlay / scrim -->
       <DialogOverlay
         data-test="o-dialog-overlay"
+        :style="{ zIndex: overlayZIndex }"
         :class="[
-          'tw:fixed tw:inset-0 tw:z-5999',
+          'tw:fixed tw:inset-0',
           'tw:bg-dialog-overlay',
           'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
           'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
@@ -298,12 +306,10 @@ watch(internalOpen, (open) => {
       <DialogContent
         data-o2-dialog
         :data-test="parentDataTest || 'o-dialog-panel'"
-        :style="contentStyle"
+        :style="[contentStyle, { zIndex: contentZIndex }]"
         :class="[
           // Positioning — centered in viewport
           'tw:fixed tw:left-1/2 tw:top-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2',
-          // Stacking — above Quasar header (2000) and drawer (3000)
-          'tw:z-6000',
           // Layout — flex-col so header/footer stick and only body scrolls
           'tw:flex tw:flex-col tw:overflow-hidden',
           // Size

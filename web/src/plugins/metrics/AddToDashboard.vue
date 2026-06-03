@@ -1,7 +1,7 @@
 <template>
-  <ODrawer
+  <ODialog
     :open="open"
-    :width="30"
+    size="md"
     :title="t('dashboard.addDashboard')"
     secondary-button-label="Cancel"
     :primary-button-label="t('metrics.add')"
@@ -13,7 +13,7 @@
     @click:primary="handlePrimaryClick()"
   >
     <OForm ref="formRef" :default-values="{ panelTitle: '' }" @submit="onSubmit.execute()">
-    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 tw:px-3 tw:py-2">
+    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
@@ -40,7 +40,7 @@
       />
     </div>
     </OForm>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -53,7 +53,7 @@ import { addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OForm from '@/lib/forms/Form/OForm.vue';
 import OFormInput from '@/lib/forms/Input/OFormInput.vue';
@@ -68,7 +68,7 @@ export default defineComponent({
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
-    ODrawer,
+    ODialog,
     OInput,
     OForm,
     OFormInput,
