@@ -112,9 +112,9 @@ mod tests {
             span_id: "span-1".to_string(),
             trace_id: "trace-1".to_string(),
             session_id: None,
-            scorer_id: "sc-1".to_string(),
+            scorer_id: "scorer-entity-1".to_string(),
             scorer_version: "1".to_string(),
-            score_config_id: Some("cfg-1".to_string()),
+            score_config_id: Some("cfg-entity-1".to_string()),
             score_config_version: Some("1".to_string()),
             score_name: Some("faithfulness".to_string()),
             source_type: LlmScoreDataSourceType::LlmJudge,
@@ -134,12 +134,20 @@ mod tests {
         assert_eq!(result.record.name, "faithfulness");
         assert_eq!(result.record.value_numeric, Some(0.95));
         assert_eq!(result.record.source_type, LlmScoreDataSourceType::LlmJudge);
+        assert_eq!(result.record.scorer_id, Some("scorer-entity-1".to_string()));
         assert_eq!(result.record.job_id, Some("job-1".to_string()));
+        assert_eq!(
+            result.record.score_config_id,
+            Some("cfg-entity-1".to_string())
+        );
 
         let json = &result.json;
         assert_eq!(json["name"], "faithfulness");
         assert_eq!(json["level"], "span");
+        assert_eq!(json["scorer_id"], "scorer-entity-1");
         assert_eq!(json["source_type"], "llm_judge");
+        assert_eq!(json["score_config_id"], "cfg-entity-1");
+        assert!(json.get("score_config_entity_id").is_none());
     }
 
     #[test]

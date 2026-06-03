@@ -125,7 +125,7 @@ impl PreparedLlmJudgeScorer {
         let extra_metadata_fields = params.extra_metadata_fields.clone().unwrap_or_default();
 
         let scorer_cfg = ScorerConfig {
-            scorer_id: scorer.id.clone(),
+            scorer_entity_id: scorer.entity_id.clone(),
             scorer_version: scorer.version.to_string(),
             scorer_type: scorer.scorer_type,
             template,
@@ -207,9 +207,9 @@ impl PreparedLlmJudgeScorer {
                     span_id: span_ctx.span_id.clone(),
                     trace_id: span_ctx.trace_id.clone(),
                     session_id: span_ctx.session_id.clone(),
-                    scorer_id: self.scorer.id.clone(),
-                    scorer_version: self.scorer.version.to_string(),
-                    score_config_id: self.score_cfg_info.score_config_id.clone(),
+                    scorer_id: self.scorer_cfg.scorer_entity_id.clone(),
+                    scorer_version: self.scorer_cfg.scorer_version.clone(),
+                    score_config_id: self.score_cfg_info.score_config_entity_id.clone(),
                     score_config_version: self.score_cfg_info.score_config_version.clone(),
                     score_name: Some(score_name),
                     source_type: LlmScoreDataSourceType::LlmJudge,
@@ -230,11 +230,11 @@ impl PreparedLlmJudgeScorer {
                     target_span_id: span_ctx.span_id.clone(),
                     target_trace_id: span_ctx.trace_id.clone(),
                     target_stream: span_ctx.source_stream.clone(),
-                    scorer_id: Some(self.scorer.id.clone()),
-                    scorer_version: Some(self.scorer.version.to_string()),
-                    scorer_type: Some(self.scorer.scorer_type),
+                    scorer_id: Some(self.scorer_cfg.scorer_entity_id.clone()),
+                    scorer_version: Some(self.scorer_cfg.scorer_version.clone()),
+                    scorer_type: Some(self.scorer_cfg.scorer_type),
                     job_id: span_ctx.job_id.clone(),
-                    score_config_id: self.score_cfg_info.score_config_id.clone(),
+                    score_config_id: self.score_cfg_info.score_config_entity_id.clone(),
                     score_config_version: self.score_cfg_info.score_config_version.clone(),
                     eval_run_id: span_ctx.eval_run_id.clone(),
                     provider_id: Some(self.provider.id.clone()),
@@ -356,9 +356,9 @@ impl PreparedRemoteScorer {
                     span_id: span_ctx.span_id.clone(),
                     trace_id: span_ctx.trace_id.clone(),
                     session_id: span_ctx.session_id.clone(),
-                    scorer_id: self.scorer.id.clone(),
+                    scorer_id: self.scorer.entity_id.clone(),
                     scorer_version: self.scorer.version.to_string(),
-                    score_config_id: self.score_config.as_ref().map(|sc| sc.id.clone()),
+                    score_config_id: self.score_config.as_ref().map(|sc| sc.entity_id.clone()),
                     score_config_version: self
                         .score_config
                         .as_ref()
@@ -382,11 +382,11 @@ impl PreparedRemoteScorer {
                     target_span_id: span_ctx.span_id.clone(),
                     target_trace_id: span_ctx.trace_id.clone(),
                     target_stream: span_ctx.source_stream.clone(),
-                    scorer_id: Some(self.scorer.id.clone()),
+                    scorer_id: Some(self.scorer.entity_id.clone()),
                     scorer_version: Some(self.scorer.version.to_string()),
                     scorer_type: Some(self.scorer.scorer_type),
                     job_id: span_ctx.job_id.clone(),
-                    score_config_id: self.score_config.as_ref().map(|sc| sc.id.clone()),
+                    score_config_id: self.score_config.as_ref().map(|sc| sc.entity_id.clone()),
                     score_config_version: self
                         .score_config
                         .as_ref()

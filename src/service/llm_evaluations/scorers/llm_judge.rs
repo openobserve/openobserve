@@ -44,7 +44,7 @@ pub struct LlmJudgeOutput {
 
 #[derive(Debug, Clone)]
 pub struct ScorerConfig {
-    pub scorer_id: String,
+    pub scorer_entity_id: String,
     pub scorer_version: String,
     pub scorer_type: ScorerType,
     pub template: String,
@@ -65,7 +65,7 @@ pub struct LlmJudgeParams {
 
 #[derive(Debug, Clone, Default)]
 pub struct ScoreConfigInfo {
-    pub score_config_id: Option<String>,
+    pub score_config_entity_id: Option<String>,
     pub score_config_version: Option<String>,
     pub score_config_name: Option<String>,
     pub data_type: ScoreConfigDataType,
@@ -76,7 +76,7 @@ pub struct ScoreConfigInfo {
 impl From<&infra::table::score_configs::ScoreConfig> for ScoreConfigInfo {
     fn from(score_config: &infra::table::score_configs::ScoreConfig) -> Self {
         Self {
-            score_config_id: Some(score_config.id.clone()),
+            score_config_entity_id: Some(score_config.entity_id.clone()),
             score_config_version: Some(score_config.version.to_string()),
             score_config_name: Some(score_config.name.clone()),
             data_type: score_config.data_type,

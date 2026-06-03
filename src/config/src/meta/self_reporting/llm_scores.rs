@@ -136,7 +136,7 @@ mod tests {
             data_type: LlmScoreDataType::Numeric,
             scorer_id: Some("sc-1".to_string()),
             scorer_version: Some("1".to_string()),
-            score_config_id: Some("cfg-1".to_string()),
+            score_config_id: Some("cfg-entity-1".to_string()),
             score_config_version: Some("1".to_string()),
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: Some("traces".to_string()),
@@ -152,6 +152,7 @@ mod tests {
         assert_eq!(back.span_id, Some("span-1".to_string()));
         assert_eq!(back.value_numeric, Some(0.95));
         assert_eq!(back.level, LlmScoreDataLevel::Span);
+        assert_eq!(back.score_config_id, Some("cfg-entity-1".to_string()));
     }
 
     #[test]
@@ -173,6 +174,7 @@ mod tests {
         assert!(obj.contains_key("scorer_id"));
         assert!(obj.contains_key("scorer_version"));
         assert!(obj.contains_key("score_config_id"));
+        assert!(!obj.contains_key("score_config_entity_id"));
         assert!(obj.contains_key("score_config_version"));
         assert!(obj.contains_key("source_type"));
         assert!(obj.contains_key("source_stream"));
@@ -219,6 +221,7 @@ mod tests {
         assert!(!obj.contains_key("value_categorical"));
         assert!(!obj.contains_key("value_boolean"));
         assert!(!obj.contains_key("scorer_id"));
+        assert!(!obj.contains_key("score_config_id"));
         assert!(!obj.contains_key("reasoning"));
         assert!(!obj.contains_key("author"));
     }

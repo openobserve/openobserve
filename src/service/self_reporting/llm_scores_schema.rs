@@ -131,6 +131,8 @@ mod tests {
         assert!(obj.contains_key("value_categorical"));
         assert!(obj.contains_key("value_boolean"));
         assert!(obj.contains_key("data_type"));
+        assert!(obj.contains_key("score_config_id"));
+        assert!(obj.contains_key("scorer_id"));
         assert!(obj.contains_key("_timestamp"));
     }
 }
