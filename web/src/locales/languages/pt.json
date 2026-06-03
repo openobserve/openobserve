@@ -2351,7 +2351,16 @@
     "delete": "Excluir",
     "variable_guide_header": "Guia de variáveis de modelo",
     "variable_usage_examples": "Exemplos de uso",
-    "body": "Corpo"
+    "body": "Corpo",
+    "clone": "Clonar",
+    "cloneTitle": "Modelo de clone",
+    "systemReadOnly": "Modelo pré-construído — a exclusão está desativada. Clone para criar uma cópia modificável.",
+    "prebuiltBadge": "Pré-construído",
+    "prebuiltBadgeHint": "Gerenciado pelo sistema. Você pode editar, mas a exclusão está desativada.",
+    "customBadge": "Personalizado",
+    "filterAll": "Todos",
+    "filterPrebuilt": "Pré-construído",
+    "filterCustom": "Personalizado"
   },
   "alert_destinations": {
     "header": "Destinos",
@@ -2388,7 +2397,13 @@
     "custom": "Personalizado",
     "separator": "Separador",
     "separator_placeholder": "Insira o separador (por exemplo, |,\\n,\\ t, espaço)",
-    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)"
+    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)",
+    "filterAll": "Todos",
+    "filterPrebuilt": "Pré-construído",
+    "filterCustom": "Personalizado",
+    "templateDefaultBadge": "Padrão",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Pesquisar uma métrica",
@@ -3890,19 +3905,23 @@
     "capabilities": {
       "query": {
         "title": "Escrever uma consulta",
-        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas."
+        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas.",
+        "prompt": "Ajude-me a escrever uma consulta"
       },
       "incident": {
         "title": "Investigue incidentes",
-        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”"
+        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”",
+        "prompt": "Ajude-me a investigar incidentes"
       },
       "dashboard": {
         "title": "Crie um painel",
-        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis."
+        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis.",
+        "prompt": "Ajude-me a criar um painel ou dashboard"
       },
       "alert": {
         "title": "Crie um alerta",
-        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão."
+        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão.",
+        "prompt": "Ajude-me a criar um alerta ou pipeline"
       }
     },
     "suggestions": {

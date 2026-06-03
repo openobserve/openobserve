@@ -16,14 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="llm-insights-dashboard tw:h-full tw:overflow-y-auto tw:px-[0.625rem] tw:pb-[0.625rem]"
+    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
   >
-    <!-- Toolbar: stream selector. The page-level "Run query" button in the
-         top toolbar is the single source of refresh — picking a different
-         stream here auto-applies the change (same convention as the rest of
-         the Traces tabs), and changing the time range / clicking Run query
-         re-runs the panels via prop watchers below. -->
-    <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]">
+    <!-- Toolbar: stream selector — hidden when no streams are available -->
+    <div
+      v-if="availableStreams.length > 0"
+      class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]"
+    >
       <div
         data-test="llm-insights-stream-selector"
         class="tw:w-[14rem] tw:flex-shrink-0"
@@ -34,17 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           labelKey="label"
           valueKey="value"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
-          :disabled="availableStreams.length === 0"
           @update:model-value="onStreamChange"
         />
-        <OTooltip v-if="availableStreams.length === 0" content="No LLM streams available." />
       </div>
     </div>
 
     <!-- Streams list loaded but no LLM streams exist for this org. -->
     <div
       v-if="streamsLoaded && availableStreams.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[320px] tw:text-center"
+      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
     >
       <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
@@ -61,23 +58,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Skeleton shown only while a real request is in flight (initial
-         streams fetch or KPI/sparkline load). Prevents the post-tab-switch
-         "Failed to load" flash by not painting the error state until data
-         actually fails for the *current* mount. -->
-    <LLMInsightsSkeleton v-else-if="!streamsLoaded || loading" />
+    <!-- Skeleton shown only while a real request is in flight -->
+    <LLMInsightsSkeleton v-else-if="!streamsLoaded || loading" class="tw:flex-1" />
 
     <!-- Stream has no LLM (gen_ai_*) fields → friendly empty state -->
     <div
       v-else-if="streamHasNoLLMFields"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[300px]"
+      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
     >
       <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         No LLM data in <b>{{ activeStream }}</b>
       </div>
       <div
-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[28rem] tw:text-center"
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[28rem]"
       >
         This stream doesn't have any LLM (<code>gen_ai_*</code>) fields. Pick a
         different stream above, or instrument your service with the OpenTelemetry
@@ -85,11 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Generic error state — only after at least one successful mount-load
-         attempt has resolved. -->
+    <!-- Generic error state -->
     <div
       v-else-if="error && hasLoadedOnce"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
+      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
     >
       <OIcon name="error-outline" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:mb-2">Failed to load LLM Insights</div>
@@ -104,10 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <!-- Empty state -->
+    <!-- Empty state — streams exist but no data in this time window -->
     <div
       v-else-if="hasLoadedOnce && !hasData"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
+      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
     >
       <OIcon name="info" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:text-[var(--o2-text-muted)]">
@@ -115,8 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Dashboard content -->
-    <template v-else>
+    <!-- Dashboard content — scrollable panel area -->
+    <div v-else class="tw:flex-1 tw:overflow-y-auto tw:pb-[0.625rem]">
       <!-- KPI Cards Row -->
       <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem] tw:mt-[0.625rem] tw:mb-[0.625rem]">
         <div
@@ -177,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
