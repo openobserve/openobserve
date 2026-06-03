@@ -807,10 +807,9 @@ describe("AddUser Component", () => {
   });
 
   describe("UI Interactions", () => {
-    it("emits update:open(false) when the cancel OButton is clicked", async () => {
-      const cancelButton = wrapper.find('[data-test="cancel-user-button"]');
-      expect(cancelButton.exists()).toBe(true);
-      await cancelButton.trigger("click");
+    it("emits update:open(false) when the cancel (secondary) button is clicked", async () => {
+      // Cancel is now ODialog's built-in secondary footer button.
+      await findDrawer(wrapper).vm.$emit("click:secondary");
 
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen).toBeTruthy();

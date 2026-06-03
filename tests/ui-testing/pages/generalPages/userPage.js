@@ -28,8 +28,10 @@ export class UserPage {
         this.userNewPasswordFieldInput = page.locator('[data-test="user-new-password-field-field"]');
         // OSelect role trigger + popover option (data-test-value keys to the role value)
         this.userRoleField = page.locator('[data-test="user-role-field"]');
-        this.saveUserButton = page.locator('[data-test="save-user-button"]');
-        this.cancelUserButton = page.locator('[data-test="cancel-user-button"]');
+        // Add/Edit user dialog footer uses ODialog's built-in primary/secondary
+        // buttons; scope to the dialog so they don't collide with other dialogs' btns.
+        this.saveUserButton = page.locator('[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.cancelUserButton = page.locator('[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]');
         // Change-password toggle in edit mode
         this.userChangePasswordToggle = page.locator('[data-test="user-change-password-field"]');
 

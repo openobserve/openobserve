@@ -19,6 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
+    :primaryButtonLabel="t('user.save')"
+    :secondaryButtonLabel="t('user.cancel')"
+    @click:primary="onSubmit"
+    @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:w-full">
@@ -181,25 +185,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop tw:mt-2"
             maxlength="100"
           />
-
-          <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-            @click="$emit('update:open', false)"
-              data-test="cancel-user-button"
-            >
-              {{ t('user.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              data-test="save-user-button"
-            >
-              {{ t('user.save') }}
-            </OButton>
-          </div>
         </OForm>
     </div>
   </ODialog>
@@ -224,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -262,7 +246,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODialog,
+  components: { ODialog,
     OIcon,
     OSwitch,
     OInput,
