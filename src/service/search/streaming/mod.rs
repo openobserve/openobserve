@@ -18,7 +18,7 @@
 //! This module contains all the components for handling streaming search requests,
 //! including caching, execution, sorting, and utility functions.
 
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, ops::ControlFlow, time::Instant};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -180,20 +180,30 @@ pub async fn process_search_stream_request(
         );
     }
 
-    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
-        req.query.sql = sql;
-    };
+    // Parse once: apply custom pattern replacement and pre-compute histogram_interval
+    // from the full query time range so all partition clones inherit a consistent value.
+    // Guard both checks to skip the parse entirely for non-histogram / non-custom queries.
+    let has_custom_patterns = req
+        .query
+        .sql
+        .contains(config::utils::query_select_utils::O2_CUSTOM_SUFFIX);
+    let needs_histogram = req.query.histogram_interval == 0 && req.query.sql.contains("histogram(");
 
-    if req.query.histogram_interval == 0 {
-        match sqlparser::parser::Parser::parse_sql(
-            &sqlparser::dialect::GenericDialect {},
+    if has_custom_patterns || needs_histogram {
+        match config::utils::query_select_utils::parse_and_replace_o2_custom_patterns(
             &req.query.sql,
         ) {
-            Ok(mut stmts) => {
-                if let Some(mut stmt) = stmts.pop() {
+            Ok((modified_sql, stmts)) => {
+                req.query.sql = modified_sql;
+                if needs_histogram {
                     let mut visitor =
                         HistogramIntervalVisitor::new((req.query.start_time, req.query.end_time));
-                    let _ = stmt.visit(&mut visitor);
+                    for mut stmt in stmts {
+                        match stmt.visit(&mut visitor) {
+                            ControlFlow::Continue(()) => {}
+                            ControlFlow::Break(()) => break, // histogram found, stop early
+                        }
+                    }
                     if let Some(interval) = visitor.interval {
                         req.query.histogram_interval = validate_and_adjust_histogram_interval(
                             interval,
@@ -204,7 +214,7 @@ pub async fn process_search_stream_request(
             }
             Err(e) => {
                 log::warn!(
-                    "[HTTP2_STREAM trace_id {trace_id}] failed to pre-compute histogram_interval, will recompute per-partition: {e}"
+                    "[HTTP2_STREAM trace_id {trace_id}] failed to parse SQL, histogram_interval will recompute per-partition: {e}"
                 );
             }
         }
