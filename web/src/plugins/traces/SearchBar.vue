@@ -79,10 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             active selection isn't orphaned mid-session.
           -->
           <OToggleGroupItem
-            v-if="
-              config.showLLMUI !== 'false' &&
-              (hasLLMStreams || searchObj.meta.searchMode === 'sessions')
-            "
+            v-if="config.showLLMUI !== 'false'"
             data-test="traces-search-mode-sessions-btn"
             value="sessions"
             size="sm"
@@ -93,10 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Sessions
           </OToggleGroupItem>
           <OToggleGroupItem
-            v-if="
-              config.showLLMUI !== 'false' &&
-              (hasLLMStreams || searchObj.meta.searchMode === 'llm-insights')
-            "
+            v-if="config.showLLMUI !== 'false'"
             data-test="traces-search-mode-llm-insights-btn"
             value="llm-insights"
             size="sm"
