@@ -96,6 +96,7 @@ import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrgan
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
@@ -110,6 +111,7 @@ export default defineComponent({
     NoData,
     OButton,
     AppPageHeader,
+    OIcon,
     OTable,
 },
   setup() {

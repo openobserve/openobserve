@@ -93,7 +93,9 @@ describe("Alert List", async () => {
       .findAll("td");
     // Index 0 is the checkbox cell; actual data cells start at index 1.
     expect(tableData[1].text()).toBe("01");
-    expect(tableData[2].text()).toBe("Template2");
+    // The Name cell now includes a Prebuilt/Custom badge next to the name,
+    // so concat'd text() ends with the badge label (e.g. "Template2Custom").
+    expect(tableData[2].text()).toContain("Template2");
   });
 
   describe("When user clicks on delete alert", () => {

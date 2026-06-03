@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <LLMInsightsDashboard
+              :key="'llm-' + store.state.selectedOrganization.identifier"
               ref="llmInsightsRef"
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"
@@ -117,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <SessionsList
+              :key="'sessions-' + store.state.selectedOrganization.identifier"
               ref="sessionsListRef"
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"

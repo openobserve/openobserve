@@ -2351,7 +2351,16 @@
     "delete": "Supprimer",
     "variable_guide_header": "Guide des variables du modèle",
     "variable_usage_examples": "Exemples d'utilisation",
-    "body": "Corps"
+    "body": "Corps",
+    "clone": "Cloner",
+    "cloneTitle": "Modèle de clonage",
+    "systemReadOnly": "Modèle prédéfini : la suppression est désactivée. Clonez-le pour en faire une copie modifiable.",
+    "prebuiltBadge": "Préconstruit",
+    "prebuiltBadgeHint": "Géré par le système. Vous pouvez modifier, mais la suppression est désactivée.",
+    "customBadge": "Personnalisé",
+    "filterAll": "Tous",
+    "filterPrebuilt": "Préconstruit",
+    "filterCustom": "Personnalisé"
   },
   "alert_destinations": {
     "header": "Destinations",
@@ -2388,7 +2397,13 @@
     "custom": "Personnalisé",
     "separator": "Séparateur",
     "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
-    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
+    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)",
+    "filterAll": "Tous",
+    "filterPrebuilt": "Préconstruit",
+    "filterCustom": "Personnalisé",
+    "templateDefaultBadge": "Par défaut",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",
@@ -3890,19 +3905,23 @@
     "capabilities": {
       "query": {
         "title": "Rédiger une requête",
-        "description": "SQL pour les logs, les traces, RUM ou ProMQL pour les métriques."
+        "description": "SQL pour les logs, les traces, RUM ou ProMQL pour les métriques.",
+        "prompt": "Aide-moi à rédiger une requête"
       },
       "incident": {
         "title": "Étudier les incidents",
-        "description": "Cause première parmi les journaux, les traces et les alertes, par exemple « Pourquoi la passerelle -5xx s'est-elle déclenchée ? »"
+        "description": "Cause première parmi les journaux, les traces et les alertes, par exemple « Pourquoi la passerelle -5xx s'est-elle déclenchée ? »",
+        "prompt": "Aide-moi à étudier les incidents"
       },
       "dashboard": {
         "title": "Créez un tableau de bord",
-        "description": "À partir d'un sujet, par exemple « État du nœud K8s : processeur, mémoire, redémarrages ». Crée également des panneaux."
+        "description": "À partir d'un sujet, par exemple « État du nœud K8s : processeur, mémoire, redémarrages ». Crée également des panneaux.",
+        "prompt": "Aide-moi à créer un tableau de bord"
       },
       "alert": {
         "title": "Créer une alerte",
-        "description": "Alertes à seuil ou planifiées et pipelines VRL à durée d'ingestion."
+        "description": "Alertes à seuil ou planifiées et pipelines VRL à durée d'ingestion.",
+        "prompt": "Aide-moi à créer une alerte"
       }
     },
     "suggestions": {

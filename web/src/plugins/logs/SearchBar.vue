@@ -708,7 +708,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
                     : 'o2-run-query-button o2-color-primary',
-                  config.isEnterprise == 'true' ||
                   store.state.zoConfig.auto_query_enabled
                     ? 'search-button-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
@@ -754,18 +753,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <OSeparator
-                v-if="
-                  config.isEnterprise == 'true' ||
-                  store.state.zoConfig.auto_query_enabled
-                "
+                v-if="store.state.zoConfig.auto_query_enabled"
                 class="tw:h-[1.875rem]! tw:w-[1px]"
                 vertical
               />
               <ODropdown
-                v-if="
-                  config.isEnterprise == 'true' ||
-                  store.state.zoConfig.auto_query_enabled
-                "
+                v-if="store.state.zoConfig.auto_query_enabled"
                 align="end"
                 side="bottom"
               >
@@ -787,7 +780,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           ? 'o2-color-primary'
                           : '',
-                      config.isEnterprise == 'true' ||
                       store.state.zoConfig.auto_query_enabled
                         ? 'search-button-dropdown-enterprise-border-radius'
                         : 'search-button-normal-border-radius',

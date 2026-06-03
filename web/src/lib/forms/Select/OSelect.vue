@@ -85,6 +85,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   iconKey: undefined,
   labelPosition: "outside",
   rowClickSingleSelect: false,
+  optionTooltip: false,
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
@@ -928,9 +929,8 @@ const fieldWidthClass = computed(() => {
               hasError
                 ? 'tw:border-select-border-error'
                 : 'tw:border-select-border tw:hover:border-select-border-hover',
-              /* Focus ring unified with OInput/OButton — see OInput.vue. */
+              /* Single-border focus — no outer ring. See OInput.vue. */
               'tw:focus:outline-none tw:focus:border-select-border-focus',
-              'tw:focus:ring-[0.125rem] tw:focus:ring-primary-500/25',
               'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               labelPosition === 'inside' && label
@@ -944,7 +944,7 @@ const fieldWidthClass = computed(() => {
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="tw:text-[0.6875rem] tw:font-medium tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-text-secondary tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
+              class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
               >{{ label }}</span
             >
 
@@ -991,10 +991,11 @@ const fieldWidthClass = computed(() => {
                 </template>
                 <span
                   v-else
+                  :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
                     'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
                     labelPosition === 'inside' && label
-                      ? 'tw:text-xs tw:font-semibold tw:leading-4'
+                      ? 'tw:text-xs tw:leading-4'
                       : '',
                     disabled
                       ? 'tw:text-select-disabled-text'
@@ -1116,7 +1117,7 @@ const fieldWidthClass = computed(() => {
                   :class="[
                     'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text tw:shrink-0',
                     'tw:placeholder:text-input-placeholder tw:outline-none',
-                    'tw:border-b tw:border-input-border tw:focus:border-input-border-focus tw:transition-colors',
+                    'tw:border-b tw:border-input-border',
                     heightClasses[size ?? 'md'],
                   ]"
                   :placeholder="searchPlaceholder"
@@ -1336,7 +1337,7 @@ const fieldWidthClass = computed(() => {
                         >
                           <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full tw:overflow-hidden">
                             <span class="tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:leading-snug">
-                              <span class="tw:truncate tw:font-medium">{{ filteredOptions[vRow.index].label }}</span>
+                              <span class="tw:truncate tw:font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
                                 class="tw:shrink-0 tw:text-[10px] tw:font-medium tw:px-1 tw:py-px tw:rounded tw:border tw:border-solid tw:leading-tight"
@@ -1380,7 +1381,7 @@ const fieldWidthClass = computed(() => {
                             v-else-if="iconKey"
                             class="tw:shrink-0 tw:size-4"
                           />
-                          <span class="tw:truncate">{{
+                          <span class="tw:truncate" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{
                             filteredOptions[vRow.index].label
                           }}</span>
                         </template>
@@ -1454,12 +1455,8 @@ const fieldWidthClass = computed(() => {
             hasError
               ? 'tw:border-select-border-error'
               : 'tw:border-select-border tw:hover:border-select-border-hover',
-            /* Focus glow unified with OInput / OSelect-listbox / OButton —
-               same 2px (0.125rem) translucent primary halo. Previously this
-               (non-searchable) trigger had only a border change and no ring, so
-               its focus read very differently from buttons and searchable selects. */
+            /* Single-border focus — no outer ring. See OInput.vue. */
             'tw:focus:outline-none tw:focus:border-select-border-focus',
-            'tw:focus:ring-[0.125rem] tw:focus:ring-primary-500/25',
             'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             labelPosition === 'inside' && label
@@ -1473,7 +1470,7 @@ const fieldWidthClass = computed(() => {
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="tw:text-[0.6875rem] tw:font-medium tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-text-secondary tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
+            class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
             >{{ label }}</span
           >
 
@@ -1488,7 +1485,7 @@ const fieldWidthClass = computed(() => {
               :class="[
                 'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
                 labelPosition === 'inside' && label
-                  ? 'tw:text-xs tw:font-semibold tw:leading-4'
+                  ? 'tw:text-xs tw:leading-4'
                   : '',
                 disabled
                   ? 'tw:text-select-disabled-text'

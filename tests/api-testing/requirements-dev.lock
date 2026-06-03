@@ -26,6 +26,8 @@ charset-normalizer==3.3.2
     # via requests
 click==8.4.1
     # via schemathesis
+execnet==2.1.2
+    # via pytest-xdist
 graphql-core==3.2.8
     # via hypothesis-graphql
 h11==0.16.0
@@ -81,12 +83,15 @@ pytest==9.0.3
     # via pytest-order
     # via pytest-pretty
     # via pytest-sugar
+    # via pytest-xdist
     # via schemathesis
 pytest-order==1.3.0
     # via pytest-openobserve
 pytest-pretty==1.2.0
     # via pytest-openobserve
 pytest-sugar==1.1.1
+    # via pytest-openobserve
+pytest-xdist==3.8.0
     # via pytest-openobserve
 pyyaml==6.0.3
     # via schemathesis
