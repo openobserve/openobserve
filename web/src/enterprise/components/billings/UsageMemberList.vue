@@ -24,24 +24,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSeparator class="tw:mb-1 tw:mt-[3px]" />
 
-        <button
-          type="button"
-          class="current-org-item"
-          :class="{ 'current-org-item--active': activeMember === '' }"
-          :data-test="`usage-member-tab-current`"
-          @click="activeMember = ''"
+        <OTabs
+          orientation="vertical"
+          v-model="activeMember"
+          data-test="usage-member-tab-current"
         >
-          <div class="member-name" :title="currentOrgToShow.title">
-            {{ currentOrgToShow.primary }}
-          </div>
-          <div
-            v-if="currentOrgToShow.secondary"
-            class="member-id"
-            :title="currentOrgToShow.secondary"
-          >
-            {{ currentOrgToShow.secondary }}
-          </div>
-        </button>
+          <OTab name="" :data-test="`usage-member-tab-current-item`">
+            <div class="member-item">
+              <div class="member-name" :title="currentOrgToShow.title">
+                {{ currentOrgToShow.primary }}
+              </div>
+              <div
+                v-if="currentOrgToShow.secondary"
+                class="member-id"
+                :title="currentOrgToShow.secondary"
+              >
+                {{ currentOrgToShow.secondary }}
+              </div>
+            </div>
+          </OTab>
+        </OTabs>
       </div>
     </div>
 
@@ -77,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="opt in filteredOptions"
             :key="opt.value"
             :name="opt.value"
-            :data-test="`usage-member-tab-${opt.value || 'current'}`"
+            :data-test="`usage-member-tab-${opt.value}`"
           >
-            <div class="member-item full-width">
+            <div class="member-item">
               <div class="member-name" :title="opt.title">
                 {{ opt.primary }}
               </div>
@@ -194,59 +196,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.current-org-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: calc(100% - 10px);
-  min-width: 0;
-  margin: 5px;
-  padding: 0.375rem 1rem 0.375rem 1.25rem;
-  border-radius: 0.5rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-
-  &:hover {
-    background-color: var(--o2-hover-bg, rgba(0, 0, 0, 0.04));
-  }
-
-  &--active {
-    background-color: var(--o2-primary-btn-bg);
-    color: white;
-
-    &:hover {
-      background-color: var(--o2-primary-btn-bg);
-    }
-
-    .member-id {
-      opacity: 0.85;
-    }
-  }
-
-  .member-name {
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    text-transform: none;
-  }
-
-  .member-id {
-    font-size: 0.72rem;
-    opacity: 0.6;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    text-transform: none;
-  }
-}
-
 .member-header {
   border-radius: 0.625rem;
   background-color: var(--o2-card-bg);
@@ -256,10 +205,24 @@ export default defineComponent({
   background-color: var(--o2-card-background);
 }
 
-.members-tabs {
-  .o-tabs {
-    height: auto !important;
-    max-height: none !important;
+// Shared tab styles applied to both the current-org and member OTabs instances
+.card-container {
+  :deep(.o-tabs--vertical) {
+    margin: 5px;
+
+    .o-tab {
+      justify-content: flex-start;
+      padding: 0.375rem 1rem 0.375rem 1.25rem;
+      border-radius: 0.5rem;
+      min-height: 1.5rem;
+      text-transform: none;
+
+      &[data-state="active"] {
+        .member-id {
+          opacity: 0.85;
+        }
+      }
+    }
   }
 
   .member-item {
@@ -288,25 +251,12 @@ export default defineComponent({
     max-width: 100%;
     text-transform: none;
   }
+}
 
-  .o-tabs {
-    &--vertical {
-      margin: 5px;
-
-      :deep(.o-tab) {
-        justify-content: flex-start;
-        padding: 0.375rem 1rem 0.375rem 1.25rem;
-        border-radius: 0.5rem;
-        min-height: 1.5rem;
-        text-transform: none;
-
-        &[data-state="active"] {
-          .member-id {
-            opacity: 0.85;
-          }
-        }
-      }
-    }
+.members-tabs {
+  :deep(.o-tabs) {
+    height: auto !important;
+    max-height: none !important;
   }
 }
 </style>
