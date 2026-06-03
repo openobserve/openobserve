@@ -391,6 +391,9 @@ mod tests {
         // https:// addresses (e.g. a TLS-terminating load balancer) must use client TLS.
         assert!(super::grpc_addr_uses_tls("https://lb.example.com:443"));
         assert!(super::grpc_addr_uses_tls("https://10.0.0.1:5081"));
+        // The scheme match is case-insensitive.
+        assert!(super::grpc_addr_uses_tls("HTTPS://10.0.0.1:5081"));
+        assert!(super::grpc_addr_uses_tls("Https://lb.example.com:443"));
     }
 
     #[test]
@@ -402,11 +405,11 @@ mod tests {
 
     #[test]
     fn test_grpc_addr_uses_tls_other_schemes() {
-        // Only the explicit https scheme enables TLS; anything else is treated as cleartext.
+        // Only the https scheme enables TLS; anything else is treated as cleartext.
         assert!(!super::grpc_addr_uses_tls("grpc://10.0.0.1:5081"));
         assert!(!super::grpc_addr_uses_tls("10.0.0.1:5081"));
         assert!(!super::grpc_addr_uses_tls(""));
-        // scheme match is case-sensitive; advertised addresses are always lowercase.
-        assert!(!super::grpc_addr_uses_tls("HTTPS://10.0.0.1:5081"));
+        // A host that merely contains "https" without it being the scheme is not TLS.
+        assert!(!super::grpc_addr_uses_tls("http://https.example.com:5081"));
     }
 }
