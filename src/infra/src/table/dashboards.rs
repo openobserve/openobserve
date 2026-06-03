@@ -423,6 +423,7 @@ async fn list_models(
     // Execute the query, either getting all results or a specific page of results.
     let results = if let Some((page_size, page_idx)) = params.page_size_and_idx
         && page_size > 0
+        && page_size.checked_mul(page_idx).is_some()
     {
         query.paginate(db, page_size).fetch_page(page_idx).await?
     } else {
@@ -597,6 +598,24 @@ mod tests {
                 ]
             )]
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn list_models_pagination_overflow_returns_empty_without_query() -> Result<(), DbErr> {
+        // page_size * page_idx overflows u64; sea-orm would otherwise panic in debug
+        // (multiply with overflow). The guard must short-circuit to an empty result
+        // and never reach the database.
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let params = ListDashboardsParams {
+            org_id: "orgId".to_owned(),
+            folder_id: None,
+            title_pat: None,
+            page_size_and_idx: Some((u64::MAX, 2)),
+        };
+        let results = list_models(&db, params).await?;
+        assert!(results.is_empty());
+        assert!(db.into_transaction_log().is_empty());
         Ok(())
     }
 
