@@ -887,3 +887,82 @@ class TestOnlineEvalEndToEnd:
 
         assert scorer_v1["producesScoreConfigId"] == score_config["entityId"]
         assert scorer_v1["producesScoreConfigVersion"] == 1
+
+    def test_05_score_config_delete_blocked_when_used_by_scorer(self):
+        s, base, org = self.s, self.base, self.org
+        suffix = self.rnd()
+
+        score_config = _api(s, base, org, "score_configs", method="POST", json_data={
+            "name": f"block-sc-{suffix}",
+            "dataType": "numeric",
+            "description": "Score config used by a scorer",
+            "numericRange": {"min": 0, "max": 1},
+            "healthyThreshold": {"min": 0.7, "max": 1},
+        }, label="block delete: create score config").json()
+        self.ids["score_configs"].append(score_config["entityId"])
+
+        scorer = _api(s, base, org, "scorers", method="POST", json_data={
+            "name": f"block-sc-scorer-{suffix}",
+            "description": "Scorer using score config",
+            "scorer": {
+                "type": "llm_judge",
+                "producesScoreConfigId": score_config["entityId"],
+                "template": "Judge {{input}}",
+                "params": {"provider_id": "block-provider", "model": "gpt-4o"},
+            },
+        }, label="block delete: create scorer").json()
+        self.ids["scorers"].append(scorer["entityId"])
+
+        resp = _api(
+            s, base, org, f"score_configs/{score_config['entityId']}",
+            method="DELETE",
+            expected_status=409,
+            label="block delete: delete score config in use",
+        )
+        assert "used by one or more scorers" in resp.text
+
+        _api(s, base, org, f"scorers/{scorer['entityId']}",
+             method="DELETE", label="block delete: delete scorer")
+        _api(s, base, org, f"score_configs/{score_config['entityId']}",
+             method="DELETE", label="block delete: delete score config after scorer")
+
+    def test_06_scorer_delete_blocked_by_non_archived_eval_job_only(self):
+        s, base, org = self.s, self.base, self.org
+        suffix = self.rnd()
+
+        scorer = _api(s, base, org, "scorers", method="POST", json_data={
+            "name": f"block-scorer-{suffix}",
+            "description": "Scorer referenced by eval job",
+            "scorer": {
+                "type": "llm_judge",
+                "template": "Judge {{input}}",
+                "params": {"provider_id": "block-provider", "model": "gpt-4o"},
+            },
+        }, label="block scorer: create scorer").json()
+        self.ids["scorers"].append(scorer["entityId"])
+
+        job = _api(s, base, org, "eval_jobs", method="POST", json_data={
+            "name": f"block-job-{suffix}",
+            "description": "Eval job referencing scorer",
+            "stream": "default",
+            "streamType": "logs",
+            "filterCondition": {"type": "condition", "field": "log",
+                                "operator": "exists"},
+            "scorers": [scorer["entityId"]],
+            "samplingMode": "all",
+            "samplingValue": None,
+        }, label="block scorer: create eval job").json()
+        self.ids["jobs"].append(job["id"])
+
+        resp = _api(
+            s, base, org, f"scorers/{scorer['entityId']}",
+            method="DELETE",
+            expected_status=409,
+            label="block scorer: delete scorer used by draft job",
+        )
+        assert "used by one or more eval jobs" in resp.text
+
+        _api(s, base, org, f"eval_jobs/{job['id']}/archive",
+             method="POST", label="block scorer: archive eval job")
+        _api(s, base, org, f"scorers/{scorer['entityId']}",
+             method="DELETE", label="block scorer: delete scorer after archive")

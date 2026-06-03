@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema, Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
+    Schema, Set,
 };
 use serde::{Deserialize, Serialize};
 
@@ -261,6 +262,22 @@ pub async fn get_by_type(
         .collect();
 
     Ok(records)
+}
+
+pub async fn has_active_by_score_config_id(
+    org_id: &str,
+    score_config_entity_id: &str,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let count = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::IsActive.eq(true))
+        .filter(Column::ProducesScoreConfigId.eq(score_config_entity_id))
+        .count(client)
+        .await?;
+
+    Ok(count > 0)
 }
 
 pub async fn delete(entity_id: &str, org_id: &str) -> Result<(), errors::Error> {

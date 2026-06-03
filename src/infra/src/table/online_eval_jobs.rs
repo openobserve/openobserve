@@ -288,6 +288,29 @@ pub async fn get_by_stream(
     Ok(records)
 }
 
+fn scorer_refs_contain(scorers: &[ScorerRef], scorer_entity_id: &str) -> bool {
+    scorers.iter().any(|scorer| scorer.id == scorer_entity_id)
+}
+
+pub async fn has_non_archived_by_scorer_ref(
+    org_id: &str,
+    scorer_entity_id: &str,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let jobs = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.ne("archived"))
+        .all(client)
+        .await?
+        .into_iter()
+        .map(OnlineEvalJob::from);
+
+    Ok(jobs
+        .into_iter()
+        .any(|job| scorer_refs_contain(&job.scorers, scorer_entity_id)))
+}
+
 pub async fn delete(id: &str) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 
@@ -417,6 +440,24 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn test_scorer_refs_contain_string_and_pinned_refs() {
+        let scorer_refs = vec![
+            ScorerRef {
+                id: "latest-scorer".to_string(),
+                version: None,
+            },
+            ScorerRef {
+                id: "pinned-scorer".to_string(),
+                version: Some(2),
+            },
+        ];
+
+        assert!(scorer_refs_contain(&scorer_refs, "latest-scorer"));
+        assert!(scorer_refs_contain(&scorer_refs, "pinned-scorer"));
+        assert!(!scorer_refs_contain(&scorer_refs, "missing-scorer"));
     }
 
     #[test]

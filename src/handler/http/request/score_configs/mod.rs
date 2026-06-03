@@ -35,6 +35,7 @@ impl From<ScoreConfigError> for Response {
             ScoreConfigError::DuplicateName => {
                 MetaHttpResponse::bad_request("Score config name already exists")
             }
+            ScoreConfigError::InUseByScorer => MetaHttpResponse::conflict(value),
         }
     }
 }
@@ -220,6 +221,7 @@ pub async fn update_score_config(
     responses(
         (status = 200, description = "Deactivated", body = String),
         (status = 404, description = "Not Found", body = ()),
+        (status = 409, description = "Conflict", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "delete"})),
@@ -242,6 +244,7 @@ mod tests {
             (ScoreConfigError::MissingName, 400),
             (ScoreConfigError::NotFound, 404),
             (ScoreConfigError::DuplicateName, 400),
+            (ScoreConfigError::InUseByScorer, 409),
         ];
         for (err, expected) in cases {
             let resp: Response = err.into();

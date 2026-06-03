@@ -46,6 +46,7 @@ impl From<ScorerError> for Response {
             | ScorerError::ScoreConfigVersionNotFound
             | ScorerError::InvalidOutputSchema(_)
             | ScorerError::DuplicateName => MetaHttpResponse::bad_request(value),
+            ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
         }
     }
 }
@@ -235,6 +236,7 @@ pub async fn update_scorer(
     responses(
         (status = 200, description = "Deactivated", body = String),
         (status = 404, description = "Not Found", body = ()),
+        (status = 409, description = "Conflict", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "delete"})),
@@ -509,6 +511,7 @@ mod tests {
             (ScorerError::ProducesScoreConfigIdImmutable, 400),
             (ScorerError::InvalidOutputSchema("bad".to_string()), 400),
             (ScorerError::DuplicateName, 400),
+            (ScorerError::InUseByEvalJob, 409),
         ];
         for (err, expected) in cases {
             let resp: Response = err.into();

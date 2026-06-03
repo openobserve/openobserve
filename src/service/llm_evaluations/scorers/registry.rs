@@ -51,6 +51,9 @@ pub enum ScorerError {
 
     #[error("Scorer name already exists")]
     DuplicateName,
+
+    #[error("Scorer cannot be deleted because it is used by one or more eval jobs")]
+    InUseByEvalJob,
 }
 
 #[tracing::instrument(skip(scorer))]
@@ -156,7 +159,10 @@ async fn resolve_score_config_version(
                     None => Err(ScorerError::ScoreConfigVersionNotFound),
                 };
             }
-            Ok(None)
+            table::score_configs::get_by_entity_id(org_id, entity_id)
+                .await?
+                .map(|score_config| Some(score_config.version))
+                .ok_or(ScorerError::ScoreConfigVersionNotFound)
         }
         _ => Ok(None),
     }
@@ -198,6 +204,9 @@ pub async fn delete_scorer(org_id: &str, entity_id: &str) -> Result<(), ScorerEr
     table::scorers::get_by_entity_id(org_id, entity_id)
         .await?
         .ok_or(ScorerError::NotFound)?;
+    if table::online_eval_jobs::has_non_archived_by_scorer_ref(org_id, entity_id).await? {
+        return Err(ScorerError::InUseByEvalJob);
+    }
     table::scorers::delete(entity_id, org_id).await?;
     remove_ownership(org_id, "scorers", Authz::new(entity_id)).await;
     publish_scorer_delete(org_id, entity_id).await;
@@ -266,6 +275,7 @@ mod tests {
             ScorerError::ProducesScoreConfigIdImmutable,
             ScorerError::InvalidOutputSchema("bad".to_string()),
             ScorerError::DuplicateName,
+            ScorerError::InUseByEvalJob,
         ];
         for c in cases {
             // each error should produce a non-empty display message

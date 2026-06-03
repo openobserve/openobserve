@@ -36,6 +36,9 @@ pub enum ScoreConfigError {
 
     #[error("Score config name already exists")]
     DuplicateName,
+
+    #[error("Score config cannot be deleted because it is used by one or more scorers")]
+    InUseByScorer,
 }
 
 #[tracing::instrument(skip(config))]
@@ -149,6 +152,9 @@ pub async fn delete_score_config(org_id: &str, entity_id: &str) -> Result<(), Sc
     table::score_configs::get_by_entity_id(org_id, entity_id)
         .await?
         .ok_or(ScoreConfigError::NotFound)?;
+    if table::scorers::has_active_by_score_config_id(org_id, entity_id).await? {
+        return Err(ScoreConfigError::InUseByScorer);
+    }
     table::score_configs::delete(entity_id, org_id).await?;
     remove_ownership(org_id, "score_configs", Authz::new(entity_id)).await;
     publish_score_config_delete(org_id, entity_id).await;
@@ -226,5 +232,8 @@ mod tests {
 
         let duplicate_name = ScoreConfigError::DuplicateName;
         assert!(matches!(duplicate_name, ScoreConfigError::DuplicateName));
+
+        let in_use_by_scorer = ScoreConfigError::InUseByScorer;
+        assert!(matches!(in_use_by_scorer, ScoreConfigError::InUseByScorer));
     }
 }
