@@ -889,6 +889,14 @@ export class AlertsPage {
     }
 
     async navigateToFolder(folderName) {
+        // Always navigate to the Alerts section first — createFolder (called by ensureFolderExists)
+        // may leave the browser on the Dashboards page since folders are shared across modules.
+        // Clicking a folder item without switching to Alerts first opens a Dashboard folder instead.
+        const isOnAlertsPage = await this.page.locator(this.locators.alertListTable).isVisible({ timeout: 3000 }).catch(() => false);
+        if (!isOnAlertsPage) {
+            await this.navigateToAlertsPage();
+        }
+
         // Use specific folder-item selector to avoid matching unrelated text
         const folderItem = this.page.locator(`div.folder-item:has-text("${folderName}")`).first();
         const folderVisible = await folderItem.isVisible({ timeout: 5000 }).catch(() => false);
@@ -900,7 +908,7 @@ export class AlertsPage {
         }
         try {
             await Promise.race([
-                this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.locator(this.locators.alertListTable).waitFor({ state: 'visible', timeout: 30000 }),
                 this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
             ]);
         } catch (error) {
