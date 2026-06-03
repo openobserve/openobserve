@@ -445,38 +445,50 @@ export const convertMultiQueryTableData = (
   const timezone = store.state.timezone;
 
   // Build ordered column list:
-  // For each query: selected fields first, then dynamic fields (if enabled)
+  // Columns are grouped by axis ACROSS queries (not per-query): all queries'
+  // X-axis fields first, then all queries' breakdown fields, then all queries'
+  // Y-axis fields. Dynamic (non-selected) response columns are appended last.
   const orderedColumnNames: string[] = [];
   const seenColumns = new Set<string>();
 
   // Collect field configs from all queries for known columns
   const knownAliases = new Map<string, any>();
 
-  panelSchema.queries.forEach((query: any, queryIdx: number) => {
-    const queryFields = [
-      ...(query.fields?.x || []),
-      ...(query.fields?.y || []),
-      ...(query.fields?.breakdown || []),
-    ];
+  // Helper: register a field's alias (deduped) and remember its config.
+  const addField = (f: any) => {
+    if (!f?.alias) return;
+    if (!seenColumns.has(f.alias)) {
+      orderedColumnNames.push(f.alias);
+      seenColumns.add(f.alias);
+    }
+    if (!knownAliases.has(f.alias)) {
+      knownAliases.set(f.alias, f);
+    }
+  };
 
-    // Add selected fields for this query first
-    queryFields.forEach((f: any) => {
-      if (f.alias && !seenColumns.has(f.alias)) {
-        orderedColumnNames.push(f.alias);
-        seenColumns.add(f.alias);
-      }
-      if (f.alias && !knownAliases.has(f.alias)) {
-        knownAliases.set(f.alias, f);
-      }
-    });
+  // 1) Q1..Qn X-axis fields, 2) Q1..Qn breakdown fields, 3) Q1..Qn Y-axis fields
+  panelSchema.queries.forEach((q: any) =>
+    (q.fields?.x || []).forEach(addField),
+  );
+  panelSchema.queries.forEach((q: any) =>
+    (q.fields?.breakdown || []).forEach(addField),
+  );
+  panelSchema.queries.forEach((q: any) =>
+    (q.fields?.y || []).forEach(addField),
+  );
 
-    // Then add dynamic fields from this query's response data
-    if (isDynamicColumns) {
+  // Then add dynamic (non-selected) response columns per query, if enabled.
+  if (isDynamicColumns) {
+    panelSchema.queries.forEach((query: any, queryIdx: number) => {
+      const selectedAliases = new Set(
+        [
+          ...(query.fields?.x || []),
+          ...(query.fields?.y || []),
+          ...(query.fields?.breakdown || []),
+        ].map((f: any) => f.alias),
+      );
       const queryData = searchQueryData[queryIdx];
       if (queryData && Array.isArray(queryData)) {
-        const selectedAliases = new Set(
-          queryFields.map((f: any) => f.alias),
-        );
         queryData.forEach((row: any) => {
           Object.keys(row).forEach((key) => {
             if (!seenColumns.has(key) && !selectedAliases.has(key)) {
@@ -486,8 +498,8 @@ export const convertMultiQueryTableData = (
           });
         });
       }
-    }
-  });
+    });
+  }
 
   // When dynamic columns is disabled, only show explicitly selected fields.
   // Extra response keys (e.g. VRL-computed fields) are not added.
