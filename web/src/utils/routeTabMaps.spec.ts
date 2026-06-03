@@ -325,6 +325,12 @@ describe("resolveTab", () => {
       );
     });
 
+    it("billings – billing_group", () => {
+      expect(resolveTab("billings", "billing_group", "usage")).toBe(
+        "billing_group"
+      );
+    });
+
     it("iam – users", () => {
       expect(resolveTab("iam", "users", "users")).toBe("users");
     });
@@ -518,8 +524,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(8);
     });
 
-    it("billings has 3 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.billings)).toHaveLength(3);
+    it("billings has 4 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.billings)).toHaveLength(4);
     });
 
     it("iam has 9 entries", () => {
