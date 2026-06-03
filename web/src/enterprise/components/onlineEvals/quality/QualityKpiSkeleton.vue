@@ -32,7 +32,7 @@
 import { useStore } from "vuex";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 
-withDefaults(defineProps<{ count?: number }>(), { count: 6 });
+withDefaults(defineProps<{ count?: number }>(), { count: 5 });
 
 const store = useStore();
 </script>
@@ -40,16 +40,8 @@ const store = useStore();
 <style lang="scss" scoped>
 .qkpi-skel {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
-}
-
-@media (max-width: 1280px) {
-  .qkpi-skel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-@media (max-width: 960px) {
-  .qkpi-skel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .dark-tile-content {

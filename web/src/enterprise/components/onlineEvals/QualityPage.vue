@@ -31,11 +31,11 @@
 
     <QualityKpiSkeleton
       v-if="!selectedConfig && showKpiSkeleton"
-      :count="6"
+      :count="visibleKpis.length"
     />
     <section v-else-if="!selectedConfig" class="quality-page__kpis" aria-label="Tier 1 KPIs">
       <QualityKpiCard
-        v-for="kpi in kpis"
+        v-for="kpi in visibleKpis"
         :key="kpi.id"
         :kpi="kpi"
         :delta="deltaByKpi[kpi.id] ?? null"
@@ -169,6 +169,11 @@ function syncDateWindow() {
 }
 
 const { sourceStream, isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindow);
+
+// Evaluation cost is intentionally hidden until the backend writes cost data.
+// To restore it, remove this filter and re-add `kpis` to the v-for.
+const HIDDEN_KPI_IDS = new Set(["evaluationCost"]);
+const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
 
 const scoreConfigsRef = toRef(props, "scoreConfigs");
 const {
@@ -398,7 +403,7 @@ const sourceStreamOptions = computed(() => [
 
 .quality-page__kpis {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
 }
 
@@ -415,20 +420,12 @@ const sourceStreamOptions = computed(() => [
 }
 
 @media (max-width: 1280px) {
-  .quality-page__kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .quality-page__tier2--split {
     grid-template-columns: 260px minmax(0, 1fr);
   }
 }
 
 @media (max-width: 960px) {
-  .quality-page__kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .quality-page__tier2--split {
     grid-template-columns: minmax(0, 1fr);
   }

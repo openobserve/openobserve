@@ -74,10 +74,6 @@
           <span class="sr-muted-cell">—</span>
         </template>
 
-        <template #cell-successRate>
-          <span class="sr-muted-cell">—</span>
-        </template>
-
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
@@ -198,13 +194,6 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.lastRun"),
     sortable: false,
     size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "successRate",
-    header: t("onlineEvals.scorer.columns.successRate"),
-    sortable: false,
-    size: "auto",
     meta: { align: "left" },
   },
   {

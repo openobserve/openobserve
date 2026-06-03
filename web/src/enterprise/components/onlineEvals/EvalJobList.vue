@@ -68,10 +68,6 @@
           <span class="ej-mono-cell">{{ scorerCountText(row) }}</span>
         </template>
 
-        <template #cell-successRate>
-          <span class="ej-muted-cell">—</span>
-        </template>
-
         <template #cell-lastRun>
           <span class="ej-muted-cell">—</span>
         </template>
@@ -220,13 +216,6 @@ const columns = computed(() => [
     accessorFn: (row: EvalJob) => (row.scorers || []).length,
     sortable: true,
     size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "successRate",
-    header: t("onlineEvals.job.columns.successRate"),
-    sortable: false,
-    size: 140,
     meta: { align: "left" },
   },
   {
