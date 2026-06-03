@@ -2351,10 +2351,7 @@
       "destinationRequired": "少なくとも 1 つの目的地が必要です!",
       "disabledNotificationsInfo": "異常検出は引き続き実行され、結果が _anomalies ストリームに書き込まれます。異常が検出されたときにアラートを受け取るように通知を有効にします。"
     },
-    "anomalyName": "アノマリー名",
-    "destinations": {
-      "saved": "目的地が保存されました"
-    }
+    "anomalyName": "アノマリー名"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2421,7 +2418,9 @@
     "filterAll": "[すべて]",
     "filterPrebuilt": "構築済み",
     "filterCustom": "カスタム",
-    "templateDefaultBadge": "デフォルト"
+    "templateDefaultBadge": "デフォルト",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

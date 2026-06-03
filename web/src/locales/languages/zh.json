@@ -2334,10 +2334,7 @@
       "destinationRequired": "至少需要一个目的地！",
       "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
     },
-    "anomalyName": "异常名称",
-    "destinations": {
-      "saved": "目的地已保存"
-    }
+    "anomalyName": "异常名称"
   },
   "alert_templates": {
     "header": "模板",
@@ -2404,7 +2401,9 @@
     "filterAll": "全部",
     "filterPrebuilt": "预建的",
     "filterCustom": "自定义",
-    "templateDefaultBadge": "默认"
+    "templateDefaultBadge": "默认",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "搜索指标",

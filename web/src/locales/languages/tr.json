@@ -2332,10 +2332,7 @@
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
     },
-    "anomalyName": "Anomali Adı",
-    "destinations": {
-      "saved": "Hedef kaydedildi"
-    }
+    "anomalyName": "Anomali Adı"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2402,7 +2399,9 @@
     "filterAll": "Hepsi",
     "filterPrebuilt": "Önceden oluşturulmuş",
     "filterCustom": "Özel",
-    "templateDefaultBadge": "Varsayılan"
+    "templateDefaultBadge": "Varsayılan",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",

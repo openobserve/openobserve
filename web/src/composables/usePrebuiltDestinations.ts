@@ -539,7 +539,7 @@ export function usePrebuiltDestinations() {
 
       toast({
         variant: "success",
-        message: t('alerts.destinations.saved'),
+        message: t('alert_destinations.saved'),
       });
 
     } catch (error: any) {
@@ -665,7 +665,7 @@ export function usePrebuiltDestinations() {
 
       toast({
         variant: "success",
-        message: t('alerts.destinations.saved'),
+        message: t('alert_destinations.saved'),
       });
 
     } catch (error: any) {

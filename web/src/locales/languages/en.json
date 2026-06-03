@@ -252,7 +252,6 @@
     "legendLabel": "Legend",
     "logs": "Logs",
     "traces": "Traces",
-    "metrics": "Metrics",
     "enrichmentTables": "Enrichment Tables",
     "switchToLogs": "click to switch back to Logs",
     "savedViewsLabel": "Saved View",
@@ -2214,9 +2213,6 @@
     "search": "Search Alert",
     "move": "Move alert",
     "name": "Name",
-    "destinations": {
-      "saved": "Destination saved"
-    },
     "addConditions": "Add Conditions",
     "sqlEditor": "SQL Editor",
     "promqlEditor": "PromQL Editor",
@@ -2718,7 +2714,7 @@
       "selectTemplate": "Select Template"
     },
     "editJson": "Edit Alert JSON",
-    "additional_settings":"Additional Settings",
+    "additional_settings": "Additional Settings",
     "alertNamePlaceholder": "Alert name",
     "nameRequired": "Alert name is required.",
     "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', quotes or space characters. Use underscores (_) instead.",
@@ -2836,7 +2832,9 @@
     "custom": "Custom",
     "separator": "Separator",
     "separator_placeholder": "Enter separator (e.g., |, \\n, \\t, space)",
-    "separator_hint": "Separator string to use between records (spaces allowed)"
+    "separator_hint": "Separator string to use between records (spaces allowed)",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
@@ -3348,7 +3346,7 @@
       "criteriaFromTemplate": "Evaluation Criteria (from template)",
       "criteriaDifferentTemplate": "Evaluation Criteria (different template — for reference only)",
       "criteriaTemplateMismatchNote": "These criteria belong to {template}, not the template that ran this evaluation ({evaluated}).",
-      "criteriaSyntaxNote": "Placeholders like \u007bquery\u007d, \u007bresponse\u007d, \u007bmodel\u007d are substituted at evaluation time and shown here in their raw template form.",
+      "criteriaSyntaxNote": "Placeholders like {query}, {response}, {model} are substituted at evaluation time and shown here in their raw template form.",
       "recommendedFixes": "Recommended Fixes",
       "fixSuggestion": "Suggestion:",
       "weakestDimension": "Weakest Dimension:",

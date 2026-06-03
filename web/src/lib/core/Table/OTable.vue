@@ -240,7 +240,7 @@ const selection = useTableSelection(table, {
   // marked selectable. Without this, parents that drop non-selectable rows
   // from `selectedIds` can never reach a fully-selected state and the header
   // checkbox stays stuck in "select" mode forever.
-  isRowSelectable: props.isRowSelectable,
+  get isRowSelectable() { return props.isRowSelectable; },
 }, emit);
 
 // ── Expansion ───────────────────────────────────────────────────

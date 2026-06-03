@@ -2334,10 +2334,7 @@
       "destinationRequired": "¡Se requiere al menos un destino!",
       "disabledNotificationsInfo": "La detección de anomalías seguirá ejecutándose y escribirá los resultados en la secuencia _anomalies. Habilite las notificaciones para recibir alertas cuando se detecten anomalías."
     },
-    "anomalyName": "Nombre de la anomalía",
-    "destinations": {
-      "saved": "Destino guardado"
-    }
+    "anomalyName": "Nombre de la anomalía"
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2404,7 +2401,9 @@
     "filterAll": "Todas",
     "filterPrebuilt": "Preconstruido",
     "filterCustom": "Personalizado",
-    "templateDefaultBadge": "Predeterminado"
+    "templateDefaultBadge": "Predeterminado",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",

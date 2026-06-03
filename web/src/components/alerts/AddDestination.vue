@@ -173,9 +173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tabindex="0"
               />
               <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
-                {{ defaultPrebuiltTemplateName
-                  ? `Leave as default to use the standard ${getDestinationTypeName(formData.destination_type)} template (${defaultPrebuiltTemplateName}), or pick a custom one.`
-                  : `Leave as default to use the standard ${getDestinationTypeName(formData.destination_type)} template, or pick a custom one.` }}
+                {{ t('alert_destinations.templateHelp', {
+                  type: getDestinationTypeName(formData.destination_type),
+                  name: defaultPrebuiltTemplateName,
+                }) }}
               </div>
             </div>
 
@@ -1030,14 +1031,19 @@ const DEFAULT_TEMPLATE_SENTINEL = "__default__";
 // kind (email vs http).
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = formData.value.destination_type === "email";
+  // Exclude all prebuilt templates: the DEFAULT sentinel already represents
+  // the canonical prebuilt_<type> for this destination, and showing other
+  // prebuilt templates (e.g. prebuilt_servicenow on a Slack destination)
+  // would allow cross-type mismatches.
   const matching = props.templates.filter((template: any) => {
+    if (template.isPrebuilt) return false;
     if (isEmailType) return template.type === "email";
     return template.type !== "email";
   });
 
-  const defaultLabel = defaultPrebuiltTemplateName.value
-    ? `Default (${defaultPrebuiltTemplateName.value})`
-    : "Default";
+  const defaultLabel = t('alert_destinations.templateDefaultOption', {
+    name: defaultPrebuiltTemplateName.value,
+  });
 
   const options: { label: string; value: string }[] = [
     { label: defaultLabel, value: DEFAULT_TEMPLATE_SENTINEL },
@@ -1276,7 +1282,7 @@ const saveDestination = async () => {
         emit("cancel:hideform");
         toast({
           variant: "success",
-          message: t('alerts.destinations.saved'),
+          message: t('alert_destinations.saved'),
         });
       })
       .catch((err: any) => {
@@ -1306,7 +1312,7 @@ const saveDestination = async () => {
         emit("cancel:hideform");
         toast({
           variant: "success",
-          message: t('alerts.destinations.saved'),
+          message: t('alert_destinations.saved'),
         });
       })
       .catch((err: any) => {

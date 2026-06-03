@@ -2332,10 +2332,7 @@
       "destinationRequired": "Er is minstens één bestemming vereist!",
       "disabledNotificationsInfo": "De detectie van afwijkingen wordt nog steeds uitgevoerd en de resultaten worden naar de _anomalieënstream geschreven. Schakel meldingen in om waarschuwingen te ontvangen wanneer er afwijkingen worden gedetecteerd."
     },
-    "anomalyName": "Naam van de anomalie",
-    "destinations": {
-      "saved": "Bestemming opgeslagen"
-    }
+    "anomalyName": "Naam van de anomalie"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2402,7 +2399,9 @@
     "filterAll": "Alles",
     "filterPrebuilt": "Voorgebouwd",
     "filterCustom": "Op maat",
-    "templateDefaultBadge": "Standaard"
+    "templateDefaultBadge": "Standaard",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
