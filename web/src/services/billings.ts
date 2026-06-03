@@ -58,16 +58,47 @@ const billings = {
   list_invoice_history: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billings/invoices`);
   },
-  get_data_usage: (org_identifier: string, usage_date: string, data_type: string) => {
-    return http().get(
-      `/api/${org_identifier}/billings/data_usage/${usage_date}?data_type=${data_type}`
-    );
+  get_data_usage: (
+    org_identifier: string,
+    usage_date: string,
+    data_type: string,
+    member?: string
+  ) => {
+    let url = `/api/${org_identifier}/billings/data_usage/${usage_date}?data_type=${data_type}`;
+    if (member) {
+      url += `&member=${member}`;
+    }
+    return http().get(url);
   },
   submit_new_user_info: async ( org_identifier: string, payload: any,) => {
     return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
   },
   get_ai_usage: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/ai/usage`);
+  },
+  list_billing_group_members: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/billing_group/members`);
+  },
+  get_billing_group_membership: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/billing_group/membership`);
+  },
+  list_billing_group_invites: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/billing_group/invites`);
+  },
+  send_billing_group_invite: (org_identifier: string, invitee_org_id: string) => {
+    return http().post(`/api/${org_identifier}/billing_group/invites`, {
+      org_id: invitee_org_id,
+    });
+  },
+  accept_billing_group_invite: (org_identifier: string, token: string) => {
+    return http().post(
+      `/api/${org_identifier}/billing_group/invites/${token}/accept`
+    );
+  },
+  reject_billing_group_invite: (org_identifier: string, token: string) => {
+    return http().delete(
+      `/api/${org_identifier}/billing_group/invites/${token}/reject`
+    );
   },
 };
 
