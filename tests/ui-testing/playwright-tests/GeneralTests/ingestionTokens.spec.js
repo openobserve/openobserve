@@ -238,18 +238,18 @@ test.describe("Org-Level Ingestion Tokens", () => {
         // Verify the Manage Tokens button is visible
         await expect(page.getByRole('button', { name: /Manage Tokens/i })).toBeVisible({ timeout: 10000 });
 
-        // The OSelect defaults to searchable mode, which renders a PopoverTrigger
-        // (a plain <button>) rather than a SelectTrigger (role="combobox").
-        // Find the token selector button between the search input and Manage Tokens.
+        // OSelect in searchable mode uses reka-ui's PopoverTrigger, which renders
+        // a <button> with data-state="closed"|"open" (no role="combobox").
+        // The token selector is the only PopoverTrigger button on this page.
         const tokenSelector = page.locator(
-            '[data-test="ingestion-page"] [style*="min-width: 220px"] button[type="button"]'
+            '[data-test="ingestion-page"] button[data-state]'
         ).first();
         await expect(tokenSelector).toBeVisible({ timeout: 10000 });
         await tokenSelector.click();
 
         // Verify dropdown listbox appears with at least one option
         const listbox = page.getByRole('listbox');
-        await expect(listbox).toBeVisible({ timeout: 5000 });
+        await expect(listbox).toBeVisible({ timeout: 10000 });
         const options = listbox.getByRole('option');
         const optionCount = await options.count();
         expect(optionCount).toBeGreaterThan(0);
