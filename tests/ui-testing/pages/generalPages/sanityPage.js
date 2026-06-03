@@ -89,7 +89,7 @@ export class SanityPage {
         this.folderAddNameField = page.locator('[data-test="dashboard-folder-add-name-field"]');
         // AddFolder.vue now uses ODrawer's primary footer button — there is
         // no standalone "dashboard-folder-add-save" element after migration.
-        this.folderAddSave = page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.folderAddSave = page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]');
         this.deleteFolderIcon = page.locator('[data-test="dashboard-delete-folder-icon"]');
 
         // ============================================================

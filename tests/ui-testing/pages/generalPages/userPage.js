@@ -63,7 +63,7 @@ export class UserPage {
         // so a blank org-name keeps Save in a disabled state instead of
         // surfacing an inline error from onSubmit.
         this.addOrgDrawerSaveButton = page.locator(
-            '[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]'
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-primary-btn"]'
         );
 
         // OTable rows — used by searchUser / verifyUserExists poll loops.
