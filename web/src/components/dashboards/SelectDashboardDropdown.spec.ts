@@ -57,6 +57,7 @@ const ODialogStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
@@ -282,18 +283,13 @@ describe("SelectDashboardDropdown", () => {
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
     });
 
-    it("should call addDashboardRef.submit() when ODrawer emits click:primary", async () => {
+    it("should pass form-id to ODialog for native form submission", async () => {
       const wrapper = mountComponent({}, store);
       wrapper.vm.showAddDashboardDialog = true;
       await wrapper.vm.$nextTick();
 
-      const submitSpy = vi.fn();
-      wrapper.vm.addDashboardRef = { submit: submitSpy };
-
       const drawer = wrapper.findComponent(ODialogStub);
-      await drawer.vm.$emit("click:primary");
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      expect(drawer.props("formId")).toBe("add-dashboard-form");
     });
 
     it("should not throw when click:primary is emitted with no addDashboardRef", async () => {

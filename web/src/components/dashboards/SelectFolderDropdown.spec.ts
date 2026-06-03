@@ -46,6 +46,7 @@ const ODialogStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
@@ -305,7 +306,7 @@ describe("SelectFolderDropdown", () => {
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
     });
 
-    it("should call AddFolder.submit() when ODrawer emits click:primary", async () => {
+    it("should pass form-id to ODialog for native form submission", async () => {
       const wrapper = createWrapper({}, store, router);
 
       // open the drawer so the AddFolder ref is mounted
@@ -314,9 +315,7 @@ describe("SelectFolderDropdown", () => {
         .trigger("click");
 
       const drawer = wrapper.findComponent(ODialogStub);
-      await drawer.vm.$emit("click:primary");
-
-      expect(addFolderSubmitSpy).toHaveBeenCalledTimes(1);
+      expect(drawer.props("formId")).toBe("add-folder-dashboards-form");
     });
 
     it("should safely handle click:primary when the AddFolder ref is null (optional chaining)", async () => {

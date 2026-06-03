@@ -131,6 +131,7 @@ const ODialogStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
@@ -800,7 +801,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     expect(drawer.props("primaryButtonLoading")).toBe(true);
   });
 
-  it("invokes onSubmit.execute when ODrawer emits click:primary", async () => {
+  it("invokes onSubmit.execute when OForm emits submit", async () => {
     const wrapper = createWrapper();
     await flushPromises();
 
@@ -808,8 +809,8 @@ describe("AddToDashboard — ODrawer surface", () => {
     wrapper.vm.activeTabId = "tab-1";
     wrapper.vm.panelTitle = "Panel";
 
-    const drawer = wrapper.findComponent(ODialogStub);
-    await drawer.vm.$emit("click:primary");
+    const form = wrapper.findComponent({ name: "OForm" });
+    await form.vm.$emit("submit", {});
     await flushPromises();
 
     expect(mockAddPanel).toHaveBeenCalled();

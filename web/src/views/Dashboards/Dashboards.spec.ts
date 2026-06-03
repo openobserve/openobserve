@@ -228,7 +228,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
     },
     ODialog: {
       name: "ODialog",
-      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel"],
+      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel", "formId"],
       emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
       template: '<div data-test-stub="o-dialog" :data-open="open" :data-title="title"><slot /></div>',
     },
@@ -582,7 +582,7 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
     });
 
-    it("should invoke addDashboardRef.submit when ODrawer emits click:primary", async () => {
+    it("should pass form-id to ODialog for native form submission (add dashboard)", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
       });
@@ -593,14 +593,8 @@ describe("Dashboards.vue", () => {
       wrapper.vm.showAddDashboardDialog = true;
       await nextTick();
 
-      const submitSpy = vi.fn();
-      wrapper.vm.addDashboardRef = { submit: submitSpy };
-
       const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      await drawer.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      expect(drawer.props("formId")).toBe("add-dashboard-form");
     });
 
     it("should not throw when click:primary fires with null addDashboardRef", async () => {
@@ -685,7 +679,7 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
     });
 
-    it("should invoke addFolderRef.submit on click:primary", async () => {
+    it("should pass form-id to ODialog for native form submission (add folder)", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
       });
@@ -696,14 +690,8 @@ describe("Dashboards.vue", () => {
       wrapper.vm.showAddFolderDialog = true;
       await nextTick();
 
-      const submitSpy = vi.fn();
-      wrapper.vm.addFolderRef = { submit: submitSpy };
-
       const drawer = findDrawerByTitle(wrapper, "New Folder");
-      await drawer.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      expect(drawer.props("formId")).toBe("add-folder-dashboards-form");
     });
 
     it("should not throw when click:primary fires with null addFolderRef", async () => {

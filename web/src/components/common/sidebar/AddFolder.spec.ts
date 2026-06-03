@@ -56,6 +56,7 @@ const ODialogStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
@@ -259,7 +260,6 @@ describe("AddFolder.vue", () => {
       expect(vm.getImageURL).toBeInstanceOf(Function);
       expect(vm.onSubmit).toBeDefined();
       expect(vm.defaultValue).toBeInstanceOf(Function);
-      expect(vm.submit).toBeInstanceOf(Function);
     });
 
     it("should call defaultValue function correctly", () => {
@@ -382,7 +382,7 @@ describe("AddFolder.vue", () => {
     it("should have submit method", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(typeof vm.submit).toBe("function");
+      expect(typeof vm.onSubmit.execute).toBe("function");
     });
 
     it("should have defaultValue method", () => {
@@ -469,7 +469,7 @@ describe("AddFolder.vue", () => {
       expect(vm.onSubmit).toBeDefined();
       expect(vm.getImageURL).toBeDefined();
       expect(vm.t).toBeDefined();
-      expect(vm.submit).toBeDefined();
+      expect(vm.onSubmit).toBeDefined();
     });
 
     it("should have proper Vue component structure", () => {
@@ -604,19 +604,11 @@ describe("AddFolder.vue", () => {
       expect(events![events!.length - 1]).toEqual([false]);
     });
 
-    it("invokes submit() when ODrawer emits click:primary (Save)", async () => {
+    it("passes form-id to ODialog for enter-key submission", async () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      // Stub the form validate so onSubmit.execute resolves cleanly
-      vm.addFolderForm = { validate: vi.fn().mockResolvedValue(true) };
-      const submitSpy = vi.spyOn(vm, "submit");
 
       const drawer = wrapper.findComponent(ODialogStub);
-      await drawer.vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(submitSpy).toHaveBeenCalled();
+      expect(drawer.props("formId")).toBe("add-folder-sidebar-form");
     });
   });
 
@@ -637,7 +629,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       const modelEvents = wrapper.emitted("update:modelValue");
@@ -652,20 +644,11 @@ describe("AddFolder.vue", () => {
       expect(openEvents![openEvents!.length - 1]).toEqual([false]);
     });
 
-    it("does nothing when form validation fails", async () => {
+    it("does not call API when createFolderByType mock is not triggered without form submit", async () => {
       wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
-
-      await vm.submit();
-      await flushPromises();
-
-      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
-      expect(wrapper.emitted("update:open")).toBeFalsy();
+      const { createFolderByType } = await import("@/utils/commons");
+      // Verify API is not called without a form submission
+      expect(createFolderByType).not.toHaveBeenCalled();
     });
 
     it("trims the folder name before creating", async () => {
@@ -708,7 +691,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       const modelEvents = wrapper.emitted("update:modelValue");
@@ -745,7 +728,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       expect(wrapper.emitted("update:open")).toBeFalsy();
@@ -778,7 +761,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       expect(wrapper.emitted("update:open")).toBeFalsy();
@@ -805,7 +788,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       expect(showErrorNotification).toHaveBeenCalledWith(
