@@ -310,7 +310,7 @@ export const convertStackedLogData = (
         },
       },
       legend: {
-        show: true,
+        show: breakdownSeries.size > 1,
         bottom: 0,
         type: "scroll",
         textStyle: { fontSize: 11 },

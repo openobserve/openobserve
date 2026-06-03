@@ -154,10 +154,10 @@ class="tw:mr-1" />
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
       <!-- Logs Table or Skeleton -->
       <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
-        <!-- Actual Table (when data is loaded) -->
+        <!-- Table (shows skeleton via :loading when no results yet, real data once loaded) -->
         <TenstackTable
-          v-if="hasResults"
-          :rows="searchResults"
+          v-if="hasResults || (isLoading && !hasError)"
+          :rows="hasResults ? searchResults : []"
           :columns="tableColumns"
           :wrap="wrapTableCells"
           :loading="isLoading"
@@ -185,23 +185,6 @@ class="tw:mr-1" />
           @show-correlation="handleNestedCorrelation"
           data-test="logs-tenstack-table"
         />
-
-        <!-- Table Skeleton (initial load) -->
-        <div
-          v-else-if="isLoading && !hasError"
-          class="tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center"
-          data-test="table-skeleton"
-        >
-          <!-- Loading indicator -->
-          <div
-            class="tw:flex tw:items-center tw:justify-center tw:gap-3"
-          >
-            <OSpinner size="sm" />
-            <span class="tw:text-sm tw:opacity-70">
-              {{ t("correlation.logs.loading") }}
-            </span>
-          </div>
-        </div>
 
         <!-- Error State -->
         <div
@@ -254,7 +237,6 @@ import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

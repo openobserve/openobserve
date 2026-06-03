@@ -260,32 +260,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Correlated Logs Tab Panel (Custom Component) -->
       <OTabPanel name="correlated-logs" stretch>
         <CorrelatedLogsTable
-          v-if="correlationProps"
-          :service-name="correlationProps.serviceName"
-          :matched-dimensions="correlationProps.matchedDimensions"
-          :additional-dimensions="correlationProps.additionalDimensions"
-          :log-streams="correlationProps.logStreams"
-          :source-stream="correlationProps.sourceStream"
-          :source-type="correlationProps.sourceType"
-          :available-dimensions="correlationProps.availableDimensions"
-          :fts-fields="correlationProps.ftsFields"
-          :time-range="correlationProps.timeRange"
+          v-if="correlationProps || correlationLoading"
+          :service-name="correlationProps?.serviceName ?? ''"
+          :matched-dimensions="correlationProps?.matchedDimensions ?? {}"
+          :additional-dimensions="correlationProps?.additionalDimensions"
+          :log-streams="correlationProps?.logStreams ?? []"
+          :source-stream="correlationProps?.sourceStream ?? ''"
+          :source-type="correlationProps?.sourceType ?? ''"
+          :available-dimensions="correlationProps?.availableDimensions"
+          :fts-fields="correlationProps?.ftsFields"
+          :time-range="correlationProps?.timeRange ?? { startTime: 0, endTime: 0 }"
           :hide-view-related-button="true"
           :hide-search-term-actions="false"
           :hide-dimension-filters="true"
           :hide-reset-filters-button="true"
+          :external-loading="correlationLoading"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />
-        <!-- Loading/Empty state when no data -->
+        <!-- Empty/error state — only shown when there is no correlation data and not loading -->
         <div
           v-else
           class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
             <div
-              v-else-if="correlationError"
+              v-if="correlationError"
               class="tw:text-base tw:text-red-500"
             >
               {{ correlationError }}
@@ -323,9 +323,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+            <div v-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+            <div v-else-if="!correlationLoading" class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
       </OTabPanel>
@@ -356,9 +355,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+            <div v-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+            <div v-else-if="!correlationLoading" class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
       </OTabPanel>
@@ -444,8 +442,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -460,7 +456,7 @@ export default defineComponent({
   name: "SearchDetail",
   components: {
     OSeparator, OCardSection,
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, OSelect, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, OSelect, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch,
     OIcon,
     OTable,
   },

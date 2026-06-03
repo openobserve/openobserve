@@ -39,6 +39,8 @@ export interface CorrelatedLogsProps {
   hideSearchTermActions?: boolean;
   hideDimensionFilters?: boolean;
   hideResetFiltersButton?: boolean;
+  /** True while the parent is still resolving correlation metadata — skips the internal fetch and keeps the table in loading state until real props arrive. */
+  externalLoading?: boolean;
 }
 
 export interface LogEntry {
@@ -68,8 +70,9 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const store = useStore();
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreamingSearch();
 
-  // State
-  const loading = ref(false);
+  // Start in loading state so TenstackTable shows its skeleton immediately on mount,
+  // even before the first fetch completes (or while externalLoading is still true).
+  const loading = ref(true);
   const error = ref<string | null>(null);
   const searchResults = ref<LogEntry[]>([]);
   const totalHits = ref(0);
@@ -183,10 +186,15 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       });
     }
 
+    // While the parent hasn't resolved correlation metadata yet, skip silently.
+    // Real props (logStreams, matchedDimensions, etc.) will arrive via watchers.
+    if (props.externalLoading) return;
+
     // Validate that we have log streams
     if (!props.logStreams || props.logStreams.length === 0) {
       console.error('[useCorrelatedLogs] No log streams available');
       error.value = 'No log stream available for correlation';
+      loading.value = false;
       return;
     }
 
