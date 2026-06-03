@@ -48,12 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator class="tw:mb-1 tw:mt-[3px]" />
 
         <div class="tw:flex tw:items-center tw:py-1 tw:w-full">
-          <OSearchInput
+          <OInput
             v-model="searchQuery"
             data-test="usage-member-search"
             :placeholder="t('billing.billingGroup.searchMemberOrg')"
             class="tw:mx-2 tw:w-full"
-          />
+          >
+            <template #icon-left>
+              <OIcon name="search" size="sm" />
+            </template>
+          </OInput>
         </div>
       </div>
 
@@ -99,7 +103,8 @@ import { useI18n } from "vue-i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface MemberOrg {
   id: string;
@@ -108,7 +113,7 @@ export interface MemberOrg {
 
 export default defineComponent({
   name: "UsageMemberList",
-  components: { OTabs, OTab, OSeparator, OSearchInput },
+  components: { OTabs, OTab, OSeparator, OInput, OIcon },
   props: {
     modelValue: {
       type: String,
