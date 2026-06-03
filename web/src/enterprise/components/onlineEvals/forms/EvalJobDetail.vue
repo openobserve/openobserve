@@ -4,13 +4,24 @@
       <!-- ── Header ── -->
       <header class="jd__header">
         <div class="jd__header-text">
-          <span class="jd__eyebrow">{{ t("onlineEvals.job.detail.eyebrow") }}</span>
-          <div class="jd__title-row">
-            <span class="jd__title">{{ row.name }}</span>
-            <span class="jd__status-pill" :class="`jd__status-pill--${row.status}`">
-              {{ statusLabel }}
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
+            <span class="jd__eyebrow">{{ t("onlineEvals.job.detail.eyebrow") }}</span>
+            <span
+              v-if="row.name"
+              :class="[
+                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                store.state.theme === 'dark'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50',
+              ]"
+            >
+              {{ row.name }}
+              <OTooltip
+                v-if="row.name && row.name.length > 35"
+                :content="row.name"
+                side="top"
+              />
             </span>
-            <span class="jd__title-version">v{{ row.version }}</span>
           </div>
           <div v-if="row.description" class="jd__sub-line">
             {{ row.description }}
@@ -414,9 +425,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type {
   EvalJob,
@@ -439,6 +452,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const store = useStore();
 
 type TabId = "configuration" | "runs" | "failures";
 const activeTab = ref<TabId>("configuration");
@@ -947,9 +961,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd__eyebrow {
-  font: 700 10px/1.4 var(--o2-font);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 11px/1.4 var(--o2-font);
+  letter-spacing: 0.02em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 

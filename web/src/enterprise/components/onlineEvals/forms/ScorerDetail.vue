@@ -4,13 +4,24 @@
       <!-- ── Header ── -->
       <header class="sd__header">
         <div class="sd__header-text">
-          <span class="sd__eyebrow">{{ t("onlineEvals.scorer.detail.eyebrow") }}</span>
-          <div class="sd__title-row">
-            <span class="sd__title">{{ row.name }}</span>
-            <span class="sd__type-pill" :class="`sd__type-pill--${scorerType}`">
-              {{ scorerTypeLabel }}
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
+            <span class="sd__eyebrow">{{ t("onlineEvals.scorer.detail.eyebrow") }}</span>
+            <span
+              v-if="row.name"
+              :class="[
+                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                store.state.theme === 'dark'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50',
+              ]"
+            >
+              {{ row.name }}
+              <OTooltip
+                v-if="row.name && row.name.length > 35"
+                :content="row.name"
+                side="top"
+              />
             </span>
-            <span class="sd__title-version">v{{ row.version }}</span>
           </div>
           <div v-if="row.description" class="sd__produces-line">
             <template v-if="producesConfig">
@@ -98,6 +109,7 @@
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd>
                 <span class="sd-type-chip" :class="`sd-type-chip--${scorerType}`">{{ scorerTypeLabel }}</span>
+                <span class="sd-version-chip">v{{ row.version }}</span>
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -287,9 +299,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type {
   EvalJob,
@@ -313,6 +327,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const store = useStore();
 
 type TabId = "configuration" | "versions" | "runs" | "usedBy";
 const activeTab = ref<TabId>("configuration");
@@ -620,9 +635,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd__eyebrow {
-  font: 700 10px/1.4 var(--o2-font);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 11px/1.4 var(--o2-font);
+  letter-spacing: 0.02em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
@@ -719,9 +733,8 @@ function relativeTime(timestampMs: number): string {
 .sd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
 
 .sd-kpi__title {
-  font: 700 10px/1.4 var(--o2-font);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 600 12px/1.4 var(--o2-font);
+  letter-spacing: 0.01em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
@@ -878,6 +891,18 @@ function relativeTime(timestampMs: number): string {
 .sd-type-chip--remote {
   background: color-mix(in srgb, #b25400 14%, transparent);
   color: #b25400;
+}
+
+.sd-version-chip {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .sd-produces {

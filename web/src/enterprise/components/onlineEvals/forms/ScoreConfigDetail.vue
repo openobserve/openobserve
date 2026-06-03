@@ -4,25 +4,23 @@
       <!-- Header: eyebrow + title + status meta + close -->
       <header class="scd__header">
         <div class="scd__header-text">
-          <span class="scd__eyebrow">{{ t("onlineEvals.scoreConfig.detail.eyebrow") }}</span>
-          <div class="scd__title-row">
-            <span class="scd__title">{{ row.name }}</span>
-            <span class="scd__type-pill" :class="`scd__type-pill--${dataType}`">
-              {{ dataType }}
-            </span>
-          </div>
-          <div class="scd__meta-row">
-            <span class="scd__status" :class="{ 'scd__status--inactive': !isActive }">
-              <span class="scd__status-dot" />
-              {{ isActive
-                ? t("onlineEvals.scoreConfig.detail.statusActive")
-                : t("onlineEvals.scoreConfig.detail.statusInactive") }}
-            </span>
-            <span class="scd-mono scd__meta-version">v{{ row.version }}</span>
-            <span v-if="createdAt" class="scd__meta-sep">·</span>
-            <span v-if="createdAt" class="scd__meta-created">
-              {{ t("onlineEvals.scoreConfig.detail.createdShort") }}
-              <span class="scd-mono">{{ formatDateShort(createdAt) }}</span>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
+            <span class="scd__eyebrow">{{ t("onlineEvals.scoreConfig.detail.eyebrow") }}</span>
+            <span
+              v-if="row.name"
+              :class="[
+                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                store.state.theme === 'dark'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50',
+              ]"
+            >
+              {{ row.name }}
+              <OTooltip
+                v-if="row.name && row.name.length > 35"
+                :content="row.name"
+                side="top"
+              />
             </span>
           </div>
         </div>
@@ -118,6 +116,17 @@
           <section class="scd-section">
             <h4 class="scd-section__title">{{ t("onlineEvals.scoreConfig.detail.metadataSection") }}</h4>
             <dl class="scd-kv">
+              <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
+              <dd>
+                <span class="scd__status" :class="{ 'scd__status--inactive': !isActive }">
+                  <span class="scd__status-dot" />
+                  {{ isActive
+                    ? t("onlineEvals.scoreConfig.detail.statusActive")
+                    : t("onlineEvals.scoreConfig.detail.statusInactive") }}
+                </span>
+              </dd>
+              <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
+              <dd class="scd-mono">v{{ row.version }}</dd>
               <dt v-if="createdAt">{{ t("onlineEvals.scoreConfig.detail.createdLabel") }}</dt>
               <dd v-if="createdAt" class="scd-mono">{{ formatTimestamp(createdAt) }}</dd>
               <dt v-if="updatedAt">{{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}</dt>
@@ -180,13 +189,17 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import {
   dataTypeOf,
   entityId,
 } from "../utils/evalEntity";
+
+const store = useStore();
 
 const props = defineProps<{
   row: ScoreConfig;
@@ -378,9 +391,8 @@ function formatDateShort(microsOrMs: number): string {
 }
 
 .scd__eyebrow {
-  font: 700 10px/1.4 var(--o2-font);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 11px/1.4 var(--o2-font);
+  letter-spacing: 0.02em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 

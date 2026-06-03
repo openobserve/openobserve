@@ -1,5 +1,5 @@
 <template>
-  <form class="job-form" @submit.prevent="save">
+  <form class="job-form" @submit.prevent="save(false)">
     <div class="job-form__top">
       <OButton
         variant="outline"
@@ -164,14 +164,19 @@
             <div class="job-field">
               <label class="job-field__label">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span class="job-field__req">*</span>
+                <span v-if="form.samplingMode !== 'all'" class="job-field__req">*</span>
               </label>
               <OInput
                 v-model="form.samplingValue"
                 size="sm"
+                :disabled="form.samplingMode === 'all'"
                 data-test="job-form-sampling-value-input"
               />
-              <div class="job-field__help">{{ t("onlineEvals.job.samplingValueHelp") }}</div>
+              <div class="job-field__help">
+                {{ form.samplingMode === 'all'
+                  ? t("onlineEvals.job.samplingValueAllHelp")
+                  : t("onlineEvals.job.samplingValueHelp") }}
+              </div>
             </div>
           </div>
         </section>
@@ -190,14 +195,39 @@
       >
         {{ t("onlineEvals.buttons.cancel") }}
       </OButton>
+      <template v-if="mode === 'create'">
+        <OButton
+          data-test="job-form-save-draft-btn"
+          type="button"
+          variant="outline"
+          size="sm-action"
+          :loading="isSaving && !pendingActivateOnSave"
+          :disabled="isSaving && pendingActivateOnSave"
+          @click="save(false)"
+        >
+          {{ t("onlineEvals.buttons.saveAsDraft") }}
+        </OButton>
+        <OButton
+          data-test="job-form-save-activate-btn"
+          type="button"
+          variant="primary"
+          size="sm-action"
+          :loading="isSaving && pendingActivateOnSave"
+          :disabled="isSaving && !pendingActivateOnSave"
+          @click="save(true)"
+        >
+          {{ t("onlineEvals.buttons.createAndActivate") }}
+        </OButton>
+      </template>
       <OButton
+        v-else
         data-test="job-form-save-btn"
         type="submit"
         variant="primary"
         size="sm-action"
         :loading="isSaving"
       >
-        {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+        {{ t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
   </form>
@@ -258,6 +288,7 @@ const filterGroup = ref(initFilterGroup(props.row));
 const inputMappings = ref(initInputMappings(props.row));
 const scorerVersions = ref(initScorerVersions(props.row));
 const isSaving = ref(false);
+const pendingActivateOnSave = ref(false);
 
 const selectedScorers = computed(() =>
   form.value.scorerIds
@@ -378,7 +409,7 @@ function syncMappings() {
   scorerVersions.value = nextVersions;
 }
 
-async function save() {
+async function save(activateAfter = false) {
   if (!props.orgId) return;
   if (!form.value.scorerIds.length) {
     showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
@@ -386,6 +417,7 @@ async function save() {
   }
 
   isSaving.value = true;
+  pendingActivateOnSave.value = activateAfter;
   try {
     const payload = {
       name: form.value.name,
@@ -396,23 +428,44 @@ async function save() {
       scorers: form.value.scorerIds.map((id) => ({ id, version: scorerVersions.value[id] ?? null })),
       inputMapping: buildJobInputMappingPayload(form.value.scorerIds, inputMappings.value),
       samplingMode: form.value.samplingMode as any,
-      samplingValue: parseJson(form.value.samplingValue, t("onlineEvals.job.samplingValueLabel")),
+      samplingValue: form.value.samplingMode === "all"
+        ? null
+        : parseJson(form.value.samplingValue, t("onlineEvals.job.samplingValueLabel")),
     };
 
     if (props.mode === "edit" && props.row) {
       await onlineEvalsService.jobs.update(props.orgId, props.row.id, payload);
+      toast({
+        variant: "success",
+        message: t("onlineEvals.saved", { label: t("onlineEvals.singular.jobs") }),
+      });
     } else {
-      await onlineEvalsService.jobs.create(props.orgId, payload);
+      const created = await onlineEvalsService.jobs.create(props.orgId, payload);
+      if (activateAfter && created?.id) {
+        try {
+          await onlineEvalsService.jobs.activate(props.orgId, created.id);
+          toast({
+            variant: "success",
+            message: t("onlineEvals.job.createdAndActivated"),
+          });
+        } catch (activateErr: any) {
+          // Job was created but activation failed — surface the activation
+          // error specifically so the user knows the job exists but is still a draft.
+          showError(activateErr, t("onlineEvals.job.createdButActivateFailed"));
+        }
+      } else {
+        toast({
+          variant: "success",
+          message: t("onlineEvals.saved", { label: t("onlineEvals.singular.jobs") }),
+        });
+      }
     }
-    toast({
-      variant: "success",
-      message: t("onlineEvals.saved", { label: t("onlineEvals.singular.jobs") }),
-    });
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.job.saveError"));
   } finally {
     isSaving.value = false;
+    pendingActivateOnSave.value = false;
   }
 }
 </script>

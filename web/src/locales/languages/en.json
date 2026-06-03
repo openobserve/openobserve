@@ -4231,7 +4231,9 @@
       "cancel": "Cancel",
       "close": "Close",
       "create": "Create",
-      "save": "Save"
+      "save": "Save",
+      "saveAsDraft": "Save as Draft",
+      "createAndActivate": "Create & Activate"
     },
     "scorerTypeDialog": {
       "title": "Create a New Scorer",
@@ -4303,6 +4305,7 @@
         "activeVersionChip": "Active",
         "lastUpdated": "Last updated",
         "metadataSection": "Metadata",
+        "statusLabel": "Status",
         "versionLabel": "Version",
         "createdLabel": "Created",
         "updatedLabel": "Updated"
@@ -4649,6 +4652,7 @@
       },
       "descriptionPlaceholder": "What does this job monitor?",
       "samplingValueHelp": "JSON: rate is a number 0-1, count is a positive integer.",
+      "samplingValueAllHelp": "Not applicable when mode is All — every matched event will be evaluated.",
       "samplingHelp": "Apply after Filter. Controls cost — only matched spans count toward the rate.",
       "presets": {
         "label": "Quick presets",
@@ -4712,7 +4716,9 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "Select at least one scorer",
-      "saveError": "Failed to save eval job"
+      "saveError": "Failed to save eval job",
+      "createdAndActivated": "Eval job created and activated",
+      "createdButActivateFailed": "Eval job created, but activation failed"
     }
   },
   "llmProviders": {
