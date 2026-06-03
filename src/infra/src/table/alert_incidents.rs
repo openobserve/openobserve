@@ -261,7 +261,7 @@ pub async fn list(
     }
 
     query
-        .paginate(client, limit)
+        .paginate(client, limit.max(1))
         .fetch_page(offset / limit)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
