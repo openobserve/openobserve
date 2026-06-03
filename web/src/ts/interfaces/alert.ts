@@ -80,6 +80,10 @@ export interface Template {
   name: string;
   body: any;
   isDefault?: boolean;
+  // True for system-managed prebuilt templates (name starts with
+  // "prebuilt_"). Such templates are read-only — the UI must hide edit /
+  // delete actions for them and the backend will refuse mutations.
+  isPrebuilt?: boolean;
   type: "http" | "email";
   title?: string;
 }

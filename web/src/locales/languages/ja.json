@@ -2368,7 +2368,16 @@
     "delete": "削除",
     "variable_guide_header": "テンプレート変数ガイド",
     "variable_usage_examples": "使用例",
-    "body": "ボディ"
+    "body": "ボディ",
+    "clone": "クローン",
+    "cloneTitle": "テンプレートを複製",
+    "systemReadOnly": "ビルド済みテンプレート — 削除は無効になっています。クローンを作成して、変更可能なコピーを作成します。",
+    "prebuiltBadge": "構築済み",
+    "prebuiltBadgeHint": "システムによって管理されます。編集はできますが、削除はできません。",
+    "customBadge": "カスタム",
+    "filterAll": "[すべて]",
+    "filterPrebuilt": "構築済み",
+    "filterCustom": "カスタム"
   },
   "alert_destinations": {
     "header": "アラート送信先",
@@ -2405,7 +2414,13 @@
     "custom": "カスタム",
     "separator": "セパレーター",
     "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
-    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
+    "filterAll": "[すべて]",
+    "filterPrebuilt": "構築済み",
+    "filterCustom": "カスタム",
+    "templateDefaultBadge": "デフォルト",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",
@@ -3890,19 +3905,23 @@
     "capabilities": {
       "query": {
         "title": "クエリーを書く",
-        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。"
+        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。",
+        "prompt": "クエリーの作成を手伝ってください"
       },
       "incident": {
         "title": "インシデントを調査",
-        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」"
+        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」",
+        "prompt": "インシデントの調査を手伝ってください"
       },
       "dashboard": {
         "title": "ダッシュボードの作成",
-        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。"
+        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。",
+        "prompt": "ダッシュボードまたはパネルの作成を手伝ってください"
       },
       "alert": {
         "title": "アラートを作成",
-        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。"
+        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。",
+        "prompt": "アラートまたはパイプラインの作成を手伝ってください"
       }
     },
     "suggestions": {

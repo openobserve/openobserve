@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:flex tw:items-center">
+  <div class="tw:flex tw:flex-wrap tw:items-center">
     <!-- <div class="tw:mb-2 title" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
       class="tw:flex tw:flex-nowrap tw:items-center tw:mb-1 tw:gap-x-1"

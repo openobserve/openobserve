@@ -236,6 +236,10 @@ const selection = useTableSelection(table, {
   selection: props.selection,
   get selectedIds() { return props.selectedIds; },
   rowKey: props.rowKey,
+  // Forward the per-row guard so "Select All" only toggles rows the caller
+  // marked selectable. Without this, parents that drop non-selectable rows
+  // from `selectedIds` can never reach a fully-selected state and the header
+  // checkbox stays stuck in "select" mode forever.
   get isRowSelectable() { return props.isRowSelectable; },
 }, emit);
 

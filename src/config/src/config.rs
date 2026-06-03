@@ -888,6 +888,12 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_ROUTE_MAX_RETRIES",
+        default = 2,
+        help = "Max number of other nodes the router will fail over to when a proxied request can't reach the selected node (e.g. during a restart/redeploy). 0 disables retry."
+    )]
+    pub max_retries: usize,
     #[env_config(name = "ZO_ROUTE_STRATEGY", parse, default = "workload")]
     pub dispatch_strategy: RouteDispatchStrategy,
 }

@@ -36,6 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="isUpdatingTemplate" class="tw:text-xl tw:font-semibold">
             {{ t("alert_templates.updateTitle") }}
           </div>
+          <div v-else-if="isClone" class="tw:text-xl tw:font-semibold">
+            {{ t("alert_templates.cloneTitle") }}
+          </div>
           <div v-else class="tw:text-xl tw:font-semibold">
             {{ t("alert_templates.addTitle") }}
           </div>
@@ -221,7 +224,18 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
-const props = defineProps<{ template: TemplateData | null }>();
+const props = withDefaults(
+  defineProps<{
+    template: TemplateData | null;
+    /**
+     * When true, the form is in "clone" mode: it pre-fills body/type/title
+     * from `template` but treats the save as a new template (so a renamed
+     * "Copy of X" is created instead of overwriting X).
+     */
+    isClone?: boolean;
+  }>(),
+  { isClone: false },
+);
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
 const QueryEditor = defineAsyncComponent(
@@ -291,7 +305,9 @@ const tabs = computed(() => [
 const setupTemplateData = () => {
   const params = router.currentRoute.value.query;
   if (props.template) {
-    isUpdatingTemplate.value = true;
+    // Clone mode pre-fills the form but stays in create mode so save
+    // produces a new template; edit mode would overwrite the original.
+    isUpdatingTemplate.value = !props.isClone;
     formData.value.name = props.template.name;
     formData.value.body = props.template.body;
     formData.value.type = props.template.type;

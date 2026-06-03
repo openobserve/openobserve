@@ -64,9 +64,10 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             "Function body cannot be empty",
         ));
     }
+    let func_trans_type = func.trans_type.unwrap_or(0);
 
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
+    if func_trans_type == 1 && org_id != "_meta" {
         return Ok(MetaHttpResponse::bad_request(
             "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
         ));
@@ -76,11 +77,11 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         Ok(MetaHttpResponse::bad_request(FN_ALREADY_EXIST))
     } else {
         // Only append "." for VRL functions, not JS
-        if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
+        if func_trans_type == 0 && !func.function.ends_with('.') {
             func.function = format!("{} \n .", func.function);
         }
         // Validate function based on type
-        match func.trans_type.unwrap() {
+        match func_trans_type {
             0 => {
                 // VRL function
                 if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
