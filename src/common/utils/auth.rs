@@ -404,7 +404,7 @@ where
         if resolved.bypass_check {
             return Ok(AuthExtractor {
                 auth: auth_str,
-                method: String::new(),
+                method: resolved.method,
                 o2_type: String::new(),
                 org_id: String::new(),
                 bypass_check: true,

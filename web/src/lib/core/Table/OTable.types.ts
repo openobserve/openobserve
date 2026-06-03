@@ -186,6 +186,10 @@ export interface OTableProps<TData = any> {
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
 
+  // ── Layout ──
+  /** When false, table shrinks to fit its content instead of filling the container height (default: true) */
+  fillHeight?: boolean;
+
   // ── Display ──
   loading?: boolean;
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
