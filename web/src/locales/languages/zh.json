@@ -3894,19 +3894,23 @@
     "capabilities": {
       "query": {
         "title": "写一个查询",
-        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。"
+        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。",
+        "prompt": "帮我写一个查询"
       },
       "incident": {
         "title": "调查事件",
-        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”"
+        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”",
+        "prompt": "帮我调查一个事件"
       },
       "dashboard": {
         "title": "构建仪表板",
-        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。"
+        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。",
+        "prompt": "帮我构建一个仪表板或面板"
       },
       "alert": {
         "title": "创建警报",
-        "description": "阈值或预设警报，以及采集时间 VRL 管道。"
+        "description": "阈值或预设警报，以及采集时间 VRL 管道。",
+        "prompt": "帮我创建一个警报或管道"
       }
     },
     "suggestions": {

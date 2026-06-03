@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <LLMInsightsDashboard
+              :key="'llm-' + store.state.selectedOrganization.identifier"
               ref="llmInsightsRef"
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"
@@ -115,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <SessionsList
+              :key="'sessions-' + store.state.selectedOrganization.identifier"
               ref="sessionsListRef"
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"
@@ -1605,14 +1607,6 @@ onBeforeMount(async () => {
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
-    // If the restored tab requires LLM streams but this org has none, fall back to traces.
-    if (
-      (searchObj.meta.searchMode === "llm-insights" ||
-        searchObj.meta.searchMode === "sessions") &&
-      !hasLLMStreams.value
-    ) {
-      searchObj.meta.searchMode = "traces";
-    }
   }
 });
 
@@ -1646,14 +1640,6 @@ onActivated(async () => {
     resetSearchObj();
     restoreUrlQueryParams();
     await loadPageData();
-    // If the restored tab requires LLM streams but this org has none, fall back to traces.
-    if (
-      (searchObj.meta.searchMode === "llm-insights" ||
-        searchObj.meta.searchMode === "sessions") &&
-      !hasLLMStreams.value
-    ) {
-      searchObj.meta.searchMode = "traces";
-    }
   }
 });
 

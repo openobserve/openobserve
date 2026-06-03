@@ -3901,19 +3901,23 @@
     "capabilities": {
       "query": {
         "title": "Een vraag schrijven",
-        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken."
+        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken.",
+        "prompt": "Help me een vraag te schrijven"
       },
       "incident": {
         "title": "Incidenten onderzoeken",
-        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”"
+        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”",
+        "prompt": "Help me incidenten te onderzoeken"
       },
       "dashboard": {
         "title": "Een dashboard bouwen",
-        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen."
+        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen.",
+        "prompt": "Help me een dashboard of paneel te bouwen"
       },
       "alert": {
         "title": "Een waarschuwing aanmaken",
-        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt."
+        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt.",
+        "prompt": "Help me een waarschuwing of pipeline aan te maken"
       }
     },
     "suggestions": {
