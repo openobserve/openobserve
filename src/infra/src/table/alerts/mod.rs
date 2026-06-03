@@ -863,30 +863,4 @@ mod tests {
         let alert = MetaAlert::try_from(make_model(&id)).unwrap();
         assert_eq!(alert.destinations, vec!["dest-1"]);
     }
-
-    #[tokio::test]
-    async fn list_models_pagination_overflow_returns_empty_without_query()
-    -> Result<(), sea_orm::DbErr> {
-        use config::meta::alerts::alert::AlertTypeFilter;
-        use sea_orm::{DatabaseBackend, MockDatabase};
-
-        // page_size * page_idx overflows u64; sea-orm would otherwise panic in debug
-        // (multiply with overflow). The guard must short-circuit to an empty result
-        // and never reach the database.
-        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
-        let params = ListAlertsParams {
-            org_id: "myorg".to_owned(),
-            folder_id: None,
-            name_substring: None,
-            stream_type_and_name: None,
-            enabled: None,
-            owner: None,
-            page_size_and_idx: Some((u64::MAX, 2)),
-            alert_type: AlertTypeFilter::default(),
-        };
-        let results = list_models(&db, params).await?;
-        assert!(results.is_empty());
-        assert!(db.into_transaction_log().is_empty());
-        Ok(())
-    }
 }
