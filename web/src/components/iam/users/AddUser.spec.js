@@ -132,50 +132,7 @@ const platform = {
 };
 
 
-// ODrawer stub: exposes the migrated props (open/size/title/...) and
-// the standard click:* emits. The default slot still hosts the original
-// q-form / inputs / OButtons so existing data-test selectors keep working.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: {
-    open: { type: Boolean, default: false },
-    persistent: { type: Boolean, default: false },
-    showClose: { type: Boolean, default: false },
-    primaryButtonDisabled: { type: Boolean, default: false },
-    secondaryButtonDisabled: { type: Boolean, default: false },
-    neutralButtonDisabled: { type: Boolean, default: false },
-    primaryButtonLoading: { type: Boolean, default: false },
-    secondaryButtonLoading: { type: Boolean, default: false },
-    neutralButtonLoading: { type: Boolean, default: false },
-    width: { type: [Number, String], default: undefined },
-    size: { type: String, default: undefined },
-    title: { type: String, default: undefined },
-    subTitle: { type: String, default: undefined },
-    primaryButtonLabel: { type: String, default: undefined },
-    secondaryButtonLabel: { type: String, default: undefined },
-    neutralButtonLabel: { type: String, default: undefined },
-    primaryButtonVariant: { type: String, default: undefined },
-    secondaryButtonVariant: { type: String, default: undefined },
-    neutralButtonVariant: { type: String, default: undefined },
-  },
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test-stub="o-drawer"
-      :data-open="String(open)"
-      :data-title="title"
-      :data-size="size"
-    >
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
-    </div>
-  `,
-  inheritAttrs: false,
-};
-
-// ODialog stub for the "Password Changed" confirmation. Buttons are driven
-// purely via the click:primary emit, matching the migrated v-model:open API.
+// ODialog stub: the main drawer has been migrated to ODialog.
 const ODialogStub = {
   name: "ODialog",
   props: {
@@ -206,11 +163,10 @@ const ODialogStub = {
       :data-open="String(open)"
       :data-title="title"
       :data-size="size"
-      :data-primary-label="primaryButtonLabel"
     >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
+      <div data-test-stub="o-dialog-header"><slot name="header" /></div>
+      <div data-test-stub="o-dialog-body"><slot /></div>
+      <div data-test-stub="o-dialog-footer"><slot name="footer" /></div>
       <button
         data-test-stub="o-dialog-primary"
         @click="$emit('click:primary')"
@@ -220,10 +176,13 @@ const ODialogStub = {
   inheritAttrs: false,
 };
 
+// Both the main form dialog and the logout confirmation dialog use ODialog.
+// findDrawer now finds ODialog (the main/first instance).
+// findDialog finds all ODialog instances — the logout confirm is the second one.
 const findDrawer = (w) =>
-  w.findComponent({ name: "ODrawer" });
-const findDialog = (w) =>
   w.findComponent({ name: "ODialog" });
+const findDialog = (w) =>
+  w.findAllComponents({ name: "ODialog" }).at(-1);
 
 describe("AddUser Component", () => {
   let wrapper;
@@ -260,7 +219,6 @@ describe("AddUser Component", () => {
         plugins: [[{ platform }], i18n, router],
         provide: { store, platform },
         stubs: {
-          ODrawer: ODrawerStub,
           ODialog: ODialogStub,
         },
         mocks: {
@@ -313,7 +271,7 @@ describe("AddUser Component", () => {
       const drawer = findDrawer(wrapper);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("size")).toBe("md");
       expect(drawer.props("title")).toBeTruthy();
     });
 

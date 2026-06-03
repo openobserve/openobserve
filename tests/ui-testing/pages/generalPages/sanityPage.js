@@ -102,7 +102,7 @@ export class SanityPage {
         this.streamTypeLogsOption = page.locator('[data-test="add-stream-type-input-option"][data-test-value="logs"]');
         // AddStream.vue uses ODrawer (isInPipeline=false on the Streams page).
         // The save action is the ODrawer built-in primary footer button.
-        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]');
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).

@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-user-dialog"
+  <ODialog data-test="add-user-dialog"
     :open="open"
-    :width="30"
+    size="md"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
     @update:open="$emit('update:open', $event)"
   >
-    <div class="tw:p-4 tw:w-full">
+    <div class="tw:w-full">
         <OForm ref="updateUserForm" @submit="onSubmit">
           <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
     </div>
-  </ODrawer>
+  </ODialog>
   <ODialog data-test="add-user-logout-confirm-dialog"
     v-model:open="logout_confirm"
     persistent
@@ -226,7 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -263,7 +262,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODialog, ODrawer,
+  components: { OButton, ODialog,
     OIcon,
     OSwitch,
     OInput,
