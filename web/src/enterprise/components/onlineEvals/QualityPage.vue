@@ -166,7 +166,10 @@ function syncDateWindow() {
   }
 }
 
-const { sourceStream, isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindow);
+// `sourceStream` is intentionally not destructured — the composable keeps its
+// internal default ("__all__"), which is correct now that the UI selector is
+// hidden and we only have one score sink (`_llm_scores`).
+const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindow);
 
 // Evaluation cost is intentionally hidden until the backend writes cost data.
 // To restore it, remove this filter and re-add `kpis` to the v-for.
@@ -388,11 +391,6 @@ function onDrill(kpiId: string) {
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
-}
-
-.quality-page__select {
-  width: 180px;
-  flex: 0 0 180px;
 }
 
 .quality-page__kpis {
