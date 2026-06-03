@@ -353,6 +353,13 @@ export const usePanelAggregation = ({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type = customChartCurrentStreamType;
 
+        // Custom charts always use a hand-written (custom) query — the default
+        // query from getDefaultQueries() is in builder mode, which would leave
+        // the query editor read-only. Switch it to custom mode.
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery = true;
+
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";

@@ -240,6 +240,21 @@ describe("useDashboardPanel", () => {
       expect(newQuery.vrlFunctionFieldList).toEqual([]);
     });
 
+    it("adds a custom-mode query (customQuery=true) for custom_chart panels", () => {
+      panel.dashboardPanelData.data.type = "custom_chart";
+      const idx = panel.dashboardPanelData.data.queries.length;
+      panel.addQuery();
+      // Custom charts use hand-written queries, so the editor must be editable.
+      expect(panel.dashboardPanelData.data.queries[idx].customQuery).toBe(true);
+    });
+
+    it("adds a builder-mode query (customQuery=false) for non-custom_chart panels", () => {
+      panel.dashboardPanelData.data.type = "bar";
+      const idx = panel.dashboardPanelData.data.queries.length;
+      panel.addQuery();
+      expect(panel.dashboardPanelData.data.queries[idx].customQuery).toBe(false);
+    });
+
     it("should remove queries when more than one exists", () => {
       panel.addQuery(); // Add a second query
       const initialLength = panel.dashboardPanelData.data.queries.length;

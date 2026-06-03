@@ -410,6 +410,18 @@ describe("usePanelAggregation", () => {
       },
     );
 
+    // custom_chart always uses a hand-written (custom) query, so resetting to it
+    // must put the query in custom mode (otherwise the query editor is read-only).
+    describe("custom_chart custom-query mode", () => {
+      it("sets the query to custom mode (customQuery=true)", () => {
+        const panelData = makePanelData("custom_chart");
+        panelData.data.queries[0].customQuery = false;
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        expect(panelData.data.queries[0].customQuery).toBe(true);
+      });
+    });
+
     // ── maps ───────────────────────────────────────────────────────────────
 
     describe("maps chart type", () => {

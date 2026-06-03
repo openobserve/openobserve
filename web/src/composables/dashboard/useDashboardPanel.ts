@@ -19,6 +19,7 @@ import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/panelValidation";
+import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
 import useValuesWebSocket from "./useValuesWebSocket";
 import queryService from "@/services/search";
@@ -118,7 +119,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       query: "",
       vrlFunctionQuery: "",
       vrlFunctionFieldList: [],
-      customQuery: false,
+      // Custom-query chart types always use a hand-written query, so a query
+      // added for such a panel starts in custom mode — otherwise its query
+      // editor would be read-only (read-only is bound to !customQuery).
+      customQuery: CUSTOM_QUERY_CHART_TYPES.includes(
+        dashboardPanelData.data.type,
+      ),
       fields: {
         stream:
           dashboardPanelData.data.queries[
