@@ -45,7 +45,7 @@
                 v-model="licenseKey"
                 :rows="8"
                 :placeholder="t('about.paste_license_placeholder')"
-                style="height: 200px"
+                style="min-height: 200px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
                 <div class="modern-info-banner">
@@ -63,6 +63,7 @@
                 data-test="no-license-update-btn"
                 variant="primary"
                 size="sm-action"
+                class="tw:mt-2"
                 :loading="updating"
                 :disabled="!licenseKey.trim()"
                 @click="updateLicense"
