@@ -252,27 +252,18 @@ async fn proxy_request(
 
     for (i, node) in nodes.iter().take(attempts).enumerate() {
         let target = ProxyTarget::new(&path, node);
-        // `body` is `Bytes`, so `clone()` is a cheap ref-count bump, not a copy.
-        let upstream_req = match method {
-            Method::GET => client.get(&target.full_url).headers(headers.clone()),
-            Method::POST => client
-                .post(&target.full_url)
-                .headers(headers.clone())
-                .body(body.clone()),
-            Method::PUT => client
-                .put(&target.full_url)
-                .headers(headers.clone())
-                .body(body.clone()),
-            Method::DELETE => client
-                .delete(&target.full_url)
-                .headers(headers.clone())
-                .body(body.clone()),
-            Method::PATCH => client
-                .patch(&target.full_url)
-                .headers(headers.clone())
-                .body(body.clone()),
+        let mut upstream_req = client
+            .request(method.clone(), &target.full_url)
+            .headers(headers.clone());
+        // Forward the buffered body for methods that carry one. `body` is
+        // `Bytes`, so `clone()` is a cheap ref-count bump, not a copy.
+        match method {
+            Method::HEAD | Method::GET | Method::OPTIONS => {}
+            Method::POST | Method::PUT | Method::DELETE | Method::PATCH => {
+                upstream_req = upstream_req.body(body.clone());
+            }
             _ => return (StatusCode::METHOD_NOT_ALLOWED).into_response(),
-        };
+        }
 
         match upstream_req.send().await {
             Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
