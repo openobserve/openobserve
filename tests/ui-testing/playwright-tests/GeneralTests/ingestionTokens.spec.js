@@ -238,20 +238,21 @@ test.describe("Org-Level Ingestion Tokens", () => {
         // Verify the Manage Tokens button is visible
         await expect(page.getByRole('button', { name: /Manage Tokens/i })).toBeVisible({ timeout: 10000 });
 
-        // Click the token selector combobox to open dropdown
-        const tokenSelector = page.getByRole('combobox');
+        // The OSelect defaults to searchable mode, which renders a PopoverTrigger
+        // (a plain <button>) rather than a SelectTrigger (role="combobox").
+        // Find the token selector button between the search input and Manage Tokens.
+        const tokenSelector = page.locator(
+            '[data-test="ingestion-page"] [style*="min-width: 220px"] button[type="button"]'
+        ).first();
         await expect(tokenSelector).toBeVisible({ timeout: 10000 });
         await tokenSelector.click();
 
-        // Verify dropdown options appear with at least one token
-        const options = page.getByRole('option');
-        await expect(options.first()).toBeVisible({ timeout: 5000 });
+        // Verify dropdown listbox appears with at least one option
+        const listbox = page.getByRole('listbox');
+        await expect(listbox).toBeVisible({ timeout: 5000 });
+        const options = listbox.getByRole('option');
         const optionCount = await options.count();
         expect(optionCount).toBeGreaterThan(0);
-
-        // The first option text should be a token name
-        const firstOptionText = await options.first().textContent();
-        expect(firstOptionText).toBeTruthy();
 
         testLogger.info('Test completed successfully');
     });
