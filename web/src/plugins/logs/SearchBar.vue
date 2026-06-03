@@ -5186,8 +5186,11 @@ html.dark .file-type label,
   font-size: var(--text-xs);
   font-weight: var(--font-medium) !important;
   line-height: 1rem !important;
-  padding: 0 !important;
+  padding: 0 0.25rem !important;
   width: 5.875rem !important;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
