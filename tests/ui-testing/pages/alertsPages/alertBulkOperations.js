@@ -176,8 +176,14 @@ export class AlertBulkOperations {
             await moveBtn.click({ force: true, timeout: 5000 });
         }
 
-        // Handle folder selection with scrolling
-        await this.page.locator(this.locators.folderDropdown).click();
+        // Wait for the move drawer to open before interacting with its contents
+        const moveDrawer = this.page.locator('[data-test="dashboard-move-to-another-folder-dialog"]');
+        await moveDrawer.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Handle folder selection — scope inside the drawer to avoid ambiguity
+        const folderDropdown = moveDrawer.locator(this.locators.folderDropdown);
+        await folderDropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await folderDropdown.click();
         await this.page.waitForTimeout(2000);
 
         await this.commonActions.scrollAndFindOption(targetFolderName, 'folder');
