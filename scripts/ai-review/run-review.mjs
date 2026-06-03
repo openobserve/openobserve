@@ -25,10 +25,8 @@ const AGENTS = {
   security: {
     name: "Security Reviewer",
     promptFile: "agents/security.md",
-    model: "claude-sonnet-4-20250514",
-    modelFamily: "anthropic",
-    failbackFamily: "deepseek",
-    failbackModel: "deepseek-chat",
+    model: "deepseek-chat",
+    modelFamily: "deepseek",
     fileFocus: f => /\.rs$|\.toml$|auth|authz|oauth|token|crypto|secret|password|unsafe/.test(f),
   },
   "code-quality": {
@@ -36,17 +34,13 @@ const AGENTS = {
     promptFile: "agents/code-quality.md",
     model: "deepseek-chat",
     modelFamily: "deepseek",
-    failbackFamily: "anthropic",
-    failbackModel: "claude-sonnet-4-20250514",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.js$/.test(f),
   },
   performance: {
     name: "Performance Reviewer",
     promptFile: "agents/performance.md",
-    model: "claude-sonnet-4-20250514",
-    modelFamily: "anthropic",
-    failbackFamily: "deepseek",
-    failbackModel: "deepseek-chat",
+    model: "deepseek-chat",
+    modelFamily: "deepseek",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.sql$/.test(f),
   },
   documentation: {
@@ -54,8 +48,6 @@ const AGENTS = {
     promptFile: "agents/documentation.md",
     model: "deepseek-chat",
     modelFamily: "deepseek",
-    failbackFamily: "anthropic",
-    failbackModel: "claude-sonnet-4-20250514",
     fileFocus: () => true,
   },
   release: {
@@ -63,8 +55,6 @@ const AGENTS = {
     promptFile: "agents/release.md",
     model: "deepseek-chat",
     modelFamily: "deepseek",
-    failbackFamily: "anthropic",
-    failbackModel: "claude-sonnet-4-20250514",
     fileFocus: f => /Cargo\.toml|package\.json|\.sql$|migration|Migration|\.yml$|Dockerfile|docker/.test(f),
   },
 };
@@ -81,11 +71,11 @@ const RISK_TIERS = {
     maxLines: 100,
     maxFiles: 20,
     agents: ["code-quality", "documentation"],
-    coordinatorModel: "claude-sonnet-4-20250514",
+    coordinatorModel: "deepseek-chat",
   },
   full: {
     agents: ["security", "code-quality", "performance", "documentation", "release"],
-    coordinatorModel: "claude-sonnet-4-20250514",
+    coordinatorModel: "deepseek-chat",
   },
 };
 
@@ -199,68 +189,7 @@ function assessRiskTier(filteredDiff) {
   return "full";
 }
 
-// ─── LLM calls ─────────────────────────────────────────────────────────────
-
-async function callAnthropic(systemPrompt, userPrompt, model, timeoutMs = AGENT_TIMEOUT_MS) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-
-  // Try primary model, fall back to claude-3-5-sonnet on 404/auth errors
-  const modelsToTry = [model];
-  if (model !== "claude-3-5-sonnet-20241022" && !model.startsWith("claude-3-5-sonnet")) {
-    modelsToTry.push("claude-3-5-sonnet-20241022");
-  }
-
-  let lastError = null;
-  for (const modelId of modelsToTry) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      if (modelId !== model) {
-        console.log(`[${isoNow()}] Anthropic failback: trying ${modelId} instead of ${model}`);
-      }
-
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: modelId,
-          max_tokens: 4096,
-          temperature: 0.0,
-          system: systemPrompt.slice(0, 100_000),
-          messages: [{ role: "user", content: userPrompt.slice(0, 150_000) }],
-        }),
-        signal: controller.signal,
-      });
-
-      if (resp.status === 404 || resp.status === 403 || resp.status === 401) {
-        const errText = await resp.text();
-        lastError = new Error(`Anthropic ${resp.status} for ${modelId}: ${errText.slice(0, 300)}`);
-        console.error(`[${isoNow()}] Anthropic ${resp.status} for ${modelId}, trying next...`);
-        continue;
-      }
-
-      if (!resp.ok) {
-        const errText = await resp.text();
-        const truncated = errText.slice(0, 500);
-        console.error(`[${isoNow()}] Anthropic HTTP ${resp.status}: ${truncated}`);
-        throw new Error(`Anthropic API error ${resp.status}: ${truncated}`);
-      }
-
-      const data = await resp.json();
-      return data.content?.[0]?.text || "";
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  throw lastError || new Error("All Anthropic models failed");
-}
+// ─── LLM calls (DeepSeek only) ─────────────────────────────────────────────
 
 async function callDeepSeek(systemPrompt, userPrompt, model, timeoutMs = AGENT_TIMEOUT_MS) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -300,16 +229,6 @@ async function callDeepSeek(systemPrompt, userPrompt, model, timeoutMs = AGENT_T
   }
 }
 
-async function callLLM(modelFamily, systemPrompt, userPrompt, model, timeoutMs) {
-  if (modelFamily === "anthropic") {
-    return callAnthropic(systemPrompt, userPrompt, model, timeoutMs);
-  }
-  if (modelFamily === "deepseek") {
-    return callDeepSeek(systemPrompt, userPrompt, model, timeoutMs);
-  }
-  throw new Error(`Unknown model family: ${modelFamily}`);
-}
-
 // ─── Finding parser ────────────────────────────────────────────────────────
 
 function parseFindings(xmlText) {
@@ -341,24 +260,10 @@ function parseFindings(xmlText) {
 // ─── Run single reviewer ──────────────────────────────────────────────────
 
 async function runReviewer(agentKey, agentDef, diff, prContext, existingReview) {
-  let modelFamily = agentDef.modelFamily;
-  let model = agentDef.model;
-
-  const hasKey = (family) => {
-    if (family === "anthropic") return Boolean(process.env.ANTHROPIC_API_KEY);
-    if (family === "deepseek") return Boolean(process.env.DEEPSEEK_API_KEY);
-    return false;
-  };
-
-  if (!hasKey(modelFamily) && agentDef.failbackFamily && hasKey(agentDef.failbackFamily)) {
-    console.log(`[${isoNow()}] ${agentDef.name}: ${modelFamily} not available, failing back to ${agentDef.failbackFamily}/${agentDef.failbackModel}`);
-    modelFamily = agentDef.failbackFamily;
-    model = agentDef.failbackModel;
-  }
-
-  if (!hasKey(modelFamily)) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — no API key for ${modelFamily}`);
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `No API key for ${modelFamily}` };
+  const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY);
+  if (!hasDeepSeek) {
+    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — DEEPSEEK_API_KEY not set`);
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "DEEPSEEK_API_KEY not set" };
   }
 
   const systemPrompt = readPrompt("shared-rules.md");
@@ -387,15 +292,14 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview) 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (${modelFamily}/${model})`);
+  console.log(`[${isoNow()}] Starting ${agentDef.name} (deepseek/${agentDef.model})`);
   const start = Date.now();
 
   try {
-    const text = await callLLM(
-      modelFamily,
+    const text = await callDeepSeek(
       fullSystem,
       userPrompt,
-      model,
+      agentDef.model,
       AGENT_TIMEOUT_MS,
     );
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
@@ -495,26 +399,12 @@ async function runCoordinator(agentResults, prContext, tier, existingReview) {
   ].join("\n");
 
   const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
-  let coordinatorModel = tierConfig.coordinatorModel || "claude-sonnet-4-20250514";
-  let modelFamily = coordinatorModel.startsWith("claude") ? "anthropic" : "deepseek";
-
-  // Coordinator failback
-  const hasKey = (family) => family === "anthropic" ? Boolean(process.env.ANTHROPIC_API_KEY) : Boolean(process.env.DEEPSEEK_API_KEY);
-  if (!hasKey(modelFamily)) {
-    const fallbackFamily = modelFamily === "anthropic" ? "deepseek" : "anthropic";
-    const fallbackModel = fallbackFamily === "deepseek" ? "deepseek-chat" : "claude-sonnet-4-20250514";
-    if (hasKey(fallbackFamily)) {
-      console.log(`[${isoNow()}] Coordinator: ${modelFamily}/${coordinatorModel} not available, failing back to ${fallbackFamily}/${fallbackModel}`);
-      modelFamily = fallbackFamily;
-      coordinatorModel = fallbackModel;
-    } else {
-      return buildFallbackReview(agentResults, tier, []);
-    }
-  }
+  const coordinatorModel = tierConfig.coordinatorModel || "deepseek-chat";
 
   console.log(`[${isoNow()}] Running coordinator (${coordinatorModel})`);
+
   try {
-    const text = await callLLM(modelFamily, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, coordinatorModel);
+    const text = await callDeepSeek(`${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, coordinatorModel);
     return text;
   } catch (err) {
     console.error(`[${isoNow()}] Coordinator failed: ${err.message}`);
@@ -654,13 +544,12 @@ async function main() {
   console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
   console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
 
-  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
   const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY);
-  if (!hasAnthropic && !hasDeepSeek) {
-    console.error("No API keys configured. Set ANTHROPIC_API_KEY and/or DEEPSEEK_API_KEY secrets.");
+  if (!hasDeepSeek) {
+    console.error("DEEPSEEK_API_KEY not set. Add it as a repository secret.");
     process.exit(1);
   }
-  console.log(`[${isoNow()}] Anthropic: ${hasAnthropic ? "configured" : "MISSING"}, DeepSeek: ${hasDeepSeek ? "configured" : "MISSING"}`);
+  console.log(`[${isoNow()}] DeepSeek: configured`);
 
   // 1. Get PR diff
   console.log(`[${isoNow()}] Fetching PR diff...`);
