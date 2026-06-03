@@ -56,6 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
           :default-columns="false"
           :show-global-filter="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="alerts-incident-list"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           data-test="incident-list-table"
           @row-click="viewIncident"
@@ -213,12 +216,16 @@ export default defineComponent({
         id: "title",
         header: t("alerts.incidents.title_field"),
         accessorKey: "title",
+        resizable: true,
+        hideable: true,
         meta: { align: "left" },
       },
       {
         id: "severity",
         header: t("alerts.incidents.severity"),
         accessorKey: "severity",
+        resizable: true,
+        hideable: true,
         size: 100,
         meta: { align: "left" },
       },
@@ -226,6 +233,8 @@ export default defineComponent({
         id: "status",
         header: t("alerts.incidents.status"),
         accessorKey: "status",
+        resizable: true,
+        hideable: true,
         size: 120,
         meta: { align: "left" },
       },
@@ -233,6 +242,8 @@ export default defineComponent({
         id: "dimensions",
         header: "Dimensions",
         accessorKey: "group_values",
+        resizable: true,
+        hideable: true,
         size: 400,
         meta: { align: "left" },
       },
@@ -240,6 +251,8 @@ export default defineComponent({
         id: "alert_count",
         header: t("alerts.incidents.alertCount"),
         accessorKey: "alert_count",
+        resizable: true,
+        hideable: true,
         size: 80,
         meta: { align: "center" },
       },
@@ -248,6 +261,8 @@ export default defineComponent({
         header: t("alerts.incidents.lastAlertAt"),
         accessorKey: "last_alert_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 180,
         meta: { align: "left" },
       },

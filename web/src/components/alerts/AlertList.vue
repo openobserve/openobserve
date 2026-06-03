@@ -169,6 +169,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 width="100%"
                 :show-global-filter="false"
                 :default-columns="false"
+                :enable-column-resize="true"
+                :persist-columns="true"
+                table-id="alerts-alert-list"
                 @row-click="triggerExpand"
               >
 
@@ -979,6 +982,8 @@ export default defineComponent({
           accessorKey: "name",
           header: t("alerts.name"),
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 250,
           minSize: 200,
           meta: { align: "left" },
@@ -989,6 +994,8 @@ export default defineComponent({
           header: t("alerts.owner"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1001,6 +1008,8 @@ export default defineComponent({
                 header: t("alerts.period"),
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "center" },
               } as OTableColumnDef,
@@ -1015,6 +1024,8 @@ export default defineComponent({
                 header: t("alerts.frequency"),
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1026,6 +1037,8 @@ export default defineComponent({
           header: t("alerts.lastTriggered"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1035,6 +1048,8 @@ export default defineComponent({
           header: t("alerts.lastSatisfied"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1047,6 +1062,8 @@ export default defineComponent({
                 header: "Last Trained At",
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1056,6 +1073,8 @@ export default defineComponent({
                 header: "Status",
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 120,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1079,6 +1098,8 @@ export default defineComponent({
           header: "Folder",
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "center" },
         } as OTableColumnDef);
