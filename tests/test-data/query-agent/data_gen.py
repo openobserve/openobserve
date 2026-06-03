@@ -1,6 +1,6 @@
 """Shared deterministic data generator for query agent tests.
 
-Used by both conftest.py (test fixture) and capture_row_counts.py (utility).
+Used by both conftest.py (test fixture) and compute_counts.py (DuckDB oracle).
 """
 
 import json

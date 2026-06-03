@@ -322,7 +322,8 @@ def main():
 
         if dirty:
             with open(fp, "w") as f:
-                json.dump(query_data, f, indent=2)
+                json.dump(query_data, f, separators=(",", ":"))
+                f.write("\n")
             updated += 1
 
     print(f"\nUpdated {updated} query files")
