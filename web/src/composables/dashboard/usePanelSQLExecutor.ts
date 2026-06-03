@@ -228,6 +228,11 @@ export const usePanelSQLExecutor = (ctx: {
 
       // Handle each query sequentially
       for (const [panelQueryIndex, it] of panelSchema.value.queries.entries()) {
+        // Skip empty queries (e.g. a query slot the user hasn't filled in)
+        if (!it.query?.trim()) {
+          continue;
+        }
+
         state.loading = true;
 
         if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
@@ -683,6 +688,13 @@ export const usePanelSQLExecutor = (ctx: {
         }
       }
 
+      // If every query was empty/skipped, no streaming request was fired, so
+      // the end/complete handlers won't run — clear loading here to avoid a
+      // perpetual loading state.
+      if (state.data.length === 0) {
+        state.loading = false;
+      }
+
       log("logaData: state.data", state.data);
       log("logaData: state.metadata", state.metadata);
     } finally {
@@ -755,6 +767,13 @@ export const usePanelSQLExecutor = (ctx: {
     const allMetadata: any[] = [];
 
     for (const [panelQueryIndex, it] of panelSchema.value.queries.entries()) {
+      // Skip empty queries (e.g. a query slot the user hasn't filled in).
+      // allSearchRequests/allMetadata are built sequentially, so skipping
+      // here keeps state array indices aligned with the backend query_index.
+      if (!it.query?.trim()) {
+        continue;
+      }
+
       if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
         // Expand time-shift query into N+1 entries (original + N shifts)
         const timeShiftInMilliSecondsArray = it.config.time_shift.map(
