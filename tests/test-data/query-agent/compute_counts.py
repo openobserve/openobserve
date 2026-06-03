@@ -172,6 +172,7 @@ _SKIP_SQLLOGICTEST = {
     "Q111",  # ROW_NUMBER ties in pagination
     "Q117",  # STRING_AGG ordering differs between engines
     "Q121",  # STRING_AGG concatenation order
+    "Q127",  # UNION across 5 groups: boundary records compete for top-10 spots
     "Q152",  # PERCENT_RANK tie-breaking differs
 }
 
