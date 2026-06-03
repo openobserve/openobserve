@@ -163,7 +163,7 @@ size="xs" class="warning" />{{
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
-    <div class="header-menu tw:flex tw:items-center tw:gap-1">
+    <div class="header-menu tw:flex tw:items-center tw:gap-x-2">
       <!-- EDITION BADGE / UPGRADE BUTTON -->
       <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
       <!-- Open Source: primary CTA to drive upgrades -->
@@ -222,7 +222,7 @@ size="xs" class="warning" />{{
         >
           <template #trigger>
             <OButton
-              variant="outline"
+              variant="outline-primary"
               size="sm-toolbar"
               data-test="navbar-organizations-select-trigger"
               class="tw:w-56"
@@ -321,16 +321,16 @@ size="xs" class="warning" />{{
       <!-- Visual separator between org context and utility icons. Parent's
            gap-1 (4px) provides equal spacing on both sides via flex gap, so
            no per-element margin needed here. -->
-      <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" />
+      <!-- <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" /> -->
 
-      <div class="header-utility-icons tw:flex tw:items-center tw:gap-1">
+      <div class="header-utility-icons tw:flex tw:items-center tw:gap-x-2">
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
       <!-- SLACK COMMUNITY LINK -->
       <OButton
         variant="ghost"
-        size="icon-toolbar"
+        size="icon-panel"
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
@@ -341,7 +341,7 @@ size="xs" class="warning" />{{
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
-          <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
+          <OButton variant="ghost" size="icon-panel" data-test="menu-link-help-item">
             <OIcon name="help-outline" size="md" class="tw:opacity-70" />
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
@@ -387,7 +387,7 @@ size="xs" class="warning" />{{
       <!-- SETTINGS BUTTON -->
       <OButton
         variant="ghost"
-        size="icon-toolbar"
+        size="icon-panel"
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
@@ -404,7 +404,7 @@ size="xs" class="warning" />{{
         <template #trigger>
           <OButton
             variant="ghost"
-            size="icon-toolbar"
+            size="icon-panel"
             data-test="header-my-account-profile-icon"
           >
             <OIcon
