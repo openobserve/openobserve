@@ -1,1 +1,1660 @@
-{"queries":[{"id":"Q021","sql":"SELECT _timestamp, pallet_id, sorter_model, facility_zone, throughput_rate FROM \"{stream}\" WHERE facility_zone IN ('ZONE-1', 'ZONE-2') AND throughput_rate > 300.0 ORDER BY throughput_rate DESC LIMIT 10","category":"basic_select","expected":{"columns":["pallet_id","sorter_model","facility_zone","throughput_rate"],"results":[["PL-002","SORT-A7","ZONE-2","900.0"],["PL-002","SORT-A7","ZONE-2","900.0"],["PL-002","SORT-A7","ZONE-2","900.0"],["PL-006","SORT-A7","ZONE-2","840.0"],["PL-006","SORT-A7","ZONE-2","840.0"],["PL-006","SORT-A7","ZONE-2","840.0"],["PL-005","SORT-X1","ZONE-1","725.0"],["PL-005","SORT-X1","ZONE-1","725.0"],["PL-005","SORT-X1","ZONE-1","725.0"],["PL-002","SORT-A7","ZONE-2","320.0"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1199000000,"end_offset":1363000000}},{"id":"Q022","sql":"SELECT * FROM \"{stream}\" WHERE operation_mode='auto' AND load_factor > 30.0 LIMIT 10","category":"basic_select","expected":{"columns":["log","stream","pallet_id","load_factor","charge_remaining","throughput_rate","sorter_model","conveyor_lane","facility_zone","control_center","item_count","defect_limit","runtime_hours","operation_mode","package_size","scan_attempts","conveyor_segment","cell_temp","build_signature"],"results":[["Q021 warehouse event record 6","stdout","PL-007","45.3","95.0","290.0","SORT-M3","LANE-C","ZONE-3","CC-GAMMA","410","0.8","120","auto","350","1","2","24.8","BS-2026-C3"],["Q022 warehouse event record 3","stderr","PL-004","72.8","58.0","610.0","SORT-Z9","LANE-D","ZONE-4","CC-DELTA","340","2.0","360","auto","750","1","4","30.1","BS-2025-D4"],["Q022 warehouse event record 6","stdout","PL-007","45.3","95.0","290.0","SORT-M3","LANE-C","ZONE-3","CC-GAMMA","410","0.8","120","auto","350","1","2","24.8","BS-2026-C3"],["Q023 warehouse event record 3","stderr","PL-004","72.8","58.0","610.0","SORT-Z9","LANE-D","ZONE-4","CC-DELTA","340","2.0","360","auto","750","1","4","30.1","BS-2025-D4"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1259000000,"end_offset":1423000000}},{"id":"Q023","sql":"SELECT _timestamp, pallet_id, sorter_model, facility_zone, throughput_rate, load_factor, CASE WHEN load_factor >= 80.0 THEN 'critical' WHEN load_factor >= 50.0 THEN 'elevated' WHEN load_factor >= 20.0 THEN 'normal' ELSE 'idle' END AS load_tier, CASE WHEN cell_temp >= 30.0 THEN 'hot' WHEN cell_temp >= 22.0 THEN 'warm' ELSE 'cool' END AS temp_category FROM \"{stream}\" WHERE (facility_zone IN ('ZONE-1', 'ZONE-2', 'ZONE-3') AND operation_mode != 'manual') OR (charge_remaining < 50.0 AND scan_attempts >= 2) ORDER BY _timestamp DESC, load_factor DESC LIMIT 15","category":"basic_select","expected":{"columns":["pallet_id","sorter_model","facility_zone","throughput_rate","load_factor","load_tier","temp_category"],"results":[["PL-003","SORT-M3","ZONE-3","480.0","55.2","elevated","warm"],["PL-006","SORT-A7","ZONE-2","840.0","94.6","critical","cool"],["PL-001","SORT-X1","ZONE-1","190.0","21.4","normal","hot"],["PL-002","SORT-A7","ZONE-2","320.0","33.0","normal","warm"],["PL-008","SORT-Q5","ZONE-4","555.0","67.9","elevated","warm"],["PL-001","SORT-X1","ZONE-1","150.0","12.5","idle","cool"],["PL-007","SORT-M3","ZONE-3","290.0","45.3","normal","warm"],["PL-003","SORT-M3","ZONE-3","480.0","55.2","elevated","warm"],["PL-006","SORT-A7","ZONE-2","840.0","94.6","critical","cool"],["PL-001","SORT-X1","ZONE-1","190.0","21.4","normal","hot"],["PL-002","SORT-A7","ZONE-2","320.0","33.0","normal","warm"],["PL-008","SORT-Q5","ZONE-4","555.0","67.9","elevated","warm"],["PL-001","SORT-X1","ZONE-1","150.0","12.5","idle","cool"],["PL-007","SORT-M3","ZONE-3","290.0","45.3","normal","warm"],["PL-003","SORT-M3","ZONE-3","480.0","55.2","elevated","warm"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1319000000,"end_offset":1483000000}},{"id":"Q024","sql":"SELECT DISTINCT sorter_model, operation_mode, facility_zone, build_signature FROM \"{stream}\" WHERE defect_limit BETWEEN 1.0 AND 3.0 AND runtime_hours NOT IN (24, 48, 72) AND package_size >= 300 ORDER BY sorter_model ASC, operation_mode ASC","category":"basic_select","expected":{"columns":["sorter_model","operation_mode","facility_zone","build_signature"],"results":[["SORT-M3","hybrid","ZONE-3","BS-2026-C3"],["SORT-Q5","manual","ZONE-4","BS-2025-D4"],["SORT-X1","auto","ZONE-1","BS-2026-A1"],["SORT-X1","manual","ZONE-1","BS-2026-A1"],["SORT-Z9","auto","ZONE-4","BS-2025-D4"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1379000000,"end_offset":1543000000}},{"id":"Q025","sql":"SELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / 100.0, 2) AS utilization_index, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(scan_attempts AS FLOAT), 0), 1) AS items_per_scan FROM \"{stream}\" WHERE load_factor IS NOT NULL AND charge_remaining IS NOT NULL AND item_count > 0 AND scan_attempts > 0 ORDER BY utilization_index DESC LIMIT 12","category":"basic_select","expected":{"columns":["pallet_id","conveyor_lane","load_factor","charge_remaining","utilization_index","items_per_scan"],"results":[["PL-006","LANE-B","94.6","88.7","83.91","38.79999923706055"],["PL-006","LANE-B","94.6","88.7","83.91","38.79999923706055"],["PL-006","LANE-B","94.6","88.7","83.91","38.79999923706055"],["PL-005","LANE-A","88.1","75.3","66.34","44.0"],["PL-005","LANE-A","88.1","75.3","66.34","44.0"],["PL-005","LANE-A","88.1","75.3","66.34","44.0"],["PL-002","LANE-B","99.0","66.6","65.93","100.0"],["PL-002","LANE-B","99.0","66.6","65.93","100.0"],["PL-002","LANE-B","99.0","66.6","65.93","100.0"],["PL-007","LANE-C","45.3","95.0","43.04","410.0"],["PL-007","LANE-C","45.3","95.0","43.04","410.0"],["PL-004","LANE-D","72.8","58.0","42.22","340.0"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1439000000,"end_offset":1603000000}},{"id":"Q026","sql":"SELECT _timestamp, log, control_center, operation_mode, cell_temp, CASE WHEN cell_temp >= 35.0 AND operation_mode = 'auto' THEN 'OVERTEMP-AUTO' WHEN cell_temp >= 35.0 THEN 'OVERTEMP' WHEN cell_temp >= 28.0 AND charge_remaining < 30.0 THEN 'WARNING-LOWCHARGE' WHEN cell_temp >= 28.0 THEN 'WARM' ELSE 'NORMAL' END AS alert_status FROM \"{stream}\" WHERE (cell_temp >= 28.0) OR (charge_remaining < 30.0 AND operation_mode != 'hybrid') ORDER BY cell_temp DESC, charge_remaining ASC LIMIT 20","category":"basic_select","expected":{"columns":["log","control_center","operation_mode","cell_temp","alert_status"],"results":[["Q024 warehouse event record 9","CC-BETA","manual","40.0","OVERTEMP"],["Q025 warehouse event record 9","CC-BETA","manual","40.0","OVERTEMP"],["Q026 warehouse event record 9","CC-BETA","manual","40.0","OVERTEMP"],["Q025 warehouse event record 4","CC-ALPHA","manual","35.7","OVERTEMP"],["Q026 warehouse event record 4","CC-ALPHA","manual","35.7","OVERTEMP"],["Q027 warehouse event record 4","CC-ALPHA","manual","35.7","OVERTEMP"],["Q024 warehouse event record 8","CC-ALPHA","auto","32.5","WARM"],["Q025 warehouse event record 8","CC-ALPHA","auto","32.5","WARM"],["Q026 warehouse event record 8","CC-ALPHA","auto","32.5","WARM"],["Q026 warehouse event record 3","CC-DELTA","auto","30.1","WARM"],["Q027 warehouse event record 3","CC-DELTA","auto","30.1","WARM"],["Q024 warehouse event record 7","CC-DELTA","manual","28.9","WARNING-LOWCHARGE"],["Q025 warehouse event record 7","CC-DELTA","manual","28.9","WARNING-LOWCHARGE"],["Q026 warehouse event record 7","CC-DELTA","manual","28.9","WARNING-LOWCHARGE"],["Q026 warehouse event record 1","CC-BETA","manual","22.0","NORMAL"],["Q027 warehouse event record 1","CC-BETA","manual","22.0","NORMAL"],["Q028 warehouse event record 1","CC-BETA","manual","22.0","NORMAL"],["Q026 warehouse event record 0","CC-ALPHA","auto","18.5","NORMAL"],["Q027 warehouse event record 0","CC-ALPHA","auto","18.5","NORMAL"],["Q028 warehouse event record 0","CC-ALPHA","auto","18.5","NORMAL"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1499000000,"end_offset":1663000000}},{"id":"Q027","sql":"SELECT _timestamp, sorter_model, facility_zone, throughput_rate, load_factor, charge_remaining, ROUND(CAST(throughput_rate AS FLOAT) * (CAST(load_factor AS FLOAT) / 100.0) * (CAST(charge_remaining AS FLOAT) / 100.0), 2) AS effective_capacity FROM \"{stream}\" WHERE throughput_rate > 300.0 AND load_factor >= 30.0 AND facility_zone != 'ZONE-4' ORDER BY effective_capacity DESC, _timestamp ASC LIMIT 10","category":"basic_select","expected":{"columns":["sorter_model","facility_zone","throughput_rate","load_factor","charge_remaining","effective_capacity"],"results":[["SORT-A7","ZONE-2","840.0","94.6","88.7","704.8499755859375"],["SORT-A7","ZONE-2","840.0","94.6","88.7","704.8499755859375"],["SORT-A7","ZONE-2","840.0","94.6","88.7","704.8499755859375"],["SORT-A7","ZONE-2","900.0","99.0","66.6","593.4099731445312"],["SORT-A7","ZONE-2","900.0","99.0","66.6","593.4099731445312"],["SORT-A7","ZONE-2","900.0","99.0","66.6","593.4099731445312"],["SORT-X1","ZONE-1","725.0","88.1","75.3","480.9599914550781"],["SORT-X1","ZONE-1","725.0","88.1","75.3","480.9599914550781"],["SORT-X1","ZONE-1","725.0","88.1","75.3","480.9599914550781"],["SORT-M3","ZONE-3","480.0","55.2","42.5","112.61000061035156"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1559000000,"end_offset":1723000000}},{"id":"Q028","sql":"SELECT pallet_id, sorter_model, conveyor_lane, operation_mode, runtime_hours, ROUND(runtime_hours / 24.0, 1) AS runtime_days, CASE WHEN runtime_hours >= 500 THEN 'heavy' WHEN runtime_hours >= 168 THEN 'moderate' ELSE 'light' END AS usage_class FROM \"{stream}\" WHERE runtime_hours IS NOT NULL AND (sorter_model LIKE 'SORT-X%' OR sorter_model LIKE 'SORT-Z%' OR (sorter_model = 'SORT-Q5' AND runtime_hours < 200)) ORDER BY runtime_days DESC","category":"basic_select","expected":{"columns":["pallet_id","sorter_model","conveyor_lane","operation_mode","runtime_hours","runtime_days","usage_class"],"results":[["PL-005","SORT-X1","LANE-A","manual","720","30.0","heavy"],["PL-005","SORT-X1","LANE-A","manual","720","30.0","heavy"],["PL-005","SORT-X1","LANE-A","manual","720","30.0","heavy"],["PL-004","SORT-Z9","LANE-D","auto","360","15.0","moderate"],["PL-004","SORT-Z9","LANE-D","auto","360","15.0","moderate"],["PL-001","SORT-X1","LANE-A","auto","90","3.8","light"],["PL-001","SORT-X1","LANE-A","auto","90","3.8","light"],["PL-001","SORT-X1","LANE-A","auto","90","3.8","light"],["PL-001","SORT-X1","LANE-A","auto","24","1.0","light"],["PL-001","SORT-X1","LANE-A","auto","24","1.0","light"],["PL-001","SORT-X1","LANE-A","auto","24","1.0","light"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1619000000,"end_offset":1783000000}},{"id":"Q029","sql":"SELECT _timestamp, control_center, facility_zone, cell_temp, COALESCE(CAST(conveyor_segment AS VARCHAR), 'N/A') AS segment_label, COALESCE(CAST(defect_limit AS VARCHAR), '0.0') AS defect_str FROM \"{stream}\" WHERE facility_zone IN (SELECT DISTINCT facility_zone FROM \"{stream}\" WHERE cell_temp > 25.0) ORDER BY cell_temp DESC LIMIT 15","category":"basic_select","expected":{"columns":["control_center","facility_zone","cell_temp","segment_label","defect_str"],"results":[["CC-BETA","ZONE-2","40.0","5","3.5"],["CC-BETA","ZONE-2","40.0","5","3.5"],["CC-BETA","ZONE-2","40.0","5","3.5"],["CC-ALPHA","ZONE-1","35.7","5","2.5"],["CC-ALPHA","ZONE-1","35.7","5","2.5"],["CC-ALPHA","ZONE-1","35.7","5","2.5"],["CC-ALPHA","ZONE-1","32.5","4","2.8"],["CC-ALPHA","ZONE-1","32.5","4","2.8"],["CC-ALPHA","ZONE-1","32.5","4","2.8"],["CC-DELTA","ZONE-4","30.1","4","2.0"],["CC-DELTA","ZONE-4","30.1","4","2.0"],["CC-DELTA","ZONE-4","28.9","3","1.2"],["CC-DELTA","ZONE-4","28.9","3","1.2"],["CC-DELTA","ZONE-4","28.9","3","1.2"],["CC-GAMMA","ZONE-3","26.3","3","1.5"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1679000000,"end_offset":1843000000}},{"id":"Q030","sql":"SELECT _timestamp, build_signature, operation_mode, item_count, package_size, ROUND(CAST(item_count AS FLOAT) * CAST(package_size AS FLOAT) / 1000.0, 2) AS total_weight_kg, CASE WHEN item_count * package_size >= 300000 THEN 'XL' WHEN item_count * package_size >= 100000 THEN 'LG' WHEN item_count * package_size >= 30000 THEN 'MD' ELSE 'SM' END AS shipment_tier FROM \"{stream}\" WHERE item_count > 0 AND package_size > 0 ORDER BY total_weight_kg DESC LIMIT 15","category":"basic_select","expected":{"columns":["build_signature","operation_mode","item_count","package_size","total_weight_kg","shipment_tier"],"results":[["BS-2026-B2","manual","500","1200","600.0","XL"],["BS-2026-B2","manual","500","1200","600.0","XL"],["BS-2026-B2","manual","500","1200","600.0","XL"],["BS-2025-D4","auto","340","750","255.0","LG"],["BS-2025-D4","auto","340","750","255.0","LG"],["BS-2025-D4","manual","275","600","165.0","LG"],["BS-2025-D4","manual","275","600","165.0","LG"],["BS-2025-D4","manual","275","600","165.0","LG"],["BS-2026-C3","auto","410","350","143.5","LG"],["BS-2026-C3","auto","410","350","143.5","LG"],["BS-2026-C3","hybrid","200","500","100.0","LG"],["BS-2026-C3","hybrid","200","500","100.0","LG"],["BS-2026-C3","hybrid","200","500","100.0","LG"],["BS-2026-A1","manual","88","1000","88.0","MD"],["BS-2026-A1","manual","88","1000","88.0","MD"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1739000000,"end_offset":1903000000}},{"id":"Q031","sql":"SELECT _timestamp, pallet_id, sorter_model, scan_attempts, retry_flag, CASE WHEN scan_attempts >= 3 THEN TRUE ELSE FALSE END AS retry_flag_derived FROM (SELECT _timestamp, pallet_id, sorter_model, scan_attempts, scan_attempts >= 3 AS retry_flag FROM \"{stream}\") sub WHERE retry_flag = TRUE ORDER BY scan_attempts DESC","category":"basic_select","expected":{"columns":["pallet_id","sorter_model","scan_attempts","retry_flag","retry_flag_derived"],"results":[["PL-002","SORT-A7","5","True","True"],["PL-002","SORT-A7","5","True","True"],["PL-002","SORT-A7","5","True","True"],["PL-006","SORT-A7","4","True","True"],["PL-006","SORT-A7","4","True","True"],["PL-006","SORT-A7","4","True","True"],["PL-008","SORT-Q5","3","True","True"],["PL-008","SORT-Q5","3","True","True"],["PL-003","SORT-M3","3","True","True"],["PL-008","SORT-Q5","3","True","True"],["PL-003","SORT-M3","3","True","True"],["PL-003","SORT-M3","3","True","True"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1799000000,"end_offset":1963000000}},{"id":"Q032","sql":"SELECT _timestamp, conveyor_lane, facility_zone, cell_temp, ambient_deviation FROM (SELECT _timestamp, conveyor_lane, facility_zone, cell_temp, ROUND(cell_temp - (SELECT AVG(cell_temp) FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone), 2) AS ambient_deviation FROM \"{stream}\" t1 WHERE cell_temp IS NOT NULL) derived WHERE ABS(ambient_deviation) > 3.0 ORDER BY ABS(ambient_deviation) DESC LIMIT 12","category":"basic_select","expected":{"columns":["conveyor_lane","facility_zone","cell_temp","ambient_deviation"],"results":[["LANE-B","ZONE-2","40.0","12.93"],["LANE-B","ZONE-2","40.0","12.93"],["LANE-B","ZONE-2","40.0","12.93"],["LANE-A","ZONE-1","18.5","-10.4"],["LANE-A","ZONE-1","18.5","-10.4"],["LANE-A","ZONE-1","18.5","-10.4"],["LANE-B","ZONE-2","19.2","-7.87"],["LANE-B","ZONE-2","19.2","-7.87"],["LANE-B","ZONE-2","19.2","-7.87"],["LANE-A","ZONE-1","35.7","6.8"],["LANE-A","ZONE-1","35.7","6.8"],["LANE-A","ZONE-1","35.7","6.8"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1859000000,"end_offset":2023000000}},{"id":"Q033","sql":"SELECT _timestamp, operation_mode, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor + (100.0 - charge_remaining)) / 2.0, 2) AS stress_index, CASE WHEN load_factor > 70.0 AND charge_remaining < 30.0 THEN 'OVERLOADED' WHEN load_factor > 70.0 THEN 'HIGH_LOAD' WHEN charge_remaining < 30.0 THEN 'LOW_CHARGE' ELSE 'STABLE' END AS health_status FROM \"{stream}\" ORDER BY stress_index DESC, _timestamp ASC LIMIT 15","category":"basic_select","expected":{"columns":["operation_mode","conveyor_lane","load_factor","charge_remaining","stress_index","health_status"],"results":[["manual","LANE-D","67.9","5.0","81.45","LOW_CHARGE"],["manual","LANE-D","67.9","5.0","81.45","LOW_CHARGE"],["manual","LANE-D","67.9","5.0","81.45","LOW_CHARGE"],["manual","LANE-B","99.0","66.6","66.2","HIGH_LOAD"],["manual","LANE-B","99.0","66.6","66.2","HIGH_LOAD"],["manual","LANE-B","99.0","66.6","66.2","HIGH_LOAD"],["auto","LANE-D","72.8","58.0","57.4","HIGH_LOAD"],["auto","LANE-D","72.8","58.0","57.4","HIGH_LOAD"],["manual","LANE-A","88.1","75.3","56.4","HIGH_LOAD"],["manual","LANE-A","88.1","75.3","56.4","HIGH_LOAD"],["manual","LANE-A","88.1","75.3","56.4","HIGH_LOAD"],["hybrid","LANE-C","55.2","42.5","56.35","STABLE"],["hybrid","LANE-C","55.2","42.5","56.35","STABLE"],["hybrid","LANE-C","55.2","42.5","56.35","STABLE"],["manual","LANE-B","33.0","25.0","54.0","LOW_CHARGE"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1919000000,"end_offset":2083000000}},{"id":"Q034","sql":"SELECT DISTINCT ON (facility_zone) facility_zone, _timestamp, sorter_model, throughput_rate, load_factor FROM \"{stream}\" WHERE throughput_rate IS NOT NULL ORDER BY facility_zone ASC, throughput_rate DESC","category":"basic_select","expected":{"columns":["facility_zone","sorter_model","throughput_rate","load_factor"],"results":[["ZONE-1","SORT-X1","725.0","88.1"],["ZONE-2","SORT-A7","900.0","99.0"],["ZONE-3","SORT-M3","480.0","55.2"],["ZONE-4","SORT-Z9","610.0","72.8"]],"results_mode":"rowsort"},"time_offset":{"start_offset":1979000000,"end_offset":2143000000}},{"id":"Q035","sql":"SELECT _timestamp, log, facility_zone, stream FROM \"{stream}\" WHERE stream = 'stdout' ORDER BY _timestamp DESC LIMIT 15","category":"basic_select","expected":{"columns":["log","facility_zone","stream"],"results":[["Q035 warehouse event record 9","ZONE-2","stdout"],["Q037 warehouse event record 2","ZONE-3","stdout"],["Q036 warehouse event record 5","ZONE-2","stdout"],["Q035 warehouse event record 8","ZONE-1","stdout"],["Q037 warehouse event record 1","ZONE-2","stdout"],["Q036 warehouse event record 4","ZONE-1","stdout"],["Q037 warehouse event record 0","ZONE-1","stdout"],["Q035 warehouse event record 6","ZONE-3","stdout"],["Q034 warehouse event record 9","ZONE-2","stdout"],["Q036 warehouse event record 2","ZONE-3","stdout"],["Q035 warehouse event record 5","ZONE-2","stdout"],["Q034 warehouse event record 8","ZONE-1","stdout"],["Q036 warehouse event record 1","ZONE-2","stdout"],["Q035 warehouse event record 4","ZONE-1","stdout"],["Q036 warehouse event record 0","ZONE-1","stdout"]],"results_mode":"rowsort"},"time_offset":{"start_offset":2039000000,"end_offset":2203000000}}],"last_query_id":35}
+{
+  "queries": [
+    {
+      "id": "Q021",
+      "sql": "SELECT _timestamp, pallet_id, sorter_model, facility_zone, throughput_rate FROM \"{stream}\" WHERE facility_zone IN ('ZONE-1', 'ZONE-2') AND throughput_rate > 300.0 ORDER BY throughput_rate DESC LIMIT 10",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-002",
+            "SORT-A7",
+            "ZONE-2",
+            "900.0"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "ZONE-2",
+            "900.0"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "ZONE-2",
+            "900.0"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "ZONE-2",
+            "840.0"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "ZONE-2",
+            "840.0"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "ZONE-2",
+            "840.0"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "ZONE-1",
+            "725.0"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "ZONE-1",
+            "725.0"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "ZONE-1",
+            "725.0"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "ZONE-2",
+            "320.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1199000000,
+        "end_offset": 1363000000
+      }
+    },
+    {
+      "id": "Q022",
+      "sql": "SELECT * FROM \"{stream}\" WHERE operation_mode='auto' AND load_factor > 30.0 LIMIT 10",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature"
+        ],
+        "results": [
+          [
+            "Q021 warehouse event record 6",
+            "stdout",
+            "PL-007",
+            "45.3",
+            "95.0",
+            "290.0",
+            "SORT-M3",
+            "LANE-C",
+            "ZONE-3",
+            "CC-GAMMA",
+            "410",
+            "0.8",
+            "120",
+            "auto",
+            "350",
+            "1",
+            "2",
+            "24.8",
+            "BS-2026-C3"
+          ],
+          [
+            "Q022 warehouse event record 3",
+            "stderr",
+            "PL-004",
+            "72.8",
+            "58.0",
+            "610.0",
+            "SORT-Z9",
+            "LANE-D",
+            "ZONE-4",
+            "CC-DELTA",
+            "340",
+            "2.0",
+            "360",
+            "auto",
+            "750",
+            "1",
+            "4",
+            "30.1",
+            "BS-2025-D4"
+          ],
+          [
+            "Q022 warehouse event record 6",
+            "stdout",
+            "PL-007",
+            "45.3",
+            "95.0",
+            "290.0",
+            "SORT-M3",
+            "LANE-C",
+            "ZONE-3",
+            "CC-GAMMA",
+            "410",
+            "0.8",
+            "120",
+            "auto",
+            "350",
+            "1",
+            "2",
+            "24.8",
+            "BS-2026-C3"
+          ],
+          [
+            "Q023 warehouse event record 3",
+            "stderr",
+            "PL-004",
+            "72.8",
+            "58.0",
+            "610.0",
+            "SORT-Z9",
+            "LANE-D",
+            "ZONE-4",
+            "CC-DELTA",
+            "340",
+            "2.0",
+            "360",
+            "auto",
+            "750",
+            "1",
+            "4",
+            "30.1",
+            "BS-2025-D4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1259000000,
+        "end_offset": 1423000000
+      }
+    },
+    {
+      "id": "Q023",
+      "sql": "SELECT _timestamp, pallet_id, sorter_model, facility_zone, throughput_rate, load_factor, CASE WHEN load_factor >= 80.0 THEN 'critical' WHEN load_factor >= 50.0 THEN 'elevated' WHEN load_factor >= 20.0 THEN 'normal' ELSE 'idle' END AS load_tier, CASE WHEN cell_temp >= 30.0 THEN 'hot' WHEN cell_temp >= 22.0 THEN 'warm' ELSE 'cool' END AS temp_category FROM \"{stream}\" WHERE (facility_zone IN ('ZONE-1', 'ZONE-2', 'ZONE-3') AND operation_mode != 'manual') OR (charge_remaining < 50.0 AND scan_attempts >= 2) ORDER BY _timestamp DESC, load_factor DESC LIMIT 15",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate",
+          "load_factor",
+          "load_tier",
+          "temp_category"
+        ],
+        "results": [
+          [
+            "PL-003",
+            "SORT-M3",
+            "ZONE-3",
+            "480.0",
+            "55.2",
+            "elevated",
+            "warm"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "ZONE-2",
+            "840.0",
+            "94.6",
+            "critical",
+            "cool"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "ZONE-1",
+            "190.0",
+            "21.4",
+            "normal",
+            "hot"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "ZONE-2",
+            "320.0",
+            "33.0",
+            "normal",
+            "warm"
+          ],
+          [
+            "PL-008",
+            "SORT-Q5",
+            "ZONE-4",
+            "555.0",
+            "67.9",
+            "elevated",
+            "warm"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "ZONE-1",
+            "150.0",
+            "12.5",
+            "idle",
+            "cool"
+          ],
+          [
+            "PL-007",
+            "SORT-M3",
+            "ZONE-3",
+            "290.0",
+            "45.3",
+            "normal",
+            "warm"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "ZONE-3",
+            "480.0",
+            "55.2",
+            "elevated",
+            "warm"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "ZONE-2",
+            "840.0",
+            "94.6",
+            "critical",
+            "cool"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "ZONE-1",
+            "190.0",
+            "21.4",
+            "normal",
+            "hot"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "ZONE-2",
+            "320.0",
+            "33.0",
+            "normal",
+            "warm"
+          ],
+          [
+            "PL-008",
+            "SORT-Q5",
+            "ZONE-4",
+            "555.0",
+            "67.9",
+            "elevated",
+            "warm"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "ZONE-1",
+            "150.0",
+            "12.5",
+            "idle",
+            "cool"
+          ],
+          [
+            "PL-007",
+            "SORT-M3",
+            "ZONE-3",
+            "290.0",
+            "45.3",
+            "normal",
+            "warm"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "ZONE-3",
+            "480.0",
+            "55.2",
+            "elevated",
+            "warm"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1319000000,
+        "end_offset": 1483000000
+      }
+    },
+    {
+      "id": "Q024",
+      "sql": "SELECT DISTINCT sorter_model, operation_mode, facility_zone, build_signature FROM \"{stream}\" WHERE defect_limit BETWEEN 1.0 AND 3.0 AND runtime_hours NOT IN (24, 48, 72) AND package_size >= 300 ORDER BY sorter_model ASC, operation_mode ASC",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "operation_mode",
+          "facility_zone",
+          "build_signature"
+        ],
+        "results": [
+          [
+            "SORT-M3",
+            "hybrid",
+            "ZONE-3",
+            "BS-2026-C3"
+          ],
+          [
+            "SORT-Q5",
+            "manual",
+            "ZONE-4",
+            "BS-2025-D4"
+          ],
+          [
+            "SORT-X1",
+            "auto",
+            "ZONE-1",
+            "BS-2026-A1"
+          ],
+          [
+            "SORT-X1",
+            "manual",
+            "ZONE-1",
+            "BS-2026-A1"
+          ],
+          [
+            "SORT-Z9",
+            "auto",
+            "ZONE-4",
+            "BS-2025-D4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1379000000,
+        "end_offset": 1543000000
+      }
+    },
+    {
+      "id": "Q025",
+      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / 100.0, 2) AS utilization_index, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(scan_attempts AS FLOAT), 0), 1) AS items_per_scan FROM \"{stream}\" WHERE load_factor IS NOT NULL AND charge_remaining IS NOT NULL AND item_count > 0 AND scan_attempts > 0 ORDER BY utilization_index DESC LIMIT 12",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "conveyor_lane",
+          "load_factor",
+          "charge_remaining",
+          "utilization_index",
+          "items_per_scan"
+        ],
+        "results": [
+          [
+            "PL-006",
+            "LANE-B",
+            "94.6",
+            "88.7",
+            "83.91",
+            "38.79999923706055"
+          ],
+          [
+            "PL-006",
+            "LANE-B",
+            "94.6",
+            "88.7",
+            "83.91",
+            "38.79999923706055"
+          ],
+          [
+            "PL-006",
+            "LANE-B",
+            "94.6",
+            "88.7",
+            "83.91",
+            "38.79999923706055"
+          ],
+          [
+            "PL-005",
+            "LANE-A",
+            "88.1",
+            "75.3",
+            "66.34",
+            "44.0"
+          ],
+          [
+            "PL-005",
+            "LANE-A",
+            "88.1",
+            "75.3",
+            "66.34",
+            "44.0"
+          ],
+          [
+            "PL-005",
+            "LANE-A",
+            "88.1",
+            "75.3",
+            "66.34",
+            "44.0"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "99.0",
+            "66.6",
+            "65.93",
+            "100.0"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "99.0",
+            "66.6",
+            "65.93",
+            "100.0"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "99.0",
+            "66.6",
+            "65.93",
+            "100.0"
+          ],
+          [
+            "PL-007",
+            "LANE-C",
+            "45.3",
+            "95.0",
+            "43.04",
+            "410.0"
+          ],
+          [
+            "PL-007",
+            "LANE-C",
+            "45.3",
+            "95.0",
+            "43.04",
+            "410.0"
+          ],
+          [
+            "PL-004",
+            "LANE-D",
+            "72.8",
+            "58.0",
+            "42.22",
+            "340.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1439000000,
+        "end_offset": 1603000000
+      }
+    },
+    {
+      "id": "Q026",
+      "sql": "SELECT _timestamp, log, control_center, operation_mode, cell_temp, CASE WHEN cell_temp >= 35.0 AND operation_mode = 'auto' THEN 'OVERTEMP-AUTO' WHEN cell_temp >= 35.0 THEN 'OVERTEMP' WHEN cell_temp >= 28.0 AND charge_remaining < 30.0 THEN 'WARNING-LOWCHARGE' WHEN cell_temp >= 28.0 THEN 'WARM' ELSE 'NORMAL' END AS alert_status FROM \"{stream}\" WHERE (cell_temp >= 28.0) OR (charge_remaining < 30.0 AND operation_mode != 'hybrid') ORDER BY cell_temp DESC, charge_remaining ASC LIMIT 20",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "log",
+          "control_center",
+          "operation_mode",
+          "cell_temp",
+          "alert_status"
+        ],
+        "results": [
+          [
+            "Q024 warehouse event record 9",
+            "CC-BETA",
+            "manual",
+            "40.0",
+            "OVERTEMP"
+          ],
+          [
+            "Q025 warehouse event record 9",
+            "CC-BETA",
+            "manual",
+            "40.0",
+            "OVERTEMP"
+          ],
+          [
+            "Q026 warehouse event record 9",
+            "CC-BETA",
+            "manual",
+            "40.0",
+            "OVERTEMP"
+          ],
+          [
+            "Q025 warehouse event record 4",
+            "CC-ALPHA",
+            "manual",
+            "35.7",
+            "OVERTEMP"
+          ],
+          [
+            "Q026 warehouse event record 4",
+            "CC-ALPHA",
+            "manual",
+            "35.7",
+            "OVERTEMP"
+          ],
+          [
+            "Q027 warehouse event record 4",
+            "CC-ALPHA",
+            "manual",
+            "35.7",
+            "OVERTEMP"
+          ],
+          [
+            "Q024 warehouse event record 8",
+            "CC-ALPHA",
+            "auto",
+            "32.5",
+            "WARM"
+          ],
+          [
+            "Q025 warehouse event record 8",
+            "CC-ALPHA",
+            "auto",
+            "32.5",
+            "WARM"
+          ],
+          [
+            "Q026 warehouse event record 8",
+            "CC-ALPHA",
+            "auto",
+            "32.5",
+            "WARM"
+          ],
+          [
+            "Q026 warehouse event record 3",
+            "CC-DELTA",
+            "auto",
+            "30.1",
+            "WARM"
+          ],
+          [
+            "Q027 warehouse event record 3",
+            "CC-DELTA",
+            "auto",
+            "30.1",
+            "WARM"
+          ],
+          [
+            "Q024 warehouse event record 7",
+            "CC-DELTA",
+            "manual",
+            "28.9",
+            "WARNING-LOWCHARGE"
+          ],
+          [
+            "Q025 warehouse event record 7",
+            "CC-DELTA",
+            "manual",
+            "28.9",
+            "WARNING-LOWCHARGE"
+          ],
+          [
+            "Q026 warehouse event record 7",
+            "CC-DELTA",
+            "manual",
+            "28.9",
+            "WARNING-LOWCHARGE"
+          ],
+          [
+            "Q026 warehouse event record 1",
+            "CC-BETA",
+            "manual",
+            "22.0",
+            "NORMAL"
+          ],
+          [
+            "Q027 warehouse event record 1",
+            "CC-BETA",
+            "manual",
+            "22.0",
+            "NORMAL"
+          ],
+          [
+            "Q028 warehouse event record 1",
+            "CC-BETA",
+            "manual",
+            "22.0",
+            "NORMAL"
+          ],
+          [
+            "Q026 warehouse event record 0",
+            "CC-ALPHA",
+            "auto",
+            "18.5",
+            "NORMAL"
+          ],
+          [
+            "Q027 warehouse event record 0",
+            "CC-ALPHA",
+            "auto",
+            "18.5",
+            "NORMAL"
+          ],
+          [
+            "Q028 warehouse event record 0",
+            "CC-ALPHA",
+            "auto",
+            "18.5",
+            "NORMAL"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1499000000,
+        "end_offset": 1663000000
+      }
+    },
+    {
+      "id": "Q027",
+      "sql": "SELECT _timestamp, sorter_model, facility_zone, throughput_rate, load_factor, charge_remaining, ROUND(CAST(throughput_rate AS FLOAT) * (CAST(load_factor AS FLOAT) / 100.0) * (CAST(charge_remaining AS FLOAT) / 100.0), 2) AS effective_capacity FROM \"{stream}\" WHERE throughput_rate > 300.0 AND load_factor >= 30.0 AND facility_zone != 'ZONE-4' ORDER BY effective_capacity DESC, _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate",
+          "load_factor",
+          "charge_remaining",
+          "effective_capacity"
+        ],
+        "results": [
+          [
+            "SORT-A7",
+            "ZONE-2",
+            "840.0",
+            "94.6",
+            "88.7",
+            "704.8499755859375"
+          ],
+          [
+            "SORT-A7",
+            "ZONE-2",
+            "840.0",
+            "94.6",
+            "88.7",
+            "704.8499755859375"
+          ],
+          [
+            "SORT-A7",
+            "ZONE-2",
+            "840.0",
+            "94.6",
+            "88.7",
+            "704.8499755859375"
+          ],
+          [
+            "SORT-A7",
+            "ZONE-2",
+            "900.0",
+            "99.0",
+            "66.6",
+            "593.4099731445312"
+          ],
+          [
+            "SORT-A7",
+            "ZONE-2",
+            "900.0",
+            "99.0",
+            "66.6",
+            "593.4099731445312"
+          ],
+          [
+            "SORT-A7",
+            "ZONE-2",
+            "900.0",
+            "99.0",
+            "66.6",
+            "593.4099731445312"
+          ],
+          [
+            "SORT-X1",
+            "ZONE-1",
+            "725.0",
+            "88.1",
+            "75.3",
+            "480.9599914550781"
+          ],
+          [
+            "SORT-X1",
+            "ZONE-1",
+            "725.0",
+            "88.1",
+            "75.3",
+            "480.9599914550781"
+          ],
+          [
+            "SORT-X1",
+            "ZONE-1",
+            "725.0",
+            "88.1",
+            "75.3",
+            "480.9599914550781"
+          ],
+          [
+            "SORT-M3",
+            "ZONE-3",
+            "480.0",
+            "55.2",
+            "42.5",
+            "112.61000061035156"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1559000000,
+        "end_offset": 1723000000
+      }
+    },
+    {
+      "id": "Q028",
+      "sql": "SELECT pallet_id, sorter_model, conveyor_lane, operation_mode, runtime_hours, ROUND(runtime_hours / 24.0, 1) AS runtime_days, CASE WHEN runtime_hours >= 500 THEN 'heavy' WHEN runtime_hours >= 168 THEN 'moderate' ELSE 'light' END AS usage_class FROM \"{stream}\" WHERE runtime_hours IS NOT NULL AND (sorter_model LIKE 'SORT-X%' OR sorter_model LIKE 'SORT-Z%' OR (sorter_model = 'SORT-Q5' AND runtime_hours < 200)) ORDER BY runtime_days DESC",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "conveyor_lane",
+          "operation_mode",
+          "runtime_hours",
+          "runtime_days",
+          "usage_class"
+        ],
+        "results": [
+          [
+            "PL-005",
+            "SORT-X1",
+            "LANE-A",
+            "manual",
+            "720",
+            "30.0",
+            "heavy"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "LANE-A",
+            "manual",
+            "720",
+            "30.0",
+            "heavy"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "LANE-A",
+            "manual",
+            "720",
+            "30.0",
+            "heavy"
+          ],
+          [
+            "PL-004",
+            "SORT-Z9",
+            "LANE-D",
+            "auto",
+            "360",
+            "15.0",
+            "moderate"
+          ],
+          [
+            "PL-004",
+            "SORT-Z9",
+            "LANE-D",
+            "auto",
+            "360",
+            "15.0",
+            "moderate"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "LANE-A",
+            "auto",
+            "90",
+            "3.8",
+            "light"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "LANE-A",
+            "auto",
+            "90",
+            "3.8",
+            "light"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "LANE-A",
+            "auto",
+            "90",
+            "3.8",
+            "light"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "LANE-A",
+            "auto",
+            "24",
+            "1.0",
+            "light"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "LANE-A",
+            "auto",
+            "24",
+            "1.0",
+            "light"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "LANE-A",
+            "auto",
+            "24",
+            "1.0",
+            "light"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1619000000,
+        "end_offset": 1783000000
+      }
+    },
+    {
+      "id": "Q029",
+      "sql": "SELECT _timestamp, control_center, facility_zone, cell_temp, COALESCE(CAST(conveyor_segment AS VARCHAR), 'N/A') AS segment_label, COALESCE(CAST(defect_limit AS VARCHAR), '0.0') AS defect_str FROM \"{stream}\" WHERE facility_zone IN (SELECT DISTINCT facility_zone FROM \"{stream}\" WHERE cell_temp > 25.0) ORDER BY cell_temp DESC LIMIT 15",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "control_center",
+          "facility_zone",
+          "cell_temp",
+          "segment_label",
+          "defect_str"
+        ],
+        "results": [
+          [
+            "CC-BETA",
+            "ZONE-2",
+            "40.0",
+            "5",
+            "3.5"
+          ],
+          [
+            "CC-BETA",
+            "ZONE-2",
+            "40.0",
+            "5",
+            "3.5"
+          ],
+          [
+            "CC-BETA",
+            "ZONE-2",
+            "40.0",
+            "5",
+            "3.5"
+          ],
+          [
+            "CC-ALPHA",
+            "ZONE-1",
+            "35.7",
+            "5",
+            "2.5"
+          ],
+          [
+            "CC-ALPHA",
+            "ZONE-1",
+            "35.7",
+            "5",
+            "2.5"
+          ],
+          [
+            "CC-ALPHA",
+            "ZONE-1",
+            "35.7",
+            "5",
+            "2.5"
+          ],
+          [
+            "CC-ALPHA",
+            "ZONE-1",
+            "32.5",
+            "4",
+            "2.8"
+          ],
+          [
+            "CC-ALPHA",
+            "ZONE-1",
+            "32.5",
+            "4",
+            "2.8"
+          ],
+          [
+            "CC-ALPHA",
+            "ZONE-1",
+            "32.5",
+            "4",
+            "2.8"
+          ],
+          [
+            "CC-DELTA",
+            "ZONE-4",
+            "30.1",
+            "4",
+            "2.0"
+          ],
+          [
+            "CC-DELTA",
+            "ZONE-4",
+            "30.1",
+            "4",
+            "2.0"
+          ],
+          [
+            "CC-DELTA",
+            "ZONE-4",
+            "28.9",
+            "3",
+            "1.2"
+          ],
+          [
+            "CC-DELTA",
+            "ZONE-4",
+            "28.9",
+            "3",
+            "1.2"
+          ],
+          [
+            "CC-DELTA",
+            "ZONE-4",
+            "28.9",
+            "3",
+            "1.2"
+          ],
+          [
+            "CC-GAMMA",
+            "ZONE-3",
+            "26.3",
+            "3",
+            "1.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1679000000,
+        "end_offset": 1843000000
+      }
+    },
+    {
+      "id": "Q030",
+      "sql": "SELECT _timestamp, build_signature, operation_mode, item_count, package_size, ROUND(CAST(item_count AS FLOAT) * CAST(package_size AS FLOAT) / 1000.0, 2) AS total_weight_kg, CASE WHEN item_count * package_size >= 300000 THEN 'XL' WHEN item_count * package_size >= 100000 THEN 'LG' WHEN item_count * package_size >= 30000 THEN 'MD' ELSE 'SM' END AS shipment_tier FROM \"{stream}\" WHERE item_count > 0 AND package_size > 0 ORDER BY total_weight_kg DESC LIMIT 15",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "build_signature",
+          "operation_mode",
+          "item_count",
+          "package_size",
+          "total_weight_kg",
+          "shipment_tier"
+        ],
+        "results": [
+          [
+            "BS-2026-B2",
+            "manual",
+            "500",
+            "1200",
+            "600.0",
+            "XL"
+          ],
+          [
+            "BS-2026-B2",
+            "manual",
+            "500",
+            "1200",
+            "600.0",
+            "XL"
+          ],
+          [
+            "BS-2026-B2",
+            "manual",
+            "500",
+            "1200",
+            "600.0",
+            "XL"
+          ],
+          [
+            "BS-2025-D4",
+            "auto",
+            "340",
+            "750",
+            "255.0",
+            "LG"
+          ],
+          [
+            "BS-2025-D4",
+            "auto",
+            "340",
+            "750",
+            "255.0",
+            "LG"
+          ],
+          [
+            "BS-2025-D4",
+            "manual",
+            "275",
+            "600",
+            "165.0",
+            "LG"
+          ],
+          [
+            "BS-2025-D4",
+            "manual",
+            "275",
+            "600",
+            "165.0",
+            "LG"
+          ],
+          [
+            "BS-2025-D4",
+            "manual",
+            "275",
+            "600",
+            "165.0",
+            "LG"
+          ],
+          [
+            "BS-2026-C3",
+            "auto",
+            "410",
+            "350",
+            "143.5",
+            "LG"
+          ],
+          [
+            "BS-2026-C3",
+            "auto",
+            "410",
+            "350",
+            "143.5",
+            "LG"
+          ],
+          [
+            "BS-2026-C3",
+            "hybrid",
+            "200",
+            "500",
+            "100.0",
+            "LG"
+          ],
+          [
+            "BS-2026-C3",
+            "hybrid",
+            "200",
+            "500",
+            "100.0",
+            "LG"
+          ],
+          [
+            "BS-2026-C3",
+            "hybrid",
+            "200",
+            "500",
+            "100.0",
+            "LG"
+          ],
+          [
+            "BS-2026-A1",
+            "manual",
+            "88",
+            "1000",
+            "88.0",
+            "MD"
+          ],
+          [
+            "BS-2026-A1",
+            "manual",
+            "88",
+            "1000",
+            "88.0",
+            "MD"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1739000000,
+        "end_offset": 1903000000
+      }
+    },
+    {
+      "id": "Q031",
+      "sql": "SELECT _timestamp, pallet_id, sorter_model, scan_attempts, retry_flag, CASE WHEN scan_attempts >= 3 THEN TRUE ELSE FALSE END AS retry_flag_derived FROM (SELECT _timestamp, pallet_id, sorter_model, scan_attempts, scan_attempts >= 3 AS retry_flag FROM \"{stream}\") sub WHERE retry_flag = TRUE ORDER BY scan_attempts DESC",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "scan_attempts",
+          "retry_flag",
+          "retry_flag_derived"
+        ],
+        "results": [
+          [
+            "PL-002",
+            "SORT-A7",
+            "5",
+            "True",
+            "True"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "5",
+            "True",
+            "True"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "5",
+            "True",
+            "True"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "4",
+            "True",
+            "True"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "4",
+            "True",
+            "True"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "4",
+            "True",
+            "True"
+          ],
+          [
+            "PL-008",
+            "SORT-Q5",
+            "3",
+            "True",
+            "True"
+          ],
+          [
+            "PL-008",
+            "SORT-Q5",
+            "3",
+            "True",
+            "True"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "3",
+            "True",
+            "True"
+          ],
+          [
+            "PL-008",
+            "SORT-Q5",
+            "3",
+            "True",
+            "True"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "3",
+            "True",
+            "True"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "3",
+            "True",
+            "True"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1799000000,
+        "end_offset": 1963000000
+      }
+    },
+    {
+      "id": "Q032",
+      "sql": "SELECT _timestamp, conveyor_lane, facility_zone, cell_temp, ambient_deviation FROM (SELECT _timestamp, conveyor_lane, facility_zone, cell_temp, ROUND(cell_temp - (SELECT AVG(cell_temp) FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone), 2) AS ambient_deviation FROM \"{stream}\" t1 WHERE cell_temp IS NOT NULL) derived WHERE ABS(ambient_deviation) > 3.0 ORDER BY ABS(ambient_deviation) DESC LIMIT 12",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "facility_zone",
+          "cell_temp",
+          "ambient_deviation"
+        ],
+        "results": [
+          [
+            "LANE-B",
+            "ZONE-2",
+            "40.0",
+            "12.93"
+          ],
+          [
+            "LANE-B",
+            "ZONE-2",
+            "40.0",
+            "12.93"
+          ],
+          [
+            "LANE-B",
+            "ZONE-2",
+            "40.0",
+            "12.93"
+          ],
+          [
+            "LANE-A",
+            "ZONE-1",
+            "18.5",
+            "-10.4"
+          ],
+          [
+            "LANE-A",
+            "ZONE-1",
+            "18.5",
+            "-10.4"
+          ],
+          [
+            "LANE-A",
+            "ZONE-1",
+            "18.5",
+            "-10.4"
+          ],
+          [
+            "LANE-B",
+            "ZONE-2",
+            "19.2",
+            "-7.87"
+          ],
+          [
+            "LANE-B",
+            "ZONE-2",
+            "19.2",
+            "-7.87"
+          ],
+          [
+            "LANE-B",
+            "ZONE-2",
+            "19.2",
+            "-7.87"
+          ],
+          [
+            "LANE-A",
+            "ZONE-1",
+            "35.7",
+            "6.8"
+          ],
+          [
+            "LANE-A",
+            "ZONE-1",
+            "35.7",
+            "6.8"
+          ],
+          [
+            "LANE-A",
+            "ZONE-1",
+            "35.7",
+            "6.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1859000000,
+        "end_offset": 2023000000
+      }
+    },
+    {
+      "id": "Q033",
+      "sql": "SELECT _timestamp, operation_mode, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor + (100.0 - charge_remaining)) / 2.0, 2) AS stress_index, CASE WHEN load_factor > 70.0 AND charge_remaining < 30.0 THEN 'OVERLOADED' WHEN load_factor > 70.0 THEN 'HIGH_LOAD' WHEN charge_remaining < 30.0 THEN 'LOW_CHARGE' ELSE 'STABLE' END AS health_status FROM \"{stream}\" ORDER BY stress_index DESC, _timestamp ASC LIMIT 15",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "conveyor_lane",
+          "load_factor",
+          "charge_remaining",
+          "stress_index",
+          "health_status"
+        ],
+        "results": [
+          [
+            "manual",
+            "LANE-D",
+            "67.9",
+            "5.0",
+            "81.45",
+            "LOW_CHARGE"
+          ],
+          [
+            "manual",
+            "LANE-D",
+            "67.9",
+            "5.0",
+            "81.45",
+            "LOW_CHARGE"
+          ],
+          [
+            "manual",
+            "LANE-D",
+            "67.9",
+            "5.0",
+            "81.45",
+            "LOW_CHARGE"
+          ],
+          [
+            "manual",
+            "LANE-B",
+            "99.0",
+            "66.6",
+            "66.2",
+            "HIGH_LOAD"
+          ],
+          [
+            "manual",
+            "LANE-B",
+            "99.0",
+            "66.6",
+            "66.2",
+            "HIGH_LOAD"
+          ],
+          [
+            "manual",
+            "LANE-B",
+            "99.0",
+            "66.6",
+            "66.2",
+            "HIGH_LOAD"
+          ],
+          [
+            "auto",
+            "LANE-D",
+            "72.8",
+            "58.0",
+            "57.4",
+            "HIGH_LOAD"
+          ],
+          [
+            "auto",
+            "LANE-D",
+            "72.8",
+            "58.0",
+            "57.4",
+            "HIGH_LOAD"
+          ],
+          [
+            "manual",
+            "LANE-A",
+            "88.1",
+            "75.3",
+            "56.4",
+            "HIGH_LOAD"
+          ],
+          [
+            "manual",
+            "LANE-A",
+            "88.1",
+            "75.3",
+            "56.4",
+            "HIGH_LOAD"
+          ],
+          [
+            "manual",
+            "LANE-A",
+            "88.1",
+            "75.3",
+            "56.4",
+            "HIGH_LOAD"
+          ],
+          [
+            "hybrid",
+            "LANE-C",
+            "55.2",
+            "42.5",
+            "56.35",
+            "STABLE"
+          ],
+          [
+            "hybrid",
+            "LANE-C",
+            "55.2",
+            "42.5",
+            "56.35",
+            "STABLE"
+          ],
+          [
+            "hybrid",
+            "LANE-C",
+            "55.2",
+            "42.5",
+            "56.35",
+            "STABLE"
+          ],
+          [
+            "manual",
+            "LANE-B",
+            "33.0",
+            "25.0",
+            "54.0",
+            "LOW_CHARGE"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1919000000,
+        "end_offset": 2083000000
+      }
+    },
+    {
+      "id": "Q034",
+      "sql": "SELECT DISTINCT ON (facility_zone) facility_zone, _timestamp, sorter_model, throughput_rate, load_factor FROM \"{stream}\" WHERE throughput_rate IS NOT NULL ORDER BY facility_zone ASC, throughput_rate DESC",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "480.0",
+            "55.2"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Z9",
+            "610.0",
+            "72.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 1979000000,
+        "end_offset": 2143000000
+      }
+    },
+    {
+      "id": "Q035",
+      "sql": "SELECT _timestamp, log, facility_zone, stream FROM \"{stream}\" WHERE stream = 'stdout' ORDER BY _timestamp DESC LIMIT 15",
+      "category": "basic_select",
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone",
+          "stream"
+        ],
+        "results": [
+          [
+            "Q035 warehouse event record 9",
+            "ZONE-2",
+            "stdout"
+          ],
+          [
+            "Q037 warehouse event record 2",
+            "ZONE-3",
+            "stdout"
+          ],
+          [
+            "Q036 warehouse event record 5",
+            "ZONE-2",
+            "stdout"
+          ],
+          [
+            "Q035 warehouse event record 8",
+            "ZONE-1",
+            "stdout"
+          ],
+          [
+            "Q037 warehouse event record 1",
+            "ZONE-2",
+            "stdout"
+          ],
+          [
+            "Q036 warehouse event record 4",
+            "ZONE-1",
+            "stdout"
+          ],
+          [
+            "Q037 warehouse event record 0",
+            "ZONE-1",
+            "stdout"
+          ],
+          [
+            "Q035 warehouse event record 6",
+            "ZONE-3",
+            "stdout"
+          ],
+          [
+            "Q034 warehouse event record 9",
+            "ZONE-2",
+            "stdout"
+          ],
+          [
+            "Q036 warehouse event record 2",
+            "ZONE-3",
+            "stdout"
+          ],
+          [
+            "Q035 warehouse event record 5",
+            "ZONE-2",
+            "stdout"
+          ],
+          [
+            "Q034 warehouse event record 8",
+            "ZONE-1",
+            "stdout"
+          ],
+          [
+            "Q036 warehouse event record 1",
+            "ZONE-2",
+            "stdout"
+          ],
+          [
+            "Q035 warehouse event record 4",
+            "ZONE-1",
+            "stdout"
+          ],
+          [
+            "Q036 warehouse event record 0",
+            "ZONE-1",
+            "stdout"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 2039000000,
+        "end_offset": 2203000000
+      }
+    }
+  ],
+  "last_query_id": 35
+}

@@ -323,7 +323,7 @@ def main():
 
         if dirty:
             with open(fp, "w") as f:
-                json.dump(query_data, f, separators=(",", ":"))
+                json.dump(query_data, f, indent=2)
                 f.write("\n")
             updated += 1
 
