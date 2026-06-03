@@ -395,21 +395,20 @@ size="xs"
                   }}
                 </OButton>
               </span>
-              <OButton
-                v-if="hasRumSessionId"
+            </div>
+            <OButton
+                v-if="hasRumSessionId && !hideSessionReplayButton"
                 data-test="trace-details-view-session-replay-btn"
                 variant="outline"
                 size="sm"
                 class="tw:ml-2"
                 @click="redirectToSessionReplay"
               >
-                <template #icon-left
-                  ><OIcon name="play-circle"
-size="sm"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="play-circle" size="sm"/>
+                </template>
                 {{ t("rum.playSessionReplay") }}
-              </OButton>
-            </div>
+            </OButton>
           </div>
         </div>
         <div
@@ -935,6 +934,10 @@ export default defineComponent({
       default: true,
     },
     showExpandButton: {
+      type: Boolean,
+      default: false,
+    },
+    hideSessionReplayButton: {
       type: Boolean,
       default: false,
     },

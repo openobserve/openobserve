@@ -34,11 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Operation Name
       <div
-        class="resize-btn tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+        class="resize-btn tw:bg-[var(--o2-primary)] tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
-        <OIcon name="drag-indicator" size="sm" />
+        <OIcon name="drag-indicator" size="sm"  />
       </div>
     </div>
     <div
@@ -175,6 +175,7 @@ $traceChartHeight: 250px;
 
 .trace-tic-first {
   z-index: 5;
+  display: none;
 }
 
 .header-bg {
