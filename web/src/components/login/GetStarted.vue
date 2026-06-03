@@ -54,14 +54,13 @@
       style="width: 100%;"
       :validators="[(val) => !String(val ?? '').trim() ? 'This field is required' : undefined]"
     />
-    <div class="tw:w-full tw:flex tw:items-center">
-      <OCheckbox v-model="isAgree">
-        <span class="tw:text-sm">
-          I have read and agree with the
-          <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
-          <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
-        </span>
-      </OCheckbox>
+    <div class="tw:w-full tw:flex tw:items-center tw:gap-2">
+      <OCheckbox v-model="isAgree" />
+      <span class="tw:text-sm">
+        I have read and agree with the
+        <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
+        <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
+      </span>
     </div>
     <div class="tw:w-full tw:mt-4">
       <OButton
