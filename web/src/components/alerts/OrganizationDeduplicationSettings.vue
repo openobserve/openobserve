@@ -239,17 +239,9 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
-    // Sanitize: convert empty string/NaN time_window_minutes to null
-    // Also normalise cross-alert fields: if org-level dedup is off, force
-    // sub-fields to their disabled state so the backend stays consistent.
     const rawWindow = localConfig.value.time_window_minutes;
-    const crossAlertEnabled = localConfig.value.enabled && localConfig.value.alert_dedup_enabled;
     const configToSave = {
       ...localConfig.value,
-      alert_dedup_enabled: crossAlertEnabled,
-      alert_fingerprint_groups: crossAlertEnabled
-        ? localConfig.value.alert_fingerprint_groups
-        : [],
       time_window_minutes:
         rawWindow == null || rawWindow === "" || isNaN(Number(rawWindow))
           ? null
