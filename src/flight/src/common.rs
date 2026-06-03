@@ -30,7 +30,7 @@ use datafusion::{
     physical_plan::{
         ExecutionPlan,
         display::DisplayableExecutionPlan,
-        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder},
+        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue},
     },
 };
 use parking_lot::Mutex;
@@ -46,7 +46,9 @@ pub struct RemoteScanMetrics {
     pub output_rows: metrics::Count,
     /// number of RecordBatches received from the remote node
     pub batches_received: metrics::Count,
-    /// total in-memory bytes of RecordBatches received
+    /// total in-memory bytes of RecordBatches received; registered as
+    /// `MetricValue::OutputBytes` so DataFusion formats it with `human_readable_size`
+    /// (e.g. "1.5 GB") rather than `human_readable_count` ("1.57 B" = billion)
     pub bytes_received: metrics::Count,
 }
 
@@ -57,7 +59,13 @@ impl RemoteScanMetrics {
         let output_rows = MetricBuilder::new(metrics).output_rows(input_partition);
         let batches_received =
             MetricBuilder::new(metrics).counter("batches_received", input_partition);
-        let bytes_received = MetricBuilder::new(metrics).counter("bytes_received", input_partition);
+
+        // Register as OutputBytes so the display uses human_readable_size (KB/MB/GB)
+        // instead of human_readable_count (K/M/B where B means billion).
+        let bytes_received = metrics::Count::new();
+        MetricBuilder::new(metrics)
+            .with_partition(input_partition)
+            .build(MetricValue::OutputBytes(bytes_received.clone()));
 
         Self {
             fetch_time,
