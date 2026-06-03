@@ -5,10 +5,19 @@ Covers PR #11691 — org-level ingestion tokens (prefix o2oi_).
 Token CRUD, enable/disable, ingestion auth (org token + backward compat),
 non-ingestion path blocking. Follows the new-framework pattern from
 test_serviceaccounts.py.
+
+.. note::
+
+    **No DELETE endpoint exists for ingestion tokens.** Tokens created during
+    test runs cannot be cleaned up (the API returns 405). The ``temp_token``
+    fixture logs each created token for traceability. Each test uses a unique
+    name (``unique_name("tkn")``) to avoid cross-test collisions. This is a
+    known limitation of the ingestion-tokens API, not a test framework gap.
 """
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Generator
 from http import HTTPStatus
 
@@ -19,7 +28,7 @@ from support.factories import unique_name
 
 logger = logging.getLogger(__name__)
 
-ORG_ID = "default"
+ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +322,12 @@ def test_ingest_with_disabled_token_fails(
     )
     assert resp.status_code == HTTPStatus.UNAUTHORIZED, \
         f"expected 401, got {resp.status_code}: {resp.text}"
+
+    # Re-enable to leave the token in its original state
+    client.patch(
+        f"ingestion-tokens/{temp_token['name']}",
+        json={"enabled": True},
+    )
 
 
 def test_ingest_with_nonexistent_token_fails(client: OpenObserveClient):
