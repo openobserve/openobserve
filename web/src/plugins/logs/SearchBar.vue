@@ -107,12 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="!toolbarMoveResetToMenu"
           data-test="logs-search-bar-reset-filters-btn"
-          class="tw:ms-1"
-          size="icon-toolbar"
+          size="xs"
           variant="outline"
           @click="resetFilters"
         >
           <OIcon name="restart-alt" size="sm" />
+          <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
           <OTooltip :content="t('search.resetFilters')" />
         </OButton>
         <!-- Histogram toggle — moves into More menu below 720px, icon-only below 950px -->
@@ -2033,8 +2033,8 @@ export default defineComponent({
     const availableLeftWidth = computed(() => Math.max(0, toolbarBarWidth.value - toolbarRightWidth.value - 14));
 
     // Approximate rendered widths of left-section content at each collapse state:
-    //   Full (toggle+text, H+text, QM+text, reset, More)      ≈ 704px
-    //   H+QM icon-only                                         ≈ 552px
+    //   Full (toggle+text, H+text, QM+text, Reset+text, More) ≈ 780px
+    //   H+QM+Reset icon-only                                   ≈ 552px
     //   Toggle group icon-only (xs)                            ≈ 312px
     //   H+QM moved into More                                   ≈ 232px
     //   Reset also moved into More                             ≈ 196px
