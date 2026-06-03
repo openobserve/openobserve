@@ -507,16 +507,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           min="0"
           max="100"
           @update:model-value="
-            (value: any) =>
-              (dashboardPanelData.data.config.decimals =
-                typeof value == 'number' && value >= 0 ? value : null)
+            (val: number) => {
+              if (typeof val === 'number' && (val < 0 || val > 100)) {
+                decimalsTouched = true;
+              }
+            }
           "
           @blur="
             () => {
-              if (dashboardPanelData.data.config.decimals == null)
-                dashboardPanelData.data.config.decimals = 2
+              decimalsTouched = true;
+              const val = dashboardPanelData.data.config.decimals;
+              // Empty field → silently reset to default 2
+              if (val == null || val === '') {
+                dashboardPanelData.data.config.decimals = 2;
+              }
+              // Invalid value (out of range) → keep it and show error
             }
           "
+          :error="decimalsTouched && typeof dashboardPanelData.data.config.decimals === 'number' && (dashboardPanelData.data.config.decimals < 0 || dashboardPanelData.data.config.decimals > 100)"
+          :error-message="t('dashboard.decimalsMustBeBetween')"
           :label="t('dashboard.decimals')"
           data-test="dashboard-config-decimals"
         />
@@ -1914,6 +1923,26 @@ export default defineComponent({
       },
     ];
     onBeforeMount(() => {
+      // Normalize config fields that default to null but may arrive as undefined
+      // when loaded from older panels (backend omits null fields in JSON response).
+      const nullableConfigKeys = [
+        "legends_position",
+        "legends_type",
+        "chart_align",
+        "unit",
+        "unit_custom",
+      ] as const;
+      nullableConfigKeys.forEach((key) => {
+        if (dashboardPanelData.data.config[key] === undefined) {
+          dashboardPanelData.data.config[key] = null;
+        }
+      });
+      if (dashboardPanelData.data.config.label_option?.position === undefined) {
+        if (dashboardPanelData.data.config.label_option) {
+          dashboardPanelData.data.config.label_option.position = null;
+        }
+      }
+
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
         dashboardPanelData.data.config.legend_width = {
@@ -2677,6 +2706,8 @@ export default defineComponent({
       }
     });
 
+    const decimalsTouched = ref(false);
+
     return {
       t,
       dashboardPanelData,
@@ -2745,6 +2776,7 @@ export default defineComponent({
       allSectionsExpanded,
       toggleAllSections,
       isPivotMode,
+      decimalsTouched,
     };
   },
 });

@@ -918,6 +918,26 @@ const setupDestinationData = () => {
         }
       }
 
+      // For ServiceNow, username:password are in Basic auth Authorization header
+      if (
+        typeId === "servicenow" &&
+        props.destination.headers?.["Authorization"]
+      ) {
+        const authHeader = props.destination.headers["Authorization"];
+        if (authHeader.startsWith("Basic ")) {
+          try {
+            const decoded = atob(authHeader.replace("Basic ", ""));
+            const colonIndex = decoded.indexOf(":");
+            if (colonIndex > 0) {
+              credentials.username = decoded.substring(0, colonIndex);
+              credentials.password = decoded.substring(colonIndex + 1);
+            }
+          } catch {
+            // Can't decode — leave credential fields blank
+          }
+        }
+      }
+
       // Note: Non-sensitive fields (severity, priority, assignmentGroup, ccRecipients, subject, username, etc.)
       // are automatically restored from metadata via Step 1 (credential_ prefix removal)
       // Sensitive fields containing "password", "key", or "token" are NOT saved to metadata for security

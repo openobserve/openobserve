@@ -24,6 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-x-item-input"
         :label="t('common.label')"
         v-model="modelValue.label"
+        :error="labelTouched && !modelValue.label"
+        :error-message="t('common.required') || 'Required'"
+        @blur="labelTouched = true"
       />
       <div v-if="!customQuery && modelValue.isDerived">
         <SortByBtnGrp :fieldObj="modelValue" />
@@ -43,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, inject } from "vue";
+import { defineComponent, inject, ref } from "vue";
 
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
@@ -73,10 +76,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useI18n();
+    const labelTouched = ref(false);
 
     return {
       t,
       emit,
+      labelTouched,
     };
   },
 });

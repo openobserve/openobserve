@@ -1,9 +1,12 @@
 <template>
   <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
+    <OForm ref="formRef" :default-values="{ title: annotationData.title }" @submit="saveAnnotation.execute()">
     <div class="tw:flex tw:flex-col">
-        <OInput
+        <OFormInput
+          name="title"
           v-model="annotationData.title"
           label="Title *"
+          :validators="[(val) => !val ? 'Title is required.' : undefined]"
         />
         <OTextarea
           v-model="annotationData.text"
@@ -25,6 +28,7 @@
           Timestamp: {{ annotationDateString }}
         </div>
     </div>
+    </OForm>
     <template #footer>
       <div class="tw:w-full tw:flex tw:gap-2">
         <OButton
@@ -41,7 +45,7 @@
         <OButton
           variant="primary"
           size="sm-action"
-          @click="saveAnnotation.execute()"
+          @click="formRef?.submit()"
           :loading="saveAnnotation.isLoading?.value"
           :disabled="!annotationData.title"
           >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
@@ -76,6 +80,8 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 const props = defineProps({
   dashboardId: { type: String, required: true },
   annotation: { type: Object, default: null, required: false },
@@ -85,6 +91,7 @@ const props = defineProps({
 const emit = defineEmits(["remove", "close"]);
 
 const store = useStore();
+const formRef = ref(null);
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 

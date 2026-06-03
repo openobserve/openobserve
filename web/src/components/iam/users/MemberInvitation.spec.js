@@ -122,7 +122,7 @@ describe("MemberInvitation Component", () => {
 
   it("renders the component for admin user", () => {
     expect(wrapper.exists()).toBe(true);
-    expect(wrapper.find('.invite-user').exists()).toBe(true);
+    expect(wrapper.find('button[data-o2-btn]').exists()).toBe(true);
   });
 
   it("does not render for non-admin users", async () => {
@@ -142,7 +142,7 @@ describe("MemberInvitation Component", () => {
       }
     });
     await nextTick();
-    expect(memberWrapper.find('.invite-user').exists()).toBe(false);
+    expect(memberWrapper.find('button[data-o2-btn]').exists()).toBe(false);
     memberWrapper.unmount();
   });
 
@@ -545,7 +545,7 @@ describe("MemberInvitation Component", () => {
           }
         });
         
-        expect(newWrapper.find('.invite-user').exists()).toBe(false);
+        expect(newWrapper.find('button[data-o2-btn]').exists()).toBe(false);
         newWrapper.unmount();
       });
     });
@@ -559,7 +559,7 @@ describe("MemberInvitation Component", () => {
         }
       });
       
-      expect(newWrapper.find('.invite-user').exists()).toBe(true);
+      expect(newWrapper.find('button[data-o2-btn]').exists()).toBe(true);
       newWrapper.unmount();
     });
   });
