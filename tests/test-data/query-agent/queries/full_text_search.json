@@ -380,15 +380,34 @@
       "sql": "SELECT histogram(_timestamp, '1 minute') AS time_block, COUNT(*) FILTER (WHERE match_all('warehouse')) AS warehouse_hits, COUNT(*) AS total_events, ROUND(CAST(COUNT(*) FILTER (WHERE match_all('warehouse')) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS hit_rate_pct FROM \"{stream}\" GROUP BY time_block ORDER BY time_block ASC",
       "category": "full_text_search",
       "expected": {
-        "row_count": 0,
-        "note": "match_all FILTER in histogram with hit-rate percentage \u2014 zero rows, columns unverifiable",
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "total_events",
-            "min": 1
-          }
-        ]
+        "columns": [
+          "time_block",
+          "warehouse_hits",
+          "total_events",
+          "hit_rate_pct"
+        ],
+        "results": [
+          [
+            "2026-06-03T05:12:00",
+            "10",
+            "10",
+            "100.0"
+          ],
+          [
+            "2026-06-03T05:13:00",
+            "10",
+            "10",
+            "100.0"
+          ],
+          [
+            "2026-06-03T05:14:00",
+            "8",
+            "8",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 4739000000,

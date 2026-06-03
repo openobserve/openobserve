@@ -438,27 +438,27 @@
         ],
         "results": [
           [
-            "CC-ALPHA",
-            "SORT-X1",
-            "auto, manual",
-            "9"
-          ],
-          [
             "CC-BETA",
             "SORT-A7",
             "hybrid, manual",
             "9"
           ],
           [
-            "CC-GAMMA",
-            "SORT-M3",
-            "hybrid, auto",
-            "5"
+            "CC-ALPHA",
+            "SORT-X1",
+            "auto, manual",
+            "9"
           ],
           [
             "CC-DELTA",
             "SORT-Q5 | SORT-Z9",
             "auto, manual",
+            "5"
+          ],
+          [
+            "CC-GAMMA",
+            "SORT-M3",
+            "hybrid, auto",
             "5"
           ]
         ],

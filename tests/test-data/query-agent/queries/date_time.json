@@ -5,20 +5,21 @@
       "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY _time ORDER BY _time ASC",
       "category": "date_time",
       "expected": {
-        "row_count": 2,
         "columns": [
           "_time",
           "cnt"
         ],
-        "note": "Histogram with explicit 2-minute interval",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T04:54:00",
+            "10"
+          ],
+          [
+            "2026-06-03T04:56:00",
+            "18"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3719000000,
@@ -30,27 +31,59 @@
       "sql": "SELECT histogram(_timestamp, '1 minute') AS ts_minute, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY ts_minute, operation_mode ORDER BY ts_minute ASC, operation_mode ASC",
       "category": "date_time",
       "expected": {
-        "row_count": 9,
         "columns": [
           "ts_minute",
           "operation_mode",
           "cnt"
         ],
-        "note": "1-minute histogram + GROUP BY operation_mode",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "auto"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T04:56:00",
+            "auto",
+            "4"
+          ],
+          [
+            "2026-06-03T04:56:00",
+            "hybrid",
+            "2"
+          ],
+          [
+            "2026-06-03T04:56:00",
+            "manual",
+            "4"
+          ],
+          [
+            "2026-06-03T04:57:00",
+            "auto",
+            "4"
+          ],
+          [
+            "2026-06-03T04:57:00",
+            "hybrid",
+            "2"
+          ],
+          [
+            "2026-06-03T04:57:00",
+            "manual",
+            "4"
+          ],
+          [
+            "2026-06-03T04:58:00",
+            "auto",
+            "2"
+          ],
+          [
+            "2026-06-03T04:58:00",
+            "hybrid",
+            "2"
+          ],
+          [
+            "2026-06-03T04:58:00",
+            "manual",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3779000000,
@@ -106,22 +139,27 @@
       "sql": "SELECT histogram(_timestamp, '5 minutes') AS _time, SUM(throughput_rate) AS total_tput, MIN(throughput_rate) AS min_tput, MAX(throughput_rate) AS max_tput FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY _time ORDER BY _time ASC",
       "category": "date_time",
       "expected": {
-        "row_count": 2,
         "columns": [
           "_time",
           "total_tput",
           "min_tput",
           "max_tput"
         ],
-        "note": "Histogram with SUM/MIN/MAX aggregates",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "total_tput",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T04:55:00",
+            "10120.0",
+            "150.0",
+            "900.0"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "4160.0",
+            "150.0",
+            "900.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3899000000,
@@ -133,22 +171,33 @@
       "sql": "SELECT histogram(_timestamp, '1 minute') AS minute_bucket, COUNT(*) FILTER (WHERE operation_mode='auto') AS auto_cnt, COUNT(*) FILTER (WHERE operation_mode='manual') AS manual_cnt, COUNT(*) FILTER (WHERE operation_mode='hybrid') AS hybrid_cnt FROM \"{stream}\" GROUP BY minute_bucket ORDER BY minute_bucket ASC",
       "category": "date_time",
       "expected": {
-        "row_count": 3,
         "columns": [
           "minute_bucket",
           "auto_cnt",
           "manual_cnt",
           "hybrid_cnt"
         ],
-        "note": "1-min histogram with 3 FILTER-counts as pivot per bucket",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "auto_cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T04:59:00",
+            "4",
+            "4",
+            "2"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "4",
+            "4",
+            "2"
+          ],
+          [
+            "2026-06-03T05:01:00",
+            "2",
+            "4",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 3959000000,
@@ -160,7 +209,6 @@
       "sql": "SELECT histogram(_timestamp, '30 seconds') AS half_min, facility_zone, COUNT(*) AS cnt, ROUND(AVG(load_factor), 2) AS avg_load, ROUND(MIN(charge_remaining), 2) AS min_charge FROM \"{stream}\" WHERE cell_temp >= 22.0 GROUP BY half_min, facility_zone HAVING ROUND(AVG(load_factor), 2) > 30.0 ORDER BY half_min ASC, facility_zone ASC",
       "category": "date_time",
       "expected": {
-        "row_count": 17,
         "columns": [
           "half_min",
           "facility_zone",
@@ -168,21 +216,128 @@
           "avg_load",
           "min_charge"
         ],
-        "note": "30-sec histogram + zone breakdown + HAVING avg_load > 30",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "facility_zone": "ZONE-1"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T05:00:00",
+            "ZONE-1",
+            "2",
+            "54.75",
+            "33.3"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "ZONE-2",
+            "1",
+            "33.0",
+            "25.0"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "ZONE-4",
+            "1",
+            "67.9",
+            "5.0"
+          ],
+          [
+            "2026-06-03T05:00:30",
+            "ZONE-2",
+            "1",
+            "99.0",
+            "66.6"
+          ],
+          [
+            "2026-06-03T05:00:30",
+            "ZONE-3",
+            "2",
+            "50.25",
+            "42.5"
+          ],
+          [
+            "2026-06-03T05:00:30",
+            "ZONE-4",
+            "1",
+            "72.8",
+            "58.0"
+          ],
+          [
+            "2026-06-03T05:01:00",
+            "ZONE-1",
+            "2",
+            "54.75",
+            "33.3"
+          ],
+          [
+            "2026-06-03T05:01:00",
+            "ZONE-2",
+            "1",
+            "33.0",
+            "25.0"
+          ],
+          [
+            "2026-06-03T05:01:00",
+            "ZONE-4",
+            "1",
+            "67.9",
+            "5.0"
+          ],
+          [
+            "2026-06-03T05:01:30",
+            "ZONE-2",
+            "1",
+            "99.0",
+            "66.6"
+          ],
+          [
+            "2026-06-03T05:01:30",
+            "ZONE-3",
+            "2",
+            "50.25",
+            "42.5"
+          ],
+          [
+            "2026-06-03T05:01:30",
+            "ZONE-4",
+            "1",
+            "72.8",
+            "58.0"
+          ],
+          [
+            "2026-06-03T05:02:00",
+            "ZONE-1",
+            "2",
+            "54.75",
+            "33.3"
+          ],
+          [
+            "2026-06-03T05:02:00",
+            "ZONE-2",
+            "1",
+            "33.0",
+            "25.0"
+          ],
+          [
+            "2026-06-03T05:02:00",
+            "ZONE-4",
+            "1",
+            "67.9",
+            "5.0"
+          ],
+          [
+            "2026-06-03T05:02:30",
+            "ZONE-2",
+            "1",
+            "99.0",
+            "66.6"
+          ],
+          [
+            "2026-06-03T05:02:30",
+            "ZONE-3",
+            "1",
+            "55.2",
+            "42.5"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 4019000000,
@@ -194,7 +349,6 @@
       "sql": "WITH bucketed AS (SELECT histogram(_timestamp, '2 minutes') AS block, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" GROUP BY block) SELECT *, ROUND(AVG(avg_tput) OVER (ORDER BY block ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) AS smoothed_avg, ROW_NUMBER() OVER (ORDER BY cnt DESC) AS peak_rank FROM bucketed ORDER BY block ASC",
       "category": "date_time",
       "expected": {
-        "row_count": 2,
         "columns": [
           "block",
           "cnt",
@@ -202,15 +356,23 @@
           "smoothed_avg",
           "peak_rank"
         ],
-        "note": "CTE with histogram + window over histogram buckets",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T05:00:00",
+            "10",
+            "506.0",
+            "506.0",
+            "2"
+          ],
+          [
+            "2026-06-03T05:02:00",
+            "18",
+            "512.22",
+            "509.11",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 4079000000,
@@ -222,7 +384,6 @@
       "sql": "SELECT histogram(_timestamp, '5 minutes') AS window_5m, sorter_model, COUNT(*) AS samples, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(cell_temp), 2) AS avg_temp, ROUND(CAST(SUM(CASE WHEN scan_attempts >= 3 THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS high_scan_pct FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY window_5m, sorter_model HAVING COUNT(*) >= 2 ORDER BY window_5m ASC, avg_tput DESC",
       "category": "date_time",
       "expected": {
-        "row_count": 7,
         "columns": [
           "window_5m",
           "sorter_model",
@@ -231,21 +392,49 @@
           "avg_temp",
           "high_scan_pct"
         ],
-        "note": "5-min histogram + sorter breakdown + computed high_scan_pct, HAVING >=2",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "sorter_model": "SORT-A7"
-            }
-          },
-          {
-            "type": "value_range",
-            "column": "samples",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T05:00:00",
+            "SORT-A7",
+            "9",
+            "686.67",
+            "27.07",
+            "66.66999816894531"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "SORT-Z9",
+            "2",
+            "610.0",
+            "30.1",
+            "0.0"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "SORT-Q5",
+            "3",
+            "555.0",
+            "28.9",
+            "100.0"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "SORT-M3",
+            "5",
+            "404.0",
+            "25.7",
+            "60.0"
+          ],
+          [
+            "2026-06-03T05:00:00",
+            "SORT-X1",
+            "9",
+            "355.0",
+            "28.9",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 4139000000,
@@ -293,21 +482,34 @@
       "sql": "SELECT bucket_a._time AS early_window, bucket_a.cnt AS early_cnt, bucket_a.avg_tput AS early_avg_tput, bucket_b._time AS late_window, bucket_b.cnt AS late_cnt, bucket_b.avg_tput AS late_avg_tput FROM (SELECT histogram(_timestamp, '3 minutes') AS _time, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" WHERE _timestamp < (SELECT MIN(_timestamp) + (MAX(_timestamp) - MIN(_timestamp)) / 2 FROM \"{stream}\") GROUP BY _time) bucket_a FULL OUTER JOIN (SELECT histogram(_timestamp, '3 minutes') AS _time, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" WHERE _timestamp >= (SELECT MIN(_timestamp) + (MAX(_timestamp) - MIN(_timestamp)) / 2 FROM \"{stream}\") GROUP BY _time) bucket_b ON bucket_a._time = bucket_b._time ORDER BY early_window ASC NULLS LAST",
       "category": "date_time",
       "expected": {
-        "row_count": 2,
         "columns": [
           "early_window",
           "early_cnt",
-          "early_avg_tput"
+          "early_avg_tput",
+          "late_window",
+          "late_cnt",
+          "late_avg_tput"
         ],
-        "note": "FULL OUTER JOIN of two histograms splitting at mid-point timestamp",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "early_cnt",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T05:03:00",
+            "14",
+            "486.43",
+            "2026-06-03T05:03:00",
+            "6",
+            "551.67"
+          ],
+          [
+            "None",
+            "None",
+            "None",
+            "2026-06-03T05:06:00",
+            "8",
+            "520.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 4259000000,
@@ -319,22 +521,33 @@
       "sql": "SELECT histogram(_timestamp, '1 minute') AS minute_slot, COUNT(*) AS total_events, ROUND(AVG(CASE WHEN cell_temp >= 28.0 THEN throughput_rate ELSE NULL END), 2) AS avg_tput_hot, ROUND(AVG(CASE WHEN cell_temp < 28.0 THEN throughput_rate ELSE NULL END), 2) AS avg_tput_cool FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY minute_slot ORDER BY minute_slot ASC",
       "category": "date_time",
       "expected": {
-        "row_count": 3,
         "columns": [
           "minute_slot",
           "total_events",
           "avg_tput_hot",
           "avg_tput_cool"
         ],
-        "note": "1-min histogram with conditional AVGs (hot vs cool temp split using CASE)",
-        "skip_row_count": true,
-        "assertions": [
-          {
-            "type": "value_range",
-            "column": "total_events",
-            "min": 0
-          }
-        ]
+        "results": [
+          [
+            "2026-06-03T05:05:00",
+            "10",
+            "596.0",
+            "416.0"
+          ],
+          [
+            "2026-06-03T05:06:00",
+            "10",
+            "596.0",
+            "416.0"
+          ],
+          [
+            "2026-06-03T05:07:00",
+            "8",
+            "592.5",
+            "447.5"
+          ]
+        ],
+        "results_mode": "rowsort"
       },
       "time_offset": {
         "start_offset": 4319000000,

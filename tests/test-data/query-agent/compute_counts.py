@@ -88,6 +88,50 @@ def _replace_match_all(sql: str) -> str:
     )
 
 
+def _replace_histogram(sql: str) -> tuple[str, bool]:
+    """Translate histogram(_timestamp, 'N unit') → DuckDB integer arithmetic.
+
+    OO's histogram is internally rewritten to DataFusion's:
+      date_bin(interval, to_timestamp_micros(_timestamp),
+               to_timestamp('2001-01-01T00:00:00'))
+
+    Pure integer arithmetic (works in ALL DuckDB versions):
+      origin + FLOOR((_timestamp - origin) / bucket_us) * bucket_us
+
+    where origin = 978307200000000 (2001-01-01 UTC in microseconds).
+
+    Returns (modified_sql, has_auto_interval).  Auto-interval queries
+    (no second argument) cannot be replicated and must stay legacy.
+    """
+    if re.search(r'histogram\(_timestamp\)', sql, re.IGNORECASE):
+        return sql, True
+
+    _ORIGIN_US = 978307200000000  # 2001-01-01T00:00:00 UTC in micros
+
+    # Map unit strings to microseconds
+    def _bucket_us(m: re.Match) -> str:
+        n = int(m.group(1))
+        unit = m.group(2)
+        if unit.startswith("second"):
+            width = n * 1_000_000
+        elif unit.startswith("minute"):
+            width = n * 60_000_000
+        elif unit.startswith("hour"):
+            width = n * 3_600_000_000
+        elif unit.startswith("day"):
+            width = n * 86_400_000_000
+        else:
+            width = n * 1_000_000
+        return f"CAST({_ORIGIN_US} + FLOOR((_timestamp - {_ORIGIN_US}) / {width}) * {width} AS BIGINT)"
+
+    pattern = (
+        r"histogram\(_timestamp,\s*'(\d+)\s*"
+        r"(second|seconds|minute|minutes|hour|hours|day|days)'\)"
+    )
+    result = re.sub(pattern, _bucket_us, sql, flags=re.IGNORECASE)
+    return result, False
+
+
 def translate_oo_to_duckdb(sql: str) -> str:
     """Translate OpenObserve SQL → DuckDB SQL.
 
@@ -103,6 +147,7 @@ def translate_oo_to_duckdb(sql: str) -> str:
 
     s = _replace_re_match(s)
     s = _replace_match_all(s)
+    s, _ = _replace_histogram(s)  # histogram(_timestamp, 'N unit') → date_bin
     s = re.sub(r'\b(pivot)\b', r'pivoted', s, flags=re.IGNORECASE)
 
     return s
@@ -118,8 +163,20 @@ _DYNAMIC_COLS = {"_timestamp", "_time"}
 
 _EXCLUDE_COLS = _OO_DROPPED_COLS | _DYNAMIC_COLS
 
+# Queries with known OO-DuckDB divergence — skip cell-by-cell comparison
+_SKIP_SQLLOGICTEST = {
+    "Q037",  # ROW_NUMBER tie-breaking differs between engines
+    "Q058",  # Self-join pairings non-deterministic across engines
+    "Q072",  # FULL OUTER JOIN histogram: NULL handling differs
+    "Q080",  # FTS match_all + histogram: DuckDB LIKE != OO Tantivy
+    "Q111",  # ROW_NUMBER ties in pagination
+    "Q117",  # STRING_AGG ordering differs between engines
+    "Q121",  # STRING_AGG concatenation order
+    "Q152",  # PERCENT_RANK tie-breaking differs
+}
 
-def compute_results(con: duckdb.DuckDBPyConnection, q: dict) -> dict | None:
+
+def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bool = False) -> dict | None:
     """Compute the expected result set for a single query.
 
     Returns the new ``expected`` dict, or None if the query should stay
@@ -138,6 +195,13 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict) -> dict | None:
 
     duck_sql = translate_oo_to_duckdb(q["sql"])
 
+    # For histogram queries, _time is deterministic (bucketed via date_bin
+    # with fixed origin).  Only _timestamp still varies between runs.
+    if is_histogram:
+        exclude_cols = _OO_DROPPED_COLS | {"_timestamp"}
+    else:
+        exclude_cols = _EXCLUDE_COLS
+
     try:
         rows = con.execute(duck_sql).fetchall()
         cols = [desc[0] for desc in con.description]
@@ -146,11 +210,31 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict) -> dict | None:
         return None
 
     # Filter out dynamic/OO-dropped columns
-    keep_idx = [i for i, c in enumerate(cols) if c not in _EXCLUDE_COLS]
+    keep_idx = [i for i, c in enumerate(cols) if c not in exclude_cols]
     filtered_cols = [cols[i] for i in keep_idx]
     filtered_rows = [
         [str(row[i]) for i in keep_idx] for row in rows
     ]
+
+    # Histogram: OO serialises bucket timestamps as ISO strings
+    # (e.g. "2026-06-03T04:00:00"), but DuckDB computes epoch
+    # microseconds.  Convert all columns whose values are epoch-us
+    # timestamps (> 1e15).  Some queries (Q072 FULL OUTER JOIN)
+    # produce multiple histogram bucket columns.
+    if is_histogram and filtered_rows:
+        from datetime import datetime, timezone
+        for row in filtered_rows:
+            for j, val in enumerate(row):
+                if val and val != 'None':
+                    try:
+                        us = int(float(val))
+                        if us > 1_000_000_000_000_000:
+                            dt = datetime.fromtimestamp(
+                                us / 1_000_000, tz=timezone.utc
+                            )
+                            row[j] = dt.strftime('%Y-%m-%dT%H:%M:%S')
+                    except (ValueError, OverflowError):
+                        pass
 
     result = {
         "columns": filtered_cols,
@@ -190,6 +274,13 @@ def main():
     total = con.execute("SELECT COUNT(*) FROM _logs").fetchone()[0]
     print(f"Loaded {total} records")
 
+    # Persist the BASE_TS so the test harness uses the same value.
+    # Without this, a minute-boundary crossing between compute and test
+    # shifts all histogram bucket timestamps.
+    override_path = QUERIES_DIR.parent / "base_ts_override.json"
+    override_path.write_text(json.dumps({"BASE_TS": BASE_TS}))
+    print(f"Saved BASE_TS override: {BASE_TS}")
+
     updated = 0
     skipped = 0
 
@@ -201,20 +292,29 @@ def main():
         for q in query_data["queries"]:
             expected = q.get("expected", {})
 
-            # Skip histogram queries — data_bin() is custom Rust
-            if "histogram(" in q["sql"]:
-                skipped += 1
-                continue
+            # Histogram queries: skip auto-interval, convert explicit-interval
+            is_histogram = "histogram(" in q["sql"]
+            if is_histogram:
+                _, has_auto = _replace_histogram(q["sql"])
+                if has_auto:
+                    skipped += 1
+                    continue
 
-            # Skip Q122 — STRING_AGG DISTINCT ORDER BY broken in OO
+            # Skip Q122 — STRING_AGG DISTINCT ORDER BY: DuckDB requires
+            # ORDER BY expressions to appear in the aggregate argument
+            # list for DISTINCT aggregates.
             if q["id"] == "Q122":
                 skipped += 1
                 continue
 
-            new_expected = compute_results(con, q)
+            new_expected = compute_results(con, q, is_histogram=is_histogram)
             if new_expected is None:
                 skipped += 1
                 continue
+
+            # Mark known-divergent queries for skip-sqllogictest fallback
+            if q["id"] in _SKIP_SQLLOGICTEST:
+                new_expected["skip_sqllogictest"] = True
 
             # Replace the expected block
             q["expected"] = new_expected
@@ -226,7 +326,7 @@ def main():
             updated += 1
 
     print(f"\nUpdated {updated} query files")
-    print(f"Skipped {skipped} (histogram + Q122 + errors)")
+    print(f"Skipped {skipped} (auto-interval histogram + Q122 + errors)")
 
     con.close()
 

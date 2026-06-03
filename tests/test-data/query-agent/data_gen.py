@@ -3,16 +3,23 @@
 Used by both conftest.py (test fixture) and capture_row_counts.py (utility).
 """
 
+import json
 import random
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 random.seed(42)
 
-# Base timestamp — rounded to the current minute so histogram() bucket
-# boundaries are deterministic across runs. Shifted 4 hours into the past
-# so all generated timestamps (~2.5 h ahead) remain in the past.
-_now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-BASE_TS = int((_now - timedelta(hours=4)).timestamp() * 1_000_000)
+# Check for a BASE_TS override saved by compute_counts.py so that the
+# compute oracle and the test harness share the same BASE_TS. Without
+# this, a minute boundary crossing between compute and test shifts
+# all histogram bucket timestamps.
+_OVERRIDE_FILE = Path(__file__).parent / "base_ts_override.json"
+if _OVERRIDE_FILE.exists():
+    BASE_TS = json.loads(_OVERRIDE_FILE.read_text())["BASE_TS"]
+else:
+    _now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    BASE_TS = int((_now - timedelta(hours=4)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
     "pallet_id":       ["PL-001", "PL-002", "PL-003", "PL-004", "PL-005", "PL-006", "PL-007", "PL-008"],
