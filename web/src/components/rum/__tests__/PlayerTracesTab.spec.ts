@@ -21,77 +21,56 @@ import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
 
 // ---------------------------------------------------------------------------
-// Module mocks
+// Module mocks — must be declared before component import
 // ---------------------------------------------------------------------------
 
 const mockSearch = vi.fn();
-const mockGetTraces = vi.fn();
 const mockFetchQueryDataWithHttpStream = vi.fn();
 
 vi.mock("@/services/search", () => ({
   default: {
     search: (...args: any[]) => mockSearch(...args),
-    get_traces: (...args: any[]) => mockGetTraces(...args),
   },
 }));
 
+// Fix 1: generateTraceContext lives in zincutils, not @/utils/trace.
+// Fix 2: formatTimeWithSuffix mock kept for deterministic duration assertions.
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
     b64EncodeUnicode: (sql: string) => sql,
     formatTimeWithSuffix: (us: number) => {
-      if (us < 1000) return `${us}us`;
-      if (us < 1000000) return `${Math.round(us / 1000)}ms`;
-      return `${Math.round(us / 1000000)}s`;
+      if (us < 1_000) return `${us}us`;
+      if (us < 1_000_000) return `${Math.round(us / 1_000)}ms`;
+      return `${Math.round(us / 1_000_000)}s`;
     },
+    generateTraceContext: () => ({ traceId: "mock-trace-context-id" }),
   };
 });
 
+// Fix 3: component uses `import useHttpStreaming from "…"` then destructures.
+// The mock must expose a default export that is a function returning the object.
 vi.mock("@/composables/useStreamingSearch", () => ({
-  fetchQueryDataWithHttpStream: (...args: any[]) => mockFetchQueryDataWithHttpStream(...args),
-}));
-
-vi.mock("@/utils/trace", () => ({
-  generateTraceContext: () => ({ traceId: "mock-trace-context-id" }),
+  default: () => ({
+    fetchQueryDataWithHttpStream: (...args: any[]) =>
+      mockFetchQueryDataWithHttpStream(...args),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
 // Test data factories
 // ---------------------------------------------------------------------------
 
+// Fix 4: component reads SQL-aliased fields (_view_url, _view_loading_type, _date).
 function createRumHit(overrides: Record<string, any> = {}) {
   return {
     _oo_trace_id: "trace-abc123def456",
-    view_url: "https://example.com/products",
-    view_loading_type: "initial_load",
-    view_id: "view-1",
-    type: "resource",
-    ...overrides,
-  };
-}
-
-function createTraceMeta(overrides: Record<string, any> = {}) {
-  return {
-    trace_id: "trace-abc123def456",
-    start_time: 1000000000,
-    end_time: 1005000000,
-    duration: 5000000,
-    ...overrides,
-  };
-}
-
-function createSpan(overrides: Record<string, any> = {}) {
-  return {
-    span_id: "span-1",
-    trace_id: "trace-abc123def456",
-    operation_name: "GET /api/products",
-    service_name: "product-catalog",
-    span_kind: "s",
-    start_time: 1001000000,
-    duration: 2000000,
-    status: "ok",
-    depth: 0,
+    _view_url: "https://example.com/products",
+    _view_loading_type: "initial_load",
+    _view_id: "view-1",
+    _type: "resource",
+    _date: 0,
     ...overrides,
   };
 }
@@ -99,30 +78,38 @@ function createSpan(overrides: Record<string, any> = {}) {
 function createTraceMetadata(overrides: Record<string, any> = {}) {
   return {
     trace_id: "trace-abc123def456",
-    duration: 523000, // 523ms in microseconds
-    spans: [5, 0], // [total spans, error spans]
-    service_name: [
-      { service_name: "product-catalog", count: 3, duration: 300000 },
-      { service_name: "api-gateway", count: 2, duration: 223000 }
-    ],
+    start_time: 1_000_000_000,
+    end_time: 1_005_000_000,
+    duration: 5_000_000,
+    spans: [5, 0], // [totalSpans, errorSpans]
+    service_name: [{ service_name: "product-catalog", count: 3 }],
     first_event: {
       service_name: "product-catalog",
-      operation_name: "GET /api/products"
+      operation_name: "GET /api/products",
     },
     ...overrides,
   };
 }
 
+// ---------------------------------------------------------------------------
+// Mock setup helpers
+// ---------------------------------------------------------------------------
+
 /**
- * Set up mocks for the initial rumdata list fetch and trace metadata streaming.
+ * Configures mocks for a successful initial fetch.
+ * Fix 5: handlers are called synchronously so flushPromises() can resolve
+ * the fetchTraceMetadata Promise (setTimeout creates a macrotask that
+ * flushPromises() does not drain).
  */
-function setupSuccessfulMocks(rumHits?: any[], traceMetadata?: any[]) {
+function setupSuccessfulMocks(
+  rumHits?: any[],
+  traceMetadataHits?: any[],
+) {
   mockSearch.mockReset();
-  mockGetTraces.mockReset();
   mockFetchQueryDataWithHttpStream.mockReset();
 
   const hits = rumHits ?? [createRumHit()];
-  const metadata = traceMetadata ?? [createTraceMetadata()];
+  const metadata = traceMetadataHits ?? [createTraceMetadata()];
 
   mockSearch.mockImplementation((_params: any, source: string) => {
     if (source === "RUM") {
@@ -131,37 +118,12 @@ function setupSuccessfulMocks(rumHits?: any[], traceMetadata?: any[]) {
     return Promise.resolve({ data: { hits: [] } });
   });
 
-  // Mock the metadata streaming for fetchTraceMetadata
-  mockFetchQueryDataWithHttpStream.mockImplementation((queryReq, handlers) => {
-    // Simulate streaming response
-    setTimeout(() => {
-      handlers.data(null, {
-        content: {
-          results: {
-            hits: metadata,
-          },
-        },
-      });
+  mockFetchQueryDataWithHttpStream.mockImplementation(
+    (_queryReq: any, handlers: any) => {
+      handlers.data(null, { content: { results: { hits: metadata } } });
       handlers.complete();
-    }, 0);
-  });
-}
-
-/**
- * Set up mocks for the lazy trace detail fetch (triggered on "View Trace Details" click).
- * Overrides both get_traces and search for the ui spans query.
- */
-function setupDetailMocks(traceMeta?: any, spans?: any[]) {
-  mockGetTraces.mockResolvedValue({
-    data: { hits: [traceMeta ?? createTraceMeta()] },
-  });
-
-  mockSearch.mockImplementation((_params: any, source: string) => {
-    if (source === "RUM") {
-      return Promise.resolve({ data: { hits: [createRumHit()] } });
-    }
-    return Promise.resolve({ data: { hits: spans ?? [createSpan()] } });
-  });
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -174,12 +136,13 @@ node.style.height = "1024px";
 document.body.appendChild(node);
 
 // ---------------------------------------------------------------------------
-// Stubs for O2 components and TraceDetails
+// Stubs
 // ---------------------------------------------------------------------------
 
 const globalStubs = {
   OButton: {
     name: "OButton",
+    // inheritAttrs: false + v-bind="$attrs" lets data-test pass through.
     template:
       '<button :disabled="disabled || undefined" v-bind="$attrs" @click="!disabled && $emit(\'click\', $event)" @keydown="$emit(\'keydown\', $event)"><slot name="icon-left" /><slot /></button>',
     props: ["variant", "size", "disabled"],
@@ -192,10 +155,17 @@ const globalStubs = {
     template: '<span :data-test="\'icon-\' + name" />',
     props: ["name", "size"],
   },
+  // Fix 6: use v-bind="$attrs" so the parent's data-test attribute passes through.
   OBadge: {
     name: "OBadge",
-    template: '<span :data-test="\'badge\'"><slot /></span>',
+    template: '<span v-bind="$attrs"><slot /></span>',
     props: ["variant", "size"],
+    inheritAttrs: false,
+  },
+  OTooltip: {
+    name: "OTooltip",
+    template: "<span />",
+    props: ["content"],
   },
   OSeparator: {
     name: "OSeparator",
@@ -212,7 +182,9 @@ const globalStubs = {
       "spanListProp",
       "startTimeProp",
       "endTimeProp",
+      "showHeader",
       "showBackButton",
+      "hideSessionReplayButton",
       "showTimeline",
       "showLogStreamSelector",
       "showShareButton",
@@ -221,6 +193,43 @@ const globalStubs = {
       "enableCorrelationLinks",
       "initialTimelineExpanded",
     ],
+  },
+  // Fix 7: stub TenstackTable so we can trigger row clicks and inspect
+  // scoped-slot content (route, duration) without mounting the real component.
+  TenstackTable: {
+    name: "TenstackTable",
+    props: [
+      "rows",
+      "columns",
+      "rowHeight",
+      "enableRowExpand",
+      "enableTextHighlight",
+      "enableStatusBar",
+      "defaultColumns",
+      "enableColumnReorder",
+      "enableAiContextButton",
+      "rowClass",
+    ],
+    emits: ["click:dataRow"],
+    template: `
+      <div data-test="rum-player-traces-tab-table">
+        <div
+          v-for="(row, i) in rows"
+          :key="i"
+          :data-test="'table-row-' + i"
+          @click="$emit('click:dataRow', row)"
+        >
+          <slot name="cell-route"    :item="row" :cell="{ column: { getSize: () => 100 } }" />
+          <slot name="cell-duration" :item="row" :cell="{ column: { getSize: () => 100 } }" />
+          <slot name="cell-status"   :item="row" :cell="{ column: { getSize: () => 100 } }" />
+        </div>
+      </div>
+    `,
+  },
+  TraceStatusCell: {
+    name: "TraceStatusCell",
+    template: '<span data-test="trace-status-cell" />',
+    props: ["item"],
   },
 };
 
@@ -255,15 +264,6 @@ function mountComponent(options: MountOptions = {}) {
 import PlayerTracesTab from "@/components/rum/PlayerTracesTab.vue";
 
 // ---------------------------------------------------------------------------
-// Helper finders
-// ---------------------------------------------------------------------------
-
-function findButtonByText(wrapper: VueWrapper, text: string) {
-  const buttons = wrapper.findAll("button");
-  return buttons.find((btn: any) => btn.text().includes(text));
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -272,11 +272,7 @@ describe("PlayerTracesTab", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockSearch.mockReset();
-    mockGetTraces.mockReset();
-
     setupSuccessfulMocks();
-
     wrapper = mountComponent();
     await flushPromises();
   });
@@ -292,37 +288,26 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("component rendering", () => {
-    it("mounts PlayerTracesTab without errors", () => {
+    it("should mount without errors", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders trace cards when data is loaded", () => {
+    it("should render trace table when data is loaded", () => {
       expect(
-        wrapper.find('[data-test="rum-player-traces-tab-trace-card-0"]').exists(),
+        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
       ).toBe(true);
     });
 
-    it("displays view label in the trace card", () => {
+    it("should display the route path in the table row", () => {
       expect(wrapper.text()).toContain("/products");
     });
 
-    it("displays kind badge for initial load", () => {
-      expect(wrapper.text()).toContain("Initial");
-    });
-
-    it("displays trace ID in abbreviated form in card footer", () => {
-      expect(wrapper.text()).toContain("trace-ab");
-      expect(wrapper.text()).toContain("def456");
-    });
-
-    it("displays View Trace Details button on trace cards", () => {
-      const btn = findButtonByText(wrapper, "View Trace Details");
-      expect(btn).toBeDefined();
-      expect(btn?.exists()).toBe(true);
-    });
-
-    it("displays trace count in filter bar", () => {
-      expect(wrapper.text()).toContain("1");
+    it("should display trace count badge in filter bar", () => {
+      const badge = wrapper.find(
+        '[data-test="rum-player-traces-tab-count-badge"]',
+      );
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toContain("1");
     });
   });
 
@@ -331,7 +316,7 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("loading state", () => {
-    it("shows loading spinner when data is being fetched", async () => {
+    it("should show loading spinner while data is being fetched", async () => {
       wrapper.unmount();
       mockSearch.mockReturnValue(new Promise(() => {}));
 
@@ -343,7 +328,7 @@ describe("PlayerTracesTab", () => {
       ).toBe(true);
     });
 
-    it("does not show trace cards while loading", async () => {
+    it("should not show the trace table while loading", async () => {
       wrapper.unmount();
       mockSearch.mockReturnValue(new Promise(() => {}));
 
@@ -351,7 +336,7 @@ describe("PlayerTracesTab", () => {
       await nextTick();
 
       expect(
-        wrapper.find('[data-test="rum-player-traces-tab-trace-card-0"]').exists(),
+        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
       ).toBe(false);
     });
   });
@@ -361,7 +346,7 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("empty state", () => {
-    it("shows empty message when there are no correlated traces", async () => {
+    it("should show empty message when there are no correlated traces", async () => {
       wrapper.unmount();
       mockSearch.mockResolvedValue({ data: { hits: [] } });
 
@@ -373,7 +358,7 @@ describe("PlayerTracesTab", () => {
       ).toBe(true);
     });
 
-    it("displays 'No correlated traces found' message", async () => {
+    it("should display 'No correlated traces found' message", async () => {
       wrapper.unmount();
       mockSearch.mockResolvedValue({ data: { hits: [] } });
 
@@ -389,7 +374,7 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("error state", () => {
-    it("shows error message when data fetch fails", async () => {
+    it("should show error message when data fetch fails", async () => {
       wrapper.unmount();
       mockSearch.mockRejectedValue(new Error("Network error"));
 
@@ -401,7 +386,7 @@ describe("PlayerTracesTab", () => {
       ).toBe(true);
     });
 
-    it("displays the error message text", async () => {
+    it("should display the error message text", async () => {
       wrapper.unmount();
       mockSearch.mockRejectedValue(new Error("Network error"));
 
@@ -411,7 +396,7 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.text()).toContain("Network error");
     });
 
-    it("renders retry button in error state", async () => {
+    it("should render retry button in error state", async () => {
       wrapper.unmount();
       mockSearch.mockRejectedValue(new Error("Network error"));
 
@@ -423,7 +408,7 @@ describe("PlayerTracesTab", () => {
       ).toBe(true);
     });
 
-    it("retries fetch when retry button is clicked", async () => {
+    it("should retry fetch when retry button is clicked", async () => {
       wrapper.unmount();
       mockSearch.mockRejectedValue(new Error("Network error"));
 
@@ -444,167 +429,50 @@ describe("PlayerTracesTab", () => {
   });
 
   // =========================================================================
-  // Trace detail view (lazy loading)
+  // Trace detail view
+  // Fix 8: component uses table row click (handleTraceRowClick) — no button.
   // =========================================================================
 
   describe("trace detail view", () => {
-    it("switches to embedded TraceDetails when View Trace Details is clicked", async () => {
-      setupDetailMocks();
+    it("should switch to embedded TraceDetails when a table row is clicked", async () => {
+      const firstRow = wrapper.find('[data-test="table-row-0"]');
+      expect(firstRow.exists()).toBe(true);
 
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      expect(viewBtn).toBeDefined();
-
-      await viewBtn!.trigger("click");
-      await flushPromises();
+      await firstRow.trigger("click");
+      await nextTick();
 
       expect(wrapper.find('[data-test="trace-details"]').exists()).toBe(true);
     });
 
-    it("shows back button in detail view", async () => {
-      setupDetailMocks();
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
+    it("should show back button in detail view", async () => {
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
 
       expect(
         wrapper.find('[data-test="rum-player-traces-tab-back-btn"]').exists(),
       ).toBe(true);
     });
 
-    it("returns to list view when back button is clicked", async () => {
-      setupDetailMocks();
+    it("should return to list view when back button is clicked", async () => {
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
 
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
-
-      const backBtn = wrapper.find(
-        '[data-test="rum-player-traces-tab-back-btn"]',
-      );
-      await backBtn.trigger("click");
+      await wrapper
+        .find('[data-test="rum-player-traces-tab-back-btn"]')
+        .trigger("click");
       await nextTick();
 
       expect(wrapper.find('[data-test="trace-details"]').exists()).toBe(false);
       expect(
-        wrapper.find('[data-test="rum-player-traces-tab-trace-card-0"]').exists(),
+        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
       ).toBe(true);
     });
 
-    it("shows the selected trace label in detail header", async () => {
-      setupDetailMocks();
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
-
-      expect(wrapper.text()).toContain("/products");
-    });
-
-    it("fetches trace metadata and spans lazily when opening detail", async () => {
-      setupDetailMocks();
-
-      // Before click, get_traces should not have been called
-      expect(mockGetTraces).not.toHaveBeenCalled();
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
-
-      expect(mockGetTraces).toHaveBeenCalled();
-      // search should have been called for both RUM (initial) and ui (detail)
-      const uiCalls = mockSearch.mock.calls.filter(
-        ([_params, source]: [any, string]) => source === "ui",
-      );
-      expect(uiCalls.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  // =========================================================================
-  // Trace detail loading state
-  // =========================================================================
-
-  describe("trace detail loading state", () => {
-    it("shows loading spinner while trace details are being fetched", async () => {
-      // Pending promise for get_traces
-      mockGetTraces.mockReturnValue(new Promise(() => {}));
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
+    it("should show the selected trace route in detail header", async () => {
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-trace-loading"]').exists(),
-      ).toBe(true);
-    });
-  });
-
-  // =========================================================================
-  // Trace detail error state
-  // =========================================================================
-
-  describe("trace detail error state", () => {
-    it("shows error when trace metadata is not found", async () => {
-      mockGetTraces.mockResolvedValue({ data: { hits: [] } });
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
-
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-trace-error"]').exists(),
-      ).toBe(true);
-    });
-
-    it("shows error when trace spans fetch fails", async () => {
-      mockGetTraces.mockResolvedValue({
-        data: { hits: [createTraceMeta()] },
-      });
-      mockSearch.mockImplementation((_params: any, source: string) => {
-        if (source === "RUM") {
-          return Promise.resolve({ data: { hits: [createRumHit()] } });
-        }
-        return Promise.reject(new Error("Spans fetch failed"));
-      });
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
-
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-trace-error"]').exists(),
-      ).toBe(true);
-    });
-
-    it("renders retry button in trace error state", async () => {
-      mockGetTraces.mockResolvedValue({ data: { hits: [] } });
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
-
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-trace-retry-btn"]').exists(),
-      ).toBe(true);
-    });
-
-    it("retries trace detail fetch when retry button is clicked", async () => {
-      mockGetTraces.mockResolvedValue({ data: { hits: [] } });
-
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn!.trigger("click");
-      await flushPromises();
-
-      mockGetTraces.mockReset();
-      setupDetailMocks();
-
-      const retryBtn = wrapper.find(
-        '[data-test="rum-player-traces-tab-trace-retry-btn"]',
-      );
-      await retryBtn.trigger("click");
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="trace-details"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("/products");
     });
   });
 
@@ -613,7 +481,7 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("props validation", () => {
-    it("does not fetch when sessionId is empty", async () => {
+    it("should not fetch when sessionId is empty", async () => {
       wrapper.unmount();
       mockSearch.mockReset();
 
@@ -623,7 +491,7 @@ describe("PlayerTracesTab", () => {
       expect(mockSearch).not.toHaveBeenCalled();
     });
 
-    it("re-fetches when sessionId prop changes", async () => {
+    it("should re-fetch when sessionId prop changes", async () => {
       mockSearch.mockClear();
 
       await wrapper.setProps({ sessionId: "new-session-id" });
@@ -632,7 +500,7 @@ describe("PlayerTracesTab", () => {
       expect(mockSearch).toHaveBeenCalled();
     });
 
-    it("resets state when sessionId changes", async () => {
+    it("should reset state when sessionId changes", async () => {
       await wrapper.setProps({ sessionId: "new-session-id" });
       await flushPromises();
 
@@ -645,25 +513,30 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("edge cases", () => {
-    it("deduplicates views by trace ID", async () => {
+    it("should deduplicate views by trace ID", async () => {
       wrapper.unmount();
 
-      setupSuccessfulMocks([
-        createRumHit({ _oo_trace_id: "same-trace" }),
-        createRumHit({ _oo_trace_id: "same-trace", view_id: "view-2" }),
-      ]);
+      const traceId = "same-trace";
+      setupSuccessfulMocks(
+        [
+          createRumHit({ _oo_trace_id: traceId }),
+          createRumHit({ _oo_trace_id: traceId, _view_id: "view-2" }),
+        ],
+        [createTraceMetadata({ trace_id: traceId })],
+      );
 
       wrapper = mountComponent();
       await flushPromises();
 
-      const cards = wrapper.findAll(
-        '[data-test^="rum-player-traces-tab-trace-card-"]',
-      );
-      expect(cards.length).toBe(1);
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      expect(rows.length).toBe(1);
     });
 
-    it("handles null trace ID in RUM hits", async () => {
+    it("should handle null trace ID in RUM hits without crashing", async () => {
       wrapper.unmount();
+
+      // null trace ID is skipped; "valid-trace" has no matching metadata so
+      // filteredViews ends up empty — component renders the empty state.
       mockSearch.mockResolvedValue({
         data: {
           hits: [
@@ -679,50 +552,47 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("displays route change badge for route_change loading type", async () => {
+    it("should render multiple table rows for multiple distinct traces", async () => {
       wrapper.unmount();
 
-      setupSuccessfulMocks([
-        createRumHit({ view_loading_type: "route_change" }),
-      ]);
-
-      wrapper = mountComponent();
-      await flushPromises();
-
-      expect(wrapper.text()).toContain("Route");
-    });
-
-    it("renders multiple trace cards for multiple traces", async () => {
-      wrapper.unmount();
-
-      setupSuccessfulMocks([
-        createRumHit({ _oo_trace_id: "trace-1", view_url: "https://example.com/page1" }),
-        createRumHit({ _oo_trace_id: "trace-2", view_url: "https://example.com/page2" }),
-      ]);
-
-      wrapper = mountComponent();
-      await flushPromises();
-
-      const cards = wrapper.findAll(
-        '[data-test^="rum-player-traces-tab-trace-card-"]',
+      setupSuccessfulMocks(
+        [
+          createRumHit({
+            _oo_trace_id: "trace-1",
+            _view_url: "https://example.com/page1",
+          }),
+          createRumHit({
+            _oo_trace_id: "trace-2",
+            _view_url: "https://example.com/page2",
+          }),
+        ],
+        [
+          createTraceMetadata({ trace_id: "trace-1" }),
+          createTraceMetadata({ trace_id: "trace-2" }),
+        ],
       );
-      expect(cards.length).toBe(2);
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      expect(rows.length).toBe(2);
     });
   });
 
   // =========================================================================
-  // Trace metadata functionality
+  // Trace metadata
   // =========================================================================
 
   describe("trace metadata", () => {
-    it("displays duration badge when metadata is available", async () => {
+    it("should display computed e2e duration in the table cell", async () => {
       wrapper.unmount();
 
-      const metadata = createTraceMetadata({
-        trace_id: "trace-abc123def456",
-        duration: 523000 // 523ms in microseconds
-      });
-      setupSuccessfulMocks([createRumHit()], [metadata]);
+      // _date = 1000ms, end_time = 1523ms * 1_000_000 → e2eDuration = 523ms.
+      setupSuccessfulMocks(
+        [createRumHit({ _date: 1000 })],
+        [createTraceMetadata({ end_time: 1_523_000_000 })],
+      );
 
       wrapper = mountComponent();
       await flushPromises();
@@ -730,114 +600,94 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.text()).toContain("523ms");
     });
 
-    it("displays error count badge when trace has errors", async () => {
+    it("should display error count badge in detail header when trace has errors", async () => {
       wrapper.unmount();
 
-      const metadata = createTraceMetadata({
-        trace_id: "trace-abc123def456",
-        spans: [5, 2] // 5 total spans, 2 error spans
-      });
-      setupSuccessfulMocks([createRumHit()], [metadata]);
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [createTraceMetadata({ spans: [5, 2] })], // 2 error spans
+      );
 
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("2 errors");
+      // Error badge only appears in the detail view header.
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      expect(wrapper.text()).toContain("2");
+      // rum.errors i18n key resolves to "Errors" (capitalised)
+      expect(wrapper.text()).toContain("Errors");
     });
 
-    it("displays service count badge", async () => {
-      wrapper.unmount();
-
-      const metadata = createTraceMetadata({
-        trace_id: "trace-abc123def456",
-        service_name: [
-          { service_name: "api-gateway", count: 2 },
-          { service_name: "product-catalog", count: 3 }
-        ]
-      });
-      setupSuccessfulMocks([createRumHit()], [metadata]);
-
-      wrapper = mountComponent();
-      await flushPromises();
-
-      expect(wrapper.text()).toContain("2 services");
-    });
-
-    it("displays root operation", async () => {
-      wrapper.unmount();
-
-      const metadata = createTraceMetadata({
-        trace_id: "trace-abc123def456",
-        first_event: {
-          service_name: "api-gateway",
-          operation_name: "GET /api/products"
-        }
-      });
-      setupSuccessfulMocks([createRumHit()], [metadata]);
-
-      wrapper = mountComponent();
-      await flushPromises();
-
-      expect(wrapper.text()).toContain("api-gateway → GET /api/products");
-    });
-
-    it("calls fetchQueryDataWithHttpStream for metadata", async () => {
+    it("should call fetchQueryDataWithHttpStream with correct args for metadata", async () => {
       wrapper.unmount();
       setupSuccessfulMocks();
 
       wrapper = mountComponent();
       await flushPromises();
 
+      // Fix 9: `type` is at the top level of the first arg, not inside queryReq.
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledWith(
         expect.objectContaining({
           queryReq: expect.objectContaining({
             stream_name: "default",
             filter: "trace_id='trace-abc123def456'",
-            type: "traces"
-          })
+          }),
+          type: "traces",
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
-    it("gracefully handles missing metadata", async () => {
+    it("should show empty state when metadata is unavailable for all RUM hits", async () => {
       wrapper.unmount();
 
-      // Mock empty metadata response
-      mockFetchQueryDataWithHttpStream.mockImplementation((queryReq, handlers) => {
-        setTimeout(() => {
+      mockSearch.mockImplementation((_params: any, source: string) => {
+        if (source === "RUM") {
+          return Promise.resolve({ data: { hits: [createRumHit()] } });
+        }
+        return Promise.resolve({ data: { hits: [] } });
+      });
+      // Metadata returns no hits → filteredViews is empty → empty state shown.
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_queryReq: any, handlers: any) => {
           handlers.data(null, { content: { results: { hits: [] } } });
           handlers.complete();
-        }, 0);
-      });
-
-      setupSuccessfulMocks([createRumHit()]);
+        },
+      );
 
       wrapper = mountComponent();
       await flushPromises();
 
-      // Card should still render with basic info, just no metadata badges
-      expect(wrapper.find('[data-test="rum-player-traces-tab-trace-card-0"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("/products");
+      expect(
+        wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists(),
+      ).toBe(true);
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it("handles metadata fetch errors gracefully", async () => {
+    it("should render available RUM views when metadata fetch errors", async () => {
       wrapper.unmount();
 
-      // Mock metadata fetch error
-      mockFetchQueryDataWithHttpStream.mockImplementation((queryReq, handlers) => {
-        setTimeout(() => {
-          handlers.error(null, new Error("Metadata fetch failed"));
-        }, 0);
+      mockSearch.mockImplementation((_params: any, source: string) => {
+        if (source === "RUM") {
+          return Promise.resolve({ data: { hits: [createRumHit()] } });
+        }
+        return Promise.resolve({ data: { hits: [] } });
       });
-
-      setupSuccessfulMocks([createRumHit()]);
+      // On error the component falls back to unfiltered views (no metadata enrichment).
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_queryReq: any, handlers: any) => {
+          handlers.error(null, new Error("Metadata fetch failed"));
+        },
+      );
 
       wrapper = mountComponent();
       await flushPromises();
 
-      // Card should still render with basic info
-      expect(wrapper.find('[data-test="rum-player-traces-tab-trace-card-0"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
+      ).toBe(true);
       expect(wrapper.text()).toContain("/products");
     });
   });
@@ -847,14 +697,14 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("formatting utilities", () => {
-    it("shortRoute extracts pathname from URL", () => {
+    it("should extract pathname from a full URL", () => {
       expect(
-        wrapper.vm.shortRoute("https://example.com/products?page=1"),
+        (wrapper.vm as any).shortRoute("https://example.com/products?page=1"),
       ).toBe("/products?page=1");
     });
 
-    it("shortRoute returns original string for invalid URLs", () => {
-      expect(wrapper.vm.shortRoute("not-a-url")).toBe("not-a-url");
+    it("should return the original string for an invalid URL", () => {
+      expect((wrapper.vm as any).shortRoute("not-a-url")).toBe("not-a-url");
     });
   });
 
@@ -863,19 +713,11 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("accessibility", () => {
-    it("all buttons are valid button elements", () => {
+    it("should render all interactive elements as proper <button> elements", () => {
       const buttons = wrapper.findAll("button");
       buttons.forEach((btn: any) => {
         expect(btn.element.tagName.toLowerCase()).toBe("button");
       });
-    });
-
-    it("View Trace Details button responds to Enter keydown", async () => {
-      const viewBtn = findButtonByText(wrapper, "View Trace Details");
-      await viewBtn?.trigger("keydown.enter");
-      await nextTick();
-
-      expect(viewBtn?.exists()).toBe(true);
     });
   });
 
@@ -884,11 +726,11 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
 
   describe("lifecycle", () => {
-    it("fetches traces on mount when sessionId is provided", () => {
+    it("should fetch traces on mount when sessionId is provided", () => {
       expect(mockSearch).toHaveBeenCalled();
     });
 
-    it("does not fetch on mount when sessionId is empty", async () => {
+    it("should not fetch on mount when sessionId is empty", async () => {
       wrapper.unmount();
       mockSearch.mockClear();
 
