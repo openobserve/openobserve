@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item tw:ml-1">
+        <div class="settings-grid-item">
           <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item tw:ml-1">
+        <div class="settings-grid-item">
           <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
@@ -1091,7 +1091,7 @@ export default defineComponent({
 
 .settings-grid-item {
   display: grid;
-  grid-template-columns: 1fr 1fr 2fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;
