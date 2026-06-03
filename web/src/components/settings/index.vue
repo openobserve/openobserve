@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('regex_patterns.title')"
                 />
                 <ORouteTab
-                  v-if="config.isEnterprise == 'true' && store.state.zoConfig.service_streams_enabled !== false"
+                  v-if="config.isEnterprise == 'true'"
                   data-test="correlation-settings-tab"
                   name="correlation_settings"
                   :to="{
