@@ -1,137 +1,113 @@
 <template>
-  <div
-    data-test="scorer-list-page"
-    class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:h-full tw:min-h-0"
+  <EvalListShell
+    data-test="scorer"
+    :title="t('onlineEvals.scorer.listTitle')"
+    :search="search"
+    :search-placeholder="t('onlineEvals.scorer.searchPlaceholder')"
+    :add-label="t('onlineEvals.scorer.newButton')"
+    :show-empty="showEmptyState"
+    @update:search="$emit('update:search', $event)"
+    @create="$emit('create')"
   >
-    <div v-if="showEmptyState" class="tw:flex-1 tw:min-h-0">
-      <div class="card-container tw:h-full tw:flex tw:items-center tw:justify-center">
-        <ScorerEmptyState @create="$emit('create')" />
-      </div>
-    </div>
-
-    <template v-else>
-      <div class="tw:shrink-0">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]">
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-              data-test="scorer-list-title"
-            >
-              {{ t("onlineEvals.scorer.listTitle") }}
-            </div>
-
-            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OInput
-                v-model="searchModel"
-                class="tw:ml-2 tw:w-[200px]"
-                :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
-                data-test="scorer-list-search-input"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
-
-              <OSelect
-                v-model="typeFilter"
-                :options="typeOptions"
-                :placeholder="t('onlineEvals.scorer.allTypes')"
-                size="md"
-                class="tw:ml-2 tw:w-[150px]"
-                data-test="scorer-list-type-filter"
-              />
-
-              <OButton
-                data-test="scorer-list-add-btn"
-                class="tw:ml-2"
-                variant="primary"
-                size="sm"
-                  @click="$emit('create')"
-              >
-                {{ t("onlineEvals.scorer.newButton") }}
-              </OButton>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tw:flex-1 tw:min-h-0">
-        <div class="card-container tw:h-full">
-          <OTable
-            data-test="scorer-list-table"
-            :data="filteredRows"
-            :columns="columns"
-            row-key="id"
-            :loading="loading"
-            :footer-title="t('onlineEvals.scorer.listTitle')"
-            :global-filter="searchModel"
-            :show-global-filter="false"
-            :page-size="20"
-            :page-size-options="[20, 50, 100, 250, 500]"
-            width="100%"
-            class="tw:w-full tw:h-full"
-            @row-click="(row: any) => $emit('view', row)"
-          >
-            <template #cell-type="{ row }">
-              <span class="sr-type-chip" :class="`sr-type-chip--${scorerTypeOf(row)}`">
-                {{ scorerTypeLabel(scorerTypeOf(row)) }}
-              </span>
-            </template>
-
-            <template #cell-produces="{ row }">
-              <span class="sr-mono-cell">{{ producesLabel(row) || "—" }}</span>
-            </template>
-
-            <template #cell-version="{ row }">
-              <span class="sr-mono-cell">v{{ row.version }}</span>
-            </template>
-
-            <template #cell-usedBy="{ row }">
-              <span class="sr-mono-cell">{{ usedByText(row) }}</span>
-            </template>
-
-            <template #cell-lastRun>
-              <span class="sr-muted-cell">—</span>
-            </template>
-
-            <template #cell-successRate>
-              <span class="sr-muted-cell">—</span>
-            </template>
-
-            <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center actions-container">
-                <OButton
-                  :data-test="`scorer-list-${row.name}-edit-btn`"
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="t('onlineEvals.actions.edit')"
-                  icon-left="edit"
-                  @click.stop="$emit('edit', row)"
-                />
-                <OButton
-                  :data-test="`scorer-list-${row.name}-delete-btn`"
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  :title="t('onlineEvals.actions.delete')"
-                  icon-left="delete"
-                  @click.stop="$emit('delete', row)"
-                />
-              </div>
-            </template>
-          </OTable>
-        </div>
-      </div>
+    <template #empty>
+      <EvalEmptyState
+        data-test="scorer-empty-state"
+        icon="rule"
+        :title="t('onlineEvals.scorer.empty.title')"
+        :description="t('onlineEvals.scorer.empty.description')"
+        :chips="[
+          { icon: 'smart-toy', label: t('onlineEvals.scorer.empty.chipLlmJudge') },
+          { icon: 'cloud', label: t('onlineEvals.scorer.empty.chipRemote') },
+        ]"
+        :cta-label="t('onlineEvals.scorer.newButton')"
+        cta-data-test="scorer-empty-create-btn"
+        @create="$emit('create')"
+      />
     </template>
-  </div>
+
+    <template #filter>
+      <OSelect
+        v-model="typeFilter"
+        :options="typeOptions"
+        :placeholder="t('onlineEvals.scorer.allTypes')"
+        size="md"
+        class="tw:ml-2 tw:w-[150px]"
+        data-test="scorer-list-type-filter"
+      />
+    </template>
+
+    <template #table>
+      <OTable
+        data-test="scorer-list-table"
+        :data="numberedRows"
+        :columns="columns"
+        row-key="id"
+        :loading="loading"
+        :footer-title="t('onlineEvals.scorer.listTitle')"
+        :global-filter="search"
+        :show-global-filter="false"
+        :page-size="20"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        width="100%"
+        class="tw:w-full tw:h-full"
+        @row-click="(row: any) => $emit('view', row)"
+      >
+        <template #cell-type="{ row }">
+          <span class="sr-type-chip" :class="`sr-type-chip--${scorerTypeOf(row)}`">
+            {{ scorerTypeLabel(scorerTypeOf(row)) }}
+          </span>
+        </template>
+
+        <template #cell-produces="{ row }">
+          <span class="sr-mono-cell">{{ producesLabel(row) || "—" }}</span>
+        </template>
+
+        <template #cell-version="{ row }">
+          <span class="sr-mono-cell">v{{ row.version }}</span>
+        </template>
+
+        <template #cell-usedBy="{ row }">
+          <span class="sr-mono-cell">{{ usedByText(row) }}</span>
+        </template>
+
+        <template #cell-lastRun>
+          <span class="sr-muted-cell">—</span>
+        </template>
+
+        <template #cell-successRate>
+          <span class="sr-muted-cell">—</span>
+        </template>
+
+        <template #cell-actions="{ row }">
+          <div class="tw:flex tw:items-center actions-container">
+            <OButton
+              :data-test="`scorer-list-${row.name}-edit-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.edit')"
+              icon-left="edit"
+              @click.stop="$emit('edit', row)"
+            />
+            <OButton
+              :data-test="`scorer-list-${row.name}-delete-btn`"
+              variant="ghost-destructive"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.delete')"
+              icon-left="delete"
+              @click.stop="$emit('delete', row)"
+            />
+          </div>
+        </template>
+      </OTable>
+    </template>
+  </EvalListShell>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type {
   EvalJob,
@@ -140,7 +116,9 @@ import type {
   ScorerType,
 } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
-import ScorerEmptyState from "./ScorerEmptyState.vue";
+import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import EvalListShell from "./EvalListShell.vue";
+import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
   rows: Scorer[];
@@ -150,7 +128,7 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: Scorer): void;
@@ -160,11 +138,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const typeFilter = ref<ScorerType | null>(null);
-
-const searchModel = computed({
-  get: () => props.search,
-  set: (v: string) => emit("update:search", v),
-});
 
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scorer.allTypes"), value: null },
@@ -244,21 +217,19 @@ const columns = computed(() => [
   },
 ]);
 
-const filteredRows = computed(() => {
-  const rows = typeFilter.value
+const filteredRows = computed(() =>
+  typeFilter.value
     ? props.rows.filter((row) => scorerTypeOf(row) === typeFilter.value)
-    : props.rows;
-  return rows.map((row, index) => ({
-    ...row,
-    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
-  }));
-});
+    : props.rows,
+);
+
+const numberedRows = useNumberedRows(filteredRows);
 
 const showEmptyState = computed(
   () =>
     !props.loading &&
     props.rows.length === 0 &&
-    !searchModel.value &&
+    !props.search &&
     !typeFilter.value,
 );
 

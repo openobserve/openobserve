@@ -1,67 +1,75 @@
 <template>
   <div
-    data-test="score-config-empty-state"
-    class="sc-empty"
-    :class="{ 'sc-empty--dark': store.state.theme === 'dark' }"
+    :data-test="dataTest"
+    class="ev-empty"
+    :class="{ 'ev-empty--dark': isDark }"
   >
-    <div class="sc-empty__icon-outer">
+    <div class="ev-empty__icon-outer">
       <div
-        class="sc-empty__icon-inner"
-        :class="{ 'sc-empty__icon-inner--dark': store.state.theme === 'dark' }"
+        class="ev-empty__icon-inner"
+        :class="{ 'ev-empty__icon-inner--dark': isDark }"
       >
-        <OIcon name="fact-check" size="lg" class="sc-empty__icon" />
+        <OIcon :name="icon" size="lg" class="ev-empty__icon" />
       </div>
     </div>
 
-    <div class="sc-empty__title">{{ t("onlineEvals.scoreConfig.empty.title") }}</div>
+    <div class="ev-empty__title">{{ title }}</div>
 
-    <div class="sc-empty__desc">
-      {{ t("onlineEvals.scoreConfig.empty.description") }}
-    </div>
+    <div class="ev-empty__desc">{{ description }}</div>
 
-    <div class="sc-empty__chips">
+    <div v-if="chips.length" class="ev-empty__chips">
       <span
-        class="sc-empty__chip"
-        :class="{ 'sc-empty__chip--dark': store.state.theme === 'dark' }"
+        v-for="(chip, idx) in chips"
+        :key="idx"
+        class="ev-empty__chip"
+        :class="{ 'ev-empty__chip--dark': isDark }"
       >
-        <OIcon name="data-array" size="xs" />
-        {{ t("onlineEvals.scoreConfig.empty.chipTypes") }}
-      </span>
-      <span
-        class="sc-empty__chip"
-        :class="{ 'sc-empty__chip--dark': store.state.theme === 'dark' }"
-      >
-        <OIcon name="favorite" size="xs" />
-        {{ t("onlineEvals.scoreConfig.empty.chipThreshold") }}
+        <OIcon v-if="chip.icon" :name="chip.icon" size="xs" />
+        {{ chip.label }}
       </span>
     </div>
 
     <OButton
-      data-test="score-config-empty-create-btn"
+      :data-test="ctaDataTest"
       variant="primary"
       size="md"
-      class="sc-empty__btn"
+      class="ev-empty__btn"
       @click="$emit('create')"
     >
-      {{ t("onlineEvals.scoreConfig.newButton") }}
+      {{ ctaLabel }}
     </OButton>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
+interface EmptyStateChip {
+  icon?: string;
+  label: string;
+}
+
+defineProps<{
+  dataTest: string;
+  icon: string;
+  title: string;
+  description: string;
+  chips: EmptyStateChip[];
+  ctaLabel: string;
+  ctaDataTest: string;
+}>();
+
 defineEmits<{ (e: "create"): void }>();
 
-const { t } = useI18n();
 const store = useStore();
+const isDark = computed(() => store.state.theme === "dark");
 </script>
 
 <style lang="scss" scoped>
-.sc-empty {
+.ev-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -81,7 +89,7 @@ const store = useStore();
     justify-content: center;
     margin-bottom: 28px;
 
-    .sc-empty--dark & { border-color: rgba(66, 133, 244, 0.3); }
+    .ev-empty--dark & { border-color: rgba(66, 133, 244, 0.3); }
   }
 
   &__icon-inner {
@@ -117,7 +125,7 @@ const store = useStore();
     font-size: 0.88rem;
     line-height: 1.65;
     color: var(--color-text-secondary, #6b7280);
-    max-width: 440px;
+    max-width: 500px;
     margin-bottom: 24px;
   }
 

@@ -22,6 +22,7 @@ import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
 import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
+import { routeGuard } from "@/utils/zincutils";
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
@@ -58,6 +59,9 @@ const useEnvRoutes = () => {
       path: "online-evals",
       name: "onlineEvals",
       component: OnlineEvals,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
       meta: {
         title: "Online Evals",
         keepAlive: false,

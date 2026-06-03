@@ -1,145 +1,123 @@
 <template>
-  <div
-    data-test="score-config-list-page"
-    class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:h-full tw:min-h-0"
+  <EvalListShell
+    data-test="score-config"
+    :title="t('onlineEvals.scoreConfig.listTitle')"
+    :search="search"
+    :search-placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
+    :add-label="t('onlineEvals.scoreConfig.newButton')"
+    :show-empty="showEmptyState"
+    @update:search="$emit('update:search', $event)"
+    @create="$emit('create')"
   >
-    <div v-if="showEmptyState" class="tw:flex-1 tw:min-h-0">
-      <div class="card-container tw:h-full tw:flex tw:items-center tw:justify-center">
-        <ScoreConfigEmptyState @create="$emit('create')" />
-      </div>
-    </div>
-
-    <template v-else>
-      <div class="tw:shrink-0">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]">
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-              data-test="score-config-list-title"
-            >
-              {{ t("onlineEvals.scoreConfig.listTitle") }}
-            </div>
-
-            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OInput
-                v-model="searchModel"
-                class="tw:ml-2 tw:w-[200px]"
-                :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
-                data-test="score-config-list-search-input"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
-
-              <OSelect
-                v-model="typeFilter"
-                :options="typeOptions"
-                :placeholder="t('onlineEvals.scoreConfig.allTypes')"
-                size="md"
-                class="tw:ml-2 tw:w-[140px]"
-                data-test="score-config-list-type-filter"
-              />
-
-              <OButton
-                data-test="score-config-list-add-btn"
-                class="tw:ml-2"
-                variant="primary"
-                size="sm"
-                  @click="$emit('create')"
-              >
-                {{ t("onlineEvals.scoreConfig.newButton") }}
-              </OButton>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tw:flex-1 tw:min-h-0">
-        <div class="card-container tw:h-full">
-          <OTable
-          data-test="score-config-list-table"
-          :data="filteredRows"
-          :columns="columns"
-          row-key="id"
-          :loading="loading"
-          :footer-title="t('onlineEvals.scoreConfig.listTitle')"
-          :global-filter="searchModel"
-          :show-global-filter="false"
-          :page-size="20"
-          :page-size-options="[20, 50, 100, 250, 500]"
-          width="100%"
-          class="tw:w-full tw:h-full"
-          @row-click="(row: any) => emit('view', row)"
-        >
-          <template #cell-type="{ row }">
-            <span class="sc-dtype-chip" :class="`sc-dtype-chip--${dataTypeOf(row)}`">
-              {{ dataTypeOf(row) }}
-            </span>
-          </template>
-
-          <template #cell-rangeValues="{ row }">
-            <span class="sc-mono-cell">{{ rangeOrValues(row) }}</span>
-          </template>
-
-          <template #cell-healthy="{ row }">
-            <span class="sc-mono-cell tw:font-semibold">{{ healthyDisplay(row) }}</span>
-          </template>
-
-          <template #cell-version="{ row }">
-            <span class="sc-version-cell">
-              <span class="sc-version-cell__dot" />v{{ row.version }}
-              <span class="sc-version-cell__muted">({{ t("onlineEvals.scoreConfig.active") }})</span>
-            </span>
-          </template>
-
-          <template #cell-usedBy="{ row }">
-            <span class="sc-mono-cell">{{ usedByText(row) }}</span>
-          </template>
-
-          <template #cell-created="{ row }">
-            {{ formatDateShort(rowCreated(row)) }}
-          </template>
-
-          <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center actions-container">
-              <OButton
-                :data-test="`score-config-list-${row.name}-edit-btn`"
-                variant="ghost"
-                size="icon-sm"
-                :title="t('onlineEvals.actions.edit')"
-                icon-left="edit"
-                @click.stop="$emit('edit', row)"
-              />
-              <OButton
-                :data-test="`score-config-list-${row.name}-delete-btn`"
-                variant="ghost-destructive"
-                size="icon-sm"
-                :title="t('onlineEvals.actions.delete')"
-                icon-left="delete"
-                @click.stop="$emit('delete', row)"
-              />
-            </div>
-          </template>
-        </OTable>
-        </div>
-      </div>
+    <template #empty>
+      <EvalEmptyState
+        data-test="score-config-empty-state"
+        icon="fact-check"
+        :title="t('onlineEvals.scoreConfig.empty.title')"
+        :description="t('onlineEvals.scoreConfig.empty.description')"
+        :chips="[
+          { icon: 'data-array', label: t('onlineEvals.scoreConfig.empty.chipTypes') },
+          { icon: 'favorite', label: t('onlineEvals.scoreConfig.empty.chipThreshold') },
+        ]"
+        :cta-label="t('onlineEvals.scoreConfig.newButton')"
+        cta-data-test="score-config-empty-create-btn"
+        @create="$emit('create')"
+      />
     </template>
-  </div>
+
+    <template #filter>
+      <OSelect
+        v-model="typeFilter"
+        :options="typeOptions"
+        :placeholder="t('onlineEvals.scoreConfig.allTypes')"
+        size="md"
+        class="tw:ml-2 tw:w-[140px]"
+        data-test="score-config-list-type-filter"
+      />
+    </template>
+
+    <template #table>
+      <OTable
+        data-test="score-config-list-table"
+        :data="numberedRows"
+        :columns="columns"
+        row-key="id"
+        :loading="loading"
+        :footer-title="t('onlineEvals.scoreConfig.listTitle')"
+        :global-filter="search"
+        :show-global-filter="false"
+        :page-size="20"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        width="100%"
+        class="tw:w-full tw:h-full"
+        @row-click="(row: any) => $emit('view', row)"
+      >
+        <template #cell-type="{ row }">
+          <span class="sc-dtype-chip" :class="`sc-dtype-chip--${dataTypeOf(row)}`">
+            {{ dataTypeOf(row) }}
+          </span>
+        </template>
+
+        <template #cell-rangeValues="{ row }">
+          <span class="sc-mono-cell">{{ rangeOrValues(row) }}</span>
+        </template>
+
+        <template #cell-healthy="{ row }">
+          <span class="sc-mono-cell tw:font-semibold">{{ healthyDisplay(row) }}</span>
+        </template>
+
+        <template #cell-version="{ row }">
+          <span class="sc-version-cell">
+            <span class="sc-version-cell__dot" />v{{ row.version }}
+            <span class="sc-version-cell__muted">({{ t("onlineEvals.scoreConfig.active") }})</span>
+          </span>
+        </template>
+
+        <template #cell-usedBy="{ row }">
+          <span class="sc-mono-cell">{{ usedByText(row) }}</span>
+        </template>
+
+        <template #cell-created="{ row }">
+          {{ formatDateShort(rowCreated(row)) }}
+        </template>
+
+        <template #cell-actions="{ row }">
+          <div class="tw:flex tw:items-center actions-container">
+            <OButton
+              :data-test="`score-config-list-${row.name}-edit-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.edit')"
+              icon-left="edit"
+              @click.stop="$emit('edit', row)"
+            />
+            <OButton
+              :data-test="`score-config-list-${row.name}-delete-btn`"
+              variant="ghost-destructive"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.delete')"
+              icon-left="delete"
+              @click.stop="$emit('delete', row)"
+            />
+          </div>
+        </template>
+      </OTable>
+    </template>
+  </EvalListShell>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
-import ScoreConfigEmptyState from "./ScoreConfigEmptyState.vue";
+import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import EvalListShell from "./EvalListShell.vue";
+import { useNumberedRows } from "./composables/useNumberedRows";
 
 type DataType = "numeric" | "categorical" | "boolean";
 
@@ -150,7 +128,7 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: ScoreConfig): void;
@@ -160,11 +138,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const typeFilter = ref<DataType | null>(null);
-
-const searchModel = computed({
-  get: () => props.search,
-  set: (v: string) => emit("update:search", v),
-});
 
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
@@ -247,21 +220,19 @@ const columns = computed(() => [
   },
 ]);
 
-const filteredRows = computed(() => {
-  const rows = typeFilter.value
+const filteredRows = computed(() =>
+  typeFilter.value
     ? props.rows.filter((row) => dataTypeOf(row) === typeFilter.value)
-    : props.rows;
-  return rows.map((row, index) => ({
-    ...row,
-    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
-  }));
-});
+    : props.rows,
+);
+
+const numberedRows = useNumberedRows(filteredRows);
 
 const showEmptyState = computed(
   () =>
     !props.loading &&
     props.rows.length === 0 &&
-    !searchModel.value &&
+    !props.search &&
     !typeFilter.value,
 );
 

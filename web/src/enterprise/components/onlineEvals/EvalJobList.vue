@@ -1,160 +1,137 @@
 <template>
-  <div
-    data-test="eval-job-list-page"
-    class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:h-full tw:min-h-0"
+  <EvalListShell
+    data-test="eval-job"
+    :title="t('onlineEvals.job.listTitle')"
+    :search="search"
+    :search-placeholder="t('onlineEvals.job.searchPlaceholder')"
+    :add-label="t('onlineEvals.job.newButton')"
+    :show-empty="showEmptyState"
+    @update:search="$emit('update:search', $event)"
+    @create="$emit('create')"
   >
-    <div v-if="showEmptyState" class="tw:flex-1 tw:min-h-0">
-      <div class="card-container tw:h-full tw:flex tw:items-center tw:justify-center">
-        <EvalJobEmptyState @create="$emit('create')" />
-      </div>
-    </div>
-
-    <template v-else>
-      <div class="tw:shrink-0">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]">
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-              data-test="eval-job-list-title"
-            >
-              {{ t("onlineEvals.job.listTitle") }}
-            </div>
-
-            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OInput
-                v-model="searchModel"
-                class="tw:ml-2 tw:w-[200px]"
-                :placeholder="t('onlineEvals.job.searchPlaceholder')"
-                data-test="eval-job-list-search-input"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
-
-              <OSelect
-                v-model="statusFilter"
-                :options="statusOptions"
-                :placeholder="t('onlineEvals.job.allStatuses')"
-                size="md"
-                class="tw:ml-2 tw:w-[150px]"
-                data-test="eval-job-list-status-filter"
-              />
-
-              <OButton
-                data-test="eval-job-list-add-btn"
-                class="tw:ml-2"
-                variant="primary"
-                size="sm"
-                  @click="$emit('create')"
-              >
-                {{ t("onlineEvals.job.newButton") }}
-              </OButton>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tw:flex-1 tw:min-h-0">
-        <div class="card-container tw:h-full">
-          <OTable
-            data-test="eval-job-list-table"
-            :data="filteredRows"
-            :columns="columns"
-            row-key="id"
-            :loading="loading"
-            :footer-title="t('onlineEvals.job.listTitle')"
-            :global-filter="searchModel"
-            :show-global-filter="false"
-            :page-size="20"
-            :page-size-options="[20, 50, 100, 250, 500]"
-            width="100%"
-            class="tw:w-full tw:h-full"
-            @row-click="(row: any) => $emit('view', row)"
-          >
-            <template #cell-status="{ row }">
-              <span class="ej-status-chip" :class="`ej-status-chip--${statusOf(row)}`">
-                <span class="ej-status-chip__dot" />
-                {{ statusLabel(statusOf(row)) }}
-              </span>
-            </template>
-
-            <template #cell-stream="{ row }">
-              <span class="ej-mono-cell">{{ row.stream }}</span>
-            </template>
-
-            <template #cell-scorers="{ row }">
-              <span class="ej-mono-cell">{{ scorerCountText(row) }}</span>
-            </template>
-
-            <template #cell-successRate>
-              <span class="ej-muted-cell">—</span>
-            </template>
-
-            <template #cell-lastRun>
-              <span class="ej-muted-cell">—</span>
-            </template>
-
-            <template #cell-created="{ row }">
-              {{ formatDateShort(rowCreated(row)) }}
-            </template>
-
-            <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center actions-container">
-                <OButton
-                  v-if="canActivate(row.status)"
-                  :data-test="`eval-job-list-${row.name}-activate-btn`"
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="t('onlineEvals.actions.activate')"
-                  icon-left="play-arrow"
-                  :loading="pendingStatusId === row.id"
-                  :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
-                  @click.stop="$emit('activate', row)"
-                />
-                <OButton
-                  v-if="canPause(row.status)"
-                  :data-test="`eval-job-list-${row.name}-pause-btn`"
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="t('onlineEvals.actions.pause')"
-                  icon-left="pause"
-                  :loading="pendingStatusId === row.id"
-                  :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
-                  @click.stop="$emit('pause', row)"
-                />
-                <OButton
-                  :data-test="`eval-job-list-${row.name}-edit-btn`"
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="t('onlineEvals.actions.edit')"
-                  icon-left="edit"
-                  @click.stop="$emit('edit', row)"
-                />
-                <OButton
-                  :data-test="`eval-job-list-${row.name}-delete-btn`"
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  :title="t('onlineEvals.actions.delete')"
-                  icon-left="delete"
-                  @click.stop="$emit('delete', row)"
-                />
-              </div>
-            </template>
-          </OTable>
-        </div>
-      </div>
+    <template #empty>
+      <EvalEmptyState
+        data-test="eval-job-empty-state"
+        icon="assessment"
+        :title="t('onlineEvals.job.empty.title')"
+        :description="t('onlineEvals.job.empty.description')"
+        :chips="[
+          { icon: 'stream', label: t('onlineEvals.job.empty.chipStreams') },
+          { icon: 'rule', label: t('onlineEvals.job.empty.chipScorers') },
+          { icon: 'tune', label: t('onlineEvals.job.empty.chipSampling') },
+        ]"
+        :cta-label="t('onlineEvals.job.newButton')"
+        cta-data-test="eval-job-empty-create-btn"
+        @create="$emit('create')"
+      />
     </template>
-  </div>
+
+    <template #filter>
+      <OSelect
+        v-model="statusFilter"
+        :options="statusOptions"
+        :placeholder="t('onlineEvals.job.allStatuses')"
+        size="md"
+        class="tw:ml-2 tw:w-[150px]"
+        data-test="eval-job-list-status-filter"
+      />
+    </template>
+
+    <template #table>
+      <OTable
+        data-test="eval-job-list-table"
+        :data="numberedRows"
+        :columns="columns"
+        row-key="id"
+        :loading="loading"
+        :footer-title="t('onlineEvals.job.listTitle')"
+        :global-filter="search"
+        :show-global-filter="false"
+        :page-size="20"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        width="100%"
+        class="tw:w-full tw:h-full"
+        @row-click="(row: any) => $emit('view', row)"
+      >
+        <template #cell-status="{ row }">
+          <span class="ej-status-chip" :class="`ej-status-chip--${statusOf(row)}`">
+            <span class="ej-status-chip__dot" />
+            {{ statusLabel(statusOf(row)) }}
+          </span>
+        </template>
+
+        <template #cell-stream="{ row }">
+          <span class="ej-mono-cell">{{ row.stream }}</span>
+        </template>
+
+        <template #cell-scorers="{ row }">
+          <span class="ej-mono-cell">{{ scorerCountText(row) }}</span>
+        </template>
+
+        <template #cell-successRate>
+          <span class="ej-muted-cell">—</span>
+        </template>
+
+        <template #cell-lastRun>
+          <span class="ej-muted-cell">—</span>
+        </template>
+
+        <template #cell-created="{ row }">
+          {{ formatDateShort(rowCreated(row)) }}
+        </template>
+
+        <template #cell-actions="{ row }">
+          <div class="tw:flex tw:items-center actions-container">
+            <OButton
+              v-if="canActivate(row.status)"
+              :data-test="`eval-job-list-${row.name}-activate-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.activate')"
+              icon-left="play-arrow"
+              :loading="pendingStatusId === row.id"
+              :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              @click.stop="$emit('activate', row)"
+            />
+            <OButton
+              v-if="canPause(row.status)"
+              :data-test="`eval-job-list-${row.name}-pause-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.pause')"
+              icon-left="pause"
+              :loading="pendingStatusId === row.id"
+              :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              @click.stop="$emit('pause', row)"
+            />
+            <OButton
+              :data-test="`eval-job-list-${row.name}-edit-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.edit')"
+              icon-left="edit"
+              @click.stop="$emit('edit', row)"
+            />
+            <OButton
+              :data-test="`eval-job-list-${row.name}-delete-btn`"
+              variant="ghost-destructive"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.delete')"
+              icon-left="delete"
+              @click.stop="$emit('delete', row)"
+            />
+          </div>
+        </template>
+      </OTable>
+    </template>
+  </EvalListShell>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type {
   EvalJob,
@@ -162,7 +139,9 @@ import type {
 } from "@/services/online-evals.service";
 import { statusOf, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
-import EvalJobEmptyState from "./EvalJobEmptyState.vue";
+import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import EvalListShell from "./EvalListShell.vue";
+import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
   rows: EvalJob[];
@@ -172,7 +151,7 @@ const props = defineProps<{
   pendingStatusId?: string | null;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: EvalJob): void;
@@ -183,22 +162,15 @@ const emit = defineEmits<{
 }>();
 
 function canActivate(status: EvalJobStatus): boolean {
-  // Per backend (`/activate` endpoint): allowed from draft, paused, degraded.
   return status === "draft" || status === "paused" || status === "degraded";
 }
 
 function canPause(status: EvalJobStatus): boolean {
-  // Per backend (`/pause` endpoint): allowed from active, degraded.
   return status === "active" || status === "degraded";
 }
 
 const { t } = useI18n();
 const statusFilter = ref<EvalJobStatus | null>(null);
-
-const searchModel = computed({
-  get: () => props.search,
-  set: (v: string) => emit("update:search", v),
-});
 
 const statusOptions = computed(() => [
   { label: t("onlineEvals.job.allStatuses"), value: null },
@@ -282,21 +254,19 @@ const columns = computed(() => [
   },
 ]);
 
-const filteredRows = computed(() => {
-  const rows = statusFilter.value
+const filteredRows = computed(() =>
+  statusFilter.value
     ? props.rows.filter((row) => statusOf(row) === statusFilter.value)
-    : props.rows;
-  return rows.map((row, index) => ({
-    ...row,
-    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
-  }));
-});
+    : props.rows,
+);
+
+const numberedRows = useNumberedRows(filteredRows);
 
 const showEmptyState = computed(
   () =>
     !props.loading &&
     props.rows.length === 0 &&
-    !searchModel.value &&
+    !props.search &&
     !statusFilter.value,
 );
 
