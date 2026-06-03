@@ -263,6 +263,10 @@ pub async fn update_user(
     mut user: UpdateUser,
 ) -> Result<Response, Error> {
     let mut allow_password_update = false;
+    #[cfg(feature = "cloud")]
+    let is_cloud = true;
+    #[cfg(not(feature = "cloud"))]
+    let is_cloud = false;
     if !is_valid_email(email) {
         return Ok(MetaHttpResponse::bad_request("Invalid email"));
     }
@@ -315,6 +319,7 @@ pub async fn update_user(
         let mut custom_roles_need_change = false;
         match existing_user {
             Some(local_user) => {
+                #[cfg(not(feature = "cloud"))]
                 if local_user.is_external {
                     return Ok(MetaHttpResponse::bad_request(
                         "Updates not allowed with external users, please update with source system",
@@ -401,7 +406,7 @@ pub async fn update_user(
                     is_updated = true;
                 }
                 if let Some(role) = user.role
-                    && !local_user.is_external
+                    && (!local_user.is_external || is_cloud)
                     && (!update_mode.is_self_update()
                         || (local_user.role.eq(&UserRole::Admin)
                             // Editor can update other's roles, but viewer can update only self
