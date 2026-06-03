@@ -74,6 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <code class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:truncate tw:min-w-0 tw:flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
         <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-shrink-0">
+          <span
+            v-if="selectedTrace.metadata?.errorCount > 0"
+            class="tw:font-bold tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-status-error-bg)]! tw:text-[var(--o2-status-error-text)]!"
+          >
+            <OIcon name="error" size="xs" />
+            {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
+          </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
             class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer hover:tw:bg-[var(--o2-border-color)]"
@@ -97,13 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
             {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
-          </span>
-          <span
-            v-if="selectedTrace.metadata?.errorCount > 0"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-status-error)]/10 tw:text-[var(--o2-status-error)]"
-          >
-            <OIcon name="error" size="xs" />
-            {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
           </span>
         </div>
       </div>
@@ -556,6 +556,10 @@ watch(
 .player-traces-tab {
   height: 100%;
   overflow: hidden;
+}
+
+:deep(.trace-details-content .card-container){
+  box-shadow: none
 }
 
 :deep(.trace-row--error td:first-child) {
