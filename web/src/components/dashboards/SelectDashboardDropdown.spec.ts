@@ -32,11 +32,11 @@ vi.mock("@/utils/commons", () => ({
   }),
 }));
 
-// Stub ODrawer so tests are deterministic (no Portal/Reka teleport) and so we
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props the component forwards + emit the click events
 // the component listens to.
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "size",
@@ -61,7 +61,7 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div
-      data-test="o-drawer-stub"
+      data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
@@ -72,11 +72,11 @@ const ODrawerStub = {
       <slot />
       <slot name="footer" />
       <button
-        data-test="o-drawer-stub-primary"
+        data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
       >{{ primaryButtonLabel }}</button>
       <button
-        data-test="o-drawer-stub-secondary"
+        data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
       >{{ secondaryButtonLabel }}</button>
     </div>
@@ -104,7 +104,7 @@ const mountComponent = (props: any = {}, store: any) =>
     global: {
       plugins: [i18n, store],
       stubs: {
-        ODrawer: ODrawerStub,
+        ODialog: ODialogStub,
         AddDashboard: AddDashboardStub,
       },
     },
@@ -201,12 +201,12 @@ describe("SelectDashboardDropdown", () => {
   describe("ODrawer migration", () => {
     it("should render ODrawer in place of q-dialog", () => {
       const wrapper = mountComponent({}, store);
-      expect(wrapper.findComponent(ODrawerStub).exists()).toBe(true);
+      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
     });
 
     it("should keep ODrawer closed by default", () => {
       const wrapper = mountComponent({}, store);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(false);
     });
 
@@ -219,38 +219,38 @@ describe("SelectDashboardDropdown", () => {
       await addButton.trigger("click");
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
     });
 
-    it("should use width 20 on ODrawer", () => {
+    it("should use size sm on ODialog", () => {
       const wrapper = mountComponent({}, store);
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(20);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("size")).toBe("sm");
     });
 
     it("should pass 'New dashboard' title to ODrawer", () => {
       const wrapper = mountComponent({}, store);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("title")).toBe("New dashboard");
     });
 
     it("should render i18n label on secondary (cancel) button", () => {
       const wrapper = mountComponent({}, store);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
     it("should render i18n label on primary (save) button", () => {
       const wrapper = mountComponent({}, store);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonLabel")).toBe("Save");
     });
 
     it("should keep data-test hook on the drawer", () => {
       const wrapper = mountComponent({}, store);
       // data-test is passed through as an attribute on ODrawer
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.attributes("data-test")).toBe(
         "dashboard-dashboard-add-dialog",
       );
@@ -263,7 +263,7 @@ describe("SelectDashboardDropdown", () => {
       wrapper.vm.showAddDashboardDialog = true;
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:secondary");
       await wrapper.vm.$nextTick();
 
@@ -275,7 +275,7 @@ describe("SelectDashboardDropdown", () => {
       wrapper.vm.showAddDashboardDialog = true;
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
@@ -290,7 +290,7 @@ describe("SelectDashboardDropdown", () => {
       const submitSpy = vi.fn();
       wrapper.vm.addDashboardRef = { submit: submitSpy };
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:primary");
 
       expect(submitSpy).toHaveBeenCalledTimes(1);
@@ -302,7 +302,7 @@ describe("SelectDashboardDropdown", () => {
       wrapper.vm.addDashboardRef = null;
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
     });
   });

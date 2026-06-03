@@ -524,11 +524,11 @@ describe("Dashboards.vue", () => {
     });
   });
 
-  // Helper: locate ODrawer instances by title prop.
-  // Each migrated drawer differs only by title, so this gives us a
+  // Helper: locate ODialog instances by title prop.
+  // Each migrated dialog differs only by title, so this gives us a
   // deterministic, attribute-free lookup against the global stub.
   const findDrawerByTitle = (w: any, title: string) => {
-    const drawers = w.findAllComponents({ name: "ODrawer" });
+    const drawers = w.findAllComponents({ name: "ODialog" });
     return drawers.find((d: any) => d.props("title") === title);
   };
 
@@ -544,7 +544,7 @@ describe("Dashboards.vue", () => {
       const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
       expect(drawer).toBeTruthy();
       expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("size")).toBe("md");
       expect(drawer.props("primaryButtonLabel")).toBe("Save");
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
     });
@@ -648,7 +648,7 @@ describe("Dashboards.vue", () => {
       const drawer = findDrawerByTitle(wrapper, "New Folder");
       expect(drawer).toBeTruthy();
       expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("size")).toBe("sm");
     });
 
     it("should switch drawer title to 'Update Folder' when in edit mode", async () => {

@@ -44,9 +44,9 @@ import service_accounts from "@/services/service_accounts";
 // Stubs
 // ---------------------------------------------------------------------------
 
-// ODrawer: renders its default slot content so all inner elements are queryable.
-const ODrawerStub = {
-  name: "ODrawer",
+// ODialog: renders its default slot content so all inner elements are queryable.
+const ODialogStub = {
+  name: "ODialog",
   props: ["open", "width", "title"],
   emits: ["update:open"],
   template: `
@@ -114,7 +114,7 @@ function mountComp(props: Record<string, unknown> = {}): VueWrapper {
     global: {
       plugins: [store, i18n],
       stubs: {
-        ODrawer: ODrawerStub,
+        ODialog: ODialogStub,
         OButton: OButtonStub,
         OInput: OInputStub,
       },
@@ -482,7 +482,7 @@ describe("AddServiceAccount", () => {
     it("emits 'update:open' when ODrawer emits update:open", async () => {
       // Act
       await wrapper
-        .findComponent({ name: "ODrawer" })
+        .findComponent({ name: "ODialog" })
         .vm.$emit("update:open", false);
 
       // Assert

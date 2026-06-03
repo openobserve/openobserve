@@ -32,11 +32,11 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
-// Lightweight stubs for the in-house O* components. ODrawer renders its
+// Lightweight stubs for the in-house O* components. ODialog renders its
 // default slot so children remain queryable, and OButton forwards click
 // events so tests can drive interactions directly.
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "width",
@@ -51,7 +51,7 @@ const ODrawerStub = {
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
-    <div data-test-stub="o-drawer" :data-open="open" :data-title="title" :data-width="width">
+    <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-width="width">
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
       <div data-test-stub="o-drawer-body"><slot /></div>
       <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
@@ -69,7 +69,7 @@ const OButtonStub = {
 
 function buildStubs() {
   return {
-    ODrawer: ODrawerStub,
+    ODialog: ODialogStub,
     OButton: OButtonStub,
   };
 }
@@ -108,7 +108,7 @@ describe("AddGroup Component", () => {
     });
 
     it("renders inside an ODrawer with the localized title", () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      const drawer = wrapper.find('[data-test-stub="o-dialog"]');
       expect(drawer.exists()).toBe(true);
       // i18n key resolves to "Add User Group" (en); assert via attribute,
       // not text, since the stub doesn't render the title body.
@@ -116,16 +116,16 @@ describe("AddGroup Component", () => {
     });
 
     it("propagates the open prop to the drawer", async () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      const drawer = wrapper.find('[data-test-stub="o-dialog"]');
       expect(drawer.attributes("data-open")).toBe("true");
 
       await wrapper.setProps({ open: false });
-      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-open")).toBe("false");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("false");
     });
 
-    it("uses width=30 on the drawer", () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-width")).toBe("30");
+    it("uses size=sm on the dialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("size")).toBe("sm");
     });
   });
 
@@ -215,7 +215,7 @@ describe("AddGroup Component", () => {
     });
 
     it("re-emits update:open from the drawer's update:open event", async () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
 
       const emitted = wrapper.emitted("update:open");
@@ -396,7 +396,7 @@ describe("AddGroup Component", () => {
       });
 
       expect(localWrapper.props("open")).toBe(false);
-      const drawer = localWrapper.find('[data-test-stub="o-drawer"]');
+      const drawer = localWrapper.find('[data-test-stub="o-dialog"]');
       expect(drawer.attributes("data-open")).toBe("false");
       localWrapper.unmount();
     });

@@ -98,10 +98,10 @@ vi.mock("../../../utils/commons", () => ({
   getDashboard: vi.fn(),
 }));
 
-// ODrawer stub: exposes the migrated props and drives the
+// ODialog stub: exposes the migrated props and drives the
 // primary/secondary buttons via emits (click:primary / click:secondary).
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "width",
@@ -237,7 +237,7 @@ describe("AddTab", () => {
       global: {
         plugins: [],
         stubs: {
-          ODrawer: ODrawerStub,
+          ODialog: ODialogStub,
           OForm: OFormStub,
           OFormInput: OFormInputStub,
         },
@@ -283,7 +283,7 @@ describe("AddTab", () => {
 
   // Helper: locate the ODrawer stub instance for emit-driven interactions.
   const findDrawer = (w: VueWrapper<any>) =>
-    w.findComponent({ name: "ODrawer" });
+    w.findComponent({ name: "ODialog" });
 
   describe("Component Initialization", () => {
     it("should render correctly", () => {

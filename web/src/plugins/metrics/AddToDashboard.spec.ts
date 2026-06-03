@@ -97,12 +97,12 @@ const mockStore = {
 };
 
 // ---------------------------------------------------------------------------
-// ODrawer stub — mirrors the migrated component's overlay surface.
+// ODialog stub — mirrors the migrated component's overlay surface.
 // Renders the default slot so children (form, dropdowns) are queryable.
 // Exposes all migrated props and emits so we can assert on them.
 // ---------------------------------------------------------------------------
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   template:
     "<div class='o-drawer-stub' :data-test='$attrs[\"data-test\"]' :data-open='open'>" +
     "<slot name='header' />" +
@@ -162,7 +162,7 @@ const createWrapper = (props: Record<string, any> = {}) => {
     },
     global: {
       stubs: {
-        ODrawer: ODrawerStub,
+        ODialog: ODialogStub,
         OForm: {
           name: "OForm",
           template: "<form class='o-form-stub' @submit.prevent='$emit(\"submit\", {})'><slot /></form>",
@@ -322,7 +322,7 @@ describe("AddToDashboard — props", () => {
   it("accepts open prop and forwards it to ODrawer", async () => {
     const wrapper = createWrapper({ open: true });
     await flushPromises();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.exists()).toBe(true);
     expect(drawer.props("open")).toBe(true);
   });
@@ -332,7 +332,7 @@ describe("AddToDashboard — props", () => {
       props: { dashboardPanelData: defaultDashboardPanelData },
       global: {
         stubs: {
-          ODrawer: ODrawerStub,
+          ODialog: ODialogStub,
           QForm: true,
           QInput: true,
           SelectFolderDropdown: true,
@@ -342,7 +342,7 @@ describe("AddToDashboard — props", () => {
       },
     });
     await flushPromises();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("open")).toBe(false);
   });
 });
@@ -741,36 +741,36 @@ describe("AddToDashboard — ODrawer surface", () => {
   it("passes the localized title to ODrawer", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("title")).toBe("dashboard.addDashboard");
   });
 
   it("passes the localized primary button label to ODrawer", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("primaryButtonLabel")).toBe("metrics.add");
   });
 
   it("passes a secondary button label (Cancel) to ODrawer", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
   });
 
-  it("passes the configured width (30) to ODrawer", async () => {
+  it("passes the configured size (md) to ODialog", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    const drawer = wrapper.findComponent(ODrawerStub);
-    expect(drawer.props("width")).toBe(30);
+    const drawer = wrapper.findComponent(ODialogStub);
+    expect(drawer.props("size")).toBe("md");
   });
 
   it("disables the primary button when panelTitle is empty", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     // panelTitle starts empty
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("primaryButtonDisabled")).toBe(true);
   });
 
@@ -779,7 +779,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     await flushPromises();
     wrapper.vm.panelTitle = "My Panel";
     await nextTick();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("primaryButtonDisabled")).toBe(false);
   });
 
@@ -788,7 +788,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     await flushPromises();
     wrapper.vm.panelTitle = "   ";
     await nextTick();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("primaryButtonDisabled")).toBe(true);
   });
 
@@ -796,7 +796,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     mockUseLoadingIsLoading.value = true;
     const wrapper = createWrapper();
     await flushPromises();
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("primaryButtonLoading")).toBe(true);
   });
 
@@ -808,7 +808,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     wrapper.vm.activeTabId = "tab-1";
     wrapper.vm.panelTitle = "Panel";
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     await drawer.vm.$emit("click:primary");
     await flushPromises();
 
@@ -819,7 +819,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     const wrapper = createWrapper();
     await flushPromises();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     await drawer.vm.$emit("click:secondary");
     await nextTick();
 
@@ -832,7 +832,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     const wrapper = createWrapper();
     await flushPromises();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     await drawer.vm.$emit("update:open", false);
     await nextTick();
 
@@ -845,7 +845,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     const wrapper = createWrapper({ open: false });
     await flushPromises();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     await drawer.vm.$emit("update:open", true);
     await nextTick();
 

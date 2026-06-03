@@ -21,11 +21,11 @@ import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
 
-// Stub ODrawer so tests are deterministic (no Portal/Reka teleport) and so we
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props the component forwards + emit the click events
 // the component listens to.
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "size",
@@ -50,7 +50,7 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div
-      data-test="o-drawer-stub"
+      data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-width="width"
       :data-title="title"
@@ -61,11 +61,11 @@ const ODrawerStub = {
       <slot />
       <slot name="footer" />
       <button
-        data-test="o-drawer-stub-primary"
+        data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
       >{{ primaryButtonLabel }}</button>
       <button
-        data-test="o-drawer-stub-secondary"
+        data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
       >{{ secondaryButtonLabel }}</button>
     </div>
@@ -92,7 +92,7 @@ const createWrapper = (props: Record<string, any> = {}, store: any, router: any)
     global: {
       plugins: [i18n, store, router],
       stubs: {
-        ODrawer: ODrawerStub,
+        ODialog: ODialogStub,
         AddFolder: AddFolderStub,
       },
     },
@@ -233,13 +233,13 @@ describe("SelectFolderDropdown", () => {
   describe("ODrawer Prop Forwarding", () => {
     it("should render the ODrawer wrapper", () => {
       const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(true);
     });
 
     it("should forward open=false to ODrawer initially", () => {
       const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(false);
     });
 
@@ -250,25 +250,25 @@ describe("SelectFolderDropdown", () => {
         .find('[data-test="dashboard-folder-move-new-add"]')
         .trigger("click");
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
     });
 
     it("should forward the localized title to ODrawer", () => {
       const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("title")).toBe(i18n.global.t("common.addFolder"));
     });
 
-    it("should forward width=30 to ODrawer", () => {
+    it("should forward size=sm to ODialog", () => {
       const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(20);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("size")).toBe("sm");
     });
 
     it("should forward the localized save label to ODrawer primary button", () => {
       const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonLabel")).toBe(
         i18n.global.t("dashboard.save"),
       );
@@ -276,7 +276,7 @@ describe("SelectFolderDropdown", () => {
 
     it("should forward the localized cancel label to ODrawer secondary button", () => {
       const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("secondaryButtonLabel")).toBe(
         i18n.global.t("dashboard.cancel"),
       );
@@ -299,7 +299,7 @@ describe("SelectFolderDropdown", () => {
         .trigger("click");
       expect(wrapper.vm.showAddFolderDialog).toBe(true);
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:secondary");
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
@@ -313,7 +313,7 @@ describe("SelectFolderDropdown", () => {
         .find('[data-test="dashboard-folder-move-new-add"]')
         .trigger("click");
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:primary");
 
       expect(addFolderSubmitSpy).toHaveBeenCalledTimes(1);
@@ -327,7 +327,7 @@ describe("SelectFolderDropdown", () => {
       wrapper.vm.addFolderRef = null;
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
     });
   });

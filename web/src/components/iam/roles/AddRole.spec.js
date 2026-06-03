@@ -49,18 +49,13 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 
-// ODrawer stub: exposes the migrated props (open/width/title/...) and drives
-// the primary/secondary/neutral buttons via the standard click:* emits. Buttons
-// inside the default slot (the AddRole component still renders its own
-// OButton cancel/save inside the slot) are also exposed for direct clicks.
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
-    "width",
+    "size",
     "showClose",
     "persistent",
-    "size",
     "title",
     "subTitle",
     "primaryButtonLabel",
@@ -79,21 +74,21 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div
-      data-test-stub="o-drawer"
+      data-test-stub="o-dialog"
       :data-open="open"
       :data-title="title"
-      :data-width="width"
+      :data-size="size"
     >
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+      <div data-test-stub="o-dialog-header"><slot name="header" /></div>
+      <div data-test-stub="o-dialog-body"><slot /></div>
+      <div data-test-stub="o-dialog-footer"><slot name="footer" /></div>
     </div>
   `,
   inheritAttrs: false,
 };
 
 const findDrawer = (w) =>
-  w.findComponent({ name: "ODrawer" });
+  w.findComponent({ name: "ODialog" });
 
 describe("AddRole Component", () => {
   let wrapper;
@@ -109,7 +104,7 @@ describe("AddRole Component", () => {
           store: mockStore,
         },
         stubs: {
-          ODrawer: ODrawerStub,
+          ODialog: ODialogStub,
           QInput: true,
         },
       },
@@ -156,7 +151,7 @@ describe("AddRole Component", () => {
       const drawer = findDrawer(wrapper);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("size")).toBe("sm");
       expect(drawer.props("title")).toBe("iam.addRole");
     });
 
@@ -503,7 +498,7 @@ describe("AddRole Component", () => {
         global: {
           plugins: [i18n],
           provide: { store: mockStore },
-          stubs: { ODrawer: ODrawerStub, QInput: true },
+          stubs: { ODialog: ODialogStub, QInput: true },
         },
       });
 

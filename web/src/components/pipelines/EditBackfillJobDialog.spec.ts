@@ -73,8 +73,8 @@ const mockJob: BackfillJob = {
 // component wires up (update:open, click:primary, click:secondary). The
 // title/buttons live on the drawer itself in the real component, so we expose
 // them via attrs so the test suite can assert on them.
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "width",
@@ -120,7 +120,7 @@ function createWrapper(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        ODrawer: ODrawerStub,
+        ODialog: ODialogStub,
         OCollapsible: {
           template: '<div><slot /></div>',
           props: ["modelValue", "icon", "label"],
@@ -277,7 +277,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.delayBetweenChunks = 5;
       vm.formData.deleteBeforeBackfill = false;
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(backfillService.updateBackfillJob).toHaveBeenCalledWith({
@@ -303,7 +303,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(wrapper.emitted("job-updated")).toBeTruthy();
@@ -319,7 +319,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
       await flushPromises();
 
       const emitted = wrapper.emitted("update:modelValue");
@@ -341,7 +341,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(vm.errorMessage).toBe("Network Error");
@@ -364,7 +364,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(vm.errorMessage).toBe("Job not found");
@@ -412,7 +412,7 @@ describe("EditBackfillJobDialog", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("click:secondary");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
       await nextTick();
 
       const emitted = wrapper.emitted("update:modelValue");
@@ -429,7 +429,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.chunkPeriodMinutes = 999;
       vm.errorMessage = "some error";
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("click:secondary");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
       await nextTick();
 
       expect(vm.formData.startTimeMicros).toBe(0);
@@ -483,7 +483,7 @@ describe("EditBackfillJobDialog", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      await wrapper.findComponent(ODrawerStub).vm.$emit("update:open", false);
+      await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
       await nextTick();
 
       const emitted = wrapper.emitted("update:modelValue");
