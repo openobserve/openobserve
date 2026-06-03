@@ -50,11 +50,20 @@ fn connect(readonly: bool, ddl: bool) -> Pool<Postgres> {
         (_, true) => cfg.common.meta_ddl_dsn.clone(),
     };
     if dsn.is_empty() {
-        // default fallback for any case is the original dsn, which is checked
-        // in config.rs to be  non-empty
         dsn = cfg.common.meta_postgres_dsn.clone();
     }
-    let db_opts = PgConnectOptions::from_str(&dsn).expect("postgres connect options create failed");
+    let db_opts = if !dsn.is_empty() {
+        PgConnectOptions::from_str(&dsn).expect("postgres connect options create failed")
+    } else {
+        // Build from individual env vars when no DSN is provided. Validated in config.rs.
+        let c = &cfg.common;
+        PgConnectOptions::new()
+            .host(&c.meta_postgres_host)
+            .port(c.meta_postgres_port)
+            .username(&c.meta_postgres_user)
+            .password(&c.meta_postgres_password)
+            .database(&c.meta_postgres_dbname)
+    };
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);

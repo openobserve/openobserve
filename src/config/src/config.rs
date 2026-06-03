@@ -912,6 +912,19 @@ pub struct Common {
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
+    // Individual connection vars — alternative to ZO_META_POSTGRES_DSN for environments
+    // where host and password must be injected separately (e.g. ECS/K8s secrets managers).
+    // Ignored when ZO_META_POSTGRES_DSN is set.
+    #[env_config(name = "ZO_META_POSTGRES_HOST", default = "")]
+    pub meta_postgres_host: String,
+    #[env_config(name = "ZO_META_POSTGRES_PORT", default = 5432)]
+    pub meta_postgres_port: u16,
+    #[env_config(name = "ZO_META_POSTGRES_USER", default = "")]
+    pub meta_postgres_user: String,
+    #[env_config(name = "ZO_META_POSTGRES_PASSWORD", default = "")]
+    pub meta_postgres_password: String,
+    #[env_config(name = "ZO_META_POSTGRES_DBNAME", default = "")]
+    pub meta_postgres_dbname: String,
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_META_PARTITION_MODE", default = "auto")]
@@ -2859,9 +2872,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
-        ));
+        let c = &cfg.common;
+        if c.meta_postgres_host.is_empty()
+            || c.meta_postgres_user.is_empty()
+            || c.meta_postgres_password.is_empty()
+            || c.meta_postgres_dbname.is_empty()
+        {
+            return Err(anyhow::anyhow!(
+                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
+                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
+                 ZO_META_POSTGRES_DBNAME"
+            ));
+        }
     }
 
     if cfg.common.meta_store.starts_with("mysql") {
