@@ -40,6 +40,7 @@ pub struct FlightDecoderStream {
     metrics: RemoteScanMetrics,
     query_context: QueryContext,
     scan_stats: ScanStats,
+    fetch_start: Option<std::time::Instant>,
 }
 
 impl FlightDecoderStream {
@@ -55,6 +56,7 @@ impl FlightDecoderStream {
             metrics,
             query_context,
             scan_stats: ScanStats::default(),
+            fetch_start: None,
         }
     }
 
@@ -98,9 +100,12 @@ impl Stream for FlightDecoderStream {
     ) -> Poll<Option<Result<RecordBatch>>> {
         let poll;
         loop {
-            let timer = std::time::Instant::now();
+            // record the start time across Poll::Pending returns so that
+            // network wait time is included in fetch_time.
+            let start = *self.fetch_start.get_or_insert_with(std::time::Instant::now);
             let res = ready!(self.inner.poll_next_unpin(cx));
-            self.metrics.fetch_time.add_duration(timer.elapsed());
+            self.metrics.fetch_time.add_duration(start.elapsed());
+            self.fetch_start = None;
             match res {
                 // Inner exhausted
                 None => {
@@ -202,16 +207,20 @@ impl Drop for FlightDecoderStream {
             "follower".to_string()
         };
         let scan_stats = self.scan_stats;
+        let batches = self.metrics.batches_received.value();
+        let bytes = self.metrics.bytes_received.value();
+        let avg_ms = self.metrics.avg_batch_time_ms();
 
         log::info!(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] flight->search: response node: {}, name: {}, is_super: {is_super}, is_querier: {is_querier}, files: {}, scan_size: {} mb, num_rows: {num_rows}, took: {} ms",
+                    "[trace_id {trace_id}] flight->search: response node: {}, name: {}, is_super: {is_super}, is_querier: {is_querier}, files: {}, scan_size: {} mb, num_rows: {num_rows}, batches: {batches}, bytes: {}, avg_batch_time: {avg_ms} ms, took: {} ms",
                     node.get_grpc_addr(),
                     node.get_name(),
                     scan_stats.files,
                     scan_stats.original_size / 1024 / 1024,
+                    bytes_to_human_readable(bytes as f64),
                     start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()
@@ -223,10 +232,11 @@ impl Drop for FlightDecoderStream {
                     .search_role(search_role)
                     .duration(start.elapsed().as_millis() as usize)
                     .desc(format!(
-                        "remote scan search files: {}, scan_size: {}, num_rows: {}",
+                        "remote scan search files: {}, scan_size: {}, num_rows: {}, batches: {batches}, bytes: {}, avg_batch_time: {avg_ms} ms",
                         scan_stats.files,
                         bytes_to_human_readable(scan_stats.original_size as f64),
-                        num_rows
+                        num_rows,
+                        bytes_to_human_readable(bytes as f64),
                     ))
                     .build(),
             )
@@ -241,7 +251,7 @@ fn record_poll(
     if let Poll::Ready(maybe_batch) = &poll
         && let Some(Ok(batch)) = maybe_batch
     {
-        metrics.record_output(batch.num_rows());
+        metrics.record_output(batch);
     }
     poll
 }
