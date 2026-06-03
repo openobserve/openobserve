@@ -66,7 +66,7 @@ static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
-    let local_val = v.as_object().unwrap();
+    let local_val = v.as_object()?;
     for action in BULK_OPERATORS {
         if let Some(val) = local_val.get(action) {
             let Some(local_val) = val.as_object() else {
