@@ -23,6 +23,7 @@ use arrow_schema::SchemaRef;
 use config::{
     cluster::LOCAL_NODE,
     meta::{cluster::NodeInfo, search::ScanStats},
+    utils::record_batch_ext::RecordBatchExt,
 };
 use datafusion::{
     self,
@@ -43,28 +44,45 @@ pub struct RemoteScanMetrics {
     pub decode_time: metrics::Time,
     /// output rows
     pub output_rows: metrics::Count,
+    /// number of RecordBatches received from the remote node
+    pub batches_received: metrics::Count,
+    /// total in-memory bytes of RecordBatches received
+    pub bytes_received: metrics::Count,
 }
 
 impl RemoteScanMetrics {
     pub fn new(input_partition: usize, metrics: &ExecutionPlanMetricsSet) -> Self {
-        // Time in nanos to execute child operator and fetch batches
         let fetch_time = MetricBuilder::new(metrics).subset_time("fetch_time", input_partition);
-
-        // Time in nanos to perform decoding
         let decode_time = MetricBuilder::new(metrics).subset_time("decode_time", input_partition);
-
-        // Output rows
         let output_rows = MetricBuilder::new(metrics).output_rows(input_partition);
+        let batches_received =
+            MetricBuilder::new(metrics).counter("batches_received", input_partition);
+        let bytes_received = MetricBuilder::new(metrics).counter("bytes_received", input_partition);
 
         Self {
             fetch_time,
             decode_time,
             output_rows,
+            batches_received,
+            bytes_received,
         }
     }
 
-    pub fn record_output(&self, n: usize) {
-        self.output_rows.add(n);
+    pub fn record_output(&self, batch: &RecordBatch) {
+        self.output_rows.add(batch.num_rows());
+        self.batches_received.add(1);
+        self.bytes_received.add(batch.size());
+    }
+
+    /// Average fetch time per batch in milliseconds, or 0 if no batches received.
+    pub fn avg_batch_time_ms(&self) -> u64 {
+        let batches = self.batches_received.value();
+        if batches == 0 {
+            return 0;
+        }
+        // fetch_time.value() is total nanoseconds (usize)
+        let total_ns = self.fetch_time.value() as u64;
+        total_ns / batches as u64 / 1_000_000
     }
 }
 
