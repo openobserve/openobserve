@@ -14,14 +14,12 @@
           </div>
           <div v-if="row.description" class="sd__produces-line">
             <template v-if="producesConfig">
-              <span class="sd__produces-prefix">{{ t("onlineEvals.scorer.detail.producesShort") }}</span>
               <span class="sd-mono sd__produces-name">{{ producesConfig.name }}</span>
               <span class="sd__sep">·</span>
             </template>
             <span class="sd__produces-desc">{{ row.description }}</span>
           </div>
           <div v-else-if="producesConfig" class="sd__produces-line">
-            <span class="sd__produces-prefix">{{ t("onlineEvals.scorer.detail.producesShort") }}</span>
             <span class="sd-mono sd__produces-name">{{ producesConfig.name }}</span>
           </div>
         </div>
@@ -187,11 +185,11 @@
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
           <div class="sd__runs-toolbar">
-            <OSelect
-              v-model="runsWindowKey"
-              :options="runsWindowOptions"
-              size="md"
-              class="sd__runs-window-select"
+            <DateTimePickerDashboard
+              ref="dateTimePickerRef"
+              v-model="selectedDate"
+              :auto-apply-dashboard="true"
+              class="sd__date-picker"
               data-test="scorer-detail-runs-window"
             />
             <OButton
@@ -212,43 +210,50 @@
             </span>
           </div>
 
-          <div v-if="runs.length === 0 && !isLoadingRuns" class="sd-empty">
-            <OIcon name="info" size="xs" />
-            <span>{{ t("onlineEvals.scorer.detail.runs.empty") }}</span>
-          </div>
-
-          <ul v-else class="sd-runs">
-            <li
-              v-for="run in runs"
-              :key="run.id"
-              class="sd-run-row"
-              :class="`sd-run-row--${run.status}`"
-              data-test="scorer-detail-run-row"
-            >
-              <div class="sd-run-row__time">{{ relativeTime(run.timestampMs) }}</div>
-              <div class="sd-run-row__job">
-                <span class="sd-mono">{{ jobNameFor(run.jobId) }}</span>
-              </div>
-              <div class="sd-run-row__target">
-                <div v-if="run.targetSpanId" class="sd-run-row__target-line">
-                  <span class="sd-run-row__label">{{ t("onlineEvals.scorer.detail.runs.spanLabel") }}</span>
-                  <span class="sd-mono">{{ shortId(run.targetSpanId) }}</span>
+          <OTable
+            data-test="scorer-detail-runs-table"
+            :data="runs"
+            :columns="runColumns"
+            row-key="id"
+            :loading="isLoadingRuns"
+            :show-global-filter="false"
+            :show-footer="false"
+            :page-size="20"
+            :page-size-options="[20, 50, 100, 200]"
+            width="100%"
+            class="tw:w-full"
+          >
+            <template #cell-timestampMs="{ row }">
+              <span class="sd-mono sd-muted-text">{{ relativeTime(row.timestampMs) }}</span>
+            </template>
+            <template #cell-jobId="{ row }">
+              <span class="sd-mono">{{ jobNameFor(row.jobId) }}</span>
+            </template>
+            <template #cell-target="{ row }">
+              <div class="sd-target-cell">
+                <div v-if="row.targetSpanId" class="sd-target-cell__line">
+                  <span class="sd-target-cell__label">{{ t("onlineEvals.scorer.detail.runs.spanLabel") }}</span>
+                  <span class="sd-mono sd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
                 </div>
-                <div v-if="run.targetTraceId" class="sd-run-row__target-line">
-                  <span class="sd-run-row__label">{{ t("onlineEvals.scorer.detail.runs.traceLabel") }}</span>
-                  <span class="sd-mono">{{ shortId(run.targetTraceId) }}</span>
+                <div v-if="row.targetTraceId" class="sd-target-cell__line">
+                  <span class="sd-target-cell__label">{{ t("onlineEvals.scorer.detail.runs.traceLabel") }}</span>
+                  <span class="sd-mono sd-target-cell__id" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
                 </div>
               </div>
-              <div class="sd-run-row__score sd-mono">{{ run.scoreDisplay }}</div>
-              <div class="sd-run-row__latency sd-mono">
-                {{ run.latencyMs != null ? formatLatency(run.latencyMs) : "—" }}
-              </div>
-              <div class="sd-run-row__status">
-                <span class="sd-run-row__dot" :class="`sd-run-row__dot--${run.status}`" />
-                {{ run.status }}
-              </div>
-            </li>
-          </ul>
+            </template>
+            <template #cell-scoreDisplay="{ row }">
+              <span class="sd-mono">{{ row.scoreDisplay }}</span>
+            </template>
+            <template #cell-latencyMs="{ row }">
+              <span class="sd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
+            </template>
+            <template #cell-status="{ row }">
+              <span class="sd-status-cell" :class="`sd-status-cell--${row.status}`">
+                <span class="sd-status-cell__dot" />
+                {{ row.status }}
+              </span>
+            </template>
+          </OTable>
         </template>
 
         <!-- Used by -->
@@ -280,11 +285,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type {
   EvalJob,
   Provider,
@@ -389,7 +395,7 @@ const updatedAt = computed<number | null>(() => {
   return typeof v === "number" ? v : null;
 });
 
-// — Tabs —
+// — Tabs — no badge counts on Runs (the KPI strip already shows totalRuns).
 const tabs = computed(() => [
   {
     id: "configuration" as TabId,
@@ -404,7 +410,7 @@ const tabs = computed(() => [
   {
     id: "runs" as TabId,
     label: t("onlineEvals.scorer.detail.tabs.runs"),
-    count: kpis.value.totalRuns,
+    count: null as number | null,
   },
   {
     id: "usedBy" as TabId,
@@ -413,30 +419,32 @@ const tabs = computed(() => [
   },
 ]);
 
-// — Runs window —
-type WindowKey = "last1h" | "last24h" | "last7d" | "last30d";
-const WINDOW_MS: Record<WindowKey, number> = {
-  last1h: 60 * 60 * 1000,
-  last24h: 24 * 60 * 60 * 1000,
-  last7d: 7 * 24 * 60 * 60 * 1000,
-  last30d: 30 * 24 * 60 * 60 * 1000,
-};
-const runsWindowKey = ref<WindowKey>("last24h");
-const runsWindowOptions = computed(() => [
-  { value: "last1h", label: t("onlineEvals.scorer.detail.runs.windowLast1h") },
-  { value: "last24h", label: t("onlineEvals.scorer.detail.runs.windowLast24h") },
-  { value: "last7d", label: t("onlineEvals.scorer.detail.runs.windowLast7d") },
-  { value: "last30d", label: t("onlineEvals.scorer.detail.runs.windowLast30d") },
-]);
-
-const dateWindow = computed<ScorerRunsWindow>(() => {
-  const nowMs = Date.now();
-  const windowMs = WINDOW_MS[runsWindowKey.value];
-  return {
-    startUs: (nowMs - windowMs) * 1000,
-    endUs: nowMs * 1000,
-  };
+// — Runs window — backed by DateTimePickerDashboard.
+const dateTimePickerRef = ref<{
+  getConsumableDateTime: () => { startTime: number; endTime: number };
+} | null>(null);
+const selectedDate = ref<any>({
+  valueType: "relative",
+  startTime: null,
+  endTime: null,
+  relativeTimePeriod: "24h",
 });
+
+const dateWindow = ref<ScorerRunsWindow>({
+  startUs: (Date.now() - 24 * 60 * 60 * 1000) * 1000,
+  endUs: Date.now() * 1000,
+});
+
+function syncDateWindow() {
+  const picker = dateTimePickerRef.value;
+  if (!picker) return;
+  const dt = picker.getConsumableDateTime();
+  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
+    dateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
+  }
+}
+
+watch(selectedDate, () => syncDateWindow(), { deep: true });
 
 const runsEnabled = computed(() => activeTab.value === "runs");
 const scorerIdRef = computed(() => entityId(props.row));
@@ -448,8 +456,60 @@ const { kpis, runs, isLoadingRuns, refresh: refreshRunsData } = useScorerRuns(
 );
 
 async function refreshRuns() {
+  syncDateWindow();
   await refreshRunsData();
 }
+
+// — OTable column definitions —
+const runColumns = computed(() => [
+  {
+    id: "timestampMs",
+    header: t("onlineEvals.scorer.detail.runs.col.time"),
+    accessorKey: "timestampMs",
+    sortable: true,
+    size: 110,
+    meta: { align: "left" },
+  },
+  {
+    id: "jobId",
+    header: t("onlineEvals.scorer.detail.runs.col.job"),
+    accessorKey: "jobId",
+    sortable: true,
+    size: "auto",
+    meta: { align: "left" },
+  },
+  {
+    id: "target",
+    header: t("onlineEvals.scorer.detail.runs.col.target"),
+    sortable: false,
+    size: 360,
+    meta: { align: "left" },
+  },
+  {
+    id: "scoreDisplay",
+    header: t("onlineEvals.scorer.detail.runs.col.score"),
+    accessorKey: "scoreDisplay",
+    sortable: false,
+    size: 80,
+    meta: { align: "right" },
+  },
+  {
+    id: "latencyMs",
+    header: t("onlineEvals.scorer.detail.runs.col.latency"),
+    accessorKey: "latencyMs",
+    sortable: true,
+    size: 90,
+    meta: { align: "right" },
+  },
+  {
+    id: "status",
+    header: t("onlineEvals.scorer.detail.runs.col.status"),
+    accessorKey: "status",
+    sortable: true,
+    size: 110,
+    meta: { align: "left" },
+  },
+]);
 
 // — KPI tone —
 const successRateTone = computed(() => {
@@ -465,11 +525,6 @@ function jobNameFor(jobId: string): string {
   if (!jobId) return t("onlineEvals.scorer.detail.runs.jobUnknown");
   const job = props.jobs.find((j) => String(j.id) === jobId);
   return job?.name ?? jobId;
-}
-
-function shortId(id: string): string {
-  if (!id) return "—";
-  return id.length > 10 ? `${id.slice(0, 8)}…` : id;
 }
 
 function formatTimestamp(microsOrMs: number): string {
@@ -619,7 +674,6 @@ function relativeTime(timestampMs: number): string {
   flex-wrap: wrap;
 }
 
-.sd__produces-prefix { color: var(--color-text-secondary, var(--o2-text-secondary)); }
 .sd__produces-name { color: var(--color-text-primary, currentColor); font-weight: 600; }
 .sd__produces-desc { color: var(--color-text-secondary, var(--o2-text-secondary)); }
 .sd__sep { opacity: 0.5; }
@@ -930,11 +984,10 @@ function relativeTime(timestampMs: number): string {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.sd__runs-window-select {
-  width: 180px;
-}
+.sd__date-picker { flex: 0 0 auto; }
 
 .sd__runs-meta {
   margin-left: auto;
@@ -947,86 +1000,66 @@ function relativeTime(timestampMs: number): string {
   font-variant-numeric: tabular-nums;
 }
 
-.sd-runs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.sd-run-row {
-  display: grid;
-  grid-template-columns: 70px 1fr 1.6fr 60px 70px 90px;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  font-size: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-}
-
-.sd-run-row:first-child { border-top: 0; }
-
-.sd-run-row__time {
+.sd-muted-text {
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
 }
 
-.sd-run-row__job span {
-  color: var(--color-text-primary, currentColor);
-  font-weight: 600;
-}
-
-.sd-run-row__target {
+.sd-target-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.sd-run-row__target-line {
+.sd-target-cell__line {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 6px;
   font-size: 11px;
+  min-width: 0;
 }
 
-.sd-run-row__label {
+.sd-target-cell__label {
+  flex-shrink: 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.sd-run-row__score,
-.sd-run-row__latency {
-  text-align: right;
+.sd-target-cell__id {
+  font-size: 11.5px;
+  color: var(--color-text-primary, currentColor);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
-.sd-run-row__status {
+.sd-status-cell {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.sd-run-row__dot {
+.sd-status-cell__dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.sd-run-row__dot--success { background: var(--o2-status-success-text, #2e7d32); }
-.sd-run-row__dot--error,
-.sd-run-row__dot--timeout { background: var(--o2-status-error-text, #c62828); }
-.sd-run-row__dot--skipped { background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent); }
+.sd-status-cell--success { color: var(--o2-status-success-text, #2e7d32); }
+.sd-status-cell--success .sd-status-cell__dot { background: var(--o2-status-success-text, #2e7d32); }
 
-.sd-run-row--success .sd-run-row__status { color: var(--o2-status-success-text, #2e7d32); }
-.sd-run-row--error  .sd-run-row__status,
-.sd-run-row--timeout .sd-run-row__status { color: var(--o2-status-error-text, #c62828); }
+.sd-status-cell--error,
+.sd-status-cell--timeout { color: var(--o2-status-error-text, #c62828); }
+.sd-status-cell--error .sd-status-cell__dot,
+.sd-status-cell--timeout .sd-status-cell__dot { background: var(--o2-status-error-text, #c62828); }
+
+.sd-status-cell--skipped .sd-status-cell__dot {
+  background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
+}
 
 /* — Used by tab — */
 .sd-used-list {

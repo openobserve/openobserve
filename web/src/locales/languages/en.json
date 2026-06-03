@@ -4395,7 +4395,6 @@
         "close": "Close",
         "eyebrow": "Scorer",
         "refresh": "Refresh",
-        "producesShort": "Produces",
         "descriptionSection": "Description",
         "configurationSection": "Configuration",
         "scorerTypeLabel": "Scorer Type",
@@ -4446,10 +4445,14 @@
           "spanLabel": "Span",
           "traceLabel": "Trace",
           "jobUnknown": "—",
-          "windowLast1h": "Last 1 hour",
-          "windowLast24h": "Last 24 hours",
-          "windowLast7d": "Last 7 days",
-          "windowLast30d": "Last 30 days"
+          "col": {
+            "time": "Time",
+            "job": "Job",
+            "target": "Target",
+            "score": "Score",
+            "latency": "Latency",
+            "status": "Status"
+          }
         }
       },
       "listTitle": "Scorers",
@@ -4547,10 +4550,12 @@
     "job": {
       "detail": {
         "close": "Close",
+        "eyebrow": "Eval Job",
+        "refresh": "Refresh",
         "descriptionSection": "Description",
         "targetSection": "Target",
         "streamLabel": "Stream",
-        "streamTypeLabel": "Stream type",
+        "streamTypeLabel": "Stream Type",
         "filterLabel": "Filter",
         "filterEmpty": "No filter — every span is evaluated",
         "scorersSection": "Scorers",
@@ -4558,8 +4563,9 @@
         "scorerUnknown": "(removed scorer)",
         "scorerTypeLlmJudge": "LLM Judge",
         "scorerTypeRemote": "Remote",
-        "producesPrefix": "Produces:",
-        "inputMappingSection": "Input mapping",
+        "producesPrefix": "Produces",
+        "viewScorerHint": "View",
+        "inputMappingSection": "Input Mapping",
         "samplingSection": "Sampling",
         "samplingModeLabel": "Mode",
         "samplingValueLabel": "Value",
@@ -4570,7 +4576,51 @@
         "versionLabel": "Version",
         "pipelineLabel": "Pipeline ID",
         "createdLabel": "Created",
-        "updatedLabel": "Updated"
+        "updatedLabel": "Updated",
+        "tabs": {
+          "configuration": "Configuration",
+          "runs": "Runs",
+          "failures": "Failures"
+        },
+        "kpis": {
+          "totalRuns": "Total Runs",
+          "totalRunsSub": "Within selected window",
+          "successRate": "Success Rate",
+          "successRateSub": "Across all scorers",
+          "avgLatency": "Avg Latency",
+          "avgLatencySub": "Avg across runs",
+          "scorers": "Scorers",
+          "scorersSubSingular": "scorer attached",
+          "scorersSubPlural": "scorers attached"
+        },
+        "runs": {
+          "showingPrefix": "Showing",
+          "showingOf": "of",
+          "showingSuffix": "matched runs",
+          "empty": "No runs recorded for this job in the selected window.",
+          "spanLabel": "SPAN",
+          "traceLabel": "TRACE",
+          "scorerUnknown": "(unknown scorer)",
+          "col": {
+            "time": "Time",
+            "scorer": "Scorer",
+            "target": "Target",
+            "score": "Score",
+            "latency": "Latency",
+            "status": "Status"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "Failures by Scorer",
+          "byScorerEmpty": "No failures recorded in the selected window.",
+          "recentTitle": "Recent Failures",
+          "recentEmpty": "No failed runs in the selected window.",
+          "col": {
+            "scorer": "Scorer",
+            "failureRate": "Failure Rate",
+            "count": "Failures / Total"
+          }
+        }
       },
       "listTitle": "Eval Jobs",
       "listSubtitle": "Deploy scorers on your production trace stream.",
