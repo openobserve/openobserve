@@ -226,8 +226,6 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
-                // when the leader sends a partial aggregate plan to followers,
-                // insert a PartialReduce to reduce data transfer.
                 let remote_scan_input =
                     wrap_partial_reduce(self.partial_reduce_enabled, input.clone())?;
                 let remote_scan_or_partial_reduce: Arc<dyn ExecutionPlan> =
@@ -330,6 +328,8 @@ impl TreeNodeRewriter for RemoteScanRewriter {
     }
 }
 
+// If partial reduce is enabled and the input is a Partial AggregateExec,
+// wrap it with a PartialReduce AggregateExec.
 fn wrap_partial_reduce(
     partial_reduce_enabled: bool,
     input: Arc<dyn ExecutionPlan>,
