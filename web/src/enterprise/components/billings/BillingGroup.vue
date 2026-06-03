@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- SUPER / PAYER ORG VIEW -->
       <div
         v-if="role === 'super'"
-        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
+        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
         data-test="org-group-super-view"
       >
         <!-- Stat cards -->
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Child orgs table (children only) -->
-        <div class="tw:shrink-0">
+        <div class="tw:flex-1 tw:min-h-0">
           <OTable
             :data="filteredSuperRows"
             :columns="superColumns"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="10"
             :page-size-options="[10, 20, 50, 100]"
-            :fill-height="false"
+            :fill-height="true"
             data-test="org-group-members-table"
           >
             <template #empty>
