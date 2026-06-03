@@ -3905,19 +3905,23 @@
     "capabilities": {
       "query": {
         "title": "クエリーを書く",
-        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。"
+        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。",
+        "prompt": "クエリーの作成を手伝ってください"
       },
       "incident": {
         "title": "インシデントを調査",
-        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」"
+        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」",
+        "prompt": "インシデントの調査を手伝ってください"
       },
       "dashboard": {
         "title": "ダッシュボードの作成",
-        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。"
+        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。",
+        "prompt": "ダッシュボードまたはパネルの作成を手伝ってください"
       },
       "alert": {
         "title": "アラートを作成",
-        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。"
+        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。",
+        "prompt": "アラートまたはパイプラインの作成を手伝ってください"
       }
     },
     "suggestions": {

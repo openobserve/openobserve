@@ -20,24 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Toolbar: stream selector + count pill + pagination -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
-      <!-- Stream selector -->
+      <!-- Stream selector — hidden when there are no LLM streams (empty state is shown below) -->
       <div
+        v-if="availableStreams.length > 0"
         data-test="sessions-list-stream-selector"
         class="tw:w-[14rem] tw:flex-shrink-0"
       >
         <OSelect
           v-model="activeStream"
-          :options="
-            availableStreams.length > 0
-              ? availableStreams.map((s) => ({ label: s, value: s }))
-              : []
-          "
+          :options="availableStreams.map((s) => ({ label: s, value: s }))"
           size="sm"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
           @update:model-value="onStreamChange"
-          :disabled="availableStreams.length === 0"
         />
-        <OTooltip v-if="availableStreams.length === 0" :content="t('traces.sessionsList.noStreamsTooltip')" />
       </div>
 
       <!-- Count pill -->

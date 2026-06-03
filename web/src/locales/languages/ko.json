@@ -3916,19 +3916,23 @@
     "capabilities": {
       "query": {
         "title": "쿼리 작성",
-        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL"
+        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL",
+        "prompt": "쿼리 작성을 도와주세요"
       },
       "incident": {
         "title": "인시던트 조사",
-        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)"
+        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)",
+        "prompt": "인시던트 조사를 도와주세요"
       },
       "dashboard": {
         "title": "대시보드 구축",
-        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다."
+        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다.",
+        "prompt": "대시보드 또는 패널 구축을 도와주세요"
       },
       "alert": {
         "title": "알림 생성",
-        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인."
+        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인.",
+        "prompt": "알림 또는 파이프라인 생성을 도와주세요"
       }
     },
     "suggestions": {

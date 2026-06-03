@@ -3914,19 +3914,23 @@
     "capabilities": {
       "query": {
         "title": "Scrivere una richiesta",
-        "description": "SQL per log, trace, RUM o ProMQL per le metriche."
+        "description": "SQL per log, trace, RUM o ProMQL per le metriche.",
+        "prompt": "Aiutami a scrivere una richiesta"
       },
       "incident": {
         "title": "Indagare sugli incidenti",
-        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»"
+        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»",
+        "prompt": "Aiutami a indagare sugli incidenti"
       },
       "dashboard": {
         "title": "Crea una dashboard",
-        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli."
+        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli.",
+        "prompt": "Aiutami a creare una dashboard o un pannello"
       },
       "alert": {
         "title": "Crea un avviso",
-        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento."
+        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento.",
+        "prompt": "Aiutami a creare un avviso o una pipeline"
       }
     },
     "suggestions": {
