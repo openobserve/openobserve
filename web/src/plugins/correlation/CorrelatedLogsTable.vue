@@ -266,6 +266,7 @@ import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
+import { getColumnWidth } from "@/composables/useLogs/logsUtils";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -330,6 +331,12 @@ const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const defaultLogFields = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+
+// Dynamic column width management
+const manuallyResizedColumns = ref<Record<string, boolean>>({});
+const dynamicWidthCalculated = ref(false);
+const canvasContext = ref<CanvasRenderingContext2D | null>(null);
+const currentRowCount = ref(0);
 let isSaving = false; // Prevent recursive saves
 let isUpdatingFromTable = false; // Prevent recursive updates from table
 
@@ -369,6 +376,12 @@ const saveColumnState = () => {
   }
 };
 
+// Load manual resize flags from localStorage
+const loadManualResizeFlags = () => {
+  // Placeholder for implementation - will be implemented in Task 5
+  console.log("loadManualResizeFlags called");
+};
+
 // Load state and key fields config on component mount
 onMounted(async () => {
   loadColumnState();
@@ -379,6 +392,13 @@ onMounted(async () => {
   } catch {
     defaultLogFields.value = [];
   }
+
+  // Initialize canvas for text measurement
+  const canvas = document.createElement("canvas");
+  canvasContext.value = canvas.getContext("2d");
+
+  // Load manual resize flags from localStorage
+  loadManualResizeFlags();
 });
 
 // Watch for changes and save to localStorage
