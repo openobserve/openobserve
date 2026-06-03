@@ -1605,6 +1605,14 @@ onBeforeMount(async () => {
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
+    // If the restored tab requires LLM streams but this org has none, fall back to traces.
+    if (
+      (searchObj.meta.searchMode === "llm-insights" ||
+        searchObj.meta.searchMode === "sessions") &&
+      !hasLLMStreams.value
+    ) {
+      searchObj.meta.searchMode = "traces";
+    }
   }
 });
 
@@ -1638,6 +1646,14 @@ onActivated(async () => {
     resetSearchObj();
     restoreUrlQueryParams();
     await loadPageData();
+    // If the restored tab requires LLM streams but this org has none, fall back to traces.
+    if (
+      (searchObj.meta.searchMode === "llm-insights" ||
+        searchObj.meta.searchMode === "sessions") &&
+      !hasLLMStreams.value
+    ) {
+      searchObj.meta.searchMode = "traces";
+    }
   }
 });
 

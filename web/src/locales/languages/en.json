@@ -2070,19 +2070,23 @@
     "capabilities": {
       "query": {
         "title": "Write a Query",
-        "description": "SQL for logs, traces, RUM, or PromQL for metrics."
+        "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
+        "prompt": "Help me write a query"
       },
       "incident": {
         "title": "Investigate Incidents",
-        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\""
+        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\"",
+        "prompt": "Help me investigate an incident"
       },
       "dashboard": {
         "title": "Build a Dashboard",
-        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels."
+        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels.",
+        "prompt": "Help me build a dashboard or panel"
       },
       "alert": {
         "title": "Create an Alert",
-        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines."
+        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines.",
+        "prompt": "Help me create an alert or pipeline"
       }
     },
     "suggestions": {

@@ -18,9 +18,9 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       tabindex="0"
       class="capability-card"
       :data-accent="card.id"
-      @click="emit('select', card.prompt)"
-      @keydown.enter.prevent="emit('select', card.prompt)"
-      @keydown.space.prevent="emit('select', card.prompt)"
+      @click="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
+      @keydown.enter.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
+      @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
     >
       <span class="capability-card__glow" aria-hidden="true"></span>
       <div class="capability-card__icon" :class="card.iconBgClass">
