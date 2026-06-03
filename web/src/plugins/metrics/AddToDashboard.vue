@@ -10,8 +10,9 @@
     data-test="add-to-dashboard-dialog"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
-    @click:primary="onSubmit.execute()"
+    @click:primary="handlePrimaryClick()"
   >
+    <OForm ref="formRef" :default-values="{ panelTitle: '' }" @submit="onSubmit.execute()">
     <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 tw:px-3 tw:py-2">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
@@ -30,12 +31,15 @@
         :dashboard-id="selectedDashboard"
         @tab-selected="updateActiveTabId"
       />
-      <OInput
-        v-model.trim="panelTitle"
+      <OFormInput
+        name="panelTitle"
+        v-model="panelTitle"
         :label="t('dashboard.panelTitle') + '*'"
         data-test="metrics-new-dashboard-panel-title"
+        :validators="[(val) => !String(val ?? '').trim() ? 'Panel Title required' : undefined]"
       />
     </div>
+    </OForm>
   </ODrawer>
 </template>
 
@@ -51,6 +55,8 @@ import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDrop
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
+import OForm from '@/lib/forms/Form/OForm.vue';
+import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
@@ -64,6 +70,8 @@ export default defineComponent({
     SelectTabDropdown,
     ODrawer,
     OInput,
+    OForm,
+    OFormInput,
   },
   props: {
     open: {
@@ -193,6 +201,11 @@ export default defineComponent({
       }
     });
 
+    const formRef = ref(null);
+    const handlePrimaryClick = async () => {
+      formRef.value?.submit();
+    };
+
     return {
       t,
       getImageURL,
@@ -207,6 +220,8 @@ export default defineComponent({
       activeFolderId,
       activeTabId,
       updateSelectedDashboard,
+      formRef,
+      handlePrimaryClick,
     };
   },
 });

@@ -82,6 +82,7 @@ pub struct Sql {
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
+    pub timezone: Option<String>,
     pub sorted_by_time: bool, // if only order by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
@@ -252,6 +253,7 @@ impl Sql {
                 }
             })
             .flatten();
+        let timezone = query.timezone.clone();
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
@@ -287,6 +289,7 @@ impl Sql {
             group_by,
             order_by,
             histogram_interval,
+            timezone,
             sorted_by_time: need_sort_by_time,
             sampling_config: parse_sampling_config(
                 query,

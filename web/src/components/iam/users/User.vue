@@ -30,11 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
           <OSearchInput
               v-model="filterQuery"
-              class="tw:w-[12.5rem]"
+              style="width: 12.5rem"
               :placeholder="t('user.search')"
               data-test="iam-users-search-input"
             />
-          <div class="tw:w-1/2" v-if="config.isCloud == 'true'">
+          <div v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
               v-model:currentrole="currentUserRole"
