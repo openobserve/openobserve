@@ -47,8 +47,17 @@ import service_accounts from "@/services/service_accounts";
 // ODialog: renders its default slot content so all inner elements are queryable.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "width", "title"],
-  emits: ["update:open"],
+  props: [
+    "open",
+    "width",
+    "title",
+    "size",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div
       data-test-stub="o-drawer"
@@ -56,22 +65,19 @@ const ODialogStub = {
       :data-title="title"
     >
       <slot />
+      <button
+        v-if="secondaryButtonLabel"
+        data-test="o-dialog-secondary-btn"
+        :disabled="secondaryButtonDisabled"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+      <button
+        v-if="primaryButtonLabel"
+        data-test="o-dialog-primary-btn"
+        :disabled="primaryButtonDisabled"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
     </div>
-  `,
-};
-
-// OButton: passes through data-test and forwards click events.
-const OButtonStub = {
-  name: "OButton",
-  props: ["variant", "size", "disabled", "loading"],
-  emits: ["click"],
-  inheritAttrs: false,
-  template: `
-    <button
-      v-bind="$attrs"
-      :disabled="disabled"
-      @click="$emit('click', $event)"
-    ><slot /></button>
   `,
 };
 
@@ -115,7 +121,6 @@ function mountComp(props: Record<string, unknown> = {}): VueWrapper {
       plugins: [store, i18n],
       stubs: {
         ODialog: ODialogStub,
-        OButton: OButtonStub,
         OInput: OInputStub,
       },
     },
@@ -123,16 +128,16 @@ function mountComp(props: Record<string, unknown> = {}): VueWrapper {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: find the save button via its data-test attribute (last resort — no
-// semantic role distinguishes Save from Cancel in this component layout).
+// Helper: Save/Cancel are now ODialog's built-in primary/secondary footer
+// buttons (see ODialogStub), addressed by their canonical data-test slugs.
 // ---------------------------------------------------------------------------
 
 function getSaveButton(wrapper: VueWrapper) {
-  return wrapper.find('[data-test="iam-add-service-account-save-btn"]');
+  return wrapper.find('[data-test="o-dialog-primary-btn"]');
 }
 
 function getCancelButton(wrapper: VueWrapper) {
-  return wrapper.find('[data-test="cancel-button"]');
+  return wrapper.find('[data-test="o-dialog-secondary-btn"]');
 }
 
 function getEmailInput(wrapper: VueWrapper) {

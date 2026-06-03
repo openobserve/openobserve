@@ -19,6 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="beingUpdated ? t('serviceAccounts.update') : t('serviceAccounts.add')"
+    :primaryButtonLabel="t('user.save')"
+    :secondaryButtonLabel="t('user.cancel')"
+    @click:primary="onSubmit"
+    @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
     <div>
@@ -40,24 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="iam-add-service-account-description-input"
             class="showLabelOnTop tw:mt-2"
           />
-          <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="cancel-button"
-              @click="$emit('update:open', false)"
-            >
-              {{ t('user.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              data-test="iam-add-service-account-save-btn"
-              @click="onSubmit"
-            >
-              {{ t('user.save') }}
-            </OButton>
-          </div>
         </div>
     </div>
   </ODialog>
@@ -65,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, watch } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { useI18n } from "vue-i18n";
@@ -88,7 +73,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODialog, OInput },
+  components: { ODialog, OInput },
   props: {
     open: {
       type: Boolean,

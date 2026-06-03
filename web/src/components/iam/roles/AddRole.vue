@@ -18,6 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="t('iam.addRole')"
+    :primaryButtonLabel="t('alerts.save')"
+    :secondaryButtonLabel="t('alerts.cancel')"
+    :primaryButtonDisabled="!name || !isValidRoleName"
+    @click:primary="saveRole"
+    @click:secondary="emits('update:open', false)"
     @update:open="emits('update:open', $event)"
   >
     <div data-test="add-role-section">
@@ -32,33 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :help-text="!showNameError ? `Use alphanumeric and '_' characters only, without spaces.` : undefined"
         @update:model-value="showNameError = !!name && !isValidRoleName"
       />
-
-      <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="emits('update:open', false)"
-          data-test="add-alert-cancel-btn"
-        >
-          {{ t('alerts.cancel') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!name || !isValidRoleName"
-          @click="saveRole"
-          data-test="add-alert-submit-btn"
-        >
-          {{ t('alerts.save') }}
-        </OButton>
-      </div>
     </div>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import { createRole, updateRole } from "@/services/iam";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { ref, computed, watch } from "vue";

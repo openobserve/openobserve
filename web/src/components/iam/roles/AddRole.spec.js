@@ -81,7 +81,21 @@ const ODialogStub = {
     >
       <div data-test-stub="o-dialog-header"><slot name="header" /></div>
       <div data-test-stub="o-dialog-body"><slot /></div>
-      <div data-test-stub="o-dialog-footer"><slot name="footer" /></div>
+      <div data-test-stub="o-dialog-footer">
+        <slot name="footer" />
+        <button
+          v-if="secondaryButtonLabel"
+          data-test="o-dialog-secondary-btn"
+          :disabled="secondaryButtonDisabled"
+          @click="$emit('click:secondary')"
+        >{{ secondaryButtonLabel }}</button>
+        <button
+          v-if="primaryButtonLabel"
+          data-test="o-dialog-primary-btn"
+          :disabled="primaryButtonDisabled"
+          @click="$emit('click:primary')"
+        >{{ primaryButtonLabel }}</button>
+      </div>
     </div>
   `,
   inheritAttrs: false,
@@ -276,7 +290,7 @@ describe("AddRole Component", () => {
     });
 
     it("emits update:open(false) when the cancel OButton is clicked", async () => {
-      const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
+      const cancelButton = wrapper.find('[data-test="o-dialog-secondary-btn"]');
       expect(cancelButton.exists()).toBe(true);
       await cancelButton.trigger("click");
 
@@ -437,7 +451,7 @@ describe("AddRole Component", () => {
       wrapper.vm.name = "valid_role";
       await wrapper.vm.$nextTick();
 
-      const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(saveButton.exists()).toBe(true);
       await saveButton.trigger("click");
       await flushPromises();
@@ -639,8 +653,8 @@ describe("AddRole Component", () => {
     });
 
     it("has both save and cancel buttons", () => {
-      const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
-      const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      const cancelButton = wrapper.find('[data-test="o-dialog-secondary-btn"]');
 
       expect(saveButton.exists()).toBe(true);
       expect(cancelButton.exists()).toBe(true);
