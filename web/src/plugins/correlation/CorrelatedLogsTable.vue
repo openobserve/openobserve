@@ -666,9 +666,28 @@ const visibleFields = computed(() => {
   );
 });
 
-// Simple helper - just calculate width directly like useStreamFields
+// Memoized column widths - only recalculate when data or visible fields change
+const memoizedColumnWidths = computed(() => {
+  const widthMap: Record<string, number> = {};
+
+  // Only calculate if we have search results
+  if (!searchResults.value || searchResults.value.length === 0) {
+    return widthMap;
+  }
+
+  visibleFields.value.forEach((field) => {
+    widthMap[field] = getColumnWidth(field);
+  });
+
+  return widthMap;
+});
+
+const longTextFields = ["message", "body"];
+
+// Simple helper that uses memoized widths
 const getColumnWidthHelper = (field: string): number => {
-  return getColumnWidth(field);
+  // Use memoized width if available, otherwise fallback to default
+  return memoizedColumnWidths.value[field] || (longTextFields.includes(field) ? 400 : 150);
 };
 
 // Generate table columns dynamically from visible fields in custom order
@@ -1021,8 +1040,6 @@ const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
   console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
-
-const longTextFields = ["message", "body"];
 
 // Simple column width calculation for correlation data
 const getColumnWidth = (field: string): number => {
