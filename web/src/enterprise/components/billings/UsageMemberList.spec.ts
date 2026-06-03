@@ -45,7 +45,7 @@ describe("UsageMemberList.vue", () => {
       wrapper = mountList([{ id: "child-1", name: "Child One" }]);
       // Current org from store is "default", which is not in members
       expect(wrapper.vm.currentOrgToShow).toBeTruthy();
-      expect(wrapper.vm.currentOrgToShow.primary).toBe("default");
+      expect(wrapper.vm.currentOrgToShow.primary).toBe("default Organization");
     });
 
     it("hides current org section when it's a member org (in members list)", () => {

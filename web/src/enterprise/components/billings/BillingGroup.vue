@@ -889,7 +889,7 @@ export default defineComponent({
     margin-bottom: 16px;
   }
   &__brand {
-    color: var(--o2-text-heading);
+    color: var(--color-tabs-active-text);
     word-break: break-word;
     cursor: pointer;
   }

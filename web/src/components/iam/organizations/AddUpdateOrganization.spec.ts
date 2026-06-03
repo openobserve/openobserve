@@ -282,8 +282,9 @@ describe("AddUpdateOrganization.vue – billing group gating", () => {
     const w = mount(AddUpdateOrganization, {
       global: {
         plugins: [store, i18n, router],
-        stubs: { OButton: true },
+        stubs: { ODrawer: ODrawerStub, OButton: OButtonStub },
       },
+      props: { open: true, modelValue: { id: "", name: "" } },
     });
     await w.vm.$nextTick();
     return w;

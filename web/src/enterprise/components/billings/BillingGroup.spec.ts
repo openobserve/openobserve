@@ -253,7 +253,7 @@ describe("BillingGroup.vue", () => {
   });
 
   describe("payerName (child headline)", () => {
-    it("truncates names longer than 10 chars", async () => {
+    it("returns the full payer name (display truncation is handled by CSS)", async () => {
       ({ wrapper } = await mountBillingGroup({
         org: "default",
         membership: {
@@ -266,7 +266,7 @@ describe("BillingGroup.vue", () => {
           accepted_by: null,
         },
       }));
-      expect(wrapper.vm.payerName).toBe("Very Long ...");
+      expect(wrapper.vm.payerName).toBe("Very Long Organization Name");
     });
 
     it("shows the full name when it is 10 chars or fewer", async () => {
