@@ -128,7 +128,7 @@ pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
     };
     match ret {
         Ok(res) => {
-            log::info!("[trace_id {trace_id}] query canceled: {res}");
+            log::info!("[trace_id {trace_id}] query canceled: {res:?}");
         }
         Err(e) => {
             log::error!("[trace_id {trace_id}] failed to cancel query: {e}");
