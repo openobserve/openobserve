@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSplitter
         v-model="splitterSize"
-        :limits="[25, 75]"
-        unit="%"
+        :limits="[200, 1400]"
+        unit="px"
         class="tw:w-full tw:h-full"
         separatorClass="tw:bg-[var(--o2-border-color)] tw:w-[1px]!"
       >
@@ -157,7 +157,7 @@ const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
-const splitterSize = ref(50);
+const splitterSize = ref(600);
 const errorCount = ref(10);
 const { performanceState } = usePerformance();
 
