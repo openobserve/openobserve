@@ -174,10 +174,8 @@ fn order_nodes(nodes: Vec<Node>) -> Vec<Node> {
 
 /// Number of nodes to try for a single request: the preferred node plus up to
 /// `ZO_ROUTE_MAX_RETRIES` fail-over nodes, bounded by how many nodes exist.
+/// With no candidate nodes this is 0, so the caller returns "No online nodes".
 fn max_attempts(node_count: usize) -> usize {
-    if node_count == 0 {
-        return 1;
-    }
     node_count.min(1 + get_config().route.max_retries)
 }
 
@@ -230,10 +228,13 @@ async fn proxy_request(
 
     // Extract method and headers before consuming the request
     let method = req.method().clone();
-    let headers = build_request_headers(req.headers(), is_streaming);
+    let mut headers = build_request_headers(req.headers(), is_streaming);
 
-    // Read request body once; it is re-sent verbatim on each fail-over attempt.
-    let body = match req.into_body().collect().await {
+    // Read the request body once and keep it buffered so it can be re-sent on
+    // each fail-over attempt. The body is held fully in memory (bounded by the
+    // usual request size limits); buffering is required because a consumed
+    // stream cannot be replayed onto another node.
+    let mut body = match req.into_body().collect().await {
         Ok(collected) => collected.to_bytes(),
         Err(e) => {
             log::error!("Failed to read request body: {:?}", e);
@@ -250,33 +251,39 @@ async fn proxy_request(
     let mut last_error: Option<(String, reqwest::Error)> = None;
 
     for (i, node) in nodes.iter().take(attempts).enumerate() {
+        let is_last = i + 1 >= attempts;
         let target = ProxyTarget::new(&path, node);
+        // Move the buffered headers/body into the final attempt; clone only when
+        // a further retry may follow. `Bytes::clone` is a cheap ref-count bump.
+        let (req_headers, req_body) = if is_last {
+            (std::mem::take(&mut headers), std::mem::take(&mut body))
+        } else {
+            (headers.clone(), body.clone())
+        };
         let upstream_req = match method {
-            Method::GET => client.get(&target.full_url).headers(headers.clone()),
+            Method::GET => client.get(&target.full_url).headers(req_headers),
             Method::POST => client
                 .post(&target.full_url)
-                .headers(headers.clone())
-                .body(body.to_vec()),
+                .headers(req_headers)
+                .body(req_body),
             Method::PUT => client
                 .put(&target.full_url)
-                .headers(headers.clone())
-                .body(body.to_vec()),
+                .headers(req_headers)
+                .body(req_body),
             Method::DELETE => client
                 .delete(&target.full_url)
-                .headers(headers.clone())
-                .body(body.to_vec()),
+                .headers(req_headers)
+                .body(req_body),
             Method::PATCH => client
                 .patch(&target.full_url)
-                .headers(headers.clone())
-                .body(body.to_vec()),
-            // unreachable: filtered above
+                .headers(req_headers)
+                .body(req_body),
             _ => return (StatusCode::METHOD_NOT_ALLOWED).into_response(),
         };
 
         match upstream_req.send().await {
             Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
             Err(e) => {
-                let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
                     log::warn!(
                         "proxy request failed: {} -> {}, error: {e}, retrying on another node",
@@ -379,25 +386,27 @@ async fn proxy_with_body_routing(
     candidates.extend(nodes.into_iter().filter(|n| n.uuid != primary.uuid));
 
     let is_streaming = is_streaming_endpoint(query_path);
-    let req_headers = build_request_headers(&headers, is_streaming);
+    let mut req_headers = build_request_headers(&headers, is_streaming);
     let client = get_http_client();
-    let method = payload_method(&querier_payload);
     let attempts = max_attempts(candidates.len());
     let mut last_error: Option<(String, reqwest::Error)> = None;
 
     for (i, node) in candidates.iter().take(attempts).enumerate() {
+        let is_last = i + 1 >= attempts;
         let target = ProxyTarget::new(&path, node);
-        let upstream_req = build_payload_request(
-            client,
-            &target.full_url,
-            req_headers.clone(),
-            &querier_payload,
-        );
+        // Move the headers into the final attempt; clone only when a retry may
+        // follow.
+        let headers = if is_last {
+            std::mem::take(&mut req_headers)
+        } else {
+            req_headers.clone()
+        };
+        let upstream_req =
+            build_payload_request(client, &target.full_url, headers, &querier_payload);
 
         match upstream_req.send().await {
             Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
             Err(e) => {
-                let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
                     log::warn!(
                         "proxy request failed: {} -> {}, error: {e}, retrying on another node",
@@ -414,14 +423,6 @@ async fn proxy_with_body_routing(
     }
 
     proxy_error_response(&path, last_error, start)
-}
-
-/// The HTTP method used to forward a parsed querier payload.
-fn payload_method(payload: &QuerierPayload) -> Method {
-    match payload {
-        QuerierPayload::Empty => Method::GET,
-        _ => Method::POST,
-    }
 }
 
 /// Builds the upstream request for a parsed querier payload against `url`.
@@ -936,22 +937,13 @@ mod tests {
     #[test]
     fn test_max_attempts_bounds() {
         let max_retries = get_config().route.max_retries;
-        // never zero, even with no candidates
-        assert_eq!(max_attempts(0), 1);
+        // no candidates -> no attempts (caller returns "No online nodes")
+        assert_eq!(max_attempts(0), 0);
         // a single node can't fail over
         assert_eq!(max_attempts(1), 1);
         // capped by 1 + max_retries when there are enough nodes
         assert_eq!(max_attempts(100), 1 + max_retries);
         // capped by the number of available nodes
         assert!(max_attempts(2) <= 2);
-    }
-
-    #[test]
-    fn test_payload_method() {
-        assert_eq!(payload_method(&QuerierPayload::Empty), Method::GET);
-        assert_eq!(
-            payload_method(&QuerierPayload::PromQL(HashMap::new())),
-            Method::POST
-        );
     }
 }
