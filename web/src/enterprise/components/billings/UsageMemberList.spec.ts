@@ -16,12 +16,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import UsageMemberList from "./UsageMemberList.vue";
-
-installQuasar();
 
 function mountList(members: any[] = [], modelValue = "") {
   return mount(UsageMemberList, {

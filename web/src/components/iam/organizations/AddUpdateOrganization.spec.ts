@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
@@ -58,8 +57,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
-
-installQuasar();
 
 // ODrawer stub: keeps slot content queryable, surfaces open state and
 // proxies the migration emit so the parent's @update:open wiring is exercised.
