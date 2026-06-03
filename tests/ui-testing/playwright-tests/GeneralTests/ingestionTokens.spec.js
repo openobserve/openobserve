@@ -9,10 +9,6 @@ test.describe("Org-Level Ingestion Tokens", () => {
     test.skip(isCloudEnvironment(), 'Ingestion tokens tab not available on cloud UI');
     let pageManager;
 
-    async function navigateToIngestionTokensTab(page) {
-        await page.locator('[data-test="iam-ingestion-tokens-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-    }
-
     // -------------------------------------------------------------------
     // Page rendering
     // -------------------------------------------------------------------
@@ -30,7 +26,7 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.verifyTitleVisible();
 
         // Verify Create Token button is visible
-        await expect(page.locator('[data-test="add-ingestion-token"]')).toBeVisible();
+        await expect(pageManager.ingestionTokensPage.createTokenButton).toBeVisible();
 
         // Verify table renders — OTable with row-key renders rows in tbody
         const table = page.locator('table');
@@ -104,15 +100,15 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.clickCreateToken();
 
         // Primary button should be disabled when name is empty
-        await expect(page.locator('[data-test="o-dialog-primary-btn"]')).toBeDisabled();
+        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeDisabled();
 
         // Typing a valid name should enable the button
         await pageManager.ingestionTokensPage.fillTokenName('valid-name');
-        await expect(page.locator('[data-test="o-dialog-primary-btn"]')).toBeEnabled();
+        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeEnabled();
 
         // Clearing the name should disable the button again
         await pageManager.ingestionTokensPage.fillTokenName('');
-        await expect(page.locator('[data-test="o-dialog-primary-btn"]')).toBeDisabled();
+        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeDisabled();
 
         // Cancel and close
         await pageManager.ingestionTokensPage.clickCancel();
@@ -181,7 +177,7 @@ test.describe("Org-Level Ingestion Tokens", () => {
 
         // Reload page to dismiss all dialogs cleanly (avoids overlay race conditions)
         await page.reload();
-        await page.locator('[data-test="ingestion-tokens-title-text"]').waitFor({ state: 'visible', timeout: 10000 });
+        await pageManager.ingestionTokensPage.titleHeading.waitFor({ state: 'visible', timeout: 10000 });
 
         // Disable the token
         await pageManager.ingestionTokensPage.toggleToken(uniqueName);
@@ -214,7 +210,7 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await page.getByRole('button', { name: /Manage Tokens/i }).click();
 
         // Should navigate to IAM > Ingestion Tokens
-        await expect(page.locator('[data-test="ingestion-tokens-title-text"]')).toBeVisible({ timeout: 10000 });
+        await expect(pageManager.ingestionTokensPage.titleHeading).toBeVisible({ timeout: 10000 });
         await expect(page).toHaveURL(/ingestionTokens/);
 
         testLogger.info('Test completed successfully');
