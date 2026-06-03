@@ -254,7 +254,10 @@
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span class="sd-mono">{{ row.scoreDisplay }}</span>
+              <span
+                class="sd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
+                :title="row.scoreDisplay"
+              >{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
               <span class="sd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
@@ -462,7 +465,9 @@ function syncDateWindow() {
 watch(selectedDate, () => syncDateWindow(), { deep: true });
 
 const runsEnabled = computed(() => activeTab.value === "runs");
-const scorerIdRef = computed(() => entityId(props.row));
+// `_evaluator.attributes_scorer_id` stores the per-version row `id`, not
+// `entity_id`. Using entityId here returns 0 runs even when runs exist.
+const scorerIdRef = computed(() => String(props.row.id));
 
 const { kpis, runs, isLoadingRuns, refresh: refreshRunsData } = useScorerRuns(
   scorerIdRef,
@@ -505,15 +510,15 @@ const runColumns = computed(() => [
     header: t("onlineEvals.scorer.detail.runs.col.score"),
     accessorKey: "scoreDisplay",
     sortable: false,
-    size: 80,
-    meta: { align: "right" },
+    size: 200,
+    meta: { align: "left" },
   },
   {
     id: "latencyMs",
     header: t("onlineEvals.scorer.detail.runs.col.latency"),
     accessorKey: "latencyMs",
     sortable: true,
-    size: 90,
+    size: 110,
     meta: { align: "right" },
   },
   {

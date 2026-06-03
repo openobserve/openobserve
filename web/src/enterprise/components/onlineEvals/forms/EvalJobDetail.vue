@@ -286,7 +286,10 @@
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span class="jd-mono">{{ row.scoreDisplay }}</span>
+              <span
+                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
+                :title="row.scoreDisplay"
+              >{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
               <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
@@ -403,7 +406,10 @@
                 </div>
               </template>
               <template #cell-scoreDisplay="{ row }">
-                <span class="jd-mono">{{ row.scoreDisplay }}</span>
+                <span
+                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
+                :title="row.scoreDisplay"
+              >{{ row.scoreDisplay }}</span>
               </template>
               <template #cell-latencyMs="{ row }">
                 <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
@@ -672,14 +678,16 @@ const resolvedScorers = computed<ResolvedScorer[]>(() => {
   });
 });
 
+// `_evaluator.attributes_scorer_id` stores the per-version row `id`, not
+// `entity_id`. Match on `s.id` so the lookup actually resolves.
 function scorerNameFor(refId: string): string {
   if (!refId) return t("onlineEvals.job.detail.runs.scorerUnknown");
-  const found = props.scorers.find((s) => entityId(s) === refId);
+  const found = props.scorers.find((s) => String(s.id) === refId);
   return found?.name ?? refId;
 }
 
 function findScorerById(refId: string): Scorer | null {
-  return props.scorers.find((s) => entityId(s) === refId) ?? null;
+  return props.scorers.find((s) => String(s.id) === refId) ?? null;
 }
 
 function onScorerClick(refId: string) {
@@ -819,15 +827,15 @@ const runColumns = computed(() => [
     header: t("onlineEvals.job.detail.runs.col.score"),
     accessorKey: "scoreDisplay",
     sortable: false,
-    size: 80,
-    meta: { align: "right" },
+    size: 200,
+    meta: { align: "left" },
   },
   {
     id: "latencyMs",
     header: t("onlineEvals.job.detail.runs.col.latency"),
     accessorKey: "latencyMs",
     sortable: true,
-    size: 90,
+    size: 110,
     meta: { align: "right" },
   },
   {
